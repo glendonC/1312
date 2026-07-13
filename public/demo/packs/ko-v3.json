@@ -1,0 +1,78 @@
+{
+  "id": "ko-v3",
+  "lang": "ko",
+  "label": "Korean",
+  "script": "Hangul",
+  "status": "active",
+  "note": "Korean is the first pack, not the schema. The engine, the gates marked universal, the error taxonomy and the scorer are language-neutral; everything in this file is what a second language would replace.",
+  "entity_kinds": [
+    "person",
+    "show",
+    "group",
+    "term",
+    "address_form"
+  ],
+  "phenomena": [
+    {
+      "id": "ko.numeral_boundary",
+      "label": "Numeral eaten by a lost pause",
+      "error_type": "boundary",
+      "note": "네 + pause + 다섯 collapses into 네다섯 (\"four or five\"). Only prosody separates them."
+    },
+    {
+      "id": "ko.kinship_address",
+      "label": "Address form read as kinship",
+      "error_type": "other",
+      "note": "오빠 / 언니 / 형 / 누나 are address forms. Literalising them invents a family."
+    },
+    {
+      "id": "ko.name_common_noun",
+      "label": "Common noun promoted to a name",
+      "error_type": "homophone",
+      "note": "사랑 is both \"love\" and a given name. A closed cast list is the only reliable disambiguator."
+    },
+    {
+      "id": "ko.contrastive_split",
+      "label": "Contrastive sentence split mid-clause",
+      "error_type": "boundary",
+      "note": "A가 아니라 B cut in half and translated separately inverts the claim."
+    }
+  ],
+  "gates": [
+    {
+      "id": "universal.silence",
+      "scope": "universal",
+      "label": "silence",
+      "since": "run-005",
+      "rule": "No speech in the window means no caption. Undefined entity confidence is junk, not 'not below threshold'. Fail closed."
+    },
+    {
+      "id": "universal.music",
+      "scope": "universal",
+      "label": "music",
+      "since": "run-004",
+      "rule": "Withhold the target line when speech SNR is negative and lexical confidence is under 0.60."
+    },
+    {
+      "id": "universal.repetition",
+      "scope": "universal",
+      "label": "repetition",
+      "since": "run-004",
+      "rule": "A line that repeats itself more than twice is a decoder loop, not speech."
+    },
+    {
+      "id": "ko.cast_closed",
+      "scope": "pack",
+      "label": "cast",
+      "since": "run-003",
+      "rule": "The cast list is closed. A proper noun outside it is demoted to its common-noun reading."
+    },
+    {
+      "id": "ko.address_form",
+      "scope": "pack",
+      "label": "address",
+      "since": "run-005",
+      "rule": "Address forms are not kinship unless the glossary confirms the family relation."
+    }
+  ]
+}

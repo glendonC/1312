@@ -1,0 +1,22 @@
+{
+  "packs": [
+    {
+      "lang": "ko",
+      "label": "Korean",
+      "pack": "ko-v3",
+      "status": "active"
+    },
+    {
+      "lang": "ja",
+      "label": "Japanese",
+      "pack": null,
+      "status": "not started"
+    },
+    {
+      "lang": "zh-Hans",
+      "label": "Chinese (Simplified)",
+      "pack": null,
+      "status": "not started"
+    }
+  ]
+}

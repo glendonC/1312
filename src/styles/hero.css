@@ -1,0 +1,84 @@
+.hero-shell {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero-picture,
+.hero-picture img {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-picture img {
+  object-fit: cover;
+  object-position: center;
+}
+
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(circle at 18% 85%, rgba(14, 44, 38, 0.58), transparent 38%),
+    radial-gradient(circle at 82% 82%, rgba(16, 69, 68, 0.45), transparent 34%),
+    linear-gradient(180deg, rgba(244, 252, 250, 0.1) 0%, rgba(20, 50, 42, 0.58) 100%);
+}
+
+.hero-content {
+  position: absolute;
+  right: var(--page-x);
+  bottom: clamp(28px, 6vw, 72px);
+  left: var(--page-x);
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.5fr);
+  align-items: end;
+  gap: clamp(24px, 5vw, 72px);
+  color: #fbfff9;
+  text-shadow: 0 2px 26px rgba(4, 30, 24, 0.3);
+}
+
+.hero-copy {
+  max-width: none;
+  min-width: 0;
+}
+
+.hero-copy h1 {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: clamp(2.35rem, 4.2vw, 3.35rem);
+  font-weight: var(--weight-thin);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.hero-line {
+  display: block;
+  white-space: nowrap;
+}
+
+.hero-aside {
+  display: grid;
+  max-width: 34rem;
+  gap: 22px;
+  justify-self: end;
+  text-align: right;
+}
+
+.hero-aside p {
+  margin: 0;
+  color: rgba(251, 255, 249, 0.86);
+  font-size: 1.02rem;
+  font-weight: var(--weight-regular);
+  line-height: 1.62;
+  text-wrap: pretty;
+}
+
+.hero-aside .hero-actions {
+  justify-content: flex-end;
+}

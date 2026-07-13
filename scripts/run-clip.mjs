@@ -450,12 +450,20 @@ async function main() {
     TRANSLATOR,
     [
       "You resolve the terms a ko->en translator will need, from a Korean transcript.",
-      `Return JSON {"entries":[{"term","gloss","kind","note"}]}.`,
+      `Return JSON {"entries":[{"term","gloss","kind","confirms_relation"}]}.`,
       `kind is one of: ${pack.entity_kinds.join(", ")}.`,
-      "gloss is English and starts with the English surface form the translator should use.",
+      // The gloss is pasted into a caption if the translator takes it literally, so it has to BE
+      // English a caption can carry. An earlier version asked for a gloss that "starts with" the
+      // surface form and got "brother-in-law (older sister's husband)", which is what then
+      // appeared on screen. A dictionary note and a subtitle are not the same object.
+      "gloss is ONLY the English surface form a subtitle would use: one to three words, no",
+      "parentheses, no explanation, no alternatives. Write 'brother-in-law', never",
+      "'brother-in-law (older sister's husband)'.",
       "Only terms that actually appear in the transcript. No invention. Empty list is a valid answer.",
-      "Address forms (누나/오빠/형/언니) get kind address_form, and the gloss must say whether the",
-      "transcript itself confirms a family relation (친누나, 매형 …) or leaves it as an address form.",
+      "Address forms (누나/오빠/형/언니/선배) get kind address_form. Set confirms_relation true ONLY if",
+      "the transcript itself proves the speakers are really family by using a kinship-only word",
+      "(친누나, 매형, 형수 — words that cannot be used to address a non-relative). The address form",
+      "meaning 'older sister' is NOT proof of a sister: that is just what the word means.",
     ].join(" "),
     transcript,
   );
@@ -465,6 +473,7 @@ async function main() {
     lang: "ko",
     gloss: e.gloss,
     kind: pack.entity_kinds.includes(e.kind) ? e.kind : "term",
+    ...(e.confirms_relation === true ? { confirms_relation: true } : {}),
     source: `${TRANSLATOR} · ${RUN} term resolution`,
   }));
 
@@ -575,9 +584,12 @@ async function main() {
 
   const SYSTEM = [
     "You translate Korean conversation into natural English for subtitles.",
-    "You are given a closed glossary, the full transcript for context, and one line to translate.",
-    "Use the glossary's English surface forms exactly. Do not invent names, places or family",
-    "relations that the Korean line does not carry. Address forms are not kinship.",
+    "You are given a glossary, the full transcript for context, and one line to translate.",
+    "Use the glossary's English surface form for a term when the term appears. The glossary is a",
+    "reference, NOT text to reproduce: never copy an entry, a parenthetical or a note into the",
+    "caption. A subtitle reads as speech, and nobody says 'brother-in-law (older sister's husband)'.",
+    "Do not invent names, places or family relations the Korean line does not carry.",
+    "Address forms are not kinship.",
     'Return JSON {"en": "...", "note": "one clause on anything you were unsure of"}.',
   ].join(" ");
 
@@ -826,7 +838,9 @@ async function main() {
     source: {
       kind: source.kind,
       label: source.channel,
-      note: `${source.attribution} Speaker labels are the recogniser's, not ours. music[] is empty because no music detector ran, not because the clip is known to be clean. silence[] is derived from VAD segment boundaries (gaps ≥ ${SILENCE_MIN_S}s), not from an energy floor.`,
+      url: source.url,
+      licence: source.licence,
+      note: `Speaker labels are the recogniser's own, not ours: nobody is named in this window, so we do not know which voice is the host and a run that guessed would be inventing the one thing a viewer could check by watching. music[] is empty because no music detector ran, NOT because the clip is known to be clean. silence[] is derived from VAD segment boundaries (gaps ≥ ${SILENCE_MIN_S}s), not from an energy floor.`,
     },
     media: "clip.mp4",
   };

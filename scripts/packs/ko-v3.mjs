@@ -101,11 +101,21 @@ export function addressGate(cue, glossary) {
   if (claims.length === 0) return null; // nothing to check; the gate does not fire.
 
   const spoken = cue.source.text;
-  const confirmedInSource = KIN_CONFIRMED.some((k) => spoken.includes(k));
-  const confirmedInGlossary = glossary.some(
-    (g) => g.kind === "address_form" && spoken.includes(g.term) && /kinship|family|sister|brother/i.test(g.gloss),
-  );
-  const supported = confirmedInSource || confirmedInGlossary;
+
+  // The evidence has to be in the AUDIO, or in a glossary entry that says so in a field rather
+  // than in its prose.
+  //
+  // The first version of this gate confirmed the relation by regex-matching the gloss for
+  // /sister|brother/, and it was defeated by every glossary it was handed: the gloss of 누나 is
+  // "older sister", because that is what 누나 MEANS. The word appearing in a dictionary entry is
+  // not evidence that these two people are related. And a glossary the same model wrote in the
+  // same run is not independent evidence of the model's own claim — it is the claim again, in a
+  // different file. So confirmation comes from a kinship-only token actually spoken (친누나,
+  // 매형 — words that cannot be used as address forms), or from a curated entry that explicitly
+  // asserts the relation.
+  const spokenAsKin = KIN_CONFIRMED.filter((k) => spoken.includes(k));
+  const asserted = glossary.find((g) => g.confirms_relation === true && spoken.includes(g.term));
+  const supported = spokenAsKin.length > 0 || Boolean(asserted);
 
   return {
     name: "address",
@@ -116,8 +126,10 @@ export function addressGate(cue, glossary) {
     fail: !supported,
     repairable: true,
     reason: supported
-      ? `"${claims[0]}" is confirmed by a kinship token in the source`
-      : `"${claims[0]}" has no kinship token in the source: 누나/오빠/형/언니 are address forms`,
+      ? spokenAsKin.length > 0
+        ? `"${claims[0]}" is carried by ${spokenAsKin.join(", ")} in the source, which is kinship and not an address form`
+        : `"${claims[0]}" is confirmed by the glossary entry for ${asserted.term}`
+      : `"${claims[0]}" claims a family this line does not: 누나/오빠/형/언니 are address forms, and nothing here confirms a relation`,
   };
 }
 
@@ -145,30 +157,51 @@ const CAP_EXEMPT = new Set([
   "Because", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
 ]);
 
+/**
+ * Letters only, lowercased. "COVID-19" → "covid", "Mai—the" → ["mai", "the"].
+ *
+ * Tokenising is the whole gate. A first version split the target on whitespace and trimmed the
+ * ends, which left "COVID-19" as "covid-" and never split "Mai—the" at all, so neither matched
+ * the glossary that contained both. The gate then reported Korean, COVID and Chiang Mai as
+ * invented names and WITHHELD two correct captions. A detector whose false positives are
+ * indistinguishable from its true ones does not fail safe just because it fails closed.
+ */
+const letters = (s) => s.replace(/[^A-Za-z]/g, "").toLowerCase();
+
 export function entityGate(cue, glossary) {
   const target = cue.draft ?? "";
-  const words = target.split(/\s+/);
 
+  // Every word the glossary vouches for, however it was written there.
   const supported = new Set();
   for (const g of glossary) {
-    // The English side of a gloss: "Thailand · country" → "Thailand".
-    for (const token of g.gloss.split(/[^A-Za-z'-]+/)) {
+    for (const token of g.gloss.split(/[^A-Za-z]+/)) {
       if (token.length > 1) supported.add(token.toLowerCase());
     }
   }
 
-  const invented = [];
-  words.forEach((raw, i) => {
-    const w = raw.replace(/^[^A-Za-z]+|[^A-Za-z']+$/g, "");
-    if (w.length < 2 || !/^[A-Z]/.test(w)) return;
-    if (i === 0 || /[.!?]$/.test(words[i - 1] ?? "")) return; // sentence-initial: no claim.
-    if (CAP_EXEMPT.has(w)) return;
-    if (supported.has(w.toLowerCase())) return;
-    invented.push(w);
-  });
+  // Words in reading order, but split on internal punctuation too, so an em-dash cannot hide a
+  // name inside a token. `after` tracks whether a sentence just ended: capitalisation there is
+  // grammar, not a claim about the world.
+  const words = [];
+  let afterStop = true;
+  for (const chunk of target.split(/\s+/)) {
+    const parts = chunk.split(/[^A-Za-z'-]+/).filter(Boolean);
+    for (const p of parts) {
+      words.push({ raw: p, sentenceInitial: afterStop });
+      afterStop = false;
+    }
+    if (/[.!?]$/.test(chunk)) afterStop = true;
+  }
 
-  const total = words.filter((w) => /^[A-Z]/.test(w)).length;
-  if (total === 0) return null;
+  const invented = [];
+  for (const { raw, sentenceInitial } of words) {
+    if (!/^[A-Z]/.test(raw) || sentenceInitial) continue;
+    const w = letters(raw);
+    if (w.length < 2 || CAP_EXEMPT.has(raw) || supported.has(w)) continue;
+    invented.push(raw);
+  }
+
+  if (!words.some((w) => /^[A-Z]/.test(w.raw))) return null;
 
   return {
     name: "entity",

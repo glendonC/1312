@@ -110,14 +110,26 @@ function Context({ agent, keep }: { agent: AgentView; keep: Keep }) {
 }
 
 /**
- * The draft, and how much the worker believes it.
+ * The draft, and how far a SECOND recogniser backs up the Korean it was translated from.
  *
- * The window is on the card because translate-01 and translate-02 do the same kind of
- * work on different halves of the clip, and a card that did not say which half would make
- * the mitosis unreadable.
+ * The bar is not confidence. No model here is asked how sure it is — they return no logprobs,
+ * and a model's estimate of its own correctness is the wrong-fluent failure this instrument
+ * exists to catch, printed next to the caption as if it were evidence. So the number is
+ * agreement between two independent recognisers that heard the same audio, which is a
+ * measurement, and the label says "agreement" so it can never be read as the other thing.
+ *
+ * It is null when the second recogniser said nothing about the window at all — it drops
+ * backchannels, so a clearly-spoken "네" gets no token against it. That is an absence of
+ * evidence, and it renders as words rather than as an empty bar: a bar at zero would read as
+ * "no confidence", which is a finding, and we did not make one.
+ *
+ * The window is on the card because translate-01 and translate-02 do the same kind of work on
+ * different halves of the clip, and a card that did not say which half would make the mitosis
+ * unreadable.
  */
 function Translate({ agent }: { agent: AgentView }) {
-  const conf = agent.draft?.conf ?? 0;
+  const draft = agent.draft;
+  const agreement = draft?.conf ?? null;
 
   return (
     <>
@@ -127,24 +139,35 @@ function Translate({ agent }: { agent: AgentView }) {
         </span>
       )}
 
-      {agent.draft ? (
+      {draft ? (
         <>
-          <p className="env-src">{agent.draft.source}</p>
-          <p className="env-tgt">{agent.draft.target}</p>
+          <p className="env-src">{draft.source}</p>
+          <p className="env-tgt">{draft.target}</p>
         </>
       ) : (
         <p className="env-empty">no draft yet</p>
       )}
 
-      <div className="env-conf">
-        <span className="env-conf-track">
-          <motion.span
-            className="env-conf-fill"
-            animate={{ width: pct(conf) }}
-            transition={{ duration: 0.4 }}
-          />
-        </span>
-        <span className="env-conf-val">{agent.draft ? conf.toFixed(2) : "—"}</span>
+      <div
+        className="env-conf"
+        title="Agreement between two independent recognisers on this window. Not a model's confidence in itself."
+      >
+        <span className="env-conf-key">agreement</span>
+
+        {agreement === null ? (
+          <span className="env-conf-none">{draft ? "not corroborated" : "—"}</span>
+        ) : (
+          <>
+            <span className="env-conf-track">
+              <motion.span
+                className="env-conf-fill"
+                animate={{ width: pct(agreement) }}
+                transition={{ duration: 0.4 }}
+              />
+            </span>
+            <span className="env-conf-val">{agreement.toFixed(2)}</span>
+          </>
+        )}
       </div>
     </>
   );

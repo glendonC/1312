@@ -243,6 +243,58 @@ function CueRow({ cue, view, target }: { cue: Cue; view: View; target: string })
   );
 }
 
+/** Media with a picture gets a screen. Media without one is just a transport. */
+const HAS_PICTURE = /\.(mp4|webm|mov|m4v)$/i;
+
+/**
+ * The caption on the picture, at this instant of the clip.
+ *
+ * Which is where the argument gets settled. Everything else in this view is a list you can
+ * study at your leisure; this is the thing a viewer actually experiences, and it is the only
+ * place the two paths can be compared the way an audience would meet them. On Cold, a line
+ * arrives for every window, fluent and certain. On 1321, some windows say we are not putting
+ * anything here and why — which looks like less, and is worth more, because the alternative was
+ * never silence, it was a confident sentence nobody could check.
+ */
+function Burned() {
+  const bundle = useBundle();
+  const view = useStudio((s) => s.view);
+  const clipT = useStudio((s) => s.clipT);
+
+  const cue = bundle?.captions.cues.find((c) => clipT >= c.t_start && clipT < c.t_end);
+  if (!cue) return null;
+
+  const cold = cue.baseline?.target.text ?? null;
+  const tgt = cue.targets[0];
+
+  if (view === "baseline") {
+    return cold ? (
+      <figcaption className="burn" data-path="cold">
+        {cold}
+      </figcaption>
+    ) : null;
+  }
+
+  if (tgt?.withheld) {
+    return (
+      <figcaption className="burn" data-path="withheld">
+        <span className="burn-mark">withheld</span>
+        {tgt.withheld.reason}
+        {view === "diff" && cold && <span className="burn-cold">Cold said: {cold}</span>}
+      </figcaption>
+    );
+  }
+
+  if (!tgt?.text) return null;
+
+  return (
+    <figcaption className="burn" data-path="prepped">
+      {tgt.text}
+      {view === "diff" && cue.hard && cold && <span className="burn-cold">Cold said: {cold}</span>}
+    </figcaption>
+  );
+}
+
 function Player() {
   const bundle = useBundle();
   const clipT = useStudio((s) => s.clipT);
@@ -250,38 +302,39 @@ function Player() {
   const playing = useStudio((s) => s.playing);
   const setPlaying = useStudio((s) => s.setPlaying);
 
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const mediaRef = useRef<HTMLMediaElement | null>(null);
   const waveRef = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
 
   const duration = bundle?.run.clip.duration ?? 0;
   const media = bundle?.run.clip.media;
   const src = media ? `/demo/runs/${bundle?.run.id}/${media}` : null;
+  const picture = Boolean(media && HAS_PICTURE.test(media));
 
   // The store owns clip time. Push external seeks into the media element.
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (Math.abs(audio.currentTime - clipT) > 0.3) audio.currentTime = clipT;
+    const el = mediaRef.current;
+    if (!el) return;
+    if (Math.abs(el.currentTime - clipT) > 0.3) el.currentTime = clipT;
   }, [clipT]);
 
   useEffect(() => {
-    const audio = audioRef.current;
+    const el = mediaRef.current;
 
     if (!playing) {
-      audio?.pause();
+      el?.pause();
       cancelAnimationFrame(raf.current);
       return;
     }
 
-    if (audio) void audio.play().catch(() => setPlaying(false));
+    if (el) void el.play().catch(() => setPlaying(false));
 
     let last = performance.now();
     const tick = (now: number): void => {
       const dt = (now - last) / 1000;
       last = now;
 
-      const next = audio ? audio.currentTime : useStudio.getState().clipT + dt;
+      const next = el ? el.currentTime : useStudio.getState().clipT + dt;
       if (next >= duration) {
         setClipT(duration);
         setPlaying(false);
@@ -298,7 +351,7 @@ function Player() {
   if (!bundle) return null;
 
   const { peaks } = bundle.wave;
-  const { music, silence } = bundle.run.clip;
+  const { music, silence, source, title } = bundle.run.clip;
 
   function seek(e: React.MouseEvent<HTMLButtonElement>): void {
     const box = waveRef.current?.getBoundingClientRect();
@@ -306,63 +359,110 @@ function Player() {
     setClipT(((e.clientX - box.left) / box.width) * duration);
   }
 
+  const attach = (el: HTMLMediaElement | null): void => {
+    mediaRef.current = el;
+  };
+
   return (
     <div className="player">
-      {src && <audio ref={audioRef} src={src} preload="auto" />}
+      {src &&
+        (picture ? (
+          /*
+           * The clip plays with the captions burned on, because that is the product — not a
+           * table of lines beside a waveform, but real footage a real person could watch, with
+           * the English this run is prepared to put on screen. And where it is not prepared to
+           * put any, the screen says so instead of showing a guess.
+           */
+          <figure className="screen">
+            <video
+              ref={attach}
+              className="screen-video"
+              src={src}
+              preload="auto"
+              playsInline
+              onClick={() => setPlaying(!playing)}
+            />
+            <Burned />
+          </figure>
+        ) : (
+          <audio ref={attach} src={src} preload="auto" />
+        ))}
 
-      <button
-        type="button"
-        className="play"
-        onClick={() => setPlaying(!playing)}
-        aria-label={playing ? "Pause" : "Play"}
-      >
-        {playing ? "❚❚" : "▶"}
-      </button>
+      <div className="transport">
+        <button
+          type="button"
+          className="play"
+          onClick={() => setPlaying(!playing)}
+          aria-label={playing ? "Pause" : "Play"}
+        >
+          {playing ? "❚❚" : "▶"}
+        </button>
 
-      <div className="wave" ref={waveRef}>
-        <svg className="wave-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
-          {peaks.map((p, i) => {
-            const step = 1000 / peaks.length;
-            const h = Math.max(2, p * 88);
-            return (
-              <rect
-                key={i}
-                x={i * step}
-                y={(100 - h) / 2}
-                width={step * 0.6}
-                height={h}
-                rx={0.6}
+        <div className="wave" ref={waveRef}>
+          <svg
+            className="wave-svg"
+            viewBox="0 0 1000 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {peaks.map((p, i) => {
+              const step = 1000 / peaks.length;
+              const h = Math.max(2, p * 88);
+              return (
+                <rect key={i} x={i * step} y={(100 - h) / 2} width={step * 0.6} height={h} rx={0.6} />
+              );
+            })}
+          </svg>
+
+          <div className="wave-regions" aria-hidden="true">
+            {music.map(([a, b], i) => (
+              <div
+                key={`m${i}`}
+                className="wave-region"
+                data-kind="music"
+                style={{ left: `${(a / duration) * 100}%`, width: `${((b - a) / duration) * 100}%` }}
               />
-            );
-          })}
-        </svg>
+            ))}
+            {silence.map(([a, b], i) => (
+              <div
+                key={`s${i}`}
+                className="wave-region"
+                data-kind="silence"
+                style={{ left: `${(a / duration) * 100}%`, width: `${((b - a) / duration) * 100}%` }}
+              />
+            ))}
+          </div>
 
-        <div className="wave-regions" aria-hidden="true">
-          {music.map(([a, b], i) => (
-            <div
-              key={`m${i}`}
-              className="wave-region"
-              data-kind="music"
-              style={{ left: `${(a / duration) * 100}%`, width: `${((b - a) / duration) * 100}%` }}
-            />
-          ))}
-          {silence.map(([a, b], i) => (
-            <div
-              key={`s${i}`}
-              className="wave-region"
-              data-kind="silence"
-              style={{ left: `${(a / duration) * 100}%`, width: `${((b - a) / duration) * 100}%` }}
-            />
-          ))}
+          <div
+            className="wave-head"
+            style={{ left: `${(clipT / duration) * 100}%` }}
+            aria-hidden="true"
+          />
+          <button type="button" className="wave-hit" onClick={seek} aria-label="Seek" />
         </div>
 
-        <div className="wave-head" style={{ left: `${(clipT / duration) * 100}%` }} aria-hidden="true" />
-        <button type="button" className="wave-hit" onClick={seek} aria-label="Seek" />
+        <span className="player-time">
+          {clock(clipT)} / {clock(duration)}
+        </span>
       </div>
 
-      <span className="player-time">
-        {clock(clipT)} / {clock(duration)}
-      </span>
+      {/*
+       * The credit is a term of the licence, not a courtesy. Creative Commons is the only reason
+       * this footage may be hosted here at all, and it is granted on condition the work is
+       * attributed — so the attribution travels with the clip, wherever the clip is shown.
+       */}
+      {source.licence && (
+        <p className="credit">
+          <span className="credit-title">{title}</span> by {source.label} ·{" "}
+          {source.url ? (
+            <a href={source.url} target="_blank" rel="noreferrer noopener">
+              {source.licence}
+            </a>
+          ) : (
+            source.licence
+          )}
+        </p>
+      )}
     </div>
   );
 }

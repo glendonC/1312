@@ -153,6 +153,33 @@
   gap: 7px;
 }
 
+/*
+ * It says "agreement", and it has to.
+ *
+ * An unlabelled bar next to a translation is read as the model's confidence in it, which is the
+ * one number nobody here is allowed to print: these models return no logprobs, and a model's
+ * opinion of its own correctness is the wrong-fluent failure this instrument exists to catch,
+ * dressed up as evidence. What the bar actually shows is how far a SECOND recogniser backs up
+ * the Korean — a measurement, between two systems, about the audio.
+ */
+.env-conf-key {
+  color: var(--ink-faint, var(--ink-muted));
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* No bar at all when there is nothing to measure: an empty track reads as a zero, and a zero is
+   a finding. The absence of one gets words instead. */
+.env-conf-none {
+  flex: 1;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-align: right;
+}
+
 .env-conf-track {
   flex: 1;
   height: 3px;
@@ -300,6 +327,20 @@
 
 .env[data-scale="cell"] .env-conf-val {
   font-size: 0.52rem;
+}
+
+/* The label survives the shrink to card size. It is the difference between a measurement and a
+   model's opinion of itself, and that does not stop mattering because the card got smaller. */
+.env[data-scale="cell"] .env-conf-key {
+  font-size: 0.46rem;
+  letter-spacing: 0.02em;
+}
+
+.env[data-scale="cell"] .env-conf-none {
+  overflow: hidden;
+  font-size: 0.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .env[data-scale="cell"] .env-gate {

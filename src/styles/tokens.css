@@ -12,7 +12,19 @@
 
   --accent: #2a6b66;
   --accent-soft: rgba(42, 107, 102, 0.12);
+  --accent-line: rgba(42, 107, 102, 0.32);
   --gold: #b8963f;
+  --gold-ink: #8a6f2a;
+  --gold-soft: rgba(184, 150, 63, 0.12);
+  --gold-line: rgba(184, 150, 63, 0.4);
+  --flag: #8c342a;
+  --flag-soft: rgba(140, 52, 42, 0.08);
+  --flag-line: rgba(140, 52, 42, 0.32);
+
+  /* the stop: the one control that interrupts work, so it is the one bright red */
+  --stop: #e23d2d;
+  --stop-hot: #c9301f;
+  --stop-line: rgba(226, 61, 45, 0.42);
 
   --glass-border: rgba(255, 255, 255, 0.58);
   --glass-fill: rgba(255, 255, 255, 0.14);
@@ -23,6 +35,7 @@
 
   --radius: 10px;
   --control-radius: 12px;
+  --squircle-radius: 22px;
   --page-x: clamp(20px, 5vw, 72px);
 
   --font-sans: "Instrument Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;

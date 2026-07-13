@@ -23,6 +23,34 @@
   }
 }
 
+@media (max-width: 720px) {
+  .timeline-row {
+    grid-template-columns: 3.75rem 1fr;
+    gap: 8px 12px;
+  }
+
+  .timeline-row .type-badge {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .timeline-row time {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .timeline-copy {
+    grid-column: 1 / -1;
+  }
+
+  .timeline-delta {
+    grid-column: 1 / -1;
+    justify-self: start;
+    max-width: none;
+    text-align: left;
+  }
+}
+
 @media (max-width: 640px) {
   .page-hero h1,
   .article-shell h1 {
@@ -46,5 +74,10 @@
   .cta-link {
     padding: 0 12px;
     font-size: 0.8rem;
+  }
+
+  .note-footer .text-back {
+    margin-left: 0;
+    width: 100%;
   }
 }

@@ -14,41 +14,107 @@
 @import "./studio/results.css";
 
 .studio {
-  display: grid;
-  grid-template-rows: 56px minmax(0, 1fr);
+  position: relative;
   min-height: 100svh;
   background: var(--paper);
 }
 
-/* ---------- persistent top strip ---------- */
+/* ---------- the overlay furniture ---------- */
 
+/*
+ * The header floats on the canvas.
+ *
+ * It was a 56px grid track, which put a hard shelf above the one surface on this screen that
+ * is meant to be endless. So it lifts off: the strip itself is inert and only the mark and the
+ * clip pill can be clicked, which means you can grab the canvas and pan it through the gap
+ * between them instead of hitting an invisible bar.
+ *
+ * The third seat is deliberately empty. It held a link to the benchmarks, which put the loudest
+ * chip on the canvas around the one thing on it that was not the product.
+ */
 .top {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 10;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 16px;
-  padding: 0 clamp(16px, 3vw, 32px);
+  padding: 14px clamp(14px, 2vw, 22px);
+  pointer-events: none;
 }
 
+.top > * {
+  pointer-events: auto;
+}
+
+/*
+ * The mark.
+ *
+ * The logo is already a squircle, and it is atmospheric — a soft field with no hard
+ * silhouette — so on bare paper at this size it dissolves into the page. The tile is what
+ * gives it an edge to be a mark against, and it is the same glass as everything else
+ * floating on this canvas.
+ */
 .top-mark {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
   justify-self: start;
-  font-size: 0.92rem;
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.06em;
+  border: 1px solid var(--glass-border);
+  border-radius: 13px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 22px rgba(26, 70, 66, 0.07);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms ease;
 }
 
+.top-mark img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  corner-shape: squircle;
+}
+
+.top-mark:hover {
+  box-shadow: 0 10px 26px rgba(26, 70, 66, 0.16);
+  transform: translateY(-1px);
+}
+
+/* what is on the canvas: the clip, and the pair it is being read into */
 .top-mid {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 9px;
   justify-self: center;
-  min-width: 0;
+  padding: 5px 7px 5px 13px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 22px rgba(26, 70, 66, 0.07);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+}
+
+/* nothing to say before a clip is loaded, so it does not sit there as an empty pill */
+.top-mid:empty {
+  display: none;
 }
 
 .top-clip {
   overflow: hidden;
-  color: var(--ink-soft);
-  font-size: 0.84rem;
+  color: var(--ink);
+  font-size: 0.82rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -56,24 +122,14 @@
 .top-pair {
   padding: 3px 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 7px;
+  corner-shape: squircle;
   color: var(--ink-muted);
-  background: var(--paper-elevated);
+  background: rgba(255, 255, 255, 0.7);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.04em;
   white-space: nowrap;
-}
-
-.top-link {
-  justify-self: end;
-  color: var(--ink-muted);
-  font-size: 0.84rem;
-  transition: color 160ms ease;
-}
-
-.top-link:hover {
-  color: var(--accent);
 }
 
 /* ---------- acts ---------- */
@@ -87,11 +143,7 @@
 /* ---------- responsive ---------- */
 
 @media (max-width: 720px) {
-  /*
-   * The clip title goes, but its grid cell stays. Removing the middle item outright pulls
-   * the Benchmarks link out of the third column and into the second, and it lands in the
-   * middle of the header instead of at its right edge.
-   */
+  /* no room for the clip's name next to the mark, and the dock is already saying its id */
   .top-clip,
   .top-pair {
     display: none;

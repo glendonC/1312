@@ -11,7 +11,8 @@
  */
 .drawer {
   position: absolute;
-  top: 16px;
+  /* clears the floating header rather than opening underneath it */
+  top: 66px;
   right: 16px;
   bottom: 112px;
   z-index: 4;

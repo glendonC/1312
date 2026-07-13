@@ -61,10 +61,11 @@
  * and everything else on it — the layout switch, the hold, the opened worker — floats on top
  * of it as an overlay rather than taking a slice out of it.
  */
+/* the canvas takes the whole window: the header and the dock float on top of it */
 .stage {
   position: relative;
   width: 100%;
-  height: calc(100svh - 56px);
+  height: 100svh;
 }
 
 .graph {
@@ -80,11 +81,17 @@
   color: rgba(22, 29, 27, 0.14);
 }
 
-/* which way the tree grows. An overlay on the canvas, not another bar across the top. */
+/*
+ * Which way the tree grows.
+ *
+ * Bottom left, where a canvas keeps its viewport controls — and out of the top right, which
+ * belongs to the way off this screen. Two different kinds of decision should not share a
+ * corner.
+ */
 .graph-seg {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  bottom: 20px;
+  left: 20px;
   z-index: 5;
   box-shadow: 0 8px 22px rgba(22, 29, 27, 0.08);
 }
@@ -373,10 +380,11 @@
  * Paused has to be visible in the work, not only in the controls. Nothing here is
  * animating, the statuses cool to the hold tone, and the chip says so in words.
  */
+/* under the mark, where the canvas reports on itself */
 .graph-hold {
   position: absolute;
-  top: 17px;
-  left: 16px;
+  top: 62px;
+  left: 17px;
   z-index: 5;
   padding: 4px 10px;
   border: 1px solid var(--hold-line);

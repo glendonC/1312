@@ -146,6 +146,7 @@ export default function Dock() {
             >
               <Hold paused={paused} />
               <span>{paused ? "Resume" : "Pause"}</span>
+              <kbd>space</kbd>
             </button>
           </motion.div>
         )}

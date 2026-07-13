@@ -65,11 +65,33 @@ function useBorn(): boolean {
   return born;
 }
 
+/**
+ * Enter and Space open a worker.
+ *
+ * The graph engine handles the click, but a node is a div, so the keyboard is ours to wire —
+ * and a workspace you can tab to but not open is worse than one you cannot reach at all.
+ */
+function useOpen(id: string): {
+  onKeyDown: (e: React.KeyboardEvent) => void;
+} {
+  const select = useStudio((s) => s.select);
+
+  return {
+    onKeyDown: (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      e.stopPropagation();
+      select(useStudio.getState().selected === id ? null : id);
+    },
+  };
+}
+
 /** One worker's live workspace, on the canvas. */
 export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode>) {
   const agent = useAgent(data.agent);
   const on = useStudio((s) => s.selected === data.agent);
   const born = useBorn();
+  const open = useOpen(data.agent);
 
   if (!agent) return null;
 
@@ -82,6 +104,7 @@ export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode
       data-born={born}
       role="button"
       tabIndex={0}
+      onKeyDown={open.onKeyDown}
       aria-label={`${agent.label}, ${agent.role}, ${agent.status}, ${agent.actions} actions`}
     >
       <Pins />

@@ -96,6 +96,19 @@
   background: rgba(22, 29, 27, 0.05);
 }
 
+/* printed because it works: space holds the run and lets it go again */
+.rail-btn kbd {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  corner-shape: squircle;
+  color: var(--ink-muted);
+  background: rgba(22, 29, 27, 0.04);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  line-height: 1;
+}
+
 /* resuming is the go, so it takes the accent the stop never gets to touch */
 .rail[data-paused="true"] .rail-btn {
   color: var(--accent);

@@ -10,6 +10,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
+import type { Layout } from "./layout";
 import {
   applyTrace,
   finish,
@@ -20,7 +21,12 @@ import {
   type Phase,
   type RunState,
 } from "./replay";
-import { ReplayTransport, type RunBundle, type RunTransport } from "./transport";
+import {
+  ReplayTransport,
+  type RunBundle,
+  type RunHandle,
+  type RunTransport,
+} from "./transport";
 import type { Trace, View } from "./types";
 
 /** The swarm and the result are one screen: the agents stay on the canvas after the run. */
@@ -41,22 +47,33 @@ interface StudioStore {
   clipT: number;
   playing: boolean;
 
+  /** How the swarm is arranged on the canvas. A way of looking, not a fact about the run. */
+  layout: Layout;
+
+  /** The run is held: the transport's clock is stopped, so the fold is stopped too. */
+  paused: boolean;
+
   boot: (transport: RunTransport) => Promise<void>;
   start: () => void;
   event: (trace: Trace) => void;
   end: () => void;
   reset: () => void;
 
+  pause: () => void;
+  resume: () => void;
+  togglePause: () => void;
+
   select: (id: string | null) => void;
   setStage: (stage: Stage) => void;
   setSpeed: (speed: number) => void;
   setView: (view: View) => void;
+  setLayout: (layout: Layout) => void;
   setClipT: (t: number) => void;
   setPlaying: (playing: boolean) => void;
 }
 
 let transport: RunTransport | null = null;
-let stopStream: (() => void) | null = null;
+let handle: RunHandle | null = null;
 
 export const useStudio = create<StudioStore>((set, get) => ({
   stage: "input",
@@ -66,8 +83,10 @@ export const useStudio = create<StudioStore>((set, get) => ({
   state: initialState(),
   speed: 6,
   view: "prepped",
+  layout: "radial",
   clipT: 0,
   playing: false,
+  paused: false,
 
   async boot(next) {
     transport = next;
@@ -83,17 +102,18 @@ export const useStudio = create<StudioStore>((set, get) => ({
     const { bundle } = get();
     if (!bundle || !transport) return;
 
-    stopStream?.();
+    handle?.stop();
 
     set({
       stage: "run",
       selected: null,
       playing: false,
+      paused: false,
       clipT: 0,
       state: seedCues(initialState(), bundle.captions.cues.map((c) => c.id)),
     });
 
-    stopStream = transport.stream({
+    handle = transport.stream({
       speed: get().speed,
       onEvent: (trace) => get().event(trace),
       onEnd: () => get().end(),
@@ -107,22 +127,53 @@ export const useStudio = create<StudioStore>((set, get) => ({
   },
 
   end() {
-    stopStream?.();
-    stopStream = null;
+    handle?.stop();
+    handle = null;
     // The stage does not change: the swarm stays on screen, the result appears under it.
-    set((s) => ({ state: finish(s.state) }));
+    set((s) => ({ state: finish(s.state), paused: false }));
   },
 
   reset() {
-    stopStream?.();
-    stopStream = null;
-    set({ stage: "input", state: initialState(), selected: null, clipT: 0, playing: false });
+    handle?.stop();
+    handle = null;
+    set({
+      stage: "input",
+      state: initialState(),
+      selected: null,
+      clipT: 0,
+      playing: false,
+      paused: false,
+    });
+  },
+
+  /**
+   * Pause is not a UI mood. The transport's clock actually stops, which stops the fold,
+   * so a paused run advances by exactly nothing until it is resumed.
+   */
+  pause() {
+    const { paused, state } = get();
+    if (!handle || paused || state.status !== "running") return;
+    handle.pause();
+    set({ paused: true });
+  },
+
+  resume() {
+    if (!handle || !get().paused) return;
+    handle.resume();
+    set({ paused: false });
+  },
+
+  togglePause() {
+    const { paused, resume, pause } = get();
+    if (paused) resume();
+    else pause();
   },
 
   select: (selected) => set({ selected }),
   setStage: (stage) => set({ stage }),
   setSpeed: (speed) => set({ speed }),
   setView: (view) => set({ view }),
+  setLayout: (layout) => set({ layout }),
   setClipT: (clipT) => set({ clipT }),
   setPlaying: (playing) => set({ playing }),
 }));
@@ -159,6 +210,10 @@ export const useCueState = (id: string): string =>
   useStudio((s) => s.state.cues[id] ?? "pending");
 
 export const useComplete = (): boolean => useStudio((s) => s.state.status === "complete");
+
+export const usePaused = (): boolean => useStudio((s) => s.paused);
+
+export const useLayout = (): Layout => useStudio((s) => s.layout);
 
 /** A worker's full history is just the event log filtered by agent. Event sourcing pays for this. */
 export const useAgentHistory = (id: string | null): Trace[] =>

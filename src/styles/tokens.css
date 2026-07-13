@@ -26,6 +26,11 @@
   --stop-hot: #c9301f;
   --stop-line: rgba(226, 61, 45, 0.42);
 
+  /* the hold: a paused run is suspended, not broken, so it cools off instead of alarming */
+  --hold: #5f6f6b;
+  --hold-soft: rgba(95, 111, 107, 0.1);
+  --hold-line: rgba(95, 111, 107, 0.34);
+
   --glass-border: rgba(255, 255, 255, 0.58);
   --glass-fill: rgba(255, 255, 255, 0.14);
   --glass-shadow:

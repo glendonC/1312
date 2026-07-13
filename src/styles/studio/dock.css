@@ -1,0 +1,504 @@
+/* The dock: the one control surface. It never leaves, and it holds the stop and the hold. */
+
+/* ---------- ACT 1: blank canvas, one glass dock ---------- */
+
+.act-input {
+  position: relative;
+  flex: 1;
+}
+
+/* something for the glass to refract, or it reads as a grey box */
+.canvas {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(58% 46% at 50% 74%, rgba(42, 107, 102, 0.17), transparent 72%),
+    radial-gradient(40% 40% at 20% 28%, rgba(184, 150, 63, 0.1), transparent 70%),
+    radial-gradient(44% 44% at 82% 24%, rgba(42, 107, 102, 0.09), transparent 72%);
+}
+
+/* the one control surface: fixed, always present, never hidden mid-run */
+.dock-well {
+  position: fixed;
+  bottom: clamp(20px, 4vh, 34px);
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  transform: translateX(-50%);
+}
+
+.dock-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.dock-note[data-tone="deny"] {
+  color: var(--flag);
+}
+
+.dock-note[data-tone="allow"] {
+  color: var(--accent);
+}
+
+/*
+ * The hold, on its own small pane of the same glass.
+ *
+ * It sits above the bar instead of inside it because it has to outlive the bar's shape:
+ * fold the dock into its capsule and the hold is still there. Pausing is not the same
+ * decision as stopping, so it does not live next to the stop and it is not red — a held
+ * run is suspended, not killed.
+ */
+.rail {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.52);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.7),
+    0 10px 26px rgba(26, 70, 66, 0.1);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+}
+
+.rail[data-paused="true"] {
+  border-color: var(--hold-line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rail-btn {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.rail-btn:hover {
+  color: var(--ink);
+  background: rgba(22, 29, 27, 0.05);
+}
+
+/* resuming is the go, so it takes the accent the stop never gets to touch */
+.rail[data-paused="true"] .rail-btn {
+  color: var(--accent);
+}
+
+.rail[data-paused="true"] .rail-btn:hover {
+  background: var(--accent-soft);
+}
+
+/* the dock expands out of its own centre, so it grows left and right at once */
+.dock {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+}
+
+/*
+ * The run's progress traces the dock's own outline. A bar sitting on the inside floor
+ * of the pill reads as a foreign object dropped into the glass. The border is already
+ * a closed loop the eye follows, so the progress just fills it.
+ */
+.dock-trace {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dock-trace-bed {
+  fill: none;
+  stroke: rgba(22, 29, 27, 0.07);
+  stroke-width: 2;
+}
+
+.dock-trace-run {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: stroke 240ms ease;
+}
+
+/* the trace does not stop where it is by accident: a held run went exactly this far */
+.dock[data-paused="true"] .dock-trace-run {
+  stroke: var(--hold);
+}
+
+.dock-status {
+  display: inline-flex;
+  min-width: 7.4rem;
+  align-items: center;
+  font-size: 0.92rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* the status verb sweeps rather than churns */
+.shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--ink-muted) 20%,
+    var(--ink) 42%,
+    var(--ink) 58%,
+    var(--ink-muted) 80%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: sweep 2.4s linear infinite;
+}
+
+@keyframes sweep {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+.dock-done {
+  color: var(--accent);
+}
+
+/* no shimmer: the sweep is the run's pulse and a held run does not have one */
+.dock-held {
+  color: var(--hold);
+}
+
+.dock-clip {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The stop and the go are the same object in two moods: same 40px circle, same fill
+ * weight, same hover lift. Only the colour differs, and only while a run is in flight,
+ * because stopping the swarm is the one irreversible thing on this screen.
+ */
+.dock-go,
+.dock-x {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  color: #f7faf8;
+  background: var(--ink);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.dock-go:hover,
+.dock-x:hover {
+  background: var(--accent);
+  transform: scale(1.06);
+}
+
+.dock-x[data-running="true"] {
+  background: var(--stop);
+  box-shadow: 0 0 0 0 var(--stop-line);
+  animation: stop-pulse 1.9s ease-out infinite;
+}
+
+.dock-x[data-running="true"]:hover {
+  background: var(--stop-hot);
+  box-shadow: none;
+  animation: none;
+}
+
+/*
+ * A held run still has something to stop, so the stop stays red — but it stops pulsing.
+ * The pulse is a heartbeat, and this run does not have one right now.
+ */
+.dock[data-paused="true"] .dock-x[data-running="true"] {
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes stop-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--stop-line);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(226, 61, 45, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(226, 61, 45, 0);
+  }
+}
+
+.dock-fab {
+  height: 54px;
+  padding: 0 30px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.dock-fab:hover {
+  color: var(--accent);
+}
+
+.dock-bar {
+  display: flex;
+  width: min(620px, 86vw);
+  height: 54px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 7px 0 22px;
+}
+
+/* the fold control takes the left inset the text used to hold */
+.dock-bar-run {
+  padding-left: 10px;
+}
+
+/* pushes the stop to the right edge, opposite where the go circle sits */
+.dock-gap {
+  flex: 1;
+}
+
+/*
+ * The hold, in the bar.
+ *
+ * Only on narrow screens, where the rail above has nowhere to live. It takes the left seat
+ * so the bar reads hold · state · stop — a control at each end, and the run's state between
+ * them. On a wide screen this is dead and the rail does the job.
+ */
+.dock-hold {
+  display: none;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.dock-hold:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.dock[data-paused="true"] .dock-hold {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/*
+ * The fold. Quiet by design: minimizing is a comfort, not a decision, so it should
+ * never compete with the stop for attention.
+ */
+.dock-fold {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.dock-fold:hover {
+  color: var(--ink);
+  background: rgba(22, 29, 27, 0.06);
+}
+
+/*
+ * Folded. The swarm keeps working whether or not the controls are on screen, so the
+ * capsule still carries the verb, the percentage, and the border trace. It is the
+ * handle back to the bar, which is why the whole thing is the button.
+ */
+.dock-mini {
+  display: flex;
+  height: 42px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px 0 22px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dock-mini .chevron {
+  color: var(--ink-muted);
+  transition: color 160ms ease;
+}
+
+.dock-mini:hover .chevron {
+  color: var(--ink);
+}
+
+.dock-status-mini {
+  min-width: 6.6rem;
+  font-size: 0.88rem;
+}
+
+.dock-pct {
+  flex: none;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-field {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+}
+
+.dock-field:focus {
+  outline: none;
+}
+
+.dock-field::placeholder {
+  color: var(--ink-muted);
+}
+
+.dock-sep {
+  width: 1px;
+  height: 22px;
+  flex: none;
+  background: rgba(22, 29, 27, 0.14);
+}
+
+.dock-demo {
+  height: 40px;
+  flex: none;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.dock-demo:hover:not(:disabled) {
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.dock-demo:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+/* ---------- responsive ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background: none;
+    color: var(--ink);
+  }
+
+  .dock-x[data-running="true"] {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  /*
+   * Compact: the rail folds into the bar. The hold takes the left seat, the stop keeps the
+   * right, and the run's state sits between two balanced circles. The fold chevron goes —
+   * a bar this small is already out of the way.
+   */
+  .rail {
+    display: none;
+  }
+
+  .dock-hold {
+    display: inline-flex;
+  }
+
+  .dock-fold {
+    display: none;
+  }
+
+  .dock-bar {
+    width: min(440px, 92vw);
+    gap: 6px;
+    padding: 0 7px;
+  }
+
+  .dock-clip {
+    display: none;
+  }
+
+  .dock-status {
+    min-width: 0;
+    flex: 1;
+    justify-content: center;
+  }
+}

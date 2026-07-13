@@ -5,53 +5,35 @@
  * Finished it offers another run. Hiding it mid-run would strand the user with no way
  * to stop what they started.
  *
- * The run's progress is drawn as a stroke that travels the pill's own outline. It is
- * measured, not guessed: the border path is rebuilt from the dock's real box, so the
- * trace stays exactly on the edge at any width the layout spring lands on.
+ * The run's progress travels the pill's own outline (DockTrace), measured from the dock's
+ * real box rather than guessed.
+ *
+ * Pause rides above the bar on its own small pane of the same glass. It sits outside the
+ * dock rather than inside it because it outlives the dock's shape: fold the bar into the
+ * capsule and the hold is still one click away, which is the whole point of being able to
+ * hold a run instead of killing it. On a screen too narrow for the rail, the hold moves
+ * into the bar and takes the left seat, opposite the stop — see dock.css.
  */
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 
-import { useBundle, useComplete, useProgress, useStage, useStudio } from "./store";
+import DockTrace from "./DockTrace";
+import { Arrow, Chevron, Cross, Hold } from "./glyphs";
+import { useBundle, useComplete, usePaused, useProgress, useStage, useStudio } from "./store";
 
 const ALLOWED_HOSTS = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"];
 
 const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as const;
 
-/** Perimeter of a pill: the two straight runs plus the two round caps. */
-function perimeterOf(w: number, h: number): number {
-  return 2 * Math.max(0, w - h) + Math.PI * h;
-}
-
-function Chevron({ up = false }: { up?: boolean }) {
-  return (
-    <svg
-      className="chevron"
-      viewBox="0 0 16 16"
-      width="14"
-      height="14"
-      aria-hidden="true"
-      style={up ? { transform: "rotate(180deg)" } : undefined}
-    >
-      <path
-        d="M4 6.5 8 10.5l4-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export default function Dock() {
   const stage = useStage();
   const complete = useComplete();
   const bundle = useBundle();
+  const paused = usePaused();
   const start = useStudio((s) => s.start);
   const reset = useStudio((s) => s.reset);
+  const togglePause = useStudio((s) => s.togglePause);
   const { phase, done } = useProgress();
 
   const [open, setOpen] = useState(false);
@@ -113,11 +95,18 @@ export default function Dock() {
   const running = stage === "run" && !complete;
   const percent = Math.round(done * 100);
 
-  // The dock clips to its padding box, so the 2px stroke is centred 2px in: any closer
-  // to the edge and the border shaves half the trace off.
-  const w = Math.max(0, box.w - 4);
-  const h = Math.max(0, box.h - 4);
-  const perimeter = perimeterOf(w, h);
+  /*
+   * The verb is the run's pulse, so a held run must not have one. The shimmer sweeps only
+   * while the clock is running; paused, the word stops moving and says what it is.
+   */
+  const verb = !running ? (
+    <span className="dock-done">Done</span>
+  ) : paused ? (
+    <span className="dock-held">Paused</span>
+  ) : (
+    <span className="shimmer">{phase}…</span>
+  );
+
 
   return (
     <div className="dock-well">
@@ -137,34 +126,40 @@ export default function Dock() {
         )}
       </AnimatePresence>
 
-      <motion.div className="dock" ref={dock} layout transition={SPRING} data-running={running}>
-        {/* the run's progress, drawn around the dock's own outline */}
-        {stage === "run" && perimeter > 0 && (
-          <svg className="dock-trace" width={box.w} height={box.h} aria-hidden="true">
-            <rect
-              className="dock-trace-bed"
-              x={2}
-              y={2}
-              width={w}
-              height={h}
-              rx={h / 2}
-              ry={h / 2}
-            />
-            <motion.rect
-              className="dock-trace-run"
-              x={2}
-              y={2}
-              width={w}
-              height={h}
-              rx={h / 2}
-              ry={h / 2}
-              strokeDasharray={perimeter}
-              initial={{ strokeDashoffset: perimeter }}
-              animate={{ strokeDashoffset: perimeter * (1 - done) }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            />
-          </svg>
+      <AnimatePresence>
+        {running && (
+          <motion.div
+            className="rail"
+            key="rail"
+            data-paused={paused}
+            initial={{ opacity: 0, y: 8, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.94 }}
+            transition={SPRING}
+          >
+            <button
+              type="button"
+              className="rail-btn"
+              onClick={togglePause}
+              aria-pressed={paused}
+              title={paused ? "Resume the run" : "Hold the run"}
+            >
+              <Hold paused={paused} />
+              <span>{paused ? "Resume" : "Pause"}</span>
+            </button>
+          </motion.div>
         )}
+      </AnimatePresence>
+
+      <motion.div
+        className="dock"
+        ref={dock}
+        layout
+        transition={SPRING}
+        data-running={running}
+        data-paused={paused}
+      >
+        {stage === "run" && <DockTrace box={box} done={done} />}
 
         <AnimatePresence mode="popLayout" initial={false}>
           {stage === "run" && mini ? (
@@ -186,11 +181,7 @@ export default function Dock() {
               layout
             >
               <span className="dock-status dock-status-mini" aria-live="polite">
-                {running ? (
-                  <span className="shimmer">{phase}…</span>
-                ) : (
-                  <span className="dock-done">Done</span>
-                )}
+                {verb}
               </span>
 
               <span className="dock-pct">{percent}%</span>
@@ -207,6 +198,23 @@ export default function Dock() {
               transition={{ duration: 0.18 }}
               layout
             >
+              {/*
+               * Narrow screens have no room for the rail above, so the hold comes into the
+               * bar as its own circle and takes the left seat. The stop keeps the right seat
+               * it holds at every width — the one irreversible control on this screen does
+               * not move house because the window got smaller.
+               */}
+              <button
+                type="button"
+                className="dock-hold"
+                onClick={togglePause}
+                aria-pressed={paused}
+                aria-label={paused ? "Resume the run" : "Hold the run"}
+                title={paused ? "Resume" : "Pause"}
+              >
+                <Hold paused={paused} />
+              </button>
+
               <button
                 type="button"
                 className="dock-fold"
@@ -218,11 +226,7 @@ export default function Dock() {
               </button>
 
               <span className="dock-status" aria-live="polite">
-                {running ? (
-                  <span className="shimmer">{phase}…</span>
-                ) : (
-                  <span className="dock-done">Done</span>
-                )}
+                {verb}
               </span>
 
               <span className="dock-clip">{bundle?.run.clip.id}</span>
@@ -245,15 +249,7 @@ export default function Dock() {
                 aria-label={running ? "Stop the run" : "Clear"}
                 title={running ? "Stop the run" : "Clear"}
               >
-                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-                  <path
-                    d="M4.4 4.4l7.2 7.2M11.6 4.4l-7.2 7.2"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <Cross />
               </button>
             </motion.div>
           ) : !open ? (
@@ -313,16 +309,7 @@ export default function Dock() {
               </button>
 
               <button type="submit" className="dock-go" aria-label="Analyze">
-                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-                  <path
-                    d="M2.6 8h10.2M8.6 3.4 13.4 8l-4.8 4.6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <Arrow />
               </button>
             </motion.form>
           )}

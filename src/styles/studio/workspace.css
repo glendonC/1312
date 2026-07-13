@@ -1,0 +1,326 @@
+/* The worker's environment, at both scales — the card on the canvas and the panel in the drawer. */
+
+/* ---------- the worker's environment ---------- */
+
+/*
+ * One renderer, two densities. `panel` is the drawer, `cell` is the same workspace shrunk
+ * onto its node in the swarm. The cell is a glance and the panel is a read, so the cell
+ * clamps lines and drops rows — but it never shows a field the panel would not show, which
+ * is why the two cannot drift apart.
+ */
+.env {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  corner-shape: squircle;
+  background: var(--paper);
+}
+
+.env[data-scale="cell"] {
+  min-height: 0;
+  flex: 1;
+  gap: 4px;
+  padding: 6px 7px;
+  overflow: hidden;
+  border-radius: 13px;
+}
+
+/* nothing has landed yet, and the workspace says so instead of showing a plausible guess */
+.env-empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  line-height: 1.5;
+}
+
+.env[data-scale="cell"] .env-empty {
+  font-size: 0.54rem;
+}
+
+/* which half of the clip this worker owns: the only thing separating translate-01 from -02 */
+.env-win {
+  align-self: flex-start;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.env[data-scale="cell"] .env-win {
+  padding: 0 4px;
+  font-size: 0.5rem;
+}
+
+.env-wave {
+  position: relative;
+  height: 46px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--paper-soft);
+}
+
+.env[data-scale="cell"] .env-wave {
+  height: 34px;
+  border-radius: 4px;
+}
+
+.env-wave svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.env-wave svg rect {
+  fill: rgba(22, 29, 27, 0.26);
+}
+
+.env-head {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--accent);
+}
+
+.env-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mark {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+}
+
+.mark[data-hard="true"] {
+  border-color: var(--flag-line);
+  color: var(--flag);
+  background: var(--flag-soft);
+}
+
+.env-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  line-height: 1.5;
+}
+
+.env-row b {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.env-row span {
+  overflow: hidden;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-src {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.env-tgt {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.env-conf {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.env-conf-track {
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.env-conf-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.env-conf-val {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.env-gate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
+}
+
+.env-gate-name {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* gate provenance: universal rules survive a language swap, pack rules do not */
+.env-gate-name i {
+  padding: 0 3px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--ink-muted);
+  font-size: 0.52rem;
+  font-style: normal;
+}
+
+.env-gate-name i[data-scope="universal"] {
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.env-gate-val {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.env-gate[data-fail="true"] .env-gate-val {
+  color: var(--flag);
+}
+
+.env-gate-track {
+  height: 3px;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.env-gate-fill {
+  display: block;
+  height: 100%;
+  background: var(--ink-muted);
+}
+
+.env-gate[data-fail="true"] .env-gate-fill {
+  background: var(--flag);
+}
+
+.stamp {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border: 1px solid var(--flag-line);
+  border-radius: 6px;
+  color: var(--flag);
+  background: var(--flag-soft);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stamp[data-kind="corrected"] {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---------- the same environment, shrunk onto the node ---------- */
+
+.env[data-scale="cell"] .mark {
+  padding: 0 4px;
+  font-size: 0.5rem;
+}
+
+.env[data-scale="cell"] .env-marks {
+  gap: 3px;
+}
+
+.env[data-scale="cell"] .env-row {
+  gap: 5px;
+  font-size: 0.56rem;
+  line-height: 1.4;
+}
+
+/*
+ * The card is a glance, not a transcript. Korean wraps to two lines and the English to
+ * one, and both ellipsize — an unclamped draft would push the confidence bar off the card
+ * and turn the swarm into soup. The full line is one click away in the drawer.
+ */
+.env[data-scale="cell"] .env-src,
+.env[data-scale="cell"] .env-tgt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.env[data-scale="cell"] .env-src {
+  font-size: 0.62rem;
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+}
+
+.env[data-scale="cell"] .env-tgt {
+  font-size: 0.58rem;
+  line-height: 1.35;
+  -webkit-line-clamp: 1;
+}
+
+.env[data-scale="cell"] .env-conf {
+  margin-top: auto;
+  gap: 5px;
+}
+
+.env[data-scale="cell"] .env-conf-val {
+  font-size: 0.52rem;
+}
+
+.env[data-scale="cell"] .env-gate {
+  gap: 2px 6px;
+}
+
+.env[data-scale="cell"] .env-gate-name {
+  font-size: 0.54rem;
+}
+
+.env[data-scale="cell"] .env-gate-name i {
+  font-size: 0.46rem;
+}
+
+.env[data-scale="cell"] .env-gate-val {
+  font-size: 0.54rem;
+}
+
+.env[data-scale="cell"] .stamp {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.48rem;
+  letter-spacing: 0.06em;
+}

@@ -37,10 +37,26 @@ export interface StreamOptions {
   onEnd: () => void;
 }
 
+/**
+ * A run in flight.
+ *
+ * Stopping and pausing are different promises, so they are different methods. `stop` is
+ * destructive and final: the run is over. `pause` suspends it and is expected to be
+ * resumed, and it has to be honest — the clock itself stops, so the fold stops, and
+ * resuming picks up at the exact trace it left off. A pause that quietly kept the clock
+ * running and then flushed a burst of catch-up traces on resume would be a lie about
+ * what the swarm did while the user was not looking.
+ */
+export interface RunHandle {
+  pause(): void;
+  resume(): void;
+  stop(): void;
+}
+
 export interface RunTransport {
   load(): Promise<RunBundle>;
-  /** Begin emitting agent events. Returns a stop function. */
-  stream(options: StreamOptions): () => void;
+  /** Begin emitting agent events. Returns the handle that controls the run. */
+  stream(options: StreamOptions): RunHandle;
 }
 
 async function json<T>(url: string): Promise<T> {
@@ -73,17 +89,24 @@ export class ReplayTransport implements RunTransport {
     return { run, captions, score, pack, wave, traces: this.traces };
   }
 
-  stream({ speed, onEvent, onEnd }: StreamOptions): () => void {
+  stream({ speed, onEvent, onEnd }: StreamOptions): RunHandle {
     let raf = 0;
     let cursor = 0;
     let elapsed = 0;
     let last = performance.now();
     let stopped = false;
+    let paused = false;
+    let ended = false;
 
     const tick = (now: number): void => {
-      if (stopped) return;
+      if (stopped || paused || ended) return;
 
-      elapsed += ((now - last) / 1000) * speed;
+      // The step is clamped to one 30fps frame. requestAnimationFrame does not fire in a
+      // background tab, so an unclamped delta charges the whole away-time to the run at
+      // once — come back after a minute and the entire trace file lands in a single frame,
+      // which is not a replay of anything. Time the user did not watch is not time the run
+      // gets to spend.
+      elapsed += Math.min((now - last) / 1000, 1 / 30) * speed;
       last = now;
 
       while (cursor < this.traces.length && this.traces[cursor].t <= elapsed) {
@@ -92,6 +115,7 @@ export class ReplayTransport implements RunTransport {
       }
 
       if (cursor >= this.traces.length) {
+        ended = true;
         onEnd();
         return;
       }
@@ -101,9 +125,28 @@ export class ReplayTransport implements RunTransport {
 
     raf = requestAnimationFrame(tick);
 
-    return () => {
-      stopped = true;
-      cancelAnimationFrame(raf);
+    return {
+      pause() {
+        if (stopped || ended || paused) return;
+        paused = true;
+        cancelAnimationFrame(raf);
+      },
+
+      resume() {
+        if (stopped || ended || !paused) return;
+        paused = false;
+
+        // The clock is not paid for the time it spent held: `last` is re-anchored to now,
+        // so `elapsed` resumes at exactly the value it stopped at. The cursor never moved,
+        // so no trace is skipped and none arrives in a catch-up burst.
+        last = performance.now();
+        raf = requestAnimationFrame(tick);
+      },
+
+      stop() {
+        stopped = true;
+        cancelAnimationFrame(raf);
+      },
     };
   }
 }
@@ -124,17 +167,85 @@ export class LiveTransport implements RunTransport {
     return json<RunBundle>(this.bundleUrl);
   }
 
-  stream({ onEvent, onEnd }: StreamOptions): () => void {
+  stream({ onEvent, onEnd }: StreamOptions): RunHandle {
     const socket = new WebSocket(this.endpoint);
 
+    let paused = false;
+    let ended = false;
+    let closed = false;
+    /** stop() closes the socket, and closing fires "close". A cancelled run is not a finished one. */
+    let dead = false;
+
+    /**
+     * Traces that landed while the run was held. A live orchestrator is a real process:
+     * it does not stop because the client looked away, and traces already in flight will
+     * arrive no matter what the UI thinks. So they are kept, in arrival order, and folded
+     * in on resume. Dropping them would silently rewrite what the swarm did.
+     */
+    const held: Trace[] = [];
+
+    const deliver = (trace: Trace): void => {
+      if (trace.action === "done") {
+        ended = true;
+        onEnd();
+        return;
+      }
+      onEvent(trace);
+    };
+
+    /**
+     * A live pause is a request, not a fact. The client asks the orchestrator to hold —
+     * it owns the decision, and it may be mid-tool-call — and holds the stream on its own
+     * side either way. Which of those actually happened is the orchestrator's to report,
+     * and the UI must not claim the agents stopped when only the view did.
+     */
+    const ask = (type: "pause" | "resume"): void => {
+      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type }));
+    };
+
     socket.addEventListener("message", (e: MessageEvent<string>) => {
+      if (dead || ended) return;
       const trace = JSON.parse(e.data) as Trace;
-      if (trace.action === "done") onEnd();
-      else onEvent(trace);
+      if (paused) {
+        held.push(trace);
+        return;
+      }
+      deliver(trace);
     });
 
-    socket.addEventListener("close", onEnd);
+    socket.addEventListener("close", () => {
+      closed = true;
+      // A run the user killed did not finish. Reporting it as finished would put a result
+      // and a score on screen for a swarm that was cut off mid-sentence.
+      if (dead || ended || paused) return;
+      onEnd();
+    });
 
-    return () => socket.close();
+    return {
+      pause() {
+        if (dead || ended || paused) return;
+        paused = true;
+        ask("pause");
+      },
+
+      resume() {
+        if (dead || ended || !paused) return;
+        paused = false;
+        ask("resume");
+
+        // Everything that arrived while held, in the order it arrived. Nothing is skipped.
+        while (held.length > 0 && !ended) deliver(held.shift() as Trace);
+        if (closed && !ended) onEnd();
+      },
+
+      stop() {
+        if (dead) return;
+        dead = true;
+        paused = false;
+        // Stopping is destructive, and that is the entire difference from pausing.
+        held.length = 0;
+        socket.close();
+      },
+    };
   }
 }

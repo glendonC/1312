@@ -4,20 +4,23 @@ import { useEffect } from "react";
 import Dock from "./Dock";
 import InputAct from "./InputAct";
 import RunAct from "./RunAct";
-import { replayTransport, useBundle, useStage, useStudio } from "./store";
+import { replayTransport, useBundle, usePaused, useStage, useStudio } from "./store";
 
 export default function StudioApp({ runId }: { runId: string }) {
   const boot = useStudio((s) => s.boot);
   const stage = useStage();
   const bundle = useBundle();
+  const paused = usePaused();
   const error = useStudio((s) => s.error);
 
   useEffect(() => {
     void boot(replayTransport(runId));
   }, [boot, runId]);
 
+  // Held is a property of the whole instrument, not of one control: everything that
+  // animates to say "alive" reads this and stops.
   return (
-    <main className="studio" data-stage={stage}>
+    <main className="studio" data-stage={stage} data-paused={paused}>
       <header className="top">
         <a className="top-mark" href="/">
           1321

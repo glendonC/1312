@@ -6,7 +6,11 @@
 
   .hero-aside {
     justify-self: end;
-    max-width: min(40rem, 100%);
+    max-width: min(38rem, 100%);
+  }
+
+  .aside-line {
+    white-space: normal;
   }
 
   .metric-grid,

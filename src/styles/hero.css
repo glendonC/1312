@@ -64,19 +64,25 @@
 
 .hero-aside {
   display: grid;
-  max-width: 34rem;
+  max-width: 38rem;
   gap: 22px;
   justify-self: end;
-  text-align: right;
+  text-align: left;
 }
 
 .hero-aside p {
+  display: flex;
+  flex-direction: column;
   margin: 0;
   color: rgba(251, 255, 249, 0.86);
   font-size: 1.02rem;
   font-weight: var(--weight-regular);
   line-height: 1.62;
-  text-wrap: pretty;
+}
+
+.aside-line {
+  display: block;
+  white-space: nowrap;
 }
 
 .hero-aside .hero-actions {

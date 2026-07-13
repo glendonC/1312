@@ -5,21 +5,9 @@
   "rows": [
     {
       "source_video": "Ux-TMWnmntM",
-      "t_start": 12.15,
-      "t_end": 13.7,
-      "raw": "Why? Why?",
-      "final": null,
-      "error_type": "other",
-      "lang": "en",
-      "withhold": true,
-      "run": "run-006",
-      "pack": "ko-v3"
-    },
-    {
-      "source_video": "Ux-TMWnmntM",
-      "t_start": 8.35,
-      "t_end": 8.6,
-      "raw": "In Thailand, I—",
+      "t_start": 18.8,
+      "t_end": 19,
+      "raw": "Yeah.",
       "final": null,
       "error_type": "other",
       "lang": "en",
@@ -30,12 +18,49 @@
     {
       "source_video": "Ux-TMWnmntM",
       "t_start": 19.15,
-      "t_end": 20.15,
+      "t_end": 20.2,
       "raw": "Yeah.",
       "final": null,
       "error_type": "other",
       "lang": "en",
       "withhold": true,
+      "run": "run-006",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 12.7,
+      "t_end": 13.6,
+      "raw": "Why? Why?",
+      "final": null,
+      "error_type": "other",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-006",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 28.12,
+      "t_end": 28.32,
+      "raw": "Yeah.",
+      "final": null,
+      "error_type": "other",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-006",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 14,
+      "t_end": 18.8,
+      "raw": "Well, back before COVID, with my sister—",
+      "final": "No, back before the pandemic, with nuna...",
+      "error_type": "other",
+      "error_subtype": "ko.kinship_address",
+      "lang": "en",
+      "withhold": false,
       "run": "run-006",
       "pack": "ko-v3"
     }

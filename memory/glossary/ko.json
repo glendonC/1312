@@ -12,7 +12,7 @@
       "term": "매형",
       "lang": "ko",
       "gloss": "brother-in-law",
-      "kind": "person",
+      "kind": "term",
       "confirms_relation": true,
       "source": "gpt-5 · run-006 term resolution"
     },
@@ -26,8 +26,8 @@
     {
       "term": "친누나",
       "lang": "ko",
-      "gloss": "older sister",
-      "kind": "person",
+      "gloss": "biological older sister",
+      "kind": "term",
       "confirms_relation": true,
       "source": "gpt-5 · run-006 term resolution"
     },

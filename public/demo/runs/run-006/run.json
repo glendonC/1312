@@ -19,14 +19,15 @@
       {
         "id": "B",
         "label": "speaker B · diarized"
-      },
-      {
-        "id": "C",
-        "label": "speaker C · unconfirmed (0.30s support)"
       }
     ],
     "music": [],
-    "silence": [],
+    "silence": [
+      [
+        7.7,
+        8.3
+      ]
+    ],
     "source": {
       "kind": "youtube",
       "label": "Didi's Korean Culture Podcast",
@@ -36,7 +37,7 @@
     },
     "media": "clip.mp4"
   },
-  "wall_s": 157.74,
+  "wall_s": 111.98,
   "recorded": "2026-07-13",
   "agents": [
     {
@@ -58,7 +59,7 @@
       "parent": "orchestrator",
       "window": [
         0,
-        12.15
+        18.8
       ]
     },
     {
@@ -68,8 +69,8 @@
       "parent": "orchestrator",
       "divided_from": "translate-01",
       "window": [
-        12.15,
-        39.92
+        18.8,
+        39.87
       ]
     },
     {

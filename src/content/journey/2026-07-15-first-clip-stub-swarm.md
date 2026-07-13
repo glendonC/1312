@@ -3,7 +3,7 @@ title: First 45s Korean clip through stub swarm
 description: "Stub orchestrator opened one workspace, scrubbed a hard dialogue clip, and returned structured placeholders. Coverage incomplete."
 date: 2026-07-15
 type: experiment
-draft: false
+draft: true
 clip: ko-clip-01
 run: run-001
 ---

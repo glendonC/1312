@@ -3,7 +3,7 @@ title: Cold vs prepped on fixed clip
 description: "Same audio, two paths. Prepped pack ahead on hard lines; Benchmarks table still placeholder until scores freeze."
 date: 2026-07-17
 type: score
-draft: false
+draft: true
 clip: ko-clip-01
 run: run-003
 delta: "cold 0.33 → prep 0.58 hard-line"

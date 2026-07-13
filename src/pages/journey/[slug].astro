@@ -2,9 +2,10 @@
 import { getCollection, render } from "astro:content";
 import GlassNav from "../../components/GlassNav.astro";
 import SiteLayout from "../../layouts/SiteLayout.astro";
+import "../../styles/journey.css";
 
 export async function getStaticPaths() {
-  const posts = await getCollection("journey");
+  const posts = await getCollection("journey", ({ data }) => !data.draft);
   return posts.map((post) => ({
     params: { slug: post.id },
     props: { post },
@@ -13,79 +14,153 @@ export async function getStaticPaths() {
 
 const { post } = Astro.props;
 const { Content } = await render(post);
-const { type, clip, run, delta, date, title, description } = post.data;
-
-const studioHref = run ? `/studio/?run=${encodeURIComponent(run)}` : "/studio/";
-const hasLinks = Boolean(clip || run || type === "score" || delta);
+const { type, date, title, description, author, topic } = post.data;
+const formatLogDate = (value: Date) => value.toISOString().slice(0, 10).replaceAll("-", ".");
 ---
 
 <SiteLayout title={`${title} | 1321`} description={description}>
   <GlassNav />
-  <main class="interior-page">
-    <article class="article-shell">
-      <header>
-        <p class="eyebrow">Field note</p>
-        <div class="note-meta">
+  <main class="journey-page journey-route-page">
+    <article class="journey-reading is-visible" data-journey-article>
+      <a class="journey-back" href="/journey/">
+        <span class="journey-back-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="15" height="15">
+            <path
+              d="M2.6 8h10.2M8.6 3.4 13.4 8l-4.8 4.6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              transform="rotate(180 8 8)"
+            />
+          </svg>
+        </span>
+        <span>Build Week</span>
+      </a>
+
+      <header class="journey-reading-hero">
+        <p class="journey-reading-meta">
+          <time datetime={date.toISOString()}>{formatLogDate(date)}</time>
           <span class={`type-badge type-${type}`}>{type}</span>
-          <time datetime={date.toISOString()}>
-            {
-              date.toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })
-            }
-          </time>
-        </div>
+          {topic && <span>{topic}</span>}
+        </p>
         <h1>{title}</h1>
-        <p>{description}</p>
-        {
-          hasLinks && (
-            <dl class="note-links">
-              {clip && (
-                <>
-                  <dt>Clip</dt>
-                  <dd>
-                    <code>{clip}</code>
-                  </dd>
-                </>
-              )}
-              {run && (
-                <>
-                  <dt>Run</dt>
-                  <dd>
-                    <a href={studioHref}>
-                      <code>{run}</code>
-                    </a>
-                  </dd>
-                </>
-              )}
-              {delta && (
-                <>
-                  <dt>Delta</dt>
-                  <dd>{delta}</dd>
-                </>
-              )}
-              {type === "score" && (
-                <>
-                  <dt>Scores</dt>
-                  <dd>
-                    <a href="/benchmarks/">Benchmarks</a>
-                  </dd>
-                </>
-              )}
-            </dl>
-          )
-        }
+        <p class="journey-reading-description">{description}</p>
+        <p class="journey-reading-byline">By {author}</p>
       </header>
-      <div class="article-body">
-        <Content />
+
+      <div class="journey-reading-divider"></div>
+
+      <div class="journey-reading-grid">
+        <aside class="journey-reading-sections">
+          <nav aria-label="Article sections" data-journey-toc>
+            <p class="journey-rail-label">Sections</p>
+          </nav>
+        </aside>
+
+        <div class="article-body journey-reading-body">
+          <Content />
+        </div>
+
+        <aside class="journey-reading-references">
+          <p class="journey-rail-label">References</p>
+          <ol data-journey-references></ol>
+        </aside>
       </div>
-      <footer class="note-footer">
-        <a class="button button-primary" href={studioHref}>Open Studio</a>
-        <a class="button button-secondary" href="/benchmarks/">Benchmarks</a>
-        <a class="text-back" href="/journey/">All field notes</a>
-      </footer>
     </article>
   </main>
+
+  <script>
+    const slugify = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/[“”"']/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+
+    const prepareJourneyReading = () => {
+      const article = document.querySelector<HTMLElement>("[data-journey-article]");
+      if (!article || article.dataset.railsReady === "true") return;
+
+      const body = article.querySelector<HTMLElement>(".journey-reading-body");
+      const toc = article.querySelector<HTMLElement>("[data-journey-toc]");
+      const references = article.querySelector<HTMLOListElement>("[data-journey-references]");
+      if (!body || !toc || !references) return;
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      body.querySelectorAll<HTMLHeadingElement>("h2").forEach((heading) => {
+        heading.id ||= slugify(heading.textContent ?? "section");
+        const link = document.createElement("a");
+        link.href = `#${heading.id}`;
+        link.textContent = heading.textContent;
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          heading.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+          history.replaceState(null, "", `#${heading.id}`);
+        });
+        toc.append(link);
+      });
+
+      const sourceNumbers = new Map<string, number>();
+      body.querySelectorAll<HTMLAnchorElement>('a[href^="http"]').forEach((source) => {
+        let citationNumber = sourceNumbers.get(source.href);
+        if (!citationNumber) {
+          citationNumber = sourceNumbers.size + 1;
+          sourceNumbers.set(source.href, citationNumber);
+
+          const item = document.createElement("li");
+          const link = document.createElement("a");
+          const number = document.createElement("span");
+          const sourceTitle = document.createElement("span");
+          const host = document.createElement("span");
+          link.href = source.href;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          number.className = "journey-reference-number";
+          sourceTitle.className = "journey-reference-title";
+          host.className = "journey-reference-source";
+          number.textContent = `[${citationNumber}]`;
+          sourceTitle.textContent = source.textContent?.replace(/[.;]$/, "") || "Source";
+          host.textContent = new URL(source.href).hostname.replace(/^www\./, "");
+          link.append(number, sourceTitle, host);
+          item.append(link);
+          references.append(item);
+        }
+
+        const marker = document.createElement("sup");
+        marker.className = "journey-citation-ref";
+        marker.textContent = `[${citationNumber}]`;
+        source.after(marker);
+      });
+
+      article.dataset.railsReady = "true";
+    };
+
+    const journeyDockWindow = window as Window & { __journeyBackDockBound?: boolean };
+    let journeyDockFrame = 0;
+    const syncJourneyBackDock = () => {
+      if (journeyDockFrame) return;
+      journeyDockFrame = window.requestAnimationFrame(() => {
+        const article = document.querySelector<HTMLElement>("[data-journey-article]");
+        const back = article?.querySelector<HTMLElement>(".journey-back");
+        back?.classList.toggle(
+          "is-docked",
+          Boolean(article && article.getBoundingClientRect().bottom <= window.innerHeight),
+        );
+        journeyDockFrame = 0;
+      });
+    };
+
+    if (!journeyDockWindow.__journeyBackDockBound) {
+      window.addEventListener("scroll", syncJourneyBackDock, { passive: true });
+      window.addEventListener("resize", syncJourneyBackDock);
+      document.addEventListener("astro:page-load", syncJourneyBackDock);
+      journeyDockWindow.__journeyBackDockBound = true;
+    }
+
+    prepareJourneyReading();
+    syncJourneyBackDock();
+    document.addEventListener("astro:page-load", prepareJourneyReading);
+  </script>
 </SiteLayout>

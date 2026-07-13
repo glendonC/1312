@@ -3,7 +3,7 @@ title: Studio shell IA live
 description: "Empty product surface shipped: ingest slot, org/swarm rail, squircle workspaces, traces, outputs. No agents yet."
 date: 2026-07-13
 type: ship
-draft: false
+draft: true
 run: shell-v0
 ---
 

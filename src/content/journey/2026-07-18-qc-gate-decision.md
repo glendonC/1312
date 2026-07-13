@@ -3,7 +3,7 @@ title: QC gate fails closed on low entity confidence
 description: "Decision: withhold EN on junk entity confidence instead of emitting fluent wrong. Spawn Translate+QC as a required pair after Segment."
 date: 2026-07-18
 type: decision
-draft: false
+draft: true
 clip: ko-clip-01
 run: run-004
 ---

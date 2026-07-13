@@ -1,48 +1,92 @@
 ---
+import { Picture } from "astro:assets";
 import { getCollection } from "astro:content";
+import journeyAtmosphere from "../../assets/journey-atmosphere.png";
 import GlassNav from "../../components/GlassNav.astro";
 import SiteLayout from "../../layouts/SiteLayout.astro";
+import "../../styles/journey.css";
 
 const posts = (await getCollection("journey", ({ data }) => !data.draft)).sort(
-  (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+  (a, b) => a.data.date.valueOf() - b.data.date.valueOf(),
 );
 
-const dateFmt = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-});
+const formatLogDate = (date: Date) => date.toISOString().slice(0, 10).replaceAll("-", ".");
 ---
 
 <SiteLayout
   title="Journey | 1321"
-  description="Build Week field notes: what we tried, what failed, what scored."
+  description="An honest record of the decisions, experiments, failures, and evidence behind 1321."
 >
   <GlassNav />
-  <main class="interior-page">
-    <header class="page-hero narrow">
-      <p class="eyebrow">Evidence</p>
-      <h1>Build Week field notes</h1>
-      <p>What we tried, what failed, what scored. Jul 13–21 and after.</p>
-    </header>
+  <main class="journey-page">
+    <section class="journey-shell" aria-labelledby="journey-title">
+      <div class="journey-stage" data-journey-stage>
+        <div class="journey-overview" data-journey-overview>
+          <header class="journey-intro">
+            <div class="journey-heading">
+              <h1 id="journey-title">Build Week</h1>
+              <p class="journey-heading-date">
+                <span>July 13–21</span>
+                <span>2026</span>
+              </p>
+            </div>
+          </header>
 
-    <ol class="timeline-list">
-      {
-        posts.map((post) => (
-          <li>
-            <a class="timeline-row" href={`/journey/${post.id}/`}>
-              <time datetime={post.data.date.toISOString()}>
-                {dateFmt.format(post.data.date)}
-              </time>
-              <span class={`type-badge type-${post.data.type}`}>{post.data.type}</span>
-              <span class="timeline-copy">
-                <span class="timeline-title">{post.data.title}</span>
-                <span class="timeline-claim">{post.data.description}</span>
-              </span>
-              {post.data.delta && <span class="timeline-delta">{post.data.delta}</span>}
-            </a>
-          </li>
-        ))
-      }
-    </ol>
+          <div class="journey-log" aria-label="Build Week entries">
+            <div class="journey-log-head" aria-hidden="true">
+              <span>/ Date</span>
+              <span>/ Entry</span>
+              <span>/ Type</span>
+            </div>
+            <ol class="journey-entry-list">
+              {
+                posts.map((post) => (
+                  <li>
+                    <a
+                      class="journey-entry"
+                      href={`/journey/${post.id}/`}
+                    >
+                      <time datetime={post.data.date.toISOString()}>{formatLogDate(post.data.date)}</time>
+                      <span class="journey-entry-title">{post.data.title}</span>
+                      <span class="journey-entry-end">
+                        <span class="journey-entry-type">{post.data.type}</span>
+                        <span class="journey-entry-arrow" aria-hidden="true">
+                          <svg viewBox="0 0 16 16" width="15" height="15">
+                            <path
+                              d="M2.6 8h10.2M8.6 3.4 13.4 8l-4.8 4.6"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="1.4"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              transform="rotate(-45 8 8)"
+                            />
+                          </svg>
+                        </span>
+                      </span>
+                    </a>
+                  </li>
+                ))
+              }
+            </ol>
+          </div>
+        </div>
+
+      </div>
+
+      <figure class="journey-visual" aria-label="A quiet path through distant green ridgelines">
+        <Picture
+          src={journeyAtmosphere}
+          alt="A quiet path through distant green ridgelines beneath a pale, cloud-layered sky."
+          formats={["avif", "webp"]}
+          widths={[640, 960, 1280]}
+          sizes="(max-width: 900px) 100vw, 48vw"
+          loading="eager"
+          decoding="async"
+        />
+        <span class="journey-visual-label">Build Week · 01</span>
+      </figure>
+    </section>
+
   </main>
 </SiteLayout>

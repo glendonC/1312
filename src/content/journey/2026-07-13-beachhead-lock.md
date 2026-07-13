@@ -3,7 +3,7 @@ title: Beachhead and problem lock
 description: "Korean YouTube/clips first. Prove cold vs prepped on fixed audio, not \"every live tool sucks.\""
 date: 2026-07-13
 type: note
-draft: false
+draft: true
 ---
 
 Locked for Build Week (Jul 13–21):

@@ -29,3 +29,20 @@ const currentLabel =
 
   <a class="cta-link" href="/studio/">Open Studio</a>
 </header>
+
+<script>
+  const scrollState = window as Window & { __siteHeaderScrollBound?: boolean };
+  const syncHeaderScrollState = () => {
+    document
+      .querySelector<HTMLElement>(".site-header")
+      ?.classList.toggle("is-scrolled", window.scrollY > 24);
+  };
+
+  if (!scrollState.__siteHeaderScrollBound) {
+    window.addEventListener("scroll", syncHeaderScrollState, { passive: true });
+    document.addEventListener("astro:page-load", syncHeaderScrollState);
+    scrollState.__siteHeaderScrollBound = true;
+  }
+
+  syncHeaderScrollState();
+</script>

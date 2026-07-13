@@ -3,7 +3,7 @@ title: Homophone miss on ko-clip-01
 description: "error_type=homophone. Stub EN guessed a fluent wrong person name; meaning inverted on a hard line."
 date: 2026-07-16
 type: failure
-draft: false
+draft: true
 clip: ko-clip-01
 run: run-002
 ---

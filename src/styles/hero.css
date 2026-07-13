@@ -79,17 +79,21 @@
 /* The demo link closes the sentence rather than floating under it, so the aside
    reads as one object instead of a paragraph with an orphan beneath it. Balanced
    wrapping keeps the lines within about 70px of each other. */
+/* The leading is what lets the chip belong. A chip resting on the baseline needs
+   its full height in the space above that baseline, and a line box only offers
+   half-leading + ascent. At 1.7 that was 21.2px against a 26px chip, so the last
+   line was forced open and drifted away from the paragraph. At 2.0 there is 23.9px,
+   which holds a 24px chip with the rhythm dead even. */
 .hero-aside p {
-  /* Same trim as the h1, recomputed for this line-height: 0.25em of descender
-     plus (1.7 - 1.2127) / 2 of half-leading sits under the last baseline. Cutting
-     it puts the paragraph's box bottom on that baseline, so the grid lands the
-     headline's baseline, this paragraph's last baseline, and the chip's bottom
-     border on one line. */
-  margin: 0 0 -0.494em;
+  /* Same trim as the h1: 0.25em of descender plus (2.0 - 1.2127) / 2 of
+     half-leading sits under the last baseline. Cutting it ends the paragraph's box
+     on that baseline, so the headline's baseline, this paragraph's last baseline,
+     and the chip's bottom border all land on one line. */
+  margin: 0 0 -0.644em;
   color: rgba(251, 255, 249, 0.88);
   font-size: 1.1rem;
   font-weight: var(--weight-regular);
-  line-height: 1.7;
+  line-height: 2;
   text-wrap: balance;
 }
 
@@ -99,68 +103,90 @@
   white-space: nowrap;
 }
 
-/* The chip has to fit inside the paragraph's 30px line box. Any taller and it
-   pries the last line open, which is what makes an inline control read as an
-   object dropped onto the text rather than part of it. 26px is the ceiling.
-   Shrinking it that far costs affordance, so the arrow pays it back: at text
-   scale a bare pill can be mistaken for a tag, and the arrow is what says
-   destination. Its shadow drops to a close one, since a standalone button's
-   halo would smear across the copy behind it. */
-/* An inline-block whose overflow is not visible takes its bottom margin edge as
-   its baseline, which is how the chip rests its bottom border on the line of text
-   instead of hanging 8px under it. .button already hides its overflow, so the chip
-   only has to stop being a flex container. */
+/* An inline-block whose overflow is not visible takes its bottom margin edge as its
+   baseline, which is how the chip rests its bottom border on the line of text rather
+   than hanging under it. .button already hides its overflow, so the chip only has to
+   stop being a flex container. 24px is what the 2.0 leading leaves above the baseline.
+
+   No backdrop-filter, unlike every other glass control on the hero: at this size,
+   under a near-opaque fill, the blur is invisible, but it makes the browser re-sample
+   and re-blur the photograph behind the label on every frame of a hover, and the label
+   shimmers on the shifting backdrop. A flat fill holds still, and background-color
+   interpolates natively, which a gradient never does.
+
+   One object, one value. A control this small cannot carry two tones — an ink disc on
+   a white pill becomes the darkest mass on the hero and reads as a widget bolted to a
+   word. The pill is the object; the mark is a detail on it, in the label's own ink. */
 .cta-inline {
   display: inline-block;
-  height: 26px;
+  height: 24px;
   min-height: 0;
   margin-left: 8px;
   border-radius: 999px;
   padding: 0 12px;
+  color: #16342e;
+  background: rgba(255, 255, 255, 0.9);
   font-size: 0.78rem;
-  line-height: 26px;
+  line-height: 24px;
   vertical-align: baseline;
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.75),
     0 3px 10px rgba(5, 31, 26, 0.16);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
-/* The chip sits in a line of text, so lifting it on hover would jog the
-   sentence. The arrow travels instead. */
+/* Every other control on the site lifts on hover. This one cannot: it rests on the
+   baseline of a sentence, and lifting it would jog the line of text it sits in. The
+   fill clears and the mark comes up to full strength instead. */
 .cta-inline:hover,
 .cta-inline:focus-visible {
   transform: none;
-  background:
-    linear-gradient(135deg, #ffffff, rgba(255, 255, 255, 0.86)),
-    rgba(255, 255, 255, 0.86);
+  background-color: #ffffff;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.9),
+    0 5px 14px rgba(5, 31, 26, 0.22);
 }
 
-.cta-arrow {
-  margin-left: 5px;
+.cta-inline:active {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.7),
+    0 1px 3px rgba(5, 31, 26, 0.2);
+  transition-duration: 80ms;
+}
+
+/* An arrow only says "elsewhere". The studio is a thing you run — the dock holds a run
+   and lets it go again — so the mark is the run itself. Phosphor's filled play, not an
+   outline one: astro-icon renders through a <use> clone, so an outline glyph cannot be
+   filled from CSS, and a hollow triangle reads as a scratch at this size. It sits back
+   at 68% and comes forward on hover, which is all the emphasis an 11px glyph can take. */
+.cta-icon {
+  width: 11px;
+  height: 11px;
+  margin-left: 6px;
   vertical-align: middle;
-  transition: translate 160ms ease;
+  opacity: 0.68;
+  transition: opacity 160ms ease;
 }
 
-.cta-inline:hover .cta-arrow,
-.cta-inline:focus-visible .cta-arrow {
-  translate: 2px 0;
+.cta-inline:hover .cta-icon,
+.cta-inline:focus-visible .cta-icon {
+  opacity: 1;
 }
 
-/* 26px is comfortable for a cursor and tight for a thumb, so where the pointer
-   is coarse the chip takes the extra height and the 2px of leading it costs. */
-@media (pointer: coarse) {
-  .cta-inline {
-    height: 32px;
-    padding: 0 14px;
-    line-height: 32px;
-  }
+.cta-inline:hover .cta-icon,
+.cta-inline:focus-visible .cta-icon {
+  scale: 1.14;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .cta-arrow {
-    transition: none;
-  }
-}
+/* No coarse-pointer bump: growing the chip on touch would pry the last line open
+   again, and WCAG exempts targets whose size is constrained by the line-height of
+   the sentence they sit in. 24px meets the minimum regardless. */
+
 
 @media (max-width: 1400px) {
   .hero-content {

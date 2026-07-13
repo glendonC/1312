@@ -1,0 +1,528 @@
+{
+  "run": "run-005",
+  "clip": "ko-clip-01",
+  "pair": {
+    "source": "ko",
+    "target": "en"
+  },
+  "cues": [
+    {
+      "id": "c01",
+      "t_start": 0,
+      "t_end": 3.63,
+      "speakers": [
+        "s1"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "자, 오늘 게스트 모셨습니다. 다은 씨."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "All right, our guest tonight. Daeun."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "자, 오늘 게스트 모셨습니다. 다은 씨."
+        },
+        "target": {
+          "lang": "en",
+          "text": "So, we have a guest today. Ms. Daeun."
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
+      "id": "c02",
+      "t_start": 3.68,
+      "t_end": 5.66,
+      "speakers": [
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "안녕하세요, 다은입니다."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Hi, everyone. I'm Daeun."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "안녕하세요, 다은입니다."
+        },
+        "target": {
+          "lang": "en",
+          "text": "Hello, I'm Daeun."
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
+      "id": "c03",
+      "t_start": 5.71,
+      "t_end": 10.41,
+      "speakers": [
+        "s1"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "팀 나오고 첫 방송이시죠? 그때 멤버가 몇 명이었어요?"
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "First time on TV since you left the group, right? How many of you were there back then?"
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "팀 나오고 첫 방송이시죠? 그때 멤버가 몇 명이었어요?"
+        },
+        "target": {
+          "lang": "en",
+          "text": "This is your first broadcast since leaving the team, right? How many members were there at the time?"
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
+      "id": "c04",
+      "t_start": 10.46,
+      "t_end": 12.04,
+      "speakers": [
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "네, 다섯 명이요."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Yeah, five of us."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "네다섯 명이요."
+        },
+        "target": {
+          "lang": "en",
+          "text": "About four or five people."
+        }
+      },
+      "hard": true,
+      "error_type": "boundary",
+      "error_subtype": "ko.numeral_boundary",
+      "recovered": "A 240ms pause after 네 is the only thing separating an affirmation from the word 네다섯 (\"four or five\"). Cold lost the pause; the count is silently wrong.",
+      "owner": "translate-01"
+    },
+    {
+      "id": "c05",
+      "t_start": 12.09,
+      "t_end": 16,
+      "speakers": [
+        "s1"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "다섯 명. 그중에 끝까지 남은 사람은요?"
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Five. And who stuck it out to the end?"
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "다섯 명. 그중에 끝까지 남은 사람은요?"
+        },
+        "target": {
+          "lang": "en",
+          "text": "Five people. And who stayed until the end?"
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
+      "id": "c06",
+      "t_start": 16.05,
+      "t_end": 17.46,
+      "speakers": [
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "저랑 준호 오빠요."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Just me and Junho."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "저랑 준호 오빠요."
+        },
+        "target": {
+          "lang": "en",
+          "text": "Me and my older brother Junho."
+        }
+      },
+      "hard": true,
+      "error_type": "other",
+      "error_subtype": "ko.kinship_address",
+      "recovered": "오빠 is an address form for an older man, not a sibling. Cold invents a brother; the glossary knows 준호 is a former bandmate, so the correct subtitle drops 오빠 entirely.",
+      "owner": "translate-01"
+    },
+    {
+      "id": "c08",
+      "t_start": 18.2,
+      "t_end": 21,
+      "speakers": [
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "근데 그때부터 사랑이 식은 거죠, 뭐."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "And I guess that's when the love kind of died."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "근데 그때부터 사랑이 식은 거죠, 뭐."
+        },
+        "target": {
+          "lang": "en",
+          "text": "That's when Sarang cooled off."
+        }
+      },
+      "hard": true,
+      "error_type": "homophone",
+      "error_subtype": "ko.name_common_noun",
+      "recovered": "사랑 is both the common noun \"love\" and a real given name. The cold path promoted it to a person. The cast list is closed, so a person outside it is demoted back to the noun. This is the miss first logged in run-002.",
+      "owner": "translate-01"
+    },
+    {
+      "id": "c09",
+      "t_start": 21.1,
+      "t_end": 23.63,
+      "speakers": [
+        "s1"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "그때 왜 해명 안 하셨어요?"
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Why didn't you set the record straight back then?"
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "그때 왜 해명 안 하셨어요?"
+        },
+        "target": {
+          "lang": "en",
+          "text": "Why didn't you explain yourself back then?"
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
+      "id": "c10",
+      "t_start": 23.68,
+      "t_end": 26.03,
+      "speakers": [
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "못 한 게 아니라 안 한 거예요."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "It's not that I couldn't. I chose not to."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "못 한 게 아니라 · 안 한 거예요."
+        },
+        "target": {
+          "lang": "en",
+          "text": "I couldn't do it. · I didn't do it."
+        }
+      },
+      "hard": true,
+      "error_type": "boundary",
+      "error_subtype": "ko.contrastive_split",
+      "recovered": "A 250ms breath splits one contrastive sentence in two. Cold translated each half alone, so the \"not that I couldn't\" half lost what it was contrasting against and asserted the opposite. Its two lines contradict each other on screen.",
+      "owner": "translate-02"
+    },
+    {
+      "id": "c11",
+      "t_start": 26.08,
+      "t_end": 27.87,
+      "speakers": [
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "말하면 더 커지잖아요."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Say anything and it just gets bigger."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "말하면 더 커지잖아요."
+        },
+        "target": {
+          "lang": "en",
+          "text": "If you say something, it only gets bigger."
+        }
+      },
+      "owner": "translate-02"
+    },
+    {
+      "id": "c12",
+      "t_start": 30,
+      "t_end": 32.14,
+      "speakers": [
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "지금은… 뭐, 괜찮아요."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": null,
+          "withheld": {
+            "gate": "music",
+            "reason": "speech SNR -5 dB, lexical confidence 0.31 < 0.60"
+          }
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "구독과 좋아요 부탁드립니다."
+        },
+        "target": {
+          "lang": "en",
+          "text": "Please subscribe and like."
+        }
+      },
+      "hard": true,
+      "error_type": "music",
+      "error_subtype": "universal.asr_boilerplate",
+      "owner": "translate-02"
+    },
+    {
+      "id": "c13",
+      "t_start": 32.19,
+      "t_end": 34.72,
+      "speakers": [
+        "s1"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "괜찮긴 뭐가 괜찮아요."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": null,
+          "withheld": {
+            "gate": "music",
+            "reason": "music + laugh transient, lexical confidence 0.38 < 0.60"
+          }
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "괜찮아요. 괜찮아요. 괜찮아요. 괜찮아요."
+        },
+        "target": {
+          "lang": "en",
+          "text": "It's okay. It's okay. It's okay. It's okay."
+        }
+      },
+      "hard": true,
+      "error_type": "music",
+      "error_subtype": "universal.repetition_loop",
+      "owner": "translate-02"
+    },
+    {
+      "id": "c14",
+      "t_start": 34.77,
+      "t_end": 37.78,
+      "speakers": [
+        "s1",
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "그럼 다시 모이면— · —아니요, 그건 아니고요."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "No, no, it's not that. · So if you all got back together—"
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "그럼 다시 모이면 아니요, 그건 아니고요."
+        },
+        "target": {
+          "lang": "en",
+          "text": "So if we get back together, no, it's not that."
+        }
+      },
+      "hard": true,
+      "error_type": "other",
+      "error_subtype": "universal.speaker_attribution",
+      "regression": "run-004 attributed this overlap correctly. run-005 flipped the speakers and credits the host with the guest's refusal. The entity gate does not cover attribution, so nothing caught it.",
+      "owner": "translate-02"
+    },
+    {
+      "id": "c15",
+      "t_start": 37.83,
+      "t_end": 41.37,
+      "speakers": [
+        "s1"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "알겠습니다. 마지막으로 한마디만."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "All right. One last word, then."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "알겠습니다. 마지막으로 한마디만."
+        },
+        "target": {
+          "lang": "en",
+          "text": "I understand. Just one last word."
+        }
+      },
+      "owner": "translate-02"
+    },
+    {
+      "id": "c16",
+      "t_start": 41.42,
+      "t_end": 44.4,
+      "speakers": [
+        "s2"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "기다려 주신 분들께 진심으로 감사합니다."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "To everyone who waited for me — thank you, sincerely."
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "기다려 주신 분들께 진심으로 감사합니다."
+        },
+        "target": {
+          "lang": "en",
+          "text": "I sincerely thank those who waited."
+        }
+      },
+      "owner": "translate-02"
+    },
+    {
+      "id": "c17",
+      "t_start": 44.6,
+      "t_end": 47.2,
+      "speakers": [],
+      "source": {
+        "lang": "ko",
+        "text": null
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": null
+        }
+      ],
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "시청해 주셔서 감사합니다."
+        },
+        "target": {
+          "lang": "en",
+          "text": "Thanks for watching!"
+        }
+      },
+      "silence": true,
+      "hard": true,
+      "error_type": "hallucination",
+      "error_subtype": "universal.silence_outro",
+      "recovered": "2.6s of digital silence. The cold path captioned it with the most common ASR outro hallucination there is. run-005 emits nothing.",
+      "owner": "qc-01"
+    }
+  ]
+}

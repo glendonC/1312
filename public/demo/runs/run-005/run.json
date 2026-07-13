@@ -1,0 +1,98 @@
+{
+  "id": "run-005",
+  "pair": {
+    "source": "ko",
+    "target": "en"
+  },
+  "pack": "ko-v3",
+  "clip": {
+    "id": "ko-clip-01",
+    "title": "심야 토크 · 게스트 다은",
+    "title_target": "Late Night Talk — guest Daeun",
+    "lang": "ko",
+    "duration": 47.2,
+    "speakers": [
+      {
+        "id": "s1",
+        "label": "host"
+      },
+      {
+        "id": "s2",
+        "label": "guest"
+      }
+    ],
+    "music": [
+      [
+        30.0,
+        41.0
+      ]
+    ],
+    "silence": [
+      [
+        17.21,
+        18.2
+      ],
+      [
+        44.6,
+        47.2
+      ]
+    ],
+    "source": {
+      "kind": "synthetic",
+      "label": "synthetic dev clip",
+      "note": "Scripted and voiced with TTS. Fictional cast, no real people. Built to contain 8 known ko->en failure modes so the answers are known in advance. It is a test fixture, not a benchmark clip: Hard-KO Clip Pack v1 is separate and its gold is not frozen."
+    },
+    "media": "clip.m4a"
+  },
+  "wall_s": 171.0,
+  "recorded": "2026-07-19",
+  "agents": [
+    {
+      "id": "segment-01",
+      "role": "segment",
+      "label": "segment-01",
+      "parent": "orchestrator"
+    },
+    {
+      "id": "context-01",
+      "role": "context",
+      "label": "context-01",
+      "parent": "orchestrator"
+    },
+    {
+      "id": "translate-01",
+      "role": "translate",
+      "label": "translate-01",
+      "parent": "orchestrator",
+      "window": [
+        0.0,
+        24.0
+      ]
+    },
+    {
+      "id": "translate-02",
+      "role": "translate",
+      "label": "translate-02",
+      "parent": "orchestrator",
+      "divided_from": "translate-01",
+      "window": [
+        24.0,
+        47.2
+      ]
+    },
+    {
+      "id": "qc-01",
+      "role": "qc",
+      "label": "qc-01",
+      "parent": "orchestrator"
+    }
+  ],
+  "artifacts": [
+    "captions.json",
+    "corrections.json",
+    "glossary.json",
+    "score.json",
+    "traces.json"
+  ],
+  "note": "Recorded run replayed by the Studio. The swarm that produced it is still the stub orchestrator described in the build log, not a live Codex fleet."
+}

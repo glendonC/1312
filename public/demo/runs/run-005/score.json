@@ -1,0 +1,316 @@
+{
+  "run": "run-005",
+  "clip": "ko-clip-01",
+  "pair": {
+    "source": "ko",
+    "target": "en"
+  },
+  "pack": "ko-v3",
+  "status": "provisional",
+  "rubric": {
+    "hard_lines": 8,
+    "criteria": [
+      "entity",
+      "meaning",
+      "honesty"
+    ],
+    "points_max": 24,
+    "note": "Synthetic dev clip, n=1, with the 8 failures planted on purpose. Not Hard-KO Clip Pack v1, whose gold is not frozen and which stays unscored on /benchmarks/. Each hard line scores entity, meaning and honesty, 1 point each."
+  },
+  "paths": {
+    "cold": {
+      "label": "Cold one-shot",
+      "points": 8,
+      "hard_line": 0.33,
+      "coverage": 1.0,
+      "time_to_usable_s": 11,
+      "withheld": 0,
+      "hallucinated": 4,
+      "note": "Single-pass ASR into MT. No glossary, no gates. Coverage reads 1.00 because it captions the silence too."
+    },
+    "run-003": {
+      "label": "Run 1",
+      "points": 14,
+      "hard_line": 0.58,
+      "coverage": 1.0,
+      "time_to_usable_s": 156,
+      "withheld": 0,
+      "hallucinated": 3,
+      "note": "Glossary seeded from the run-002 miss. No QC gate yet."
+    },
+    "run-004": {
+      "label": "Run 2",
+      "points": 16,
+      "hard_line": 0.67,
+      "coverage": 0.87,
+      "time_to_usable_s": 168,
+      "withheld": 2,
+      "hallucinated": 1,
+      "regressions": 0,
+      "note": "QC gate lands. It withholds instead of guessing, which costs coverage and buys honesty."
+    },
+    "run-005": {
+      "label": "Run 3 · this run",
+      "points": 18,
+      "hard_line": 0.75,
+      "coverage": 0.87,
+      "time_to_usable_s": 171,
+      "withheld": 2,
+      "hallucinated": 0,
+      "regressions": 1,
+      "note": "Silence gate lands. One overlap line regressed and is shown, not hidden."
+    },
+    "youtube_auto": {
+      "label": "YouTube auto-translate",
+      "points": null,
+      "hard_line": null,
+      "coverage": null,
+      "time_to_usable_s": null,
+      "withheld": null,
+      "hallucinated": null,
+      "status": "not_captured",
+      "note": "Not captured. Needs a date-stamped run on a public clip, so it stays empty rather than guessed."
+    }
+  },
+  "trail": [
+    {
+      "run": "run-003",
+      "hard_line": 0.58
+    },
+    {
+      "run": "run-004",
+      "hard_line": 0.67
+    },
+    {
+      "run": "run-005",
+      "hard_line": 0.75
+    }
+  ],
+  "delta_vs_cold": 0.42,
+  "per_line": [
+    {
+      "cue": "c04",
+      "error_type": "boundary",
+      "error_subtype": "ko.numeral_boundary",
+      "label": "the count",
+      "scores": {
+        "cold": {
+          "e": 0,
+          "m": 0,
+          "h": 1
+        },
+        "run-003": {
+          "e": 0,
+          "m": 1,
+          "h": 1
+        },
+        "run-004": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        },
+        "run-005": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        }
+      }
+    },
+    {
+      "cue": "c06",
+      "error_type": "other",
+      "error_subtype": "ko.kinship_address",
+      "label": "who she stayed with",
+      "scores": {
+        "cold": {
+          "e": 0,
+          "m": 0,
+          "h": 1
+        },
+        "run-003": {
+          "e": 0,
+          "m": 1,
+          "h": 1
+        },
+        "run-004": {
+          "e": 0,
+          "m": 1,
+          "h": 1
+        },
+        "run-005": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        }
+      }
+    },
+    {
+      "cue": "c08",
+      "error_type": "homophone",
+      "error_subtype": "ko.name_common_noun",
+      "label": "love, or a person",
+      "scores": {
+        "cold": {
+          "e": 0,
+          "m": 0,
+          "h": 0
+        },
+        "run-003": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        },
+        "run-004": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        },
+        "run-005": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        }
+      }
+    },
+    {
+      "cue": "c10",
+      "error_type": "boundary",
+      "error_subtype": "ko.contrastive_split",
+      "label": "couldn't, or chose not to",
+      "scores": {
+        "cold": {
+          "e": 1,
+          "m": 0,
+          "h": 1
+        },
+        "run-003": {
+          "e": 1,
+          "m": 0,
+          "h": 1
+        },
+        "run-004": {
+          "e": 1,
+          "m": 0,
+          "h": 1
+        },
+        "run-005": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        }
+      }
+    },
+    {
+      "cue": "c12",
+      "error_type": "music",
+      "error_subtype": "universal.asr_boilerplate",
+      "label": "line under music",
+      "scores": {
+        "cold": {
+          "e": 1,
+          "m": 0,
+          "h": 0
+        },
+        "run-003": {
+          "e": 1,
+          "m": 0,
+          "h": 0
+        },
+        "run-004": {
+          "e": 0,
+          "m": 0,
+          "h": 1
+        },
+        "run-005": {
+          "e": 0,
+          "m": 0,
+          "h": 1
+        }
+      }
+    },
+    {
+      "cue": "c13",
+      "error_type": "music",
+      "error_subtype": "universal.repetition_loop",
+      "label": "line under music and laughter",
+      "scores": {
+        "cold": {
+          "e": 1,
+          "m": 0,
+          "h": 0
+        },
+        "run-003": {
+          "e": 1,
+          "m": 0,
+          "h": 0
+        },
+        "run-004": {
+          "e": 0,
+          "m": 0,
+          "h": 1
+        },
+        "run-005": {
+          "e": 0,
+          "m": 0,
+          "h": 1
+        }
+      }
+    },
+    {
+      "cue": "c14",
+      "error_type": "other",
+      "error_subtype": "universal.speaker_attribution",
+      "label": "who refuses",
+      "scores": {
+        "cold": {
+          "e": 0,
+          "m": 0,
+          "h": 1
+        },
+        "run-003": {
+          "e": 0,
+          "m": 1,
+          "h": 1
+        },
+        "run-004": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        },
+        "run-005": {
+          "e": 0,
+          "m": 0,
+          "h": 1
+        }
+      }
+    },
+    {
+      "cue": "c17",
+      "error_type": "hallucination",
+      "error_subtype": "universal.silence_outro",
+      "label": "silence",
+      "scores": {
+        "cold": {
+          "e": 1,
+          "m": 0,
+          "h": 0
+        },
+        "run-003": {
+          "e": 1,
+          "m": 0,
+          "h": 0
+        },
+        "run-004": {
+          "e": 1,
+          "m": 0,
+          "h": 0
+        },
+        "run-005": {
+          "e": 1,
+          "m": 1,
+          "h": 1
+        }
+      }
+    }
+  ]
+}

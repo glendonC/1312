@@ -1,0 +1,98 @@
+{
+  "run": "run-005",
+  "clip": "ko-clip-01",
+  "pack": "ko-v3",
+  "rows": [
+    {
+      "source_video": "ko-clip-01",
+      "t_start": 10.46,
+      "t_end": 12.04,
+      "raw": "About four or five people.",
+      "final": "Yeah, five of us.",
+      "error_type": "boundary",
+      "error_subtype": "ko.numeral_boundary",
+      "lang": "en",
+      "withhold": false,
+      "run": "run-005",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "ko-clip-01",
+      "t_start": 16.05,
+      "t_end": 17.46,
+      "raw": "Me and my older brother Junho.",
+      "final": "Just me and Junho.",
+      "error_type": "other",
+      "error_subtype": "ko.kinship_address",
+      "lang": "en",
+      "withhold": false,
+      "run": "run-005",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "ko-clip-01",
+      "t_start": 18.2,
+      "t_end": 21,
+      "raw": "That's when Sarang cooled off.",
+      "final": "And I guess that's when the love kind of died.",
+      "error_type": "homophone",
+      "error_subtype": "ko.name_common_noun",
+      "lang": "en",
+      "withhold": false,
+      "run": "run-005",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "ko-clip-01",
+      "t_start": 23.68,
+      "t_end": 26.03,
+      "raw": "I couldn't do it. · I didn't do it.",
+      "final": "It's not that I couldn't. I chose not to.",
+      "error_type": "boundary",
+      "error_subtype": "ko.contrastive_split",
+      "lang": "en",
+      "withhold": false,
+      "run": "run-005",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "ko-clip-01",
+      "t_start": 30,
+      "t_end": 32.14,
+      "raw": "Please subscribe and like.",
+      "final": null,
+      "error_type": "music",
+      "error_subtype": "universal.asr_boilerplate",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-005",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "ko-clip-01",
+      "t_start": 32.19,
+      "t_end": 34.72,
+      "raw": "It's okay. It's okay. It's okay. It's okay.",
+      "final": null,
+      "error_type": "music",
+      "error_subtype": "universal.repetition_loop",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-005",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "ko-clip-01",
+      "t_start": 44.6,
+      "t_end": 47.2,
+      "raw": "Thanks for watching!",
+      "final": null,
+      "error_type": "hallucination",
+      "error_subtype": "universal.silence_outro",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-005",
+      "pack": "ko-v3"
+    }
+  ]
+}

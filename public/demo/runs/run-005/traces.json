@@ -1,0 +1,1366 @@
+{
+  "run": "run-005",
+  "clip": "ko-clip-01",
+  "wall_s": 171.0,
+  "traces": [
+    {
+      "t": 0.0,
+      "agent": "orchestrator",
+      "action": "inspect",
+      "target": "ko-clip-01",
+      "detail": "47.2s · 2 speakers · music from 30.0 · 2.6s silent tail · hardness 0.62",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "orchestrator",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 1.6,
+      "agent": "orchestrator",
+      "action": "spawn",
+      "target": "segment-01",
+      "detail": "one segmenter is enough for 47s",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "segment-01",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 2.2,
+      "agent": "orchestrator",
+      "action": "spawn",
+      "target": "context-01",
+      "detail": "memory lookup runs in parallel with segmentation",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "context-01",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 3.0,
+      "agent": "segment-01",
+      "action": "open",
+      "target": "workspace",
+      "detail": "isolated workspace",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "segment-01",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 3.6,
+      "agent": "context-01",
+      "action": "open",
+      "target": "workspace",
+      "detail": "isolated workspace",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "context-01",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 5.0,
+      "agent": "context-01",
+      "action": "lookup",
+      "target": "memory/glossary/ko",
+      "detail": "3 entries carried over from run-002",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "준호",
+          "gloss": "person · former member"
+        }
+      }
+    },
+    {
+      "t": 6.4,
+      "agent": "segment-01",
+      "action": "scrub",
+      "target": "0.0 → 10.0",
+      "detail": "reading the waveform",
+      "level": "info",
+      "clip_t": 5.0,
+      "view": {
+        "playhead": 5.0
+      }
+    },
+    {
+      "t": 8.2,
+      "agent": "context-01",
+      "action": "lookup",
+      "target": "cast",
+      "detail": "cast list closed at 3 names",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "다은",
+          "gloss": "person · guest"
+        }
+      }
+    },
+    {
+      "t": 9.6,
+      "agent": "segment-01",
+      "action": "vad",
+      "target": "10.70",
+      "detail": "240ms pause inside a speech run · a numeral may be hiding behind it",
+      "level": "warn",
+      "clip_t": 10.7,
+      "view": {
+        "playhead": 10.7,
+        "mark": {
+          "label": "c04",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 11.5,
+      "agent": "context-01",
+      "action": "lookup",
+      "target": "memory/rules/ko",
+      "detail": "5 gates loaded · 3 universal, 2 Korean",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "사랑",
+          "gloss": "common noun · not a cast name"
+        }
+      }
+    },
+    {
+      "t": 13.0,
+      "agent": "segment-01",
+      "action": "scrub",
+      "target": "10.0 → 18.0",
+      "detail": "reading the waveform",
+      "level": "info",
+      "clip_t": 14.0,
+      "view": {
+        "playhead": 14.0
+      }
+    },
+    {
+      "t": 14.4,
+      "agent": "context-01",
+      "action": "lookup",
+      "target": "memory/glossary/ko",
+      "detail": "address forms are not kinship",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "오빠",
+          "gloss": "address form · not a brother"
+        }
+      }
+    },
+    {
+      "t": 16.0,
+      "agent": "segment-01",
+      "action": "detect",
+      "target": "17.21",
+      "detail": "1.0s beat · no speech",
+      "level": "info",
+      "clip_t": 17.21,
+      "view": {
+        "playhead": 17.21
+      }
+    },
+    {
+      "t": 17.5,
+      "agent": "context-01",
+      "action": "report",
+      "target": "glossary",
+      "detail": "6 entries · cast closed · 5 gates",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "context-01",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 19.0,
+      "agent": "segment-01",
+      "action": "mark",
+      "target": "c08",
+      "detail": "bare subject on an idiom-locked collocation",
+      "level": "warn",
+      "clip_t": 18.2,
+      "view": {
+        "playhead": 18.2,
+        "mark": {
+          "label": "c08",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 20.5,
+      "agent": "orchestrator",
+      "action": "merge",
+      "target": "context-01",
+      "detail": "glossary and rules folded into the job context",
+      "level": "info"
+    },
+    {
+      "t": 21.5,
+      "agent": "context-01",
+      "action": "retire",
+      "target": "context-01",
+      "detail": "reported up · nothing left to do",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "context-01",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 24.0,
+      "agent": "segment-01",
+      "action": "vad",
+      "target": "24.66",
+      "detail": "250ms breath mid-sentence · splitting here would cut a contrast in half",
+      "level": "warn",
+      "clip_t": 24.66,
+      "view": {
+        "playhead": 24.66,
+        "mark": {
+          "label": "c10",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 27.0,
+      "agent": "segment-01",
+      "action": "detect",
+      "target": "30.00",
+      "detail": "music onset · speech SNR -5 dB",
+      "level": "warn",
+      "clip_t": 30.0,
+      "view": {
+        "playhead": 30.0,
+        "mark": {
+          "label": "c12",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 29.5,
+      "agent": "segment-01",
+      "action": "detect",
+      "target": "33.40",
+      "detail": "laugh transient over speech",
+      "level": "warn",
+      "clip_t": 33.4,
+      "view": {
+        "playhead": 33.4,
+        "mark": {
+          "label": "c13",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 32.0,
+      "agent": "segment-01",
+      "action": "diarize",
+      "target": "35.95",
+      "detail": "both speakers talking for 0.5s",
+      "level": "warn",
+      "clip_t": 35.95,
+      "view": {
+        "playhead": 35.95,
+        "mark": {
+          "label": "c14",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 35.0,
+      "agent": "segment-01",
+      "action": "detect",
+      "target": "44.60",
+      "detail": "2.6s of digital silence · no room tone",
+      "level": "warn",
+      "clip_t": 44.6,
+      "view": {
+        "playhead": 44.6,
+        "mark": {
+          "label": "c17",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 38.0,
+      "agent": "segment-01",
+      "action": "report",
+      "target": "16 cues",
+      "detail": "timed source lines · empty target slots · 8 hard candidates",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "segment-01",
+          "status": "reporting"
+        },
+        {
+          "type": "cues",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 40.0,
+      "agent": "orchestrator",
+      "action": "merge",
+      "target": "segment-01",
+      "detail": "the transcript has its shape · nothing translated yet",
+      "level": "info"
+    },
+    {
+      "t": 42.0,
+      "agent": "orchestrator",
+      "action": "spawn",
+      "target": "translate-01",
+      "detail": "translate and qc spawn as a pair · rule from run-004",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-01",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 42.6,
+      "agent": "orchestrator",
+      "action": "spawn",
+      "target": "qc-01",
+      "detail": "no translator ships without a gate",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 44.0,
+      "agent": "translate-01",
+      "action": "open",
+      "target": "workspace",
+      "detail": "cues c01–c09",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-01",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 44.6,
+      "agent": "qc-01",
+      "action": "open",
+      "target": "workspace",
+      "detail": "5 gates armed",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 46.0,
+      "agent": "segment-01",
+      "action": "retire",
+      "target": "segment-01",
+      "detail": "reported up · nothing left to do",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "segment-01",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 48.0,
+      "agent": "orchestrator",
+      "action": "divide",
+      "target": "translate-01",
+      "detail": "16 cues is over the 8-cue worker limit · dividing",
+      "level": "info"
+    },
+    {
+      "t": 49.5,
+      "agent": "translate-01",
+      "action": "divide",
+      "target": "translate-02",
+      "detail": "second half handed to a new worker · 24.0–47.2",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-02",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 51.0,
+      "agent": "translate-02",
+      "action": "open",
+      "target": "workspace",
+      "detail": "cues c10–c16",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-02",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 54.0,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c01",
+      "detail": "confidence 0.95",
+      "level": "info",
+      "clip_t": 0,
+      "view": {
+        "draft": {
+          "source": "자, 오늘 게스트 모셨습니다. 다은 씨.",
+          "target": "All right, our guest tonight. Daeun.",
+          "conf": 0.95
+        }
+      }
+    },
+    {
+      "t": 56.0,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c01",
+      "detail": "clean · confidence 0.95",
+      "level": "info",
+      "clip_t": 0,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.95,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c01",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.07
+        }
+      ]
+    },
+    {
+      "t": 57.6,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c10",
+      "detail": "confidence 0.55 · below the gate",
+      "level": "warn",
+      "clip_t": 23.68,
+      "view": {
+        "draft": {
+          "source": "못 한 게 아니라 안 한 거예요.",
+          "target": "It's not that I couldn't. I chose not to.",
+          "conf": 0.55
+        }
+      }
+    },
+    {
+      "t": 59.6,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c10",
+      "detail": "A가 아니라 B was split in half · rejoining before translating",
+      "level": "gate",
+      "clip_t": 23.68,
+      "view": {
+        "gate": {
+          "name": "contrast",
+          "scope": "pack",
+          "value": 0.55,
+          "limit": 0.6,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "corrected",
+          "text": "corrected"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c10",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "hard_line": 0.5,
+          "coverage": 0.13,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 62.0,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c02",
+      "detail": "confidence 0.96",
+      "level": "info",
+      "clip_t": 3.68,
+      "view": {
+        "draft": {
+          "source": "안녕하세요, 다은입니다.",
+          "target": "Hi, everyone. I'm Daeun.",
+          "conf": 0.96
+        }
+      }
+    },
+    {
+      "t": 64.0,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c02",
+      "detail": "clean · confidence 0.96",
+      "level": "info",
+      "clip_t": 3.68,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.96,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c02",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.2
+        }
+      ]
+    },
+    {
+      "t": 65.6,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c11",
+      "detail": "confidence 0.92",
+      "level": "info",
+      "clip_t": 26.08,
+      "view": {
+        "draft": {
+          "source": "말하면 더 커지잖아요.",
+          "target": "Say anything and it just gets bigger.",
+          "conf": 0.92
+        }
+      }
+    },
+    {
+      "t": 67.6,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c11",
+      "detail": "clean · confidence 0.92",
+      "level": "info",
+      "clip_t": 26.08,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.92,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c11",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.27
+        }
+      ]
+    },
+    {
+      "t": 69.2,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c03",
+      "detail": "confidence 0.91",
+      "level": "info",
+      "clip_t": 5.71,
+      "view": {
+        "draft": {
+          "source": "팀 나오고 첫 방송이시죠? 그때 멤버가 몇 명이었어요?",
+          "target": "First time on TV since you left the group, right? How many of you were there back then?",
+          "conf": 0.91
+        }
+      }
+    },
+    {
+      "t": 71.2,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c03",
+      "detail": "clean · confidence 0.91",
+      "level": "info",
+      "clip_t": 5.71,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.91,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c03",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.33
+        }
+      ]
+    },
+    {
+      "t": 72.8,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c04",
+      "detail": "confidence 0.52 · below the gate",
+      "level": "warn",
+      "clip_t": 10.46,
+      "view": {
+        "draft": {
+          "source": "네, 다섯 명이요.",
+          "target": "Yeah, five of us.",
+          "conf": 0.52
+        }
+      }
+    },
+    {
+      "t": 74.8,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c04",
+      "detail": "240ms pause splits 네 from 다섯 · this is an affirmation, not 네다섯",
+      "level": "gate",
+      "clip_t": 10.46,
+      "view": {
+        "gate": {
+          "name": "pause",
+          "scope": "pack",
+          "value": 0.24,
+          "limit": 0.18,
+          "fail": false
+        },
+        "stamp": {
+          "kind": "corrected",
+          "text": "corrected"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c04",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "hard_line": 0.12,
+          "coverage": 0.4,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 77.2,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c12",
+      "detail": "confidence 0.31 · below the gate",
+      "level": "warn",
+      "clip_t": 30,
+      "view": {
+        "draft": {
+          "source": "지금은… 뭐, 괜찮아요.",
+          "target": "—",
+          "conf": 0.31
+        }
+      }
+    },
+    {
+      "t": 79.2,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c12",
+      "detail": "speech SNR -5 dB · will not guess under music",
+      "level": "gate",
+      "clip_t": 30,
+      "view": {
+        "gate": {
+          "name": "music",
+          "scope": "universal",
+          "value": 0.31,
+          "limit": 0.6,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "withheld",
+          "text": "withheld"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c12",
+          "state": "withheld"
+        },
+        {
+          "type": "score",
+          "hard_line": 0.54,
+          "coverage": 0.4,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 81.6,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c05",
+      "detail": "confidence 0.93",
+      "level": "info",
+      "clip_t": 12.09,
+      "view": {
+        "draft": {
+          "source": "다섯 명. 그중에 끝까지 남은 사람은요?",
+          "target": "Five. And who stuck it out to the end?",
+          "conf": 0.93
+        }
+      }
+    },
+    {
+      "t": 83.6,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c05",
+      "detail": "clean · confidence 0.93",
+      "level": "info",
+      "clip_t": 12.09,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.93,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c05",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.47
+        }
+      ]
+    },
+    {
+      "t": 85.2,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c13",
+      "detail": "confidence 0.38 · below the gate",
+      "level": "warn",
+      "clip_t": 32.19,
+      "view": {
+        "draft": {
+          "source": "괜찮긴 뭐가 괜찮아요.",
+          "target": "—",
+          "conf": 0.38
+        }
+      }
+    },
+    {
+      "t": 87.2,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c13",
+      "detail": "music and laughter · will not guess",
+      "level": "gate",
+      "clip_t": 32.19,
+      "view": {
+        "gate": {
+          "name": "music",
+          "scope": "universal",
+          "value": 0.38,
+          "limit": 0.6,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "withheld",
+          "text": "withheld"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c13",
+          "state": "withheld"
+        },
+        {
+          "type": "score",
+          "hard_line": 0.58,
+          "coverage": 0.47,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 89.6,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c06",
+      "detail": "confidence 0.61",
+      "level": "info",
+      "clip_t": 16.05,
+      "view": {
+        "draft": {
+          "source": "저랑 준호 오빠요.",
+          "target": "Just me and Junho.",
+          "conf": 0.61
+        }
+      }
+    },
+    {
+      "t": 91.6,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c06",
+      "detail": "오빠 is an address form · 준호 is a bandmate, not a brother",
+      "level": "gate",
+      "clip_t": 16.05,
+      "view": {
+        "gate": {
+          "name": "address",
+          "scope": "pack",
+          "value": 0.31,
+          "limit": 0.6,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "corrected",
+          "text": "corrected"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c06",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "hard_line": 0.25,
+          "coverage": 0.53,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 94.0,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c14",
+      "detail": "confidence 0.48 · below the gate",
+      "level": "warn",
+      "clip_t": 34.77,
+      "view": {
+        "draft": {
+          "source": "그럼 다시 모이면— · —아니요, 그건 아니고요.",
+          "target": "No, no, it's not that. · So if you all got back together—",
+          "conf": 0.48
+        }
+      }
+    },
+    {
+      "t": 96.0,
+      "agent": "qc-01",
+      "action": "pass",
+      "target": "c14",
+      "detail": "attribution is low but the gate only covers entities · passing it through",
+      "level": "warn",
+      "clip_t": 34.77,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.48,
+          "limit": 0.6,
+          "fail": true
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c14",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "hard_line": 0.62,
+          "coverage": 0.6,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 98.4,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c08",
+      "detail": "confidence 0.49 · below the gate",
+      "level": "warn",
+      "clip_t": 18.2,
+      "view": {
+        "draft": {
+          "source": "근데 그때부터 사랑이 식은 거죠, 뭐.",
+          "target": "And I guess that's when the love kind of died.",
+          "conf": 0.49
+        }
+      }
+    },
+    {
+      "t": 100.4,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c08",
+      "detail": "\"Sarang\" is not on the closed cast list · demoted to the common noun \"love\"",
+      "level": "gate",
+      "clip_t": 18.2,
+      "view": {
+        "gate": {
+          "name": "cast",
+          "scope": "pack",
+          "value": 0.22,
+          "limit": 0.6,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "corrected",
+          "text": "corrected"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c08",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "hard_line": 0.38,
+          "coverage": 0.67,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 102.8,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c15",
+      "detail": "confidence 0.94",
+      "level": "info",
+      "clip_t": 37.83,
+      "view": {
+        "draft": {
+          "source": "알겠습니다. 마지막으로 한마디만.",
+          "target": "All right. One last word, then.",
+          "conf": 0.94
+        }
+      }
+    },
+    {
+      "t": 104.8,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c15",
+      "detail": "clean · confidence 0.94",
+      "level": "info",
+      "clip_t": 37.83,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.94,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c15",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.73
+        }
+      ]
+    },
+    {
+      "t": 106.4,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c09",
+      "detail": "confidence 0.90",
+      "level": "info",
+      "clip_t": 21.1,
+      "view": {
+        "draft": {
+          "source": "그때 왜 해명 안 하셨어요?",
+          "target": "Why didn't you set the record straight back then?",
+          "conf": 0.9
+        }
+      }
+    },
+    {
+      "t": 108.4,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c09",
+      "detail": "clean · confidence 0.90",
+      "level": "info",
+      "clip_t": 21.1,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.9,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c09",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.8
+        }
+      ]
+    },
+    {
+      "t": 110.0,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c16",
+      "detail": "confidence 0.93",
+      "level": "info",
+      "clip_t": 41.42,
+      "view": {
+        "draft": {
+          "source": "기다려 주신 분들께 진심으로 감사합니다.",
+          "target": "To everyone who waited for me — thank you, sincerely.",
+          "conf": 0.93
+        }
+      }
+    },
+    {
+      "t": 112.0,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c16",
+      "detail": "clean · confidence 0.93",
+      "level": "info",
+      "clip_t": 41.42,
+      "view": {
+        "gate": {
+          "name": "confidence",
+          "scope": "universal",
+          "value": 0.93,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c16",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.87
+        }
+      ]
+    },
+    {
+      "t": 113.6,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c17",
+      "detail": "no speech in the window · entity confidence undefined, which is junk · emitting nothing",
+      "level": "gate",
+      "clip_t": 44.6,
+      "view": {
+        "gate": {
+          "name": "silence",
+          "scope": "universal",
+          "value": 0.0,
+          "limit": 0.6,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "dropped",
+          "text": "dropped"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c17",
+          "state": "dropped"
+        },
+        {
+          "type": "score",
+          "hard_line": 0.75,
+          "coverage": 0.87,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 116.6,
+      "agent": "translate-01",
+      "action": "report",
+      "target": "c01–c09",
+      "detail": "9 cues · 1 corrected by the gate",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-01",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 118.1,
+      "agent": "translate-02",
+      "action": "report",
+      "target": "c10–c16",
+      "detail": "7 cues · 2 withheld · 1 low-confidence pass",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-02",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 119.6,
+      "agent": "qc-01",
+      "action": "report",
+      "target": "8 hard lines",
+      "detail": "4 corrected · 2 withheld · 1 dropped · 1 passed on low confidence",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 121.6,
+      "agent": "translate-01",
+      "action": "retire",
+      "target": "translate-01",
+      "detail": "reported up",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-01",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 122.4,
+      "agent": "translate-02",
+      "action": "retire",
+      "target": "translate-02",
+      "detail": "reported up",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-02",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 123.2,
+      "agent": "qc-01",
+      "action": "retire",
+      "target": "qc-01",
+      "detail": "reported up",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 124.6,
+      "agent": "orchestrator",
+      "action": "merge",
+      "target": "16 cues",
+      "detail": "13 committed · 2 withheld · 1 dropped",
+      "level": "info"
+    },
+    {
+      "t": 126.6,
+      "agent": "orchestrator",
+      "action": "score",
+      "target": "run-005",
+      "detail": "hard lines 0.75 · +0.42 vs cold · 0 catastrophic errors · 1 regression on the overlap line",
+      "level": "gate",
+      "effects": [
+        {
+          "type": "score",
+          "hard_line": 0.75,
+          "coverage": 0.87,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 128.1,
+      "agent": "orchestrator",
+      "action": "done",
+      "target": "run-005",
+      "detail": "72 actions · 5 workers · 2:51 wall",
+      "level": "info"
+    }
+  ]
+}

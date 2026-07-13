@@ -1,0 +1,52 @@
+{
+  "run": "run-005",
+  "clip": "ko-clip-01",
+  "pack": "ko-v3",
+  "scope": "run",
+  "promoted_to": "memory/glossary/ko.json",
+  "cast_closed": true,
+  "entries": [
+    {
+      "term": "서준",
+      "lang": "ko",
+      "gloss": "Seojun · host",
+      "kind": "person",
+      "source": "clip metadata"
+    },
+    {
+      "term": "다은",
+      "lang": "ko",
+      "gloss": "Daeun · guest",
+      "kind": "person",
+      "source": "clip metadata"
+    },
+    {
+      "term": "준호",
+      "lang": "ko",
+      "gloss": "Junho · former member, not kin",
+      "kind": "person",
+      "source": "run-002 corrections"
+    },
+    {
+      "term": "오빠",
+      "lang": "ko",
+      "gloss": "address form, not a brother",
+      "kind": "address_form",
+      "source": "run-005 rule"
+    },
+    {
+      "term": "사랑",
+      "lang": "ko",
+      "gloss": "common noun \"love\" · not a cast name",
+      "kind": "term",
+      "source": "run-002 corrections"
+    },
+    {
+      "term": "심야 토크",
+      "lang": "ko",
+      "gloss": "Late Night Talk · show title",
+      "kind": "show",
+      "source": "clip metadata"
+    }
+  ]
+}

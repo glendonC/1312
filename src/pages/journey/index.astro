@@ -1,8 +1,7 @@
 ---
-import { Picture } from "astro:assets";
 import { getCollection } from "astro:content";
-import journeyAtmosphere from "../../assets/journey-atmosphere.png";
 import GlassNav from "../../components/GlassNav.astro";
+import JourneyPaperShader from "../../components/JourneyPaperShader.astro";
 import SiteLayout from "../../layouts/SiteLayout.astro";
 import "../../styles/journey.css";
 
@@ -74,17 +73,11 @@ const formatLogDate = (date: Date) => date.toISOString().slice(0, 10).replaceAll
 
       </div>
 
-      <figure class="journey-visual" aria-label="A quiet path through distant green ridgelines">
-        <Picture
-          src={journeyAtmosphere}
-          alt="A quiet path through distant green ridgelines beneath a pale, cloud-layered sky."
-          formats={["avif", "webp"]}
-          widths={[640, 960, 1280]}
-          sizes="(max-width: 900px) 100vw, 48vw"
-          loading="eager"
-          decoding="async"
-        />
-        <span class="journey-visual-label">Build Week · 01</span>
+      <figure
+        class="journey-visual"
+        aria-label="An abstract paper field where layered Korean and English signals converge"
+      >
+        <JourneyPaperShader />
       </figure>
     </section>
 

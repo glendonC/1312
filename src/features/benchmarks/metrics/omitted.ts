@@ -1,0 +1,40 @@
+import type { MetricDefinition } from "../types";
+
+export const omittedMetrics: MetricDefinition[] = [
+  {
+    id: "bleu-headline",
+    label: "BLEU as headline",
+    priority: "omit",
+    question: "Can corpus n-gram overlap stand in for product quality?",
+    layer: "Translation",
+    evaluation: "automated",
+    requiredData: "Corpus references and pinned tokenizer",
+    support: "missing",
+    field: "omitted.bleu",
+    limitation: "A few short clips and critical semantic failures make it a poor product headline.",
+  },
+  {
+    id: "coverage-headline",
+    label: "Raw coverage as headline",
+    priority: "omit",
+    question: "Did the system emit something for most expected speech?",
+    layer: "Output",
+    evaluation: "automated",
+    requiredData: "Explicit cue/time/language denominator",
+    support: "sample-only",
+    field: "omitted.raw_coverage",
+    limitation: "It rewards guessing and even captioning silence unless paired with correctness.",
+  },
+  {
+    id: "composite-pack-score",
+    label: "Single composite pack score",
+    priority: "omit",
+    question: "Can quality, coverage, timing and latency be reduced to one rank?",
+    layer: "Cross-pipeline",
+    evaluation: "hybrid",
+    requiredData: "Product-selected weights for unlike outcomes",
+    support: "missing",
+    field: "omitted.composite",
+    limitation: "Weights hide tradeoffs and can bury catastrophic failures.",
+  },
+];

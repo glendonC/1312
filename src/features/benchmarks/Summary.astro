@@ -1,0 +1,39 @@
+---
+import {
+  completedRuns,
+  goldReadyClips,
+  heroValue,
+  heroValueLabel,
+  report,
+  reportIsScored,
+  sourcedClips,
+} from "./model";
+---
+
+<section class="bench-summary" aria-label="Benchmark summary">
+  <article class="summary-question">
+    <span>Research question</span>
+    <strong>Does preparation preserve more critical meaning?</strong>
+    <p>Prepared 1321 versus cold, YouTube auto-translate, and an optional open baseline.</p>
+  </article>
+  <article>
+    <span>Sources</span>
+    <strong>{sourcedClips}<small> / {report.pack.target_clip_count}</small></strong>
+    <p>Acquired clips</p>
+  </article>
+  <article>
+    <span>Gold</span>
+    <strong>{goldReadyClips}<small> / {report.pack.target_clip_count}</small></strong>
+    <p>Frozen clips</p>
+  </article>
+  <article>
+    <span>Runs</span>
+    <strong>{completedRuns}<small> / {report.systems.length}</small></strong>
+    <p>Scored conditions</p>
+  </article>
+  <article class:list={["summary-performance", reportIsScored && "is-measured"]}>
+    <span>Performance</span>
+    <strong>{heroValue}</strong>
+    <p>{heroValueLabel}</p>
+  </article>
+</section>

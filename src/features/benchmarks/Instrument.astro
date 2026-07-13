@@ -1,0 +1,51 @@
+---
+import ComparePanel from "./ComparePanel.astro";
+import EvidencePanel from "./EvidencePanel.astro";
+import MethodsPanel from "./MethodsPanel.astro";
+import ReceiptsPanel from "./ReceiptsPanel.astro";
+import ResultsPanel from "./ResultsPanel.astro";
+import TestPackPanel from "./TestPackPanel.astro";
+import { tabs } from "./model";
+---
+
+<section class="bench-instrument" aria-label="Benchmark report" data-bench-instrument>
+  <div class="instrument-bar">
+    <div class="instrument-select">
+      <label for="bench-section">Section</label>
+      <select id="bench-section" data-bench-select>
+        {tabs.map((tab) => <option value={tab.id}>{tab.label}</option>)}
+      </select>
+    </div>
+
+    <div class="bench-tabs" role="tablist" aria-label="Benchmark sections">
+      {tabs.map((tab, index) => (
+        <button
+          id={`tab-${tab.id}`}
+          type="button"
+          role="tab"
+          aria-selected={index === 0 ? "true" : "false"}
+          aria-controls={`panel-${tab.id}`}
+          tabindex={index === 0 ? 0 : -1}
+          data-bench-tab={tab.id}
+        >
+          <span class="tab-icon" aria-hidden="true">{tab.icon}</span>
+          <span>{tab.label}</span>
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <div class="instrument-panels">
+    <EvidencePanel />
+    <TestPackPanel />
+    <ComparePanel />
+    <ResultsPanel />
+    <MethodsPanel />
+    <ReceiptsPanel />
+  </div>
+</section>
+
+<script>
+  import { bindBenchmarkInstruments } from "./instrument";
+  bindBenchmarkInstruments();
+</script>

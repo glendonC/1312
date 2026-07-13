@@ -1,0 +1,82 @@
+---
+import PanelHeader from "./PanelHeader.astro";
+import { completedRuns, progressStages, report, sourcedClips } from "./model";
+---
+
+<section
+  class="instrument-panel evidence-panel"
+  id="panel-evidence"
+  role="tabpanel"
+  aria-labelledby="tab-evidence"
+  tabindex="0"
+  data-bench-panel="evidence"
+>
+  <PanelHeader
+    index="01"
+    label="Evidence today"
+    title="Current evidence state"
+    description="Every empty cell is intentional. It shows exactly what must exist before a number can appear."
+  />
+
+  <ol class="evidence-progress" aria-label="Benchmark publication stages">
+    {progressStages.map((stage, index) => (
+      <li data-stage-state={stage.state}>
+        <span class="stage-marker">{String(index + 1).padStart(2, "0")}</span>
+        <strong>{stage.label}</strong>
+        <small>{stage.meta}</small>
+      </li>
+    ))}
+  </ol>
+
+  <div class="panel-split evidence-split">
+    <div class="evidence-board">
+      <div class="board-summary">
+        <div>
+          <strong>{report.pack.target_clip_count}</strong>
+          <span>selection slots</span>
+        </div>
+        <p>Planned targets are not acquired clips.</p>
+      </div>
+
+      <div class="evidence-matrix" role="table" aria-label="Evidence readiness by selection slot">
+        <div class="matrix-row matrix-head" role="row">
+          <span role="columnheader">Slot</span>
+          <span role="columnheader">Plan</span>
+          <span role="columnheader">Source</span>
+          <span role="columnheader">Gold</span>
+          <span role="columnheader">Review</span>
+        </div>
+        {report.pack.clips.map((clip, index) => {
+          const isGoldReady = clip.status === "gold_ready" || clip.status === "frozen";
+          return (
+            <div class="matrix-row" role="row">
+              <span class="matrix-label" role="rowheader">{String(index + 1).padStart(2, "0")}</span>
+              <span class="matrix-cell is-planned" role="cell" aria-label="Selection slot planned">○</span>
+              <span class:list={["matrix-cell", clip.source ? "is-ready" : "is-missing"]} role="cell" aria-label={clip.source ? "Source ready" : "Source missing"}>{clip.source ? "✓" : ""}</span>
+              <span class:list={["matrix-cell", isGoldReady ? "is-ready" : "is-missing"]} role="cell" aria-label={isGoldReady ? "Gold ready" : "Gold missing"}>{isGoldReady ? "✓" : ""}</span>
+              <span class:list={["matrix-cell", clip.annotations.reviewed ? "is-ready" : "is-missing"]} role="cell" aria-label={clip.annotations.reviewed ? "Review ready" : "Review missing"}>{clip.annotations.reviewed ? "✓" : ""}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+    <div class="evidence-facts" aria-label="Evidence summary">
+      <article class="fact-source">
+        <span>01</span>
+        <strong>{sourcedClips} / {report.pack.target_clip_count}</strong>
+        <div><h3>Sources acquired</h3><p>Five domains are planned. None currently claims media provenance.</p></div>
+      </article>
+      <article class="fact-run">
+        <span>02</span>
+        <strong>{completedRuns} / {report.systems.length}</strong>
+        <div><h3>Conditions scored</h3><p>All four conditions are definitions, not completed benchmark runs.</p></div>
+      </article>
+      <article class="fact-result">
+        <span>03</span>
+        <strong>—</strong>
+        <div><h3>Performance measured</h3><p>Null remains “Not measured.” It never becomes zero, a rank, or a claim.</p></div>
+      </article>
+    </div>
+  </div>
+</section>

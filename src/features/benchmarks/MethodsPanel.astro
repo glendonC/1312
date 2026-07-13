@@ -1,0 +1,65 @@
+---
+import PanelHeader from "./PanelHeader.astro";
+import {
+  evaluationLabels,
+  metricGroups,
+  priorityLabels,
+  supportLabels,
+} from "./model";
+---
+
+<section
+  class="instrument-panel methods-panel"
+  id="panel-methods"
+  role="tabpanel"
+  aria-labelledby="tab-methods"
+  tabindex="0"
+  data-bench-panel="methods"
+  hidden
+>
+  <PanelHeader
+    index="05"
+    label="Methods"
+    title="Metric registry"
+    description="Diagnostics explain a result. Research-only methods wait for the right evidence. Omitted metrics cannot quietly become claims."
+  />
+
+  <div class="method-groups">
+    {metricGroups.map((group) => (
+      <details class={`method-group method-${group.id}`} open={group.id === "headline"}>
+        <summary>
+          <strong>{group.metrics.length}</strong>
+          <div><h3>{group.label}</h3><p>{group.note}</p></div>
+          <span aria-hidden="true">+</span>
+        </summary>
+        <div class="method-list">
+          {group.metrics.map((metric) => (
+            <details class="method-item">
+              <summary>
+                <div><strong>{metric.label}</strong><span>{metric.layer}</span></div>
+                <span class={`support-mark support-${metric.support}`}>{supportLabels[metric.support]}</span>
+              </summary>
+              <div class="method-detail">
+                <p class="method-question">{metric.question}</p>
+                <dl>
+                  <div><dt>Evaluation</dt><dd>{evaluationLabels[metric.evaluation]}</dd></div>
+                  <div><dt>Evidence required</dt><dd>{metric.requiredData}</dd></div>
+                  <div><dt>Limitation</dt><dd>{metric.limitation}</dd></div>
+                  <div><dt>Contract field</dt><dd><code>{metric.field}</code></dd></div>
+                </dl>
+                <footer>
+                  <span class={`priority-mark priority-${metric.priority}`}>{priorityLabels[metric.priority]}</span>
+                  {metric.reference && (
+                    <a href={metric.reference.url} target="_blank" rel="noopener noreferrer">
+                      {metric.reference.label} ↗
+                    </a>
+                  )}
+                </footer>
+              </div>
+            </details>
+          ))}
+        </div>
+      </details>
+    ))}
+  </div>
+</section>

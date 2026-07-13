@@ -1,0 +1,166 @@
+/* Methods */
+
+.method-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.method-group {
+  border: 1px solid var(--bench-line-strong);
+  background: #f3f4f1;
+}
+
+.method-group > summary {
+  display: grid;
+  min-height: 94px;
+  padding: 16px 20px;
+  grid-template-columns: 86px minmax(0, 1fr) 30px;
+  gap: 18px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.method-group > summary::-webkit-details-marker,
+.method-item > summary::-webkit-details-marker,
+.receipt-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.method-group > summary > strong {
+  font-size: clamp(2.4rem, 4vw, 4.2rem);
+  font-weight: var(--weight-thin);
+  letter-spacing: -0.075em;
+  line-height: 1;
+}
+
+.method-group > summary h3 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.025em;
+}
+
+.method-group > summary p {
+  margin: 5px 0 0;
+  color: var(--bench-muted);
+  font-size: 0.69rem;
+  line-height: 1.45;
+}
+
+.method-group > summary > span {
+  justify-self: end;
+  font-size: 1.3rem;
+  font-weight: var(--weight-thin);
+  transition: transform 180ms ease;
+}
+
+.method-group[open] > summary > span {
+  transform: rotate(45deg);
+}
+
+.method-headline > summary { background: #17201e; color: #fff; }
+.method-headline > summary p { color: rgba(255, 255, 255, 0.62); }
+.method-diagnostic > summary { background: var(--bench-blue-soft); }
+.method-research-only > summary { background: #f0e4f2; }
+.method-omit > summary { background: var(--bench-coral-soft); }
+
+.method-list {
+  display: grid;
+  padding: 10px;
+  border-top: 1px solid var(--bench-line);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.method-item {
+  border: 1px solid var(--bench-line);
+  background: #fff;
+}
+
+.method-item > summary {
+  display: grid;
+  min-height: 66px;
+  padding: 13px 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.method-item > summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.method-item > summary strong {
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+}
+
+.method-item > summary div > span {
+  color: var(--bench-muted);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+}
+
+.method-detail {
+  padding: 0 14px 15px;
+  border-top: 1px solid var(--bench-line);
+}
+
+.method-question {
+  margin: 14px 0;
+  font-size: 0.81rem;
+  line-height: 1.45;
+}
+
+.method-detail dl {
+  margin: 0;
+}
+
+.method-detail dl div {
+  display: grid;
+  padding: 9px 0;
+  border-top: 1px solid var(--bench-line);
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.method-detail dt {
+  color: var(--bench-muted);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  text-transform: uppercase;
+}
+
+.method-detail dd {
+  margin: 0;
+  color: rgba(21, 32, 29, 0.76);
+  font-size: 0.66rem;
+  line-height: 1.48;
+}
+
+.method-detail code,
+.receipt-details code {
+  color: var(--bench-teal);
+  font-family: var(--font-mono);
+  font-size: 0.61rem;
+  overflow-wrap: anywhere;
+}
+
+.method-detail footer {
+  display: flex;
+  margin-top: 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.method-detail footer a {
+  color: var(--bench-teal);
+  font-size: 0.67rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

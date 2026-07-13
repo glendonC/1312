@@ -1,0 +1,486 @@
+{
+  "$schema": "../../schemas/capture.schema.json",
+  "schema_version": "0.1.0",
+  "kind": "capture",
+  "capture_id": "run-006",
+  "captured_at": "2026-07-13",
+  "scored": false,
+  "pack_evidence": false,
+  "clip": {
+    "id": "Ux-TMWnmntM",
+    "duration_s": 40,
+    "lang": "ko",
+    "pair": "ko->en",
+    "media": "clip.mp4",
+    "source": {
+      "kind": "youtube",
+      "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+      "channel": "Didi's Korean Culture Podcast",
+      "licence": "Creative Commons Attribution license (reuse allowed)",
+      "window": {
+        "start": "00:05:10",
+        "end": "00:05:50"
+      },
+      "attribution": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed)."
+    }
+  },
+  "reproducible": {
+    "deterministic": false,
+    "note": "Re-running this pipeline over the same audio does NOT reproduce this capture. The diarizer returns a different segmentation each call (11 to 15 segments have been observed on this clip), so cue count, boundaries and coverage move between runs. This capture is one honest sample, not a fixture. It was not re-rolled to obtain a better coverage number, and a future capture that differs is evidence of that variance rather than of a regression."
+  },
+  "systems": [
+    {
+      "id": "1321-prepped",
+      "role": "subject",
+      "config": {
+        "asr": "gpt-4o-transcribe-diarize",
+        "cross_check_asr": "whisper-1",
+        "translator": "gpt-5",
+        "pack": "ko-v3",
+        "gates": "universal.asr_agreement, universal.repetition, ko.address_form, ko.entity_support",
+        "agreement_floor": 0.6,
+        "abstention": "fail closed on a measured disagreement; abstain where the cross-check produced no words at all"
+      }
+    },
+    {
+      "id": "1321-cold",
+      "role": "internal_control",
+      "config": {
+        "asr": "whisper-1",
+        "translator": "gpt-4o",
+        "glossary": "none",
+        "gates": "none",
+        "note": "One-shot. It is handed the prepped path's windows for free, so it is a foil for translation, entities and honesty, NOT for segmentation."
+      }
+    }
+  ],
+  "measured": {
+    "1321-prepped": {
+      "units_total": 15,
+      "units_emitted": 11,
+      "units_withheld": 4,
+      "units_uncorroborated": 3,
+      "coverage": 0.73,
+      "latency": {
+        "first_usable_s": 55.86,
+        "complete_s": 111.98
+      },
+      "gate_hits": {
+        "asr_agreement": 4,
+        "address": 1
+      },
+      "repairs": 1
+    },
+    "1321-cold": {
+      "units_total": 15,
+      "units_emitted": 12,
+      "units_withheld": 0,
+      "coverage": 0.8,
+      "latency": {
+        "first_usable_s": 50.7,
+        "complete_s": 50.7
+      },
+      "gate_hits": {},
+      "repairs": 0
+    }
+  },
+  "unscored": {
+    "critical_meaning": null,
+    "critical_outcomes": null,
+    "catastrophic": null,
+    "reason": "There is no gold for this clip and no human has reviewed the output, so accuracy is not merely unmeasured here, it is unmeasurable. Coverage is not a score: 1321 refused 3 lines and cold refused none, which makes cold's coverage the higher number and tells you nothing about which of them was right. Nothing in this file may be rendered on /benchmarks/ as evidence of quality."
+  },
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "speakers": [
+        "A"
+      ],
+      "source": "분들이 몇 분 계신데",
+      "hard": true,
+      "phenomenon": "ko.counter_homophone",
+      "corroboration": {
+        "agreement": 1,
+        "by": "whisper-1",
+        "heard": "분들이 몇 분 계신데"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "I know a few people.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "There are a few people here.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "speakers": [
+        "B"
+      ],
+      "source": "네",
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "Yeah.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "speakers": [
+        "A"
+      ],
+      "source": "어떤 분은 태국 갔다 오셨다고 했거든요. 근데 태국이 진짜 좋았다고 그러시더라구요.",
+      "corroboration": {
+        "agreement": 0.971,
+        "by": "whisper-1",
+        "heard": "어떤 분은 태국 갔다 오셨다고 했거든요 근데 태국이 진짜 좋았다고 그러시더라고요"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "One of them said they’d been to Thailand, and they said it was really great.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "One person said they went to Thailand and mentioned that it was really nice.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 8.3,
+      "t_end": 10.75,
+      "speakers": [
+        "B"
+      ],
+      "source": "저 태국에 한국어 학원을 차리는게 꿈이에요",
+      "corroboration": {
+        "agreement": 0.895,
+        "by": "whisper-1",
+        "heard": "제가 태국에 한국어 학원을 차리는게 꿈이에요"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "My dream is to open a Korean language school in Thailand.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "My dream is to open a Korean language school in Thailand.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 11.25,
+      "t_end": 11.9,
+      "speakers": [
+        "A"
+      ],
+      "source": "아 진짜요?",
+      "corroboration": {
+        "agreement": 1,
+        "by": "whisper-1",
+        "heard": "아 진짜요"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "Oh, really?",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "Oh, really?",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "speakers": [
+        "B"
+      ],
+      "source": "네",
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "Yeah.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 12.7,
+      "t_end": 13.6,
+      "speakers": [
+        "A"
+      ],
+      "source": "왜요 왜요?",
+      "corroboration": {
+        "agreement": 0.5,
+        "by": "whisper-1",
+        "heard": "왜요"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.50 on this window (< 0.6)"
+          }
+        },
+        "1321-cold": {
+          "text": "Why?",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 14,
+      "t_end": 18.8,
+      "speakers": [
+        "B"
+      ],
+      "source": "아니 그 예전에 코로나 사태 이전에 누나랑",
+      "hard": true,
+      "phenomenon": "ko.kinship_address",
+      "corroboration": {
+        "agreement": 0.824,
+        "by": "whisper-1",
+        "heard": "아니 그 예전에 코로나 사태 이전에"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "No, back before the pandemic, with nuna...",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "Well, before the COVID-19 situation,",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 18.8,
+      "t_end": 19,
+      "speakers": [
+        "A"
+      ],
+      "source": "네",
+      "corroboration": {
+        "agreement": 0,
+        "by": "whisper-1",
+        "heard": "누나랑"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+          }
+        },
+        "1321-cold": {
+          "text": "with my sister,",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 19,
+      "t_end": 19.15,
+      "speakers": [
+        "B"
+      ],
+      "source": "친누나가",
+      "hard": true,
+      "phenomenon": "ko.kinship_address",
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "My biological older sister—",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 19.15,
+      "t_end": 20.2,
+      "speakers": [
+        "A"
+      ],
+      "source": "네",
+      "corroboration": {
+        "agreement": 0,
+        "by": "whisper-1",
+        "heard": "친누나가"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+          }
+        },
+        "1321-cold": {
+          "text": "my real sister,",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 20.2,
+      "t_end": 25.2,
+      "speakers": [
+        "B"
+      ],
+      "source": "그 막 그 매형이랑 태국에 한 달 살기를 하려고 했는데",
+      "hard": true,
+      "phenomenon": "ko.kinship_address",
+      "corroboration": {
+        "agreement": 0.857,
+        "by": "whisper-1",
+        "heard": "그 막 그 매형이랑 태국에 한달 살기를 하려고"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "Like, she and my brother-in-law were planning a one-month stay in Thailand, but—",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "was planning to live in Thailand for a month with her husband,",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 25.52,
+      "t_end": 28.12,
+      "speakers": [
+        "B"
+      ],
+      "source": "그 내용이 너무 바쁘셔가지고 남는 사람이",
+      "corroboration": {
+        "agreement": 0.706,
+        "by": "whisper-1",
+        "heard": "그 매형이 너무 바쁘셔가지고 남는"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "They were so busy that the only one with time to spare...",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "but her husband was too busy, so the only person available",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 28.12,
+      "t_end": 28.32,
+      "speakers": [
+        "A"
+      ],
+      "source": "네.",
+      "corroboration": {
+        "agreement": 0,
+        "by": "whisper-1",
+        "heard": "사람이"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+          }
+        },
+        "1321-cold": {
+          "text": "was me,",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "speakers": [
+        "B"
+      ],
+      "source": "저밖에 없어서 그 공짜로 태국 한 달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한 달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어",
+      "hard": true,
+      "phenomenon": "ko.numeral_boundary",
+      "corroboration": {
+        "agreement": 1,
+        "by": "whisper-1",
+        "heard": "저밖에 없어서 그 공짜로 태국 한달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어"
+      },
+      "outputs": {
+        "1321-prepped": {
+          "text": "I was the only one with free time, so I ended up doing a one-month stay in Thailand for free. I spent a month in Chiang Mai—the place was so pretty and the people were so friendly, and Korean...",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "so I ended up living in Thailand for a month for free. Oh, but I lived in Chiang Mai for a month, and the neighborhood was so beautiful, and the people were so kind, and Korean...",
+          "withheld": null
+        }
+      },
+      "gold": null
+    }
+  ],
+  "artifacts": {
+    "output": "public/demo/runs/run-006/captions.json",
+    "runtime": "public/demo/runs/run-006/traces.json",
+    "score": "public/demo/runs/run-006/score.json",
+    "glossary": "public/demo/runs/run-006/glossary.json",
+    "corrections": "public/demo/runs/run-006/corrections.json",
+    "media": "public/demo/runs/run-006/clip.mp4"
+  },
+  "notes": "The first run of the real pipeline over real media, kept so later runs have something to beat. 11 of 15 lines committed, 4 withheld by a gate that fired, 3 committed uncorroborated because the cross-check recogniser drops backchannels and produced no words in those windows. Confidence throughout is agreement between two independent recognisers, never a model's estimate of itself. Glossary: 7 terms, cast NOT closed (nobody is named in the window, so there is no cast to close)."
+}

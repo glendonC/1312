@@ -87,15 +87,29 @@ export default function Results() {
           }
           good
         />
+        {/*
+          Coverage is not a score, and this line exists to stop it being read as one. Both paths
+          can land on the same number for opposite reasons: our gaps are lines we refused and gave
+          a reason for, cold's are lines its recogniser never heard. A refusal and a miss look
+          identical in a ratio and are nothing alike.
+        */}
         <Score
           value={rate(prep?.coverage ?? null)}
           label="coverage"
-          sub={`${prep?.withheld ?? 0} withheld · cold reads 1.00 because it never withholds`}
+          sub={
+            cold?.coverage != null && cold.coverage < 1
+              ? `${prep?.withheld ?? 0} withheld, each with a reason · cold ${rate(cold.coverage)}, but its gaps are lines it never heard`
+              : `${prep?.withheld ?? 0} withheld, each with a reason · cold ${rate(cold?.coverage ?? null)} and never refuses anything`
+          }
         />
         <Score
           value={clock(prep?.time_to_usable_s ?? 0)}
-          label="time to usable"
-          sub={`cold took ${clock(cold?.time_to_usable_s ?? 0)}`}
+          label="time to first usable line"
+          sub={
+            prep?.time_to_complete_s == null
+              ? `cold took ${clock(cold?.time_to_usable_s ?? 0)}`
+              : `every line by ${clock(prep.time_to_complete_s)} · cold answers in one call, at ${clock(cold?.time_to_usable_s ?? 0)}`
+          }
         />
       </div>
 

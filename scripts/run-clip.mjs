@@ -580,6 +580,13 @@ async function main() {
   let corrected = 0;
   let fabrications = 0;
   let qcGating = false;
+  // Two different questions, and they were being answered with one number.
+  //
+  // `lastCommitAt` was assigned on every commit, so it ended up holding the time of the LAST
+  // one and was then written to a field called time_to_usable_s. "Usable" is a claim about when
+  // you could start working; "complete" is a claim about when we stopped. Reporting the second
+  // under the name of the first is the kind of quiet mislabel this whole run exists to refuse.
+  let firstCommitAt = null;
   let lastCommitAt = 0;
 
   const SYSTEM = [
@@ -715,6 +722,7 @@ async function main() {
     cue.targets[0].text = cue.draft;
     committed++;
     lastCommitAt = now();
+    if (firstCommitAt === null) firstCommitAt = lastCommitAt;
 
     emit(
       "qc-01",
@@ -815,6 +823,20 @@ async function main() {
   emit("orchestrator", "done", RUN, `${traces.length + 1} actions · 5 workers · ${wall.toFixed(1)}s wall`);
 
   /* -- write the run folder ---------------------------------------------- */
+
+  /*
+   * Cold's coverage is MEASURED, not assumed.
+   *
+   * This was hardcoded to 1.00, on the reasoning that a path with no gates never withholds
+   * anything. True, and irrelevant: cold still ends up with no caption on some windows, because
+   * its recogniser never heard the line at all. Those are MISSES, not refusals, and the two look
+   * identical in a coverage number while meaning opposite things — one path declined to guess and
+   * said why, the other does not know the line exists. Asserting 1.00 handed cold a perfect score
+   * on exactly the windows where it had failed hardest.
+   */
+  const coldEmitted = cues.filter((c) => Boolean(c.baseline?.target.text)).length;
+  const coldCoverage = Number((coldEmitted / cues.length).toFixed(2));
+  const coldMisses = cues.length - coldEmitted;
 
   const coldFabs = cues.reduce((n, c) => {
     const r = entityGate({ ...c, draft: c.baseline?.target.text ?? "" }, glossary);
@@ -942,29 +964,34 @@ async function main() {
       hard_lines: marks.length,
       criteria: ["entity", "meaning", "honesty"],
       points_max: marks.length * 3,
-      note: `No gold exists for this clip, so NOTHING here is scored for accuracy: points and hard_line are null on every path, and so is delta_vs_cold — a run with nothing to be right against has not beaten the cold path by zero, it has not been compared to it at all. What IS real: coverage, withheld, time-to-usable, and the gate hits — measurements of what this run DID, not of whether it was right. ${marks.length} lines were flagged hard because they carry a ko-v3 phenomenon, which is a detection in the source that any Korean reader can check, not a verdict on the English. Scoring against gold lives in bench/.`,
+      note: `No gold exists for this clip, so NOTHING here is scored for accuracy: points and hard_line are null on every path, and so is delta_vs_cold — a run with nothing to be right against has not beaten the cold path by zero, it has not been compared to it at all. What IS real: coverage, withheld, the two latencies, and the gate hits — measurements of what this run DID, not of whether it was right. ${marks.length} lines were flagged hard because they carry a ko-v3 phenomenon, which is a detection in the source that any Korean reader can check, not a verdict on the English. Scoring against gold lives in bench/.`,
     },
     paths: {
       cold: {
         label: "Cold one-shot",
         points: null,
         hard_line: null,
-        coverage: 1.0,
+        coverage: coldCoverage,
+        // Cold answers in one call, so the first line it can stand behind and the last one
+        // arrive together. First-usable and complete are the same instant for it, and that is
+        // a real property of the shape of the path, not a rounding.
         time_to_usable_s: coldAt,
+        time_to_complete_s: coldAt,
         withheld: 0,
         // Not "hallucinated". We ran a detector, and a detector firing is a detection, not a
         // verified fabrication — that needs gold. ${coldFabs} unsupported proper nouns is what
         // we can say, and we say it here rather than in a field named for a stronger claim.
         hallucinated: null,
         status: "unscored",
-        note: `${ASR2} + one-shot ${COLD}, no glossary, no gates. It is handed the prepped path's windows for free, so it is a foil for translation, entities and honesty — NOT for segmentation. Coverage reads 1.00 because it never withholds anything, which is the point rather than an achievement. The entity gate found ${coldFabs} proper noun${coldFabs === 1 ? "" : "s"} in its English that trace to nothing in the Korean or the glossary; that is a detection, not a gold-verified error count, so hallucinated is null.`,
+        note: `${ASR2} + one-shot ${COLD}, no glossary, no gates. It is handed the prepped path's windows for free, so it is a foil for translation, entities and honesty — NOT for segmentation. withheld is 0 because it has no gate and never refuses anything, but coverage is still ${coldCoverage.toFixed(2)}: it has no caption on ${coldMisses} window${coldMisses === 1 ? "" : "s"} because its recogniser never heard the line. Those are MISSES, not refusals, and a coverage number cannot tell them apart — which is why coverage is not a score. The entity gate found ${coldFabs} proper noun${coldFabs === 1 ? "" : "s"} in its English that trace to nothing in the Korean or the glossary; that is a detection, not a gold-verified error count, so hallucinated is null.`,
       },
       [RUN]: {
         label: "1321 · this run",
         points: null,
         hard_line: null,
         coverage,
-        time_to_usable_s: lastCommitAt,
+        time_to_usable_s: firstCommitAt,
+        time_to_complete_s: lastCommitAt,
         withheld,
         hallucinated: null,
         status: "unscored",

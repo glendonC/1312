@@ -282,7 +282,17 @@ export interface PathScore {
   points: number | null;
   hard_line: number | null;
   coverage: number | null;
+  /**
+   * When the first line this path will stand behind arrived, and when the last one did.
+   *
+   * They are two different claims and they used to share one field: the run assigned "usable"
+   * on every commit, so it held the time of the LAST one. Reporting completion under a name
+   * that says usable flatters nobody here — it made the run look slower — but a metric whose
+   * label does not describe it is a metric nobody can check, which is the failure this whole
+   * repo is about.
+   */
   time_to_usable_s: number | null;
+  time_to_complete_s?: number | null;
   withheld: number | null;
   hallucinated: number | null;
   regressions?: number;

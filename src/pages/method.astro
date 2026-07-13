@@ -1,9 +1,16 @@
 ---
 import GlassNav from "../components/GlassNav.astro";
+import MethodProcess from "../method/MethodProcess";
 import SiteLayout from "../layouts/SiteLayout.astro";
+import "../styles/method.css";
 ---
 
-<SiteLayout title="Method | 1321" description="Method.">
+<SiteLayout
+  title="Method | 1321"
+  description="How 1321 turns Korean media into checked English captions."
+>
   <GlassNav />
-  <main class="interior-page"></main>
+  <main class="method-page">
+    <MethodProcess client:load />
+  </main>
 </SiteLayout>

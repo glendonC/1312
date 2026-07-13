@@ -50,7 +50,11 @@
 .hero-copy h1 {
   display: flex;
   flex-direction: column;
-  margin: 0;
+  /* At this line-height Instrument Sans leaves 0.184em of descender and leading
+     below the last baseline. The grid bottom-aligns boxes, so that dead space
+     would push the aside's button below the text it should sit beside; trim it
+     and the button's bottom edge lands on the baseline. */
+  margin: 0 0 -0.184em;
   font-size: clamp(2.35rem, 4.2vw, 3.35rem);
   font-weight: var(--weight-thin);
   line-height: 1.08;

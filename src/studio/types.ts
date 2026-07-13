@@ -95,6 +95,16 @@ export interface ClipSource {
   kind: string;
   label: string;
   note: string;
+  /**
+   * Where the clip came from, and what lets us republish it.
+   *
+   * These are not metadata. A Creative Commons licence is the only reason this demo may host
+   * somebody else's video, and it is granted on the condition that the work is credited — so
+   * the credit is a term of the licence, not a courtesy, and the UI prints it wherever the clip
+   * plays. A run whose media has no `licence` here has no business being shipped.
+   */
+  url?: string;
+  licence?: string;
 }
 
 export interface Clip {
@@ -237,8 +247,20 @@ export interface Correction {
 export interface GlossaryEntry {
   term: string;
   lang: LangCode;
+  /** The English the translator should USE. A surface form, not a dictionary note. */
   gloss: string;
   kind: string;
+  /**
+   * Only for an address form (누나, 오빠, 선배 …), and only when something OUTSIDE the word
+   * itself establishes that the speakers really are family: a kinship-only token in the audio,
+   * or curated knowledge of the cast.
+   *
+   * It is a field and not a sentence on purpose. The gate that reads it used to look for
+   * kinship words in the gloss prose instead, and was defeated by every glossary it was given,
+   * because the gloss of 누나 is "older sister" — that is what the word means, and a dictionary
+   * entry is not evidence that these two people are related.
+   */
+  confirms_relation?: boolean;
   source: string;
 }
 

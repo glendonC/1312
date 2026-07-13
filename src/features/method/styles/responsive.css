@@ -1,0 +1,119 @@
+@media (max-width: 1180px) {
+  .process-layout {
+    grid-template-columns: minmax(290px, 0.68fr) minmax(540px, 1.32fr);
+    gap: clamp(40px, 5vw, 72px);
+  }
+
+  .process-intro h1 {
+    font-size: clamp(3.15rem, 5vw, 4.25rem);
+  }
+}
+
+@media (max-width: 900px) {
+  .process-section {
+    padding-top: var(--interior-main-start);
+  }
+
+  .process-layout {
+    grid-template-columns: 1fr;
+    gap: 58px;
+  }
+
+  .process-intro {
+    position: static;
+  }
+
+  .process-intro h1 {
+    font-size: clamp(3.2rem, 11vw, 5.4rem);
+    white-space: normal;
+  }
+
+  .process-rail {
+    min-height: auto;
+  }
+
+  .process-cards {
+    position: static;
+    height: auto;
+    min-height: 0;
+  }
+
+  .process-card {
+    flex-basis: 82px;
+  }
+
+  .process-card.is-active {
+    min-height: 560px;
+  }
+
+  .card-heading {
+    min-height: 80px;
+  }
+}
+
+@media (max-width: 640px) {
+  .process-section {
+    padding-inline: 16px;
+    padding-bottom: 0;
+  }
+
+  .process-eyebrow {
+    margin-bottom: 22px;
+  }
+
+  .process-layout {
+    gap: 42px;
+  }
+
+  .process-progress {
+    margin-top: 32px;
+  }
+
+  .process-detail-stage {
+    min-height: 250px;
+  }
+
+  .process-card {
+    border-radius: 14px;
+  }
+
+  .process-card.is-active {
+    min-height: 510px;
+  }
+
+  .card-heading {
+    padding-inline: 20px;
+  }
+
+  .card-heading > span:first-child {
+    gap: 18px;
+  }
+
+  .card-title {
+    font-size: 1.7rem;
+  }
+
+  .card-panel {
+    padding: 0 20px 22px;
+    grid-template-rows: minmax(210px, 1fr) auto;
+  }
+
+  .card-graphic {
+    min-height: 210px;
+  }
+
+  .diagram-labels {
+    font-size: 10px;
+  }
+
+  .process-card footer {
+    min-height: 0;
+    font-size: 0.88rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-card {
+    transition: none;
+  }
+}

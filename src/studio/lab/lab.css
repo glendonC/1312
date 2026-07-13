@@ -1,0 +1,248 @@
+.studio-lab {
+  position: fixed;
+  top: 68px;
+  right: 16px;
+  bottom: 18px;
+  z-index: 40;
+  display: flex;
+  width: min(390px, calc(100vw - 32px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 22px 64px rgba(22, 29, 27, 0.16);
+  backdrop-filter: blur(22px) saturate(1.45);
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+}
+
+.studio-lab[data-collapsed="true"] {
+  right: 16px;
+  bottom: auto;
+  width: 190px;
+}
+
+.lab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.studio-lab[data-collapsed="true"] .lab-head {
+  border-bottom: 0;
+}
+
+.lab-head > span {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.lab-head b {
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+}
+
+.lab-head small,
+.lab-readout small {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+}
+
+.lab-collapse {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink-muted);
+  background: var(--paper-soft);
+  cursor: pointer;
+}
+
+.lab-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.lab-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+}
+
+.lab-field select,
+.lab-field input {
+  min-width: 0;
+  flex: 1;
+}
+
+.lab-field select {
+  max-width: 230px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  color: var(--ink);
+  background: var(--paper-elevated);
+  font: inherit;
+}
+
+.lab-note,
+.lab-inspector p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.lab-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  align-items: baseline;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: var(--paper-soft);
+}
+
+.lab-readout span {
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.lab-readout b {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: var(--weight-regular);
+}
+
+.lab-readout small {
+  grid-column: 1 / -1;
+}
+
+.lab-actions,
+.lab-checkpoints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lab-actions button,
+.lab-checkpoints button {
+  padding: 6px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  color: var(--ink-soft);
+  background: var(--paper-elevated);
+  font-family: var(--font-sans);
+  font-size: 0.64rem;
+  cursor: pointer;
+}
+
+.lab-actions button:hover:not(:disabled),
+.lab-checkpoints button:hover:not(:disabled),
+.lab-checkpoints button[aria-pressed="true"] {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.lab-actions button:disabled,
+.lab-checkpoints button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.lab-checkpoints {
+  padding-top: 2px;
+}
+
+.lab-inspector {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.lab-inspector summary {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+.lab-inspector dl {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0;
+}
+
+.lab-inspector dl div {
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr);
+  gap: 8px;
+}
+
+.lab-inspector dt,
+.lab-inspector dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  line-height: 1.45;
+}
+
+.lab-inspector dt {
+  color: var(--ink-muted);
+}
+
+.lab-inspector dd {
+  color: var(--ink-soft);
+}
+
+.lab-inspector pre {
+  max-height: 360px;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: 9px;
+  color: var(--ink-soft);
+  background: #f1f4f1;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .studio-lab {
+    top: auto;
+    right: 10px;
+    bottom: 92px;
+    left: 10px;
+    width: auto;
+    max-height: 64svh;
+  }
+
+  .studio-lab[data-collapsed="true"] {
+    right: 10px;
+    bottom: 92px;
+    left: auto;
+    width: 190px;
+  }
+}

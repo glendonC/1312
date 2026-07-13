@@ -60,9 +60,19 @@ export interface RunHandle {
   pause(): ControlDisposition;
   resume(): ControlDisposition;
   stop(): void;
+  /** Present only on deterministic replay handles. */
+  replay?: ReplayControls;
+}
+
+export interface ReplayControls {
+  seek(cursor: number): number;
+  step(): boolean;
+  setSpeed(speed: number): void;
+  cursor(): number;
 }
 
 export interface RunTransport {
+  readonly mode: "replay" | "live";
   load(): Promise<RunBundle>;
   /** Begin emitting agent events. Returns the handle that controls the run. */
   stream(options: StreamOptions): RunHandle;
@@ -76,6 +86,7 @@ async function json<T>(url: string): Promise<T> {
 
 /** Replays a run recorded to disk, on a clock. */
 export class ReplayTransport implements RunTransport {
+  readonly mode = "replay" as const;
   private traces: Trace[] = [];
 
   constructor(private readonly runId: string) {}
@@ -103,9 +114,11 @@ export class ReplayTransport implements RunTransport {
   }
 
   stream({ speed, onEvent, onEnd }: StreamOptions): RunHandle {
+    const traces = this.traces;
     let raf = 0;
     let cursor = 0;
     let elapsed = 0;
+    let pace = Number.isFinite(speed) && speed > 0 ? speed : 1;
     let last = performance.now();
     let stopped = false;
     let paused = false;
@@ -119,15 +132,15 @@ export class ReplayTransport implements RunTransport {
       // once — come back after a minute and the entire trace file lands in a single frame,
       // which is not a replay of anything. Time the user did not watch is not time the run
       // gets to spend.
-      elapsed += Math.min((now - last) / 1000, 1 / 30) * speed;
+      elapsed += Math.min((now - last) / 1000, 1 / 30) * pace;
       last = now;
 
-      while (cursor < this.traces.length && this.traces[cursor].t <= elapsed) {
-        onEvent(this.traces[cursor]);
+      while (cursor < traces.length && traces[cursor].t <= elapsed) {
+        onEvent(traces[cursor]);
         cursor += 1;
       }
 
-      if (cursor >= this.traces.length) {
+      if (cursor >= traces.length) {
         ended = true;
         onEnd();
         return;
@@ -138,7 +151,7 @@ export class ReplayTransport implements RunTransport {
 
     raf = requestAnimationFrame(tick);
 
-    return {
+    const control: RunHandle = {
       pause() {
         if (stopped || ended || paused) return "unavailable";
         paused = true;
@@ -163,6 +176,40 @@ export class ReplayTransport implements RunTransport {
         cancelAnimationFrame(raf);
       },
     };
+
+    control.replay = {
+      seek(nextCursor) {
+        if (stopped) return cursor;
+        cancelAnimationFrame(raf);
+        const requested = Number.isFinite(nextCursor) ? Math.trunc(nextCursor) : cursor;
+        cursor = Math.max(0, Math.min(traces.length, requested));
+        elapsed = cursor === 0 ? 0 : traces[cursor - 1].t;
+        ended = cursor >= traces.length;
+        last = performance.now();
+        if (!paused && !ended) raf = requestAnimationFrame(tick);
+        return cursor;
+      },
+      step() {
+        if (stopped || ended || !paused || cursor >= traces.length) return false;
+        const next = traces[cursor];
+        cursor += 1;
+        elapsed = Math.max(elapsed, next.t);
+        onEvent(next);
+        if (cursor >= traces.length) {
+          ended = true;
+          onEnd();
+        }
+        return true;
+      },
+      setSpeed(nextSpeed) {
+        if (Number.isFinite(nextSpeed) && nextSpeed > 0) pace = nextSpeed;
+      },
+      cursor() {
+        return cursor;
+      },
+    };
+
+    return control;
   }
 }
 
@@ -173,6 +220,7 @@ export class ReplayTransport implements RunTransport {
  * this repo refuses to ship.
  */
 export class LiveTransport implements RunTransport {
+  readonly mode = "live" as const;
   constructor(
     private readonly endpoint: string,
     private readonly bundleUrl: string,

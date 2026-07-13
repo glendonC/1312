@@ -11,6 +11,7 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
 import type { Layout } from "./layout";
+import { projectRun } from "./replayProjection";
 import {
   applyTrace,
   finish,
@@ -75,6 +76,9 @@ interface StudioStore {
   pause: () => void;
   resume: () => void;
   togglePause: () => void;
+  seekCursor: (cursor: number) => void;
+  stepTrace: () => void;
+  restartReplay: () => void;
 
   select: (id: string | null) => void;
   setStage: (stage: Stage) => void;
@@ -232,9 +236,67 @@ export const useStudio = create<StudioStore>((set, get) => ({
     else pause();
   },
 
+  seekCursor(cursor) {
+    const { bundle } = get();
+    if (!bundle || !transport) return;
+    if (transport.mode !== "replay") {
+      set({ error: "This transport does not support deterministic seeking." });
+      return;
+    }
+    const projected = projectRun(bundle, cursor);
+
+    handle?.stop();
+    handle = null;
+
+    set({
+      stage: "run",
+      state: projected,
+      selected: null,
+      clipT: 0,
+      playing: false,
+      paused: projected.status !== "complete",
+      pausePending: false,
+      outcome: null,
+    });
+
+    if (projected.status === "complete") return;
+
+    const nextHandle = transport.stream({
+      speed: get().speed,
+      onEvent: (trace) => get().event(trace),
+      onEnd: () => get().end(),
+      onAbort: (reason) => get().cancel(reason),
+    });
+    if (!nextHandle.replay || nextHandle.pause() !== "applied") {
+      nextHandle.stop();
+      set({ paused: false, error: "This transport does not support deterministic seeking." });
+      return;
+    }
+    nextHandle.replay.seek(projected.cursor);
+    handle = nextHandle;
+  },
+
+  stepTrace() {
+    const { bundle, state } = get();
+    if (!bundle || state.status === "complete") return;
+    if (!handle?.replay) get().seekCursor(state.cursor);
+    if (!get().paused) get().pause();
+    if (!get().paused) return;
+    handle?.replay?.step();
+  },
+
+  restartReplay() {
+    get().seekCursor(0);
+  },
+
   select: (selected) => set({ selected }),
   setStage: (stage) => set({ stage }),
-  setSpeed: (speed) => set({ speed }),
+  setSpeed: (speed) => {
+    if (!Number.isFinite(speed) || speed <= 0) return;
+    const safe = Math.max(0.25, Math.min(24, speed));
+    handle?.replay?.setSpeed(safe);
+    set({ speed: safe });
+  },
   setView: (view) => set({ view }),
   setLayout: (layout) => set({ layout }),
   setClipT: (clipT) =>

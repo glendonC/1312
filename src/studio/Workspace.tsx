@@ -128,8 +128,13 @@ function Context({ agent, keep }: { agent: AgentView; keep: Keep }) {
  * unreadable.
  */
 function Translate({ agent }: { agent: AgentView }) {
+  const bundle = useBundle();
   const draft = agent.draft;
-  const agreement = draft?.conf ?? null;
+  const cue = draft
+    ? bundle?.captions.cues.find((candidate) => candidate.source.text === draft.source)
+    : undefined;
+  const agreementRecorded = Boolean(cue?.corroboration);
+  const agreement = agreementRecorded ? (draft?.conf ?? null) : null;
 
   return (
     <>
@@ -155,7 +160,9 @@ function Translate({ agent }: { agent: AgentView }) {
         <span className="env-conf-key">agreement</span>
 
         {agreement === null ? (
-          <span className="env-conf-none">{draft ? "not corroborated" : "—"}</span>
+          <span className="env-conf-none">
+            {draft ? (agreementRecorded ? "not corroborated" : "not measured") : "—"}
+          </span>
         ) : (
           <>
             <span className="env-conf-track">

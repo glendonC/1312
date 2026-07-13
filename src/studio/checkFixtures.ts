@@ -15,6 +15,9 @@ import type {
   TracesFile,
   WaveFile,
 } from "./types";
+import { deriveCheckpoints } from "./lab/checkpoints";
+import { SCENARIOS, validateScenarioEvidence } from "./lab/scenarios";
+import { projectRun } from "./replayProjection";
 
 const RUNS = pathToFileURL(`${resolve(process.cwd(), "public/demo/runs")}/`);
 const PACKS = pathToFileURL(`${resolve(process.cwd(), "public/demo/packs")}/`);
@@ -35,6 +38,7 @@ export async function checkRecordedRuns(): Promise<void> {
 
   if (entries.length === 0) throw new Error("Studio fixture check found no recorded runs");
 
+  const bundles = new Map<string, RunBundle>();
   for (const entry of entries) {
     const base = new URL(`${entry.name}/`, RUNS);
     const [run, captions, score, wave, traceFile, glossary, corrections] = await Promise.all([
@@ -65,8 +69,34 @@ export async function checkRecordedRuns(): Promise<void> {
     };
 
     assertRunBundle(bundle, `Recorded Studio fixture ${entry.name}`);
+    bundles.set(run.id, bundle);
+
+    for (let cursor = 0; cursor <= bundle.traces.length; cursor += 1) {
+      const projected = projectRun(bundle, cursor);
+      if (projected.cursor !== cursor) {
+        throw new Error(`${run.id} projection cursor ${projected.cursor} did not match ${cursor}`);
+      }
+      const shouldBeComplete = cursor === bundle.traces.length;
+      if ((projected.status === "complete") !== shouldBeComplete) {
+        throw new Error(`${run.id} projection completion did not match cursor ${cursor}`);
+      }
+    }
 
     for (const artifact of run.artifacts) await access(new URL(artifact, base));
     if (run.clip.media) await access(new URL(run.clip.media, base));
+  }
+
+  for (const scenario of SCENARIOS) {
+    const bundle = bundles.get(scenario.runId);
+    if (!bundle) throw new Error(`Studio lab scenario ${scenario.id} references missing run ${scenario.runId}`);
+    validateScenarioEvidence(bundle, scenario);
+  }
+
+  const current = bundles.get("run-006");
+  if (!current) throw new Error("Studio lab checkpoints require run-006");
+  for (const checkpoint of deriveCheckpoints(current)) {
+    if (checkpoint.phase !== "Ready" && checkpoint.cursor === null) {
+      throw new Error(`Studio lab could not derive the ${checkpoint.phase} checkpoint from run-006`);
+    }
   }
 }

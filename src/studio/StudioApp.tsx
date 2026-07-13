@@ -1,5 +1,5 @@
 import { AnimatePresence, MotionConfig } from "motion/react";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import Dock from "./Dock";
 import InputAct from "./InputAct";
@@ -7,17 +7,25 @@ import RunAct from "./RunAct";
 import { replayTransport, useBundle, usePaused, useStage, useStudio } from "./store";
 import useShortcuts from "./useShortcuts";
 
+const DevLab = import.meta.env.DEV ? lazy(() => import("./lab/Lab")) : null;
+
 export default function StudioApp({ runId }: { runId: string }) {
   const boot = useStudio((s) => s.boot);
   const stage = useStage();
   const bundle = useBundle();
   const paused = usePaused();
+  const [lab, setLab] = useState(false);
 
   useShortcuts();
 
   useEffect(() => {
     void boot(replayTransport(runId));
   }, [boot, runId]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    setLab(new URLSearchParams(window.location.search).get("lab") === "1");
+  }, []);
 
   // Held is a property of the whole instrument, not of one control: everything that
   // animates to say "alive" reads this and stops.
@@ -65,6 +73,11 @@ export default function StudioApp({ runId }: { runId: string }) {
       </AnimatePresence>
 
       <Dock />
+      {lab && DevLab && (
+        <Suspense fallback={null}>
+          <DevLab defaultRunId={runId} />
+        </Suspense>
+      )}
       </main>
     </MotionConfig>
   );

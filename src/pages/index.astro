@@ -1,0 +1,47 @@
+---
+import { Picture } from "astro:assets";
+import GlassNav from "../components/GlassNav.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+import heroBackground from "../assets/hero-background.png";
+---
+
+<SiteLayout
+  title="1321 | Language intelligence for real media"
+  description="Codex agents study Korean video first so captions and learning aren’t a cold guess."
+>
+  <main class="hero-shell">
+    <Picture
+      src={heroBackground}
+      alt=""
+      class="hero-picture"
+      formats={["avif", "webp"]}
+      widths={[960, 1440, 1920, 2560, 3840]}
+      sizes="100vw"
+      loading="eager"
+      decoding="async"
+    />
+    <div class="hero-scrim" aria-hidden="true"></div>
+    <GlassNav />
+
+    <section class="hero-content" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title">
+          <span class="hero-line">Autonomous Language Intelligence</span>
+          <span class="hero-line">for Real-World Media</span>
+        </h1>
+      </div>
+
+      <div class="hero-aside">
+        <p>
+          Transforming real-world media into captions, translations,
+          explanations, and personalized learning through autonomous,
+          self-improving&nbsp;investigation.
+        </p>
+
+        <div class="hero-actions" aria-label="1321 actions">
+          <a class="button button-primary" href="/studio/">View Demo</a>
+        </div>
+      </div>
+    </section>
+  </main>
+</SiteLayout>

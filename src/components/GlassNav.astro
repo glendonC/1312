@@ -1,0 +1,31 @@
+---
+const navItems = [
+  { label: "Method", href: "/method/" },
+  { label: "Journey", href: "/journey/" },
+  { label: "Benchmarks", href: "/benchmarks/" },
+];
+
+const currentPath = Astro.url.pathname;
+const isHome = currentPath === "/";
+const currentLabel =
+  navItems.find((item) => currentPath === item.href || currentPath.startsWith(item.href))?.label ??
+  "1321";
+---
+
+<header class:list={["site-header", isHome ? "is-home" : "is-interior"]} aria-label="Primary navigation">
+  <div class="breadcrumb" aria-label="Current page">
+    <a class="brand" href="/" aria-label="1321 home">1321</a>
+    {!isHome && (
+      <>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-current">{currentLabel}</span>
+      </>
+    )}
+  </div>
+
+  <nav class="glass-nav">
+    {navItems.map((item) => <a href={item.href} class="nav-link">{item.label}</a>)}
+  </nav>
+
+  <a class="cta-link" href="/studio/">Open Studio</a>
+</header>

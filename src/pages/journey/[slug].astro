@@ -1,0 +1,39 @@
+---
+import { getCollection, render } from "astro:content";
+import GlassNav from "../../components/GlassNav.astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("journey");
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+
+<SiteLayout title={`${post.data.title} | 1321`} description={post.data.description}>
+  <GlassNav />
+  <main class="interior-page">
+    <article class="article-shell">
+      <header>
+        <p class="eyebrow">Field note</p>
+        <h1>{post.data.title}</h1>
+        <p>{post.data.description}</p>
+        <time datetime={post.data.date.toISOString()}>
+          {post.data.date.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </time>
+      </header>
+      <div class="article-body">
+        <Content />
+      </div>
+    </article>
+  </main>
+</SiteLayout>

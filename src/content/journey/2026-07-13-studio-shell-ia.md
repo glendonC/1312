@@ -11,10 +11,10 @@ Shipped `/studio/` as an empty shell so the product surface exists before the sw
 
 IA panels (scaffold only):
 
-1. **Ingest**  -  URL / local clip slot
-2. **Org chart**  -  orchestrator + spawn slots
-3. **Squircles**  -  isolated live workspaces
-4. **Traces**  -  per-worker action log rail
-5. **Outputs**  -  captions / study / score hooks
+1. **Ingest** - URL / local clip slot
+2. **Org chart** - orchestrator + spawn slots
+3. **Squircles** - isolated live workspaces
+4. **Traces** - per-worker action log rail
+5. **Outputs** - captions / study / score hooks
 
 Linked run id: `shell-v0`. No media processed. Open Studio to see the empty instrument; Method still owns the loop explanation.

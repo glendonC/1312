@@ -9,7 +9,7 @@
     {
       "id": "c01",
       "t_start": 0,
-      "t_end": 1.7,
+      "t_end": 1.6,
       "speakers": [
         "A"
       ],
@@ -20,9 +20,14 @@
       "targets": [
         {
           "lang": "en",
-          "text": "There are a few people..."
+          "text": "I know a few people,"
         }
       ],
+      "corroboration": {
+        "agreement": 1,
+        "by": "whisper-1",
+        "heard": "분들이 몇 분 계신데"
+      },
       "baseline": {
         "path": "cold",
         "source": {
@@ -41,25 +46,26 @@
     },
     {
       "id": "c02",
-      "t_start": 1.7,
-      "t_end": 1.9,
+      "t_start": 1.6,
+      "t_end": 2.05,
       "speakers": [
         "B"
       ],
       "source": {
         "lang": "ko",
-        "text": "네"
+        "text": "네."
       },
       "targets": [
         {
           "lang": "en",
-          "text": null,
-          "withheld": {
-            "gate": "asr_agreement",
-            "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
-          }
+          "text": "Yeah."
         }
       ],
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
       "baseline": {
         "path": "cold",
         "source": {
@@ -75,7 +81,7 @@
     },
     {
       "id": "c03",
-      "t_start": 1.9,
+      "t_start": 2.05,
       "t_end": 7.85,
       "speakers": [
         "A"
@@ -87,9 +93,14 @@
       "targets": [
         {
           "lang": "en",
-          "text": "One of them said they’d been to Thailand, and that it was really great."
+          "text": "Someone said they’d been to Thailand, and that it was really great."
         }
       ],
+      "corroboration": {
+        "agreement": 0.971,
+        "by": "whisper-1",
+        "heard": "어떤 분은 태국 갔다 오셨다고 했거든요 근데 태국이 진짜 좋았다고 그러시더라고요"
+      },
       "baseline": {
         "path": "cold",
         "source": {
@@ -101,81 +112,18 @@
           "text": "One person said they went to Thailand and mentioned that it was really nice."
         }
       },
-      "hard": true,
-      "error_type": "boundary",
-      "error_subtype": "ko.numeral_boundary",
       "owner": "translate-01"
     },
     {
       "id": "c04",
-      "t_start": 8.1,
-      "t_end": 10.75,
+      "t_start": 8.35,
+      "t_end": 8.6,
       "speakers": [
         "B"
       ],
       "source": {
         "lang": "ko",
-        "text": "저 태국에 한국어 학원을 차리는 게 꿈이에요"
-      },
-      "targets": [
-        {
-          "lang": "en",
-          "text": "My dream is to open a Korean language school in Thailand."
-        }
-      ],
-      "baseline": {
-        "path": "cold",
-        "source": {
-          "lang": "ko",
-          "text": "제가 태국에 한국어 학원을 차리는게 꿈이에요"
-        },
-        "target": {
-          "lang": "en",
-          "text": "My dream is to open a Korean language school in Thailand."
-        }
-      },
-      "owner": "translate-01"
-    },
-    {
-      "id": "c05",
-      "t_start": 10.75,
-      "t_end": 12.4,
-      "speakers": [
-        "A"
-      ],
-      "source": {
-        "lang": "ko",
-        "text": "아 진짜요? 왜요"
-      },
-      "targets": [
-        {
-          "lang": "en",
-          "text": "Oh, really? Why?"
-        }
-      ],
-      "baseline": {
-        "path": "cold",
-        "source": {
-          "lang": "ko",
-          "text": "아 진짜요"
-        },
-        "target": {
-          "lang": "en",
-          "text": "Oh, really?"
-        }
-      },
-      "owner": "translate-01"
-    },
-    {
-      "id": "c06",
-      "t_start": 12.4,
-      "t_end": 12.9,
-      "speakers": [
-        "B"
-      ],
-      "source": {
-        "lang": "ko",
-        "text": "아니"
+        "text": "저 태국에"
       },
       "targets": [
         {
@@ -187,6 +135,46 @@
           }
         }
       ],
+      "corroboration": {
+        "agreement": 0,
+        "by": "whisper-1",
+        "heard": "제가"
+      },
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "제가"
+        },
+        "target": {
+          "lang": "en",
+          "text": "I"
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
+      "id": "c05",
+      "t_start": 8.6,
+      "t_end": 8.9,
+      "speakers": [
+        "C"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "음."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Mm."
+        }
+      ],
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
       "baseline": {
         "path": "cold",
         "source": {
@@ -201,22 +189,136 @@
       "owner": "translate-01"
     },
     {
+      "id": "c06",
+      "t_start": 8.9,
+      "t_end": 10.85,
+      "speakers": [
+        "B"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "한국어 학원을 차리는게 꿈이에요."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "It's my dream to open a Korean language school."
+        }
+      ],
+      "corroboration": {
+        "agreement": 0.824,
+        "by": "whisper-1",
+        "heard": "태국에 한국어 학원을 차리는게 꿈이에요"
+      },
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "태국에 한국어 학원을 차리는게 꿈이에요"
+        },
+        "target": {
+          "lang": "en",
+          "text": "My dream is to open a Korean language school in Thailand."
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
       "id": "c07",
-      "t_start": 12.9,
+      "t_start": 11.3,
+      "t_end": 11.85,
+      "speakers": [
+        "A"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "아, 진짜요?"
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Oh, really?"
+        }
+      ],
+      "corroboration": {
+        "agreement": 0.75,
+        "by": "whisper-1",
+        "heard": "진짜요"
+      },
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": "진짜요"
+        },
+        "target": {
+          "lang": "en",
+          "text": "Really?"
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
+      "id": "c08",
+      "t_start": 11.85,
+      "t_end": 12.15,
+      "speakers": [
+        "B"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "네."
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Yes."
+        }
+      ],
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": ""
+        },
+        "target": {
+          "lang": "en",
+          "text": ""
+        }
+      },
+      "owner": "translate-01"
+    },
+    {
+      "id": "c09",
+      "t_start": 12.15,
       "t_end": 13.7,
       "speakers": [
         "A"
       ],
       "source": {
         "lang": "ko",
-        "text": "왜요?"
+        "text": "왜요, 왜요?"
       },
       "targets": [
         {
           "lang": "en",
-          "text": "Why?"
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.50 on this window (< 0.6)"
+          }
         }
       ],
+      "corroboration": {
+        "agreement": 0.5,
+        "by": "whisper-1",
+        "heard": "왜요"
+      },
       "baseline": {
         "path": "cold",
         "source": {
@@ -228,29 +330,30 @@
           "text": "Why?"
         }
       },
-      "owner": "translate-01"
+      "owner": "translate-02"
     },
     {
-      "id": "c08",
-      "t_start": 13.7,
-      "t_end": 19.1,
+      "id": "c10",
+      "t_start": 13.85,
+      "t_end": 19.15,
       "speakers": [
         "B"
       ],
       "source": {
         "lang": "ko",
-        "text": "그 예전에 코로나 사태 이전에 누나랑 친누나가"
+        "text": "아니 그 예전에 코로나 사태 이전에 누나랑, 친누나가"
       },
       "targets": [
         {
           "lang": "en",
-          "text": null,
-          "withheld": {
-            "gate": "asr_agreement",
-            "reason": "two recognisers agree only 0.58 on this window (< 0.6)"
-          }
+          "text": "Well, back before COVID, with my older sister—my own older sister—"
         }
       ],
+      "corroboration": {
+        "agreement": 0.714,
+        "by": "whisper-1",
+        "heard": "왜요 아니 그 예전에 코로나 사태 이전에 누나랑"
+      },
       "baseline": {
         "path": "cold",
         "source": {
@@ -259,18 +362,18 @@
         },
         "target": {
           "lang": "en",
-          "text": "Why? Well, before the COVID-19 situation, with my sister..."
+          "text": "Why? Well, before the COVID-19 situation, my sister and"
         }
       },
       "hard": true,
       "error_type": "other",
       "error_subtype": "ko.kinship_address",
-      "owner": "translate-01"
+      "owner": "translate-02"
     },
     {
-      "id": "c09",
-      "t_start": 19.1,
-      "t_end": 19.3,
+      "id": "c11",
+      "t_start": 19.15,
+      "t_end": 20.15,
       "speakers": [
         "A"
       ],
@@ -288,45 +391,55 @@
           }
         }
       ],
+      "corroboration": {
+        "agreement": 0,
+        "by": "whisper-1",
+        "heard": "친누나가"
+      },
       "baseline": {
         "path": "cold",
         "source": {
           "lang": "ko",
-          "text": ""
+          "text": "친누나가"
         },
         "target": {
           "lang": "en",
-          "text": ""
+          "text": "my older sister"
         }
       },
       "owner": "translate-02"
     },
     {
-      "id": "c10",
-      "t_start": 19.3,
-      "t_end": 25.35,
+      "id": "c12",
+      "t_start": 20.15,
+      "t_end": 25.65,
       "speakers": [
         "B"
       ],
       "source": {
         "lang": "ko",
-        "text": "그 막 그 매형이랑 태국에 한 달 살기를 하려고 했는데"
+        "text": "그 막 그 매형이랑 태국에 한달 살기를 하려고 했는데"
       },
       "targets": [
         {
           "lang": "en",
-          "text": "They were, like, planning to go for a month-long stay in Thailand with my brother-in-law, but..."
+          "text": "My sister and my brother-in-law were planning a one-month stay in Thailand, but..."
         }
       ],
+      "corroboration": {
+        "agreement": 1,
+        "by": "whisper-1",
+        "heard": "그 막 그 매형이랑 태국에 한달 살기를 하려고 했는데"
+      },
       "baseline": {
         "path": "cold",
         "source": {
           "lang": "ko",
-          "text": "친누나가 그 막 그 매형이랑 태국에 한달 살기를 하려고 했는데"
+          "text": "그 막 그 매형이랑 태국에 한달 살기를 하려고 했는데"
         },
         "target": {
           "lang": "en",
-          "text": "My older sister and her husband were planning to live in Thailand for a month."
+          "text": "were planning to live in Thailand for a month with her husband."
         }
       },
       "hard": true,
@@ -335,9 +448,44 @@
       "owner": "translate-02"
     },
     {
-      "id": "c11",
+      "id": "c13",
+      "t_start": 25.75,
+      "t_end": 25.8,
+      "speakers": [
+        "B"
+      ],
+      "source": {
+        "lang": "ko",
+        "text": "그"
+      },
+      "targets": [
+        {
+          "lang": "en",
+          "text": "Uh..."
+        }
+      ],
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
+      "baseline": {
+        "path": "cold",
+        "source": {
+          "lang": "ko",
+          "text": ""
+        },
+        "target": {
+          "lang": "en",
+          "text": ""
+        }
+      },
+      "owner": "translate-02"
+    },
+    {
+      "id": "c14",
       "t_start": 25.52,
-      "t_end": 39.82,
+      "t_end": 39.92,
       "speakers": [
         "B"
       ],
@@ -348,9 +496,14 @@
       "targets": [
         {
           "lang": "en",
-          "text": "Since they were all so busy, I was the only one free, so I ended up doing a month-long stay in Thailand for free. I lived in Chiang Mai for a month, and the area was so pretty and the people were so friendly, and Korean..."
+          "text": "They were all too busy, so I was the only one available and ended up getting a free one-month stay in Thailand. I spent a month in Chiang Mai, the town was so pretty and the people were so kind, and Korean..."
         }
       ],
+      "corroboration": {
+        "agreement": 0.974,
+        "by": "whisper-1",
+        "heard": "그 매형이 너무 바쁘셔가지고 남는 사람이 저밖에 없어서 그 공짜로 태국 한달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어"
+      },
       "baseline": {
         "path": "cold",
         "source": {
@@ -359,7 +512,7 @@
         },
         "target": {
           "lang": "en",
-          "text": "But her husband was too busy, so I was the only one available, and I ended up living in Thailand for a month for free. Oh, I lived in Chiang Mai for a month, and the neighborhood was so beautiful, and the people were so kind, and Korean..."
+          "text": "But her husband was too busy, so I was the only one available, and I ended up living in Thailand for a month for free. I lived in Chiang Mai for a month, and the neighborhood was so beautiful, and the people were so kind, and Korean language..."
         }
       },
       "hard": true,

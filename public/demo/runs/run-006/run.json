@@ -19,6 +19,10 @@
       {
         "id": "B",
         "label": "speaker B · diarized"
+      },
+      {
+        "id": "C",
+        "label": "speaker C · unconfirmed (0.30s support)"
       }
     ],
     "music": [],
@@ -26,11 +30,13 @@
     "source": {
       "kind": "youtube",
       "label": "Didi's Korean Culture Podcast",
-      "note": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed). Speaker labels are the recogniser's, not ours. music[] is empty because no music detector ran, not because the clip is known to be clean. silence[] is derived from VAD segment boundaries (gaps ≥ 0.6s), not from an energy floor."
+      "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+      "licence": "Creative Commons Attribution license (reuse allowed)",
+      "note": "Speaker labels are the recogniser's own, not ours: nobody is named in this window, so we do not know which voice is the host and a run that guessed would be inventing the one thing a viewer could check by watching. music[] is empty because no music detector ran, NOT because the clip is known to be clean. silence[] is derived from VAD segment boundaries (gaps ≥ 0.6s), not from an energy floor."
     },
     "media": "clip.mp4"
   },
-  "wall_s": 246.8,
+  "wall_s": 157.74,
   "recorded": "2026-07-13",
   "agents": [
     {
@@ -52,7 +58,7 @@
       "parent": "orchestrator",
       "window": [
         0,
-        19.1
+        12.15
       ]
     },
     {
@@ -62,8 +68,8 @@
       "parent": "orchestrator",
       "divided_from": "translate-01",
       "window": [
-        19.1,
-        39.82
+        12.15,
+        39.92
       ]
     },
     {

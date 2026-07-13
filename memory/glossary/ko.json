@@ -1,24 +1,11 @@
 {
-  "run": "run-006",
-  "clip": "Ux-TMWnmntM",
-  "pack": "ko-v3",
-  "scope": "run",
-  "promoted_to": "memory/glossary/ko.json",
-  "cast_closed": false,
+  "lang": "ko",
   "entries": [
     {
       "term": "누나",
       "lang": "ko",
       "gloss": "older sister",
       "kind": "address_form",
-      "source": "gpt-5 · run-006 term resolution"
-    },
-    {
-      "term": "친누나",
-      "lang": "ko",
-      "gloss": "older sister",
-      "kind": "person",
-      "confirms_relation": true,
       "source": "gpt-5 · run-006 term resolution"
     },
     {
@@ -30,13 +17,6 @@
       "source": "gpt-5 · run-006 term resolution"
     },
     {
-      "term": "태국",
-      "lang": "ko",
-      "gloss": "Thailand",
-      "kind": "place",
-      "source": "gpt-5 · run-006 term resolution"
-    },
-    {
       "term": "치앙마이",
       "lang": "ko",
       "gloss": "Chiang Mai",
@@ -44,10 +24,11 @@
       "source": "gpt-5 · run-006 term resolution"
     },
     {
-      "term": "한국어 학원",
+      "term": "친누나",
       "lang": "ko",
-      "gloss": "Korean language school",
-      "kind": "term",
+      "gloss": "older sister",
+      "kind": "person",
+      "confirms_relation": true,
       "source": "gpt-5 · run-006 term resolution"
     },
     {
@@ -58,14 +39,28 @@
       "source": "gpt-5 · run-006 term resolution"
     },
     {
-      "term": "한달 살기",
+      "term": "태국",
+      "lang": "ko",
+      "gloss": "Thailand",
+      "kind": "place",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "한 달 살기",
       "lang": "ko",
       "gloss": "one-month stay",
       "kind": "term",
       "source": "gpt-5 · run-006 term resolution"
     },
     {
-      "term": "한 달 살기",
+      "term": "한국어 학원",
+      "lang": "ko",
+      "gloss": "Korean language school",
+      "kind": "term",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "한달 살기",
       "lang": "ko",
       "gloss": "one-month stay",
       "kind": "term",

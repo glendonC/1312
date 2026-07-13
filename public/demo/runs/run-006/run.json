@@ -1,0 +1,84 @@
+{
+  "id": "run-006",
+  "pair": {
+    "source": "ko",
+    "target": "en"
+  },
+  "pack": "ko-v3",
+  "clip": {
+    "id": "Ux-TMWnmntM",
+    "title": "Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
+    "title_target": "Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
+    "lang": "ko",
+    "duration": 40,
+    "speakers": [
+      {
+        "id": "A",
+        "label": "speaker A · diarized"
+      },
+      {
+        "id": "B",
+        "label": "speaker B · diarized"
+      }
+    ],
+    "music": [],
+    "silence": [],
+    "source": {
+      "kind": "youtube",
+      "label": "Didi's Korean Culture Podcast",
+      "note": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed). Speaker labels are the recogniser's, not ours. music[] is empty because no music detector ran, not because the clip is known to be clean. silence[] is derived from VAD segment boundaries (gaps ≥ 0.6s), not from an energy floor."
+    },
+    "media": "clip.mp4"
+  },
+  "wall_s": 246.8,
+  "recorded": "2026-07-13",
+  "agents": [
+    {
+      "id": "segment-01",
+      "role": "segment",
+      "label": "segment-01",
+      "parent": "orchestrator"
+    },
+    {
+      "id": "context-01",
+      "role": "context",
+      "label": "context-01",
+      "parent": "orchestrator"
+    },
+    {
+      "id": "translate-01",
+      "role": "translate",
+      "label": "translate-01",
+      "parent": "orchestrator",
+      "window": [
+        0,
+        19.1
+      ]
+    },
+    {
+      "id": "translate-02",
+      "role": "translate",
+      "label": "translate-02",
+      "parent": "orchestrator",
+      "divided_from": "translate-01",
+      "window": [
+        19.1,
+        39.82
+      ]
+    },
+    {
+      "id": "qc-01",
+      "role": "qc",
+      "label": "qc-01",
+      "parent": "orchestrator"
+    }
+  ],
+  "artifacts": [
+    "captions.json",
+    "corrections.json",
+    "glossary.json",
+    "score.json",
+    "traces.json"
+  ],
+  "note": "A run that actually happened on 2026-07-13, against real CC-BY media. Source lines are gpt-4o-transcribe-diarize; the confidence the gates read is cross-recogniser agreement with whisper-1, because gpt-4o-transcribe-diarize returns no logprobs and a confidence we cannot measure is one we do not print."
+}

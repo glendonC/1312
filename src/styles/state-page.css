@@ -1,0 +1,129 @@
+.state-page {
+  display: flex;
+  min-height: 100svh;
+  padding: 118px var(--page-x) 42px;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.state-page__shell {
+  display: grid;
+  width: min(1640px, 100%);
+  min-height: min(760px, calc(100svh - 160px));
+  margin: auto;
+  grid-template-columns: minmax(0, 0.86fr) minmax(440px, 1.14fr);
+  gap: clamp(48px, 7vw, 120px);
+  align-items: center;
+}
+
+.state-page__copy {
+  max-width: 660px;
+  padding-block: 36px;
+}
+
+.state-page__eyebrow {
+  margin: 0 0 26px;
+  color: var(--flag);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.state-page__copy h1 {
+  max-width: 11ch;
+  margin: 0 0 0 -0.045em;
+  font-size: clamp(3.8rem, 5.25vw, 6.25rem);
+  font-weight: var(--weight-thin);
+  letter-spacing: -0.066em;
+  line-height: 0.9;
+  text-wrap: balance;
+}
+
+.state-page__description {
+  max-width: 34rem;
+  margin: clamp(28px, 4vw, 44px) 0 0;
+  color: var(--ink-soft);
+  font-size: clamp(1rem, 1.35vw, 1.14rem);
+  line-height: 1.68;
+}
+
+.state-page__actions,
+.state-page__action-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.state-page__actions {
+  margin-top: 34px;
+}
+
+.state-page__visual {
+  width: 100%;
+  height: min(760px, calc(100svh - 160px));
+  min-height: 540px;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .state-page {
+    padding-bottom: 72px;
+  }
+
+  .state-page__shell {
+    grid-template-columns: 1fr;
+    gap: 52px;
+  }
+
+  .state-page__copy {
+    max-width: 740px;
+    padding: 34px 0 0;
+  }
+
+  .state-page__copy h1 {
+    max-width: 9.5ch;
+  }
+
+  .state-page__visual {
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 4 / 3;
+  }
+}
+
+@media (max-width: 560px) {
+  .state-page {
+    padding: 108px 16px 28px;
+  }
+
+  .state-page__shell {
+    gap: 42px;
+  }
+
+  .state-page__copy {
+    padding-top: 24px;
+  }
+
+  .state-page__eyebrow {
+    margin-bottom: 20px;
+  }
+
+  .state-page__copy h1 {
+    font-size: clamp(3.65rem, 18vw, 5.3rem);
+  }
+
+  .state-page__description {
+    margin-top: 24px;
+  }
+
+  .state-page__actions {
+    margin-top: 28px;
+  }
+
+  .state-page__visual {
+    aspect-ratio: 0.94;
+  }
+}

@@ -63,16 +63,28 @@ export default function Results() {
       </div>
 
       <div className="scores">
+        {/* A null score is not a zero. An unscored run prints "—" and says why: there is no
+            gold for this clip, so a delta against cold is not a number we are entitled to. */}
         <Score
           value={rate(prep?.hard_line ?? null)}
           label="hard lines"
-          sub={`${signed(score.delta_vs_cold)} vs cold ${rate(cold?.hard_line ?? null)}`}
+          sub={
+            prep?.hard_line == null
+              ? "unscored · no gold for this clip"
+              : score.delta_vs_cold == null
+                ? `cold delta unavailable · cold ${rate(cold?.hard_line ?? null)}`
+                : `${signed(score.delta_vs_cold)} vs cold ${rate(cold?.hard_line ?? null)}`
+          }
           good
         />
         <Score
-          value={String(prep?.hallucinated ?? 0)}
+          value={prep?.hallucinated == null ? "—" : String(prep.hallucinated)}
           label="fabrications"
-          sub={`cold made ${cold?.hallucinated ?? 0} on the same audio`}
+          sub={
+            cold?.hallucinated == null
+              ? "entity gate · not gold-verified"
+              : `cold made ${cold.hallucinated} on the same audio`
+          }
           good
         />
         <Score

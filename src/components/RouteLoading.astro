@@ -1,0 +1,44 @@
+---
+import LoadingScreen from "./LoadingScreen.astro";
+---
+
+<LoadingScreen mode="route" />
+
+<script>
+  type RouteLoadingWindow = Window & {
+    __routeLoadingBound?: boolean;
+    __routeLoadingTimer?: number;
+  };
+
+  const routeLoadingWindow = window as RouteLoadingWindow;
+
+  const hideRouteLoader = () => {
+    if (routeLoadingWindow.__routeLoadingTimer) {
+      window.clearTimeout(routeLoadingWindow.__routeLoadingTimer);
+      routeLoadingWindow.__routeLoadingTimer = undefined;
+    }
+
+    const loader = document.querySelector<HTMLElement>("[data-route-loader]");
+    loader?.removeAttribute("data-visible");
+    loader?.setAttribute("aria-hidden", "true");
+  };
+
+  const queueRouteLoader = () => {
+    hideRouteLoader();
+    routeLoadingWindow.__routeLoadingTimer = window.setTimeout(() => {
+      const loader = document.querySelector<HTMLElement>("[data-route-loader]");
+      loader?.setAttribute("data-visible", "true");
+      loader?.setAttribute("aria-hidden", "false");
+    }, 160);
+  };
+
+  if (!routeLoadingWindow.__routeLoadingBound) {
+    document.addEventListener("astro:before-preparation", queueRouteLoader);
+    document.addEventListener("astro:after-swap", hideRouteLoader);
+    document.addEventListener("astro:page-load", hideRouteLoader);
+    window.addEventListener("pageshow", hideRouteLoader);
+    routeLoadingWindow.__routeLoadingBound = true;
+  }
+
+  hideRouteLoader();
+</script>

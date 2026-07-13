@@ -6,48 +6,51 @@
 
   .hero-aside {
     justify-self: end;
-    max-width: min(38rem, 100%);
-  }
-
-  .aside-line {
-    white-space: normal;
+    max-width: min(26rem, 100%);
   }
 
   .metric-grid,
-  .feature-grid {
+  .feature-grid,
+  .secondary-strip,
+  .clip-strip,
+  .method-split,
+  .limits-grid,
+  .landscape-grid,
+  .foil-board,
+  .heatmap {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .impact-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .pack-mark {
+    text-align: left;
+  }
+
+  .impact-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .impact-stat {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .impact-meta {
+    justify-content: flex-start;
+  }
+
+  .evolution-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
   }
 
   .glass-nav {
     display: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .timeline-row {
-    grid-template-columns: 3.75rem 1fr;
-    gap: 8px 12px;
-  }
-
-  .timeline-row .type-badge {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .timeline-row time {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .timeline-copy {
-    grid-column: 1 / -1;
-  }
-
-  .timeline-delta {
-    grid-column: 1 / -1;
-    justify-self: start;
-    max-width: none;
-    text-align: left;
   }
 }
 
@@ -59,7 +62,18 @@
 
   .metric-grid,
   .feature-grid,
-  .table-row {
+  .secondary-strip,
+  .clip-strip,
+  .method-split,
+  .limits-grid,
+  .landscape-grid,
+  .foil-board,
+  .heatmap,
+  .table-row,
+  .evo-milestones,
+  .evo-bars,
+  .evo-axis,
+  .foil-scores {
     grid-template-columns: 1fr;
   }
 
@@ -79,5 +93,19 @@
   .note-footer .text-back {
     margin-left: 0;
     width: 100%;
+  }
+
+  .impact-lead {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .impact-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  .evo-bars {
+    height: 120px;
   }
 }

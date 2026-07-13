@@ -1,0 +1,37 @@
+---
+import GlassNav from "../components/GlassNav.astro";
+import SiteLayout from "./SiteLayout.astro";
+import "../styles/state-page.css";
+
+interface Props {
+  title: string;
+  description: string;
+  eyebrow: string;
+  heading: string;
+  navLabel: string;
+  noIndex?: boolean;
+}
+
+const { title, description, eyebrow, heading, navLabel, noIndex = false } = Astro.props;
+---
+
+<SiteLayout title={title} description={description} noIndex={noIndex}>
+  <GlassNav currentLabel={navLabel} />
+
+  <main class="state-page">
+    <section class="state-page__shell" aria-labelledby="state-page-title">
+      <div class="state-page__copy">
+        <p class="state-page__eyebrow">{eyebrow}</p>
+        <h1 id="state-page-title">{heading}</h1>
+        <p class="state-page__description">{description}</p>
+        <div class="state-page__actions">
+          <slot name="actions" />
+        </div>
+      </div>
+
+      <figure class="state-page__visual">
+        <slot name="visual" />
+      </figure>
+    </section>
+  </main>
+</SiteLayout>

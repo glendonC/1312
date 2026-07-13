@@ -1,13 +1,19 @@
 ---
+interface Props {
+  currentLabel?: string;
+}
+
 const navItems = [
   { label: "Method", href: "/method/" },
   { label: "Journey", href: "/journey/" },
   { label: "Benchmarks", href: "/benchmarks/" },
 ];
 
+const { currentLabel: currentLabelOverride } = Astro.props;
 const currentPath = Astro.url.pathname;
 const isHome = currentPath === "/";
 const currentLabel =
+  currentLabelOverride ??
   navItems.find((item) => currentPath === item.href || currentPath.startsWith(item.href))?.label ??
   "1321";
 ---

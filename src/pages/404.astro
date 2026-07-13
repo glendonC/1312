@@ -1,0 +1,36 @@
+---
+import StateSignal from "../components/StateSignal.astro";
+import StatePageLayout from "../layouts/StatePageLayout.astro";
+---
+
+<StatePageLayout
+  title="Page not found | 1321"
+  description="The address does not point to a page in 1321. Return home or rejoin the Build Week log."
+  eyebrow="404 / Signal lost"
+  heading="This route has gone quiet."
+  navLabel="404"
+  noIndex
+>
+  <div slot="actions" class="state-page__action-list">
+    <a class="button button-accent" href="/">Return home</a>
+    <a class="button button-quiet" href="/journey/">
+      View Build Week
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <path
+          d="M3 13 13 3M6 3h7v7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.35"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </a>
+  </div>
+
+  <StateSignal
+    slot="visual"
+    tone="missing"
+    label="An abstract red signal field marking a route that could not be found"
+  />
+</StatePageLayout>

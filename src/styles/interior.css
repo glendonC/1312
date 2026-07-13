@@ -140,35 +140,6 @@
   text-transform: uppercase;
 }
 
-.timeline-list {
-  list-style: none;
-  width: min(920px, 100%);
-  margin: 0 auto;
-  padding: 0;
-  border-top: 1px solid var(--line-strong);
-}
-
-.timeline-list > li {
-  border-bottom: 1px solid var(--line);
-}
-
-.timeline-row {
-  display: grid;
-  grid-template-columns: 4.5rem 5.5rem minmax(0, 1fr) auto;
-  gap: 14px 18px;
-  align-items: start;
-  padding: 18px 4px;
-  color: inherit;
-  text-decoration: none;
-  transition: background-color 160ms ease;
-}
-
-.timeline-row:hover,
-.timeline-row:focus-visible {
-  background: var(--paper-soft);
-}
-
-.timeline-row time,
 .article-shell time,
 .note-meta time {
   color: var(--accent);
@@ -220,39 +191,6 @@
   border-color: rgba(22, 29, 27, 0.22);
   color: var(--ink);
   background: var(--paper-soft);
-}
-
-.timeline-copy {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.timeline-title {
-  color: var(--ink);
-  font-size: 1.05rem;
-  font-weight: var(--weight-medium);
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-}
-
-.timeline-claim {
-  color: var(--ink-soft);
-  font-size: 0.92rem;
-  font-weight: var(--weight-regular);
-  line-height: 1.55;
-}
-
-.timeline-delta {
-  justify-self: end;
-  max-width: 14rem;
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: var(--weight-regular);
-  letter-spacing: 0.02em;
-  line-height: 1.45;
-  text-align: right;
 }
 
 .article-shell {

@@ -161,6 +161,30 @@ export interface Baseline {
   target: Line;
 }
 
+/**
+ * What a second, independent recogniser heard in this window.
+ *
+ * A recogniser cannot tell you how sure it is — the models we run return no logprobs, and a
+ * model's own estimate of its correctness is a self-report, which is the exact failure this
+ * product exists to catch. So the confidence a gate reads is not asked of anyone: it is the
+ * AGREEMENT between two systems that heard the same audio, which is a measurement.
+ *
+ * `agreement` is null when the second recogniser produced no words in the window at all.
+ * Whisper drops backchannels, so a bare "네" comes back with no token against it and there is
+ * nothing to compare. That is an ABSENCE OF EVIDENCE, and it must not be stored as a zero:
+ * zero means "the two of them heard different things", which is a finding, and this is the
+ * absence of one. A line with a null agreement is committed on one recogniser's word and says
+ * so; it is never withheld for a silence that belongs to our tooling rather than to the clip.
+ */
+export interface Corroboration {
+  /** 0..1 character agreement between two independent recognisers. null = not measurable. */
+  agreement: number | null;
+  /** The recogniser that did the checking. */
+  by: string;
+  /** What it wrote for this window. Empty = it wrote nothing here. */
+  heard: string;
+}
+
 export interface Cue {
   id: string;
   t_start: number;
@@ -170,6 +194,8 @@ export interface Cue {
   source: Line;
   /** One entry per target language. Today: one. */
   targets: TargetLine[];
+  /** Absent on a run that had only one recogniser. */
+  corroboration?: Corroboration;
   baseline?: Baseline;
   silence?: boolean;
   hard?: boolean;
@@ -271,7 +297,12 @@ export interface ScoreFile {
   };
   paths: Record<string, PathScore>;
   trail: { run: string; hard_line: number }[];
-  delta_vs_cold: number;
+  /**
+   * null when there is no gold for the clip. A run with nothing to be right against cannot
+   * have beaten the cold path by zero — it has not been compared to it at all, and writing 0
+   * would render as "+0.00 vs cold", a claim of parity we did not earn.
+   */
+  delta_vs_cold: number | null;
   per_line: PerLine[];
 }
 
@@ -284,7 +315,8 @@ export interface TraceView {
   playhead?: number;
   mark?: { label: string; hard?: boolean };
   gloss?: { term: string; gloss: string };
-  draft?: { source: string; target: string; conf: number };
+  /** `conf` is cross-recogniser agreement, never a model's opinion of itself. null = not measurable. */
+  draft?: { source: string; target: string; conf: number | null };
   gate?: { name: string; scope: GateScope; value: number; limit: number; fail?: boolean };
   stamp?: { kind: "withheld" | "corrected" | "dropped"; text: string };
 }

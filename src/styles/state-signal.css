@@ -1,0 +1,50 @@
+.state-signal {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(92, 28, 23, 0.16);
+  border-radius: var(--squircle-radius);
+  corner-shape: squircle;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(190, 111, 98, 0.72), transparent 58%),
+    radial-gradient(circle at 72% 66%, rgba(112, 43, 38, 0.66), transparent 56%),
+    #f0ded8;
+  box-shadow: 0 24px 60px rgba(72, 24, 20, 0.12);
+}
+
+.state-signal > .atmosphere-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(190, 111, 98, 0.72), transparent 58%),
+    radial-gradient(circle at 72% 66%, rgba(112, 43, 38, 0.66), transparent 56%),
+    #f0ded8;
+}
+
+.state-signal .atmosphere-field canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.state-signal::before,
+.state-signal::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.state-signal::before {
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px rgba(255, 245, 241, 0.68),
+    inset 0 -1px rgba(72, 24, 20, 0.1);
+}
+
+.state-signal::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 38%);
+}

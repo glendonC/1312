@@ -10,9 +10,16 @@
     "show",
     "group",
     "term",
-    "address_form"
+    "address_form",
+    "place"
   ],
   "phenomena": [
+    {
+      "id": "ko.counter_homophone",
+      "label": "Bound counter read as the wrong noun",
+      "error_type": "homophone",
+      "note": "몇 분 is both \"how many people\" (honorific counter 분) and \"how many minutes\". Only the surrounding verb decides. Landed by run-006 on real conversational media."
+    },
     {
       "id": "ko.numeral_boundary",
       "label": "Numeral eaten by a lost pause",
@@ -39,6 +46,20 @@
     }
   ],
   "gates": [
+    {
+      "id": "universal.asr_agreement",
+      "scope": "universal",
+      "label": "asr_agreement",
+      "since": "run-006",
+      "rule": "The recogniser returns no logprobs, so there is no confidence to read. Run a second, independent recogniser over the same window and gate on the measured agreement between them: below 0.60, the source line itself is in doubt and the target is withheld. A confidence we cannot measure is one we do not print."
+    },
+    {
+      "id": "universal.speaker_support",
+      "scope": "universal",
+      "label": "speaker",
+      "since": "run-006",
+      "rule": "A diarization label supported by under 1.0s of speech across the whole clip is not a distinct speaker. The label is kept as reported and flagged unconfirmed; it is never silently merged into another, because which speaker it really was is not something the run can know."
+    },
     {
       "id": "universal.silence",
       "scope": "universal",
@@ -73,6 +94,13 @@
       "label": "address",
       "since": "run-005",
       "rule": "Address forms are not kinship unless the glossary confirms the family relation."
+    },
+    {
+      "id": "ko.entity_support",
+      "scope": "pack",
+      "label": "entity",
+      "since": "run-006",
+      "rule": "Every proper noun in the target must trace to a glossary entry or to the source. What cast_closed does when there is a cast, this does when there is not: an unscripted clip names nobody, so there is no list to be outside of, but an invented name is still invented."
     }
   ]
 }

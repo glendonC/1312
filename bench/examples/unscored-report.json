@@ -1,0 +1,296 @@
+{
+  "$schema": "../schemas/report.schema.json",
+  "schema_version": "0.1.0",
+  "pack_id": "hard-ko-v1",
+  "status": "protocol_draft",
+  "generated_at": null,
+  "protocol": {
+    "primary_job": "ready_to_watch_captions",
+    "hypothesis": "On the same frozen Korean media, a prepared 1321 workflow should preserve more critical meaning than the same stack run cold and a dated YouTube auto-translation capture.",
+    "hard_line_definition": "Binary human judgment: the pre-registered critical meaning is preserved or it is not.",
+    "coverage_denominator": "pre_registered_critical_units",
+    "abstention_policy": "A withheld line is reported separately from both a correct line and a wrongly emitted line.",
+    "minimum_reviewers": 2,
+    "blinded_review": true,
+    "adjudication_required": true
+  },
+  "pack": {
+    "label": "Hard-KO Clip Pack v1",
+    "frozen": false,
+    "target_clip_count": 5,
+    "clips": [
+      {
+        "id": "slot-control-01",
+        "status": "planned",
+        "role": "control",
+        "source": null,
+        "target_duration_s": { "min": 30, "max": 60 },
+        "domain_target": "Clear broadcast or interview speech",
+        "phenomenon_targets": ["names", "numbers"],
+        "annotations": {
+          "activity": false,
+          "speakers": false,
+          "korean_gold": false,
+          "english_guidance": false,
+          "critical_units": false,
+          "facts": false,
+          "subtitle_gold": false,
+          "reviewed": false
+        }
+      },
+      {
+        "id": "slot-control-02",
+        "status": "planned",
+        "role": "control",
+        "source": null,
+        "target_duration_s": { "min": 30, "max": 60 },
+        "domain_target": "Clear conversational Korean",
+        "phenomenon_targets": ["honorifics", "speaker-turns"],
+        "annotations": {
+          "activity": false,
+          "speakers": false,
+          "korean_gold": false,
+          "english_guidance": false,
+          "critical_units": false,
+          "facts": false,
+          "subtitle_gold": false,
+          "reviewed": false
+        }
+      },
+      {
+        "id": "slot-hard-01",
+        "status": "planned",
+        "role": "hard",
+        "source": null,
+        "target_duration_s": { "min": 30, "max": 90 },
+        "domain_target": "Variety or talk media",
+        "phenomenon_targets": ["overlap", "slang", "humor", "relationships"],
+        "annotations": {
+          "activity": false,
+          "speakers": false,
+          "korean_gold": false,
+          "english_guidance": false,
+          "critical_units": false,
+          "facts": false,
+          "subtitle_gold": false,
+          "reviewed": false
+        }
+      },
+      {
+        "id": "slot-hard-02",
+        "status": "planned",
+        "role": "hard",
+        "source": null,
+        "target_duration_s": { "min": 30, "max": 90 },
+        "domain_target": "Streamer, fan, or niche community media",
+        "phenomenon_targets": ["fandom-terms", "fast-speech", "code-switch", "music"],
+        "annotations": {
+          "activity": false,
+          "speakers": false,
+          "korean_gold": false,
+          "english_guidance": false,
+          "critical_units": false,
+          "facts": false,
+          "subtitle_gold": false,
+          "reviewed": false
+        }
+      },
+      {
+        "id": "slot-hard-03",
+        "status": "planned",
+        "role": "hard",
+        "source": null,
+        "target_duration_s": { "min": 30, "max": 90 },
+        "domain_target": "Dense contextual or dialect-heavy media",
+        "phenomenon_targets": ["dialect", "on-screen-text", "implicature", "overlap"],
+        "annotations": {
+          "activity": false,
+          "speakers": false,
+          "korean_gold": false,
+          "english_guidance": false,
+          "critical_units": false,
+          "facts": false,
+          "subtitle_gold": false,
+          "reviewed": false
+        }
+      }
+    ]
+  },
+  "systems": [
+    {
+      "id": "1321-prepped",
+      "label": "1321 prepared",
+      "role": "subject",
+      "required": true,
+      "status": "not_run",
+      "version": null,
+      "capture_date": null,
+      "input_modalities": ["audio", "video", "context", "glossary", "correction-rules"]
+    },
+    {
+      "id": "1321-cold",
+      "label": "1321 cold",
+      "role": "internal_control",
+      "required": true,
+      "status": "not_run",
+      "version": null,
+      "capture_date": null,
+      "input_modalities": ["audio", "video"]
+    },
+    {
+      "id": "youtube-auto",
+      "label": "YouTube KO auto-CC → EN auto-translate",
+      "role": "public_foil",
+      "required": true,
+      "status": "not_run",
+      "version": null,
+      "capture_date": null,
+      "input_modalities": ["youtube-video"]
+    },
+    {
+      "id": "open-asr-mt",
+      "label": "Pinned open ASR → MT",
+      "role": "optional_baseline",
+      "required": false,
+      "status": "not_run",
+      "version": null,
+      "capture_date": null,
+      "input_modalities": ["audio"]
+    }
+  ],
+  "results": [
+    {
+      "system_id": "1321-prepped",
+      "run_id": null,
+      "status": "not_run",
+      "config": null,
+      "headline": {
+        "critical_meaning": { "passes": null, "total": null, "rate": null },
+        "critical_outcomes": { "correct": null, "wrong": null, "withheld": null, "missing": null, "total": null },
+        "catastrophic": { "count": null, "rate": null, "denominator": null },
+        "latency": { "first_usable_s": null, "complete_s": null }
+      },
+      "diagnostics": {
+        "ko_cer": null,
+        "ko_swer": null,
+        "critical_entities": null,
+        "critical_facts": null,
+        "critical_speaker": null,
+        "non_speech_false_captions": null,
+        "cue_timing": null,
+        "subtitle_compliance": null,
+        "mqm_errors": null,
+        "chrf": null,
+        "comet": null,
+        "suber": null,
+        "risk_coverage": null,
+        "correction_effort": null,
+        "same_clip_retention": null,
+        "held_out_transfer": null,
+        "run_variance": null
+      },
+      "artifacts": { "output": null, "runtime": null, "score": null, "review": null }
+    },
+    {
+      "system_id": "1321-cold",
+      "run_id": null,
+      "status": "not_run",
+      "config": null,
+      "headline": {
+        "critical_meaning": { "passes": null, "total": null, "rate": null },
+        "critical_outcomes": { "correct": null, "wrong": null, "withheld": null, "missing": null, "total": null },
+        "catastrophic": { "count": null, "rate": null, "denominator": null },
+        "latency": { "first_usable_s": null, "complete_s": null }
+      },
+      "diagnostics": {
+        "ko_cer": null,
+        "ko_swer": null,
+        "critical_entities": null,
+        "critical_facts": null,
+        "critical_speaker": null,
+        "non_speech_false_captions": null,
+        "cue_timing": null,
+        "subtitle_compliance": null,
+        "mqm_errors": null,
+        "chrf": null,
+        "comet": null,
+        "suber": null,
+        "risk_coverage": null,
+        "correction_effort": null,
+        "same_clip_retention": null,
+        "held_out_transfer": null,
+        "run_variance": null
+      },
+      "artifacts": { "output": null, "runtime": null, "score": null, "review": null }
+    },
+    {
+      "system_id": "youtube-auto",
+      "run_id": null,
+      "status": "not_run",
+      "config": null,
+      "headline": {
+        "critical_meaning": { "passes": null, "total": null, "rate": null },
+        "critical_outcomes": { "correct": null, "wrong": null, "withheld": null, "missing": null, "total": null },
+        "catastrophic": { "count": null, "rate": null, "denominator": null },
+        "latency": { "first_usable_s": null, "complete_s": null }
+      },
+      "diagnostics": {
+        "ko_cer": null,
+        "ko_swer": null,
+        "critical_entities": null,
+        "critical_facts": null,
+        "critical_speaker": null,
+        "non_speech_false_captions": null,
+        "cue_timing": null,
+        "subtitle_compliance": null,
+        "mqm_errors": null,
+        "chrf": null,
+        "comet": null,
+        "suber": null,
+        "risk_coverage": null,
+        "correction_effort": null,
+        "same_clip_retention": null,
+        "held_out_transfer": null,
+        "run_variance": null
+      },
+      "artifacts": { "output": null, "runtime": null, "score": null, "review": null }
+    },
+    {
+      "system_id": "open-asr-mt",
+      "run_id": null,
+      "status": "not_run",
+      "config": null,
+      "headline": {
+        "critical_meaning": { "passes": null, "total": null, "rate": null },
+        "critical_outcomes": { "correct": null, "wrong": null, "withheld": null, "missing": null, "total": null },
+        "catastrophic": { "count": null, "rate": null, "denominator": null },
+        "latency": { "first_usable_s": null, "complete_s": null }
+      },
+      "diagnostics": {
+        "ko_cer": null,
+        "ko_swer": null,
+        "critical_entities": null,
+        "critical_facts": null,
+        "critical_speaker": null,
+        "non_speech_false_captions": null,
+        "cue_timing": null,
+        "subtitle_compliance": null,
+        "mqm_errors": null,
+        "chrf": null,
+        "comet": null,
+        "suber": null,
+        "risk_coverage": null,
+        "correction_effort": null,
+        "same_clip_retention": null,
+        "held_out_transfer": null,
+        "run_variance": null
+      },
+      "artifacts": { "output": null, "runtime": null, "score": null, "review": null }
+    }
+  ],
+  "notes": [
+    "All five clip entries are selection slots, not sourced media.",
+    "All system rows are planned conditions, not completed runs.",
+    "The synthetic Studio fixture is intentionally excluded from this report."
+  ]
+}

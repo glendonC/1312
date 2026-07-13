@@ -171,31 +171,6 @@
   white-space: nowrap;
 }
 
-/* the status verb sweeps rather than churns */
-.shimmer {
-  background: linear-gradient(
-    100deg,
-    var(--ink-muted) 20%,
-    var(--ink) 42%,
-    var(--ink) 58%,
-    var(--ink-muted) 80%
-  );
-  background-size: 220% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  animation: sweep 2.4s linear infinite;
-}
-
-@keyframes sweep {
-  from {
-    background-position: 180% 0;
-  }
-  to {
-    background-position: -80% 0;
-  }
-}
-
 .dock-done {
   color: var(--accent);
 }
@@ -470,12 +445,6 @@
 /* ---------- responsive ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .shimmer {
-    animation: none;
-    background: none;
-    color: var(--ink);
-  }
-
   .dock-x[data-running="true"] {
     animation: none;
   }

@@ -45,7 +45,7 @@ export interface AgentView {
   playhead: number | null;
   marks: { label: string; hard: boolean }[];
   gloss: { term: string; gloss: string }[];
-  draft: { source: string; target: string; conf: number } | null;
+  draft: { source: string; target: string; conf: number | null } | null;
   gates: GateReading[];
   stamp: { kind: string; text: string } | null;
   think: ThinkLine[];

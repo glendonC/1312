@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro check && astro build",
+    "bench:check": "node scripts/check-bench.mjs",
     "preview": "astro preview"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
+    "ajv": "^8.20.0",
     "astro": "^7.0.0",
     "playwright": "^1.61.1",
     "typescript": "^6.0.3"

@@ -1,0 +1,66 @@
+{
+  "run": "run-006",
+  "clip": "Ux-TMWnmntM",
+  "pack": "ko-v3",
+  "scope": "run",
+  "promoted_to": "memory/glossary/ko.json",
+  "cast_closed": true,
+  "entries": [
+    {
+      "term": "태국",
+      "lang": "ko",
+      "gloss": "Thailand",
+      "kind": "place",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "한국어 학원",
+      "lang": "ko",
+      "gloss": "Korean language school",
+      "kind": "term",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "누나",
+      "lang": "ko",
+      "gloss": "older sister (address form; transcript does not confirm an actual family relation for this '누나')",
+      "kind": "address_form",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "친누나",
+      "lang": "ko",
+      "gloss": "older sister (biological)",
+      "kind": "term",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "매형",
+      "lang": "ko",
+      "gloss": "brother-in-law (husband of the speaker's older sister)",
+      "kind": "term",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "한 달 살기",
+      "lang": "ko",
+      "gloss": "month-long stay (living in a place for a month)",
+      "kind": "term",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "치앙마이",
+      "lang": "ko",
+      "gloss": "Chiang Mai",
+      "kind": "place",
+      "source": "gpt-5 · run-006 term resolution"
+    },
+    {
+      "term": "코로나 사태",
+      "lang": "ko",
+      "gloss": "the COVID-19 pandemic",
+      "kind": "term",
+      "source": "gpt-5 · run-006 term resolution"
+    }
+  ]
+}

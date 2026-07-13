@@ -1,4 +1,5 @@
 ---
+import LoadingScreen from "../../components/LoadingScreen.astro";
 import StudioApp from "../../studio/StudioApp";
 import SiteLayout from "../../layouts/SiteLayout.astro";
 ---
@@ -7,5 +8,7 @@ import SiteLayout from "../../layouts/SiteLayout.astro";
   title="Studio | 1321"
   description="Paste a clip. Watch it get studied. Read captions it will stand behind."
 >
-  <StudioApp runId="run-005" client:only="react" />
+  <StudioApp runId="run-005" client:only="react">
+    <LoadingScreen slot="fallback" />
+  </StudioApp>
 </SiteLayout>

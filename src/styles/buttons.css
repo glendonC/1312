@@ -1,9 +1,3 @@
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .button {
   position: relative;
   z-index: 0;
@@ -65,4 +59,39 @@
   color: #f7faf8;
   background: var(--ink);
   box-shadow: 0 14px 34px rgba(22, 29, 27, 0.16);
+}
+
+.button-accent {
+  border: 1px solid transparent;
+  color: #f4fbf9;
+  background: linear-gradient(180deg, #357f79 0%, var(--accent) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 2px rgba(16, 57, 52, 0.22),
+    0 10px 24px rgba(42, 107, 102, 0.22);
+}
+
+.button-accent:hover,
+.button-accent:focus-visible {
+  background: linear-gradient(180deg, #3d8b84 0%, #2f746e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 2px 4px rgba(16, 57, 52, 0.2),
+    0 14px 30px rgba(42, 107, 102, 0.26);
+}
+
+.button-quiet {
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.52);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.8),
+    0 8px 22px rgba(22, 29, 27, 0.05);
+}
+
+.button-quiet:hover,
+.button-quiet:focus-visible {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--paper-elevated);
 }

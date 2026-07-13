@@ -1,0 +1,56 @@
+{
+  "run": "run-006",
+  "clip": "Ux-TMWnmntM",
+  "pack": "ko-v3",
+  "rows": [
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 19.1,
+      "t_end": 19.3,
+      "raw": "Yeah.",
+      "final": null,
+      "error_type": "other",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-006",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 1.7,
+      "t_end": 1.9,
+      "raw": "Yeah.",
+      "final": null,
+      "error_type": "other",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-006",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 12.4,
+      "t_end": 12.9,
+      "raw": "Well,",
+      "final": null,
+      "error_type": "other",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-006",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 13.7,
+      "t_end": 19.1,
+      "raw": "Back then, before the COVID-19 pandemic, older sister (address form) and older sister (biological)...",
+      "final": null,
+      "error_type": "other",
+      "error_subtype": "ko.kinship_address",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-006",
+      "pack": "ko-v3"
+    }
+  ]
+}

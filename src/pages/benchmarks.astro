@@ -1,9 +1,712 @@
 ---
+import report from "../../bench/examples/unscored-report.json";
 import GlassNav from "../components/GlassNav.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
+import {
+  annotationRequirements,
+  artifactContract,
+  benchmarkCopy,
+  displayNumber,
+  displayRate,
+  evaluationLabels,
+  metricGroups,
+  outcomeStates,
+  priorityLabels,
+  supportLabels,
+} from "../data/benchmarks";
+import "../styles/benchmarks.css";
+
+const statusLabels: Record<string, string> = {
+  protocol_draft: "Protocol draft",
+  gold_frozen: "Gold frozen",
+  scored: "Scored report",
+  planned: "Planned",
+  sourced: "Source acquired",
+  annotated: "Annotation in progress",
+  gold_ready: "Gold ready",
+  frozen: "Frozen",
+  not_run: "Not run",
+  captured: "Captured",
+  reviewed: "Reviewed",
+};
+
+const roleLabels: Record<string, string> = {
+  subject: "1321 subject",
+  internal_control: "Internal control",
+  public_foil: "Public foil",
+  optional_baseline: "Optional baseline",
+  control: "Control",
+  hard: "Hard case",
+};
+
+const tabDefinitions = [
+  { id: "evidence", label: "Evidence", icon: "◎" },
+  { id: "pack", label: "Test pack", icon: "▦" },
+  { id: "compare", label: "Compare", icon: "⇄" },
+  { id: "results", label: "Results", icon: "◫" },
+  { id: "methods", label: "Methods", icon: "⌁" },
+  { id: "receipts", label: "Receipts", icon: "↗" },
+] as const;
+
+const sourcedClips = report.pack.clips.filter((clip) => clip.source !== null).length;
+const goldReadyClips = report.pack.clips.filter((clip) =>
+  clip.status === "gold_ready" || clip.status === "frozen"
+).length;
+const completedRuns = report.results.filter((result) => result.status === "scored").length;
+const reviewedRuns = report.results.filter((result) =>
+  result.status === "reviewed" || result.status === "scored"
+).length;
+const totalAnnotationFields = report.pack.clips.reduce(
+  (sum, clip) => sum + Object.keys(clip.annotations).length,
+  0,
+);
+const completeAnnotationFields = report.pack.clips.reduce(
+  (sum, clip) => sum + Object.values(clip.annotations).filter(Boolean).length,
+  0,
+);
+const readyArtifacts = artifactContract.filter((artifact) => artifact.state === "ready").length;
+const missingArtifacts = artifactContract.length - readyArtifacts;
+const reportIsScored = report.status === "scored" && completedRuns === report.systems.length;
+const resultBySystem = new Map(report.results.map((result) => [result.system_id, result]));
+const subjectSystem = report.systems.find((system) => system.role === "subject");
+const subjectResult = subjectSystem ? resultBySystem.get(subjectSystem.id) : undefined;
+const heroValue = reportIsScored
+  ? displayRate(subjectResult?.headline.critical_meaning.rate ?? null)
+  : "—";
+const heroValueLabel = reportIsScored ? "Critical meaning preserved" : "Not measured";
+
+const progressStages = [
+  { label: "Draft", state: "current", meta: "Current" },
+  { label: "Source", state: sourcedClips === report.pack.target_clip_count ? "complete" : "future", meta: `${sourcedClips}/${report.pack.target_clip_count}` },
+  { label: "Freeze", state: goldReadyClips === report.pack.target_clip_count ? "complete" : "future", meta: `${goldReadyClips}/${report.pack.target_clip_count}` },
+  { label: "Run", state: completedRuns === report.systems.length ? "complete" : "future", meta: `${completedRuns}/${report.systems.length}` },
+  { label: "Review", state: reviewedRuns === report.systems.length ? "complete" : "future", meta: `${reviewedRuns}/${report.systems.length}` },
+  { label: "Publish", state: reportIsScored ? "complete" : "future", meta: reportIsScored ? "Live" : "Locked" },
+] as const;
+
+const difficultyGroups = [
+  {
+    index: "01",
+    title: "Hear the speech",
+    description: "Fast delivery, overlap, music, and dialect test whether the Korean can be recovered cleanly.",
+    tags: ["fast-speech", "overlap", "music", "dialect"],
+  },
+  {
+    index: "02",
+    title: "Read the context",
+    description: "Humor, implicature, honorifics, and relationships test what audio alone cannot explain.",
+    tags: ["humor", "implicature", "honorifics", "relationships"],
+  },
+  {
+    index: "03",
+    title: "Keep specifics intact",
+    description: "Names, numbers, fandom terms, code-switching, and on-screen text test exact meaning.",
+    tags: ["names", "numbers", "fandom-terms", "code-switch", "on-screen-text"],
+  },
+] as const;
+
+const comparisonNotes = [
+  {
+    index: "01",
+    title: "Preparation effect",
+    copy: "Prepared versus cold keeps the 1321 stack comparable while changing the context it may use.",
+  },
+  {
+    index: "02",
+    title: "Public reference point",
+    copy: "A date-stamped YouTube capture shows what a familiar public workflow produced on the same media.",
+  },
+  {
+    index: "03",
+    title: "Optional open baseline",
+    copy: "A pinned ASR-to-translation pipeline can provide a reproducible baseline without becoming the headline.",
+  },
+] as const;
+
+const workItems = [
+  {
+    label: "Source the five media selections",
+    meta: `${sourcedClips} of ${report.pack.target_clip_count} acquired`,
+    state: sourcedClips === report.pack.target_clip_count ? "ready" : "missing",
+    stateLabel: sourcedClips === report.pack.target_clip_count ? "Ready" : "Missing",
+  },
+  {
+    label: "Freeze gold and critical units",
+    meta: `${completeAnnotationFields} of ${totalAnnotationFields} clip checks complete`,
+    state: goldReadyClips === report.pack.target_clip_count ? "ready" : "missing",
+    stateLabel: goldReadyClips === report.pack.target_clip_count ? "Ready" : "Missing",
+  },
+  {
+    label: "Capture and score every condition",
+    meta: `${completedRuns} of ${report.systems.length} scored`,
+    state: completedRuns === report.systems.length ? "measured" : "planned",
+    stateLabel: completedRuns === report.systems.length ? "Measured" : "Planned",
+  },
+  {
+    label: "Complete blinded review",
+    meta: `${reviewedRuns} of ${report.systems.length} reviewed`,
+    state: reviewedRuns === report.systems.length ? "ready" : "planned",
+    stateLabel: reviewedRuns === report.systems.length ? "Ready" : "Planned",
+  },
+  {
+    label: "Publish the scored report and receipts",
+    meta: reportIsScored ? "Versioned report published" : "Unlocks only after review",
+    state: reportIsScored ? "measured" : "planned",
+    stateLabel: reportIsScored ? "Measured" : "Planned",
+  },
+] as const;
+
+const outcomePercent = (value: number | null, total: number | null) => {
+  if (value === null || total === null || total === 0) return "0%";
+  return `${Math.max(0, Math.min(100, (value / total) * 100))}%`;
+};
+
+const outcomeClass: Record<string, string> = {
+  correct: "outcome-correct",
+  wrong: "outcome-wrong",
+  withheld: "outcome-withheld",
+  missing: "outcome-missing",
+};
 ---
 
-<SiteLayout title="Benchmarks | 1321" description="Benchmarks.">
+<SiteLayout
+  title="Benchmarks | 1321"
+  description="The evidence state, planned Korean-media test pack, comparison conditions, headline outcomes, and auditable benchmark receipts for 1321."
+>
   <GlassNav />
-  <main class="interior-page"></main>
+
+  <main class="bench-page">
+    <div class="bench-shell">
+      <section class="bench-summary" aria-label="Benchmark summary">
+          <article class="summary-question">
+            <span>Research question</span>
+            <strong>Does preparation preserve more critical meaning?</strong>
+            <p>Prepared 1321 versus cold, YouTube auto-translate, and an optional open baseline.</p>
+          </article>
+          <article>
+            <span>Sources</span>
+            <strong>{sourcedClips}<small> / {report.pack.target_clip_count}</small></strong>
+            <p>Acquired clips</p>
+          </article>
+          <article>
+            <span>Gold</span>
+            <strong>{goldReadyClips}<small> / {report.pack.target_clip_count}</small></strong>
+            <p>Frozen clips</p>
+          </article>
+          <article>
+            <span>Runs</span>
+            <strong>{completedRuns}<small> / {report.systems.length}</small></strong>
+            <p>Scored conditions</p>
+          </article>
+          <article class:list={["summary-performance", reportIsScored && "is-measured"]}>
+            <span>Performance</span>
+            <strong>{heroValue}</strong>
+            <p>{heroValueLabel}</p>
+          </article>
+      </section>
+
+      <section class="bench-instrument" aria-label="Benchmark report" data-bench-instrument>
+        <div class="instrument-bar">
+          <div class="instrument-select">
+            <label for="bench-section">Section</label>
+            <select id="bench-section" data-bench-select>
+              {tabDefinitions.map((tab) => <option value={tab.id}>{tab.label}</option>)}
+            </select>
+          </div>
+
+          <div class="bench-tabs" role="tablist" aria-label="Benchmark sections">
+            {tabDefinitions.map((tab, index) => (
+              <button
+                id={`tab-${tab.id}`}
+                type="button"
+                role="tab"
+                aria-selected={index === 0 ? "true" : "false"}
+                aria-controls={`panel-${tab.id}`}
+                tabindex={index === 0 ? 0 : -1}
+                data-bench-tab={tab.id}
+              >
+                <span class="tab-icon" aria-hidden="true">{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div class="instrument-panels">
+          <section
+            class="instrument-panel evidence-panel"
+            id="panel-evidence"
+            role="tabpanel"
+            aria-labelledby="tab-evidence"
+            tabindex="0"
+            data-bench-panel="evidence"
+          >
+            <header class="panel-heading">
+              <div>
+                <p>01 / Evidence today</p>
+                <h2>Current evidence state</h2>
+              </div>
+              <p>Every empty cell is intentional. It shows exactly what must exist before a number can appear.</p>
+            </header>
+
+            <ol class="evidence-progress" aria-label="Benchmark publication stages">
+              {progressStages.map((stage, index) => (
+                <li data-stage-state={stage.state}>
+                  <span class="stage-marker">{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{stage.label}</strong>
+                  <small>{stage.meta}</small>
+                </li>
+              ))}
+            </ol>
+
+            <div class="panel-split evidence-split">
+              <div class="evidence-board">
+                <div class="board-summary">
+                  <div>
+                    <strong>{report.pack.target_clip_count}</strong>
+                    <span>selection slots</span>
+                  </div>
+                  <p>Planned targets are not acquired clips.</p>
+                </div>
+
+                <div class="evidence-matrix" role="table" aria-label="Evidence readiness by selection slot">
+                  <div class="matrix-row matrix-head" role="row">
+                    <span role="columnheader">Slot</span>
+                    <span role="columnheader">Plan</span>
+                    <span role="columnheader">Source</span>
+                    <span role="columnheader">Gold</span>
+                    <span role="columnheader">Review</span>
+                  </div>
+                  {report.pack.clips.map((clip, index) => {
+                    const isGoldReady = clip.status === "gold_ready" || clip.status === "frozen";
+                    return (
+                      <div class="matrix-row" role="row">
+                        <span class="matrix-label" role="rowheader">{String(index + 1).padStart(2, "0")}</span>
+                        <span class="matrix-cell is-planned" role="cell" aria-label="Selection slot planned">○</span>
+                        <span class:list={["matrix-cell", clip.source ? "is-ready" : "is-missing"]} role="cell" aria-label={clip.source ? "Source ready" : "Source missing"}>{clip.source ? "✓" : ""}</span>
+                        <span class:list={["matrix-cell", isGoldReady ? "is-ready" : "is-missing"]} role="cell" aria-label={isGoldReady ? "Gold ready" : "Gold missing"}>{isGoldReady ? "✓" : ""}</span>
+                        <span class:list={["matrix-cell", clip.annotations.reviewed ? "is-ready" : "is-missing"]} role="cell" aria-label={clip.annotations.reviewed ? "Review ready" : "Review missing"}>{clip.annotations.reviewed ? "✓" : ""}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div class="evidence-facts" aria-label="Evidence summary">
+                <article class="fact-source">
+                  <span>01</span>
+                  <strong>{sourcedClips} / {report.pack.target_clip_count}</strong>
+                  <div><h3>Sources acquired</h3><p>Five domains are planned. None currently claims media provenance.</p></div>
+                </article>
+                <article class="fact-run">
+                  <span>02</span>
+                  <strong>{completedRuns} / {report.systems.length}</strong>
+                  <div><h3>Conditions scored</h3><p>All four conditions are definitions, not completed benchmark runs.</p></div>
+                </article>
+                <article class="fact-result">
+                  <span>03</span>
+                  <strong>—</strong>
+                  <div><h3>Performance measured</h3><p>Null remains “Not measured.” It never becomes zero, a rank, or a claim.</p></div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="instrument-panel pack-panel"
+            id="panel-pack"
+            role="tabpanel"
+            aria-labelledby="tab-pack"
+            tabindex="0"
+            data-bench-panel="pack"
+            hidden
+          >
+            <header class="panel-heading">
+              <div>
+                <p>02 / Test pack</p>
+                <h2>Planned media coverage</h2>
+              </div>
+              <p>The pack mixes clear controls with real-media failure modes. These are selection targets, not clip evidence.</p>
+            </header>
+
+            <div class="panel-split pack-split">
+              <div class="clip-reel" aria-label="Planned Korean media selection slots">
+                {report.pack.clips.map((clip, index) => (
+                  <article class:list={["clip-frame", clip.source ? "has-source" : "needs-source"]}>
+                    <div class="clip-frame-top">
+                      <span class="clip-number">{String(index + 1).padStart(2, "0")}</span>
+                      <span class:list={["state-chip", clip.source ? "state-ready" : "state-missing"]}>
+                        <span aria-hidden="true">{clip.source ? "✓" : "▨"}</span>
+                        {clip.source ? "Source acquired" : "Not sourced"}
+                      </span>
+                    </div>
+                    <div class="clip-frame-body">
+                      <span>{roleLabels[clip.role] ?? clip.role}</span>
+                      <h3>{clip.domain_target}</h3>
+                      <p>{clip.target_duration_s.min}–{clip.target_duration_s.max} seconds</p>
+                    </div>
+                    <ul class="tag-list" aria-label={`${clip.domain_target} target phenomena`}>
+                      {clip.phenomenon_targets.map((phenomenon) => <li>{phenomenon.replaceAll("-", " ")}</li>)}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+
+              <div class="difficulty-stack" aria-label="Difficulty groups">
+                {difficultyGroups.map((group) => (
+                  <article>
+                    <span>{group.index}</span>
+                    <div>
+                      <h3>{group.title}</h3>
+                      <p>{group.description}</p>
+                      <ul class="tag-list">
+                        {group.tags.map((tag) => <li>{tag.replaceAll("-", " ")}</li>)}
+                      </ul>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="instrument-panel compare-panel"
+            id="panel-compare"
+            role="tabpanel"
+            aria-labelledby="tab-compare"
+            tabindex="0"
+            data-bench-panel="compare"
+            hidden
+          >
+            <header class="panel-heading">
+              <div>
+                <p>03 / Compare</p>
+                <h2>Comparison conditions</h2>
+              </div>
+              <p>Versions, inputs, and capture dates stay visible so a comparison never hides what changed.</p>
+            </header>
+
+            <div class="same-reel-rule">
+              <span>Same frozen clips</span>
+              <span aria-hidden="true">──────────────────</span>
+              <span>Different allowed inputs</span>
+            </div>
+
+            <div class="panel-split compare-split">
+              <div class="condition-board" aria-label="Planned comparison conditions">
+                {report.systems.map((system, index) => {
+                  const result = resultBySystem.get(system.id);
+                  const measured = result?.status === "scored";
+                  return (
+                    <article data-system-role={system.role}>
+                      <div class="condition-topline">
+                        <span>[{String(index + 1).padStart(2, "0")}]</span>
+                        <span class:list={["state-chip", measured ? "state-measured" : "state-planned"]}>
+                          <span aria-hidden="true">{measured ? "●" : "○"}</span>
+                          {measured ? "Measured" : statusLabels[system.status] ?? system.status}
+                        </span>
+                      </div>
+                      <span class="condition-role">{roleLabels[system.role] ?? system.role}{system.required ? " · required" : " · optional"}</span>
+                      <h3>{system.label}</h3>
+                      <ul class="tag-list" aria-label={`${system.label} allowed inputs`}>
+                        {system.input_modalities.map((input) => <li>{input.replaceAll("-", " ")}</li>)}
+                      </ul>
+                      <p>{system.version ?? "Version not pinned"}<span>{system.capture_date ?? "No capture date"}</span></p>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div class="comparison-notes" aria-label="Why these conditions are compared">
+                {comparisonNotes.map((note) => (
+                  <article>
+                    <span>{note.index}</span>
+                    <div><h3>{note.title}</h3><p>{note.copy}</p></div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="instrument-panel results-panel"
+            id="panel-results"
+            role="tabpanel"
+            aria-labelledby="tab-results"
+            tabindex="0"
+            data-bench-panel="results"
+            hidden
+          >
+            <header class="panel-heading">
+              <div>
+                <p>04 / Results</p>
+                <h2>Headline outcome contract</h2>
+              </div>
+              <p>Headline outcomes compare systems. The four critical-unit states remain separate so restraint cannot masquerade as correctness.</p>
+            </header>
+
+            {!reportIsScored ? (
+              <div class="panel-split result-split">
+                <div class="empty-scorecard" role="note" aria-label="No benchmark result is measured">
+                  <div class="empty-score-topline"><span>Headline result</span><span>Awaiting frozen evidence</span></div>
+                  <strong aria-hidden="true">—</strong>
+                  <h3>Not measured</h3>
+                  <p>Results will appear here only after real sources, frozen gold, captured outputs, and blinded review exist.</p>
+                  <div class="empty-outcome-track" aria-hidden="true"></div>
+                  <span class="empty-track-label">No outcome proportions yet</span>
+                  <dl>
+                    <div><dt>Critical meaning</dt><dd>—</dd></div>
+                    <div><dt>Catastrophic errors</dt><dd>—</dd></div>
+                    <div><dt>Time to usable</dt><dd>—</dd></div>
+                  </dl>
+                </div>
+
+                <div class="outcome-key" aria-label="How to interpret critical-unit outcomes">
+                  {outcomeStates.map((outcome, index) => (
+                    <article class={outcomeClass[outcome.id]}>
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <h3>{outcome.label}</h3>
+                      <p>{outcome.definition}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div class="scored-results" aria-label="Scored system results">
+                {report.systems.map((system) => {
+                  const result = resultBySystem.get(system.id)!;
+                  const outcomes = result.headline.critical_outcomes;
+                  return (
+                    <article class="result-card">
+                      <header>
+                        <div><span>{roleLabels[system.role] ?? system.role}</span><h3>{system.label}</h3></div>
+                        <span class="state-chip state-measured"><span aria-hidden="true">●</span>Measured</span>
+                      </header>
+                      <div class="result-headlines">
+                        <div><strong>{displayRate(result.headline.critical_meaning.rate)}</strong><span>Critical meaning</span></div>
+                        <div><strong>{displayNumber(result.headline.catastrophic.count)}</strong><span>Catastrophic errors</span></div>
+                        <div><strong>{displayNumber(result.headline.latency.first_usable_s, { maximumFractionDigits: 1 })}</strong><span>Seconds to usable</span></div>
+                      </div>
+                      <div
+                        class="outcome-bar"
+                        role="img"
+                        aria-label={`${system.label}: ${displayNumber(outcomes.correct)} correct, ${displayNumber(outcomes.wrong)} wrong, ${displayNumber(outcomes.withheld)} withheld, ${displayNumber(outcomes.missing)} missing`}
+                      >
+                        <span class="outcome-correct" style={`width:${outcomePercent(outcomes.correct, outcomes.total)}`}></span>
+                        <span class="outcome-wrong" style={`width:${outcomePercent(outcomes.wrong, outcomes.total)}`}></span>
+                        <span class="outcome-withheld" style={`width:${outcomePercent(outcomes.withheld, outcomes.total)}`}></span>
+                        <span class="outcome-missing" style={`width:${outcomePercent(outcomes.missing, outcomes.total)}`}></span>
+                      </div>
+                      <dl class="outcome-values">
+                        <div class="outcome-correct"><dt>Correct</dt><dd>{displayNumber(outcomes.correct)}</dd></div>
+                        <div class="outcome-wrong"><dt>Wrong</dt><dd>{displayNumber(outcomes.wrong)}</dd></div>
+                        <div class="outcome-withheld"><dt>Withheld</dt><dd>{displayNumber(outcomes.withheld)}</dd></div>
+                        <div class="outcome-missing"><dt>Missing</dt><dd>{displayNumber(outcomes.missing)}</dd></div>
+                      </dl>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section
+            class="instrument-panel methods-panel"
+            id="panel-methods"
+            role="tabpanel"
+            aria-labelledby="tab-methods"
+            tabindex="0"
+            data-bench-panel="methods"
+            hidden
+          >
+            <header class="panel-heading">
+              <div>
+                <p>05 / Methods</p>
+                <h2>Metric registry</h2>
+              </div>
+              <p>Diagnostics explain a result. Research-only methods wait for the right evidence. Omitted metrics cannot quietly become claims.</p>
+            </header>
+
+            <div class="method-groups">
+              {metricGroups.map((group) => (
+                <details class={`method-group method-${group.id}`} open={group.id === "headline"}>
+                  <summary>
+                    <strong>{group.metrics.length}</strong>
+                    <div><h3>{group.label}</h3><p>{group.note}</p></div>
+                    <span aria-hidden="true">+</span>
+                  </summary>
+                  <div class="method-list">
+                    {group.metrics.map((metric) => (
+                      <details class="method-item">
+                        <summary>
+                          <div><strong>{metric.label}</strong><span>{metric.layer}</span></div>
+                          <span class={`support-mark support-${metric.support}`}>{supportLabels[metric.support]}</span>
+                        </summary>
+                        <div class="method-detail">
+                          <p class="method-question">{metric.question}</p>
+                          <dl>
+                            <div><dt>Evaluation</dt><dd>{evaluationLabels[metric.evaluation]}</dd></div>
+                            <div><dt>Evidence required</dt><dd>{metric.requiredData}</dd></div>
+                            <div><dt>Limitation</dt><dd>{metric.limitation}</dd></div>
+                            <div><dt>Contract field</dt><dd><code>{metric.field}</code></dd></div>
+                          </dl>
+                          <footer>
+                            <span class={`priority-mark priority-${metric.priority}`}>{priorityLabels[metric.priority]}</span>
+                            {metric.reference && <a href={metric.reference.url}>{metric.reference.label} ↗</a>}
+                          </footer>
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </section>
+
+          <section
+            class="instrument-panel receipts-panel"
+            id="panel-receipts"
+            role="tabpanel"
+            aria-labelledby="tab-receipts"
+            tabindex="0"
+            data-bench-panel="receipts"
+            hidden
+          >
+            <header class="panel-heading">
+              <div>
+                <p>06 / Receipts</p>
+                <h2>Evidence and audit trail</h2>
+              </div>
+              <p>The public scorecard stays simple; source, configuration, output, runtime, review, and score files keep it auditable.</p>
+            </header>
+
+            <div class="panel-split receipt-split">
+              <div class="work-ledger">
+                <div class="ledger-heading"><span>Work required</span><span>Current state</span></div>
+                {workItems.map((item) => (
+                  <article>
+                    <span class={`ledger-marker state-${item.state}`} aria-hidden="true"></span>
+                    <div><h3>{item.label}</h3><p>{item.meta}</p></div>
+                    <span class={`state-chip state-${item.state}`}>
+                      <span aria-hidden="true">{item.state === "ready" ? "✓" : item.state === "measured" ? "●" : item.state === "missing" ? "▨" : "○"}</span>
+                      {item.stateLabel}
+                    </span>
+                  </article>
+                ))}
+              </div>
+
+              <div class="receipt-stack">
+                <article class="receipt-summary">
+                  <span>Repository support</span>
+                  <strong>{readyArtifacts}<small> / {artifactContract.length}</small></strong>
+                  <p>{missingArtifacts} evidence paths still need real benchmark artifacts.</p>
+                </article>
+
+                <details class="receipt-details">
+                  <summary>Artifact paths <span>{artifactContract.length}</span></summary>
+                  <ul>
+                    {artifactContract.map((artifact) => (
+                      <li>
+                        <span class={`ledger-marker state-${artifact.state === "ready" ? "ready" : "missing"}`} aria-hidden="true"></span>
+                        <div><code>{artifact.path}</code><small>{artifact.role}</small></div>
+                        <span>{supportLabels[artifact.state]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+
+                <details class="receipt-details">
+                  <summary>Gold evidence types <span>{annotationRequirements.length}</span></summary>
+                  <ul>
+                    {annotationRequirements.map((requirement) => (
+                      <li>
+                        <span class={`ledger-marker state-${requirement.status === "missing" ? "missing" : "planned"}`} aria-hidden="true"></span>
+                        <div><strong>{requirement.label}</strong><small>{requirement.purpose}</small></div>
+                        <span>{requirement.status === "missing" ? "Missing" : "Planned"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </div>
+            </div>
+
+            <div class="protocol-strip" aria-label="Protocol decisions">
+              <div><span>Judgment</span><strong>Critical meaning preserved</strong></div>
+              <div><span>Review</span><strong>{report.protocol.minimum_reviewers} blinded reviewers + adjudication</strong></div>
+              <div><span>Abstention</span><strong>Withheld stays separate</strong></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <footer class="bench-footer">
+        <p><strong>Evidence boundary.</strong> {benchmarkCopy.evidenceBoundary} {benchmarkCopy.publicationRule}</p>
+        <details>
+          <summary>Report notes</summary>
+          <ul>{report.notes.map((note) => <li>{note}</li>)}</ul>
+          <p>{benchmarkCopy.demoBoundary}</p>
+        </details>
+      </footer>
+    </div>
+  </main>
 </SiteLayout>
+
+<script>
+  const initializeBenchmarkInstrument = () => {
+    document.querySelectorAll<HTMLElement>("[data-bench-instrument]").forEach((instrument) => {
+      if (instrument.dataset.bound === "true") return;
+      instrument.dataset.bound = "true";
+
+      const tabs = Array.from(instrument.querySelectorAll<HTMLButtonElement>("[data-bench-tab]"));
+      const panels = Array.from(instrument.querySelectorAll<HTMLElement>("[data-bench-panel]"));
+      const select = instrument.querySelector<HTMLSelectElement>("[data-bench-select]");
+
+      const activate = (id: string, updateUrl = true) => {
+        if (!tabs.some((tab) => tab.dataset.benchTab === id)) return;
+
+        tabs.forEach((tab) => {
+          const selected = tab.dataset.benchTab === id;
+          tab.setAttribute("aria-selected", String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+        });
+
+        panels.forEach((panel) => {
+          panel.hidden = panel.dataset.benchPanel !== id;
+        });
+
+        if (select) select.value = id;
+        instrument.dataset.activePanel = id;
+
+        if (updateUrl) {
+          const nextUrl = `${window.location.pathname}${window.location.search}#${id}`;
+          window.history.replaceState(null, "", nextUrl);
+        }
+      };
+
+      tabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => activate(tab.dataset.benchTab ?? "evidence"));
+        tab.addEventListener("keydown", (event) => {
+          let nextIndex = index;
+          if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (index + 1) % tabs.length;
+          else if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (index - 1 + tabs.length) % tabs.length;
+          else if (event.key === "Home") nextIndex = 0;
+          else if (event.key === "End") nextIndex = tabs.length - 1;
+          else return;
+
+          event.preventDefault();
+          const nextTab = tabs[nextIndex];
+          nextTab.focus();
+          activate(nextTab.dataset.benchTab ?? "evidence");
+        });
+      });
+
+      select?.addEventListener("change", () => activate(select.value));
+
+      const requestedPanel = window.location.hash.slice(1);
+      activate(requestedPanel || "evidence", false);
+    });
+  };
+
+  initializeBenchmarkInstrument();
+  document.addEventListener("astro:page-load", initializeBenchmarkInstrument);
+</script>

@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/schemas/benchmark-report.schema.json",
+  "title": "1321 benchmark report",
+  "description": "A versioned evidence receipt for an unscored protocol or a scored Korean-to-English media evaluation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "pack_id", "status", "generated_at", "protocol", "pack", "systems", "results", "notes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "pack_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["protocol_draft", "gold_frozen", "scored"] },
+    "generated_at": { "type": ["string", "null"], "format": "date-time" },
+    "protocol": { "$ref": "#/$defs/protocol" },
+    "pack": { "$ref": "#/$defs/pack" },
+    "systems": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/system" }
+    },
+    "results": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/result" }
+    },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "nullableRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "nullableCount": { "type": ["integer", "null"], "minimum": 0 },
+    "nullableSeconds": { "type": ["number", "null"], "minimum": 0 },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_job", "hypothesis", "hard_line_definition", "coverage_denominator", "abstention_policy", "minimum_reviewers", "blinded_review", "adjudication_required"],
+      "properties": {
+        "primary_job": { "enum": ["ready_to_watch_captions", "study_utility"] },
+        "hypothesis": { "type": "string", "minLength": 1 },
+        "hard_line_definition": { "type": "string", "minLength": 1 },
+        "coverage_denominator": { "enum": ["pre_registered_critical_units", "speech_cues", "speech_time"] },
+        "abstention_policy": { "type": "string", "minLength": 1 },
+        "minimum_reviewers": { "type": "integer", "minimum": 1 },
+        "blinded_review": { "type": "boolean" },
+        "adjudication_required": { "type": "boolean" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "label", "channel", "url", "video_id", "licence", "window", "duration", "attribution", "note"],
+      "properties": {
+        "kind": { "enum": ["youtube", "local", "owned"] },
+        "label": { "type": "string", "minLength": 1 },
+        "channel": { "type": "string", "minLength": 1 },
+        "url": { "type": ["string", "null"], "minLength": 1 },
+        "video_id": { "type": ["string", "null"], "minLength": 1 },
+        "licence": { "type": "string", "minLength": 1 },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": { "type": "string", "minLength": 1 },
+            "end": { "type": "string", "minLength": 1 }
+          }
+        },
+        "duration": { "type": "number", "exclusiveMinimum": 0 },
+        "attribution": { "type": "string", "minLength": 1 },
+        "note": { "type": "string" }
+      }
+    },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activity", "speakers", "korean_gold", "english_guidance", "critical_units", "facts", "subtitle_gold", "reviewed"],
+      "properties": {
+        "activity": { "type": "boolean" },
+        "speakers": { "type": "boolean" },
+        "korean_gold": { "type": "boolean" },
+        "english_guidance": { "type": "boolean" },
+        "critical_units": { "type": "boolean" },
+        "facts": { "type": "boolean" },
+        "subtitle_gold": { "type": "boolean" },
+        "reviewed": { "type": "boolean" }
+      }
+    },
+    "clip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "role", "source", "target_duration_s", "domain_target", "phenomenon_targets", "annotations"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["planned", "sourced", "gold_ready", "frozen"] },
+        "role": { "enum": ["control", "hard"] },
+        "source": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/source" }] },
+        "target_duration_s": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "number", "minimum": 0 },
+            "max": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "domain_target": { "type": "string" },
+        "phenomenon_targets": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "annotations": { "$ref": "#/$defs/annotations" }
+      }
+    },
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "frozen", "target_clip_count", "clips"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "frozen": { "type": "boolean" },
+        "target_clip_count": { "type": "integer", "minimum": 1 },
+        "clips": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/clip" } }
+      }
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "role", "required", "status", "version", "capture_date", "input_modalities"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["subject", "internal_control", "public_foil", "optional_baseline"] },
+        "required": { "type": "boolean" },
+        "status": { "enum": ["not_run", "captured", "scored"] },
+        "version": { "type": ["string", "null"], "minLength": 1 },
+        "capture_date": { "type": ["string", "null"], "format": "date" },
+        "input_modalities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "criticalMeaning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passes", "total", "rate"],
+      "properties": {
+        "passes": { "$ref": "#/$defs/nullableCount" },
+        "total": { "$ref": "#/$defs/nullableCount" },
+        "rate": { "$ref": "#/$defs/nullableRate" }
+      }
+    },
+    "criticalOutcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correct", "wrong", "withheld", "missing", "total"],
+      "properties": {
+        "correct": { "$ref": "#/$defs/nullableCount" },
+        "wrong": { "$ref": "#/$defs/nullableCount" },
+        "withheld": { "$ref": "#/$defs/nullableCount" },
+        "missing": { "$ref": "#/$defs/nullableCount" },
+        "total": { "$ref": "#/$defs/nullableCount" }
+      }
+    },
+    "catastrophic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "rate", "denominator"],
+      "properties": {
+        "count": { "$ref": "#/$defs/nullableCount" },
+        "rate": { "$ref": "#/$defs/nullableRate" },
+        "denominator": { "$ref": "#/$defs/nullableCount" }
+      }
+    },
+    "latency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first_usable_s", "complete_s"],
+      "properties": {
+        "first_usable_s": { "$ref": "#/$defs/nullableSeconds" },
+        "complete_s": { "$ref": "#/$defs/nullableSeconds" }
+      }
+    },
+    "headline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["critical_meaning", "critical_outcomes", "catastrophic", "latency"],
+      "properties": {
+        "critical_meaning": { "$ref": "#/$defs/criticalMeaning" },
+        "critical_outcomes": { "$ref": "#/$defs/criticalOutcomes" },
+        "catastrophic": { "$ref": "#/$defs/catastrophic" },
+        "latency": { "$ref": "#/$defs/latency" }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ko_cer", "ko_swer", "critical_entities", "critical_facts", "critical_speaker", "non_speech_false_captions", "cue_timing", "subtitle_compliance", "mqm_errors", "chrf", "comet", "suber", "risk_coverage", "correction_effort", "same_clip_retention", "held_out_transfer", "run_variance"],
+      "properties": {
+        "ko_cer": { "type": ["number", "null"], "minimum": 0 },
+        "ko_swer": { "type": ["number", "null"], "minimum": 0 },
+        "critical_entities": { "type": ["object", "null"] },
+        "critical_facts": { "type": ["object", "null"] },
+        "critical_speaker": { "type": ["object", "null"] },
+        "non_speech_false_captions": { "$ref": "#/$defs/nullableCount" },
+        "cue_timing": { "type": ["object", "null"] },
+        "subtitle_compliance": { "type": ["object", "null"] },
+        "mqm_errors": { "type": ["object", "null"] },
+        "chrf": { "type": ["number", "null"] },
+        "comet": { "type": ["number", "null"] },
+        "suber": { "type": ["number", "null"] },
+        "risk_coverage": { "type": ["object", "null"] },
+        "correction_effort": { "type": ["object", "null"] },
+        "same_clip_retention": { "type": ["object", "null"] },
+        "held_out_transfer": { "type": ["object", "null"] },
+        "run_variance": { "type": ["object", "null"] }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["output", "runtime", "score", "review"],
+      "properties": {
+        "output": { "type": ["string", "null"], "minLength": 1 },
+        "runtime": { "type": ["string", "null"], "minLength": 1 },
+        "score": { "type": ["string", "null"], "minLength": 1 },
+        "review": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system_id", "run_id", "status", "config", "headline", "diagnostics", "artifacts"],
+      "properties": {
+        "system_id": { "type": "string", "minLength": 1 },
+        "run_id": { "type": ["string", "null"], "minLength": 1 },
+        "status": { "enum": ["not_run", "captured", "reviewed", "scored"] },
+        "config": { "type": ["object", "null"], "minProperties": 1 },
+        "headline": { "$ref": "#/$defs/headline" },
+        "diagnostics": { "$ref": "#/$defs/diagnostics" },
+        "artifacts": { "$ref": "#/$defs/artifacts" }
+      }
+    }
+  }
+}

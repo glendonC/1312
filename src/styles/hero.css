@@ -67,28 +67,37 @@
 }
 
 .hero-aside {
-  display: grid;
-  max-width: 38rem;
-  gap: 22px;
+  max-width: 26rem;
   justify-self: end;
   text-align: left;
 }
 
+/* The demo link closes the sentence rather than floating under it, so the aside
+   reads as one object instead of a paragraph with an orphan beneath it. Balanced
+   wrapping keeps the lines within about 70px of each other. */
 .hero-aside p {
-  display: flex;
-  flex-direction: column;
   margin: 0;
-  color: rgba(251, 255, 249, 0.86);
-  font-size: 1.02rem;
+  color: rgba(251, 255, 249, 0.88);
+  font-size: 1.1rem;
   font-weight: var(--weight-regular);
-  line-height: 1.62;
+  line-height: 1.7;
+  text-wrap: balance;
 }
 
-.aside-line {
-  display: block;
+/* Balancing is free to break a line at a hyphen, and "self-improving" split
+   across two lines reads as two words. */
+.nowrap {
   white-space: nowrap;
 }
 
-.hero-aside .hero-actions {
-  justify-content: flex-end;
+.cta-inline {
+  min-height: 34px;
+  margin-left: 8px;
+  border-radius: 10px;
+  padding: 0 15px;
+  font-size: 0.83rem;
+  vertical-align: middle;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.8),
+    0 8px 20px rgba(5, 31, 26, 0.16);
 }

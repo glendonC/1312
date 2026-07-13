@@ -1,0 +1,47 @@
+{
+  "run": "run-006",
+  "clip": "Ux-TMWnmntM",
+  "pair": {
+    "source": "ko",
+    "target": "en"
+  },
+  "pack": "ko-v3",
+  "status": "unscored",
+  "rubric": {
+    "hard_lines": 5,
+    "criteria": [
+      "entity",
+      "meaning",
+      "honesty"
+    ],
+    "points_max": 15,
+    "note": "No gold exists for this clip, so NOTHING here is scored for accuracy: points and hard_line are null on every path. What is real: coverage, withheld, time-to-usable and the entity-gate hits — measurements of what this run DID, not of whether it was right. 5 lines were flagged hard because they carry a ko-v3 phenomenon, which is a detection, not a verdict. Scoring against gold lives in bench/."
+  },
+  "paths": {
+    "cold": {
+      "label": "Cold one-shot",
+      "points": null,
+      "hard_line": null,
+      "coverage": 1,
+      "time_to_usable_s": 91.61,
+      "withheld": 0,
+      "hallucinated": 1,
+      "status": "unscored",
+      "note": "whisper-1 + one-shot gpt-4o, no glossary, no gates. It is handed the prepped path's windows for free, so it is a foil for translation, entities and honesty — NOT for segmentation. Coverage is 1.00 because it never withholds. \"hallucinated\" is entity-gate hits, not gold-verified errors."
+    },
+    "run-006": {
+      "label": "Run 4 · this run",
+      "points": null,
+      "hard_line": null,
+      "coverage": 0.64,
+      "time_to_usable_s": 210.98,
+      "withheld": 4,
+      "hallucinated": 0,
+      "status": "unscored",
+      "note": "7 of 11 lines committed, 4 withheld by a gate that fired, 0 sent back to the translator and fixed. hard_line is null: this run cannot mark its own homework."
+    }
+  },
+  "trail": [],
+  "delta_vs_cold": 0,
+  "per_line": []
+}

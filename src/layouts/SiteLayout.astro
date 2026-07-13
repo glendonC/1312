@@ -1,15 +1,18 @@
 ---
 import { ClientRouter } from "astro:transitions";
+import RouteLoading from "../components/RouteLoading.astro";
 import "../styles/global.css";
 
 interface Props {
   title?: string;
   description?: string;
+  noIndex?: boolean;
 }
 
 const {
   title = "1321",
   description = "Language intelligence for real media. Korean to English first.",
+  noIndex = false,
 } = Astro.props;
 ---
 
@@ -19,6 +22,7 @@ const {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    {noIndex && <meta name="robots" content="noindex" />}
     <meta name="theme-color" content="#f7faf8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
@@ -33,6 +37,7 @@ const {
     <ClientRouter />
   </head>
   <body>
+    <RouteLoading />
     <slot />
   </body>
 </html>

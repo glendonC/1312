@@ -104,7 +104,7 @@ export default function Dock() {
   ) : paused ? (
     <span className="dock-held">Paused</span>
   ) : (
-    <span className="shimmer">{phase}…</span>
+    <span className="text-shimmer">{phase}…</span>
   );
 
 

@@ -199,6 +199,11 @@
     #edf2ed;
 }
 
+.journey-paper-shader > .atmosphere-field {
+  position: absolute;
+  inset: 0;
+}
+
 .journey-paper-shader canvas {
   display: block;
   width: 100%;

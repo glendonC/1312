@@ -1,0 +1,15 @@
+---
+import AtmosphereField from "./AtmosphereField.astro";
+import "../styles/state-signal.css";
+
+interface Props {
+  label: string;
+  tone?: "missing" | "idle" | "offline";
+}
+
+const { label, tone = "missing" } = Astro.props;
+---
+
+<div class="state-signal" data-tone={tone} role="img" aria-label={label}>
+  <AtmosphereField tone={tone === "missing" ? "missing" : "journey"} />
+</div>

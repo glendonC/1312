@@ -1,0 +1,19 @@
+---
+interface Props {
+  label?: string;
+  mode?: "initial" | "route";
+}
+
+const { label = "Loading…", mode = "initial" } = Astro.props;
+const isRouteLoader = mode === "route";
+---
+
+<div
+  class:list={["loading-screen", `loading-screen--${mode}`]}
+  data-route-loader={isRouteLoader ? "" : undefined}
+  role="status"
+  aria-live="polite"
+  aria-hidden={isRouteLoader ? "true" : "false"}
+>
+  <span class="loading-screen__label text-shimmer">{label}</span>
+</div>

@@ -33,7 +33,9 @@ export default function Dock() {
   const paused = usePaused();
   const start = useStudio((s) => s.start);
   const reset = useStudio((s) => s.reset);
+  const cancelRun = useStudio((s) => s.cancel);
   const togglePause = useStudio((s) => s.togglePause);
+  const pausePending = useStudio((s) => s.pausePending);
   const { phase, done } = useProgress();
 
   const [open, setOpen] = useState(false);
@@ -84,12 +86,13 @@ export default function Dock() {
     });
   }
 
-  function cancel(): void {
+  function clear(): void {
     setOpen(false);
     setMini(false);
     setUrl("");
     setNote(null);
-    reset();
+    if (running) cancelRun();
+    else reset();
   }
 
   const running = stage === "run" && !complete;
@@ -101,6 +104,8 @@ export default function Dock() {
    */
   const verb = !running ? (
     <span className="dock-done">Done</span>
+  ) : pausePending ? (
+    <span className="dock-held">Pause requested</span>
   ) : paused ? (
     <span className="dock-held">Paused</span>
   ) : (
@@ -132,6 +137,7 @@ export default function Dock() {
             className="rail"
             key="rail"
             data-paused={paused}
+            data-pending={pausePending}
             initial={{ opacity: 0, y: 8, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.94 }}
@@ -142,6 +148,7 @@ export default function Dock() {
               className="rail-btn"
               onClick={togglePause}
               aria-pressed={paused}
+              disabled={pausePending}
               title={paused ? "Resume the run" : "Hold the run"}
             >
               <Hold paused={paused} />
@@ -210,6 +217,7 @@ export default function Dock() {
                 className="dock-hold"
                 onClick={togglePause}
                 aria-pressed={paused}
+                disabled={pausePending}
                 aria-label={paused ? "Resume the run" : "Hold the run"}
                 title={paused ? "Resume" : "Pause"}
               >
@@ -246,7 +254,7 @@ export default function Dock() {
                 type="button"
                 className="dock-x"
                 data-running={running}
-                onClick={cancel}
+                onClick={clear}
                 aria-label={running ? "Stop the run" : "Clear"}
                 title={running ? "Stop the run" : "Clear"}
               >

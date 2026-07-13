@@ -1,4 +1,5 @@
 export function clock(t: number, tenths = false): string {
+  if (!Number.isFinite(t)) return "—";
   const safe = Math.max(0, t);
   const m = Math.floor(safe / 60);
   const s = Math.floor(safe % 60);
@@ -7,7 +8,7 @@ export function clock(t: number, tenths = false): string {
 }
 
 export function pct(n: number): string {
-  return `${Math.round(n * 100)}%`;
+  return Number.isFinite(n) ? `${Math.round(n * 100)}%` : "—";
 }
 
 export function rate(n: number | null): string {

@@ -443,5 +443,7 @@
   .graph-seg {
     top: 12px;
     right: 12px;
+    bottom: auto;
+    left: auto;
   }
 }

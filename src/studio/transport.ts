@@ -14,12 +14,15 @@
 
 import type {
   CaptionsFile,
+  CorrectionsFile,
+  GlossaryFile,
   LanguagePack,
   RunManifest,
   ScoreFile,
   Trace,
   WaveFile,
 } from "./types";
+import { assertRunBundle } from "./bundle";
 
 export interface RunBundle {
   run: RunManifest;
@@ -28,6 +31,8 @@ export interface RunBundle {
   pack: LanguagePack;
   wave: WaveFile;
   traces: Trace[];
+  glossary: GlossaryFile;
+  corrections: CorrectionsFile;
 }
 
 export interface StreamOptions {
@@ -35,7 +40,11 @@ export interface StreamOptions {
   speed: number;
   onEvent: (trace: Trace) => void;
   onEnd: () => void;
+  /** Transport ended without evidence of completion. */
+  onAbort?: (reason: string) => void;
 }
+
+export type ControlDisposition = "applied" | "requested" | "unavailable";
 
 /**
  * A run in flight.
@@ -48,8 +57,8 @@ export interface StreamOptions {
  * what the swarm did while the user was not looking.
  */
 export interface RunHandle {
-  pause(): void;
-  resume(): void;
+  pause(): ControlDisposition;
+  resume(): ControlDisposition;
   stop(): void;
 }
 
@@ -74,19 +83,23 @@ export class ReplayTransport implements RunTransport {
   async load(): Promise<RunBundle> {
     const base = `/demo/runs/${this.runId}`;
 
-    const [run, captions, score, wave, traceFile] = await Promise.all([
+    const [run, captions, score, wave, traceFile, glossary, corrections] = await Promise.all([
       json<RunManifest>(`${base}/run.json`),
       json<CaptionsFile>(`${base}/captions.json`),
       json<ScoreFile>(`${base}/score.json`),
       json<WaveFile>(`${base}/waveform.json`),
       json<{ traces: Trace[] }>(`${base}/traces.json`),
+      json<GlossaryFile>(`${base}/glossary.json`),
+      json<CorrectionsFile>(`${base}/corrections.json`),
     ]);
 
     // The language pack is cross-run memory, so it lives outside the run folder.
     const pack = await json<LanguagePack>(`/demo/packs/${run.pack}.json`);
 
     this.traces = traceFile.traces;
-    return { run, captions, score, pack, wave, traces: this.traces };
+    const bundle = { run, captions, score, pack, wave, traces: this.traces, glossary, corrections };
+    assertRunBundle(bundle, `Studio run ${this.runId}`);
+    return bundle;
   }
 
   stream({ speed, onEvent, onEnd }: StreamOptions): RunHandle {
@@ -127,13 +140,14 @@ export class ReplayTransport implements RunTransport {
 
     return {
       pause() {
-        if (stopped || ended || paused) return;
+        if (stopped || ended || paused) return "unavailable";
         paused = true;
         cancelAnimationFrame(raf);
+        return "applied";
       },
 
       resume() {
-        if (stopped || ended || !paused) return;
+        if (stopped || ended || !paused) return "unavailable";
         paused = false;
 
         // The clock is not paid for the time it spent held: `last` is re-anchored to now,
@@ -141,6 +155,7 @@ export class ReplayTransport implements RunTransport {
         // so no trace is skipped and none arrives in a catch-up burst.
         last = performance.now();
         raf = requestAnimationFrame(tick);
+        return "applied";
       },
 
       stop() {
@@ -164,28 +179,21 @@ export class LiveTransport implements RunTransport {
   ) {}
 
   async load(): Promise<RunBundle> {
-    return json<RunBundle>(this.bundleUrl);
+    const bundle = await json<RunBundle>(this.bundleUrl);
+    assertRunBundle(bundle, `Live Studio bundle ${this.bundleUrl}`);
+    return bundle;
   }
 
-  stream({ onEvent, onEnd }: StreamOptions): RunHandle {
+  stream({ onEvent, onEnd, onAbort }: StreamOptions): RunHandle {
     const socket = new WebSocket(this.endpoint);
 
-    let paused = false;
     let ended = false;
-    let closed = false;
     /** stop() closes the socket, and closing fires "close". A cancelled run is not a finished one. */
     let dead = false;
 
-    /**
-     * Traces that landed while the run was held. A live orchestrator is a real process:
-     * it does not stop because the client looked away, and traces already in flight will
-     * arrive no matter what the UI thinks. So they are kept, in arrival order, and folded
-     * in on resume. Dropping them would silently rewrite what the swarm did.
-     */
-    const held: Trace[] = [];
-
     const deliver = (trace: Trace): void => {
       if (trace.action === "done") {
+        onEvent(trace);
         ended = true;
         onEnd();
         return;
@@ -206,44 +214,34 @@ export class LiveTransport implements RunTransport {
     socket.addEventListener("message", (e: MessageEvent<string>) => {
       if (dead || ended) return;
       const trace = JSON.parse(e.data) as Trace;
-      if (paused) {
-        held.push(trace);
-        return;
-      }
       deliver(trace);
     });
 
     socket.addEventListener("close", () => {
-      closed = true;
       // A run the user killed did not finish. Reporting it as finished would put a result
       // and a score on screen for a swarm that was cut off mid-sentence.
-      if (dead || ended || paused) return;
-      onEnd();
+      if (dead || ended) return;
+      onAbort?.("The live runtime disconnected before it acknowledged completion.");
     });
 
     return {
       pause() {
-        if (dead || ended || paused) return;
-        paused = true;
+        if (dead || ended) return "unavailable";
         ask("pause");
+        // There is no acknowledgement producer yet. The UI may say the request was sent,
+        // but it must keep projecting the run as live until the runtime says otherwise.
+        return socket.readyState === WebSocket.OPEN ? "requested" : "unavailable";
       },
 
       resume() {
-        if (dead || ended || !paused) return;
-        paused = false;
-        ask("resume");
-
-        // Everything that arrived while held, in the order it arrived. Nothing is skipped.
-        while (held.length > 0 && !ended) deliver(held.shift() as Trace);
-        if (closed && !ended) onEnd();
+        // A pause is never locally claimed, so there is no acknowledged held state to resume.
+        return "unavailable";
       },
 
       stop() {
         if (dead) return;
         dead = true;
-        paused = false;
         // Stopping is destructive, and that is the entire difference from pausing.
-        held.length = 0;
         socket.close();
       },
     };

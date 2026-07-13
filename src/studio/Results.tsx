@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { clock, rate, signed } from "./format";
 import { useBundle, useStudio } from "./store";
@@ -23,17 +23,28 @@ export default function Results() {
   const { run, captions, score } = bundle;
   const prep = score.paths[run.id];
   const cold = score.paths["cold"];
+  const hasComparison = Boolean(cold && captions.cues.some((cue) => cue.baseline));
+  const accuracyMeasured = Boolean(
+    score.status !== "unscored" && prep?.hard_line != null && cold?.hard_line != null,
+  );
+  const views = hasComparison ? VIEWS : VIEWS.filter((candidate) => candidate.id === "prepped");
+  const activeView = hasComparison ? view : "prepped";
 
   const note =
-    view === "prepped"
+    activeView === "prepped"
       ? "What 1321 will stand behind. Lines it cannot are withheld, not guessed."
-      : view === "baseline"
-        ? "One-shot ASR into MT. No glossary, no gates. Fluent, confident, wrong."
-        : "Same audio, both paths. Cold in red.";
+      : activeView === "baseline"
+        ? accuracyMeasured
+          ? "One-shot ASR into MT. No glossary and no gates. Accuracy is measured against this fixture's reference."
+          : "Recorded comparison output. Accuracy is unscored because this clip has no reference."
+        : accuracyMeasured
+          ? "Same audio and measured reference, with comparison differences marked."
+          : "Same audio and two recorded outputs. Differences are visible, but neither is marked right or wrong.";
 
   return (
     <motion.div
       className="results"
+      data-accuracy={accuracyMeasured ? "measured" : "unscored"}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
@@ -42,11 +53,11 @@ export default function Results() {
 
       <div className="result-bar">
         <div className="seg" role="group" aria-label="Caption view">
-          {VIEWS.map((v) => (
+          {views.map((v) => (
             <button
               key={v.id}
               type="button"
-              className={`seg-btn${view === v.id ? " is-on" : ""}`}
+              className={`seg-btn${activeView === v.id ? " is-on" : ""}`}
               onClick={() => setView(v.id)}
             >
               {v.label}
@@ -57,9 +68,13 @@ export default function Results() {
       </div>
 
       <div className="cues">
-        {captions.cues.map((cue) => (
-          <CueRow key={cue.id} cue={cue} view={view} target={run.pair.target} />
-        ))}
+        {captions.cues.length === 0 ? (
+          <p className="cues-empty">No caption cues were recorded. No transcript or result is implied.</p>
+        ) : (
+          captions.cues.map((cue) => (
+            <CueRow key={cue.id} cue={cue} view={activeView} target={run.pair.target} />
+          ))
+        )}
       </div>
 
       <div className="scores">
@@ -75,7 +90,7 @@ export default function Results() {
                 ? `cold delta unavailable · cold ${rate(cold?.hard_line ?? null)}`
                 : `${signed(score.delta_vs_cold)} vs cold ${rate(cold?.hard_line ?? null)}`
           }
-          good
+          good={prep?.hard_line != null}
         />
         <Score
           value={prep?.hallucinated == null ? "—" : String(prep.hallucinated)}
@@ -85,7 +100,7 @@ export default function Results() {
               ? "entity gate · not gold-verified"
               : `cold made ${cold.hallucinated} on the same audio`
           }
-          good
+          good={prep?.hallucinated != null}
         />
         {/*
           Coverage is not a score, and this line exists to stop it being read as one. Both paths
@@ -96,20 +111,12 @@ export default function Results() {
         <Score
           value={rate(prep?.coverage ?? null)}
           label="coverage"
-          sub={
-            cold?.coverage != null && cold.coverage < 1
-              ? `${prep?.withheld ?? 0} withheld, each with a reason · cold ${rate(cold.coverage)}, but its gaps are lines it never heard`
-              : `${prep?.withheld ?? 0} withheld, each with a reason · cold ${rate(cold?.coverage ?? null)} and never refuses anything`
-          }
+          sub={coverageNote(prep?.withheld ?? null, cold?.coverage ?? null)}
         />
         <Score
-          value={clock(prep?.time_to_usable_s ?? 0)}
+          value={time(prep?.time_to_usable_s ?? null)}
           label="time to first usable line"
-          sub={
-            prep?.time_to_complete_s == null
-              ? `cold took ${clock(cold?.time_to_usable_s ?? 0)}`
-              : `every line by ${clock(prep.time_to_complete_s)} · cold answers in one call, at ${clock(cold?.time_to_usable_s ?? 0)}`
-          }
+          sub={timingNote(prep?.time_to_complete_s ?? null, cold?.time_to_usable_s ?? null)}
         />
       </div>
 
@@ -143,13 +150,18 @@ export default function Results() {
               </div>
             ))}
           </div>
-          <p className="raw-links">
-            <a href={`/demo/runs/${run.id}/captions.json`}>captions.json</a>
-            <a href={`/demo/runs/${run.id}/corrections.json`}>corrections.json</a>
-            <a href={`/demo/runs/${run.id}/traces.json`}>traces.json</a>
-            <a href={`/demo/runs/${run.id}/score.json`}>score.json</a>
-            <a href={`/demo/packs/${run.pack}.json`}>{run.pack}.json</a>
-          </p>
+          {run.artifacts.length > 0 ? (
+            <p className="raw-links">
+              {run.artifacts.map((artifact) => (
+                <a key={artifact} href={`/demo/runs/${run.id}/${artifact}`}>
+                  {artifact}
+                </a>
+              ))}
+              <a href={`/demo/packs/${run.pack}.json`}>{run.pack}.json</a>
+            </p>
+          ) : (
+            <p className="raw-empty">No artifact links were declared by this run.</p>
+          )}
         </div>
       </details>
     </motion.div>
@@ -181,6 +193,23 @@ function Score({
       <span className="score-sub">{sub}</span>
     </div>
   );
+}
+
+function time(value: number | null): string {
+  return value === null ? "—" : clock(value);
+}
+
+function coverageNote(withheld: number | null, coldCoverage: number | null): string {
+  const withheldText = withheld === null ? "withheld count unavailable" : `${withheld} withheld, each with a reason`;
+  if (coldCoverage === null) return `${withheldText} · comparison coverage unavailable`;
+  return coldCoverage < 1
+    ? `${withheldText} · cold ${rate(coldCoverage)}, but its gaps are lines it never heard`
+    : `${withheldText} · cold ${rate(coldCoverage)} and never refuses anything`;
+}
+
+function timingNote(completed: number | null, coldUsable: number | null): string {
+  const coldText = coldUsable === null ? "comparison timing unavailable" : `cold answered at ${clock(coldUsable)}`;
+  return completed === null ? coldText : `every line by ${clock(completed)} · ${coldText}`;
 }
 
 function CueRow({ cue, view, target }: { cue: Cue; view: View; target: string }) {
@@ -279,7 +308,7 @@ function Burned() {
   if (!cue) return null;
 
   const cold = cue.baseline?.target.text ?? null;
-  const tgt = cue.targets[0];
+  const tgt = cue.targets.find((target) => target.lang === bundle?.run.pair.target);
 
   if (view === "baseline") {
     return cold ? (
@@ -317,13 +346,15 @@ function Player() {
   const setPlaying = useStudio((s) => s.setPlaying);
 
   const mediaRef = useRef<HTMLMediaElement | null>(null);
-  const waveRef = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
+  const [mediaFailed, setMediaFailed] = useState(false);
 
   const duration = bundle?.run.clip.duration ?? 0;
   const media = bundle?.run.clip.media;
   const src = media ? `/demo/runs/${bundle?.run.id}/${media}` : null;
   const picture = Boolean(media && HAS_PICTURE.test(media));
+
+  useEffect(() => setMediaFailed(false), [src]);
 
   // The store owns clip time. Push external seeks into the media element.
   useEffect(() => {
@@ -335,9 +366,10 @@ function Player() {
   useEffect(() => {
     const el = mediaRef.current;
 
-    if (!playing) {
+    if (!playing || !src || mediaFailed) {
       el?.pause();
       cancelAnimationFrame(raf.current);
+      if (playing && (!src || mediaFailed)) setPlaying(false);
       return;
     }
 
@@ -348,7 +380,7 @@ function Player() {
       const dt = (now - last) / 1000;
       last = now;
 
-      const next = el ? el.currentTime : useStudio.getState().clipT + dt;
+      const next = el?.currentTime ?? useStudio.getState().clipT + dt;
       if (next >= duration) {
         setClipT(duration);
         setPlaying(false);
@@ -360,18 +392,12 @@ function Player() {
 
     raf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf.current);
-  }, [playing, duration, setClipT, setPlaying]);
+  }, [playing, duration, mediaFailed, setClipT, setPlaying, src]);
 
   if (!bundle) return null;
 
   const { peaks } = bundle.wave;
   const { music, silence, source, title } = bundle.run.clip;
-
-  function seek(e: React.MouseEvent<HTMLButtonElement>): void {
-    const box = waveRef.current?.getBoundingClientRect();
-    if (!box) return;
-    setClipT(((e.clientX - box.left) / box.width) * duration);
-  }
 
   const attach = (el: HTMLMediaElement | null): void => {
     mediaRef.current = el;
@@ -395,24 +421,41 @@ function Player() {
               preload="auto"
               playsInline
               onClick={() => setPlaying(!playing)}
+              onError={() => {
+                setMediaFailed(true);
+                setPlaying(false);
+              }}
             />
             <Burned />
           </figure>
         ) : (
-          <audio ref={attach} src={src} preload="auto" />
+          <audio
+            ref={attach}
+            src={src}
+            preload="auto"
+            onError={() => {
+              setMediaFailed(true);
+              setPlaying(false);
+            }}
+          />
         ))}
+
+      {!src && <p className="media-empty">No playable media artifact was recorded for this run.</p>}
+      {mediaFailed && <p className="media-empty">The recorded media could not be loaded. Captions remain inspectable.</p>}
 
       <div className="transport">
         <button
           type="button"
           className="play"
           onClick={() => setPlaying(!playing)}
+          disabled={!src || mediaFailed}
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? "❚❚" : "▶"}
         </button>
 
-        <div className="wave" ref={waveRef}>
+        {peaks.length > 0 && duration > 0 ? (
+        <div className="wave">
           <svg
             className="wave-svg"
             viewBox="0 0 1000 100"
@@ -452,8 +495,21 @@ function Player() {
             style={{ left: `${(clipT / duration) * 100}%` }}
             aria-hidden="true"
           />
-          <button type="button" className="wave-hit" onClick={seek} aria-label="Seek" />
+          <input
+            type="range"
+            className="wave-hit"
+            min={0}
+            max={duration}
+            step={0.1}
+            value={clipT}
+            onChange={(event) => setClipT(event.currentTarget.valueAsNumber)}
+            aria-label="Seek through clip"
+            aria-valuetext={`${clock(clipT)} of ${clock(duration)}`}
+          />
         </div>
+        ) : (
+          <p className="wave-empty">No waveform samples were recorded.</p>
+        )}
 
         <span className="player-time">
           {clock(clipT)} / {clock(duration)}

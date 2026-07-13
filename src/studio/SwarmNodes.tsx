@@ -125,6 +125,7 @@ export const HubNode = memo(function HubNode() {
   const status = useStudio((s) => s.state.orchestrator.status);
   const note = useStudio((s) => s.state.orchestrator.note);
   const on = useStudio((s) => s.selected === "orchestrator");
+  const open = useOpen("orchestrator");
 
   return (
     <div
@@ -133,6 +134,7 @@ export const HubNode = memo(function HubNode() {
       data-on={on}
       role="button"
       tabIndex={0}
+      onKeyDown={open.onKeyDown}
       aria-label={`orchestrator, ${status}. ${note}`}
       title={note}
     >

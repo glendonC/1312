@@ -26,6 +26,7 @@ import {
   type Edge,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
+import { useReducedMotion } from "motion/react";
 
 import { place, type Layout, type Size, type Spec } from "./layout";
 import { useAgentIds, useBundle, useLayout, usePaused, useStudio } from "./store";
@@ -52,6 +53,7 @@ function Swarm() {
   const bundle = useBundle();
   const ids = useAgentIds();
   const paused = usePaused();
+  const reduceMotion = useReducedMotion();
   const layout = useLayout();
   const setLayout = useStudio((s) => s.setLayout);
   const select = useStudio((s) => s.select);
@@ -146,10 +148,10 @@ function Swarm() {
     );
 
     const t = window.setTimeout(() => {
-      void fitView({ padding: 0.16, duration: 420, maxZoom: 1, minZoom: 0.45 });
+      void fitView({ padding: 0.16, duration: reduceMotion ? 0 : 420, maxZoom: 1, minZoom: 0.45 });
     }, 30);
     return () => clearTimeout(t);
-  }, [specs, layout, measured, getNodes, fitView, setNodes, setEdges]);
+  }, [specs, layout, measured, getNodes, fitView, reduceMotion, setNodes, setEdges]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: SwarmNode) => {

@@ -242,6 +242,13 @@ export interface Correction {
   pack: string;
 }
 
+export interface CorrectionsFile {
+  run: string;
+  clip: string;
+  pack: string;
+  rows: Correction[];
+}
+
 /* ----------------------------------------------------------- glossary.json */
 
 export interface GlossaryEntry {

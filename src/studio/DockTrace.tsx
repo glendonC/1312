@@ -27,6 +27,7 @@ export default function DockTrace({
   const w = Math.max(0, box.w - 4);
   const h = Math.max(0, box.h - 4);
   const perimeter = perimeterOf(w, h);
+  const complete = Number.isFinite(done) ? Math.max(0, Math.min(1, done)) : 0;
 
   if (perimeter <= 0) return null;
 
@@ -43,7 +44,7 @@ export default function DockTrace({
         ry={h / 2}
         strokeDasharray={perimeter}
         initial={{ strokeDashoffset: perimeter }}
-        animate={{ strokeDashoffset: perimeter * (1 - done) }}
+        animate={{ strokeDashoffset: perimeter * (1 - complete) }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       />
     </svg>

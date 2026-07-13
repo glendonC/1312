@@ -3,6 +3,9 @@ import LoadingScreen from "../../components/LoadingScreen.astro";
 import StudioApp from "../../studio/StudioApp";
 import SiteLayout from "../../layouts/SiteLayout.astro";
 import "../../styles/studio.css";
+import { checkRecordedRuns } from "../../studio/checkFixtures";
+
+await checkRecordedRuns();
 ---
 
 <SiteLayout

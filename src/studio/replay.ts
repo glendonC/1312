@@ -225,10 +225,15 @@ export function finish(state: RunState): RunState {
   for (const [id, a] of Object.entries(state.agents)) {
     agents[id] = a.status === "retired" ? a : { ...a, status: "retired" };
   }
-  return { ...state, status: "complete", agents };
+  return {
+    ...state,
+    status: "complete",
+    orchestrator: { status: "retired", note: "run complete" },
+    agents,
+  };
 }
 
 export function progress(state: RunState, total: number): number {
-  if (total === 0) return 0;
-  return Math.min(1, state.cursor / total);
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(state.cursor)) return 0;
+  return Math.max(0, Math.min(1, state.cursor / total));
 }

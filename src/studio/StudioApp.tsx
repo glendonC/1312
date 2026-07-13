@@ -1,4 +1,4 @@
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, MotionConfig } from "motion/react";
 import { useEffect } from "react";
 
 import Dock from "./Dock";
@@ -12,7 +12,6 @@ export default function StudioApp({ runId }: { runId: string }) {
   const stage = useStage();
   const bundle = useBundle();
   const paused = usePaused();
-  const error = useStudio((s) => s.error);
 
   useShortcuts();
 
@@ -23,7 +22,8 @@ export default function StudioApp({ runId }: { runId: string }) {
   // Held is a property of the whole instrument, not of one control: everything that
   // animates to say "alive" reads this and stops.
   return (
-    <main className="studio" data-stage={stage} data-paused={paused}>
+    <MotionConfig reducedMotion="user">
+      <main className="studio" data-stage={stage} data-paused={paused}>
       {/*
        * The header floats ON the canvas rather than sitting in a row above it. It used to be
        * a 56px grid track, which meant the canvas — the one thing on this screen that is
@@ -57,13 +57,7 @@ export default function StudioApp({ runId }: { runId: string }) {
       </header>
 
       <AnimatePresence mode="wait">
-        {error ? (
-          <section className="act act-input" key="error">
-            <p className="prompt-help" data-tone="deny">
-              {error}
-            </p>
-          </section>
-        ) : stage === "input" ? (
+        {stage === "input" ? (
           <InputAct key="input" />
         ) : (
           <RunAct key="run" />
@@ -71,6 +65,7 @@ export default function StudioApp({ runId }: { runId: string }) {
       </AnimatePresence>
 
       <Dock />
-    </main>
+      </main>
+    </MotionConfig>
   );
 }

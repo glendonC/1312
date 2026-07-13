@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.dev/bench/schemas/capture.schema.json",
+  "title": "Run capture",
+  "description": "A dated record of one run over one clip. A capture is NOT a benchmark report: the clip was not drawn from a frozen pack, no gold exists for it, and nobody has reviewed the output. It therefore carries measurements of what the run DID (units emitted, units withheld, latency, gate hits) and nothing at all about whether the run was RIGHT. Accuracy lives in report.schema.json, needs gold, and cannot be reached from here. The `scored` field is pinned to false by this schema so a capture cannot quietly grow into a claim it has not earned.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "capture_id",
+    "captured_at",
+    "scored",
+    "pack_evidence",
+    "clip",
+    "reproducible",
+    "systems",
+    "measured",
+    "unscored",
+    "units",
+    "notes"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": "0.1.0" },
+    "kind": { "const": "capture" },
+    "capture_id": { "type": "string", "minLength": 1 },
+    "captured_at": { "type": "string", "format": "date" },
+
+    "scored": {
+      "const": false,
+      "description": "Always false. Scoring needs gold and human review; a capture has neither."
+    },
+    "pack_evidence": {
+      "const": false,
+      "description": "Always false. This clip was not drawn from the frozen Hard-KO pack, so /benchmarks/ may not render it as evidence."
+    },
+
+    "clip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "duration_s", "lang", "pair", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+        "lang": { "type": "string", "minLength": 2 },
+        "pair": { "type": "string", "minLength": 2 },
+        "media": { "type": ["string", "null"] },
+        "source": {
+          "type": "object",
+          "description": "Same provenance shape ingest-clip.mjs emits. A capture of media we may not republish is still a capture, but the licence has to be on the record either way.",
+          "required": ["kind", "url", "channel", "licence", "attribution"],
+          "properties": {
+            "kind": { "type": "string" },
+            "url": { "type": "string" },
+            "channel": { "type": "string" },
+            "licence": { "type": "string" },
+            "window": { "type": ["object", "null"] },
+            "attribution": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "reproducible": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deterministic", "note"],
+      "properties": {
+        "deterministic": { "type": "boolean" },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "systems": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "role", "config"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "role": { "enum": ["subject", "internal_control", "public_foil", "optional_baseline"] },
+          "config": {
+            "type": "object",
+            "description": "Every model actually called, pinned by name. A capture whose config is not pinned cannot be compared to anything later.",
+            "minProperties": 1
+          }
+        }
+      }
+    },
+
+    "measured": {
+      "type": "object",
+      "description": "Only things this process observed. Keyed by system id.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["units_total", "units_emitted", "units_withheld", "coverage", "latency"],
+        "properties": {
+          "units_total": { "type": "integer", "minimum": 0 },
+          "units_emitted": { "type": "integer", "minimum": 0 },
+          "units_withheld": { "type": "integer", "minimum": 0 },
+          "units_uncorroborated": { "type": "integer", "minimum": 0 },
+          "coverage": { "type": "number", "minimum": 0, "maximum": 1 },
+          "latency": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["first_usable_s", "complete_s"],
+            "properties": {
+              "first_usable_s": { "type": ["number", "null"], "minimum": 0 },
+              "complete_s": { "type": ["number", "null"], "minimum": 0 }
+            }
+          },
+          "gate_hits": {
+            "type": "object",
+            "description": "Times a code gate fired. A detection, not a verified error: a detector firing N times is N detections.",
+            "additionalProperties": { "type": "integer", "minimum": 0 }
+          },
+          "repairs": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+
+    "unscored": {
+      "type": "object",
+      "description": "Everything a capture is structurally incapable of knowing. Every value is null, and `reason` says why. This object exists so the gap is explicit rather than merely absent.",
+      "additionalProperties": false,
+      "required": ["critical_meaning", "critical_outcomes", "catastrophic", "reason"],
+      "properties": {
+        "critical_meaning": { "type": "null" },
+        "critical_outcomes": { "type": "null" },
+        "catastrophic": { "type": "null" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "units": {
+      "type": "array",
+      "description": "Keyed by TIME, never by cue id. The diarizer is not deterministic, so cue ids are an artifact of one execution and gold pinned to them would rot on the next run. Timestamps belong to the clip and survive.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["t_start", "t_end", "source"],
+        "properties": {
+          "t_start": { "type": "number", "minimum": 0 },
+          "t_end": { "type": "number", "minimum": 0 },
+          "speakers": { "type": "array", "items": { "type": "string" } },
+          "source": { "type": "string" },
+          "hard": { "type": "boolean" },
+          "phenomenon": { "type": ["string", "null"] },
+          "corroboration": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "agreement": { "type": ["number", "null"] },
+              "by": { "type": "string" },
+              "heard": { "type": "string" }
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "description": "What each system actually emitted here. null text with a withheld reason is a refusal; null text with no reason is a miss.",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "text": { "type": ["string", "null"] },
+                "withheld": { "type": ["object", "null"] }
+              }
+            }
+          },
+          "gold": {
+            "type": "null",
+            "description": "Reserved and pinned null. A reference translation must be written by a human who reads the source language. Filling this with a model and then scoring model output against it would be the model marking its own homework, which is the exact failure this project exists to catch."
+          }
+        }
+      }
+    },
+
+    "artifacts": {
+      "type": "object",
+      "description": "Paths to the raw evidence this capture was derived from. A capture with no artifacts is an assertion.",
+      "additionalProperties": { "type": "string" }
+    },
+
+    "notes": { "type": "string", "minLength": 1 }
+  }
+}

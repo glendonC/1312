@@ -1,6 +1,6 @@
 ---
-import StateSignal from "../components/StateSignal.astro";
-import StatePageLayout from "../layouts/StatePageLayout.astro";
+import MissingRouteSignal from "../features/system-states/MissingRouteSignal.astro";
+import StatePageLayout from "../features/system-states/StatePageLayout.astro";
 ---
 
 <StatePageLayout
@@ -28,9 +28,8 @@ import StatePageLayout from "../layouts/StatePageLayout.astro";
     </a>
   </div>
 
-  <StateSignal
+  <MissingRouteSignal
     slot="visual"
-    tone="missing"
     label="An abstract red signal field marking a route that could not be found"
   />
 </StatePageLayout>

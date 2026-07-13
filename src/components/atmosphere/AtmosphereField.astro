@@ -1,0 +1,30 @@
+---
+interface Props {
+  tone?: "journey" | "missing";
+}
+
+const { tone = "journey" } = Astro.props;
+---
+
+<div class="atmosphere-field" data-tone={tone} aria-hidden="true">
+  <canvas data-atmosphere-field data-tone={tone}></canvas>
+</div>
+
+<style>
+  .atmosphere-field {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+</style>
+
+<script>
+  import { bindAtmosphereFields } from "./renderer";
+  bindAtmosphereFields();
+</script>

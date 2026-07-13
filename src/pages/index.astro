@@ -3,6 +3,7 @@ import { Picture } from "astro:assets";
 import GlassNav from "../components/GlassNav.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import heroBackground from "../assets/hero-background.png";
+import "../styles/hero.css";
 ---
 
 <SiteLayout
@@ -34,9 +35,28 @@ import heroBackground from "../assets/hero-background.png";
       <div class="hero-aside">
         <p>
           Transforming <span class="nowrap">real-world</span> media into captions, translations,
-          explanations, and personalized learning through autonomous,
-          <span class="nowrap">self-improving</span> investigation.
-          <a class="button button-primary cta-inline" href="/studio/">View Demo</a>
+          explanations, and personalized learning through autonomous,{" "}
+          <span class="nowrap">self-improving</span>{" "}
+          <span class="nowrap">
+            investigation.{" "}
+            <a class="button button-primary cta-inline" href="/studio/">
+              View demo
+              <svg
+                class="cta-arrow"
+                width="12"
+                height="12"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M2.5 8h11M9 3.5 13.5 8 9 12.5" />
+              </svg>
+            </a>
+          </span>
         </p>
       </div>
     </section>

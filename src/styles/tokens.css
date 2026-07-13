@@ -13,6 +13,16 @@
   --accent: #2a6b66;
   --accent-soft: rgba(42, 107, 102, 0.12);
   --accent-line: rgba(42, 107, 102, 0.32);
+  --accent-control: linear-gradient(180deg, #357f79 0%, var(--accent) 100%);
+  --accent-control-hover: linear-gradient(180deg, #3d8b84 0%, #2f746e 100%);
+  --accent-control-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 2px rgba(16, 57, 52, 0.22),
+    0 10px 24px rgba(42, 107, 102, 0.24);
+  --accent-control-shadow-hover:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 2px 4px rgba(16, 57, 52, 0.2),
+    0 14px 30px rgba(42, 107, 102, 0.28);
   --gold: #b8963f;
   --gold-ink: #8a6f2a;
   --gold-soft: rgba(184, 150, 63, 0.12);
@@ -42,6 +52,7 @@
   --control-radius: 12px;
   --squircle-radius: 22px;
   --page-x: clamp(20px, 5vw, 72px);
+  --interior-main-start: 132px;
 
   --font-sans: "Instrument Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -49,4 +60,10 @@
   --weight-thin: 300;
   --weight-regular: 400;
   --weight-medium: 500;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --interior-main-start: 116px;
+  }
 }

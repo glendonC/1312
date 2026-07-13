@@ -23,6 +23,27 @@ Last updated: 2026-07-13
 | Eval | Fixed clips + `score.json` | Yolodex-style iterate-until-target |
 | Hosting demo | Vercel / Cloudflare Pages / `*.pages.dev` | Skip expensive `1321.ai` for now |
 
+## Frontend boundaries
+
+The public site follows four explicit layers so new surfaces do not grow back into route-level god files:
+
+```text
+src/
+  pages/        route composition and document metadata only
+  features/     domain UI, view models, client behavior, and feature-owned styles
+  components/   genuinely shared visual and loading primitives
+  layouts/      document shells shared across unrelated features
+  styles/       global tokens, reset, navigation, buttons, and transitions only
+  studio/       isolated product application
+```
+
+- A route should assemble a feature, not contain its implementation.
+- Feature data derivation belongs in a typed model rather than an Astro frontmatter block.
+- Client enhancement code lives beside its feature and binds once across Astro transitions.
+- Responsive rules stay with the feature they change.
+- Studio CSS is loaded only by `/studio/`; public pages must not inherit the product application's surface styles.
+- Shared components expose only implemented variants. Future states are added when their behavior and visuals exist.
+
 ### Explicitly deferred
 
 - User accounts / sync

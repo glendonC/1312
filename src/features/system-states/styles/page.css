@@ -1,3 +1,4 @@
+/* Shared composition for route-level system states. */
 .state-page {
   display: flex;
   min-height: 100svh;

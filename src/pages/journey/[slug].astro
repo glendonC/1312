@@ -1,8 +1,9 @@
 ---
 import { getCollection, render } from "astro:content";
 import GlassNav from "../../components/GlassNav.astro";
+import { formatLogDate } from "../../features/journey/format";
 import SiteLayout from "../../layouts/SiteLayout.astro";
-import "../../styles/journey.css";
+import "../../features/journey/styles/index.css";
 
 export async function getStaticPaths() {
   const posts = await getCollection("journey", ({ data }) => !data.draft);
@@ -15,7 +16,6 @@ export async function getStaticPaths() {
 const { post } = Astro.props;
 const { Content } = await render(post);
 const { type, date, title, description, author, topic } = post.data;
-const formatLogDate = (value: Date) => value.toISOString().slice(0, 10).replaceAll("-", ".");
 ---
 
 <SiteLayout title={`${title} | 1321`} description={description}>
@@ -72,95 +72,7 @@ const formatLogDate = (value: Date) => value.toISOString().slice(0, 10).replaceA
   </main>
 
   <script>
-    const slugify = (value: string) =>
-      value
-        .toLowerCase()
-        .replace(/[“”"']/g, "")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
-
-    const prepareJourneyReading = () => {
-      const article = document.querySelector<HTMLElement>("[data-journey-article]");
-      if (!article || article.dataset.railsReady === "true") return;
-
-      const body = article.querySelector<HTMLElement>(".journey-reading-body");
-      const toc = article.querySelector<HTMLElement>("[data-journey-toc]");
-      const references = article.querySelector<HTMLOListElement>("[data-journey-references]");
-      if (!body || !toc || !references) return;
-
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      body.querySelectorAll<HTMLHeadingElement>("h2").forEach((heading) => {
-        heading.id ||= slugify(heading.textContent ?? "section");
-        const link = document.createElement("a");
-        link.href = `#${heading.id}`;
-        link.textContent = heading.textContent;
-        link.addEventListener("click", (event) => {
-          event.preventDefault();
-          heading.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
-          history.replaceState(null, "", `#${heading.id}`);
-        });
-        toc.append(link);
-      });
-
-      const sourceNumbers = new Map<string, number>();
-      body.querySelectorAll<HTMLAnchorElement>('a[href^="http"]').forEach((source) => {
-        let citationNumber = sourceNumbers.get(source.href);
-        if (!citationNumber) {
-          citationNumber = sourceNumbers.size + 1;
-          sourceNumbers.set(source.href, citationNumber);
-
-          const item = document.createElement("li");
-          const link = document.createElement("a");
-          const number = document.createElement("span");
-          const sourceTitle = document.createElement("span");
-          const host = document.createElement("span");
-          link.href = source.href;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          number.className = "journey-reference-number";
-          sourceTitle.className = "journey-reference-title";
-          host.className = "journey-reference-source";
-          number.textContent = `[${citationNumber}]`;
-          sourceTitle.textContent = source.textContent?.replace(/[.;]$/, "") || "Source";
-          host.textContent = new URL(source.href).hostname.replace(/^www\./, "");
-          link.append(number, sourceTitle, host);
-          item.append(link);
-          references.append(item);
-        }
-
-        const marker = document.createElement("sup");
-        marker.className = "journey-citation-ref";
-        marker.textContent = `[${citationNumber}]`;
-        source.after(marker);
-      });
-
-      article.dataset.railsReady = "true";
-    };
-
-    const journeyDockWindow = window as Window & { __journeyBackDockBound?: boolean };
-    let journeyDockFrame = 0;
-    const syncJourneyBackDock = () => {
-      if (journeyDockFrame) return;
-      journeyDockFrame = window.requestAnimationFrame(() => {
-        const article = document.querySelector<HTMLElement>("[data-journey-article]");
-        const back = article?.querySelector<HTMLElement>(".journey-back");
-        back?.classList.toggle(
-          "is-docked",
-          Boolean(article && article.getBoundingClientRect().bottom <= window.innerHeight),
-        );
-        journeyDockFrame = 0;
-      });
-    };
-
-    if (!journeyDockWindow.__journeyBackDockBound) {
-      window.addEventListener("scroll", syncJourneyBackDock, { passive: true });
-      window.addEventListener("resize", syncJourneyBackDock);
-      document.addEventListener("astro:page-load", syncJourneyBackDock);
-      journeyDockWindow.__journeyBackDockBound = true;
-    }
-
-    prepareJourneyReading();
-    syncJourneyBackDock();
-    document.addEventListener("astro:page-load", prepareJourneyReading);
+    import { bindJourneyArticleEnhancements } from "../../features/journey/enhanceArticle";
+    bindJourneyArticleEnhancements();
   </script>
 </SiteLayout>

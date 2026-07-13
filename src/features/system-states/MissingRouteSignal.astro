@@ -1,0 +1,14 @@
+---
+import AtmosphereField from "../../components/atmosphere/AtmosphereField.astro";
+import "./styles/signal.css";
+
+interface Props {
+  label: string;
+}
+
+const { label } = Astro.props;
+---
+
+<div class="state-signal" role="img" aria-label={label}>
+  <AtmosphereField tone="missing" />
+</div>

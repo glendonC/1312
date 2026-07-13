@@ -29,8 +29,15 @@ const currentLabel =
     )}
   </div>
 
-  <nav class="glass-nav">
-    {navItems.map((item) => <a href={item.href} class="nav-link">{item.label}</a>)}
+  <nav class="glass-nav" aria-label="Site sections">
+    {navItems.map((item) => {
+      const isCurrent = currentPath === item.href || currentPath.startsWith(item.href);
+      return (
+        <a href={item.href} class="nav-link" aria-current={isCurrent ? "page" : undefined}>
+          {item.label}
+        </a>
+      );
+    })}
   </nav>
 
   <a class="cta-link" href="/studio/">Open Studio</a>

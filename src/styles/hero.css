@@ -35,7 +35,11 @@
   bottom: clamp(28px, 6vw, 72px);
   left: var(--page-x);
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.5fr);
+  /* The headline never wraps, so it holds its 841px whatever the track says. A
+     fractional aside track shrinks under it and the two collide; a real track
+     keeps the aside wide enough for four balanced lines and lets the headline
+     take the rest. Below 1400px there is no honest room for both, so they stack. */
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 24rem);
   align-items: end;
   gap: clamp(24px, 5vw, 72px);
   color: #fbfff9;
@@ -76,7 +80,12 @@
    reads as one object instead of a paragraph with an orphan beneath it. Balanced
    wrapping keeps the lines within about 70px of each other. */
 .hero-aside p {
-  margin: 0;
+  /* Same trim as the h1, recomputed for this line-height: 0.25em of descender
+     plus (1.7 - 1.2127) / 2 of half-leading sits under the last baseline. Cutting
+     it puts the paragraph's box bottom on that baseline, so the grid lands the
+     headline's baseline, this paragraph's last baseline, and the chip's bottom
+     border on one line. */
+  margin: 0 0 -0.494em;
   color: rgba(251, 255, 249, 0.88);
   font-size: 1.1rem;
   font-weight: var(--weight-regular);
@@ -90,14 +99,87 @@
   white-space: nowrap;
 }
 
+/* The chip has to fit inside the paragraph's 30px line box. Any taller and it
+   pries the last line open, which is what makes an inline control read as an
+   object dropped onto the text rather than part of it. 26px is the ceiling.
+   Shrinking it that far costs affordance, so the arrow pays it back: at text
+   scale a bare pill can be mistaken for a tag, and the arrow is what says
+   destination. Its shadow drops to a close one, since a standalone button's
+   halo would smear across the copy behind it. */
+/* An inline-block whose overflow is not visible takes its bottom margin edge as
+   its baseline, which is how the chip rests its bottom border on the line of text
+   instead of hanging 8px under it. .button already hides its overflow, so the chip
+   only has to stop being a flex container. */
 .cta-inline {
-  min-height: 34px;
+  display: inline-block;
+  height: 26px;
+  min-height: 0;
   margin-left: 8px;
-  border-radius: 10px;
-  padding: 0 15px;
-  font-size: 0.83rem;
-  vertical-align: middle;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+  line-height: 26px;
+  vertical-align: baseline;
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.8),
-    0 8px 20px rgba(5, 31, 26, 0.16);
+    inset 0 1px 1px rgba(255, 255, 255, 0.75),
+    0 3px 10px rgba(5, 31, 26, 0.16);
+}
+
+/* The chip sits in a line of text, so lifting it on hover would jog the
+   sentence. The arrow travels instead. */
+.cta-inline:hover,
+.cta-inline:focus-visible {
+  transform: none;
+  background:
+    linear-gradient(135deg, #ffffff, rgba(255, 255, 255, 0.86)),
+    rgba(255, 255, 255, 0.86);
+}
+
+.cta-arrow {
+  margin-left: 5px;
+  vertical-align: middle;
+  transition: translate 160ms ease;
+}
+
+.cta-inline:hover .cta-arrow,
+.cta-inline:focus-visible .cta-arrow {
+  translate: 2px 0;
+}
+
+/* 26px is comfortable for a cursor and tight for a thumb, so where the pointer
+   is coarse the chip takes the extra height and the 2px of leading it costs. */
+@media (pointer: coarse) {
+  .cta-inline {
+    height: 32px;
+    padding: 0 14px;
+    line-height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-arrow {
+    transition: none;
+  }
+}
+
+@media (max-width: 1400px) {
+  .hero-content {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .hero-aside {
+    max-width: min(26rem, 100%);
+    justify-self: end;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-copy h1 {
+    font-size: 2.1rem;
+  }
+
+  .hero-line {
+    white-space: normal;
+  }
 }

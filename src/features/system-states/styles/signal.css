@@ -1,3 +1,4 @@
+/* The missing-route visual reuses the shared atmospheric renderer. */
 .state-signal {
   position: relative;
   width: 100%;
@@ -11,22 +12,6 @@
     radial-gradient(circle at 72% 66%, rgba(112, 43, 38, 0.66), transparent 56%),
     #f0ded8;
   box-shadow: 0 24px 60px rgba(72, 24, 20, 0.12);
-}
-
-.state-signal > .atmosphere-field {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 30% 24%, rgba(190, 111, 98, 0.72), transparent 58%),
-    radial-gradient(circle at 72% 66%, rgba(112, 43, 38, 0.66), transparent 56%),
-    #f0ded8;
-}
-
-.state-signal .atmosphere-field canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
 }
 
 .state-signal::before,

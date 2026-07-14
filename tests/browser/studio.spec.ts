@@ -22,6 +22,50 @@ test("the lab is opt-in during development", async ({ page }) => {
   await openLab(page);
 });
 
+test("a submitted source launches the recorded interface preview", async ({ page }) => {
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Add a source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await page.keyboard.press("Enter");
+
+  await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
+  await expect(
+    page.getByRole("note", {
+      name: "Recorded interface preview for YouTube video link dQw4w9WgXcQ. The submitted source was not processed.",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Hosted source probe unavailable")).toHaveCount(0);
+});
+
+test("the submitted preview fits every supported viewport", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive viewport contract");
+
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/studio/");
+    await page.getByRole("button", { name: "Add a source" }).click();
+    await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/dQw4w9WgXcQ");
+    await page.keyboard.press("Enter");
+    await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
+
+    for (const locator of [page.locator(".top-mid"), page.locator(".dock")]) {
+      const box = await locator.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
+      expect(box?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
+      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height + 0.5);
+    }
+  }
+});
+
 test("pause freezes the replay cursor and step advances exactly once", async ({ page }) => {
   await openLab(page);
   await scenario(page).selectOption("current-run");

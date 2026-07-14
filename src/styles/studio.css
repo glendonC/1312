@@ -106,6 +106,10 @@
   -webkit-backdrop-filter: blur(18px) saturate(1.6);
 }
 
+.top-mid[data-preview="true"] {
+  max-width: min(680px, calc(100vw - 160px));
+}
+
 /* nothing to say before a clip is loaded, so it does not sit there as an empty pill */
 .top-mid:empty {
   display: none;
@@ -147,6 +151,18 @@
   .top-clip,
   .top-pair {
     display: none;
+  }
+
+  .top-mid[data-preview="true"] {
+    max-width: calc(100vw - 132px);
+    padding-left: 7px;
+  }
+
+  .top-mid[data-preview="true"] .top-pair {
+    display: inline-flex;
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
   }
 }
 

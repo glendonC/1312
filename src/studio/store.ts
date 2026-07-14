@@ -23,6 +23,7 @@ import {
   type OutputDepth,
   type PreflightSession,
 } from "./preflight/model";
+import { createStudioPreviewSession, type StudioPreviewSession } from "./previewSession";
 import { projectRun } from "./replayProjection";
 import {
   applyTrace,
@@ -59,6 +60,8 @@ interface StudioStore {
   error: string | null;
   outcome: SessionOutcome | null;
   preflight: PreflightSession;
+  /** UI-only source context. Recorded evidence remains entirely inside bundle. */
+  previewSession: StudioPreviewSession | null;
   outputDepth: OutputDepth;
   /** Which worker's workspace and history is open. */
   selected: string | null;
@@ -120,6 +123,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
   error: null,
   outcome: null,
   preflight: idlePreflight(),
+  previewSession: null,
   outputDepth: "evidence",
   selected: null,
   state: initialState(),
@@ -142,6 +146,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
       error: null,
       outcome: null,
       preflight: idlePreflight(),
+      previewSession: null,
       outputDepth: "evidence",
       stage: "input",
       state: initialState(),
@@ -154,6 +159,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
       const bundle = await next.load();
       if (version !== loadVersion) return;
       set({ bundle, loadStatus: "ready", error: null });
+      if (get().previewSession) get().start();
     } catch (err) {
       if (version !== loadVersion) return;
       set({
@@ -172,18 +178,25 @@ export const useStudio = create<StudioStore>((set, get) => ({
   openRecordedPreflight() {
     const { bundle, loadStatus } = get();
     if (loadStatus === "loading") {
-      set({ preflight: loadingRecordedPreflight() });
+      set({ preflight: loadingRecordedPreflight(), previewSession: null });
       return;
     }
     if (!bundle) {
-      set({ preflight: unavailableRecordedPreflight() });
+      set({ preflight: unavailableRecordedPreflight(), previewSession: null });
       return;
     }
-    set({ preflight: recordedPreflight(bundle) });
+    set({ preflight: recordedPreflight(bundle), previewSession: null });
   },
 
   submitSource(source) {
-    set({ preflight: submittedSourcePreflight(source), outcome: null });
+    const previewSession = createStudioPreviewSession(source);
+    if (!previewSession) {
+      set({ preflight: submittedSourcePreflight(source), previewSession: null, outcome: null });
+      return;
+    }
+
+    set({ preflight: idlePreflight(), previewSession, outcome: null });
+    if (get().bundle) get().start();
   },
 
   updatePreflightRequest(request) {
@@ -263,6 +276,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
       paused: false,
       pausePending: false,
       outcome: null,
+      previewSession: null,
     });
   },
 
@@ -279,6 +293,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
       pausePending: false,
       outcome: { kind: "cancelled", reason },
       preflight: idlePreflight(),
+      previewSession: null,
     });
   },
 

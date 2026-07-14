@@ -14,6 +14,7 @@ export default function StudioApp({ runId }: { runId: string }) {
   const stage = useStage();
   const bundle = useBundle();
   const paused = usePaused();
+  const previewSession = useStudio((s) => s.previewSession);
   const [lab, setLab] = useState(false);
 
   useShortcuts();
@@ -43,14 +44,32 @@ export default function StudioApp({ runId }: { runId: string }) {
           <img src="/favicon.svg" alt="" width="30" height="30" />
         </a>
 
-        <div className="top-mid">
+        <div
+          className="top-mid"
+          data-preview={previewSession ? "true" : undefined}
+          role={previewSession ? "note" : undefined}
+          aria-label={
+            previewSession
+              ? `Recorded interface preview for ${previewSession.source.accessibleName}. The submitted source was not processed.`
+              : undefined
+          }
+        >
           {bundle && stage !== "input" && (
-            <>
-              <span className="top-clip">{bundle.run.clip.title_target}</span>
-              <span className="top-pair">
-                {bundle.run.pair.source} &rarr; {bundle.run.pair.target} · {bundle.run.pack}
-              </span>
-            </>
+            previewSession ? (
+              <>
+                <span className="top-clip" title={previewSession.source.raw}>
+                  {previewSession.source.displayUrl}
+                </span>
+                <span className="top-pair">Recorded interface preview</span>
+              </>
+            ) : (
+              <>
+                <span className="top-clip">{bundle.run.clip.title_target}</span>
+                <span className="top-pair">
+                  {bundle.run.pair.source} &rarr; {bundle.run.pair.target} · {bundle.run.pack}
+                </span>
+              </>
+            )
           )}
         </div>
 

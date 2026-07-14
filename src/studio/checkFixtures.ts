@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
 
 import { assertRunBundle } from "./bundle";
+import { checkBundlePolicies } from "./checkBundlePolicies";
 import type { RunBundle } from "./transport";
 import type {
   CaptionsFile,
@@ -179,6 +180,7 @@ export async function checkRecordedRuns(): Promise<void> {
 
   const current = bundles.get("run-006");
   if (!current) throw new Error("Studio lab checkpoints require run-006");
+  checkBundlePolicies(current);
   const preflight = recordedPreflight(current);
   if (preflight.status !== "ready" || !preflight.facts) {
     throw new Error("run-006 must retain its producer-backed ingest receipt");

@@ -1,6 +1,12 @@
 import type { RunBundle } from "../transport";
 
-export type ScenarioEvidence = "recorded" | "uncorroborated" | "withheld" | "regression" | "unscored";
+export type ScenarioEvidence =
+  | "recorded"
+  | "uncorroborated"
+  | "withheld"
+  | "regression"
+  | "unscored"
+  | "provisional_measured";
 
 export interface LabScenario {
   id: string;
@@ -56,6 +62,15 @@ export const SCENARIOS: readonly LabScenario[] = [
     anchor: { kind: "trace", agent: "qc-01", action: "pass", target: "c14" },
     note: "A synthetic recorded fixture where an overlap attribution regressed and remained visible.",
   },
+  {
+    id: "provisional-measured-complete",
+    label: "Run 005 · provisional measured done",
+    runId: "run-005",
+    evidence: "provisional_measured",
+    anchor: { kind: "end" },
+    note:
+      "Completed synthetic development fixture with a provisional measured score. The Hard-KO gold pack is not frozen, so this is not a gold benchmark result.",
+  },
 ] as const;
 
 export function resolveScenarioCursor(bundle: RunBundle, scenario: LabScenario): number {
@@ -85,6 +100,21 @@ export function validateScenarioEvidence(bundle: RunBundle, scenario: LabScenari
   if (scenario.evidence === "recorded") return;
   if (scenario.evidence === "unscored") {
     if (bundle.score.status !== "unscored") throw new Error(`Scenario ${scenario.id} is not unscored`);
+    return;
+  }
+  if (scenario.evidence === "provisional_measured") {
+    const measured = bundle.score.paths[bundle.run.id];
+    if (
+      bundle.score.status !== "provisional" ||
+      !measured ||
+      !Number.isFinite(measured.points) ||
+      !Number.isFinite(measured.hard_line)
+    ) {
+      throw new Error(`Scenario ${scenario.id} is not a provisional measured completion`);
+    }
+    if (!bundle.score.rubric.note.toLowerCase().includes("gold is not frozen")) {
+      throw new Error(`Scenario ${scenario.id} does not preserve the unfrozen-gold disclaimer`);
+    }
     return;
   }
 

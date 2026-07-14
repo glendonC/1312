@@ -194,9 +194,14 @@ export function assertRunBundle(value: unknown, context = "Studio run bundle"): 
       if (end < start) fail(context, `run.agents[${index}].window`, "ends before it starts");
     }
   });
-  list(run.artifacts, context, "run.artifacts").forEach((value, index) =>
+  const declaredArtifacts = list(run.artifacts, context, "run.artifacts").map((value, index) =>
     text(value, context, `run.artifacts[${index}]`),
   );
+  for (const required of ["captions.json", "corrections.json", "glossary.json", "score.json", "traces.json"]) {
+    if (!declaredArtifacts.includes(required)) {
+      fail(context, "run.artifacts", `must declare required artifact ${required}`);
+    }
+  }
 
   const captions = record(bundle.captions, context, "captions");
   if (text(captions.run, context, "captions.run") !== runId) fail(context, "captions.run", "does not match run.id");
@@ -285,6 +290,9 @@ export function assertRunBundle(value: unknown, context = "Studio run bundle"): 
   traces.forEach((value, index) => {
     trace(value, context, `traces[${index}]`, agentIds, cueIds);
     const item = value as Trace;
+    if (item.action === "done" && (item.agent !== "orchestrator" || index !== traces.length - 1)) {
+      fail(context, `traces[${index}]`, "terminal done trace must be the final orchestrator event");
+    }
     if (item.t < previous) fail(context, `traces[${index}].t`, "is earlier than the preceding trace");
     if (item.t > (run.wall_s as number) + 0.15) fail(context, `traces[${index}].t`, "is later than run.wall_s");
     if (item.agent === "orchestrator") lifecycle.set("orchestrator", "working");

@@ -25,6 +25,7 @@ import type {
   WaveFile,
 } from "./types";
 import { assertRunBundle } from "./bundle";
+import { assertTrace } from "./traceValidation";
 
 export interface RunBundle {
   run: RunManifest;
@@ -246,6 +247,7 @@ export class ReplayTransport implements RunTransport {
  */
 export class LiveTransport implements RunTransport {
   readonly mode = "live" as const;
+  private bundle: RunBundle | null = null;
   constructor(
     private readonly endpoint: string,
     private readonly bundleUrl: string,
@@ -254,13 +256,23 @@ export class LiveTransport implements RunTransport {
   async load(): Promise<RunBundle> {
     const bundle = await json<RunBundle>(this.bundleUrl);
     assertRunBundle(bundle, `Live Studio bundle ${this.bundleUrl}`);
+    this.bundle = bundle;
     return bundle;
   }
 
   stream({ onEvent, onEnd, onAbort }: StreamOptions): RunHandle {
     const socket = new WebSocket(this.endpoint);
+    const bundle = this.bundle;
+    const scope = bundle
+      ? {
+          agents: new Set(["orchestrator", ...bundle.run.agents.map((agent) => agent.id)]),
+          cues: new Set(bundle.captions.cues.map((cue) => cue.id)),
+          duration: bundle.run.clip.duration,
+        }
+      : null;
 
     let ended = false;
+    let previousT = -Infinity;
     /** stop() closes the socket, and closing fires "close". A cancelled run is not a finished one. */
     let dead = false;
 
@@ -286,8 +298,20 @@ export class LiveTransport implements RunTransport {
 
     socket.addEventListener("message", (e: MessageEvent<string>) => {
       if (dead || ended) return;
-      const trace = JSON.parse(e.data) as Trace;
-      deliver(trace);
+      try {
+        if (!scope) throw new Error("Live Studio transport must load and validate its bundle before streaming");
+        const trace: unknown = JSON.parse(e.data);
+        assertTrace(trace, "Live Studio event", scope, previousT);
+        if (trace.action === "done" && trace.agent !== "orchestrator") {
+          throw new Error("Live Studio event: only the orchestrator can acknowledge completion");
+        }
+        previousT = trace.t;
+        deliver(trace);
+      } catch (error) {
+        dead = true;
+        socket.close();
+        onAbort?.(error instanceof Error ? error.message : "The live runtime emitted an invalid event.");
+      }
     });
 
     socket.addEventListener("close", () => {

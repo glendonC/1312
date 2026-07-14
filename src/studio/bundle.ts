@@ -2,6 +2,7 @@ import type { RunBundle } from "./transport";
 import type { AgentStatus, CueState, Effect, Trace } from "./types";
 import { canTransition } from "./lifecycle";
 import { assertSourceReceipts } from "./preflight/receiptValidation";
+import { assertTrace } from "./traceValidation";
 
 const ROLES = new Set(["orchestrator", "segment", "context", "translate", "qc"]);
 const STATUSES = new Set<AgentStatus>([
@@ -101,6 +102,7 @@ function trace(
   agents: Set<string>,
   cues: Set<string>,
 ): asserts value is Trace {
+  assertTrace(value, context, { agents, cues, duration: Number.POSITIVE_INFINITY });
   const item = record(value, context, path);
   number(item.t, context, `${path}.t`, 0);
   const agent = text(item.agent, context, `${path}.agent`);

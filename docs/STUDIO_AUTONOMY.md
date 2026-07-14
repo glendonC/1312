@@ -291,7 +291,7 @@ values distinctly and explain which assumptions dominate the estimate.
 | Transport seam | Replay pause/step/seek/speed and single-trace live validation | Production-runtime adapter and acknowledged live control |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler and dynamic registry | Real worker launcher and production-event projection into the graph |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
-| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, post-run evidence index, and a receipted ffmpeg range extraction host | Time-ranged language over speech receipts plus additional individually implemented media operations and detector-backed tracks/stems |
+| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, and a receipted ffmpeg range extraction host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
 | Coordination | Legacy trace prose plus production bounded tasks and structured report-up | Real worker execution and live projection; never retrofit legacy prose into handoffs |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
@@ -309,7 +309,7 @@ recorded run.
 |---|---|---|
 | 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. Browser automation is authored but interactive execution is unavailable in the current in-app browser environment. |
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
-| 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, immutable V1/V2 preflight indexes, and pinned Silero VAD speech/non-speech receipts are real. The detector path preserves normalized PCM and raw frame scores and is projected separately from declared language. Hosted submission, time-ranged language, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
+| 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Pinned Silero VAD receipts preserve normalized PCM, raw frame scores, and exact speech windows. The pinned Whisper language producer consumes only those validated windows and receipts per-range scores plus classified, unknown, or withheld decisions. Studio projects measured speech and language separately from job/pack declarations. Hosted submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
 | 3 — tasks and agents | Production foundation implemented | Bounded scheduling, dynamic registration, journal replay, and report-up are real local modules. No real Codex worker launcher or Studio adapter exists, so a live child is not shown in the product. |
 | 4 — scoped media | One operation implemented | `media.extract` executes ffmpeg under exact grants and emits content-addressed receipt/lineage. Seek, step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools are not claimed. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
@@ -481,8 +481,9 @@ injection.
 
 - Introduce explicit loading, probing, ready-to-confirm, failed, and cancelled session states.
 - Implement source/access and media metadata probing.
-- Project the receipted speech/non-speech ranges (implemented for the pinned VAD path), then add
-  language, music, and overlap summaries only when their independent producers exist.
+- Project the receipted speech/non-speech and language ranges (implemented for the pinned VAD and
+  speech-window language paths), then add music and overlap summaries only when their independent
+  producers exist.
 - Add range selection with a 30 to 60 second recommendation and 120 second hosted cap.
 - Add primary and advanced analysis choices.
 - Create exact scenarios for no Korean, mixed language, music, overlap, and excessive duration.
@@ -587,8 +588,11 @@ The next production slices, in dependency order:
 1. Implemented 2026-07-14: pinned MIT-licensed Silero VAD 6.2.1 and ONNX Runtime 1.27.0 CPU,
    including binary/model hashes, preserved fixed audio normalization, exact sample-range receipts,
    raw frame scores, immutable V2 lineage, Studio projection, and fail-closed mutation fixtures.
-2. Add time-ranged language detection only after it can consume receipted speech windows and record
-   its model/version/configuration and unknown results. Keep pack policy outside the detector/runtime.
+2. Implemented 2026-07-14: pinned `Xenova/whisper-tiny` q8 language identification over validated
+   `studio.speech-activity.v1` windows, with exact model/runtime/configuration identities, all
+   99-language logits and softmax scores, classified/unknown/withheld decisions, immutable V3
+   lineage, Studio projection, and fail-closed mutation fixtures. Job and pack language remain
+   declarations outside the detector/runtime.
 3. Implement a real local worker launcher and adapt production runtime events into a separate Studio
    projection. Do not connect or translate the fixture-only contract events.
 4. Have the launcher receipt executor spans and model usage from the start so observability does not

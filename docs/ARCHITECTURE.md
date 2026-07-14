@@ -84,11 +84,26 @@ probability, and an exact speech/non-speech sample partition. `scripts/seal-spee
 re-hashes that evidence and writes `preflight-v2.json` without replacing `preflight.json`.
 
 `run-005` is a checked production-validator fixture over project-owned bytes, not a production
-worker run. Its V1 and V2 indexes are both retained, and the build re-hashes every artifact they
-name. The Studio projects only the validated detector receipt and labels the job language as a
-declaration, not detector output. Floating-point repeatability is claimed only inside the receipted
-model/runtime/execution-provider/configuration envelope; arbitrary cross-platform equality has not
-been established.
+worker run. Its V1 and V2 indexes are both retained. A third immutable extension is produced by
+`scripts/detect-language.mjs`, which reads only the normalized PCM sample ranges in the validated
+speech receipt and its V2 lineage. The local producer uses the pinned `Xenova/whisper-tiny` q8 ONNX
+export at revision `5332fcc35e32a33b86612b9a57a89be7906102b1`, Transformers.js 4.2.0, and its
+nested ONNX Runtime 1.24.3 CPU engine. It receipts the seven model/licence evidence files, runtime
+package and binary identities, platform, execution mode, thread counts, graph optimization, exact
+99-language token set, logits, and restricted softmax scores.
+
+Each receipted speech window is partitioned into at most 30-second chunks. Chunks shorter than one
+second are withheld; measured chunks are classified only when the top model probability is at least
+0.5 and the top-two margin is at least 0.15, otherwise the decision is first-class unknown. The
+scores are explicitly uncalibrated. `scripts/seal-language-preflight.mjs` re-hashes the complete
+evidence unit and writes `preflight-v3.json` without replacing V1 or V2. The build re-hashes every
+artifact named by all three indexes. The Studio projects validated language ranges separately from
+`run.clip.lang`, the translation target, and the selected language pack; detector output changes
+none of those declarations and does not create a replayable recommended range.
+
+The local production test proves byte equality across repeated executions inside the recorded
+model/runtime/execution-provider/configuration envelope. Arbitrary cross-platform floating-point
+equality has not been established, so the runtime platform and binary are part of the receipt.
 
 Language detection, acoustic classification, overlap estimation, and range recommendation are
 separate producers. A source adapter cannot infer any of those facts from a provider or filename.
@@ -99,7 +114,7 @@ separate producers. A source adapter cannot infer any of those facts from a prov
 | Owned local bytes, SHA-256 identity, explicit rights scope, full-file selection, raw/derived lineage | `scripts/ingest-owned-media.mjs` | `OwnedLocalIngestReceipt` in `source.json` |
 | Container, codecs, track durations, sample rate, channels, dimensions | `scripts/probe-media.mjs` using `ffprobe` | content-bound `studio.media-probe.v1` in `media-probe.json` |
 | Speech and non-speech windows | `scripts/detect-speech.mjs` using pinned Silero VAD and ONNX Runtime CPU | `studio.speech-activity.v1`, normalized PCM, raw frame scores, and immutable V2 preflight lineage for content-addressed owned media |
-| Time-ranged language distribution | None | Withheld |
+| Time-ranged language distribution over receipted speech windows | `scripts/detect-language.mjs` using pinned Xenova Whisper q8, Transformers.js, and ONNX Runtime CPU | `studio.language-ranges.v1`, all 99 language scores, classified/unknown/withheld decisions, and immutable V3 lineage for content-addressed V2 speech evidence |
 | Music, noise, speakers, and overlap | None | Withheld |
 | Suggested range and processing class | None | Withheld |
 
@@ -235,7 +250,7 @@ This row shape is future fine-tune data.
 5. ✅ Standalone preflight index with unsupported detector findings withheld
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
-8. 🔄 Pinned VAD implemented; language producer, real worker launcher, and production runtime projection remain
+8. 🔄 Pinned VAD and speech-window language producer implemented; real worker launcher and production runtime projection remain
 9. ⏳ Acoustic/overlap/separation producers and study export
 
 ## Open questions (do not block UI)

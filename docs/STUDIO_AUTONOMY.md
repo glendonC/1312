@@ -297,7 +297,7 @@ values distinctly and explain which assumptions dominate the estimate.
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
 | Observability | Append-only production journal plus a deterministic content-addressed post-run index, normalized task/agent/operation/execution/handoff/failure facts, structured in-memory filters and aggregations, source identity links, and the separate local Run Explorer | Queue/dependency/reporting spans, critical-path semantics, model-adapter identity and provider units where available, persistent multi-run storage, and retention/access policy |
-| Forecasting | Preflight has measured media duration and explicit user-selected range | Versioned work planner, price-book adapter, historical calibration, interactive comparison, and forecast evaluation |
+| Forecasting | Versioned, content-addressed forecast and run-start freeze artifacts now derive a deterministic workload floor from the measured media envelope, selected range, and explicit operation ranges | Price-book adapter, model-usage estimate producer, elapsed-time and historical calibration, interactive comparison, and separate forecast evaluation |
 
 The normal Studio visualizes recorded legacy runs. The separate `/studio/runtime/` inspector can
 validate an operator-selected production NDJSON journal, build its immutable observability index,
@@ -319,7 +319,7 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
 | 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
-| 10 — forecasting | Planned, partially unblocked | Measured media duration and selected range can support workload floors. Token, cost, and calibrated time ranges remain unavailable until real worker, usage, price-book, and historical producers exist. |
+| 10 — forecasting | Deterministic floor implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `studio.forecast-freeze.v1` can bind the accepted forecast identity to a run start without embedding actuals; evaluation remains a separate future artifact. No runtime-start or UI integration is claimed. |
 
 ## Submission and customization UX
 
@@ -613,8 +613,15 @@ The next production slices, in dependency order:
    multi-index filters and aggregations, and a local structured Run Explorer with source identity
    links. No journal prose or provider payload is indexed; unsupported timing phases, critical
    path, CLI-default model identity, provider units, and billing remain null/unavailable.
-7. Add the deterministic forecast floor from measured media range and explicit work-plan inputs,
-   then add token, cost, and historical calibration only when their producers exist.
+7. Implemented 2026-07-14 for the available inputs: versioned, content-addressed
+   `studio.forecast.v1` records bind the input artifact, measured `studio.media-probe.v1` duration
+   receipt, selected range, explicit work-plan operation ranges, estimator version, assumptions,
+   and uncertainty. The baseline sums requested media milliseconds as a deterministic workload
+   floor, not elapsed time or usage; expected and conservative workloads, elapsed time, model
+   usage, calibration, price-book snapshot, currency, and API cost stay null/unavailable. A
+   separate `studio.forecast-freeze.v1` binds acceptance to a run start by forecast content id and
+   leaves future receipted-actual evaluation separate. Runtime-start wiring, UI, pricing, and
+   calibration producers are not claimed.
 8. Add reviewer-facing memory proposal and rollback inspection before any accepted snapshot is fed
    into a new run; record the exact snapshot content id when that first happens.
 9. Run the authored browser matrix in an environment with an available in-app browser, then add only

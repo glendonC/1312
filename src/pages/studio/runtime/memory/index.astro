@@ -1,0 +1,14 @@
+---
+import SiteLayout from "../../../../layouts/SiteLayout.astro";
+import MemoryReviewInspector from "../../../../studio/runtime/production/memory/MemoryReviewInspector";
+import "../../../../studio/runtime/production/inspector.css";
+import "../../../../studio/runtime/production/memory/memory-inspector.css";
+---
+
+<SiteLayout
+  title="Memory Review Inspector | 1321 Studio"
+  description="Inspect immutable memory proposals, decisions, rollback receipts, materializations, and exact run-consumption bindings."
+  noIndex
+>
+  <MemoryReviewInspector client:load />
+</SiteLayout>

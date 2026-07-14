@@ -37,6 +37,8 @@
 }
 
 .runtime-back { color: inherit; }
+.runtime-inspector-nav { display: flex; gap: 1rem; }
+.runtime-inspector-nav a { color: inherit; }
 .runtime-kicker { margin: 3.5rem 0 .8rem; color: #287354; }
 .runtime-hero h1 { max-width: 14ch; margin: 0; font-size: clamp(2.4rem, 7vw, 5.5rem); font-weight: 400; line-height: .96; letter-spacing: -.055em; }
 .runtime-lede { max-width: 44rem; margin: 1.5rem 0 0; color: #53635d; font-size: 1.06rem; line-height: 1.6; }

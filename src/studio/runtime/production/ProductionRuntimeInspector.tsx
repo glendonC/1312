@@ -115,7 +115,10 @@ export default function ProductionRuntimeInspector() {
   return (
     <main className="runtime-inspector">
       <header className="runtime-hero">
-        <a href="/studio/" className="runtime-back">1321 Studio</a>
+        <nav className="runtime-inspector-nav" aria-label="Studio inspectors">
+          <a href="/studio/" className="runtime-back">1321 Studio</a>
+          <a href="/studio/runtime/memory/">Memory review</a>
+        </nav>
         <p className="runtime-kicker">Production Run Explorer</p>
         <h1>Inspect certified runtime exhaust</h1>
         <p className="runtime-lede">

@@ -622,8 +622,13 @@ The next production slices, in dependency order:
    separate `studio.forecast-freeze.v1` binds acceptance to a run start by forecast content id and
    leaves future receipted-actual evaluation separate. Runtime-start wiring, UI, pricing, and
    calibration producers are not claimed.
-8. Add reviewer-facing memory proposal and rollback inspection before any accepted snapshot is fed
-   into a new run; record the exact snapshot content id when that first happens.
+8. Implemented 2026-07-14: the dedicated memory review inspector validates an operator-selected
+   set of proposal, decision, revocation, legacy, materialization, and consumption receipts; derives
+   supersession and rollback from those receipts; and exposes both the accepted snapshot content id
+   and the full materialization receipt content id. The run-input boundary returns no entries until
+   its exact run/snapshot consumption receipt has been recorded. No production run calls that
+   boundary yet, so current consumption remains unavailable; the browser view is not repository
+   discovery and displays, but does not re-read, externally referenced evidence bytes.
 9. Run the authored browser matrix in an environment with an available in-app browser, then add only
    evidence-backed difficult-media scenarios produced by the new detectors.
 

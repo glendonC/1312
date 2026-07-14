@@ -17,8 +17,10 @@ import type {
   CorrectionsFile,
   GlossaryFile,
   LanguagePack,
+  MediaProbeReceipt,
   RunManifest,
   ScoreFile,
+  IngestReceipt,
   Trace,
   WaveFile,
 } from "./types";
@@ -33,6 +35,9 @@ export interface RunBundle {
   traces: Trace[];
   glossary: GlossaryFile;
   corrections: CorrectionsFile;
+  /** Optional ingest receipt. Older synthetic fixtures have no source producer. */
+  ingestReceipt?: IngestReceipt | null;
+  mediaProbe?: MediaProbeReceipt | null;
 }
 
 export interface StreamOptions {
@@ -84,6 +89,13 @@ async function json<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function optionalJson<T>(url: string): Promise<T | null> {
+  const res = await fetch(url);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`studio: cannot load ${url} (${res.status})`);
+  return (await res.json()) as T;
+}
+
 /** Replays a run recorded to disk, on a clock. */
 export class ReplayTransport implements RunTransport {
   readonly mode = "replay" as const;
@@ -94,7 +106,7 @@ export class ReplayTransport implements RunTransport {
   async load(): Promise<RunBundle> {
     const base = `/demo/runs/${this.runId}`;
 
-    const [run, captions, score, wave, traceFile, glossary, corrections] = await Promise.all([
+    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe] = await Promise.all([
       json<RunManifest>(`${base}/run.json`),
       json<CaptionsFile>(`${base}/captions.json`),
       json<ScoreFile>(`${base}/score.json`),
@@ -102,13 +114,26 @@ export class ReplayTransport implements RunTransport {
       json<{ traces: Trace[] }>(`${base}/traces.json`),
       json<GlossaryFile>(`${base}/glossary.json`),
       json<CorrectionsFile>(`${base}/corrections.json`),
+      optionalJson<IngestReceipt>(`${base}/source.json`),
+      optionalJson<MediaProbeReceipt>(`${base}/media-probe.json`),
     ]);
 
     // The language pack is cross-run memory, so it lives outside the run folder.
     const pack = await json<LanguagePack>(`/demo/packs/${run.pack}.json`);
 
     this.traces = traceFile.traces;
-    const bundle = { run, captions, score, pack, wave, traces: this.traces, glossary, corrections };
+    const bundle = {
+      run,
+      captions,
+      score,
+      pack,
+      wave,
+      traces: this.traces,
+      glossary,
+      corrections,
+      ingestReceipt,
+      mediaProbe,
+    };
     assertRunBundle(bundle, `Studio run ${this.runId}`);
     return bundle;
   }

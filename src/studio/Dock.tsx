@@ -16,13 +16,11 @@
  */
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 
 import DockTrace from "./DockTrace";
 import { Arrow, Chevron, Cross, Hold } from "./glyphs";
 import { useBundle, useComplete, usePaused, useProgress, useStage, useStudio } from "./store";
-
-const ALLOWED_HOSTS = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"];
 
 const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as const;
 
@@ -32,6 +30,9 @@ export default function Dock() {
   const bundle = useBundle();
   const paused = usePaused();
   const start = useStudio((s) => s.start);
+  const openRecordedPreflight = useStudio((s) => s.openRecordedPreflight);
+  const submitSource = useStudio((s) => s.submitSource);
+  const dismissPreflight = useStudio((s) => s.dismissPreflight);
   const reset = useStudio((s) => s.reset);
   const cancelRun = useStudio((s) => s.cancel);
   const togglePause = useStudio((s) => s.togglePause);
@@ -41,7 +42,6 @@ export default function Dock() {
   const [open, setOpen] = useState(false);
   const [mini, setMini] = useState(false);
   const [url, setUrl] = useState("");
-  const [note, setNote] = useState<{ tone: "allow" | "deny"; text: string } | null>(null);
   const field = useRef<HTMLInputElement>(null);
 
   const dock = useRef<HTMLDivElement>(null);
@@ -62,37 +62,23 @@ export default function Dock() {
     if (open) field.current?.focus();
   }, [open]);
 
-  function submit(e: FormEvent): void {
+  function submit(e: SyntheticEvent<HTMLFormElement>): void {
     e.preventDefault();
     const raw = url.trim();
     if (!raw) return;
-
-    let host: string;
-    try {
-      host = new URL(raw).hostname;
-    } catch {
-      setNote({ tone: "deny", text: "That is not a link." });
-      return;
-    }
-
-    if (!ALLOWED_HOSTS.includes(host)) {
-      setNote({ tone: "deny", text: `${host} is not on the allowlist. Public YouTube, or files you own.` });
-      return;
-    }
-
-    setNote({
-      tone: "allow",
-      text: "Host allowed, but fetching is off in the hosted build. Run it locally, or take the demo clip.",
-    });
+    submitSource(raw);
+    setOpen(false);
   }
 
   function clear(): void {
     setOpen(false);
     setMini(false);
     setUrl("");
-    setNote(null);
     if (running) cancelRun();
-    else reset();
+    else {
+      dismissPreflight();
+      reset();
+    }
   }
 
   const running = stage === "run" && !complete;
@@ -115,22 +101,6 @@ export default function Dock() {
 
   return (
     <div className="dock-well">
-      <AnimatePresence mode="wait">
-        {note && stage === "input" && (
-          <motion.p
-            key={note.text}
-            className="dock-note"
-            data-tone={note.tone}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            {note.text}
-          </motion.p>
-        )}
-      </AnimatePresence>
-
       <AnimatePresence>
         {running && (
           <motion.div
@@ -298,7 +268,6 @@ export default function Dock() {
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);
-                  setNote(null);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") setOpen(false);
@@ -310,7 +279,10 @@ export default function Dock() {
               <button
                 type="button"
                 className="dock-demo"
-                onClick={start}
+                onClick={() => {
+                  setOpen(false);
+                  openRecordedPreflight();
+                }}
                 disabled={!bundle}
                 title={bundle?.run.clip.title_target}
               >

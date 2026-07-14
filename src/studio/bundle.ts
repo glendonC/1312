@@ -163,6 +163,72 @@ export function assertRunBundle(value: unknown, context = "Studio run bundle"): 
   record(clip.source, context, "run.clip.source");
   if (clip.media !== null) text(clip.media, context, "run.clip.media");
 
+  if (bundle.ingestReceipt != null) {
+    const receipt = record(bundle.ingestReceipt, context, "ingestReceipt");
+    const receiptKind = text(receipt.kind, context, "ingestReceipt.kind");
+    if (receiptKind !== "youtube") fail(context, "ingestReceipt.kind", `has no registered producer for ${receiptKind}`);
+    text(receipt.label, context, "ingestReceipt.label");
+    text(receipt.channel, context, "ingestReceipt.channel");
+    const receiptUrl = text(receipt.url, context, "ingestReceipt.url");
+    text(receipt.video_id, context, "ingestReceipt.video_id");
+    const receiptLicence = text(receipt.licence, context, "ingestReceipt.licence");
+    const receiptWindow = record(receipt.window, context, "ingestReceipt.window");
+    text(receiptWindow.start, context, "ingestReceipt.window.start");
+    text(receiptWindow.end, context, "ingestReceipt.window.end");
+    const receiptDuration = number(receipt.duration, context, "ingestReceipt.duration", 0);
+    text(receipt.attribution, context, "ingestReceipt.attribution");
+    text(receipt.note, context, "ingestReceipt.note");
+    const source = clip.source as Record<string, unknown>;
+    if (source.url !== receiptUrl) fail(context, "ingestReceipt.url", "does not match run.clip.source.url");
+    if (source.licence !== receiptLicence) {
+      fail(context, "ingestReceipt.licence", "does not match run.clip.source.licence");
+    }
+    if (Math.abs(receiptDuration - duration) > 0.15) {
+      fail(context, "ingestReceipt.duration", "does not match run.clip.duration");
+    }
+  }
+
+  if (bundle.mediaProbe != null) {
+    const probe = record(bundle.mediaProbe, context, "mediaProbe");
+    if (text(probe.schema, context, "mediaProbe.schema") !== "studio.media-probe.v1") {
+      fail(context, "mediaProbe.schema", "is not supported");
+    }
+    if (text(probe.producer, context, "mediaProbe.producer") !== "scripts/probe-media.mjs") {
+      fail(context, "mediaProbe.producer", "has no registered producer");
+    }
+    if (text(probe.run, context, "mediaProbe.run") !== runId) {
+      fail(context, "mediaProbe.run", "does not match run.id");
+    }
+    const probedMedia = text(probe.media, context, "mediaProbe.media");
+    if (probedMedia !== clip.media) fail(context, "mediaProbe.media", "does not match run.clip.media");
+    const probeDuration = number(probe.duration, context, "mediaProbe.duration", 0);
+    if (Math.abs(probeDuration - duration) > 0.15) {
+      fail(context, "mediaProbe.duration", "does not match run.clip.duration");
+    }
+    const containers = list(probe.container, context, "mediaProbe.container");
+    if (containers.length === 0) fail(context, "mediaProbe.container", "must not be empty");
+    containers.forEach((value, index) => text(value, context, `mediaProbe.container[${index}]`));
+    const trackIndexes = new Set<number>();
+    const tracks = list(probe.tracks, context, "mediaProbe.tracks");
+    if (tracks.length === 0) fail(context, "mediaProbe.tracks", "must not be empty");
+    tracks.forEach((value, index) => {
+      const track = record(value, context, `mediaProbe.tracks[${index}]`);
+      const trackIndex = number(track.index, context, `mediaProbe.tracks[${index}].index`, 0);
+      if (trackIndexes.has(trackIndex)) fail(context, `mediaProbe.tracks[${index}].index`, `duplicates ${trackIndex}`);
+      trackIndexes.add(trackIndex);
+      const trackType = text(track.type, context, `mediaProbe.tracks[${index}].type`);
+      text(track.codec, context, `mediaProbe.tracks[${index}].codec`);
+      if (trackType === "video") {
+        number(track.width, context, `mediaProbe.tracks[${index}].width`, 1);
+        number(track.height, context, `mediaProbe.tracks[${index}].height`, 1);
+      }
+      if (trackType === "audio") {
+        number(track.sample_rate, context, `mediaProbe.tracks[${index}].sample_rate`, 1);
+        number(track.channels, context, `mediaProbe.tracks[${index}].channels`, 1);
+      }
+    });
+  }
+
   const agentIds = new Set<string>(["orchestrator"]);
   list(run.agents, context, "run.agents").forEach((value, index) => {
     const agent = record(value, context, `run.agents[${index}]`);

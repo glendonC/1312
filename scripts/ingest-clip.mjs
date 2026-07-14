@@ -95,7 +95,7 @@ if (!REDISTRIBUTABLE.test(licence)) {
       "",
       "  Two ways forward:",
       "    - find a Creative Commons video (YouTube: Filters > Features > Creative Commons)",
-      "    - or use media you own, and pass it as a local file",
+      "    - keep owned media local until a rights-receipted upload adapter is implemented",
       "",
       "  For the BENCH, none of this applies: score a hard clip locally and publish the",
       "  numbers, the url and the timestamps. Evidence travels; the media does not have to.",

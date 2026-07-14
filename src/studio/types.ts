@@ -107,6 +107,51 @@ export interface ClipSource {
   licence?: string;
 }
 
+/**
+ * Receipt written by scripts/ingest-clip.mjs after it has fetched source metadata,
+ * enforced the redistribution licence, cut the selected window, and measured that cut.
+ * It is not a language, music, speaker, or complexity probe.
+ */
+export interface YouTubeIngestReceipt {
+  kind: "youtube";
+  label: string;
+  channel: string;
+  url: string;
+  video_id: string;
+  licence: string;
+  window: { start: string; end: string };
+  duration: number;
+  attribution: string;
+  note: string;
+}
+
+/**
+ * Closed over producers that actually exist. Add another receipt variant only with the
+ * corresponding ingest producer and runtime assertion; do not make provider fields optional.
+ */
+export type IngestReceipt = YouTubeIngestReceipt;
+
+/** Exact local media facts written by scripts/probe-media.mjs from ffprobe output. */
+export interface MediaProbeTrack {
+  index: number;
+  type: string;
+  codec: string;
+  width?: number;
+  height?: number;
+  sample_rate?: number;
+  channels?: number;
+}
+
+export interface MediaProbeReceipt {
+  schema: "studio.media-probe.v1";
+  producer: "scripts/probe-media.mjs";
+  run: string;
+  media: string;
+  duration: number;
+  container: string[];
+  tracks: MediaProbeTrack[];
+}
+
 export interface Clip {
   id: string;
   title: string;

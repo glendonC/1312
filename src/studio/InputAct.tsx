@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 
+import Preflight from "./preflight/Preflight";
 import { useStudio } from "./store";
 
 /** A blank canvas. Everything the user can do lives in the dock. */
@@ -9,6 +10,7 @@ export default function InputAct() {
   const outcome = useStudio((state) => state.outcome);
   const retry = useStudio((state) => state.retry);
   const start = useStudio((state) => state.start);
+  const preflightStatus = useStudio((state) => state.preflight.status);
 
   return (
     <motion.section
@@ -20,14 +22,16 @@ export default function InputAct() {
     >
       <div className="canvas" aria-hidden="true" />
 
-      {loadStatus === "loading" && (
+      {preflightStatus !== "idle" && <Preflight />}
+
+      {preflightStatus === "idle" && loadStatus === "loading" && (
         <div className="input-status" role="status" aria-live="polite">
           <span className="input-status-kicker">Recorded evidence</span>
           <p>Loading the run bundle…</p>
         </div>
       )}
 
-      {loadStatus === "failed" && (
+      {preflightStatus === "idle" && loadStatus === "failed" && (
         <div className="input-status" role="alert">
           <span className="input-status-kicker">Run unavailable</span>
           <p>The recorded evidence could not be loaded. Nothing has been replayed.</p>
@@ -38,7 +42,7 @@ export default function InputAct() {
         </div>
       )}
 
-      {outcome?.kind === "cancelled" && loadStatus === "ready" && (
+      {preflightStatus === "idle" && outcome?.kind === "cancelled" && loadStatus === "ready" && (
         <div className="input-status" role="status" aria-live="polite">
           <span className="input-status-kicker">Cancelled</span>
           <p>{outcome.reason} No completed result is being shown.</p>

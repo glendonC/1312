@@ -10,14 +10,19 @@ import type {
   CorrectionsFile,
   GlossaryFile,
   LanguagePack,
+  MediaProbeReceipt,
   RunManifest,
   ScoreFile,
+  IngestReceipt,
   TracesFile,
   WaveFile,
 } from "./types";
 import { deriveCheckpoints } from "./lab/checkpoints";
+import { PREFLIGHT_SCENARIOS, validatePreflightScenario } from "./lab/preflightScenarios";
 import { SCENARIOS, validateScenarioEvidence } from "./lab/scenarios";
 import { projectRun } from "./replayProjection";
+import { assessRecordedRequest, recordedPreflight } from "./preflight/model";
+import { classifySourceUrl } from "./preflight/sourceAdapters";
 
 const RUNS = pathToFileURL(`${resolve(process.cwd(), "public/demo/runs")}/`);
 const PACKS = pathToFileURL(`${resolve(process.cwd(), "public/demo/packs")}/`);
@@ -26,6 +31,15 @@ async function json<T>(url: URL): Promise<T> {
   try {
     return JSON.parse(await readFile(url, "utf8")) as T;
   } catch (error) {
+    throw new Error(`Studio fixture ${fileURLToPath(url)} could not be read`, { cause: error });
+  }
+}
+
+async function optionalJson<T>(url: URL): Promise<T | null> {
+  try {
+    return JSON.parse(await readFile(url, "utf8")) as T;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw new Error(`Studio fixture ${fileURLToPath(url)} could not be read`, { cause: error });
   }
 }
@@ -41,7 +55,7 @@ export async function checkRecordedRuns(): Promise<void> {
   const bundles = new Map<string, RunBundle>();
   for (const entry of entries) {
     const base = new URL(`${entry.name}/`, RUNS);
-    const [run, captions, score, wave, traceFile, glossary, corrections] = await Promise.all([
+    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe] = await Promise.all([
       json<RunManifest>(new URL("run.json", base)),
       json<CaptionsFile>(new URL("captions.json", base)),
       json<ScoreFile>(new URL("score.json", base)),
@@ -49,6 +63,8 @@ export async function checkRecordedRuns(): Promise<void> {
       json<TracesFile>(new URL("traces.json", base)),
       json<GlossaryFile>(new URL("glossary.json", base)),
       json<CorrectionsFile>(new URL("corrections.json", base)),
+      optionalJson<IngestReceipt>(new URL("source.json", base)),
+      optionalJson<MediaProbeReceipt>(new URL("media-probe.json", base)),
     ]);
     const pack = await json<LanguagePack>(new URL(`${run.pack}.json`, PACKS));
     if (traceFile.run !== run.id || traceFile.clip !== run.clip.id) {
@@ -66,6 +82,8 @@ export async function checkRecordedRuns(): Promise<void> {
       glossary,
       corrections,
       pack,
+      ingestReceipt,
+      mediaProbe,
     };
 
     assertRunBundle(bundle, `Recorded Studio fixture ${entry.name}`);
@@ -91,9 +109,33 @@ export async function checkRecordedRuns(): Promise<void> {
     if (!bundle) throw new Error(`Studio lab scenario ${scenario.id} references missing run ${scenario.runId}`);
     validateScenarioEvidence(bundle, scenario);
   }
+  for (const scenario of PREFLIGHT_SCENARIOS) validatePreflightScenario(scenario);
 
   const current = bundles.get("run-006");
   if (!current) throw new Error("Studio lab checkpoints require run-006");
+  const preflight = recordedPreflight(current);
+  if (preflight.status !== "ready" || !preflight.facts) {
+    throw new Error("run-006 must retain its producer-backed ingest receipt");
+  }
+  if (!preflight.facts.mediaProbe) {
+    throw new Error("run-006 must retain its producer-backed media probe receipt");
+  }
+  if (!assessRecordedRequest(preflight, current, false).canReplay) {
+    throw new Error("run-006 recorded selection must remain replayable after preflight");
+  }
+  const changedRange = {
+    ...preflight,
+    request: { ...preflight.request, rangeMode: "custom" as const, end: preflight.request.end - 1 },
+  };
+  if (assessRecordedRequest(changedRange, current, false).canReplay) {
+    throw new Error("preflight must not claim a recorded artifact for an unrecorded custom range");
+  }
+  if (classifySourceUrl("https://www.youtube.com/watch?v=fixture").kind !== "supported") {
+    throw new Error("the YouTube producer URL adapter is not registered");
+  }
+  if (classifySourceUrl("https://example.com/media").kind !== "unsupported") {
+    throw new Error("an unregistered source provider was accepted");
+  }
   for (const checkpoint of deriveCheckpoints(current)) {
     if (checkpoint.phase !== "Ready" && checkpoint.cursor === null) {
       throw new Error(`Studio lab could not derive the ${checkpoint.phase} checkpoint from run-006`);

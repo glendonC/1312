@@ -6,6 +6,7 @@ import { replayTransport, useStudio } from "../store";
 import { deriveCheckpoints } from "./checkpoints";
 import { inspectCursor } from "./inspect";
 import { resolveScenarioCursor, SCENARIOS } from "./scenarios";
+import { preflightFixture, PREFLIGHT_SCENARIOS } from "./preflightScenarios";
 
 import "./lab.css";
 
@@ -23,6 +24,7 @@ export default function Lab({ defaultRunId }: { defaultRunId: string }) {
   const setSpeed = useStudio((current) => current.setSpeed);
 
   const [scenarioId, setScenarioId] = useState("current-run");
+  const [preflightId, setPreflightId] = useState("");
   const [busy, setBusy] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -39,6 +41,8 @@ export default function Lab({ defaultRunId }: { defaultRunId: string }) {
     const scenario = SCENARIOS.find((candidate) => candidate.id === nextId);
     if (!scenario) return;
     setScenarioId(nextId);
+    setPreflightId("");
+    useStudio.getState().dismissPreflight();
     setBusy(true);
     try {
       if (useStudio.getState().bundle?.run.id !== scenario.runId) {
@@ -51,6 +55,15 @@ export default function Lab({ defaultRunId }: { defaultRunId: string }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function choosePreflight(nextId: string): void {
+    const scenario = PREFLIGHT_SCENARIOS.find((candidate) => candidate.id === nextId);
+    if (!scenario) return;
+    setPreflightId(nextId);
+    useStudio.getState().reset();
+    useStudio.setState({ preflight: preflightFixture(scenario) });
+    setCollapsed(true);
   }
 
   function jump(phaseName: string, checkpointCursor: number | null): void {
@@ -97,6 +110,20 @@ export default function Lab({ defaultRunId }: { defaultRunId: string }) {
             {SCENARIOS.find((scenario) => scenario.id === scenarioId)?.note ??
               `Current recorded run: ${defaultRunId}`}
           </p>
+
+          <label className="lab-field">
+            <span>Preflight contract</span>
+            <select value={preflightId} onChange={(event) => choosePreflight(event.currentTarget.value)}>
+              <option value="" disabled>
+                Select state
+              </option>
+              {PREFLIGHT_SCENARIOS.map((scenario) => (
+                <option key={scenario.id} value={scenario.id}>
+                  {scenario.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div className="lab-readout" aria-live="polite">
             <span>{phase}</span>

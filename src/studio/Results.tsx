@@ -17,13 +17,15 @@ export default function Results() {
   const setView = useStudio((s) => s.setView);
   const reset = useStudio((s) => s.reset);
   const emitted = useStudio((s) => s.state.emitted);
+  const outputDepth = useStudio((s) => s.outputDepth);
 
   if (!bundle) return null;
 
   const { run, captions, score } = bundle;
   const prep = score.paths[run.id];
   const cold = score.paths["cold"];
-  const hasComparison = Boolean(cold && captions.cues.some((cue) => cue.baseline));
+  const showEvidence = outputDepth === "evidence";
+  const hasComparison = showEvidence && Boolean(cold && captions.cues.some((cue) => cue.baseline));
   const accuracyMeasured = Boolean(
     score.status !== "unscored" && prep?.hard_line != null && cold?.hard_line != null,
   );
@@ -32,7 +34,9 @@ export default function Results() {
 
   const note =
     activeView === "prepped"
-      ? "What 1321 will stand behind. Lines it cannot are withheld, not guessed."
+      ? showEvidence
+        ? "What 1321 will stand behind. Lines it cannot are withheld, not guessed."
+        : "Caption result only. Withheld lines remain visible because absence is part of the result."
       : activeView === "baseline"
         ? accuracyMeasured
           ? "One-shot ASR into MT. No glossary and no gates. Accuracy is measured against this fixture's reference."
@@ -77,7 +81,7 @@ export default function Results() {
         )}
       </div>
 
-      <div className="scores">
+      {showEvidence && <div className="scores">
         {/* A null score is not a zero. An unscored run prints "—" and says why: there is no
             gold for this clip, so a delta against cold is not a number we are entitled to. */}
         <Score
@@ -118,7 +122,7 @@ export default function Results() {
           label="time to first usable line"
           sub={timingNote(prep?.time_to_complete_s ?? null, cold?.time_to_usable_s ?? null)}
         />
-      </div>
+      </div>}
 
       <footer className="result-foot">
         <p className="caveat">{score.rubric.note}</p>
@@ -132,7 +136,7 @@ export default function Results() {
         </div>
       </footer>
 
-      <details className="raw">
+      {showEvidence && <details className="raw">
         <summary>
           Raw run — {emitted.length} agent actions, {run.agents.length} workers,{" "}
           {clock(run.wall_s)} wall
@@ -163,7 +167,7 @@ export default function Results() {
             <p className="raw-empty">No artifact links were declared by this run.</p>
           )}
         </div>
-      </details>
+      </details>}
     </motion.div>
   );
 }

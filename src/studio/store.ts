@@ -11,6 +11,18 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
 import type { Layout } from "./layout";
+import {
+  assessRecordedRequest,
+  cancelledPreflight,
+  idlePreflight,
+  loadingRecordedPreflight,
+  recordedPreflight,
+  submittedSourcePreflight,
+  unavailableRecordedPreflight,
+  type AnalysisRequest,
+  type OutputDepth,
+  type PreflightSession,
+} from "./preflight/model";
 import { projectRun } from "./replayProjection";
 import {
   applyTrace,
@@ -46,6 +58,8 @@ interface StudioStore {
   loadStatus: LoadStatus;
   error: string | null;
   outcome: SessionOutcome | null;
+  preflight: PreflightSession;
+  outputDepth: OutputDepth;
   /** Which worker's workspace and history is open. */
   selected: string | null;
 
@@ -67,6 +81,12 @@ interface StudioStore {
 
   boot: (transport: RunTransport) => Promise<void>;
   retry: () => Promise<void>;
+  openRecordedPreflight: () => void;
+  submitSource: (source: string) => void;
+  updatePreflightRequest: (request: Partial<AnalysisRequest>) => void;
+  dismissPreflight: () => void;
+  cancelPreflight: () => void;
+  confirmPreflight: () => void;
   start: () => void;
   event: (trace: Trace) => void;
   end: () => void;
@@ -99,6 +119,8 @@ export const useStudio = create<StudioStore>((set, get) => ({
   loadStatus: "idle",
   error: null,
   outcome: null,
+  preflight: idlePreflight(),
+  outputDepth: "evidence",
   selected: null,
   state: initialState(),
   speed: 6,
@@ -119,6 +141,8 @@ export const useStudio = create<StudioStore>((set, get) => ({
       loadStatus: "loading",
       error: null,
       outcome: null,
+      preflight: idlePreflight(),
+      outputDepth: "evidence",
       stage: "input",
       state: initialState(),
       selected: null,
@@ -145,6 +169,49 @@ export const useStudio = create<StudioStore>((set, get) => ({
     await get().boot(transport);
   },
 
+  openRecordedPreflight() {
+    const { bundle, loadStatus } = get();
+    if (loadStatus === "loading") {
+      set({ preflight: loadingRecordedPreflight() });
+      return;
+    }
+    if (!bundle) {
+      set({ preflight: unavailableRecordedPreflight() });
+      return;
+    }
+    set({ preflight: recordedPreflight(bundle) });
+  },
+
+  submitSource(source) {
+    set({ preflight: submittedSourcePreflight(source), outcome: null });
+  },
+
+  updatePreflightRequest(request) {
+    set((current) => ({
+      preflight: {
+        ...current.preflight,
+        request: { ...current.preflight.request, ...request },
+      },
+    }));
+  },
+
+  dismissPreflight() {
+    set({ preflight: idlePreflight() });
+  },
+
+  cancelPreflight() {
+    set((current) => ({ preflight: cancelledPreflight(current.preflight) }));
+  },
+
+  confirmPreflight() {
+    const { bundle, preflight } = get();
+    if (!bundle) return;
+    const assessment = assessRecordedRequest(preflight, bundle, import.meta.env.DEV);
+    if (!assessment.canReplay) return;
+    set({ outputDepth: preflight.request.outputDepth });
+    get().start();
+  },
+
   start() {
     const { bundle } = get();
     if (!bundle || !transport) return;
@@ -158,6 +225,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
       paused: false,
       pausePending: false,
       outcome: null,
+      preflight: idlePreflight(),
       clipT: 0,
       state: seedCues(initialState(), bundle.captions.cues.map((c) => c.id)),
     });
@@ -210,6 +278,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
       paused: false,
       pausePending: false,
       outcome: { kind: "cancelled", reason },
+      preflight: idlePreflight(),
     });
   },
 

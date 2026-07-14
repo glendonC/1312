@@ -16,7 +16,7 @@ Last updated: 2026-07-13
 | Marketing + Studio UI | **Astro static** + light CSS (this repo) | Fast, matches Sori site pattern |
 | Studio interactivity | Progressive: Astro islands / small client JS → later React island if needed | Don’t boil the ocean day one |
 | Agent runtime | **Codex app / `codex exec`** + orchestrator scripts (Yolodex-like skills) | Contest-native; parallel worktrees/workspaces |
-| Media ingest | `yt-dlp` / local file → workspace media | YouTube-first; DRM out of scope |
+| Media ingest | Provider adapter → rights receipt → workspace media | YouTube receipt exists; owned upload/local adapters remain unimplemented |
 | ASR (v1) | Whisper-family or cloud ASR behind a seam | Swappable; not the brand |
 | Translation / repair | GPT-5.6 specialists + QC gates | Model does language work; code enforces honesty |
 | Persistence | Local workspace folders + **JSON/SQLite** | Accountless compounding on one machine |
@@ -43,6 +43,36 @@ src/
 - Responsive rules stay with the feature they change.
 - Studio CSS is loaded only by `/studio/`; public pages must not inherit the product application's surface styles.
 - Shared components expose only implemented variants. Future states are added when their behavior and visuals exist.
+
+## Source ingest boundary
+
+Provider wire data does not enter the Studio session model directly. Each real ingest producer owns
+a strict receipt and a matching adapter normalizes it into provider-neutral preflight facts:
+
+```text
+provider input
+  -> provider-specific ingest producer
+  -> provider-specific rights and range receipt
+  -> source adapter
+  -> normalized preflight facts
+```
+
+Today, `scripts/ingest-clip.mjs` is the only producer and `YouTubeIngestReceipt` is therefore the
+only receipt variant. Its `channel` and `video_id` fields stop at the YouTube adapter. A future owned
+upload must bring its own producer, ownership or licence evidence, stable content identifier, and
+runtime assertion before a receipt variant or adapter is added. Optional provider fields are not a
+substitute for that contract.
+
+Language detection, acoustic classification, overlap estimation, and range recommendation are
+separate producers. A source adapter cannot infer any of those facts from a provider or filename.
+
+| Preflight fact | Current producer | Receipt / status |
+|---|---|---|
+| Source URL, creator, redistribution licence, selected range | `scripts/ingest-clip.mjs` | `YouTubeIngestReceipt` in `source.json` |
+| Container, codecs, sample rate, channels, dimensions | `scripts/probe-media.mjs` using `ffprobe` | `studio.media-probe.v1` in `media-probe.json` |
+| Time-ranged language distribution | None | Withheld |
+| Music, speech, noise, speakers, and overlap | None | Withheld |
+| Suggested range and processing class | None | Withheld |
 
 ### Explicitly deferred
 
@@ -127,7 +157,8 @@ This row shape is future fine-tune data.
 
 - User-armed ingest; no silent always-on capture in v1.
 - Fail closed / withhold when confidence is junk.
-- Public YouTube / owned files only for agent browse.
+- Only registered source adapters may ingest. Owned files remain local and unsupported until an
+  upload/local adapter records rights evidence and provenance.
 - Don’t log secrets into traces.
 
 ## Implementation order

@@ -1,0 +1,31 @@
+{
+  "schema": "studio.media-probe.v1",
+  "producer": "scripts/probe-media.mjs",
+  "run": "run-006",
+  "media": "clip.mp4",
+  "duration": 40.04,
+  "container": [
+    "mov",
+    "mp4",
+    "m4a",
+    "3gp",
+    "3g2",
+    "mj2"
+  ],
+  "tracks": [
+    {
+      "index": 0,
+      "type": "video",
+      "codec": "h264",
+      "width": 1280,
+      "height": 720
+    },
+    {
+      "index": 1,
+      "type": "audio",
+      "codec": "aac",
+      "sample_rate": 48000,
+      "channels": 2
+    }
+  ]
+}

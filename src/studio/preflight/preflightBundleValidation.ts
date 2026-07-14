@@ -1,7 +1,10 @@
 import type {
   PreflightArtifact,
+  PreflightArtifactKind,
   PreflightBundle,
+  PreflightBundleV1,
   PreflightSourceBinding,
+  SpeechActivityReceipt,
 } from "./contracts";
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -76,7 +79,12 @@ function relativeArtifactPath(value: unknown, context: string, path: string): st
   return candidate;
 }
 
-function artifact(value: unknown, context: string, path: string): PreflightArtifact {
+function artifact(
+  value: unknown,
+  version: "v1" | "v2",
+  context: string,
+  path: string,
+): PreflightArtifact {
   const item = record(value, context, path);
   exactKeys(
     item,
@@ -85,16 +93,16 @@ function artifact(value: unknown, context: string, path: string): PreflightArtif
     path,
   );
   artifactId(item.artifact_id, context, `${path}.artifact_id`);
-  const kind = text(item.kind, context, `${path}.kind`);
-  if (kind !== "raw_media" && kind !== "source_receipt" && kind !== "media_probe_receipt") {
-    fail(context, `${path}.kind`, `has no registered artifact kind ${kind}`);
+  const kind = text(item.kind, context, `${path}.kind`) as PreflightArtifactKind;
+  const v1Kinds: PreflightArtifactKind[] = ["raw_media", "source_receipt", "media_probe_receipt"];
+  const v2Kinds: PreflightArtifactKind[] = [...v1Kinds, "detector_audio", "speech_activity_receipt"];
+  if (!(version === "v1" ? v1Kinds : v2Kinds).includes(kind)) {
+    fail(context, `${path}.kind`, `has no registered ${version} artifact kind ${kind}`);
   }
   const artifactClass = text(item.class, context, `${path}.class`);
-  if (artifactClass !== "raw" && artifactClass !== "receipt") {
-    fail(context, `${path}.class`, `has no registered artifact class ${artifactClass}`);
-  }
-  if ((kind === "raw_media") !== (artifactClass === "raw")) {
-    fail(context, `${path}.class`, `does not match artifact kind ${kind}`);
+  const expectedClass = kind === "raw_media" ? "raw" : kind === "detector_audio" ? "derived" : "receipt";
+  if (artifactClass !== expectedClass) {
+    fail(context, `${path}.class`, `must equal ${expectedClass} for artifact kind ${kind}`);
   }
   relativeArtifactPath(item.path, context, `${path}.path`);
   const content = record(item.content, context, `${path}.content`);
@@ -120,7 +128,7 @@ function artifact(value: unknown, context: string, path: string): PreflightArtif
 function oneArtifact(
   artifacts: Map<string, PreflightArtifact>,
   id: unknown,
-  kind: PreflightArtifact["kind"],
+  kind: PreflightArtifactKind,
   context: string,
   path: string,
 ): PreflightArtifact {
@@ -145,26 +153,25 @@ function exactSources(
   }
 }
 
-/**
- * Validate an immutable preflight index against normalized facts from its source adapter.
- * Artifact bytes are hashed separately by the CLI and production build.
- */
-export function assertPreflightBundle(
-  value: unknown,
+function commonArtifacts(
+  bundle: Record<string, unknown>,
   binding: PreflightSourceBinding,
-  context = "Studio preflight bundle",
-): asserts value is PreflightBundle {
-  const bundle = record(value, context, "bundle");
-  exactKeys(bundle, ["schema", "producer", "preflight_id", "source", "artifacts", "findings", "note"], context, "bundle");
-  exact(bundle.schema, "studio.preflight-bundle.v1", context, "bundle.schema");
-  exact(bundle.producer, "scripts/preflight-owned-media.mjs", context, "bundle.producer");
-  exact(bundle.preflight_id, `preflight:${binding.raw.contentId}`, context, "bundle.preflight_id");
-  text(bundle.note, context, "bundle.note");
-
+  version: "v1" | "v2",
+  expectedCount: number,
+  context: string,
+): { artifacts: Map<string, PreflightArtifact>; findings: Record<string, unknown> } {
   const entries = list(bundle.artifacts, context, "bundle.artifacts").map((entry, index) =>
-    artifact(entry, context, `bundle.artifacts[${index}]`),
+    artifact(entry, version, context, `bundle.artifacts[${index}]`),
   );
-  if (entries.length !== 3) fail(context, "bundle.artifacts", "must contain the exact raw, source, and media-probe artifacts");
+  if (entries.length !== expectedCount) {
+    fail(
+      context,
+      "bundle.artifacts",
+      version === "v1"
+        ? "must contain the exact raw, source, and media-probe artifacts"
+        : "must contain the exact raw, source, media-probe, detector-audio, and speech-activity artifacts",
+    );
+  }
   const artifacts = new Map(entries.map((entry) => [entry.artifact_id, entry]));
   if (artifacts.size !== entries.length) fail(context, "bundle.artifacts", "must not contain duplicate artifact ids");
   if (new Set(entries.map((entry) => entry.path)).size !== entries.length) {
@@ -215,10 +222,121 @@ export function assertPreflightBundle(
     fail(context, "bundle.findings.container_tracks", "does not match the registered media-probe receipt");
   }
   exactSources(probe, [binding.raw.contentId], context, "bundle.findings.container_tracks.source_content_ids");
+  return { artifacts, findings };
+}
 
+function validateV1(
+  bundle: Record<string, unknown>,
+  binding: PreflightSourceBinding,
+  context: string,
+): void {
+  exact(bundle.producer, "scripts/preflight-owned-media.mjs", context, "bundle.producer");
+  exact(bundle.preflight_id, `preflight:${binding.raw.contentId}`, context, "bundle.preflight_id");
+  const { findings } = commonArtifacts(bundle, binding, "v1", 3, context);
   for (const key of ["speech_activity", "language_ranges", "acoustic_ranges", "speaker_overlap", "complexity"] as const) {
     if (findings[key] !== null) {
       fail(context, `bundle.findings.${key}`, "has no registered deterministic producer");
     }
   }
 }
+
+function validateV2(
+  bundle: Record<string, unknown>,
+  binding: PreflightSourceBinding,
+  speechActivity: SpeechActivityReceipt | null | undefined,
+  context: string,
+): void {
+  exact(bundle.producer, "scripts/seal-speech-preflight.mjs", context, "bundle.producer");
+  exact(bundle.preflight_id, `preflight:${binding.raw.contentId}:speech-v1`, context, "bundle.preflight_id");
+  if (!speechActivity) fail(context, "speechActivity", "is required to validate a v2 preflight bundle");
+  if (
+    speechActivity.schema !== "studio.speech-activity.v1" ||
+    speechActivity.producer.id !== "silero-vad" ||
+    speechActivity.producer.version !== "6.2.1" ||
+    speechActivity.producer.implementation !== "scripts/detect-speech.mjs"
+  ) {
+    fail(context, "speechActivity.producer", "is not the registered speech-activity receipt");
+  }
+  if (
+    speechActivity.input.media !== binding.raw.path ||
+    speechActivity.input.content_id !== binding.raw.contentId ||
+    speechActivity.input.bytes !== binding.raw.bytes
+  ) {
+    fail(context, "speechActivity.input", "does not match the receipted raw media");
+  }
+
+  const { artifacts, findings } = commonArtifacts(bundle, binding, "v2", 5, context);
+  const expectedIds = ["raw-media", "source-receipt", "container-probe", "speech-detector-audio", "speech-activity"];
+  if (expectedIds.some((id) => !artifacts.has(id))) {
+    fail(context, "bundle.artifacts", `must use the exact v2 artifact ids ${expectedIds.join(", ")}`);
+  }
+  exact(findings.speech_activity, "speech-activity", context, "bundle.findings.speech_activity");
+  const normalized = oneArtifact(
+    artifacts,
+    "speech-detector-audio",
+    "detector_audio",
+    context,
+    "bundle.artifacts.speech-detector-audio",
+  );
+  const normalizedReceipt = speechActivity.normalization.artifact;
+  if (
+    normalized.path !== normalizedReceipt.path ||
+    normalized.content.id !== normalizedReceipt.content.id ||
+    normalized.content.bytes !== normalizedReceipt.content.bytes ||
+    normalized.producer !== speechActivity.producer.implementation
+  ) {
+    fail(context, "bundle.artifacts.speech-detector-audio", "does not match the normalized detector audio receipt");
+  }
+  exactSources(normalized, [binding.raw.contentId], context, "bundle.artifacts.speech-detector-audio.source_content_ids");
+
+  const speechReceipt = oneArtifact(
+    artifacts,
+    findings.speech_activity,
+    "speech_activity_receipt",
+    context,
+    "bundle.findings.speech_activity",
+  );
+  if (speechReceipt.path !== "speech-activity.json" || speechReceipt.producer !== speechActivity.producer.implementation) {
+    fail(context, "bundle.findings.speech_activity", "does not match the registered speech-activity receipt artifact");
+  }
+  exactSources(
+    speechReceipt,
+    [binding.raw.contentId, normalized.content.id, speechActivity.producer.model.content.id],
+    context,
+    "bundle.findings.speech_activity.source_content_ids",
+  );
+  for (const key of ["language_ranges", "acoustic_ranges", "speaker_overlap", "complexity"] as const) {
+    if (findings[key] !== null) fail(context, `bundle.findings.${key}`, "has no registered deterministic producer");
+  }
+}
+
+/**
+ * Validate an immutable preflight index against normalized source facts. V1 keeps its original
+ * three-argument API. V2 additionally requires a separately loaded, fully validated speech receipt
+ * as the fourth argument so the bundle can cross-bind its normalized audio and model lineage.
+ */
+export function assertPreflightBundle(
+  value: unknown,
+  binding: PreflightSourceBinding,
+  context?: string,
+  speechActivity?: SpeechActivityReceipt | null,
+): asserts value is PreflightBundle {
+  const label = context ?? "Studio preflight bundle";
+  const bundle = record(value, label, "bundle");
+  exactKeys(bundle, ["schema", "producer", "preflight_id", "source", "artifacts", "findings", "note"], label, "bundle");
+  const schema = text(bundle.schema, label, "bundle.schema");
+  text(bundle.note, label, "bundle.note");
+  if (schema === "studio.preflight-bundle.v1") {
+    if (speechActivity) fail(label, "speechActivity", "requires studio.preflight-bundle.v2");
+    validateV1(bundle, binding, label);
+    return;
+  }
+  if (schema === "studio.preflight-bundle.v2") {
+    validateV2(bundle, binding, speechActivity, label);
+    return;
+  }
+  fail(label, "bundle.schema", `has no registered preflight schema ${schema}`);
+}
+
+/** Preserve the historical V1 type name for callers that deliberately accept only V1. */
+export type LegacyPreflightBundle = PreflightBundleV1;

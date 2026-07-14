@@ -1,5 +1,6 @@
 import type { RunBundle } from "../transport";
 import { classifySourceUrl, normalizeIngestReceipt, type RecordedSourceFacts } from "./sourceAdapters";
+import { projectSpeechActivity, type RecordedSpeechActivityFacts } from "./speechProjection";
 
 export const RECOMMENDED_RANGE_S = { min: 30, max: 60 } as const;
 export const HOSTED_MAX_RANGE_S = 120;
@@ -36,7 +37,7 @@ export interface AnalysisRequest {
 }
 
 export interface ProducerGap {
-  id: "container" | "language" | "acoustic" | "overlap" | "complexity" | "hosted-ingest";
+  id: "container" | "speech" | "language" | "acoustic" | "overlap" | "complexity" | "hosted-ingest";
   label: string;
   consequence: string;
 }
@@ -47,11 +48,15 @@ export interface PreflightProvenance {
   note: string;
 }
 
+export interface RecordedPreflightFacts extends RecordedSourceFacts {
+  speechActivity: RecordedSpeechActivityFacts | null;
+}
+
 export interface PreflightSession {
   status: PreflightStatus;
   title: string;
   message: string;
-  facts: RecordedSourceFacts | null;
+  facts: RecordedPreflightFacts | null;
   request: AnalysisRequest;
   missing: ProducerGap[];
   provenance: PreflightProvenance;
@@ -66,13 +71,18 @@ export const PRODUCER_GAPS: readonly ProducerGap[] = [
     consequence: "No container, codec, channel, or sample-rate measurement is available.",
   },
   {
+    id: "speech",
+    label: "Time-ranged speech detector",
+    consequence: "No measured speech or non-speech windows are available.",
+  },
+  {
     id: "language",
     label: "Time-ranged language detector",
     consequence: "No target-language range, mixed-language range, or language-absence finding can be produced.",
   },
   {
     id: "acoustic",
-    label: "Music, speech, and noise classifier",
+    label: "Music and noise classifier",
     consequence: "An empty music array cannot be read as proof that this source is music-free.",
   },
   {
@@ -158,8 +168,8 @@ export function cancelledPreflight(current: PreflightSession): PreflightSession 
 }
 
 export function recordedPreflight(bundle: RunBundle): PreflightSession {
-  const facts = normalizeIngestReceipt(bundle);
-  if (!facts) {
+  const sourceFacts = normalizeIngestReceipt(bundle);
+  if (!sourceFacts) {
     return {
       ...idlePreflight(),
       status: "inaccessible",
@@ -181,15 +191,24 @@ export function recordedPreflight(bundle: RunBundle): PreflightSession {
       },
     };
   }
+  const facts: RecordedPreflightFacts = {
+    ...sourceFacts,
+    speechActivity: projectSpeechActivity(bundle.speechActivity),
+  };
 
   return {
     status: "ready",
     title: "Recorded source ready for confirmation",
-    message:
-      "These facts came from the ingest receipt for the already-recorded run. This is not a new live probe.",
+    message: facts.speechActivity
+      ? "Source facts came from the recorded ingest receipt; speech windows came from its validated detector receipt. No new live probe ran."
+      : "These facts came from the ingest receipt for the already-recorded run. This is not a new live probe.",
     facts,
     request: initialRequest(bundle.run.pair.target, facts.selection.duration),
-    missing: PRODUCER_GAPS.filter((gap) => gap.id !== "container" || facts.mediaProbe === null),
+    missing: PRODUCER_GAPS.filter(
+      (gap) =>
+        (gap.id !== "container" || facts.mediaProbe === null) &&
+        (gap.id !== "speech" || facts.speechActivity === null),
+    ),
     provenance: {
       kind: "recorded_ingest",
       producer: facts.producer,

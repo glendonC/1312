@@ -28,17 +28,19 @@ import { RUNTIME_CONTRACT_FIXTURES } from "./lab/runtimeFixtures";
 import { SCENARIOS, validateScenarioEvidence } from "./lab/scenarios";
 import { projectRun } from "./replayProjection";
 import { assessRecordedRequest, recordedPreflight } from "./preflight/model";
-import { classifySourceUrl, preflightSourceBinding } from "./preflight/sourceAdapters";
+import { classifySourceUrl } from "./preflight/sourceAdapters";
 import { checkSourceReceiptPolicies } from "./preflight/checkReceiptPolicies";
 import { checkPreflightBundlePolicies } from "./preflight/checkPreflightBundlePolicies";
-import type { PreflightBundle } from "./preflight/contracts";
-import { assertPreflightBundle } from "./preflight/preflightBundleValidation";
+import { checkSpeechReceiptPolicies } from "./preflight/checkSpeechReceiptPolicies";
+import type { PreflightBundle, SpeechActivityReceipt } from "./preflight/contracts";
+import { assertPreflightEvidence } from "./preflight/evidenceValidation";
 import { checkRuntimeContractPolicies } from "./runtime/checkContractPolicies";
 import { validateRuntimeContractFixture } from "./runtime/validateContractFixture";
 import { checkTracePolicies } from "./checkTracePolicies";
 
 const RUNS = pathToFileURL(`${resolve(process.cwd(), "public/demo/runs")}/`);
 const PACKS = pathToFileURL(`${resolve(process.cwd(), "public/demo/packs")}/`);
+const ROOT = pathToFileURL(`${resolve(process.cwd())}/`);
 
 async function json<T>(url: URL): Promise<T> {
   try {
@@ -71,6 +73,16 @@ async function contentIdentity(url: URL): Promise<{ contentId: string; bytes: nu
   return { contentId: `sha256:${digest}`, bytes: details.size };
 }
 
+function expectPreflightFailure(action: () => void, expected: string): void {
+  try {
+    action();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes(expected)) return;
+    throw error;
+  }
+  throw new Error(`Studio preflight validation accepted evidence that should fail with ${expected}`);
+}
+
 /** Executed from the Studio route during Astro's production build. */
 export async function checkRecordedRuns(): Promise<void> {
   const entries = (await readdir(RUNS, { withFileTypes: true }))
@@ -82,7 +94,21 @@ export async function checkRecordedRuns(): Promise<void> {
   const bundles = new Map<string, RunBundle>();
   for (const entry of entries) {
     const base = new URL(`${entry.name}/`, RUNS);
-    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe, preflightBundle, evidenceIndex] = await Promise.all([
+    const [
+      run,
+      captions,
+      score,
+      wave,
+      traceFile,
+      glossary,
+      corrections,
+      ingestReceipt,
+      mediaProbe,
+      preflightV1,
+      preflightV2,
+      speechActivity,
+      evidenceIndex,
+    ] = await Promise.all([
       json<RunManifest>(new URL("run.json", base)),
       json<CaptionsFile>(new URL("captions.json", base)),
       json<ScoreFile>(new URL("score.json", base)),
@@ -93,6 +119,8 @@ export async function checkRecordedRuns(): Promise<void> {
       optionalJson<IngestReceipt>(new URL("source.json", base)),
       optionalJson<MediaProbeReceipt>(new URL("media-probe.json", base)),
       optionalJson<PreflightBundle>(new URL("preflight.json", base)),
+      optionalJson<PreflightBundle>(new URL("preflight-v2.json", base)),
+      optionalJson<SpeechActivityReceipt>(new URL("speech-activity.json", base)),
       json<RecordedEvidenceIndex>(new URL("evidence.json", base)),
     ]);
     const pack = await json<LanguagePack>(new URL(`${run.pack}.json`, PACKS));
@@ -113,10 +141,13 @@ export async function checkRecordedRuns(): Promise<void> {
       pack,
       ingestReceipt,
       mediaProbe,
+      preflightBundle: preflightV2 ?? preflightV1,
+      speechActivity,
       evidence: evidenceIndex,
     };
 
     assertRunBundle(bundle, `Recorded Studio fixture ${entry.name}`);
+    assertPreflightEvidence(bundle, `Recorded Studio fixture ${entry.name} preflight evidence`);
     checkRecordedEvidencePolicies(evidenceIndex, bundle);
     bundles.set(run.id, bundle);
 
@@ -149,19 +180,43 @@ export async function checkRecordedRuns(): Promise<void> {
         throw new Error(`Recorded Studio fixture ${entry.name}: derived media probe receipt does not match its artifact bytes`);
       }
     }
-    if (preflightBundle) {
-      const binding = preflightSourceBinding(ingestReceipt);
-      if (!binding) {
-        throw new Error(`Recorded Studio fixture ${entry.name}: preflight index has no content-addressed source adapter`);
+    if (preflightV1) {
+      assertPreflightEvidence(
+        { ...bundle, preflightBundle: preflightV1, speechActivity: null },
+        `Recorded Studio fixture ${entry.name} preflight V1 evidence`,
+      );
+      if (preflightV1.schema !== "studio.preflight-bundle.v1") {
+        throw new Error(`Recorded Studio fixture ${entry.name}: preflight.json must contain the V1 schema`);
       }
-      assertPreflightBundle(preflightBundle, binding, `Recorded Studio fixture ${entry.name} preflight index`);
+    }
+    if (preflightV2) {
+      assertPreflightEvidence(
+        { ...bundle, preflightBundle: preflightV2, speechActivity },
+        `Recorded Studio fixture ${entry.name} preflight V2 evidence`,
+      );
+      if (preflightV2.schema !== "studio.preflight-bundle.v2") {
+        throw new Error(`Recorded Studio fixture ${entry.name}: preflight-v2.json must contain the V2 schema`);
+      }
+    }
+    for (const [indexName, preflightBundle] of [
+      ["V1", preflightV1],
+      ["V2", preflightV2],
+    ] as const) {
+      if (!preflightBundle) continue;
       for (const artifact of preflightBundle.artifacts) {
         const actual = await contentIdentity(new URL(artifact.path, base));
         if (artifact.content.id !== actual.contentId || artifact.content.bytes !== actual.bytes) {
           throw new Error(
-            `Recorded Studio fixture ${entry.name}: preflight artifact ${artifact.artifact_id} does not match its indexed bytes`,
+            `Recorded Studio fixture ${entry.name}: preflight ${indexName} artifact ${artifact.artifact_id} does not match its indexed bytes`,
           );
         }
+      }
+    }
+    if (speechActivity) {
+      const actual = await contentIdentity(new URL(speechActivity.producer.model.path, ROOT));
+      const expected = speechActivity.producer.model.content;
+      if (expected.id !== actual.contentId || expected.bytes !== actual.bytes) {
+        throw new Error(`Recorded Studio fixture ${entry.name}: pinned speech model does not match its receipted bytes`);
       }
     }
 
@@ -188,6 +243,7 @@ export async function checkRecordedRuns(): Promise<void> {
   for (const scenario of PREFLIGHT_SCENARIOS) validatePreflightScenario(scenario);
   checkSourceReceiptPolicies();
   checkPreflightBundlePolicies();
+  checkSpeechReceiptPolicies();
   checkTracePolicies();
   for (const fixture of RUNTIME_CONTRACT_FIXTURES) validateRuntimeContractFixture(fixture);
   checkRuntimeContractPolicies(RUNTIME_CONTRACT_FIXTURES[0]);
@@ -220,6 +276,14 @@ export async function checkRecordedRuns(): Promise<void> {
   }
   const owned = bundles.get("run-005");
   if (!owned) throw new Error("owned local adapter checks require run-005");
+  expectPreflightFailure(
+    () => assertPreflightEvidence({ ...owned, preflightBundle: null }, "run-005 unpaired speech receipt"),
+    "speech receipt requires studio.preflight-bundle.v2",
+  );
+  expectPreflightFailure(
+    () => assertPreflightEvidence({ ...owned, speechActivity: null }, "run-005 unpaired preflight V2"),
+    "studio.preflight-bundle.v2 requires its speech receipt",
+  );
   const ownedPreflight = recordedPreflight(owned);
   if (
     ownedPreflight.status !== "ready" ||
@@ -228,6 +292,13 @@ export async function checkRecordedRuns(): Promise<void> {
     ownedPreflight.facts.creator !== null
   ) {
     throw new Error("run-005 must retain its content-addressed owned/local receipt without inferring a creator");
+  }
+  if (
+    !ownedPreflight.facts.speechActivity ||
+    ownedPreflight.missing.some((gap) => gap.id === "speech") ||
+    !ownedPreflight.missing.some((gap) => gap.id === "language")
+  ) {
+    throw new Error("run-005 must expose validated speech windows while retaining unavailable language detection");
   }
   if (ownedPreflight.relevance.music || ownedPreflight.relevance.backgroundSpeech || ownedPreflight.relevance.speakerFocus) {
     throw new Error("owned/local source facts must not infer acoustic or speaker relevance");

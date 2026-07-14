@@ -108,6 +108,28 @@ export default function Preflight() {
             </dd>
           </div>
         )}
+        {facts.speechActivity && (
+          <div data-testid="speech-activity-evidence">
+            <dt>Detector-measured speech</dt>
+            <dd>
+              {formatDetectorSeconds(facts.speechActivity.speechDuration)} speech ·{" "}
+              {(facts.speechActivity.coverage * 100).toFixed(1)}% of decoded samples ·{" "}
+              {facts.speechActivity.windows.length} speech {facts.speechActivity.windows.length === 1 ? "window" : "windows"}
+              <br />
+              {facts.speechActivity.windows.length > 0
+                ? facts.speechActivity.windows
+                    .map(
+                      (window) =>
+                        `${formatDetectorSeconds(window.startSeconds)}–${formatDetectorSeconds(window.endSeconds)}`,
+                    )
+                    .join(" · ")
+                : "The detector produced no speech windows."}
+              <br />
+              {facts.speechActivity.producer.id} {facts.speechActivity.producer.version} · model revision{" "}
+              {facts.speechActivity.producer.modelRevision.slice(0, 12)}…
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Language</dt>
           <dd>{facts.declaredLanguage} declared for the job · not detector output</dd>
@@ -131,6 +153,10 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatDetectorSeconds(seconds: number): string {
+  return `${seconds.toFixed(3).replace(/\.?(?:0+)$/, "")}s`;
 }
 
 function mediaSummary(containers: string[], tracks: MediaProbeTrack[]): string {

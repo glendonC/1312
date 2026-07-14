@@ -84,3 +84,20 @@ test("reduced motion disables decorative animation", async ({ page }) => {
   );
   expect(animations).toBe(0);
 });
+
+test("owned-media preflight shows receipted speech windows without inferring language", async ({ page }) => {
+  await openLab(page);
+  await scenario(page).selectOption("regression");
+  await expect(readout(page)).toHaveText(/\d+ \/ 72/);
+  await page.getByRole("button", { name: "Ready", exact: true }).click();
+  await page.getByRole("button", { name: "Add a source" }).click();
+  await page.getByRole("button", { name: "Demo clip" }).click();
+
+  const speech = page.getByTestId("speech-activity-evidence");
+  await expect(speech).toBeVisible();
+  await expect(speech).toContainText(/\d+(?:\.\d+)?s speech · \d+\.\d% of decoded samples · \d+ speech windows?/);
+  await expect(speech).toContainText(/\d+(?:\.\d+)?s–\d+(?:\.\d+)?s/);
+  await expect(speech).toContainText("silero-vad 6.2.1");
+  await expect(page.getByText(/declared for the job · not detector output/)).toBeVisible();
+  await expect(page.getByLabel(/Whole detected .* range · no language detector output/)).toBeDisabled();
+});

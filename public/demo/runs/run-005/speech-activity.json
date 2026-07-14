@@ -1,0 +1,7676 @@
+{
+  "schema": "studio.speech-activity.v1",
+  "producer": {
+    "id": "silero-vad",
+    "version": "6.2.1",
+    "implementation": "scripts/detect-speech.mjs",
+    "model": {
+      "revision": "7e30209a3e901f9842f81b225f3e93d8199902b1",
+      "path": "vendor/silero-vad/v6.2.1/silero_vad_16k_op15.onnx",
+      "license": "MIT",
+      "license_path": "vendor/silero-vad/v6.2.1/LICENSE",
+      "content": {
+        "id": "sha256:7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49"
+        },
+        "bytes": 1289603
+      }
+    },
+    "runtime": {
+      "id": "onnxruntime-node",
+      "version": "1.27.0",
+      "execution_provider": "cpu",
+      "execution_mode": "sequential",
+      "intra_op_threads": 1,
+      "inter_op_threads": 1,
+      "binary": {
+        "path": "node_modules/onnxruntime-node/bin/napi-v6/darwin/arm64/onnxruntime_binding.node",
+        "content": {
+          "id": "sha256:2b26ea21a9088b03eb2c37a6f18a18930747d5f7039af4a40e3dbcec436835a0",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "2b26ea21a9088b03eb2c37a6f18a18930747d5f7039af4a40e3dbcec436835a0"
+          },
+          "bytes": 266584
+        }
+      },
+      "platform": {
+        "os": "darwin",
+        "arch": "arm64",
+        "node": "v24.15.0"
+      }
+    }
+  },
+  "run": "run-005",
+  "input": {
+    "media": "clip.m4a",
+    "content_id": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+    "bytes": 329662,
+    "track_index": 0
+  },
+  "normalization": {
+    "producer": {
+      "id": "ffmpeg",
+      "version": "8.1.1",
+      "binary": {
+        "path": "/opt/homebrew/Cellar/ffmpeg/8.1.1/bin/ffmpeg",
+        "content": {
+          "id": "sha256:00d01197255300c02122c783dd0126a9e7f47d6c6a19faafae2e6610efd071d3",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "00d01197255300c02122c783dd0126a9e7f47d6c6a19faafae2e6610efd071d3"
+          },
+          "bytes": 441728
+        }
+      }
+    },
+    "arguments": [
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-threads",
+      "1",
+      "-i",
+      "<input>",
+      "-map",
+      "0:0",
+      "-vn",
+      "-ac",
+      "1",
+      "-ar",
+      "16000",
+      "-sample_fmt",
+      "s16",
+      "-c:a",
+      "pcm_s16le",
+      "-f",
+      "s16le",
+      "<output>"
+    ],
+    "sample_rate_hz": 16000,
+    "channels": 1,
+    "sample_format": "s16le",
+    "sample_count": 755712,
+    "artifact": {
+      "path": "speech-input.pcm",
+      "content": {
+        "id": "sha256:d94c0bf80b21f672c3f8baabbebce1f41d36fc486d82c26471b9bc42b1578d57",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "d94c0bf80b21f672c3f8baabbebce1f41d36fc486d82c26471b9bc42b1578d57"
+        },
+        "bytes": 1511424
+      }
+    }
+  },
+  "configuration": {
+    "frame_samples": 512,
+    "threshold": 0.5,
+    "negative_threshold": 0.35,
+    "min_speech_duration_ms": 250,
+    "min_silence_duration_ms": 100,
+    "speech_pad_ms": 30
+  },
+  "frames": [
+    {
+      "start_sample": 0,
+      "end_sample": 512,
+      "probability": 0.11404726
+    },
+    {
+      "start_sample": 512,
+      "end_sample": 1024,
+      "probability": 0.63500273
+    },
+    {
+      "start_sample": 1024,
+      "end_sample": 1536,
+      "probability": 0.98237741
+    },
+    {
+      "start_sample": 1536,
+      "end_sample": 2048,
+      "probability": 0.98843169
+    },
+    {
+      "start_sample": 2048,
+      "end_sample": 2560,
+      "probability": 0.98855269
+    },
+    {
+      "start_sample": 2560,
+      "end_sample": 3072,
+      "probability": 0.9924702
+    },
+    {
+      "start_sample": 3072,
+      "end_sample": 3584,
+      "probability": 0.99366498
+    },
+    {
+      "start_sample": 3584,
+      "end_sample": 4096,
+      "probability": 0.708812
+    },
+    {
+      "start_sample": 4096,
+      "end_sample": 4608,
+      "probability": 0.93045092
+    },
+    {
+      "start_sample": 4608,
+      "end_sample": 5120,
+      "probability": 0.99309981
+    },
+    {
+      "start_sample": 5120,
+      "end_sample": 5632,
+      "probability": 0.98361337
+    },
+    {
+      "start_sample": 5632,
+      "end_sample": 6144,
+      "probability": 0.98887336
+    },
+    {
+      "start_sample": 6144,
+      "end_sample": 6656,
+      "probability": 0.99078643
+    },
+    {
+      "start_sample": 6656,
+      "end_sample": 7168,
+      "probability": 0.99593621
+    },
+    {
+      "start_sample": 7168,
+      "end_sample": 7680,
+      "probability": 0.99839139
+    },
+    {
+      "start_sample": 7680,
+      "end_sample": 8192,
+      "probability": 0.99734163
+    },
+    {
+      "start_sample": 8192,
+      "end_sample": 8704,
+      "probability": 0.99761802
+    },
+    {
+      "start_sample": 8704,
+      "end_sample": 9216,
+      "probability": 0.9975763
+    },
+    {
+      "start_sample": 9216,
+      "end_sample": 9728,
+      "probability": 0.99774396
+    },
+    {
+      "start_sample": 9728,
+      "end_sample": 10240,
+      "probability": 0.98693907
+    },
+    {
+      "start_sample": 10240,
+      "end_sample": 10752,
+      "probability": 0.99833155
+    },
+    {
+      "start_sample": 10752,
+      "end_sample": 11264,
+      "probability": 0.99925542
+    },
+    {
+      "start_sample": 11264,
+      "end_sample": 11776,
+      "probability": 0.99921703
+    },
+    {
+      "start_sample": 11776,
+      "end_sample": 12288,
+      "probability": 0.99952507
+    },
+    {
+      "start_sample": 12288,
+      "end_sample": 12800,
+      "probability": 0.99976629
+    },
+    {
+      "start_sample": 12800,
+      "end_sample": 13312,
+      "probability": 0.99992824
+    },
+    {
+      "start_sample": 13312,
+      "end_sample": 13824,
+      "probability": 0.99777269
+    },
+    {
+      "start_sample": 13824,
+      "end_sample": 14336,
+      "probability": 0.99893701
+    },
+    {
+      "start_sample": 14336,
+      "end_sample": 14848,
+      "probability": 0.99970365
+    },
+    {
+      "start_sample": 14848,
+      "end_sample": 15360,
+      "probability": 0.99988675
+    },
+    {
+      "start_sample": 15360,
+      "end_sample": 15872,
+      "probability": 0.99974513
+    },
+    {
+      "start_sample": 15872,
+      "end_sample": 16384,
+      "probability": 0.99981761
+    },
+    {
+      "start_sample": 16384,
+      "end_sample": 16896,
+      "probability": 0.99980366
+    },
+    {
+      "start_sample": 16896,
+      "end_sample": 17408,
+      "probability": 0.99966049
+    },
+    {
+      "start_sample": 17408,
+      "end_sample": 17920,
+      "probability": 0.99975389
+    },
+    {
+      "start_sample": 17920,
+      "end_sample": 18432,
+      "probability": 0.99993575
+    },
+    {
+      "start_sample": 18432,
+      "end_sample": 18944,
+      "probability": 0.99992263
+    },
+    {
+      "start_sample": 18944,
+      "end_sample": 19456,
+      "probability": 0.99998522
+    },
+    {
+      "start_sample": 19456,
+      "end_sample": 19968,
+      "probability": 0.99998415
+    },
+    {
+      "start_sample": 19968,
+      "end_sample": 20480,
+      "probability": 0.99994481
+    },
+    {
+      "start_sample": 20480,
+      "end_sample": 20992,
+      "probability": 0.99994361
+    },
+    {
+      "start_sample": 20992,
+      "end_sample": 21504,
+      "probability": 0.99987745
+    },
+    {
+      "start_sample": 21504,
+      "end_sample": 22016,
+      "probability": 0.99997473
+    },
+    {
+      "start_sample": 22016,
+      "end_sample": 22528,
+      "probability": 0.99998707
+    },
+    {
+      "start_sample": 22528,
+      "end_sample": 23040,
+      "probability": 0.9999482
+    },
+    {
+      "start_sample": 23040,
+      "end_sample": 23552,
+      "probability": 0.99974549
+    },
+    {
+      "start_sample": 23552,
+      "end_sample": 24064,
+      "probability": 0.99926674
+    },
+    {
+      "start_sample": 24064,
+      "end_sample": 24576,
+      "probability": 0.9976362
+    },
+    {
+      "start_sample": 24576,
+      "end_sample": 25088,
+      "probability": 0.99864089
+    },
+    {
+      "start_sample": 25088,
+      "end_sample": 25600,
+      "probability": 0.99965501
+    },
+    {
+      "start_sample": 25600,
+      "end_sample": 26112,
+      "probability": 0.99986583
+    },
+    {
+      "start_sample": 26112,
+      "end_sample": 26624,
+      "probability": 0.9999249
+    },
+    {
+      "start_sample": 26624,
+      "end_sample": 27136,
+      "probability": 0.9999457
+    },
+    {
+      "start_sample": 27136,
+      "end_sample": 27648,
+      "probability": 0.99998778
+    },
+    {
+      "start_sample": 27648,
+      "end_sample": 28160,
+      "probability": 0.99999201
+    },
+    {
+      "start_sample": 28160,
+      "end_sample": 28672,
+      "probability": 0.99998569
+    },
+    {
+      "start_sample": 28672,
+      "end_sample": 29184,
+      "probability": 0.99998891
+    },
+    {
+      "start_sample": 29184,
+      "end_sample": 29696,
+      "probability": 0.99994862
+    },
+    {
+      "start_sample": 29696,
+      "end_sample": 30208,
+      "probability": 0.99912488
+    },
+    {
+      "start_sample": 30208,
+      "end_sample": 30720,
+      "probability": 0.86482954
+    },
+    {
+      "start_sample": 30720,
+      "end_sample": 31232,
+      "probability": 0.35196504
+    },
+    {
+      "start_sample": 31232,
+      "end_sample": 31744,
+      "probability": 0.1739389
+    },
+    {
+      "start_sample": 31744,
+      "end_sample": 32256,
+      "probability": 0.11213961
+    },
+    {
+      "start_sample": 32256,
+      "end_sample": 32768,
+      "probability": 0.08563477
+    },
+    {
+      "start_sample": 32768,
+      "end_sample": 33280,
+      "probability": 0.07162333
+    },
+    {
+      "start_sample": 33280,
+      "end_sample": 33792,
+      "probability": 0.0623166
+    },
+    {
+      "start_sample": 33792,
+      "end_sample": 34304,
+      "probability": 0.05606619
+    },
+    {
+      "start_sample": 34304,
+      "end_sample": 34816,
+      "probability": 0.05238062
+    },
+    {
+      "start_sample": 34816,
+      "end_sample": 35328,
+      "probability": 0.04997703
+    },
+    {
+      "start_sample": 35328,
+      "end_sample": 35840,
+      "probability": 0.04916176
+    },
+    {
+      "start_sample": 35840,
+      "end_sample": 36352,
+      "probability": 0.45398936
+    },
+    {
+      "start_sample": 36352,
+      "end_sample": 36864,
+      "probability": 0.90544069
+    },
+    {
+      "start_sample": 36864,
+      "end_sample": 37376,
+      "probability": 0.9638359
+    },
+    {
+      "start_sample": 37376,
+      "end_sample": 37888,
+      "probability": 0.99798262
+    },
+    {
+      "start_sample": 37888,
+      "end_sample": 38400,
+      "probability": 0.99945879
+    },
+    {
+      "start_sample": 38400,
+      "end_sample": 38912,
+      "probability": 0.9994964
+    },
+    {
+      "start_sample": 38912,
+      "end_sample": 39424,
+      "probability": 0.999713
+    },
+    {
+      "start_sample": 39424,
+      "end_sample": 39936,
+      "probability": 0.99979955
+    },
+    {
+      "start_sample": 39936,
+      "end_sample": 40448,
+      "probability": 0.99990928
+    },
+    {
+      "start_sample": 40448,
+      "end_sample": 40960,
+      "probability": 0.99991262
+    },
+    {
+      "start_sample": 40960,
+      "end_sample": 41472,
+      "probability": 0.99994022
+    },
+    {
+      "start_sample": 41472,
+      "end_sample": 41984,
+      "probability": 0.99965096
+    },
+    {
+      "start_sample": 41984,
+      "end_sample": 42496,
+      "probability": 0.99882495
+    },
+    {
+      "start_sample": 42496,
+      "end_sample": 43008,
+      "probability": 0.99411738
+    },
+    {
+      "start_sample": 43008,
+      "end_sample": 43520,
+      "probability": 0.981457
+    },
+    {
+      "start_sample": 43520,
+      "end_sample": 44032,
+      "probability": 0.99899632
+    },
+    {
+      "start_sample": 44032,
+      "end_sample": 44544,
+      "probability": 0.99990308
+    },
+    {
+      "start_sample": 44544,
+      "end_sample": 45056,
+      "probability": 0.99985385
+    },
+    {
+      "start_sample": 45056,
+      "end_sample": 45568,
+      "probability": 0.99981254
+    },
+    {
+      "start_sample": 45568,
+      "end_sample": 46080,
+      "probability": 0.99971104
+    },
+    {
+      "start_sample": 46080,
+      "end_sample": 46592,
+      "probability": 0.99761426
+    },
+    {
+      "start_sample": 46592,
+      "end_sample": 47104,
+      "probability": 0.58923888
+    },
+    {
+      "start_sample": 47104,
+      "end_sample": 47616,
+      "probability": 0.12248591
+    },
+    {
+      "start_sample": 47616,
+      "end_sample": 48128,
+      "probability": 0.04832295
+    },
+    {
+      "start_sample": 48128,
+      "end_sample": 48640,
+      "probability": 0.03126335
+    },
+    {
+      "start_sample": 48640,
+      "end_sample": 49152,
+      "probability": 0.02579209
+    },
+    {
+      "start_sample": 49152,
+      "end_sample": 49664,
+      "probability": 0.02279741
+    },
+    {
+      "start_sample": 49664,
+      "end_sample": 50176,
+      "probability": 0.0213781
+    },
+    {
+      "start_sample": 50176,
+      "end_sample": 50688,
+      "probability": 0.02018502
+    },
+    {
+      "start_sample": 50688,
+      "end_sample": 51200,
+      "probability": 0.01950988
+    },
+    {
+      "start_sample": 51200,
+      "end_sample": 51712,
+      "probability": 0.01950276
+    },
+    {
+      "start_sample": 51712,
+      "end_sample": 52224,
+      "probability": 0.01986253
+    },
+    {
+      "start_sample": 52224,
+      "end_sample": 52736,
+      "probability": 0.02037093
+    },
+    {
+      "start_sample": 52736,
+      "end_sample": 53248,
+      "probability": 0.0207752
+    },
+    {
+      "start_sample": 53248,
+      "end_sample": 53760,
+      "probability": 0.02110505
+    },
+    {
+      "start_sample": 53760,
+      "end_sample": 54272,
+      "probability": 0.02138379
+    },
+    {
+      "start_sample": 54272,
+      "end_sample": 54784,
+      "probability": 0.02159041
+    },
+    {
+      "start_sample": 54784,
+      "end_sample": 55296,
+      "probability": 0.02172539
+    },
+    {
+      "start_sample": 55296,
+      "end_sample": 55808,
+      "probability": 0.02178499
+    },
+    {
+      "start_sample": 55808,
+      "end_sample": 56320,
+      "probability": 0.02177155
+    },
+    {
+      "start_sample": 56320,
+      "end_sample": 56832,
+      "probability": 0.02172428
+    },
+    {
+      "start_sample": 56832,
+      "end_sample": 57344,
+      "probability": 0.02161646
+    },
+    {
+      "start_sample": 57344,
+      "end_sample": 57856,
+      "probability": 0.02145374
+    },
+    {
+      "start_sample": 57856,
+      "end_sample": 58368,
+      "probability": 0.02123967
+    },
+    {
+      "start_sample": 58368,
+      "end_sample": 58880,
+      "probability": 0.22217846
+    },
+    {
+      "start_sample": 58880,
+      "end_sample": 59392,
+      "probability": 0.99416357
+    },
+    {
+      "start_sample": 59392,
+      "end_sample": 59904,
+      "probability": 0.99975789
+    },
+    {
+      "start_sample": 59904,
+      "end_sample": 60416,
+      "probability": 0.99980104
+    },
+    {
+      "start_sample": 60416,
+      "end_sample": 60928,
+      "probability": 0.99991751
+    },
+    {
+      "start_sample": 60928,
+      "end_sample": 61440,
+      "probability": 0.99985528
+    },
+    {
+      "start_sample": 61440,
+      "end_sample": 61952,
+      "probability": 0.99998158
+    },
+    {
+      "start_sample": 61952,
+      "end_sample": 62464,
+      "probability": 0.99999219
+    },
+    {
+      "start_sample": 62464,
+      "end_sample": 62976,
+      "probability": 0.99999881
+    },
+    {
+      "start_sample": 62976,
+      "end_sample": 63488,
+      "probability": 0.9999944
+    },
+    {
+      "start_sample": 63488,
+      "end_sample": 64000,
+      "probability": 0.99999779
+    },
+    {
+      "start_sample": 64000,
+      "end_sample": 64512,
+      "probability": 0.99999201
+    },
+    {
+      "start_sample": 64512,
+      "end_sample": 65024,
+      "probability": 0.99997258
+    },
+    {
+      "start_sample": 65024,
+      "end_sample": 65536,
+      "probability": 0.9999944
+    },
+    {
+      "start_sample": 65536,
+      "end_sample": 66048,
+      "probability": 0.99980664
+    },
+    {
+      "start_sample": 66048,
+      "end_sample": 66560,
+      "probability": 0.99973798
+    },
+    {
+      "start_sample": 66560,
+      "end_sample": 67072,
+      "probability": 0.9999851
+    },
+    {
+      "start_sample": 67072,
+      "end_sample": 67584,
+      "probability": 0.99999774
+    },
+    {
+      "start_sample": 67584,
+      "end_sample": 68096,
+      "probability": 0.99999666
+    },
+    {
+      "start_sample": 68096,
+      "end_sample": 68608,
+      "probability": 0.9999916
+    },
+    {
+      "start_sample": 68608,
+      "end_sample": 69120,
+      "probability": 0.9999752
+    },
+    {
+      "start_sample": 69120,
+      "end_sample": 69632,
+      "probability": 0.9999603
+    },
+    {
+      "start_sample": 69632,
+      "end_sample": 70144,
+      "probability": 0.99990714
+    },
+    {
+      "start_sample": 70144,
+      "end_sample": 70656,
+      "probability": 0.99901116
+    },
+    {
+      "start_sample": 70656,
+      "end_sample": 71168,
+      "probability": 0.99777907
+    },
+    {
+      "start_sample": 71168,
+      "end_sample": 71680,
+      "probability": 0.99833333
+    },
+    {
+      "start_sample": 71680,
+      "end_sample": 72192,
+      "probability": 0.49966112
+    },
+    {
+      "start_sample": 72192,
+      "end_sample": 72704,
+      "probability": 0.06880692
+    },
+    {
+      "start_sample": 72704,
+      "end_sample": 73216,
+      "probability": 0.0270538
+    },
+    {
+      "start_sample": 73216,
+      "end_sample": 73728,
+      "probability": 0.01968145
+    },
+    {
+      "start_sample": 73728,
+      "end_sample": 74240,
+      "probability": 0.01845986
+    },
+    {
+      "start_sample": 74240,
+      "end_sample": 74752,
+      "probability": 0.30031198
+    },
+    {
+      "start_sample": 74752,
+      "end_sample": 75264,
+      "probability": 0.99301243
+    },
+    {
+      "start_sample": 75264,
+      "end_sample": 75776,
+      "probability": 0.99953282
+    },
+    {
+      "start_sample": 75776,
+      "end_sample": 76288,
+      "probability": 0.99905121
+    },
+    {
+      "start_sample": 76288,
+      "end_sample": 76800,
+      "probability": 0.99972963
+    },
+    {
+      "start_sample": 76800,
+      "end_sample": 77312,
+      "probability": 0.99983299
+    },
+    {
+      "start_sample": 77312,
+      "end_sample": 77824,
+      "probability": 0.99996865
+    },
+    {
+      "start_sample": 77824,
+      "end_sample": 78336,
+      "probability": 0.99998313
+    },
+    {
+      "start_sample": 78336,
+      "end_sample": 78848,
+      "probability": 0.99997997
+    },
+    {
+      "start_sample": 78848,
+      "end_sample": 79360,
+      "probability": 0.9999938
+    },
+    {
+      "start_sample": 79360,
+      "end_sample": 79872,
+      "probability": 0.99998844
+    },
+    {
+      "start_sample": 79872,
+      "end_sample": 80384,
+      "probability": 0.99998641
+    },
+    {
+      "start_sample": 80384,
+      "end_sample": 80896,
+      "probability": 0.99998808
+    },
+    {
+      "start_sample": 80896,
+      "end_sample": 81408,
+      "probability": 0.99999553
+    },
+    {
+      "start_sample": 81408,
+      "end_sample": 81920,
+      "probability": 0.99999738
+    },
+    {
+      "start_sample": 81920,
+      "end_sample": 82432,
+      "probability": 0.99998087
+    },
+    {
+      "start_sample": 82432,
+      "end_sample": 82944,
+      "probability": 0.99999249
+    },
+    {
+      "start_sample": 82944,
+      "end_sample": 83456,
+      "probability": 0.99999821
+    },
+    {
+      "start_sample": 83456,
+      "end_sample": 83968,
+      "probability": 0.99999845
+    },
+    {
+      "start_sample": 83968,
+      "end_sample": 84480,
+      "probability": 0.99999636
+    },
+    {
+      "start_sample": 84480,
+      "end_sample": 84992,
+      "probability": 0.99999201
+    },
+    {
+      "start_sample": 84992,
+      "end_sample": 85504,
+      "probability": 0.99977386
+    },
+    {
+      "start_sample": 85504,
+      "end_sample": 86016,
+      "probability": 0.98721361
+    },
+    {
+      "start_sample": 86016,
+      "end_sample": 86528,
+      "probability": 0.19243526
+    },
+    {
+      "start_sample": 86528,
+      "end_sample": 87040,
+      "probability": 0.02177313
+    },
+    {
+      "start_sample": 87040,
+      "end_sample": 87552,
+      "probability": 0.01301041
+    },
+    {
+      "start_sample": 87552,
+      "end_sample": 88064,
+      "probability": 0.01053753
+    },
+    {
+      "start_sample": 88064,
+      "end_sample": 88576,
+      "probability": 0.01029018
+    },
+    {
+      "start_sample": 88576,
+      "end_sample": 89088,
+      "probability": 0.0103738
+    },
+    {
+      "start_sample": 89088,
+      "end_sample": 89600,
+      "probability": 0.0107474
+    },
+    {
+      "start_sample": 89600,
+      "end_sample": 90112,
+      "probability": 0.01140577
+    },
+    {
+      "start_sample": 90112,
+      "end_sample": 90624,
+      "probability": 0.01224655
+    },
+    {
+      "start_sample": 90624,
+      "end_sample": 91136,
+      "probability": 0.01315498
+    },
+    {
+      "start_sample": 91136,
+      "end_sample": 91648,
+      "probability": 0.22640517
+    },
+    {
+      "start_sample": 91648,
+      "end_sample": 92160,
+      "probability": 0.82783294
+    },
+    {
+      "start_sample": 92160,
+      "end_sample": 92672,
+      "probability": 0.97396505
+    },
+    {
+      "start_sample": 92672,
+      "end_sample": 93184,
+      "probability": 0.97210133
+    },
+    {
+      "start_sample": 93184,
+      "end_sample": 93696,
+      "probability": 0.96004069
+    },
+    {
+      "start_sample": 93696,
+      "end_sample": 94208,
+      "probability": 0.97370881
+    },
+    {
+      "start_sample": 94208,
+      "end_sample": 94720,
+      "probability": 0.97801882
+    },
+    {
+      "start_sample": 94720,
+      "end_sample": 95232,
+      "probability": 0.94236827
+    },
+    {
+      "start_sample": 95232,
+      "end_sample": 95744,
+      "probability": 0.96335983
+    },
+    {
+      "start_sample": 95744,
+      "end_sample": 96256,
+      "probability": 0.99863386
+    },
+    {
+      "start_sample": 96256,
+      "end_sample": 96768,
+      "probability": 0.99980545
+    },
+    {
+      "start_sample": 96768,
+      "end_sample": 97280,
+      "probability": 0.9998163
+    },
+    {
+      "start_sample": 97280,
+      "end_sample": 97792,
+      "probability": 0.99958408
+    },
+    {
+      "start_sample": 97792,
+      "end_sample": 98304,
+      "probability": 0.99944383
+    },
+    {
+      "start_sample": 98304,
+      "end_sample": 98816,
+      "probability": 0.98818094
+    },
+    {
+      "start_sample": 98816,
+      "end_sample": 99328,
+      "probability": 0.9927547
+    },
+    {
+      "start_sample": 99328,
+      "end_sample": 99840,
+      "probability": 0.99699962
+    },
+    {
+      "start_sample": 99840,
+      "end_sample": 100352,
+      "probability": 0.99762976
+    },
+    {
+      "start_sample": 100352,
+      "end_sample": 100864,
+      "probability": 0.99616796
+    },
+    {
+      "start_sample": 100864,
+      "end_sample": 101376,
+      "probability": 0.74335539
+    },
+    {
+      "start_sample": 101376,
+      "end_sample": 101888,
+      "probability": 0.94313276
+    },
+    {
+      "start_sample": 101888,
+      "end_sample": 102400,
+      "probability": 0.55386221
+    },
+    {
+      "start_sample": 102400,
+      "end_sample": 102912,
+      "probability": 0.91509712
+    },
+    {
+      "start_sample": 102912,
+      "end_sample": 103424,
+      "probability": 0.95244038
+    },
+    {
+      "start_sample": 103424,
+      "end_sample": 103936,
+      "probability": 0.99928099
+    },
+    {
+      "start_sample": 103936,
+      "end_sample": 104448,
+      "probability": 0.9995966
+    },
+    {
+      "start_sample": 104448,
+      "end_sample": 104960,
+      "probability": 0.99972129
+    },
+    {
+      "start_sample": 104960,
+      "end_sample": 105472,
+      "probability": 0.99142349
+    },
+    {
+      "start_sample": 105472,
+      "end_sample": 105984,
+      "probability": 0.9931047
+    },
+    {
+      "start_sample": 105984,
+      "end_sample": 106496,
+      "probability": 0.97782922
+    },
+    {
+      "start_sample": 106496,
+      "end_sample": 107008,
+      "probability": 0.99864078
+    },
+    {
+      "start_sample": 107008,
+      "end_sample": 107520,
+      "probability": 0.99988437
+    },
+    {
+      "start_sample": 107520,
+      "end_sample": 108032,
+      "probability": 0.99994993
+    },
+    {
+      "start_sample": 108032,
+      "end_sample": 108544,
+      "probability": 0.99994129
+    },
+    {
+      "start_sample": 108544,
+      "end_sample": 109056,
+      "probability": 0.99996811
+    },
+    {
+      "start_sample": 109056,
+      "end_sample": 109568,
+      "probability": 0.99997842
+    },
+    {
+      "start_sample": 109568,
+      "end_sample": 110080,
+      "probability": 0.99998057
+    },
+    {
+      "start_sample": 110080,
+      "end_sample": 110592,
+      "probability": 0.9999963
+    },
+    {
+      "start_sample": 110592,
+      "end_sample": 111104,
+      "probability": 0.99998736
+    },
+    {
+      "start_sample": 111104,
+      "end_sample": 111616,
+      "probability": 0.99997246
+    },
+    {
+      "start_sample": 111616,
+      "end_sample": 112128,
+      "probability": 0.99993885
+    },
+    {
+      "start_sample": 112128,
+      "end_sample": 112640,
+      "probability": 0.99991745
+    },
+    {
+      "start_sample": 112640,
+      "end_sample": 113152,
+      "probability": 0.99989986
+    },
+    {
+      "start_sample": 113152,
+      "end_sample": 113664,
+      "probability": 0.99994725
+    },
+    {
+      "start_sample": 113664,
+      "end_sample": 114176,
+      "probability": 0.99990439
+    },
+    {
+      "start_sample": 114176,
+      "end_sample": 114688,
+      "probability": 0.99993443
+    },
+    {
+      "start_sample": 114688,
+      "end_sample": 115200,
+      "probability": 0.99956995
+    },
+    {
+      "start_sample": 115200,
+      "end_sample": 115712,
+      "probability": 0.99994576
+    },
+    {
+      "start_sample": 115712,
+      "end_sample": 116224,
+      "probability": 0.99998832
+    },
+    {
+      "start_sample": 116224,
+      "end_sample": 116736,
+      "probability": 0.99997687
+    },
+    {
+      "start_sample": 116736,
+      "end_sample": 117248,
+      "probability": 0.99998724
+    },
+    {
+      "start_sample": 117248,
+      "end_sample": 117760,
+      "probability": 0.9999696
+    },
+    {
+      "start_sample": 117760,
+      "end_sample": 118272,
+      "probability": 0.99911332
+    },
+    {
+      "start_sample": 118272,
+      "end_sample": 118784,
+      "probability": 0.99985826
+    },
+    {
+      "start_sample": 118784,
+      "end_sample": 119296,
+      "probability": 0.9835636
+    },
+    {
+      "start_sample": 119296,
+      "end_sample": 119808,
+      "probability": 0.46044815
+    },
+    {
+      "start_sample": 119808,
+      "end_sample": 120320,
+      "probability": 0.12326285
+    },
+    {
+      "start_sample": 120320,
+      "end_sample": 120832,
+      "probability": 0.06123769
+    },
+    {
+      "start_sample": 120832,
+      "end_sample": 121344,
+      "probability": 0.04454136
+    },
+    {
+      "start_sample": 121344,
+      "end_sample": 121856,
+      "probability": 0.03711411
+    },
+    {
+      "start_sample": 121856,
+      "end_sample": 122368,
+      "probability": 0.03207442
+    },
+    {
+      "start_sample": 122368,
+      "end_sample": 122880,
+      "probability": 0.02980024
+    },
+    {
+      "start_sample": 122880,
+      "end_sample": 123392,
+      "probability": 0.02919573
+    },
+    {
+      "start_sample": 123392,
+      "end_sample": 123904,
+      "probability": 0.02924031
+    },
+    {
+      "start_sample": 123904,
+      "end_sample": 124416,
+      "probability": 0.02953991
+    },
+    {
+      "start_sample": 124416,
+      "end_sample": 124928,
+      "probability": 0.03009784
+    },
+    {
+      "start_sample": 124928,
+      "end_sample": 125440,
+      "probability": 0.03079826
+    },
+    {
+      "start_sample": 125440,
+      "end_sample": 125952,
+      "probability": 0.2450459
+    },
+    {
+      "start_sample": 125952,
+      "end_sample": 126464,
+      "probability": 0.75365412
+    },
+    {
+      "start_sample": 126464,
+      "end_sample": 126976,
+      "probability": 0.98058403
+    },
+    {
+      "start_sample": 126976,
+      "end_sample": 127488,
+      "probability": 0.98854792
+    },
+    {
+      "start_sample": 127488,
+      "end_sample": 128000,
+      "probability": 0.4674722
+    },
+    {
+      "start_sample": 128000,
+      "end_sample": 128512,
+      "probability": 0.751176
+    },
+    {
+      "start_sample": 128512,
+      "end_sample": 129024,
+      "probability": 0.9054445
+    },
+    {
+      "start_sample": 129024,
+      "end_sample": 129536,
+      "probability": 0.99743694
+    },
+    {
+      "start_sample": 129536,
+      "end_sample": 130048,
+      "probability": 0.99977034
+    },
+    {
+      "start_sample": 130048,
+      "end_sample": 130560,
+      "probability": 0.99962664
+    },
+    {
+      "start_sample": 130560,
+      "end_sample": 131072,
+      "probability": 0.99990255
+    },
+    {
+      "start_sample": 131072,
+      "end_sample": 131584,
+      "probability": 0.99988091
+    },
+    {
+      "start_sample": 131584,
+      "end_sample": 132096,
+      "probability": 0.99915665
+    },
+    {
+      "start_sample": 132096,
+      "end_sample": 132608,
+      "probability": 0.9381901
+    },
+    {
+      "start_sample": 132608,
+      "end_sample": 133120,
+      "probability": 0.98222578
+    },
+    {
+      "start_sample": 133120,
+      "end_sample": 133632,
+      "probability": 0.98707265
+    },
+    {
+      "start_sample": 133632,
+      "end_sample": 134144,
+      "probability": 0.98441106
+    },
+    {
+      "start_sample": 134144,
+      "end_sample": 134656,
+      "probability": 0.99178034
+    },
+    {
+      "start_sample": 134656,
+      "end_sample": 135168,
+      "probability": 0.99021018
+    },
+    {
+      "start_sample": 135168,
+      "end_sample": 135680,
+      "probability": 0.99874175
+    },
+    {
+      "start_sample": 135680,
+      "end_sample": 136192,
+      "probability": 0.99904627
+    },
+    {
+      "start_sample": 136192,
+      "end_sample": 136704,
+      "probability": 0.9994024
+    },
+    {
+      "start_sample": 136704,
+      "end_sample": 137216,
+      "probability": 0.99865645
+    },
+    {
+      "start_sample": 137216,
+      "end_sample": 137728,
+      "probability": 0.99975872
+    },
+    {
+      "start_sample": 137728,
+      "end_sample": 138240,
+      "probability": 0.9997915
+    },
+    {
+      "start_sample": 138240,
+      "end_sample": 138752,
+      "probability": 0.99986297
+    },
+    {
+      "start_sample": 138752,
+      "end_sample": 139264,
+      "probability": 0.99997389
+    },
+    {
+      "start_sample": 139264,
+      "end_sample": 139776,
+      "probability": 0.99989355
+    },
+    {
+      "start_sample": 139776,
+      "end_sample": 140288,
+      "probability": 0.99985313
+    },
+    {
+      "start_sample": 140288,
+      "end_sample": 140800,
+      "probability": 0.99993515
+    },
+    {
+      "start_sample": 140800,
+      "end_sample": 141312,
+      "probability": 0.99995971
+    },
+    {
+      "start_sample": 141312,
+      "end_sample": 141824,
+      "probability": 0.99990976
+    },
+    {
+      "start_sample": 141824,
+      "end_sample": 142336,
+      "probability": 0.99894142
+    },
+    {
+      "start_sample": 142336,
+      "end_sample": 142848,
+      "probability": 0.99451017
+    },
+    {
+      "start_sample": 142848,
+      "end_sample": 143360,
+      "probability": 0.99515009
+    },
+    {
+      "start_sample": 143360,
+      "end_sample": 143872,
+      "probability": 0.99922007
+    },
+    {
+      "start_sample": 143872,
+      "end_sample": 144384,
+      "probability": 0.99933845
+    },
+    {
+      "start_sample": 144384,
+      "end_sample": 144896,
+      "probability": 0.99934077
+    },
+    {
+      "start_sample": 144896,
+      "end_sample": 145408,
+      "probability": 0.99964654
+    },
+    {
+      "start_sample": 145408,
+      "end_sample": 145920,
+      "probability": 0.99974328
+    },
+    {
+      "start_sample": 145920,
+      "end_sample": 146432,
+      "probability": 0.99988675
+    },
+    {
+      "start_sample": 146432,
+      "end_sample": 146944,
+      "probability": 0.99988711
+    },
+    {
+      "start_sample": 146944,
+      "end_sample": 147456,
+      "probability": 0.99987698
+    },
+    {
+      "start_sample": 147456,
+      "end_sample": 147968,
+      "probability": 0.99991286
+    },
+    {
+      "start_sample": 147968,
+      "end_sample": 148480,
+      "probability": 0.99993098
+    },
+    {
+      "start_sample": 148480,
+      "end_sample": 148992,
+      "probability": 0.99986476
+    },
+    {
+      "start_sample": 148992,
+      "end_sample": 149504,
+      "probability": 0.99994266
+    },
+    {
+      "start_sample": 149504,
+      "end_sample": 150016,
+      "probability": 0.99996364
+    },
+    {
+      "start_sample": 150016,
+      "end_sample": 150528,
+      "probability": 0.99997348
+    },
+    {
+      "start_sample": 150528,
+      "end_sample": 151040,
+      "probability": 0.99998873
+    },
+    {
+      "start_sample": 151040,
+      "end_sample": 151552,
+      "probability": 0.99999452
+    },
+    {
+      "start_sample": 151552,
+      "end_sample": 152064,
+      "probability": 0.99998581
+    },
+    {
+      "start_sample": 152064,
+      "end_sample": 152576,
+      "probability": 0.99998719
+    },
+    {
+      "start_sample": 152576,
+      "end_sample": 153088,
+      "probability": 0.99998653
+    },
+    {
+      "start_sample": 153088,
+      "end_sample": 153600,
+      "probability": 0.99992067
+    },
+    {
+      "start_sample": 153600,
+      "end_sample": 154112,
+      "probability": 0.99995774
+    },
+    {
+      "start_sample": 154112,
+      "end_sample": 154624,
+      "probability": 0.99873209
+    },
+    {
+      "start_sample": 154624,
+      "end_sample": 155136,
+      "probability": 0.99748665
+    },
+    {
+      "start_sample": 155136,
+      "end_sample": 155648,
+      "probability": 0.87632519
+    },
+    {
+      "start_sample": 155648,
+      "end_sample": 156160,
+      "probability": 0.21760097
+    },
+    {
+      "start_sample": 156160,
+      "end_sample": 156672,
+      "probability": 0.08959761
+    },
+    {
+      "start_sample": 156672,
+      "end_sample": 157184,
+      "probability": 0.04948914
+    },
+    {
+      "start_sample": 157184,
+      "end_sample": 157696,
+      "probability": 0.0383566
+    },
+    {
+      "start_sample": 157696,
+      "end_sample": 158208,
+      "probability": 0.03382578
+    },
+    {
+      "start_sample": 158208,
+      "end_sample": 158720,
+      "probability": 0.03180978
+    },
+    {
+      "start_sample": 158720,
+      "end_sample": 159232,
+      "probability": 0.03058389
+    },
+    {
+      "start_sample": 159232,
+      "end_sample": 159744,
+      "probability": 0.03008923
+    },
+    {
+      "start_sample": 159744,
+      "end_sample": 160256,
+      "probability": 0.03001562
+    },
+    {
+      "start_sample": 160256,
+      "end_sample": 160768,
+      "probability": 0.03028905
+    },
+    {
+      "start_sample": 160768,
+      "end_sample": 161280,
+      "probability": 0.03070766
+    },
+    {
+      "start_sample": 161280,
+      "end_sample": 161792,
+      "probability": 0.03113174
+    },
+    {
+      "start_sample": 161792,
+      "end_sample": 162304,
+      "probability": 0.03151518
+    },
+    {
+      "start_sample": 162304,
+      "end_sample": 162816,
+      "probability": 0.03182146
+    },
+    {
+      "start_sample": 162816,
+      "end_sample": 163328,
+      "probability": 0.03202471
+    },
+    {
+      "start_sample": 163328,
+      "end_sample": 163840,
+      "probability": 0.03212166
+    },
+    {
+      "start_sample": 163840,
+      "end_sample": 164352,
+      "probability": 0.03211117
+    },
+    {
+      "start_sample": 164352,
+      "end_sample": 164864,
+      "probability": 0.03182665
+    },
+    {
+      "start_sample": 164864,
+      "end_sample": 165376,
+      "probability": 0.03145844
+    },
+    {
+      "start_sample": 165376,
+      "end_sample": 165888,
+      "probability": 0.03094578
+    },
+    {
+      "start_sample": 165888,
+      "end_sample": 166400,
+      "probability": 0.03035995
+    },
+    {
+      "start_sample": 166400,
+      "end_sample": 166912,
+      "probability": 0.02972561
+    },
+    {
+      "start_sample": 166912,
+      "end_sample": 167424,
+      "probability": 0.20260036
+    },
+    {
+      "start_sample": 167424,
+      "end_sample": 167936,
+      "probability": 0.99851507
+    },
+    {
+      "start_sample": 167936,
+      "end_sample": 168448,
+      "probability": 0.99996424
+    },
+    {
+      "start_sample": 168448,
+      "end_sample": 168960,
+      "probability": 0.99998546
+    },
+    {
+      "start_sample": 168960,
+      "end_sample": 169472,
+      "probability": 0.99998343
+    },
+    {
+      "start_sample": 169472,
+      "end_sample": 169984,
+      "probability": 0.99997461
+    },
+    {
+      "start_sample": 169984,
+      "end_sample": 170496,
+      "probability": 0.99999392
+    },
+    {
+      "start_sample": 170496,
+      "end_sample": 171008,
+      "probability": 0.99985301
+    },
+    {
+      "start_sample": 171008,
+      "end_sample": 171520,
+      "probability": 0.99988902
+    },
+    {
+      "start_sample": 171520,
+      "end_sample": 172032,
+      "probability": 0.98723364
+    },
+    {
+      "start_sample": 172032,
+      "end_sample": 172544,
+      "probability": 0.49377099
+    },
+    {
+      "start_sample": 172544,
+      "end_sample": 173056,
+      "probability": 0.11113951
+    },
+    {
+      "start_sample": 173056,
+      "end_sample": 173568,
+      "probability": 0.05232418
+    },
+    {
+      "start_sample": 173568,
+      "end_sample": 174080,
+      "probability": 0.03614163
+    },
+    {
+      "start_sample": 174080,
+      "end_sample": 174592,
+      "probability": 0.0320321
+    },
+    {
+      "start_sample": 174592,
+      "end_sample": 175104,
+      "probability": 0.03545743
+    },
+    {
+      "start_sample": 175104,
+      "end_sample": 175616,
+      "probability": 0.53840548
+    },
+    {
+      "start_sample": 175616,
+      "end_sample": 176128,
+      "probability": 0.996912
+    },
+    {
+      "start_sample": 176128,
+      "end_sample": 176640,
+      "probability": 0.99939215
+    },
+    {
+      "start_sample": 176640,
+      "end_sample": 177152,
+      "probability": 0.9999876
+    },
+    {
+      "start_sample": 177152,
+      "end_sample": 177664,
+      "probability": 0.99984765
+    },
+    {
+      "start_sample": 177664,
+      "end_sample": 178176,
+      "probability": 0.99999177
+    },
+    {
+      "start_sample": 178176,
+      "end_sample": 178688,
+      "probability": 0.99999809
+    },
+    {
+      "start_sample": 178688,
+      "end_sample": 179200,
+      "probability": 0.99999851
+    },
+    {
+      "start_sample": 179200,
+      "end_sample": 179712,
+      "probability": 0.99999297
+    },
+    {
+      "start_sample": 179712,
+      "end_sample": 180224,
+      "probability": 0.99996114
+    },
+    {
+      "start_sample": 180224,
+      "end_sample": 180736,
+      "probability": 0.99999183
+    },
+    {
+      "start_sample": 180736,
+      "end_sample": 181248,
+      "probability": 0.99999619
+    },
+    {
+      "start_sample": 181248,
+      "end_sample": 181760,
+      "probability": 0.99999732
+    },
+    {
+      "start_sample": 181760,
+      "end_sample": 182272,
+      "probability": 0.99999839
+    },
+    {
+      "start_sample": 182272,
+      "end_sample": 182784,
+      "probability": 0.99999928
+    },
+    {
+      "start_sample": 182784,
+      "end_sample": 183296,
+      "probability": 0.99999952
+    },
+    {
+      "start_sample": 183296,
+      "end_sample": 183808,
+      "probability": 0.9999994
+    },
+    {
+      "start_sample": 183808,
+      "end_sample": 184320,
+      "probability": 0.9999994
+    },
+    {
+      "start_sample": 184320,
+      "end_sample": 184832,
+      "probability": 0.99999851
+    },
+    {
+      "start_sample": 184832,
+      "end_sample": 185344,
+      "probability": 0.99999785
+    },
+    {
+      "start_sample": 185344,
+      "end_sample": 185856,
+      "probability": 0.9999963
+    },
+    {
+      "start_sample": 185856,
+      "end_sample": 186368,
+      "probability": 0.99999642
+    },
+    {
+      "start_sample": 186368,
+      "end_sample": 186880,
+      "probability": 0.99999452
+    },
+    {
+      "start_sample": 186880,
+      "end_sample": 187392,
+      "probability": 0.99999583
+    },
+    {
+      "start_sample": 187392,
+      "end_sample": 187904,
+      "probability": 0.99997789
+    },
+    {
+      "start_sample": 187904,
+      "end_sample": 188416,
+      "probability": 0.99444437
+    },
+    {
+      "start_sample": 188416,
+      "end_sample": 188928,
+      "probability": 0.1931968
+    },
+    {
+      "start_sample": 188928,
+      "end_sample": 189440,
+      "probability": 0.05310962
+    },
+    {
+      "start_sample": 189440,
+      "end_sample": 189952,
+      "probability": 0.02318412
+    },
+    {
+      "start_sample": 189952,
+      "end_sample": 190464,
+      "probability": 0.02063847
+    },
+    {
+      "start_sample": 190464,
+      "end_sample": 190976,
+      "probability": 0.01998404
+    },
+    {
+      "start_sample": 190976,
+      "end_sample": 191488,
+      "probability": 0.02036458
+    },
+    {
+      "start_sample": 191488,
+      "end_sample": 192000,
+      "probability": 0.02125263
+    },
+    {
+      "start_sample": 192000,
+      "end_sample": 192512,
+      "probability": 0.02266893
+    },
+    {
+      "start_sample": 192512,
+      "end_sample": 193024,
+      "probability": 0.02412835
+    },
+    {
+      "start_sample": 193024,
+      "end_sample": 193536,
+      "probability": 0.19399115
+    },
+    {
+      "start_sample": 193536,
+      "end_sample": 194048,
+      "probability": 0.84371746
+    },
+    {
+      "start_sample": 194048,
+      "end_sample": 194560,
+      "probability": 0.97763765
+    },
+    {
+      "start_sample": 194560,
+      "end_sample": 195072,
+      "probability": 0.99959064
+    },
+    {
+      "start_sample": 195072,
+      "end_sample": 195584,
+      "probability": 0.99987471
+    },
+    {
+      "start_sample": 195584,
+      "end_sample": 196096,
+      "probability": 0.99996281
+    },
+    {
+      "start_sample": 196096,
+      "end_sample": 196608,
+      "probability": 0.99997211
+    },
+    {
+      "start_sample": 196608,
+      "end_sample": 197120,
+      "probability": 0.99999136
+    },
+    {
+      "start_sample": 197120,
+      "end_sample": 197632,
+      "probability": 0.99993157
+    },
+    {
+      "start_sample": 197632,
+      "end_sample": 198144,
+      "probability": 0.99737298
+    },
+    {
+      "start_sample": 198144,
+      "end_sample": 198656,
+      "probability": 0.99904132
+    },
+    {
+      "start_sample": 198656,
+      "end_sample": 199168,
+      "probability": 0.91448766
+    },
+    {
+      "start_sample": 199168,
+      "end_sample": 199680,
+      "probability": 0.96461773
+    },
+    {
+      "start_sample": 199680,
+      "end_sample": 200192,
+      "probability": 0.99772441
+    },
+    {
+      "start_sample": 200192,
+      "end_sample": 200704,
+      "probability": 0.99959898
+    },
+    {
+      "start_sample": 200704,
+      "end_sample": 201216,
+      "probability": 0.99992585
+    },
+    {
+      "start_sample": 201216,
+      "end_sample": 201728,
+      "probability": 0.99995774
+    },
+    {
+      "start_sample": 201728,
+      "end_sample": 202240,
+      "probability": 0.99977791
+    },
+    {
+      "start_sample": 202240,
+      "end_sample": 202752,
+      "probability": 0.99823797
+    },
+    {
+      "start_sample": 202752,
+      "end_sample": 203264,
+      "probability": 0.99002576
+    },
+    {
+      "start_sample": 203264,
+      "end_sample": 203776,
+      "probability": 0.99467313
+    },
+    {
+      "start_sample": 203776,
+      "end_sample": 204288,
+      "probability": 0.94968259
+    },
+    {
+      "start_sample": 204288,
+      "end_sample": 204800,
+      "probability": 0.42772284
+    },
+    {
+      "start_sample": 204800,
+      "end_sample": 205312,
+      "probability": 0.12166819
+    },
+    {
+      "start_sample": 205312,
+      "end_sample": 205824,
+      "probability": 0.04399765
+    },
+    {
+      "start_sample": 205824,
+      "end_sample": 206336,
+      "probability": 0.0292283
+    },
+    {
+      "start_sample": 206336,
+      "end_sample": 206848,
+      "probability": 0.02473485
+    },
+    {
+      "start_sample": 206848,
+      "end_sample": 207360,
+      "probability": 0.02088726
+    },
+    {
+      "start_sample": 207360,
+      "end_sample": 207872,
+      "probability": 0.01817897
+    },
+    {
+      "start_sample": 207872,
+      "end_sample": 208384,
+      "probability": 0.01685891
+    },
+    {
+      "start_sample": 208384,
+      "end_sample": 208896,
+      "probability": 0.016359
+    },
+    {
+      "start_sample": 208896,
+      "end_sample": 209408,
+      "probability": 0.01666296
+    },
+    {
+      "start_sample": 209408,
+      "end_sample": 209920,
+      "probability": 0.01738632
+    },
+    {
+      "start_sample": 209920,
+      "end_sample": 210432,
+      "probability": 0.01829398
+    },
+    {
+      "start_sample": 210432,
+      "end_sample": 210944,
+      "probability": 0.01923424
+    },
+    {
+      "start_sample": 210944,
+      "end_sample": 211456,
+      "probability": 0.02013579
+    },
+    {
+      "start_sample": 211456,
+      "end_sample": 211968,
+      "probability": 0.19586262
+    },
+    {
+      "start_sample": 211968,
+      "end_sample": 212480,
+      "probability": 0.59728825
+    },
+    {
+      "start_sample": 212480,
+      "end_sample": 212992,
+      "probability": 0.99438727
+    },
+    {
+      "start_sample": 212992,
+      "end_sample": 213504,
+      "probability": 0.99837101
+    },
+    {
+      "start_sample": 213504,
+      "end_sample": 214016,
+      "probability": 0.99809426
+    },
+    {
+      "start_sample": 214016,
+      "end_sample": 214528,
+      "probability": 0.99950278
+    },
+    {
+      "start_sample": 214528,
+      "end_sample": 215040,
+      "probability": 0.99990612
+    },
+    {
+      "start_sample": 215040,
+      "end_sample": 215552,
+      "probability": 0.9999572
+    },
+    {
+      "start_sample": 215552,
+      "end_sample": 216064,
+      "probability": 0.99992412
+    },
+    {
+      "start_sample": 216064,
+      "end_sample": 216576,
+      "probability": 0.99989796
+    },
+    {
+      "start_sample": 216576,
+      "end_sample": 217088,
+      "probability": 0.99994791
+    },
+    {
+      "start_sample": 217088,
+      "end_sample": 217600,
+      "probability": 0.99999487
+    },
+    {
+      "start_sample": 217600,
+      "end_sample": 218112,
+      "probability": 0.99999774
+    },
+    {
+      "start_sample": 218112,
+      "end_sample": 218624,
+      "probability": 0.99998903
+    },
+    {
+      "start_sample": 218624,
+      "end_sample": 219136,
+      "probability": 0.99998665
+    },
+    {
+      "start_sample": 219136,
+      "end_sample": 219648,
+      "probability": 0.99996966
+    },
+    {
+      "start_sample": 219648,
+      "end_sample": 220160,
+      "probability": 0.98700118
+    },
+    {
+      "start_sample": 220160,
+      "end_sample": 220672,
+      "probability": 0.98372853
+    },
+    {
+      "start_sample": 220672,
+      "end_sample": 221184,
+      "probability": 0.99944675
+    },
+    {
+      "start_sample": 221184,
+      "end_sample": 221696,
+      "probability": 0.99986613
+    },
+    {
+      "start_sample": 221696,
+      "end_sample": 222208,
+      "probability": 0.99873853
+    },
+    {
+      "start_sample": 222208,
+      "end_sample": 222720,
+      "probability": 0.96409583
+    },
+    {
+      "start_sample": 222720,
+      "end_sample": 223232,
+      "probability": 0.98971534
+    },
+    {
+      "start_sample": 223232,
+      "end_sample": 223744,
+      "probability": 0.99339235
+    },
+    {
+      "start_sample": 223744,
+      "end_sample": 224256,
+      "probability": 0.99967402
+    },
+    {
+      "start_sample": 224256,
+      "end_sample": 224768,
+      "probability": 0.99964231
+    },
+    {
+      "start_sample": 224768,
+      "end_sample": 225280,
+      "probability": 0.99994218
+    },
+    {
+      "start_sample": 225280,
+      "end_sample": 225792,
+      "probability": 0.99995589
+    },
+    {
+      "start_sample": 225792,
+      "end_sample": 226304,
+      "probability": 0.99995923
+    },
+    {
+      "start_sample": 226304,
+      "end_sample": 226816,
+      "probability": 0.99997818
+    },
+    {
+      "start_sample": 226816,
+      "end_sample": 227328,
+      "probability": 0.99996203
+    },
+    {
+      "start_sample": 227328,
+      "end_sample": 227840,
+      "probability": 0.99998486
+    },
+    {
+      "start_sample": 227840,
+      "end_sample": 228352,
+      "probability": 0.99996638
+    },
+    {
+      "start_sample": 228352,
+      "end_sample": 228864,
+      "probability": 0.9998908
+    },
+    {
+      "start_sample": 228864,
+      "end_sample": 229376,
+      "probability": 0.99981904
+    },
+    {
+      "start_sample": 229376,
+      "end_sample": 229888,
+      "probability": 0.99985707
+    },
+    {
+      "start_sample": 229888,
+      "end_sample": 230400,
+      "probability": 0.99997675
+    },
+    {
+      "start_sample": 230400,
+      "end_sample": 230912,
+      "probability": 0.9998312
+    },
+    {
+      "start_sample": 230912,
+      "end_sample": 231424,
+      "probability": 0.99976522
+    },
+    {
+      "start_sample": 231424,
+      "end_sample": 231936,
+      "probability": 0.99980509
+    },
+    {
+      "start_sample": 231936,
+      "end_sample": 232448,
+      "probability": 0.99983865
+    },
+    {
+      "start_sample": 232448,
+      "end_sample": 232960,
+      "probability": 0.99995971
+    },
+    {
+      "start_sample": 232960,
+      "end_sample": 233472,
+      "probability": 0.99998516
+    },
+    {
+      "start_sample": 233472,
+      "end_sample": 233984,
+      "probability": 0.99995196
+    },
+    {
+      "start_sample": 233984,
+      "end_sample": 234496,
+      "probability": 0.99960655
+    },
+    {
+      "start_sample": 234496,
+      "end_sample": 235008,
+      "probability": 0.99999535
+    },
+    {
+      "start_sample": 235008,
+      "end_sample": 235520,
+      "probability": 0.99999857
+    },
+    {
+      "start_sample": 235520,
+      "end_sample": 236032,
+      "probability": 0.99999577
+    },
+    {
+      "start_sample": 236032,
+      "end_sample": 236544,
+      "probability": 0.99999416
+    },
+    {
+      "start_sample": 236544,
+      "end_sample": 237056,
+      "probability": 0.99999666
+    },
+    {
+      "start_sample": 237056,
+      "end_sample": 237568,
+      "probability": 0.99996829
+    },
+    {
+      "start_sample": 237568,
+      "end_sample": 238080,
+      "probability": 0.99988484
+    },
+    {
+      "start_sample": 238080,
+      "end_sample": 238592,
+      "probability": 0.999825
+    },
+    {
+      "start_sample": 238592,
+      "end_sample": 239104,
+      "probability": 0.99954736
+    },
+    {
+      "start_sample": 239104,
+      "end_sample": 239616,
+      "probability": 0.99974096
+    },
+    {
+      "start_sample": 239616,
+      "end_sample": 240128,
+      "probability": 0.99968004
+    },
+    {
+      "start_sample": 240128,
+      "end_sample": 240640,
+      "probability": 0.99904156
+    },
+    {
+      "start_sample": 240640,
+      "end_sample": 241152,
+      "probability": 0.99975526
+    },
+    {
+      "start_sample": 241152,
+      "end_sample": 241664,
+      "probability": 0.99929464
+    },
+    {
+      "start_sample": 241664,
+      "end_sample": 242176,
+      "probability": 0.99954629
+    },
+    {
+      "start_sample": 242176,
+      "end_sample": 242688,
+      "probability": 0.99969029
+    },
+    {
+      "start_sample": 242688,
+      "end_sample": 243200,
+      "probability": 0.99974555
+    },
+    {
+      "start_sample": 243200,
+      "end_sample": 243712,
+      "probability": 0.99990559
+    },
+    {
+      "start_sample": 243712,
+      "end_sample": 244224,
+      "probability": 0.99625921
+    },
+    {
+      "start_sample": 244224,
+      "end_sample": 244736,
+      "probability": 0.99431753
+    },
+    {
+      "start_sample": 244736,
+      "end_sample": 245248,
+      "probability": 0.68230337
+    },
+    {
+      "start_sample": 245248,
+      "end_sample": 245760,
+      "probability": 0.20756194
+    },
+    {
+      "start_sample": 245760,
+      "end_sample": 246272,
+      "probability": 0.07857662
+    },
+    {
+      "start_sample": 246272,
+      "end_sample": 246784,
+      "probability": 0.04352057
+    },
+    {
+      "start_sample": 246784,
+      "end_sample": 247296,
+      "probability": 0.03289738
+    },
+    {
+      "start_sample": 247296,
+      "end_sample": 247808,
+      "probability": 0.02774653
+    },
+    {
+      "start_sample": 247808,
+      "end_sample": 248320,
+      "probability": 0.02513456
+    },
+    {
+      "start_sample": 248320,
+      "end_sample": 248832,
+      "probability": 0.02449936
+    },
+    {
+      "start_sample": 248832,
+      "end_sample": 249344,
+      "probability": 0.02432814
+    },
+    {
+      "start_sample": 249344,
+      "end_sample": 249856,
+      "probability": 0.02405736
+    },
+    {
+      "start_sample": 249856,
+      "end_sample": 250368,
+      "probability": 0.02419937
+    },
+    {
+      "start_sample": 250368,
+      "end_sample": 250880,
+      "probability": 0.02444059
+    },
+    {
+      "start_sample": 250880,
+      "end_sample": 251392,
+      "probability": 0.02466938
+    },
+    {
+      "start_sample": 251392,
+      "end_sample": 251904,
+      "probability": 0.02486682
+    },
+    {
+      "start_sample": 251904,
+      "end_sample": 252416,
+      "probability": 0.02501151
+    },
+    {
+      "start_sample": 252416,
+      "end_sample": 252928,
+      "probability": 0.02503112
+    },
+    {
+      "start_sample": 252928,
+      "end_sample": 253440,
+      "probability": 0.02491605
+    },
+    {
+      "start_sample": 253440,
+      "end_sample": 253952,
+      "probability": 0.02472091
+    },
+    {
+      "start_sample": 253952,
+      "end_sample": 254464,
+      "probability": 0.02445921
+    },
+    {
+      "start_sample": 254464,
+      "end_sample": 254976,
+      "probability": 0.02417243
+    },
+    {
+      "start_sample": 254976,
+      "end_sample": 255488,
+      "probability": 0.02382696
+    },
+    {
+      "start_sample": 255488,
+      "end_sample": 256000,
+      "probability": 0.02343142
+    },
+    {
+      "start_sample": 256000,
+      "end_sample": 256512,
+      "probability": 0.02299419
+    },
+    {
+      "start_sample": 256512,
+      "end_sample": 257024,
+      "probability": 0.25836408
+    },
+    {
+      "start_sample": 257024,
+      "end_sample": 257536,
+      "probability": 0.9198873
+    },
+    {
+      "start_sample": 257536,
+      "end_sample": 258048,
+      "probability": 0.99976778
+    },
+    {
+      "start_sample": 258048,
+      "end_sample": 258560,
+      "probability": 0.99997389
+    },
+    {
+      "start_sample": 258560,
+      "end_sample": 259072,
+      "probability": 0.99999732
+    },
+    {
+      "start_sample": 259072,
+      "end_sample": 259584,
+      "probability": 0.99999416
+    },
+    {
+      "start_sample": 259584,
+      "end_sample": 260096,
+      "probability": 0.99997991
+    },
+    {
+      "start_sample": 260096,
+      "end_sample": 260608,
+      "probability": 0.99999177
+    },
+    {
+      "start_sample": 260608,
+      "end_sample": 261120,
+      "probability": 0.99990821
+    },
+    {
+      "start_sample": 261120,
+      "end_sample": 261632,
+      "probability": 0.99969661
+    },
+    {
+      "start_sample": 261632,
+      "end_sample": 262144,
+      "probability": 0.99989903
+    },
+    {
+      "start_sample": 262144,
+      "end_sample": 262656,
+      "probability": 0.99990022
+    },
+    {
+      "start_sample": 262656,
+      "end_sample": 263168,
+      "probability": 0.99999195
+    },
+    {
+      "start_sample": 263168,
+      "end_sample": 263680,
+      "probability": 0.99999803
+    },
+    {
+      "start_sample": 263680,
+      "end_sample": 264192,
+      "probability": 0.99997735
+    },
+    {
+      "start_sample": 264192,
+      "end_sample": 264704,
+      "probability": 0.99998987
+    },
+    {
+      "start_sample": 264704,
+      "end_sample": 265216,
+      "probability": 0.99999571
+    },
+    {
+      "start_sample": 265216,
+      "end_sample": 265728,
+      "probability": 0.99999589
+    },
+    {
+      "start_sample": 265728,
+      "end_sample": 266240,
+      "probability": 0.99999833
+    },
+    {
+      "start_sample": 266240,
+      "end_sample": 266752,
+      "probability": 0.99998355
+    },
+    {
+      "start_sample": 266752,
+      "end_sample": 267264,
+      "probability": 0.99997878
+    },
+    {
+      "start_sample": 267264,
+      "end_sample": 267776,
+      "probability": 0.99997765
+    },
+    {
+      "start_sample": 267776,
+      "end_sample": 268288,
+      "probability": 0.9999097
+    },
+    {
+      "start_sample": 268288,
+      "end_sample": 268800,
+      "probability": 0.99996233
+    },
+    {
+      "start_sample": 268800,
+      "end_sample": 269312,
+      "probability": 0.99998426
+    },
+    {
+      "start_sample": 269312,
+      "end_sample": 269824,
+      "probability": 0.99998385
+    },
+    {
+      "start_sample": 269824,
+      "end_sample": 270336,
+      "probability": 0.99998403
+    },
+    {
+      "start_sample": 270336,
+      "end_sample": 270848,
+      "probability": 0.99998343
+    },
+    {
+      "start_sample": 270848,
+      "end_sample": 271360,
+      "probability": 0.99996948
+    },
+    {
+      "start_sample": 271360,
+      "end_sample": 271872,
+      "probability": 0.99992549
+    },
+    {
+      "start_sample": 271872,
+      "end_sample": 272384,
+      "probability": 0.99989069
+    },
+    {
+      "start_sample": 272384,
+      "end_sample": 272896,
+      "probability": 0.99991667
+    },
+    {
+      "start_sample": 272896,
+      "end_sample": 273408,
+      "probability": 0.99992597
+    },
+    {
+      "start_sample": 273408,
+      "end_sample": 273920,
+      "probability": 0.99997616
+    },
+    {
+      "start_sample": 273920,
+      "end_sample": 274432,
+      "probability": 0.99990273
+    },
+    {
+      "start_sample": 274432,
+      "end_sample": 274944,
+      "probability": 0.99261236
+    },
+    {
+      "start_sample": 274944,
+      "end_sample": 275456,
+      "probability": 0.20034182
+    },
+    {
+      "start_sample": 275456,
+      "end_sample": 275968,
+      "probability": 0.05541134
+    },
+    {
+      "start_sample": 275968,
+      "end_sample": 276480,
+      "probability": 0.02192265
+    },
+    {
+      "start_sample": 276480,
+      "end_sample": 276992,
+      "probability": 0.01820755
+    },
+    {
+      "start_sample": 276992,
+      "end_sample": 277504,
+      "probability": 0.01821619
+    },
+    {
+      "start_sample": 277504,
+      "end_sample": 278016,
+      "probability": 0.01834038
+    },
+    {
+      "start_sample": 278016,
+      "end_sample": 278528,
+      "probability": 0.01883626
+    },
+    {
+      "start_sample": 278528,
+      "end_sample": 279040,
+      "probability": 0.01985651
+    },
+    {
+      "start_sample": 279040,
+      "end_sample": 279552,
+      "probability": 0.02098635
+    },
+    {
+      "start_sample": 279552,
+      "end_sample": 280064,
+      "probability": 0.02213866
+    },
+    {
+      "start_sample": 280064,
+      "end_sample": 280576,
+      "probability": 0.02321306
+    },
+    {
+      "start_sample": 280576,
+      "end_sample": 281088,
+      "probability": 0.02412489
+    },
+    {
+      "start_sample": 281088,
+      "end_sample": 281600,
+      "probability": 0.02485323
+    },
+    {
+      "start_sample": 281600,
+      "end_sample": 282112,
+      "probability": 0.02541083
+    },
+    {
+      "start_sample": 282112,
+      "end_sample": 282624,
+      "probability": 0.02582139
+    },
+    {
+      "start_sample": 282624,
+      "end_sample": 283136,
+      "probability": 0.02610785
+    },
+    {
+      "start_sample": 283136,
+      "end_sample": 283648,
+      "probability": 0.02628022
+    },
+    {
+      "start_sample": 283648,
+      "end_sample": 284160,
+      "probability": 0.02615651
+    },
+    {
+      "start_sample": 284160,
+      "end_sample": 284672,
+      "probability": 0.02595919
+    },
+    {
+      "start_sample": 284672,
+      "end_sample": 285184,
+      "probability": 0.02570006
+    },
+    {
+      "start_sample": 285184,
+      "end_sample": 285696,
+      "probability": 0.02538946
+    },
+    {
+      "start_sample": 285696,
+      "end_sample": 286208,
+      "probability": 0.02507082
+    },
+    {
+      "start_sample": 286208,
+      "end_sample": 286720,
+      "probability": 0.02471629
+    },
+    {
+      "start_sample": 286720,
+      "end_sample": 287232,
+      "probability": 0.0243299
+    },
+    {
+      "start_sample": 287232,
+      "end_sample": 287744,
+      "probability": 0.023918
+    },
+    {
+      "start_sample": 287744,
+      "end_sample": 288256,
+      "probability": 0.02348584
+    },
+    {
+      "start_sample": 288256,
+      "end_sample": 288768,
+      "probability": 0.02303803
+    },
+    {
+      "start_sample": 288768,
+      "end_sample": 289280,
+      "probability": 0.0225786
+    },
+    {
+      "start_sample": 289280,
+      "end_sample": 289792,
+      "probability": 0.02211058
+    },
+    {
+      "start_sample": 289792,
+      "end_sample": 290304,
+      "probability": 0.02163696
+    },
+    {
+      "start_sample": 290304,
+      "end_sample": 290816,
+      "probability": 0.02115992
+    },
+    {
+      "start_sample": 290816,
+      "end_sample": 291328,
+      "probability": 0.19859162
+    },
+    {
+      "start_sample": 291328,
+      "end_sample": 291840,
+      "probability": 0.97376096
+    },
+    {
+      "start_sample": 291840,
+      "end_sample": 292352,
+      "probability": 0.99989164
+    },
+    {
+      "start_sample": 292352,
+      "end_sample": 292864,
+      "probability": 0.99998033
+    },
+    {
+      "start_sample": 292864,
+      "end_sample": 293376,
+      "probability": 0.99995029
+    },
+    {
+      "start_sample": 293376,
+      "end_sample": 293888,
+      "probability": 0.99989748
+    },
+    {
+      "start_sample": 293888,
+      "end_sample": 294400,
+      "probability": 0.99989867
+    },
+    {
+      "start_sample": 294400,
+      "end_sample": 294912,
+      "probability": 0.99993694
+    },
+    {
+      "start_sample": 294912,
+      "end_sample": 295424,
+      "probability": 0.999951
+    },
+    {
+      "start_sample": 295424,
+      "end_sample": 295936,
+      "probability": 0.99994302
+    },
+    {
+      "start_sample": 295936,
+      "end_sample": 296448,
+      "probability": 0.9999916
+    },
+    {
+      "start_sample": 296448,
+      "end_sample": 296960,
+      "probability": 0.99994349
+    },
+    {
+      "start_sample": 296960,
+      "end_sample": 297472,
+      "probability": 0.99997836
+    },
+    {
+      "start_sample": 297472,
+      "end_sample": 297984,
+      "probability": 0.99999845
+    },
+    {
+      "start_sample": 297984,
+      "end_sample": 298496,
+      "probability": 0.99999839
+    },
+    {
+      "start_sample": 298496,
+      "end_sample": 299008,
+      "probability": 0.99968827
+    },
+    {
+      "start_sample": 299008,
+      "end_sample": 299520,
+      "probability": 0.99977541
+    },
+    {
+      "start_sample": 299520,
+      "end_sample": 300032,
+      "probability": 0.99944127
+    },
+    {
+      "start_sample": 300032,
+      "end_sample": 300544,
+      "probability": 0.99997365
+    },
+    {
+      "start_sample": 300544,
+      "end_sample": 301056,
+      "probability": 0.99998379
+    },
+    {
+      "start_sample": 301056,
+      "end_sample": 301568,
+      "probability": 0.99999911
+    },
+    {
+      "start_sample": 301568,
+      "end_sample": 302080,
+      "probability": 0.99999481
+    },
+    {
+      "start_sample": 302080,
+      "end_sample": 302592,
+      "probability": 0.99999505
+    },
+    {
+      "start_sample": 302592,
+      "end_sample": 303104,
+      "probability": 0.99999917
+    },
+    {
+      "start_sample": 303104,
+      "end_sample": 303616,
+      "probability": 0.99995619
+    },
+    {
+      "start_sample": 303616,
+      "end_sample": 304128,
+      "probability": 0.99996418
+    },
+    {
+      "start_sample": 304128,
+      "end_sample": 304640,
+      "probability": 0.99991786
+    },
+    {
+      "start_sample": 304640,
+      "end_sample": 305152,
+      "probability": 0.99983382
+    },
+    {
+      "start_sample": 305152,
+      "end_sample": 305664,
+      "probability": 0.99997425
+    },
+    {
+      "start_sample": 305664,
+      "end_sample": 306176,
+      "probability": 0.99999654
+    },
+    {
+      "start_sample": 306176,
+      "end_sample": 306688,
+      "probability": 0.99999774
+    },
+    {
+      "start_sample": 306688,
+      "end_sample": 307200,
+      "probability": 0.99996966
+    },
+    {
+      "start_sample": 307200,
+      "end_sample": 307712,
+      "probability": 0.99996686
+    },
+    {
+      "start_sample": 307712,
+      "end_sample": 308224,
+      "probability": 0.99998498
+    },
+    {
+      "start_sample": 308224,
+      "end_sample": 308736,
+      "probability": 0.99998164
+    },
+    {
+      "start_sample": 308736,
+      "end_sample": 309248,
+      "probability": 0.99999386
+    },
+    {
+      "start_sample": 309248,
+      "end_sample": 309760,
+      "probability": 0.99999547
+    },
+    {
+      "start_sample": 309760,
+      "end_sample": 310272,
+      "probability": 0.9999963
+    },
+    {
+      "start_sample": 310272,
+      "end_sample": 310784,
+      "probability": 0.99999821
+    },
+    {
+      "start_sample": 310784,
+      "end_sample": 311296,
+      "probability": 0.99999595
+    },
+    {
+      "start_sample": 311296,
+      "end_sample": 311808,
+      "probability": 0.99998152
+    },
+    {
+      "start_sample": 311808,
+      "end_sample": 312320,
+      "probability": 0.99997699
+    },
+    {
+      "start_sample": 312320,
+      "end_sample": 312832,
+      "probability": 0.9999882
+    },
+    {
+      "start_sample": 312832,
+      "end_sample": 313344,
+      "probability": 0.99999529
+    },
+    {
+      "start_sample": 313344,
+      "end_sample": 313856,
+      "probability": 0.99996161
+    },
+    {
+      "start_sample": 313856,
+      "end_sample": 314368,
+      "probability": 0.99998307
+    },
+    {
+      "start_sample": 314368,
+      "end_sample": 314880,
+      "probability": 0.99999797
+    },
+    {
+      "start_sample": 314880,
+      "end_sample": 315392,
+      "probability": 0.99998277
+    },
+    {
+      "start_sample": 315392,
+      "end_sample": 315904,
+      "probability": 0.99998736
+    },
+    {
+      "start_sample": 315904,
+      "end_sample": 316416,
+      "probability": 0.99999726
+    },
+    {
+      "start_sample": 316416,
+      "end_sample": 316928,
+      "probability": 0.99999845
+    },
+    {
+      "start_sample": 316928,
+      "end_sample": 317440,
+      "probability": 0.99996936
+    },
+    {
+      "start_sample": 317440,
+      "end_sample": 317952,
+      "probability": 0.9998759
+    },
+    {
+      "start_sample": 317952,
+      "end_sample": 318464,
+      "probability": 0.99984503
+    },
+    {
+      "start_sample": 318464,
+      "end_sample": 318976,
+      "probability": 0.99998939
+    },
+    {
+      "start_sample": 318976,
+      "end_sample": 319488,
+      "probability": 0.99999672
+    },
+    {
+      "start_sample": 319488,
+      "end_sample": 320000,
+      "probability": 0.99999356
+    },
+    {
+      "start_sample": 320000,
+      "end_sample": 320512,
+      "probability": 0.99999881
+    },
+    {
+      "start_sample": 320512,
+      "end_sample": 321024,
+      "probability": 0.99999696
+    },
+    {
+      "start_sample": 321024,
+      "end_sample": 321536,
+      "probability": 0.99999326
+    },
+    {
+      "start_sample": 321536,
+      "end_sample": 322048,
+      "probability": 0.99999923
+    },
+    {
+      "start_sample": 322048,
+      "end_sample": 322560,
+      "probability": 0.99999809
+    },
+    {
+      "start_sample": 322560,
+      "end_sample": 323072,
+      "probability": 0.99999821
+    },
+    {
+      "start_sample": 323072,
+      "end_sample": 323584,
+      "probability": 0.99999774
+    },
+    {
+      "start_sample": 323584,
+      "end_sample": 324096,
+      "probability": 0.99999642
+    },
+    {
+      "start_sample": 324096,
+      "end_sample": 324608,
+      "probability": 0.99999475
+    },
+    {
+      "start_sample": 324608,
+      "end_sample": 325120,
+      "probability": 0.99995571
+    },
+    {
+      "start_sample": 325120,
+      "end_sample": 325632,
+      "probability": 0.92032814
+    },
+    {
+      "start_sample": 325632,
+      "end_sample": 326144,
+      "probability": 0.21759731
+    },
+    {
+      "start_sample": 326144,
+      "end_sample": 326656,
+      "probability": 0.05245665
+    },
+    {
+      "start_sample": 326656,
+      "end_sample": 327168,
+      "probability": 0.03045633
+    },
+    {
+      "start_sample": 327168,
+      "end_sample": 327680,
+      "probability": 0.18218622
+    },
+    {
+      "start_sample": 327680,
+      "end_sample": 328192,
+      "probability": 0.99861991
+    },
+    {
+      "start_sample": 328192,
+      "end_sample": 328704,
+      "probability": 0.99996817
+    },
+    {
+      "start_sample": 328704,
+      "end_sample": 329216,
+      "probability": 0.99997908
+    },
+    {
+      "start_sample": 329216,
+      "end_sample": 329728,
+      "probability": 0.99998999
+    },
+    {
+      "start_sample": 329728,
+      "end_sample": 330240,
+      "probability": 0.99999785
+    },
+    {
+      "start_sample": 330240,
+      "end_sample": 330752,
+      "probability": 0.9999947
+    },
+    {
+      "start_sample": 330752,
+      "end_sample": 331264,
+      "probability": 0.99999428
+    },
+    {
+      "start_sample": 331264,
+      "end_sample": 331776,
+      "probability": 0.99999177
+    },
+    {
+      "start_sample": 331776,
+      "end_sample": 332288,
+      "probability": 0.99997389
+    },
+    {
+      "start_sample": 332288,
+      "end_sample": 332800,
+      "probability": 0.98577547
+    },
+    {
+      "start_sample": 332800,
+      "end_sample": 333312,
+      "probability": 0.26181459
+    },
+    {
+      "start_sample": 333312,
+      "end_sample": 333824,
+      "probability": 0.04583091
+    },
+    {
+      "start_sample": 333824,
+      "end_sample": 334336,
+      "probability": 0.01626524
+    },
+    {
+      "start_sample": 334336,
+      "end_sample": 334848,
+      "probability": 0.01189393
+    },
+    {
+      "start_sample": 334848,
+      "end_sample": 335360,
+      "probability": 0.01205355
+    },
+    {
+      "start_sample": 335360,
+      "end_sample": 335872,
+      "probability": 0.01212034
+    },
+    {
+      "start_sample": 335872,
+      "end_sample": 336384,
+      "probability": 0.01258335
+    },
+    {
+      "start_sample": 336384,
+      "end_sample": 336896,
+      "probability": 0.01349971
+    },
+    {
+      "start_sample": 336896,
+      "end_sample": 337408,
+      "probability": 0.01456183
+    },
+    {
+      "start_sample": 337408,
+      "end_sample": 337920,
+      "probability": 0.1735107
+    },
+    {
+      "start_sample": 337920,
+      "end_sample": 338432,
+      "probability": 0.51888633
+    },
+    {
+      "start_sample": 338432,
+      "end_sample": 338944,
+      "probability": 0.9447853
+    },
+    {
+      "start_sample": 338944,
+      "end_sample": 339456,
+      "probability": 0.89832664
+    },
+    {
+      "start_sample": 339456,
+      "end_sample": 339968,
+      "probability": 0.56939381
+    },
+    {
+      "start_sample": 339968,
+      "end_sample": 340480,
+      "probability": 0.36148018
+    },
+    {
+      "start_sample": 340480,
+      "end_sample": 340992,
+      "probability": 0.95763135
+    },
+    {
+      "start_sample": 340992,
+      "end_sample": 341504,
+      "probability": 0.99834883
+    },
+    {
+      "start_sample": 341504,
+      "end_sample": 342016,
+      "probability": 0.99981606
+    },
+    {
+      "start_sample": 342016,
+      "end_sample": 342528,
+      "probability": 0.99945593
+    },
+    {
+      "start_sample": 342528,
+      "end_sample": 343040,
+      "probability": 0.99983358
+    },
+    {
+      "start_sample": 343040,
+      "end_sample": 343552,
+      "probability": 0.9997617
+    },
+    {
+      "start_sample": 343552,
+      "end_sample": 344064,
+      "probability": 0.99889302
+    },
+    {
+      "start_sample": 344064,
+      "end_sample": 344576,
+      "probability": 0.99958682
+    },
+    {
+      "start_sample": 344576,
+      "end_sample": 345088,
+      "probability": 0.99947548
+    },
+    {
+      "start_sample": 345088,
+      "end_sample": 345600,
+      "probability": 0.99943125
+    },
+    {
+      "start_sample": 345600,
+      "end_sample": 346112,
+      "probability": 0.99842453
+    },
+    {
+      "start_sample": 346112,
+      "end_sample": 346624,
+      "probability": 0.9996264
+    },
+    {
+      "start_sample": 346624,
+      "end_sample": 347136,
+      "probability": 0.99949133
+    },
+    {
+      "start_sample": 347136,
+      "end_sample": 347648,
+      "probability": 0.99950397
+    },
+    {
+      "start_sample": 347648,
+      "end_sample": 348160,
+      "probability": 0.99967027
+    },
+    {
+      "start_sample": 348160,
+      "end_sample": 348672,
+      "probability": 0.9986583
+    },
+    {
+      "start_sample": 348672,
+      "end_sample": 349184,
+      "probability": 0.99732471
+    },
+    {
+      "start_sample": 349184,
+      "end_sample": 349696,
+      "probability": 0.99800956
+    },
+    {
+      "start_sample": 349696,
+      "end_sample": 350208,
+      "probability": 0.99588978
+    },
+    {
+      "start_sample": 350208,
+      "end_sample": 350720,
+      "probability": 0.99809796
+    },
+    {
+      "start_sample": 350720,
+      "end_sample": 351232,
+      "probability": 0.99905407
+    },
+    {
+      "start_sample": 351232,
+      "end_sample": 351744,
+      "probability": 0.99975777
+    },
+    {
+      "start_sample": 351744,
+      "end_sample": 352256,
+      "probability": 0.9996103
+    },
+    {
+      "start_sample": 352256,
+      "end_sample": 352768,
+      "probability": 0.99931526
+    },
+    {
+      "start_sample": 352768,
+      "end_sample": 353280,
+      "probability": 0.99934632
+    },
+    {
+      "start_sample": 353280,
+      "end_sample": 353792,
+      "probability": 0.99993783
+    },
+    {
+      "start_sample": 353792,
+      "end_sample": 354304,
+      "probability": 0.99998116
+    },
+    {
+      "start_sample": 354304,
+      "end_sample": 354816,
+      "probability": 0.9999826
+    },
+    {
+      "start_sample": 354816,
+      "end_sample": 355328,
+      "probability": 0.99996197
+    },
+    {
+      "start_sample": 355328,
+      "end_sample": 355840,
+      "probability": 0.99982178
+    },
+    {
+      "start_sample": 355840,
+      "end_sample": 356352,
+      "probability": 0.99976242
+    },
+    {
+      "start_sample": 356352,
+      "end_sample": 356864,
+      "probability": 0.99995911
+    },
+    {
+      "start_sample": 356864,
+      "end_sample": 357376,
+      "probability": 0.99999309
+    },
+    {
+      "start_sample": 357376,
+      "end_sample": 357888,
+      "probability": 0.99997973
+    },
+    {
+      "start_sample": 357888,
+      "end_sample": 358400,
+      "probability": 0.9999361
+    },
+    {
+      "start_sample": 358400,
+      "end_sample": 358912,
+      "probability": 0.99996173
+    },
+    {
+      "start_sample": 358912,
+      "end_sample": 359424,
+      "probability": 0.99996358
+    },
+    {
+      "start_sample": 359424,
+      "end_sample": 359936,
+      "probability": 0.99993896
+    },
+    {
+      "start_sample": 359936,
+      "end_sample": 360448,
+      "probability": 0.9999333
+    },
+    {
+      "start_sample": 360448,
+      "end_sample": 360960,
+      "probability": 0.999771
+    },
+    {
+      "start_sample": 360960,
+      "end_sample": 361472,
+      "probability": 0.99992162
+    },
+    {
+      "start_sample": 361472,
+      "end_sample": 361984,
+      "probability": 0.99996293
+    },
+    {
+      "start_sample": 361984,
+      "end_sample": 362496,
+      "probability": 0.99982643
+    },
+    {
+      "start_sample": 362496,
+      "end_sample": 363008,
+      "probability": 0.99982339
+    },
+    {
+      "start_sample": 363008,
+      "end_sample": 363520,
+      "probability": 0.99995041
+    },
+    {
+      "start_sample": 363520,
+      "end_sample": 364032,
+      "probability": 0.99987817
+    },
+    {
+      "start_sample": 364032,
+      "end_sample": 364544,
+      "probability": 0.99986613
+    },
+    {
+      "start_sample": 364544,
+      "end_sample": 365056,
+      "probability": 0.99981546
+    },
+    {
+      "start_sample": 365056,
+      "end_sample": 365568,
+      "probability": 0.99846524
+    },
+    {
+      "start_sample": 365568,
+      "end_sample": 366080,
+      "probability": 0.99714643
+    },
+    {
+      "start_sample": 366080,
+      "end_sample": 366592,
+      "probability": 0.95851231
+    },
+    {
+      "start_sample": 366592,
+      "end_sample": 367104,
+      "probability": 0.5025537
+    },
+    {
+      "start_sample": 367104,
+      "end_sample": 367616,
+      "probability": 0.16802794
+    },
+    {
+      "start_sample": 367616,
+      "end_sample": 368128,
+      "probability": 0.08184671
+    },
+    {
+      "start_sample": 368128,
+      "end_sample": 368640,
+      "probability": 0.0542925
+    },
+    {
+      "start_sample": 368640,
+      "end_sample": 369152,
+      "probability": 0.04410326
+    },
+    {
+      "start_sample": 369152,
+      "end_sample": 369664,
+      "probability": 0.03908774
+    },
+    {
+      "start_sample": 369664,
+      "end_sample": 370176,
+      "probability": 0.03708178
+    },
+    {
+      "start_sample": 370176,
+      "end_sample": 370688,
+      "probability": 0.03579295
+    },
+    {
+      "start_sample": 370688,
+      "end_sample": 371200,
+      "probability": 0.03480819
+    },
+    {
+      "start_sample": 371200,
+      "end_sample": 371712,
+      "probability": 0.0344536
+    },
+    {
+      "start_sample": 371712,
+      "end_sample": 372224,
+      "probability": 0.03434181
+    },
+    {
+      "start_sample": 372224,
+      "end_sample": 372736,
+      "probability": 0.03415191
+    },
+    {
+      "start_sample": 372736,
+      "end_sample": 373248,
+      "probability": 0.03387329
+    },
+    {
+      "start_sample": 373248,
+      "end_sample": 373760,
+      "probability": 0.03350735
+    },
+    {
+      "start_sample": 373760,
+      "end_sample": 374272,
+      "probability": 0.03303614
+    },
+    {
+      "start_sample": 374272,
+      "end_sample": 374784,
+      "probability": 0.0324651
+    },
+    {
+      "start_sample": 374784,
+      "end_sample": 375296,
+      "probability": 0.03180701
+    },
+    {
+      "start_sample": 375296,
+      "end_sample": 375808,
+      "probability": 0.0311009
+    },
+    {
+      "start_sample": 375808,
+      "end_sample": 376320,
+      "probability": 0.03036642
+    },
+    {
+      "start_sample": 376320,
+      "end_sample": 376832,
+      "probability": 0.02957645
+    },
+    {
+      "start_sample": 376832,
+      "end_sample": 377344,
+      "probability": 0.02874431
+    },
+    {
+      "start_sample": 377344,
+      "end_sample": 377856,
+      "probability": 0.02788189
+    },
+    {
+      "start_sample": 377856,
+      "end_sample": 378368,
+      "probability": 0.02694908
+    },
+    {
+      "start_sample": 378368,
+      "end_sample": 378880,
+      "probability": 0.02601996
+    },
+    {
+      "start_sample": 378880,
+      "end_sample": 379392,
+      "probability": 0.80826008
+    },
+    {
+      "start_sample": 379392,
+      "end_sample": 379904,
+      "probability": 0.99947846
+    },
+    {
+      "start_sample": 379904,
+      "end_sample": 380416,
+      "probability": 0.99996889
+    },
+    {
+      "start_sample": 380416,
+      "end_sample": 380928,
+      "probability": 0.99999809
+    },
+    {
+      "start_sample": 380928,
+      "end_sample": 381440,
+      "probability": 0.99996734
+    },
+    {
+      "start_sample": 381440,
+      "end_sample": 381952,
+      "probability": 0.99999541
+    },
+    {
+      "start_sample": 381952,
+      "end_sample": 382464,
+      "probability": 0.99998665
+    },
+    {
+      "start_sample": 382464,
+      "end_sample": 382976,
+      "probability": 0.99997461
+    },
+    {
+      "start_sample": 382976,
+      "end_sample": 383488,
+      "probability": 0.9999119
+    },
+    {
+      "start_sample": 383488,
+      "end_sample": 384000,
+      "probability": 0.99999559
+    },
+    {
+      "start_sample": 384000,
+      "end_sample": 384512,
+      "probability": 0.99991918
+    },
+    {
+      "start_sample": 384512,
+      "end_sample": 385024,
+      "probability": 0.99994659
+    },
+    {
+      "start_sample": 385024,
+      "end_sample": 385536,
+      "probability": 0.99988699
+    },
+    {
+      "start_sample": 385536,
+      "end_sample": 386048,
+      "probability": 0.99998134
+    },
+    {
+      "start_sample": 386048,
+      "end_sample": 386560,
+      "probability": 0.99999487
+    },
+    {
+      "start_sample": 386560,
+      "end_sample": 387072,
+      "probability": 0.99999642
+    },
+    {
+      "start_sample": 387072,
+      "end_sample": 387584,
+      "probability": 0.99999249
+    },
+    {
+      "start_sample": 387584,
+      "end_sample": 388096,
+      "probability": 0.99997008
+    },
+    {
+      "start_sample": 388096,
+      "end_sample": 388608,
+      "probability": 0.99998426
+    },
+    {
+      "start_sample": 388608,
+      "end_sample": 389120,
+      "probability": 0.99995923
+    },
+    {
+      "start_sample": 389120,
+      "end_sample": 389632,
+      "probability": 0.99999481
+    },
+    {
+      "start_sample": 389632,
+      "end_sample": 390144,
+      "probability": 0.99999905
+    },
+    {
+      "start_sample": 390144,
+      "end_sample": 390656,
+      "probability": 0.99999928
+    },
+    {
+      "start_sample": 390656,
+      "end_sample": 391168,
+      "probability": 0.99999833
+    },
+    {
+      "start_sample": 391168,
+      "end_sample": 391680,
+      "probability": 0.99999833
+    },
+    {
+      "start_sample": 391680,
+      "end_sample": 392192,
+      "probability": 0.9999975
+    },
+    {
+      "start_sample": 392192,
+      "end_sample": 392704,
+      "probability": 0.9999947
+    },
+    {
+      "start_sample": 392704,
+      "end_sample": 393216,
+      "probability": 0.99999052
+    },
+    {
+      "start_sample": 393216,
+      "end_sample": 393728,
+      "probability": 0.99999368
+    },
+    {
+      "start_sample": 393728,
+      "end_sample": 394240,
+      "probability": 0.99997246
+    },
+    {
+      "start_sample": 394240,
+      "end_sample": 394752,
+      "probability": 0.99830276
+    },
+    {
+      "start_sample": 394752,
+      "end_sample": 395264,
+      "probability": 0.2289522
+    },
+    {
+      "start_sample": 395264,
+      "end_sample": 395776,
+      "probability": 0.03440675
+    },
+    {
+      "start_sample": 395776,
+      "end_sample": 396288,
+      "probability": 0.01900968
+    },
+    {
+      "start_sample": 396288,
+      "end_sample": 396800,
+      "probability": 0.01743633
+    },
+    {
+      "start_sample": 396800,
+      "end_sample": 397312,
+      "probability": 0.01622906
+    },
+    {
+      "start_sample": 397312,
+      "end_sample": 397824,
+      "probability": 0.01689276
+    },
+    {
+      "start_sample": 397824,
+      "end_sample": 398336,
+      "probability": 0.01793551
+    },
+    {
+      "start_sample": 398336,
+      "end_sample": 398848,
+      "probability": 0.2632798
+    },
+    {
+      "start_sample": 398848,
+      "end_sample": 399360,
+      "probability": 0.99908018
+    },
+    {
+      "start_sample": 399360,
+      "end_sample": 399872,
+      "probability": 0.9999907
+    },
+    {
+      "start_sample": 399872,
+      "end_sample": 400384,
+      "probability": 0.99989825
+    },
+    {
+      "start_sample": 400384,
+      "end_sample": 400896,
+      "probability": 0.99997997
+    },
+    {
+      "start_sample": 400896,
+      "end_sample": 401408,
+      "probability": 0.99990201
+    },
+    {
+      "start_sample": 401408,
+      "end_sample": 401920,
+      "probability": 0.99990094
+    },
+    {
+      "start_sample": 401920,
+      "end_sample": 402432,
+      "probability": 0.99918854
+    },
+    {
+      "start_sample": 402432,
+      "end_sample": 402944,
+      "probability": 0.99973643
+    },
+    {
+      "start_sample": 402944,
+      "end_sample": 403456,
+      "probability": 0.99881554
+    },
+    {
+      "start_sample": 403456,
+      "end_sample": 403968,
+      "probability": 0.99849796
+    },
+    {
+      "start_sample": 403968,
+      "end_sample": 404480,
+      "probability": 0.99891722
+    },
+    {
+      "start_sample": 404480,
+      "end_sample": 404992,
+      "probability": 0.99996901
+    },
+    {
+      "start_sample": 404992,
+      "end_sample": 405504,
+      "probability": 0.99999398
+    },
+    {
+      "start_sample": 405504,
+      "end_sample": 406016,
+      "probability": 0.9999975
+    },
+    {
+      "start_sample": 406016,
+      "end_sample": 406528,
+      "probability": 0.99999815
+    },
+    {
+      "start_sample": 406528,
+      "end_sample": 407040,
+      "probability": 0.99999857
+    },
+    {
+      "start_sample": 407040,
+      "end_sample": 407552,
+      "probability": 0.99999893
+    },
+    {
+      "start_sample": 407552,
+      "end_sample": 408064,
+      "probability": 0.99999666
+    },
+    {
+      "start_sample": 408064,
+      "end_sample": 408576,
+      "probability": 0.99999368
+    },
+    {
+      "start_sample": 408576,
+      "end_sample": 409088,
+      "probability": 0.99998391
+    },
+    {
+      "start_sample": 409088,
+      "end_sample": 409600,
+      "probability": 0.99998039
+    },
+    {
+      "start_sample": 409600,
+      "end_sample": 410112,
+      "probability": 0.99996346
+    },
+    {
+      "start_sample": 410112,
+      "end_sample": 410624,
+      "probability": 0.99997914
+    },
+    {
+      "start_sample": 410624,
+      "end_sample": 411136,
+      "probability": 0.99998319
+    },
+    {
+      "start_sample": 411136,
+      "end_sample": 411648,
+      "probability": 0.99995297
+    },
+    {
+      "start_sample": 411648,
+      "end_sample": 412160,
+      "probability": 0.99537706
+    },
+    {
+      "start_sample": 412160,
+      "end_sample": 412672,
+      "probability": 0.17303362
+    },
+    {
+      "start_sample": 412672,
+      "end_sample": 413184,
+      "probability": 0.03514791
+    },
+    {
+      "start_sample": 413184,
+      "end_sample": 413696,
+      "probability": 0.01615554
+    },
+    {
+      "start_sample": 413696,
+      "end_sample": 414208,
+      "probability": 0.01299596
+    },
+    {
+      "start_sample": 414208,
+      "end_sample": 414720,
+      "probability": 0.01244301
+    },
+    {
+      "start_sample": 414720,
+      "end_sample": 415232,
+      "probability": 0.0133689
+    },
+    {
+      "start_sample": 415232,
+      "end_sample": 415744,
+      "probability": 0.01439673
+    },
+    {
+      "start_sample": 415744,
+      "end_sample": 416256,
+      "probability": 0.01583746
+    },
+    {
+      "start_sample": 416256,
+      "end_sample": 416768,
+      "probability": 0.01724041
+    },
+    {
+      "start_sample": 416768,
+      "end_sample": 417280,
+      "probability": 0.02327767
+    },
+    {
+      "start_sample": 417280,
+      "end_sample": 417792,
+      "probability": 0.74232376
+    },
+    {
+      "start_sample": 417792,
+      "end_sample": 418304,
+      "probability": 0.99977696
+    },
+    {
+      "start_sample": 418304,
+      "end_sample": 418816,
+      "probability": 0.99997574
+    },
+    {
+      "start_sample": 418816,
+      "end_sample": 419328,
+      "probability": 0.9999913
+    },
+    {
+      "start_sample": 419328,
+      "end_sample": 419840,
+      "probability": 0.99999499
+    },
+    {
+      "start_sample": 419840,
+      "end_sample": 420352,
+      "probability": 0.99999428
+    },
+    {
+      "start_sample": 420352,
+      "end_sample": 420864,
+      "probability": 0.99999392
+    },
+    {
+      "start_sample": 420864,
+      "end_sample": 421376,
+      "probability": 0.99999273
+    },
+    {
+      "start_sample": 421376,
+      "end_sample": 421888,
+      "probability": 0.99999166
+    },
+    {
+      "start_sample": 421888,
+      "end_sample": 422400,
+      "probability": 0.99999702
+    },
+    {
+      "start_sample": 422400,
+      "end_sample": 422912,
+      "probability": 0.99999881
+    },
+    {
+      "start_sample": 422912,
+      "end_sample": 423424,
+      "probability": 0.99999827
+    },
+    {
+      "start_sample": 423424,
+      "end_sample": 423936,
+      "probability": 0.9999758
+    },
+    {
+      "start_sample": 423936,
+      "end_sample": 424448,
+      "probability": 0.9999848
+    },
+    {
+      "start_sample": 424448,
+      "end_sample": 424960,
+      "probability": 0.99994755
+    },
+    {
+      "start_sample": 424960,
+      "end_sample": 425472,
+      "probability": 0.99995124
+    },
+    {
+      "start_sample": 425472,
+      "end_sample": 425984,
+      "probability": 0.99995363
+    },
+    {
+      "start_sample": 425984,
+      "end_sample": 426496,
+      "probability": 0.99999034
+    },
+    {
+      "start_sample": 426496,
+      "end_sample": 427008,
+      "probability": 0.9999938
+    },
+    {
+      "start_sample": 427008,
+      "end_sample": 427520,
+      "probability": 0.99999869
+    },
+    {
+      "start_sample": 427520,
+      "end_sample": 428032,
+      "probability": 0.99998844
+    },
+    {
+      "start_sample": 428032,
+      "end_sample": 428544,
+      "probability": 0.99997985
+    },
+    {
+      "start_sample": 428544,
+      "end_sample": 429056,
+      "probability": 0.99996126
+    },
+    {
+      "start_sample": 429056,
+      "end_sample": 429568,
+      "probability": 0.99999166
+    },
+    {
+      "start_sample": 429568,
+      "end_sample": 430080,
+      "probability": 0.99998152
+    },
+    {
+      "start_sample": 430080,
+      "end_sample": 430592,
+      "probability": 0.99999928
+    },
+    {
+      "start_sample": 430592,
+      "end_sample": 431104,
+      "probability": 0.99999768
+    },
+    {
+      "start_sample": 431104,
+      "end_sample": 431616,
+      "probability": 0.99999064
+    },
+    {
+      "start_sample": 431616,
+      "end_sample": 432128,
+      "probability": 0.99999321
+    },
+    {
+      "start_sample": 432128,
+      "end_sample": 432640,
+      "probability": 0.99999857
+    },
+    {
+      "start_sample": 432640,
+      "end_sample": 433152,
+      "probability": 0.99999529
+    },
+    {
+      "start_sample": 433152,
+      "end_sample": 433664,
+      "probability": 0.99999523
+    },
+    {
+      "start_sample": 433664,
+      "end_sample": 434176,
+      "probability": 0.99999869
+    },
+    {
+      "start_sample": 434176,
+      "end_sample": 434688,
+      "probability": 0.99999768
+    },
+    {
+      "start_sample": 434688,
+      "end_sample": 435200,
+      "probability": 0.99999499
+    },
+    {
+      "start_sample": 435200,
+      "end_sample": 435712,
+      "probability": 0.99999905
+    },
+    {
+      "start_sample": 435712,
+      "end_sample": 436224,
+      "probability": 0.99999863
+    },
+    {
+      "start_sample": 436224,
+      "end_sample": 436736,
+      "probability": 0.99999702
+    },
+    {
+      "start_sample": 436736,
+      "end_sample": 437248,
+      "probability": 0.99999797
+    },
+    {
+      "start_sample": 437248,
+      "end_sample": 437760,
+      "probability": 0.99999714
+    },
+    {
+      "start_sample": 437760,
+      "end_sample": 438272,
+      "probability": 0.99999255
+    },
+    {
+      "start_sample": 438272,
+      "end_sample": 438784,
+      "probability": 0.99998593
+    },
+    {
+      "start_sample": 438784,
+      "end_sample": 439296,
+      "probability": 0.99997866
+    },
+    {
+      "start_sample": 439296,
+      "end_sample": 439808,
+      "probability": 0.99998033
+    },
+    {
+      "start_sample": 439808,
+      "end_sample": 440320,
+      "probability": 0.99999118
+    },
+    {
+      "start_sample": 440320,
+      "end_sample": 440832,
+      "probability": 0.99998003
+    },
+    {
+      "start_sample": 440832,
+      "end_sample": 441344,
+      "probability": 0.99831909
+    },
+    {
+      "start_sample": 441344,
+      "end_sample": 441856,
+      "probability": 0.17964864
+    },
+    {
+      "start_sample": 441856,
+      "end_sample": 442368,
+      "probability": 0.04527402
+    },
+    {
+      "start_sample": 442368,
+      "end_sample": 442880,
+      "probability": 0.01792437
+    },
+    {
+      "start_sample": 442880,
+      "end_sample": 443392,
+      "probability": 0.01489359
+    },
+    {
+      "start_sample": 443392,
+      "end_sample": 443904,
+      "probability": 0.01370123
+    },
+    {
+      "start_sample": 443904,
+      "end_sample": 444416,
+      "probability": 0.01434234
+    },
+    {
+      "start_sample": 444416,
+      "end_sample": 444928,
+      "probability": 0.01488343
+    },
+    {
+      "start_sample": 444928,
+      "end_sample": 445440,
+      "probability": 0.01628783
+    },
+    {
+      "start_sample": 445440,
+      "end_sample": 445952,
+      "probability": 0.01777026
+    },
+    {
+      "start_sample": 445952,
+      "end_sample": 446464,
+      "probability": 0.01935357
+    },
+    {
+      "start_sample": 446464,
+      "end_sample": 446976,
+      "probability": 0.02082336
+    },
+    {
+      "start_sample": 446976,
+      "end_sample": 447488,
+      "probability": 0.0220449
+    },
+    {
+      "start_sample": 447488,
+      "end_sample": 448000,
+      "probability": 0.02290961
+    },
+    {
+      "start_sample": 448000,
+      "end_sample": 448512,
+      "probability": 0.02352706
+    },
+    {
+      "start_sample": 448512,
+      "end_sample": 449024,
+      "probability": 0.0239237
+    },
+    {
+      "start_sample": 449024,
+      "end_sample": 449536,
+      "probability": 0.0241431
+    },
+    {
+      "start_sample": 449536,
+      "end_sample": 450048,
+      "probability": 0.02421817
+    },
+    {
+      "start_sample": 450048,
+      "end_sample": 450560,
+      "probability": 0.02421692
+    },
+    {
+      "start_sample": 450560,
+      "end_sample": 451072,
+      "probability": 0.02411902
+    },
+    {
+      "start_sample": 451072,
+      "end_sample": 451584,
+      "probability": 0.02394244
+    },
+    {
+      "start_sample": 451584,
+      "end_sample": 452096,
+      "probability": 0.02370259
+    },
+    {
+      "start_sample": 452096,
+      "end_sample": 452608,
+      "probability": 0.02341232
+    },
+    {
+      "start_sample": 452608,
+      "end_sample": 453120,
+      "probability": 0.02308249
+    },
+    {
+      "start_sample": 453120,
+      "end_sample": 453632,
+      "probability": 0.02272221
+    },
+    {
+      "start_sample": 453632,
+      "end_sample": 454144,
+      "probability": 0.02234045
+    },
+    {
+      "start_sample": 454144,
+      "end_sample": 454656,
+      "probability": 0.02194378
+    },
+    {
+      "start_sample": 454656,
+      "end_sample": 455168,
+      "probability": 0.02153465
+    },
+    {
+      "start_sample": 455168,
+      "end_sample": 455680,
+      "probability": 0.02111709
+    },
+    {
+      "start_sample": 455680,
+      "end_sample": 456192,
+      "probability": 0.02069414
+    },
+    {
+      "start_sample": 456192,
+      "end_sample": 456704,
+      "probability": 0.0202685
+    },
+    {
+      "start_sample": 456704,
+      "end_sample": 457216,
+      "probability": 0.019842
+    },
+    {
+      "start_sample": 457216,
+      "end_sample": 457728,
+      "probability": 0.01941618
+    },
+    {
+      "start_sample": 457728,
+      "end_sample": 458240,
+      "probability": 0.01899227
+    },
+    {
+      "start_sample": 458240,
+      "end_sample": 458752,
+      "probability": 0.01857126
+    },
+    {
+      "start_sample": 458752,
+      "end_sample": 459264,
+      "probability": 0.01815358
+    },
+    {
+      "start_sample": 459264,
+      "end_sample": 459776,
+      "probability": 0.01774007
+    },
+    {
+      "start_sample": 459776,
+      "end_sample": 460288,
+      "probability": 0.01733088
+    },
+    {
+      "start_sample": 460288,
+      "end_sample": 460800,
+      "probability": 0.01692635
+    },
+    {
+      "start_sample": 460800,
+      "end_sample": 461312,
+      "probability": 0.01652679
+    },
+    {
+      "start_sample": 461312,
+      "end_sample": 461824,
+      "probability": 0.01613227
+    },
+    {
+      "start_sample": 461824,
+      "end_sample": 462336,
+      "probability": 0.01574299
+    },
+    {
+      "start_sample": 462336,
+      "end_sample": 462848,
+      "probability": 0.01535898
+    },
+    {
+      "start_sample": 462848,
+      "end_sample": 463360,
+      "probability": 0.01498044
+    },
+    {
+      "start_sample": 463360,
+      "end_sample": 463872,
+      "probability": 0.01460734
+    },
+    {
+      "start_sample": 463872,
+      "end_sample": 464384,
+      "probability": 0.01423985
+    },
+    {
+      "start_sample": 464384,
+      "end_sample": 464896,
+      "probability": 0.01387522
+    },
+    {
+      "start_sample": 464896,
+      "end_sample": 465408,
+      "probability": 0.01351595
+    },
+    {
+      "start_sample": 465408,
+      "end_sample": 465920,
+      "probability": 0.01316288
+    },
+    {
+      "start_sample": 465920,
+      "end_sample": 466432,
+      "probability": 0.0128161
+    },
+    {
+      "start_sample": 466432,
+      "end_sample": 466944,
+      "probability": 0.01247582
+    },
+    {
+      "start_sample": 466944,
+      "end_sample": 467456,
+      "probability": 0.01214215
+    },
+    {
+      "start_sample": 467456,
+      "end_sample": 467968,
+      "probability": 0.01181531
+    },
+    {
+      "start_sample": 467968,
+      "end_sample": 468480,
+      "probability": 0.01149529
+    },
+    {
+      "start_sample": 468480,
+      "end_sample": 468992,
+      "probability": 0.0111824
+    },
+    {
+      "start_sample": 468992,
+      "end_sample": 469504,
+      "probability": 0.01087666
+    },
+    {
+      "start_sample": 469504,
+      "end_sample": 470016,
+      "probability": 0.01057801
+    },
+    {
+      "start_sample": 470016,
+      "end_sample": 470528,
+      "probability": 0.01028663
+    },
+    {
+      "start_sample": 470528,
+      "end_sample": 471040,
+      "probability": 0.01000249
+    },
+    {
+      "start_sample": 471040,
+      "end_sample": 471552,
+      "probability": 0.00972548
+    },
+    {
+      "start_sample": 471552,
+      "end_sample": 472064,
+      "probability": 0.00945559
+    },
+    {
+      "start_sample": 472064,
+      "end_sample": 472576,
+      "probability": 0.00919151
+    },
+    {
+      "start_sample": 472576,
+      "end_sample": 473088,
+      "probability": 0.0089342
+    },
+    {
+      "start_sample": 473088,
+      "end_sample": 473600,
+      "probability": 0.0086838
+    },
+    {
+      "start_sample": 473600,
+      "end_sample": 474112,
+      "probability": 0.00844014
+    },
+    {
+      "start_sample": 474112,
+      "end_sample": 474624,
+      "probability": 0.00820312
+    },
+    {
+      "start_sample": 474624,
+      "end_sample": 475136,
+      "probability": 0.00797254
+    },
+    {
+      "start_sample": 475136,
+      "end_sample": 475648,
+      "probability": 0.00774845
+    },
+    {
+      "start_sample": 475648,
+      "end_sample": 476160,
+      "probability": 0.00753066
+    },
+    {
+      "start_sample": 476160,
+      "end_sample": 476672,
+      "probability": 0.00731912
+    },
+    {
+      "start_sample": 476672,
+      "end_sample": 477184,
+      "probability": 0.00711349
+    },
+    {
+      "start_sample": 477184,
+      "end_sample": 477696,
+      "probability": 0.00691384
+    },
+    {
+      "start_sample": 477696,
+      "end_sample": 478208,
+      "probability": 0.00672138
+    },
+    {
+      "start_sample": 478208,
+      "end_sample": 478720,
+      "probability": 0.00653419
+    },
+    {
+      "start_sample": 478720,
+      "end_sample": 479232,
+      "probability": 0.00635216
+    },
+    {
+      "start_sample": 479232,
+      "end_sample": 479744,
+      "probability": 0.00617504
+    },
+    {
+      "start_sample": 479744,
+      "end_sample": 480256,
+      "probability": 0.10677388
+    },
+    {
+      "start_sample": 480256,
+      "end_sample": 480768,
+      "probability": 0.80328196
+    },
+    {
+      "start_sample": 480768,
+      "end_sample": 481280,
+      "probability": 0.99889994
+    },
+    {
+      "start_sample": 481280,
+      "end_sample": 481792,
+      "probability": 0.99998951
+    },
+    {
+      "start_sample": 481792,
+      "end_sample": 482304,
+      "probability": 0.99970847
+    },
+    {
+      "start_sample": 482304,
+      "end_sample": 482816,
+      "probability": 0.99997568
+    },
+    {
+      "start_sample": 482816,
+      "end_sample": 483328,
+      "probability": 0.99999571
+    },
+    {
+      "start_sample": 483328,
+      "end_sample": 483840,
+      "probability": 0.99998742
+    },
+    {
+      "start_sample": 483840,
+      "end_sample": 484352,
+      "probability": 0.99999636
+    },
+    {
+      "start_sample": 484352,
+      "end_sample": 484864,
+      "probability": 0.99999869
+    },
+    {
+      "start_sample": 484864,
+      "end_sample": 485376,
+      "probability": 0.99999702
+    },
+    {
+      "start_sample": 485376,
+      "end_sample": 485888,
+      "probability": 0.99998409
+    },
+    {
+      "start_sample": 485888,
+      "end_sample": 486400,
+      "probability": 0.99999291
+    },
+    {
+      "start_sample": 486400,
+      "end_sample": 486912,
+      "probability": 0.99999297
+    },
+    {
+      "start_sample": 486912,
+      "end_sample": 487424,
+      "probability": 0.99999136
+    },
+    {
+      "start_sample": 487424,
+      "end_sample": 487936,
+      "probability": 0.99994969
+    },
+    {
+      "start_sample": 487936,
+      "end_sample": 488448,
+      "probability": 0.99916524
+    },
+    {
+      "start_sample": 488448,
+      "end_sample": 488960,
+      "probability": 0.98541987
+    },
+    {
+      "start_sample": 488960,
+      "end_sample": 489472,
+      "probability": 0.95598781
+    },
+    {
+      "start_sample": 489472,
+      "end_sample": 489984,
+      "probability": 0.96120769
+    },
+    {
+      "start_sample": 489984,
+      "end_sample": 490496,
+      "probability": 0.93452895
+    },
+    {
+      "start_sample": 490496,
+      "end_sample": 491008,
+      "probability": 0.97312737
+    },
+    {
+      "start_sample": 491008,
+      "end_sample": 491520,
+      "probability": 0.99974883
+    },
+    {
+      "start_sample": 491520,
+      "end_sample": 492032,
+      "probability": 0.99991441
+    },
+    {
+      "start_sample": 492032,
+      "end_sample": 492544,
+      "probability": 0.99995649
+    },
+    {
+      "start_sample": 492544,
+      "end_sample": 493056,
+      "probability": 0.99997199
+    },
+    {
+      "start_sample": 493056,
+      "end_sample": 493568,
+      "probability": 0.99997985
+    },
+    {
+      "start_sample": 493568,
+      "end_sample": 494080,
+      "probability": 0.99999303
+    },
+    {
+      "start_sample": 494080,
+      "end_sample": 494592,
+      "probability": 0.99997616
+    },
+    {
+      "start_sample": 494592,
+      "end_sample": 495104,
+      "probability": 0.9999519
+    },
+    {
+      "start_sample": 495104,
+      "end_sample": 495616,
+      "probability": 0.99992442
+    },
+    {
+      "start_sample": 495616,
+      "end_sample": 496128,
+      "probability": 0.9991554
+    },
+    {
+      "start_sample": 496128,
+      "end_sample": 496640,
+      "probability": 0.99657977
+    },
+    {
+      "start_sample": 496640,
+      "end_sample": 497152,
+      "probability": 0.99494642
+    },
+    {
+      "start_sample": 497152,
+      "end_sample": 497664,
+      "probability": 0.99384153
+    },
+    {
+      "start_sample": 497664,
+      "end_sample": 498176,
+      "probability": 0.99699056
+    },
+    {
+      "start_sample": 498176,
+      "end_sample": 498688,
+      "probability": 0.99913359
+    },
+    {
+      "start_sample": 498688,
+      "end_sample": 499200,
+      "probability": 0.99984998
+    },
+    {
+      "start_sample": 499200,
+      "end_sample": 499712,
+      "probability": 0.9999851
+    },
+    {
+      "start_sample": 499712,
+      "end_sample": 500224,
+      "probability": 0.99994755
+    },
+    {
+      "start_sample": 500224,
+      "end_sample": 500736,
+      "probability": 0.99984372
+    },
+    {
+      "start_sample": 500736,
+      "end_sample": 501248,
+      "probability": 0.99998879
+    },
+    {
+      "start_sample": 501248,
+      "end_sample": 501760,
+      "probability": 0.99998188
+    },
+    {
+      "start_sample": 501760,
+      "end_sample": 502272,
+      "probability": 0.9999907
+    },
+    {
+      "start_sample": 502272,
+      "end_sample": 502784,
+      "probability": 0.99997211
+    },
+    {
+      "start_sample": 502784,
+      "end_sample": 503296,
+      "probability": 0.99999523
+    },
+    {
+      "start_sample": 503296,
+      "end_sample": 503808,
+      "probability": 0.99999654
+    },
+    {
+      "start_sample": 503808,
+      "end_sample": 504320,
+      "probability": 0.99999875
+    },
+    {
+      "start_sample": 504320,
+      "end_sample": 504832,
+      "probability": 0.99999666
+    },
+    {
+      "start_sample": 504832,
+      "end_sample": 505344,
+      "probability": 0.99999654
+    },
+    {
+      "start_sample": 505344,
+      "end_sample": 505856,
+      "probability": 0.99999362
+    },
+    {
+      "start_sample": 505856,
+      "end_sample": 506368,
+      "probability": 0.99998844
+    },
+    {
+      "start_sample": 506368,
+      "end_sample": 506880,
+      "probability": 0.99996758
+    },
+    {
+      "start_sample": 506880,
+      "end_sample": 507392,
+      "probability": 0.99993038
+    },
+    {
+      "start_sample": 507392,
+      "end_sample": 507904,
+      "probability": 0.99989724
+    },
+    {
+      "start_sample": 507904,
+      "end_sample": 508416,
+      "probability": 0.99973822
+    },
+    {
+      "start_sample": 508416,
+      "end_sample": 508928,
+      "probability": 0.99967653
+    },
+    {
+      "start_sample": 508928,
+      "end_sample": 509440,
+      "probability": 0.99987841
+    },
+    {
+      "start_sample": 509440,
+      "end_sample": 509952,
+      "probability": 0.99895871
+    },
+    {
+      "start_sample": 509952,
+      "end_sample": 510464,
+      "probability": 0.98024458
+    },
+    {
+      "start_sample": 510464,
+      "end_sample": 510976,
+      "probability": 0.9442296
+    },
+    {
+      "start_sample": 510976,
+      "end_sample": 511488,
+      "probability": 0.88260603
+    },
+    {
+      "start_sample": 511488,
+      "end_sample": 512000,
+      "probability": 0.84818614
+    },
+    {
+      "start_sample": 512000,
+      "end_sample": 512512,
+      "probability": 0.86143839
+    },
+    {
+      "start_sample": 512512,
+      "end_sample": 513024,
+      "probability": 0.91177726
+    },
+    {
+      "start_sample": 513024,
+      "end_sample": 513536,
+      "probability": 0.92748976
+    },
+    {
+      "start_sample": 513536,
+      "end_sample": 514048,
+      "probability": 0.81396979
+    },
+    {
+      "start_sample": 514048,
+      "end_sample": 514560,
+      "probability": 0.62906563
+    },
+    {
+      "start_sample": 514560,
+      "end_sample": 515072,
+      "probability": 0.47117352
+    },
+    {
+      "start_sample": 515072,
+      "end_sample": 515584,
+      "probability": 0.78370714
+    },
+    {
+      "start_sample": 515584,
+      "end_sample": 516096,
+      "probability": 0.88885021
+    },
+    {
+      "start_sample": 516096,
+      "end_sample": 516608,
+      "probability": 0.94161201
+    },
+    {
+      "start_sample": 516608,
+      "end_sample": 517120,
+      "probability": 0.97804421
+    },
+    {
+      "start_sample": 517120,
+      "end_sample": 517632,
+      "probability": 0.99507308
+    },
+    {
+      "start_sample": 517632,
+      "end_sample": 518144,
+      "probability": 0.99962205
+    },
+    {
+      "start_sample": 518144,
+      "end_sample": 518656,
+      "probability": 0.99972522
+    },
+    {
+      "start_sample": 518656,
+      "end_sample": 519168,
+      "probability": 0.99961126
+    },
+    {
+      "start_sample": 519168,
+      "end_sample": 519680,
+      "probability": 0.99982202
+    },
+    {
+      "start_sample": 519680,
+      "end_sample": 520192,
+      "probability": 0.99988735
+    },
+    {
+      "start_sample": 520192,
+      "end_sample": 520704,
+      "probability": 0.99990076
+    },
+    {
+      "start_sample": 520704,
+      "end_sample": 521216,
+      "probability": 0.99989277
+    },
+    {
+      "start_sample": 521216,
+      "end_sample": 521728,
+      "probability": 0.99913013
+    },
+    {
+      "start_sample": 521728,
+      "end_sample": 522240,
+      "probability": 0.99983817
+    },
+    {
+      "start_sample": 522240,
+      "end_sample": 522752,
+      "probability": 0.99943292
+    },
+    {
+      "start_sample": 522752,
+      "end_sample": 523264,
+      "probability": 0.99969292
+    },
+    {
+      "start_sample": 523264,
+      "end_sample": 523776,
+      "probability": 0.99961853
+    },
+    {
+      "start_sample": 523776,
+      "end_sample": 524288,
+      "probability": 0.99977493
+    },
+    {
+      "start_sample": 524288,
+      "end_sample": 524800,
+      "probability": 0.99983215
+    },
+    {
+      "start_sample": 524800,
+      "end_sample": 525312,
+      "probability": 0.99985695
+    },
+    {
+      "start_sample": 525312,
+      "end_sample": 525824,
+      "probability": 0.99930042
+    },
+    {
+      "start_sample": 525824,
+      "end_sample": 526336,
+      "probability": 0.99917793
+    },
+    {
+      "start_sample": 526336,
+      "end_sample": 526848,
+      "probability": 0.98459971
+    },
+    {
+      "start_sample": 526848,
+      "end_sample": 527360,
+      "probability": 0.98507988
+    },
+    {
+      "start_sample": 527360,
+      "end_sample": 527872,
+      "probability": 0.99074823
+    },
+    {
+      "start_sample": 527872,
+      "end_sample": 528384,
+      "probability": 0.97525835
+    },
+    {
+      "start_sample": 528384,
+      "end_sample": 528896,
+      "probability": 0.96023273
+    },
+    {
+      "start_sample": 528896,
+      "end_sample": 529408,
+      "probability": 0.99726999
+    },
+    {
+      "start_sample": 529408,
+      "end_sample": 529920,
+      "probability": 0.99974018
+    },
+    {
+      "start_sample": 529920,
+      "end_sample": 530432,
+      "probability": 0.99984086
+    },
+    {
+      "start_sample": 530432,
+      "end_sample": 530944,
+      "probability": 0.99975425
+    },
+    {
+      "start_sample": 530944,
+      "end_sample": 531456,
+      "probability": 0.99715281
+    },
+    {
+      "start_sample": 531456,
+      "end_sample": 531968,
+      "probability": 0.99991846
+    },
+    {
+      "start_sample": 531968,
+      "end_sample": 532480,
+      "probability": 0.99826485
+    },
+    {
+      "start_sample": 532480,
+      "end_sample": 532992,
+      "probability": 0.99913287
+    },
+    {
+      "start_sample": 532992,
+      "end_sample": 533504,
+      "probability": 0.99945116
+    },
+    {
+      "start_sample": 533504,
+      "end_sample": 534016,
+      "probability": 0.99978942
+    },
+    {
+      "start_sample": 534016,
+      "end_sample": 534528,
+      "probability": 0.9998228
+    },
+    {
+      "start_sample": 534528,
+      "end_sample": 535040,
+      "probability": 0.99990404
+    },
+    {
+      "start_sample": 535040,
+      "end_sample": 535552,
+      "probability": 0.99943948
+    },
+    {
+      "start_sample": 535552,
+      "end_sample": 536064,
+      "probability": 0.99759102
+    },
+    {
+      "start_sample": 536064,
+      "end_sample": 536576,
+      "probability": 0.99552476
+    },
+    {
+      "start_sample": 536576,
+      "end_sample": 537088,
+      "probability": 0.99784631
+    },
+    {
+      "start_sample": 537088,
+      "end_sample": 537600,
+      "probability": 0.99608433
+    },
+    {
+      "start_sample": 537600,
+      "end_sample": 538112,
+      "probability": 0.99455225
+    },
+    {
+      "start_sample": 538112,
+      "end_sample": 538624,
+      "probability": 0.98573452
+    },
+    {
+      "start_sample": 538624,
+      "end_sample": 539136,
+      "probability": 0.99933583
+    },
+    {
+      "start_sample": 539136,
+      "end_sample": 539648,
+      "probability": 0.99974227
+    },
+    {
+      "start_sample": 539648,
+      "end_sample": 540160,
+      "probability": 0.99941444
+    },
+    {
+      "start_sample": 540160,
+      "end_sample": 540672,
+      "probability": 0.99923277
+    },
+    {
+      "start_sample": 540672,
+      "end_sample": 541184,
+      "probability": 0.99580407
+    },
+    {
+      "start_sample": 541184,
+      "end_sample": 541696,
+      "probability": 0.9956935
+    },
+    {
+      "start_sample": 541696,
+      "end_sample": 542208,
+      "probability": 0.99743116
+    },
+    {
+      "start_sample": 542208,
+      "end_sample": 542720,
+      "probability": 0.99531257
+    },
+    {
+      "start_sample": 542720,
+      "end_sample": 543232,
+      "probability": 0.99486136
+    },
+    {
+      "start_sample": 543232,
+      "end_sample": 543744,
+      "probability": 0.98904192
+    },
+    {
+      "start_sample": 543744,
+      "end_sample": 544256,
+      "probability": 0.90385532
+    },
+    {
+      "start_sample": 544256,
+      "end_sample": 544768,
+      "probability": 0.5605818
+    },
+    {
+      "start_sample": 544768,
+      "end_sample": 545280,
+      "probability": 0.2772733
+    },
+    {
+      "start_sample": 545280,
+      "end_sample": 545792,
+      "probability": 0.14578471
+    },
+    {
+      "start_sample": 545792,
+      "end_sample": 546304,
+      "probability": 0.08459982
+    },
+    {
+      "start_sample": 546304,
+      "end_sample": 546816,
+      "probability": 0.06135559
+    },
+    {
+      "start_sample": 546816,
+      "end_sample": 547328,
+      "probability": 0.04751799
+    },
+    {
+      "start_sample": 547328,
+      "end_sample": 547840,
+      "probability": 0.04243144
+    },
+    {
+      "start_sample": 547840,
+      "end_sample": 548352,
+      "probability": 0.04348868
+    },
+    {
+      "start_sample": 548352,
+      "end_sample": 548864,
+      "probability": 0.03607932
+    },
+    {
+      "start_sample": 548864,
+      "end_sample": 549376,
+      "probability": 0.03885555
+    },
+    {
+      "start_sample": 549376,
+      "end_sample": 549888,
+      "probability": 0.04356977
+    },
+    {
+      "start_sample": 549888,
+      "end_sample": 550400,
+      "probability": 0.04808456
+    },
+    {
+      "start_sample": 550400,
+      "end_sample": 550912,
+      "probability": 0.06119767
+    },
+    {
+      "start_sample": 550912,
+      "end_sample": 551424,
+      "probability": 0.04068249
+    },
+    {
+      "start_sample": 551424,
+      "end_sample": 551936,
+      "probability": 0.03505087
+    },
+    {
+      "start_sample": 551936,
+      "end_sample": 552448,
+      "probability": 0.02712965
+    },
+    {
+      "start_sample": 552448,
+      "end_sample": 552960,
+      "probability": 0.02751276
+    },
+    {
+      "start_sample": 552960,
+      "end_sample": 553472,
+      "probability": 0.03248522
+    },
+    {
+      "start_sample": 553472,
+      "end_sample": 553984,
+      "probability": 0.03858429
+    },
+    {
+      "start_sample": 553984,
+      "end_sample": 554496,
+      "probability": 0.05941585
+    },
+    {
+      "start_sample": 554496,
+      "end_sample": 555008,
+      "probability": 0.05205089
+    },
+    {
+      "start_sample": 555008,
+      "end_sample": 555520,
+      "probability": 0.03519201
+    },
+    {
+      "start_sample": 555520,
+      "end_sample": 556032,
+      "probability": 0.03920928
+    },
+    {
+      "start_sample": 556032,
+      "end_sample": 556544,
+      "probability": 0.3865537
+    },
+    {
+      "start_sample": 556544,
+      "end_sample": 557056,
+      "probability": 0.39946666
+    },
+    {
+      "start_sample": 557056,
+      "end_sample": 557568,
+      "probability": 0.90360063
+    },
+    {
+      "start_sample": 557568,
+      "end_sample": 558080,
+      "probability": 0.96384168
+    },
+    {
+      "start_sample": 558080,
+      "end_sample": 558592,
+      "probability": 0.97111624
+    },
+    {
+      "start_sample": 558592,
+      "end_sample": 559104,
+      "probability": 0.99678111
+    },
+    {
+      "start_sample": 559104,
+      "end_sample": 559616,
+      "probability": 0.99868953
+    },
+    {
+      "start_sample": 559616,
+      "end_sample": 560128,
+      "probability": 0.99863291
+    },
+    {
+      "start_sample": 560128,
+      "end_sample": 560640,
+      "probability": 0.99947846
+    },
+    {
+      "start_sample": 560640,
+      "end_sample": 561152,
+      "probability": 0.99951231
+    },
+    {
+      "start_sample": 561152,
+      "end_sample": 561664,
+      "probability": 0.99928981
+    },
+    {
+      "start_sample": 561664,
+      "end_sample": 562176,
+      "probability": 0.9985081
+    },
+    {
+      "start_sample": 562176,
+      "end_sample": 562688,
+      "probability": 0.99923849
+    },
+    {
+      "start_sample": 562688,
+      "end_sample": 563200,
+      "probability": 0.99991238
+    },
+    {
+      "start_sample": 563200,
+      "end_sample": 563712,
+      "probability": 0.99986821
+    },
+    {
+      "start_sample": 563712,
+      "end_sample": 564224,
+      "probability": 0.99989641
+    },
+    {
+      "start_sample": 564224,
+      "end_sample": 564736,
+      "probability": 0.99988163
+    },
+    {
+      "start_sample": 564736,
+      "end_sample": 565248,
+      "probability": 0.99991524
+    },
+    {
+      "start_sample": 565248,
+      "end_sample": 565760,
+      "probability": 0.99997318
+    },
+    {
+      "start_sample": 565760,
+      "end_sample": 566272,
+      "probability": 0.9999609
+    },
+    {
+      "start_sample": 566272,
+      "end_sample": 566784,
+      "probability": 0.99995852
+    },
+    {
+      "start_sample": 566784,
+      "end_sample": 567296,
+      "probability": 0.99926245
+    },
+    {
+      "start_sample": 567296,
+      "end_sample": 567808,
+      "probability": 0.99946618
+    },
+    {
+      "start_sample": 567808,
+      "end_sample": 568320,
+      "probability": 0.9979713
+    },
+    {
+      "start_sample": 568320,
+      "end_sample": 568832,
+      "probability": 0.99907744
+    },
+    {
+      "start_sample": 568832,
+      "end_sample": 569344,
+      "probability": 0.99934781
+    },
+    {
+      "start_sample": 569344,
+      "end_sample": 569856,
+      "probability": 0.99967575
+    },
+    {
+      "start_sample": 569856,
+      "end_sample": 570368,
+      "probability": 0.99983311
+    },
+    {
+      "start_sample": 570368,
+      "end_sample": 570880,
+      "probability": 0.99960995
+    },
+    {
+      "start_sample": 570880,
+      "end_sample": 571392,
+      "probability": 0.99880952
+    },
+    {
+      "start_sample": 571392,
+      "end_sample": 571904,
+      "probability": 0.99951506
+    },
+    {
+      "start_sample": 571904,
+      "end_sample": 572416,
+      "probability": 0.99989009
+    },
+    {
+      "start_sample": 572416,
+      "end_sample": 572928,
+      "probability": 0.99996185
+    },
+    {
+      "start_sample": 572928,
+      "end_sample": 573440,
+      "probability": 0.99993813
+    },
+    {
+      "start_sample": 573440,
+      "end_sample": 573952,
+      "probability": 0.99992788
+    },
+    {
+      "start_sample": 573952,
+      "end_sample": 574464,
+      "probability": 0.99991506
+    },
+    {
+      "start_sample": 574464,
+      "end_sample": 574976,
+      "probability": 0.99902105
+    },
+    {
+      "start_sample": 574976,
+      "end_sample": 575488,
+      "probability": 0.99918127
+    },
+    {
+      "start_sample": 575488,
+      "end_sample": 576000,
+      "probability": 0.99989367
+    },
+    {
+      "start_sample": 576000,
+      "end_sample": 576512,
+      "probability": 0.99996901
+    },
+    {
+      "start_sample": 576512,
+      "end_sample": 577024,
+      "probability": 0.99998546
+    },
+    {
+      "start_sample": 577024,
+      "end_sample": 577536,
+      "probability": 0.9999907
+    },
+    {
+      "start_sample": 577536,
+      "end_sample": 578048,
+      "probability": 0.99999297
+    },
+    {
+      "start_sample": 578048,
+      "end_sample": 578560,
+      "probability": 0.99999756
+    },
+    {
+      "start_sample": 578560,
+      "end_sample": 579072,
+      "probability": 0.99998856
+    },
+    {
+      "start_sample": 579072,
+      "end_sample": 579584,
+      "probability": 0.99997795
+    },
+    {
+      "start_sample": 579584,
+      "end_sample": 580096,
+      "probability": 0.99999321
+    },
+    {
+      "start_sample": 580096,
+      "end_sample": 580608,
+      "probability": 0.99994683
+    },
+    {
+      "start_sample": 580608,
+      "end_sample": 581120,
+      "probability": 0.99998534
+    },
+    {
+      "start_sample": 581120,
+      "end_sample": 581632,
+      "probability": 0.99997008
+    },
+    {
+      "start_sample": 581632,
+      "end_sample": 582144,
+      "probability": 0.99986756
+    },
+    {
+      "start_sample": 582144,
+      "end_sample": 582656,
+      "probability": 0.99986261
+    },
+    {
+      "start_sample": 582656,
+      "end_sample": 583168,
+      "probability": 0.99264979
+    },
+    {
+      "start_sample": 583168,
+      "end_sample": 583680,
+      "probability": 0.71851695
+    },
+    {
+      "start_sample": 583680,
+      "end_sample": 584192,
+      "probability": 0.45557284
+    },
+    {
+      "start_sample": 584192,
+      "end_sample": 584704,
+      "probability": 0.32871842
+    },
+    {
+      "start_sample": 584704,
+      "end_sample": 585216,
+      "probability": 0.21620134
+    },
+    {
+      "start_sample": 585216,
+      "end_sample": 585728,
+      "probability": 0.48363274
+    },
+    {
+      "start_sample": 585728,
+      "end_sample": 586240,
+      "probability": 0.99494028
+    },
+    {
+      "start_sample": 586240,
+      "end_sample": 586752,
+      "probability": 0.99980944
+    },
+    {
+      "start_sample": 586752,
+      "end_sample": 587264,
+      "probability": 0.99999726
+    },
+    {
+      "start_sample": 587264,
+      "end_sample": 587776,
+      "probability": 0.9999758
+    },
+    {
+      "start_sample": 587776,
+      "end_sample": 588288,
+      "probability": 0.99998689
+    },
+    {
+      "start_sample": 588288,
+      "end_sample": 588800,
+      "probability": 0.99998933
+    },
+    {
+      "start_sample": 588800,
+      "end_sample": 589312,
+      "probability": 0.99999571
+    },
+    {
+      "start_sample": 589312,
+      "end_sample": 589824,
+      "probability": 0.99997008
+    },
+    {
+      "start_sample": 589824,
+      "end_sample": 590336,
+      "probability": 0.99999815
+    },
+    {
+      "start_sample": 590336,
+      "end_sample": 590848,
+      "probability": 0.99999869
+    },
+    {
+      "start_sample": 590848,
+      "end_sample": 591360,
+      "probability": 0.99999774
+    },
+    {
+      "start_sample": 591360,
+      "end_sample": 591872,
+      "probability": 0.99999869
+    },
+    {
+      "start_sample": 591872,
+      "end_sample": 592384,
+      "probability": 0.99999726
+    },
+    {
+      "start_sample": 592384,
+      "end_sample": 592896,
+      "probability": 0.99999899
+    },
+    {
+      "start_sample": 592896,
+      "end_sample": 593408,
+      "probability": 0.99999827
+    },
+    {
+      "start_sample": 593408,
+      "end_sample": 593920,
+      "probability": 0.9999246
+    },
+    {
+      "start_sample": 593920,
+      "end_sample": 594432,
+      "probability": 0.99999785
+    },
+    {
+      "start_sample": 594432,
+      "end_sample": 594944,
+      "probability": 0.99999893
+    },
+    {
+      "start_sample": 594944,
+      "end_sample": 595456,
+      "probability": 0.99999946
+    },
+    {
+      "start_sample": 595456,
+      "end_sample": 595968,
+      "probability": 0.99999809
+    },
+    {
+      "start_sample": 595968,
+      "end_sample": 596480,
+      "probability": 0.99999607
+    },
+    {
+      "start_sample": 596480,
+      "end_sample": 596992,
+      "probability": 0.99999428
+    },
+    {
+      "start_sample": 596992,
+      "end_sample": 597504,
+      "probability": 0.99998915
+    },
+    {
+      "start_sample": 597504,
+      "end_sample": 598016,
+      "probability": 0.99998188
+    },
+    {
+      "start_sample": 598016,
+      "end_sample": 598528,
+      "probability": 0.99997795
+    },
+    {
+      "start_sample": 598528,
+      "end_sample": 599040,
+      "probability": 0.99997568
+    },
+    {
+      "start_sample": 599040,
+      "end_sample": 599552,
+      "probability": 0.99996364
+    },
+    {
+      "start_sample": 599552,
+      "end_sample": 600064,
+      "probability": 0.9998827
+    },
+    {
+      "start_sample": 600064,
+      "end_sample": 600576,
+      "probability": 0.97215998
+    },
+    {
+      "start_sample": 600576,
+      "end_sample": 601088,
+      "probability": 0.73161292
+    },
+    {
+      "start_sample": 601088,
+      "end_sample": 601600,
+      "probability": 0.32036194
+    },
+    {
+      "start_sample": 601600,
+      "end_sample": 602112,
+      "probability": 0.16462231
+    },
+    {
+      "start_sample": 602112,
+      "end_sample": 602624,
+      "probability": 0.08281493
+    },
+    {
+      "start_sample": 602624,
+      "end_sample": 603136,
+      "probability": 0.05900583
+    },
+    {
+      "start_sample": 603136,
+      "end_sample": 603648,
+      "probability": 0.05118573
+    },
+    {
+      "start_sample": 603648,
+      "end_sample": 604160,
+      "probability": 0.04098013
+    },
+    {
+      "start_sample": 604160,
+      "end_sample": 604672,
+      "probability": 0.03457147
+    },
+    {
+      "start_sample": 604672,
+      "end_sample": 605184,
+      "probability": 0.02870673
+    },
+    {
+      "start_sample": 605184,
+      "end_sample": 605696,
+      "probability": 0.77767003
+    },
+    {
+      "start_sample": 605696,
+      "end_sample": 606208,
+      "probability": 0.99805224
+    },
+    {
+      "start_sample": 606208,
+      "end_sample": 606720,
+      "probability": 0.99979246
+    },
+    {
+      "start_sample": 606720,
+      "end_sample": 607232,
+      "probability": 0.99960279
+    },
+    {
+      "start_sample": 607232,
+      "end_sample": 607744,
+      "probability": 0.99967122
+    },
+    {
+      "start_sample": 607744,
+      "end_sample": 608256,
+      "probability": 0.99986941
+    },
+    {
+      "start_sample": 608256,
+      "end_sample": 608768,
+      "probability": 0.99999154
+    },
+    {
+      "start_sample": 608768,
+      "end_sample": 609280,
+      "probability": 0.9999882
+    },
+    {
+      "start_sample": 609280,
+      "end_sample": 609792,
+      "probability": 0.99999356
+    },
+    {
+      "start_sample": 609792,
+      "end_sample": 610304,
+      "probability": 0.9999907
+    },
+    {
+      "start_sample": 610304,
+      "end_sample": 610816,
+      "probability": 0.99996853
+    },
+    {
+      "start_sample": 610816,
+      "end_sample": 611328,
+      "probability": 0.99989605
+    },
+    {
+      "start_sample": 611328,
+      "end_sample": 611840,
+      "probability": 0.99995935
+    },
+    {
+      "start_sample": 611840,
+      "end_sample": 612352,
+      "probability": 0.99991906
+    },
+    {
+      "start_sample": 612352,
+      "end_sample": 612864,
+      "probability": 0.99964768
+    },
+    {
+      "start_sample": 612864,
+      "end_sample": 613376,
+      "probability": 0.99920231
+    },
+    {
+      "start_sample": 613376,
+      "end_sample": 613888,
+      "probability": 0.998411
+    },
+    {
+      "start_sample": 613888,
+      "end_sample": 614400,
+      "probability": 0.99692035
+    },
+    {
+      "start_sample": 614400,
+      "end_sample": 614912,
+      "probability": 0.998523
+    },
+    {
+      "start_sample": 614912,
+      "end_sample": 615424,
+      "probability": 0.99960887
+    },
+    {
+      "start_sample": 615424,
+      "end_sample": 615936,
+      "probability": 0.99382073
+    },
+    {
+      "start_sample": 615936,
+      "end_sample": 616448,
+      "probability": 0.99991071
+    },
+    {
+      "start_sample": 616448,
+      "end_sample": 616960,
+      "probability": 0.99992967
+    },
+    {
+      "start_sample": 616960,
+      "end_sample": 617472,
+      "probability": 0.99998534
+    },
+    {
+      "start_sample": 617472,
+      "end_sample": 617984,
+      "probability": 0.9999764
+    },
+    {
+      "start_sample": 617984,
+      "end_sample": 618496,
+      "probability": 0.99998033
+    },
+    {
+      "start_sample": 618496,
+      "end_sample": 619008,
+      "probability": 0.99988663
+    },
+    {
+      "start_sample": 619008,
+      "end_sample": 619520,
+      "probability": 0.99975955
+    },
+    {
+      "start_sample": 619520,
+      "end_sample": 620032,
+      "probability": 0.98887408
+    },
+    {
+      "start_sample": 620032,
+      "end_sample": 620544,
+      "probability": 0.77380013
+    },
+    {
+      "start_sample": 620544,
+      "end_sample": 621056,
+      "probability": 0.31707346
+    },
+    {
+      "start_sample": 621056,
+      "end_sample": 621568,
+      "probability": 0.21777961
+    },
+    {
+      "start_sample": 621568,
+      "end_sample": 622080,
+      "probability": 0.17576942
+    },
+    {
+      "start_sample": 622080,
+      "end_sample": 622592,
+      "probability": 0.13829216
+    },
+    {
+      "start_sample": 622592,
+      "end_sample": 623104,
+      "probability": 0.07916331
+    },
+    {
+      "start_sample": 623104,
+      "end_sample": 623616,
+      "probability": 0.05225027
+    },
+    {
+      "start_sample": 623616,
+      "end_sample": 624128,
+      "probability": 0.03085968
+    },
+    {
+      "start_sample": 624128,
+      "end_sample": 624640,
+      "probability": 0.02934843
+    },
+    {
+      "start_sample": 624640,
+      "end_sample": 625152,
+      "probability": 0.03442201
+    },
+    {
+      "start_sample": 625152,
+      "end_sample": 625664,
+      "probability": 0.04908839
+    },
+    {
+      "start_sample": 625664,
+      "end_sample": 626176,
+      "probability": 0.06872076
+    },
+    {
+      "start_sample": 626176,
+      "end_sample": 626688,
+      "probability": 0.05271986
+    },
+    {
+      "start_sample": 626688,
+      "end_sample": 627200,
+      "probability": 0.45560917
+    },
+    {
+      "start_sample": 627200,
+      "end_sample": 627712,
+      "probability": 0.62807417
+    },
+    {
+      "start_sample": 627712,
+      "end_sample": 628224,
+      "probability": 0.99873531
+    },
+    {
+      "start_sample": 628224,
+      "end_sample": 628736,
+      "probability": 0.99960291
+    },
+    {
+      "start_sample": 628736,
+      "end_sample": 629248,
+      "probability": 0.99992144
+    },
+    {
+      "start_sample": 629248,
+      "end_sample": 629760,
+      "probability": 0.99997222
+    },
+    {
+      "start_sample": 629760,
+      "end_sample": 630272,
+      "probability": 0.99992561
+    },
+    {
+      "start_sample": 630272,
+      "end_sample": 630784,
+      "probability": 0.99994922
+    },
+    {
+      "start_sample": 630784,
+      "end_sample": 631296,
+      "probability": 0.99982119
+    },
+    {
+      "start_sample": 631296,
+      "end_sample": 631808,
+      "probability": 0.99972177
+    },
+    {
+      "start_sample": 631808,
+      "end_sample": 632320,
+      "probability": 0.99984878
+    },
+    {
+      "start_sample": 632320,
+      "end_sample": 632832,
+      "probability": 0.99994254
+    },
+    {
+      "start_sample": 632832,
+      "end_sample": 633344,
+      "probability": 0.9999693
+    },
+    {
+      "start_sample": 633344,
+      "end_sample": 633856,
+      "probability": 0.99986976
+    },
+    {
+      "start_sample": 633856,
+      "end_sample": 634368,
+      "probability": 0.99992931
+    },
+    {
+      "start_sample": 634368,
+      "end_sample": 634880,
+      "probability": 0.99893785
+    },
+    {
+      "start_sample": 634880,
+      "end_sample": 635392,
+      "probability": 0.99453503
+    },
+    {
+      "start_sample": 635392,
+      "end_sample": 635904,
+      "probability": 0.99759835
+    },
+    {
+      "start_sample": 635904,
+      "end_sample": 636416,
+      "probability": 0.99894595
+    },
+    {
+      "start_sample": 636416,
+      "end_sample": 636928,
+      "probability": 0.99897718
+    },
+    {
+      "start_sample": 636928,
+      "end_sample": 637440,
+      "probability": 0.99833608
+    },
+    {
+      "start_sample": 637440,
+      "end_sample": 637952,
+      "probability": 0.99634969
+    },
+    {
+      "start_sample": 637952,
+      "end_sample": 638464,
+      "probability": 0.9996742
+    },
+    {
+      "start_sample": 638464,
+      "end_sample": 638976,
+      "probability": 0.99982208
+    },
+    {
+      "start_sample": 638976,
+      "end_sample": 639488,
+      "probability": 0.99934667
+    },
+    {
+      "start_sample": 639488,
+      "end_sample": 640000,
+      "probability": 0.99966508
+    },
+    {
+      "start_sample": 640000,
+      "end_sample": 640512,
+      "probability": 0.99957275
+    },
+    {
+      "start_sample": 640512,
+      "end_sample": 641024,
+      "probability": 0.9993825
+    },
+    {
+      "start_sample": 641024,
+      "end_sample": 641536,
+      "probability": 0.99875867
+    },
+    {
+      "start_sample": 641536,
+      "end_sample": 642048,
+      "probability": 0.99979866
+    },
+    {
+      "start_sample": 642048,
+      "end_sample": 642560,
+      "probability": 0.99994141
+    },
+    {
+      "start_sample": 642560,
+      "end_sample": 643072,
+      "probability": 0.99991333
+    },
+    {
+      "start_sample": 643072,
+      "end_sample": 643584,
+      "probability": 0.99965388
+    },
+    {
+      "start_sample": 643584,
+      "end_sample": 644096,
+      "probability": 0.99991965
+    },
+    {
+      "start_sample": 644096,
+      "end_sample": 644608,
+      "probability": 0.99975705
+    },
+    {
+      "start_sample": 644608,
+      "end_sample": 645120,
+      "probability": 0.9996562
+    },
+    {
+      "start_sample": 645120,
+      "end_sample": 645632,
+      "probability": 0.99963593
+    },
+    {
+      "start_sample": 645632,
+      "end_sample": 646144,
+      "probability": 0.99839211
+    },
+    {
+      "start_sample": 646144,
+      "end_sample": 646656,
+      "probability": 0.99996334
+    },
+    {
+      "start_sample": 646656,
+      "end_sample": 647168,
+      "probability": 0.99997234
+    },
+    {
+      "start_sample": 647168,
+      "end_sample": 647680,
+      "probability": 0.99993896
+    },
+    {
+      "start_sample": 647680,
+      "end_sample": 648192,
+      "probability": 0.99990153
+    },
+    {
+      "start_sample": 648192,
+      "end_sample": 648704,
+      "probability": 0.99801958
+    },
+    {
+      "start_sample": 648704,
+      "end_sample": 649216,
+      "probability": 0.99097085
+    },
+    {
+      "start_sample": 649216,
+      "end_sample": 649728,
+      "probability": 0.99069178
+    },
+    {
+      "start_sample": 649728,
+      "end_sample": 650240,
+      "probability": 0.97325361
+    },
+    {
+      "start_sample": 650240,
+      "end_sample": 650752,
+      "probability": 0.41150004
+    },
+    {
+      "start_sample": 650752,
+      "end_sample": 651264,
+      "probability": 0.13596869
+    },
+    {
+      "start_sample": 651264,
+      "end_sample": 651776,
+      "probability": 0.0547626
+    },
+    {
+      "start_sample": 651776,
+      "end_sample": 652288,
+      "probability": 0.03793564
+    },
+    {
+      "start_sample": 652288,
+      "end_sample": 652800,
+      "probability": 0.02970755
+    },
+    {
+      "start_sample": 652800,
+      "end_sample": 653312,
+      "probability": 0.02506277
+    },
+    {
+      "start_sample": 653312,
+      "end_sample": 653824,
+      "probability": 0.02291924
+    },
+    {
+      "start_sample": 653824,
+      "end_sample": 654336,
+      "probability": 0.02146229
+    },
+    {
+      "start_sample": 654336,
+      "end_sample": 654848,
+      "probability": 0.02461854
+    },
+    {
+      "start_sample": 654848,
+      "end_sample": 655360,
+      "probability": 0.02337661
+    },
+    {
+      "start_sample": 655360,
+      "end_sample": 655872,
+      "probability": 0.02134803
+    },
+    {
+      "start_sample": 655872,
+      "end_sample": 656384,
+      "probability": 0.01714084
+    },
+    {
+      "start_sample": 656384,
+      "end_sample": 656896,
+      "probability": 0.02361435
+    },
+    {
+      "start_sample": 656896,
+      "end_sample": 657408,
+      "probability": 0.0259451
+    },
+    {
+      "start_sample": 657408,
+      "end_sample": 657920,
+      "probability": 0.02582738
+    },
+    {
+      "start_sample": 657920,
+      "end_sample": 658432,
+      "probability": 0.02460933
+    },
+    {
+      "start_sample": 658432,
+      "end_sample": 658944,
+      "probability": 0.02273548
+    },
+    {
+      "start_sample": 658944,
+      "end_sample": 659456,
+      "probability": 0.02123728
+    },
+    {
+      "start_sample": 659456,
+      "end_sample": 659968,
+      "probability": 0.01994222
+    },
+    {
+      "start_sample": 659968,
+      "end_sample": 660480,
+      "probability": 0.01888329
+    },
+    {
+      "start_sample": 660480,
+      "end_sample": 660992,
+      "probability": 0.0180203
+    },
+    {
+      "start_sample": 660992,
+      "end_sample": 661504,
+      "probability": 0.01727736
+    },
+    {
+      "start_sample": 661504,
+      "end_sample": 662016,
+      "probability": 0.01662832
+    },
+    {
+      "start_sample": 662016,
+      "end_sample": 662528,
+      "probability": 0.0160512
+    },
+    {
+      "start_sample": 662528,
+      "end_sample": 663040,
+      "probability": 0.27369213
+    },
+    {
+      "start_sample": 663040,
+      "end_sample": 663552,
+      "probability": 0.99268132
+    },
+    {
+      "start_sample": 663552,
+      "end_sample": 664064,
+      "probability": 0.99988467
+    },
+    {
+      "start_sample": 664064,
+      "end_sample": 664576,
+      "probability": 0.99999249
+    },
+    {
+      "start_sample": 664576,
+      "end_sample": 665088,
+      "probability": 0.99992168
+    },
+    {
+      "start_sample": 665088,
+      "end_sample": 665600,
+      "probability": 0.99998426
+    },
+    {
+      "start_sample": 665600,
+      "end_sample": 666112,
+      "probability": 0.99997807
+    },
+    {
+      "start_sample": 666112,
+      "end_sample": 666624,
+      "probability": 0.99998724
+    },
+    {
+      "start_sample": 666624,
+      "end_sample": 667136,
+      "probability": 0.99998063
+    },
+    {
+      "start_sample": 667136,
+      "end_sample": 667648,
+      "probability": 0.9999944
+    },
+    {
+      "start_sample": 667648,
+      "end_sample": 668160,
+      "probability": 0.99999446
+    },
+    {
+      "start_sample": 668160,
+      "end_sample": 668672,
+      "probability": 0.99999768
+    },
+    {
+      "start_sample": 668672,
+      "end_sample": 669184,
+      "probability": 0.99992645
+    },
+    {
+      "start_sample": 669184,
+      "end_sample": 669696,
+      "probability": 0.99738985
+    },
+    {
+      "start_sample": 669696,
+      "end_sample": 670208,
+      "probability": 0.99695992
+    },
+    {
+      "start_sample": 670208,
+      "end_sample": 670720,
+      "probability": 0.99286562
+    },
+    {
+      "start_sample": 670720,
+      "end_sample": 671232,
+      "probability": 0.99993956
+    },
+    {
+      "start_sample": 671232,
+      "end_sample": 671744,
+      "probability": 0.99999487
+    },
+    {
+      "start_sample": 671744,
+      "end_sample": 672256,
+      "probability": 0.99999702
+    },
+    {
+      "start_sample": 672256,
+      "end_sample": 672768,
+      "probability": 0.99997723
+    },
+    {
+      "start_sample": 672768,
+      "end_sample": 673280,
+      "probability": 0.99997586
+    },
+    {
+      "start_sample": 673280,
+      "end_sample": 673792,
+      "probability": 0.9999969
+    },
+    {
+      "start_sample": 673792,
+      "end_sample": 674304,
+      "probability": 0.99993312
+    },
+    {
+      "start_sample": 674304,
+      "end_sample": 674816,
+      "probability": 0.99987322
+    },
+    {
+      "start_sample": 674816,
+      "end_sample": 675328,
+      "probability": 0.99959189
+    },
+    {
+      "start_sample": 675328,
+      "end_sample": 675840,
+      "probability": 0.9997173
+    },
+    {
+      "start_sample": 675840,
+      "end_sample": 676352,
+      "probability": 0.99976975
+    },
+    {
+      "start_sample": 676352,
+      "end_sample": 676864,
+      "probability": 0.99997854
+    },
+    {
+      "start_sample": 676864,
+      "end_sample": 677376,
+      "probability": 0.99999785
+    },
+    {
+      "start_sample": 677376,
+      "end_sample": 677888,
+      "probability": 0.99997938
+    },
+    {
+      "start_sample": 677888,
+      "end_sample": 678400,
+      "probability": 0.99993527
+    },
+    {
+      "start_sample": 678400,
+      "end_sample": 678912,
+      "probability": 0.99993104
+    },
+    {
+      "start_sample": 678912,
+      "end_sample": 679424,
+      "probability": 0.99999386
+    },
+    {
+      "start_sample": 679424,
+      "end_sample": 679936,
+      "probability": 0.9999963
+    },
+    {
+      "start_sample": 679936,
+      "end_sample": 680448,
+      "probability": 0.99999809
+    },
+    {
+      "start_sample": 680448,
+      "end_sample": 680960,
+      "probability": 0.99992144
+    },
+    {
+      "start_sample": 680960,
+      "end_sample": 681472,
+      "probability": 0.99995542
+    },
+    {
+      "start_sample": 681472,
+      "end_sample": 681984,
+      "probability": 0.99998945
+    },
+    {
+      "start_sample": 681984,
+      "end_sample": 682496,
+      "probability": 0.99999303
+    },
+    {
+      "start_sample": 682496,
+      "end_sample": 683008,
+      "probability": 0.99999541
+    },
+    {
+      "start_sample": 683008,
+      "end_sample": 683520,
+      "probability": 0.99997461
+    },
+    {
+      "start_sample": 683520,
+      "end_sample": 684032,
+      "probability": 0.99995929
+    },
+    {
+      "start_sample": 684032,
+      "end_sample": 684544,
+      "probability": 0.99998724
+    },
+    {
+      "start_sample": 684544,
+      "end_sample": 685056,
+      "probability": 0.99999595
+    },
+    {
+      "start_sample": 685056,
+      "end_sample": 685568,
+      "probability": 0.99999809
+    },
+    {
+      "start_sample": 685568,
+      "end_sample": 686080,
+      "probability": 0.99999392
+    },
+    {
+      "start_sample": 686080,
+      "end_sample": 686592,
+      "probability": 0.99998987
+    },
+    {
+      "start_sample": 686592,
+      "end_sample": 687104,
+      "probability": 0.99998683
+    },
+    {
+      "start_sample": 687104,
+      "end_sample": 687616,
+      "probability": 0.99999344
+    },
+    {
+      "start_sample": 687616,
+      "end_sample": 688128,
+      "probability": 0.99999762
+    },
+    {
+      "start_sample": 688128,
+      "end_sample": 688640,
+      "probability": 0.99999046
+    },
+    {
+      "start_sample": 688640,
+      "end_sample": 689152,
+      "probability": 0.99999762
+    },
+    {
+      "start_sample": 689152,
+      "end_sample": 689664,
+      "probability": 0.99999869
+    },
+    {
+      "start_sample": 689664,
+      "end_sample": 690176,
+      "probability": 0.99998468
+    },
+    {
+      "start_sample": 690176,
+      "end_sample": 690688,
+      "probability": 0.99999416
+    },
+    {
+      "start_sample": 690688,
+      "end_sample": 691200,
+      "probability": 0.99999642
+    },
+    {
+      "start_sample": 691200,
+      "end_sample": 691712,
+      "probability": 0.99999595
+    },
+    {
+      "start_sample": 691712,
+      "end_sample": 692224,
+      "probability": 0.99996948
+    },
+    {
+      "start_sample": 692224,
+      "end_sample": 692736,
+      "probability": 0.99997246
+    },
+    {
+      "start_sample": 692736,
+      "end_sample": 693248,
+      "probability": 0.99998546
+    },
+    {
+      "start_sample": 693248,
+      "end_sample": 693760,
+      "probability": 0.99996263
+    },
+    {
+      "start_sample": 693760,
+      "end_sample": 694272,
+      "probability": 0.99999529
+    },
+    {
+      "start_sample": 694272,
+      "end_sample": 694784,
+      "probability": 0.99995065
+    },
+    {
+      "start_sample": 694784,
+      "end_sample": 695296,
+      "probability": 0.99998462
+    },
+    {
+      "start_sample": 695296,
+      "end_sample": 695808,
+      "probability": 0.99669504
+    },
+    {
+      "start_sample": 695808,
+      "end_sample": 696320,
+      "probability": 0.99985474
+    },
+    {
+      "start_sample": 696320,
+      "end_sample": 696832,
+      "probability": 0.99997449
+    },
+    {
+      "start_sample": 696832,
+      "end_sample": 697344,
+      "probability": 0.99983585
+    },
+    {
+      "start_sample": 697344,
+      "end_sample": 697856,
+      "probability": 0.99955106
+    },
+    {
+      "start_sample": 697856,
+      "end_sample": 698368,
+      "probability": 0.9993459
+    },
+    {
+      "start_sample": 698368,
+      "end_sample": 698880,
+      "probability": 0.99996978
+    },
+    {
+      "start_sample": 698880,
+      "end_sample": 699392,
+      "probability": 0.99993771
+    },
+    {
+      "start_sample": 699392,
+      "end_sample": 699904,
+      "probability": 0.99998498
+    },
+    {
+      "start_sample": 699904,
+      "end_sample": 700416,
+      "probability": 0.99999267
+    },
+    {
+      "start_sample": 700416,
+      "end_sample": 700928,
+      "probability": 0.99998689
+    },
+    {
+      "start_sample": 700928,
+      "end_sample": 701440,
+      "probability": 0.99999708
+    },
+    {
+      "start_sample": 701440,
+      "end_sample": 701952,
+      "probability": 0.99962068
+    },
+    {
+      "start_sample": 701952,
+      "end_sample": 702464,
+      "probability": 0.99998391
+    },
+    {
+      "start_sample": 702464,
+      "end_sample": 702976,
+      "probability": 0.99999619
+    },
+    {
+      "start_sample": 702976,
+      "end_sample": 703488,
+      "probability": 0.99999487
+    },
+    {
+      "start_sample": 703488,
+      "end_sample": 704000,
+      "probability": 0.99999261
+    },
+    {
+      "start_sample": 704000,
+      "end_sample": 704512,
+      "probability": 0.99999404
+    },
+    {
+      "start_sample": 704512,
+      "end_sample": 705024,
+      "probability": 0.99995953
+    },
+    {
+      "start_sample": 705024,
+      "end_sample": 705536,
+      "probability": 0.99985707
+    },
+    {
+      "start_sample": 705536,
+      "end_sample": 706048,
+      "probability": 0.73065865
+    },
+    {
+      "start_sample": 706048,
+      "end_sample": 706560,
+      "probability": 0.05002302
+    },
+    {
+      "start_sample": 706560,
+      "end_sample": 707072,
+      "probability": 0.02056113
+    },
+    {
+      "start_sample": 707072,
+      "end_sample": 707584,
+      "probability": 0.01388791
+    },
+    {
+      "start_sample": 707584,
+      "end_sample": 708096,
+      "probability": 0.01495469
+    },
+    {
+      "start_sample": 708096,
+      "end_sample": 708608,
+      "probability": 0.01637229
+    },
+    {
+      "start_sample": 708608,
+      "end_sample": 709120,
+      "probability": 0.01746216
+    },
+    {
+      "start_sample": 709120,
+      "end_sample": 709632,
+      "probability": 0.01908275
+    },
+    {
+      "start_sample": 709632,
+      "end_sample": 710144,
+      "probability": 0.02105287
+    },
+    {
+      "start_sample": 710144,
+      "end_sample": 710656,
+      "probability": 0.02302477
+    },
+    {
+      "start_sample": 710656,
+      "end_sample": 711168,
+      "probability": 0.0247567
+    },
+    {
+      "start_sample": 711168,
+      "end_sample": 711680,
+      "probability": 0.02616715
+    },
+    {
+      "start_sample": 711680,
+      "end_sample": 712192,
+      "probability": 0.02723372
+    },
+    {
+      "start_sample": 712192,
+      "end_sample": 712704,
+      "probability": 0.02799571
+    },
+    {
+      "start_sample": 712704,
+      "end_sample": 713216,
+      "probability": 0.02849284
+    },
+    {
+      "start_sample": 713216,
+      "end_sample": 713728,
+      "probability": 0.02877069
+    },
+    {
+      "start_sample": 713728,
+      "end_sample": 714240,
+      "probability": 0.02887705
+    },
+    {
+      "start_sample": 714240,
+      "end_sample": 714752,
+      "probability": 0.02886397
+    },
+    {
+      "start_sample": 714752,
+      "end_sample": 715264,
+      "probability": 0.02872309
+    },
+    {
+      "start_sample": 715264,
+      "end_sample": 715776,
+      "probability": 0.02847725
+    },
+    {
+      "start_sample": 715776,
+      "end_sample": 716288,
+      "probability": 0.02815899
+    },
+    {
+      "start_sample": 716288,
+      "end_sample": 716800,
+      "probability": 0.0278134
+    },
+    {
+      "start_sample": 716800,
+      "end_sample": 717312,
+      "probability": 0.02737615
+    },
+    {
+      "start_sample": 717312,
+      "end_sample": 717824,
+      "probability": 0.02683401
+    },
+    {
+      "start_sample": 717824,
+      "end_sample": 718336,
+      "probability": 0.026274
+    },
+    {
+      "start_sample": 718336,
+      "end_sample": 718848,
+      "probability": 0.02570328
+    },
+    {
+      "start_sample": 718848,
+      "end_sample": 719360,
+      "probability": 0.02512458
+    },
+    {
+      "start_sample": 719360,
+      "end_sample": 719872,
+      "probability": 0.02454257
+    },
+    {
+      "start_sample": 719872,
+      "end_sample": 720384,
+      "probability": 0.02396089
+    },
+    {
+      "start_sample": 720384,
+      "end_sample": 720896,
+      "probability": 0.02338231
+    },
+    {
+      "start_sample": 720896,
+      "end_sample": 721408,
+      "probability": 0.02280885
+    },
+    {
+      "start_sample": 721408,
+      "end_sample": 721920,
+      "probability": 0.0222421
+    },
+    {
+      "start_sample": 721920,
+      "end_sample": 722432,
+      "probability": 0.02168322
+    },
+    {
+      "start_sample": 722432,
+      "end_sample": 722944,
+      "probability": 0.02113307
+    },
+    {
+      "start_sample": 722944,
+      "end_sample": 723456,
+      "probability": 0.02059194
+    },
+    {
+      "start_sample": 723456,
+      "end_sample": 723968,
+      "probability": 0.02006063
+    },
+    {
+      "start_sample": 723968,
+      "end_sample": 724480,
+      "probability": 0.01953918
+    },
+    {
+      "start_sample": 724480,
+      "end_sample": 724992,
+      "probability": 0.01902765
+    },
+    {
+      "start_sample": 724992,
+      "end_sample": 725504,
+      "probability": 0.01852617
+    },
+    {
+      "start_sample": 725504,
+      "end_sample": 726016,
+      "probability": 0.01803464
+    },
+    {
+      "start_sample": 726016,
+      "end_sample": 726528,
+      "probability": 0.01755306
+    },
+    {
+      "start_sample": 726528,
+      "end_sample": 727040,
+      "probability": 0.0170815
+    },
+    {
+      "start_sample": 727040,
+      "end_sample": 727552,
+      "probability": 0.01661983
+    },
+    {
+      "start_sample": 727552,
+      "end_sample": 728064,
+      "probability": 0.01616785
+    },
+    {
+      "start_sample": 728064,
+      "end_sample": 728576,
+      "probability": 0.01572561
+    },
+    {
+      "start_sample": 728576,
+      "end_sample": 729088,
+      "probability": 0.01529297
+    },
+    {
+      "start_sample": 729088,
+      "end_sample": 729600,
+      "probability": 0.01487008
+    },
+    {
+      "start_sample": 729600,
+      "end_sample": 730112,
+      "probability": 0.01445678
+    },
+    {
+      "start_sample": 730112,
+      "end_sample": 730624,
+      "probability": 0.01405334
+    },
+    {
+      "start_sample": 730624,
+      "end_sample": 731136,
+      "probability": 0.01365963
+    },
+    {
+      "start_sample": 731136,
+      "end_sample": 731648,
+      "probability": 0.01327586
+    },
+    {
+      "start_sample": 731648,
+      "end_sample": 732160,
+      "probability": 0.01290193
+    },
+    {
+      "start_sample": 732160,
+      "end_sample": 732672,
+      "probability": 0.01253802
+    },
+    {
+      "start_sample": 732672,
+      "end_sample": 733184,
+      "probability": 0.01218396
+    },
+    {
+      "start_sample": 733184,
+      "end_sample": 733696,
+      "probability": 0.01183969
+    },
+    {
+      "start_sample": 733696,
+      "end_sample": 734208,
+      "probability": 0.0115051
+    },
+    {
+      "start_sample": 734208,
+      "end_sample": 734720,
+      "probability": 0.01117954
+    },
+    {
+      "start_sample": 734720,
+      "end_sample": 735232,
+      "probability": 0.01086143
+    },
+    {
+      "start_sample": 735232,
+      "end_sample": 735744,
+      "probability": 0.01055264
+    },
+    {
+      "start_sample": 735744,
+      "end_sample": 736256,
+      "probability": 0.01025319
+    },
+    {
+      "start_sample": 736256,
+      "end_sample": 736768,
+      "probability": 0.00996274
+    },
+    {
+      "start_sample": 736768,
+      "end_sample": 737280,
+      "probability": 0.00968105
+    },
+    {
+      "start_sample": 737280,
+      "end_sample": 737792,
+      "probability": 0.00940755
+    },
+    {
+      "start_sample": 737792,
+      "end_sample": 738304,
+      "probability": 0.00914076
+    },
+    {
+      "start_sample": 738304,
+      "end_sample": 738816,
+      "probability": 0.00888193
+    },
+    {
+      "start_sample": 738816,
+      "end_sample": 739328,
+      "probability": 0.00863087
+    },
+    {
+      "start_sample": 739328,
+      "end_sample": 739840,
+      "probability": 0.00838715
+    },
+    {
+      "start_sample": 739840,
+      "end_sample": 740352,
+      "probability": 0.00815055
+    },
+    {
+      "start_sample": 740352,
+      "end_sample": 740864,
+      "probability": 0.00789225
+    },
+    {
+      "start_sample": 740864,
+      "end_sample": 741376,
+      "probability": 0.00757316
+    },
+    {
+      "start_sample": 741376,
+      "end_sample": 741888,
+      "probability": 0.00726888
+    },
+    {
+      "start_sample": 741888,
+      "end_sample": 742400,
+      "probability": 0.00697872
+    },
+    {
+      "start_sample": 742400,
+      "end_sample": 742912,
+      "probability": 0.00670189
+    },
+    {
+      "start_sample": 742912,
+      "end_sample": 743424,
+      "probability": 0.00643769
+    },
+    {
+      "start_sample": 743424,
+      "end_sample": 743936,
+      "probability": 0.00618562
+    },
+    {
+      "start_sample": 743936,
+      "end_sample": 744448,
+      "probability": 0.00594494
+    },
+    {
+      "start_sample": 744448,
+      "end_sample": 744960,
+      "probability": 0.0057151
+    },
+    {
+      "start_sample": 744960,
+      "end_sample": 745472,
+      "probability": 0.00549549
+    },
+    {
+      "start_sample": 745472,
+      "end_sample": 745984,
+      "probability": 0.00528571
+    },
+    {
+      "start_sample": 745984,
+      "end_sample": 746496,
+      "probability": 0.00508523
+    },
+    {
+      "start_sample": 746496,
+      "end_sample": 747008,
+      "probability": 0.00489348
+    },
+    {
+      "start_sample": 747008,
+      "end_sample": 747520,
+      "probability": 0.00471017
+    },
+    {
+      "start_sample": 747520,
+      "end_sample": 748032,
+      "probability": 0.00453487
+    },
+    {
+      "start_sample": 748032,
+      "end_sample": 748544,
+      "probability": 0.00436696
+    },
+    {
+      "start_sample": 748544,
+      "end_sample": 749056,
+      "probability": 0.00420636
+    },
+    {
+      "start_sample": 749056,
+      "end_sample": 749568,
+      "probability": 0.00405246
+    },
+    {
+      "start_sample": 749568,
+      "end_sample": 750080,
+      "probability": 0.00390515
+    },
+    {
+      "start_sample": 750080,
+      "end_sample": 750592,
+      "probability": 0.00376394
+    },
+    {
+      "start_sample": 750592,
+      "end_sample": 751104,
+      "probability": 0.00362858
+    },
+    {
+      "start_sample": 751104,
+      "end_sample": 751616,
+      "probability": 0.00349888
+    },
+    {
+      "start_sample": 751616,
+      "end_sample": 752128,
+      "probability": 0.00337452
+    },
+    {
+      "start_sample": 752128,
+      "end_sample": 752640,
+      "probability": 0.00325581
+    },
+    {
+      "start_sample": 752640,
+      "end_sample": 753152,
+      "probability": 0.00314209
+    },
+    {
+      "start_sample": 753152,
+      "end_sample": 753664,
+      "probability": 0.00303295
+    },
+    {
+      "start_sample": 753664,
+      "end_sample": 754176,
+      "probability": 0.00292826
+    },
+    {
+      "start_sample": 754176,
+      "end_sample": 754688,
+      "probability": 0.00282058
+    },
+    {
+      "start_sample": 754688,
+      "end_sample": 755200,
+      "probability": 0.00271568
+    },
+    {
+      "start_sample": 755200,
+      "end_sample": 755712,
+      "probability": 0.00261518
+    }
+  ],
+  "speech_windows": [
+    {
+      "start_sample": 32,
+      "end_sample": 31712
+    },
+    {
+      "start_sample": 35872,
+      "end_sample": 47584
+    },
+    {
+      "start_sample": 58400,
+      "end_sample": 72672
+    },
+    {
+      "start_sample": 74272,
+      "end_sample": 86496
+    },
+    {
+      "start_sample": 91168,
+      "end_sample": 120288
+    },
+    {
+      "start_sample": 125472,
+      "end_sample": 156128
+    },
+    {
+      "start_sample": 166944,
+      "end_sample": 173024
+    },
+    {
+      "start_sample": 174624,
+      "end_sample": 188896
+    },
+    {
+      "start_sample": 193056,
+      "end_sample": 205280
+    },
+    {
+      "start_sample": 211488,
+      "end_sample": 245728
+    },
+    {
+      "start_sample": 256544,
+      "end_sample": 275424
+    },
+    {
+      "start_sample": 290848,
+      "end_sample": 333280
+    },
+    {
+      "start_sample": 337440,
+      "end_sample": 367584
+    },
+    {
+      "start_sample": 378400,
+      "end_sample": 395232
+    },
+    {
+      "start_sample": 398368,
+      "end_sample": 412640
+    },
+    {
+      "start_sample": 416800,
+      "end_sample": 441824
+    },
+    {
+      "start_sample": 479776,
+      "end_sample": 545248
+    },
+    {
+      "start_sample": 556576,
+      "end_sample": 601568
+    },
+    {
+      "start_sample": 604704,
+      "end_sample": 621024
+    },
+    {
+      "start_sample": 626720,
+      "end_sample": 651232
+    },
+    {
+      "start_sample": 662560,
+      "end_sample": 706528
+    }
+  ],
+  "non_speech_windows": [
+    {
+      "start_sample": 0,
+      "end_sample": 32
+    },
+    {
+      "start_sample": 31712,
+      "end_sample": 35872
+    },
+    {
+      "start_sample": 47584,
+      "end_sample": 58400
+    },
+    {
+      "start_sample": 72672,
+      "end_sample": 74272
+    },
+    {
+      "start_sample": 86496,
+      "end_sample": 91168
+    },
+    {
+      "start_sample": 120288,
+      "end_sample": 125472
+    },
+    {
+      "start_sample": 156128,
+      "end_sample": 166944
+    },
+    {
+      "start_sample": 173024,
+      "end_sample": 174624
+    },
+    {
+      "start_sample": 188896,
+      "end_sample": 193056
+    },
+    {
+      "start_sample": 205280,
+      "end_sample": 211488
+    },
+    {
+      "start_sample": 245728,
+      "end_sample": 256544
+    },
+    {
+      "start_sample": 275424,
+      "end_sample": 290848
+    },
+    {
+      "start_sample": 333280,
+      "end_sample": 337440
+    },
+    {
+      "start_sample": 367584,
+      "end_sample": 378400
+    },
+    {
+      "start_sample": 395232,
+      "end_sample": 398368
+    },
+    {
+      "start_sample": 412640,
+      "end_sample": 416800
+    },
+    {
+      "start_sample": 441824,
+      "end_sample": 479776
+    },
+    {
+      "start_sample": 545248,
+      "end_sample": 556576
+    },
+    {
+      "start_sample": 601568,
+      "end_sample": 604704
+    },
+    {
+      "start_sample": 621024,
+      "end_sample": 626720
+    },
+    {
+      "start_sample": 651232,
+      "end_sample": 662560
+    },
+    {
+      "start_sample": 706528,
+      "end_sample": 755712
+    }
+  ],
+  "note": "Speech activity only. No language, music, speaker, overlap, identity, or ownership fact is inferred by this producer."
+}

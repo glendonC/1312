@@ -1,14 +1,10 @@
 import ProcessCard from "./ProcessCard";
 import { steps } from "./steps";
 
-function AnimatedHeadline({ text }: { text: string }) {
+function ProcessHeadline({ text }: { text: string }) {
   return (
     <h2 className="process-detail-title" aria-label={text}>
-      {Array.from(text).map((character, index) => (
-        <span key={`${character}-${index}`} aria-hidden="true">
-          {character === " " ? "\u00a0" : character}
-        </span>
-      ))}
+      {text}
     </h2>
   );
 }
@@ -32,11 +28,15 @@ export default function MethodProcess() {
           </p>
           <p className="process-intro-copy process-intro-copy-secondary">
             Each worker can revisit the media, use permitted tools, gather context, and return
-            structured evidence for the system to reconcile.
-          </p>
-          <p className="process-proof-case">
-            <span>First proof case</span>
-            <strong>Korean to English real media</strong>
+            structured evidence for the system to reconcile. Korean-to-English media is the first
+            proof case for a larger system that lets autonomous agents investigate and understand
+            real media.{" "}
+            <a className="process-proof-link" href="/journey/2026-07-13-why-1321/">
+              <span>Why this proof case</span>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" />
+              </svg>
+            </a>
           </p>
           <div className="process-progress" aria-hidden="true">
             <span style={{ transform: "scaleX(0)" }} />
@@ -48,7 +48,7 @@ export default function MethodProcess() {
                 <span>[01]</span>
                 <span className="process-detail-principle">{steps[0].principle}</span>
               </p>
-              <AnimatedHeadline text={steps[0].headline} />
+              <ProcessHeadline text={steps[0].headline} />
               <p className="process-detail-copy">{steps[0].detail}</p>
             </div>
           </div>

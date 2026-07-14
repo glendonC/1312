@@ -19,10 +19,64 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 
 import DockTrace from "./DockTrace";
-import { Arrow, Chevron, Cross, Hold } from "./glyphs";
+import { Arrow, Chevron, Cross, Edit, Hold, LinkSource, YouTube } from "./glyphs";
 import { useBundle, useComplete, usePaused, useProgress, useStage, useStudio } from "./store";
 
 const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as const;
+const YOUTUBE_HOSTS = new Set(["youtube.com", "m.youtube.com", "youtu.be"]);
+
+type SourcePresentation = {
+  kind: "youtube" | "web";
+  displayUrl: string;
+  compactUrl?: string;
+  accessibleName: string;
+};
+
+function presentSource(raw: string): SourcePresentation | null {
+  let source: URL;
+
+  try {
+    source = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+
+  if (source.protocol !== "https:" && source.protocol !== "http:") return null;
+
+  const host = source.hostname.toLowerCase().replace(/^www\./, "");
+  const pathParts = source.pathname.split("/").filter(Boolean);
+
+  if (YOUTUBE_HOSTS.has(host)) {
+    const videoId = host === "youtu.be"
+      ? pathParts[0]
+      : source.searchParams.get("v")
+        ?? (["embed", "live", "shorts"].includes(pathParts[0] ?? "") ? pathParts[1] : undefined);
+
+    if (videoId) {
+      return {
+        kind: "youtube",
+        displayUrl: `youtube.com/watch?v=${videoId}`,
+        compactUrl: `youtu.be/${videoId}`,
+        accessibleName: `YouTube video link ${videoId}`,
+      };
+    }
+  }
+
+  let path = source.pathname;
+  try {
+    path = decodeURI(path);
+  } catch {
+    // Keep the encoded path when a valid URL contains an incomplete escape sequence.
+  }
+  path = path.replace(/\/$/, "");
+  const identifier = path || "Home";
+
+  return {
+    kind: "web",
+    displayUrl: `${host}${identifier === "Home" ? "" : identifier}`,
+    accessibleName: `Web source ${host} ${identifier}`,
+  };
+}
 
 export default function Dock() {
   const stage = useStage();
@@ -42,7 +96,11 @@ export default function Dock() {
   const [open, setOpen] = useState(false);
   const [mini, setMini] = useState(false);
   const [url, setUrl] = useState("");
+  const [editingSource, setEditingSource] = useState(true);
+  const [fieldOverflow, setFieldOverflow] = useState({ left: false, right: false });
+  const [sourceOverflow, setSourceOverflow] = useState(false);
   const field = useRef<HTMLInputElement>(null);
+  const sourceUrl = useRef<HTMLSpanElement>(null);
 
   const dock = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -58,9 +116,47 @@ export default function Dock() {
     return () => ro.disconnect();
   }, []);
 
+  const sourcePresentation = presentSource(url);
+  const reviewingSource = sourcePresentation !== null && !editingSource;
+
+  function syncFieldOverflow(): void {
+    const input = field.current;
+    if (!input) return;
+
+    const maxScroll = Math.max(0, input.scrollWidth - input.clientWidth);
+    const next = {
+      left: input.scrollLeft > 1,
+      right: input.scrollLeft < maxScroll - 1,
+    };
+
+    setFieldOverflow((current) =>
+      current.left === next.left && current.right === next.right ? current : next,
+    );
+  }
+
   useEffect(() => {
-    if (open) field.current?.focus();
-  }, [open]);
+    if (!open || !editingSource) return;
+    field.current?.focus();
+  }, [editingSource, open]);
+
+  useLayoutEffect(() => {
+    if (!open || !editingSource) return;
+    const frame = window.requestAnimationFrame(syncFieldOverflow);
+    return () => window.cancelAnimationFrame(frame);
+  }, [box.w, editingSource, open, url]);
+
+  useLayoutEffect(() => {
+    if (!reviewingSource) {
+      setSourceOverflow(false);
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const source = sourceUrl.current;
+      setSourceOverflow(Boolean(source && source.scrollWidth > source.clientWidth + 1));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [box.w, reviewingSource, url]);
 
   function submit(e: SyntheticEvent<HTMLFormElement>): void {
     e.preventDefault();
@@ -74,6 +170,8 @@ export default function Dock() {
     setOpen(false);
     setMini(false);
     setUrl("");
+    setEditingSource(true);
+    setFieldOverflow({ left: false, right: false });
     if (running) cancelRun();
     else {
       dismissPreflight();
@@ -236,7 +334,10 @@ export default function Dock() {
               key="closed"
               type="button"
               className="dock-fab"
-              onClick={() => setOpen(true)}
+              onClick={() => {
+                setEditingSource(true);
+                setOpen(true);
+              }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -248,7 +349,7 @@ export default function Dock() {
           ) : (
             <motion.form
               key="open"
-              className="dock-bar"
+              className={`dock-bar${reviewingSource ? " dock-bar-source" : ""}`}
               onSubmit={submit}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -256,38 +357,89 @@ export default function Dock() {
               transition={{ duration: 0.18, delay: 0.06 }}
               layout
             >
-              <input
-                ref={field}
-                className="dock-field"
-                type="text"
-                inputMode="url"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="Paste a link"
-                aria-label="Clip link"
-                value={url}
-                onChange={(e) => {
-                  setUrl(e.target.value);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setOpen(false);
-                }}
-              />
+              {reviewingSource ? (
+                <>
+                  <button
+                    type="button"
+                    className="dock-source-edit"
+                    aria-label={`Edit source: ${sourcePresentation.accessibleName}`}
+                    onClick={() => setEditingSource(true)}
+                  >
+                    <Edit />
+                  </button>
 
-              <span className="dock-sep" aria-hidden="true" />
+                  <div className="dock-source" title={url}>
+                    <span className="dock-source-glyph" data-kind={sourcePresentation.kind}>
+                      {sourcePresentation.kind === "youtube" ? <YouTube /> : <LinkSource />}
+                    </span>
+                    <span
+                      ref={sourceUrl}
+                      className="dock-source-url"
+                      data-overflow={sourceOverflow}
+                    >
+                      <span
+                        className={`dock-source-url-full${sourcePresentation.compactUrl ? " has-compact" : ""}`}
+                      >
+                        {sourcePresentation.displayUrl}
+                      </span>
+                      {sourcePresentation.compactUrl && (
+                        <span className="dock-source-url-compact">{sourcePresentation.compactUrl}</span>
+                      )}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <span
+                  className="dock-field-shell"
+                  data-overflow-left={fieldOverflow.left}
+                  data-overflow-right={fieldOverflow.right}
+                >
+                  <input
+                    ref={field}
+                    className="dock-field"
+                    type="text"
+                    inputMode="url"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Paste a link"
+                    aria-label="Clip link"
+                    value={url}
+                    onBlur={() => {
+                      if (sourcePresentation) {
+                        window.requestAnimationFrame(() => setEditingSource(false));
+                      }
+                    }}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setOpen(false);
+                      window.requestAnimationFrame(syncFieldOverflow);
+                    }}
+                    onScroll={syncFieldOverflow}
+                    onSelect={syncFieldOverflow}
+                  />
+                </span>
+              )}
 
-              <button
-                type="button"
-                className="dock-demo"
-                onClick={() => {
-                  setOpen(false);
-                  openRecordedPreflight();
-                }}
-                disabled={!bundle}
-                title={bundle?.run.clip.title_target}
-              >
-                Demo clip
-              </button>
+              {!reviewingSource && (
+                <>
+                  <span className="dock-sep" aria-hidden="true" />
+
+                  <button
+                    type="button"
+                    className="dock-demo"
+                    onClick={() => {
+                      setOpen(false);
+                      openRecordedPreflight();
+                    }}
+                    disabled={!bundle}
+                    title={bundle?.run.clip.title_target}
+                  >
+                    Demo clip
+                  </button>
+                </>
+              )}
 
               <button type="submit" className="dock-go" aria-label="Analyze">
                 <Arrow />

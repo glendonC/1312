@@ -18,7 +18,7 @@ export function enhanceMethodProcess(root: HTMLElement) {
 
   if (!rail || cards.length === 0) return () => {};
 
-  const desktopQuery = window.matchMedia("(min-width: 901px)");
+  const desktopQuery = window.matchMedia("(min-width: 961px)");
   const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   const abortController = new AbortController();
   const { signal } = abortController;
@@ -104,9 +104,8 @@ export function enhanceMethodProcess(root: HTMLElement) {
     card.querySelector<HTMLButtonElement>(".card-heading")?.addEventListener(
       "click",
       () => {
-        activeIndex = index;
-
         if (!desktopQuery.matches) {
+          activeIndex = index;
           render(0, index);
           renderDetails(index);
           return;

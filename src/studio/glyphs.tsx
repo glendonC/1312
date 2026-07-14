@@ -72,3 +72,42 @@ export function Arrow() {
     </svg>
   );
 }
+
+export function YouTube() {
+  return (
+    <svg viewBox="0 0 24 17" width="24" height="17" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="23" height="16" rx="5" fill="#ff0033" />
+      <path d="m10 5 6 3.5-6 3.5z" fill="#fff" />
+    </svg>
+  );
+}
+
+export function LinkSource() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path
+        d="m6.4 9.6 3.2-3.2M5.2 11.9 4.1 13a2.1 2.1 0 0 1-3-3l2.5-2.5a2.1 2.1 0 0 1 3 0M10.8 4.1 11.9 3a2.1 2.1 0 0 1 3 3l-2.5 2.5a2.1 2.1 0 0 1-3 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function Edit() {
+  return (
+    <svg className="edit" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="m4 10.7-.5 2.1 2.1-.5 6.7-6.7-1.6-1.6zM9.8 4.9l1.6 1.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

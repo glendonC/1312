@@ -329,6 +329,21 @@
   padding: 0 7px 0 22px;
 }
 
+.dock-bar-source {
+  width: fit-content;
+  max-width: min(480px, 86vw);
+  padding-inline: 7px;
+}
+
+.dock-bar-source .dock-source {
+  flex: 0 1 auto;
+}
+
+.dock-bar-source .dock-source-url {
+  max-width: 300px;
+  flex: 0 1 auto;
+}
+
 /* the fold control takes the left inset the text used to hold */
 .dock-bar-run {
   padding-left: 10px;
@@ -439,15 +454,50 @@
   font-variant-numeric: tabular-nums;
 }
 
-.dock-field {
+.dock-field-shell {
+  position: relative;
+  display: flex;
   min-width: 0;
   height: 100%;
   flex: 1;
+}
+
+.dock-field {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
   border: 0;
   background: transparent;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 0.95rem;
+}
+
+.dock-field-shell[data-overflow-left="true"] .dock-field {
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 100%);
+}
+
+.dock-field-shell[data-overflow-right="true"] .dock-field {
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+
+.dock-field-shell[data-overflow-left="true"][data-overflow-right="true"] .dock-field {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
 }
 
 .dock-field:focus {
@@ -456,6 +506,79 @@
 
 .dock-field::placeholder {
   color: var(--ink-muted);
+}
+
+.dock-source {
+  display: flex;
+  min-width: 0;
+  height: 44px;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.dock-source-edit {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.58);
+  cursor: pointer;
+}
+
+.dock-source-edit:hover {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.dock-source-edit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dock-source-glyph {
+  display: inline-flex;
+  width: 34px;
+  height: 30px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+}
+
+.dock-source-url {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.dock-source-url[data-overflow="true"] {
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+}
+
+.dock-source-url-compact {
+  display: none;
 }
 
 .dock-sep {
@@ -524,6 +647,11 @@
     padding: 0 7px;
   }
 
+  .dock-bar-source {
+    width: fit-content;
+    max-width: 92vw;
+  }
+
   .dock-clip {
     display: none;
   }
@@ -532,5 +660,15 @@
     min-width: 0;
     flex: 1;
     justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .dock-source-url-full.has-compact {
+    display: none;
+  }
+
+  .dock-source-url-compact {
+    display: inline;
   }
 }

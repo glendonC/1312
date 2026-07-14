@@ -13,7 +13,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .process-section {
     padding-top: var(--interior-main-start);
   }
@@ -33,7 +33,7 @@
   }
 
   .process-intro-copy,
-  .process-proof-case {
+  .process-intro-copy-secondary {
     max-width: 42rem;
   }
 
@@ -186,9 +186,10 @@
     margin-top: 10px;
   }
 
-  .process-proof-case {
-    grid-template-columns: 1fr;
-    gap: 5px;
+  .process-proof-link {
+    min-height: 44px;
+    margin: 8px 0 0;
+    padding-inline: 12px;
   }
 
   .process-card {

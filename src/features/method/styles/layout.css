@@ -57,30 +57,42 @@
   color: var(--ink-soft);
 }
 
-.process-proof-case {
-  display: grid;
-  max-width: 35rem;
-  margin: 24px 0 0;
-  padding: 13px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  grid-template-columns: minmax(104px, 0.42fr) minmax(0, 1fr);
-  gap: 18px;
-  align-items: baseline;
-}
-
-.process-proof-case span {
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.process-proof-case strong {
-  font-size: 0.86rem;
+.process-proof-link {
+  display: flex;
+  width: max-content;
+  min-height: 34px;
+  margin: 10px 0 0;
+  padding: 5px 10px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  color: var(--accent);
   font-weight: var(--weight-medium);
-  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+
+.process-proof-link svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.process-proof-link:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.process-proof-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .process-progress {
@@ -136,12 +148,12 @@
   color: var(--ink);
   font-size: clamp(1.75rem, 2.5vw, 2.75rem);
   font-weight: var(--weight-regular);
+  hyphens: none;
   letter-spacing: -0.04em;
   line-height: 1.04;
-}
-
-.process-detail-title span {
-  display: inline-block;
+  overflow-wrap: normal;
+  text-wrap: balance;
+  word-break: normal;
 }
 
 .process-detail-copy {

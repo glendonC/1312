@@ -1,7 +1,7 @@
 # Studio Autonomous Media Runtime
 
 Status: living implementation ledger for the Studio, media runtime, and development lab
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 ## Purpose
 
@@ -291,7 +291,7 @@ values distinctly and explain which assumptions dominate the estimate.
 | Transport seam | Replay pause/step/seek/speed and single-trace live validation | Production-runtime adapter and acknowledged live control |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler and dynamic registry | Real worker launcher and production-event projection into the graph |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
-| Media evidence | Playhead, marks, waveform, real ffprobe, post-run evidence index, and a receipted ffmpeg range extraction host | Additional individually implemented media operations and detector-backed tracks/stems |
+| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, post-run evidence index, and a receipted ffmpeg range extraction host | Time-ranged language over speech receipts plus additional individually implemented media operations and detector-backed tracks/stems |
 | Coordination | Legacy trace prose plus production bounded tasks and structured report-up | Real worker execution and live projection; never retrofit legacy prose into handoffs |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
@@ -303,13 +303,13 @@ The Studio visualizes recorded legacy runs. A production runtime library now exi
 the static Studio is not its host and does not claim that local smoke-test activity happened in a
 recorded run.
 
-## Implementation ledger — 2026-07-13
+## Implementation ledger — 2026-07-14
 
 | Phase | Status | Honest boundary |
 |---|---|---|
 | 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. Browser automation is authored but interactive execution is unavailable in the current in-app browser environment. |
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
-| 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, standalone immutable preflight index, range policy, and fail-closed fixtures are real. Hosted submission, deterministic VAD, time-ranged language, acoustic/overlap/visual detectors, and measured recommendation are absent. |
+| 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, immutable V1/V2 preflight indexes, and pinned Silero VAD speech/non-speech receipts are real. The detector path preserves normalized PCM and raw frame scores and is projected separately from declared language. Hosted submission, time-ranged language, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
 | 3 — tasks and agents | Production foundation implemented | Bounded scheduling, dynamic registration, journal replay, and report-up are real local modules. No real Codex worker launcher or Studio adapter exists, so a live child is not shown in the product. |
 | 4 — scoped media | One operation implemented | `media.extract` executes ffmpeg under exact grants and emits content-addressed receipt/lineage. Seek, step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools are not claimed. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
@@ -429,8 +429,8 @@ components must never write desired worker, cue, or score state directly.
 
 ## Minimal append-only contract additions
 
-Do not add these until the named producer exists. These are the smallest concepts the autonomous
-runtime cannot represent honestly today.
+Add these concepts only with the named producer. Several now have production foundations; the rows
+whose producers remain unavailable are still architectural requirements, not implemented fields.
 
 | Concept | Why it is needed | Real producer |
 |---|---|---|
@@ -481,7 +481,8 @@ injection.
 
 - Introduce explicit loading, probing, ready-to-confirm, failed, and cancelled session states.
 - Implement source/access and media metadata probing.
-- Add time-ranged language, speech, music, and overlap summaries.
+- Project the receipted speech/non-speech ranges (implemented for the pinned VAD path), then add
+  language, music, and overlap summaries only when their independent producers exist.
 - Add range selection with a 30 to 60 second recommendation and 120 second hosted cap.
 - Add primary and advanced analysis choices.
 - Create exact scenarios for no Korean, mixed language, music, overlap, and excessive duration.
@@ -583,8 +584,9 @@ range, inspect every assumption, and later compare the prediction with immutable
 
 The next production slices, in dependency order:
 
-1. Select and pin a licensed deterministic VAD producer, including binary/model hashes, fixed audio
-   normalization, exact range receipts, and fail-closed mutation fixtures.
+1. Implemented 2026-07-14: pinned MIT-licensed Silero VAD 6.2.1 and ONNX Runtime 1.27.0 CPU,
+   including binary/model hashes, preserved fixed audio normalization, exact sample-range receipts,
+   raw frame scores, immutable V2 lineage, Studio projection, and fail-closed mutation fixtures.
 2. Add time-ranged language detection only after it can consume receipted speech windows and record
    its model/version/configuration and unknown results. Keep pack policy outside the detector/runtime.
 3. Implement a real local worker launcher and adapt production runtime events into a separate Studio

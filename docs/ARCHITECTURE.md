@@ -1,7 +1,7 @@
 # Architecture (verified direction — UI-first week)
 
 Status: **decided for Build Week**; implement agents after UI scaffold is solid.  
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 ## Goals
 
@@ -72,9 +72,23 @@ shared bag, and scripts that consume `source.json` normalize it through a source
 
 `scripts/preflight-owned-media.mjs` composes those two existing producers into an immutable,
 standalone `studio.preflight-bundle.v1` index. The index contains only the normalized raw artifact,
-source receipt, and ffprobe receipt. Speech activity, language ranges, acoustic ranges, overlap,
-and complexity remain explicit nulls until a pinned producer exists. `run-005/preflight.json` is the
-checked production fixture; the build re-hashes every artifact it names.
+source receipt, and ffprobe receipt. It remains immutable and continues to withhold every detector
+finding.
+
+The first detector-backed extension is a separate `studio.preflight-bundle.v2`; it does not rewrite
+the V1 index or the source receipt. `scripts/detect-speech.mjs` normalizes one explicitly selected
+audio track to preserved 16 kHz mono signed 16-bit PCM with a hashed ffmpeg binary, then runs the
+vendored Silero VAD 6.2.1 ONNX model through pinned `onnxruntime-node` 1.27.0 CPU inference. The
+receipt retains the exact model, runtime, and normalization identities, every 512-sample frame
+probability, and an exact speech/non-speech sample partition. `scripts/seal-speech-preflight.mjs`
+re-hashes that evidence and writes `preflight-v2.json` without replacing `preflight.json`.
+
+`run-005` is a checked production-validator fixture over project-owned bytes, not a production
+worker run. Its V1 and V2 indexes are both retained, and the build re-hashes every artifact they
+name. The Studio projects only the validated detector receipt and labels the job language as a
+declaration, not detector output. Floating-point repeatability is claimed only inside the receipted
+model/runtime/execution-provider/configuration envelope; arbitrary cross-platform equality has not
+been established.
 
 Language detection, acoustic classification, overlap estimation, and range recommendation are
 separate producers. A source adapter cannot infer any of those facts from a provider or filename.
@@ -84,8 +98,9 @@ separate producers. A source adapter cannot infer any of those facts from a prov
 | Source URL, creator, redistribution licence, selected range | `scripts/ingest-clip.mjs` | `YouTubeIngestReceipt` in `source.json` |
 | Owned local bytes, SHA-256 identity, explicit rights scope, full-file selection, raw/derived lineage | `scripts/ingest-owned-media.mjs` | `OwnedLocalIngestReceipt` in `source.json` |
 | Container, codecs, track durations, sample rate, channels, dimensions | `scripts/probe-media.mjs` using `ffprobe` | content-bound `studio.media-probe.v1` in `media-probe.json` |
+| Speech and non-speech windows | `scripts/detect-speech.mjs` using pinned Silero VAD and ONNX Runtime CPU | `studio.speech-activity.v1`, normalized PCM, raw frame scores, and immutable V2 preflight lineage for content-addressed owned media |
 | Time-ranged language distribution | None | Withheld |
-| Music, speech, noise, speakers, and overlap | None | Withheld |
+| Music, noise, speakers, and overlap | None | Withheld |
 | Suggested range and processing class | None | Withheld |
 
 ## Production runtime boundary
@@ -220,7 +235,7 @@ This row shape is future fine-tune data.
 5. ✅ Standalone preflight index with unsupported detector findings withheld
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
-8. 🔄 Pinned VAD/language producers, real worker launcher, and production runtime projection
+8. 🔄 Pinned VAD implemented; language producer, real worker launcher, and production runtime projection remain
 9. ⏳ Acoustic/overlap/separation producers and study export
 
 ## Open questions (do not block UI)

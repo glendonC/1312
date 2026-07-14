@@ -1,0 +1,463 @@
+{
+  "manifest_id": "bench-candidates:sha256:15591db8b90e839b92c91c34ea803eeb9277e161a08a15e6fdbcf6cf2c304a7c",
+  "schema": "studio.bench.candidates.v1",
+  "run": "run-006",
+  "clip": {
+    "id": "Ux-TMWnmntM",
+    "lang": "ko",
+    "duration_s": 40
+  },
+  "routing": {
+    "route": "gold",
+    "reason": "run-006 is the first real hard-clip run and its misses are the intended seed of hard-ko-v1 (RFC 0001). Known caveat, on the record: this clip's run glossary was merged into memory/glossary/ko.json by the pre-gate pipeline; that file is quarantined legacy_unreviewed and cannot be promoted or injected, so it is not a live leak path, but any future reviewed proposal drawing on this clip must and will fail the contamination guard."
+  },
+  "status": "candidate",
+  "scorable": false,
+  "source_artifacts": [
+    {
+      "path": "public/demo/runs/run-006/run.json",
+      "content_id": "sha256:bdedff75be4a01c580fa7ee3b46710124ff003761bace376ee40d3d1856664bf",
+      "bytes": 2562
+    },
+    {
+      "path": "public/demo/runs/run-006/captions.json",
+      "content_id": "sha256:45b3ff96cef4a0112586e6bfb6e530e7cb227d48147f90a65e4ace3fd3f6690c",
+      "bytes": 13502
+    },
+    {
+      "path": "public/demo/runs/run-006/corrections.json",
+      "content_id": "sha256:868e38880fc66c5f96908ab6a4a0dc1c0de0f64e9314cb63f815daa804877a0f",
+      "bytes": 1489
+    },
+    {
+      "path": "public/demo/runs/run-006/source.json",
+      "content_id": "sha256:8f7c3748e5bc7cd8bde01ba15577d6936ce482225a16f20f8827c0cd52404f30",
+      "bytes": 807
+    }
+  ],
+  "candidates": [
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "source_text": "분들이 몇 분 계신데",
+      "speakers": [
+        "A"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": 1,
+        "by": "whisper-1",
+        "heard": "분들이 몇 분 계신데"
+      },
+      "phenomenon": "ko.counter_homophone",
+      "outputs": {
+        "1321-prepped": {
+          "text": "I know a few people.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "There are a few people here.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "source_text": "네",
+      "speakers": [
+        "B"
+      ],
+      "signals": [
+        "uncorroborated_commit",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "Yeah.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "source_text": "어떤 분은 태국 갔다 오셨다고 했거든요. 근데 태국이 진짜 좋았다고 그러시더라구요.",
+      "speakers": [
+        "A"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": 0.971,
+        "by": "whisper-1",
+        "heard": "어떤 분은 태국 갔다 오셨다고 했거든요 근데 태국이 진짜 좋았다고 그러시더라고요"
+      },
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "One of them said they’d been to Thailand, and they said it was really great.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "One person said they went to Thailand and mentioned that it was really nice.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "source_text": "네",
+      "speakers": [
+        "B"
+      ],
+      "signals": [
+        "uncorroborated_commit",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "Yeah.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 12.7,
+      "t_end": 13.6,
+      "source_text": "왜요 왜요?",
+      "speakers": [
+        "A"
+      ],
+      "signals": [
+        "withheld"
+      ],
+      "gate": {
+        "id": "asr_agreement",
+        "reason": "two recognisers agree only 0.50 on this window (< 0.6)"
+      },
+      "corroboration": {
+        "agreement": 0.5,
+        "by": "whisper-1",
+        "heard": "왜요"
+      },
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.50 on this window (< 0.6)"
+          }
+        },
+        "1321-cold": {
+          "text": "Why?",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 14,
+      "t_end": 18.8,
+      "source_text": "아니 그 예전에 코로나 사태 이전에 누나랑",
+      "speakers": [
+        "B"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": 0.824,
+        "by": "whisper-1",
+        "heard": "아니 그 예전에 코로나 사태 이전에"
+      },
+      "phenomenon": "ko.kinship_address",
+      "outputs": {
+        "1321-prepped": {
+          "text": "No, back before the pandemic, with nuna...",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "Well, before the COVID-19 situation,",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 18.8,
+      "t_end": 19,
+      "source_text": "네",
+      "speakers": [
+        "A"
+      ],
+      "signals": [
+        "withheld"
+      ],
+      "gate": {
+        "id": "asr_agreement",
+        "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+      },
+      "corroboration": {
+        "agreement": 0,
+        "by": "whisper-1",
+        "heard": "누나랑"
+      },
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+          }
+        },
+        "1321-cold": {
+          "text": "with my sister,",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 19,
+      "t_end": 19.15,
+      "source_text": "친누나가",
+      "speakers": [
+        "B"
+      ],
+      "signals": [
+        "uncorroborated_commit",
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": null,
+        "by": "whisper-1",
+        "heard": ""
+      },
+      "phenomenon": "ko.kinship_address",
+      "outputs": {
+        "1321-prepped": {
+          "text": "My biological older sister—",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 19.15,
+      "t_end": 20.2,
+      "source_text": "네",
+      "speakers": [
+        "A"
+      ],
+      "signals": [
+        "withheld"
+      ],
+      "gate": {
+        "id": "asr_agreement",
+        "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+      },
+      "corroboration": {
+        "agreement": 0,
+        "by": "whisper-1",
+        "heard": "친누나가"
+      },
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+          }
+        },
+        "1321-cold": {
+          "text": "my real sister,",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 20.2,
+      "t_end": 25.2,
+      "source_text": "그 막 그 매형이랑 태국에 한 달 살기를 하려고 했는데",
+      "speakers": [
+        "B"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": 0.857,
+        "by": "whisper-1",
+        "heard": "그 막 그 매형이랑 태국에 한달 살기를 하려고"
+      },
+      "phenomenon": "ko.kinship_address",
+      "outputs": {
+        "1321-prepped": {
+          "text": "Like, she and my brother-in-law were planning a one-month stay in Thailand, but—",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "was planning to live in Thailand for a month with her husband,",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 25.52,
+      "t_end": 28.12,
+      "source_text": "그 내용이 너무 바쁘셔가지고 남는 사람이",
+      "speakers": [
+        "B"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": 0.706,
+        "by": "whisper-1",
+        "heard": "그 매형이 너무 바쁘셔가지고 남는"
+      },
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "They were so busy that the only one with time to spare...",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "but her husband was too busy, so the only person available",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 28.12,
+      "t_end": 28.32,
+      "source_text": "네.",
+      "speakers": [
+        "A"
+      ],
+      "signals": [
+        "withheld"
+      ],
+      "gate": {
+        "id": "asr_agreement",
+        "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+      },
+      "corroboration": {
+        "agreement": 0,
+        "by": "whisper-1",
+        "heard": "사람이"
+      },
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "asr_agreement",
+            "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+          }
+        },
+        "1321-cold": {
+          "text": "was me,",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "source_text": "저밖에 없어서 그 공짜로 태국 한 달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한 달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어",
+      "speakers": [
+        "B"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": {
+        "agreement": 1,
+        "by": "whisper-1",
+        "heard": "저밖에 없어서 그 공짜로 태국 한달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어"
+      },
+      "phenomenon": "ko.numeral_boundary",
+      "outputs": {
+        "1321-prepped": {
+          "text": "I was the only one with free time, so I ended up doing a one-month stay in Thailand for free. I spent a month in Chiang Mai—the place was so pretty and the people were so friendly, and Korean...",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "so I ended up living in Thailand for a month for free. Oh, but I lived in Chiang Mai for a month, and the neighborhood was so beautiful, and the people were so kind, and Korean...",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    }
+  ],
+  "notes": "Derived from the recorded run-006 artifacts only. 13 of 15 cues carry at least one signal: 4 withheld by a gate, 3 committed uncorroborated, 5 ko-v3 phenomenon detections, 9 cold/prepped divergences. A signal is a reason for a human to look, not a verdict: nothing here says any line was right or wrong, and no candidate can be scored against. 5 correction rows exist in the run folder and are deliberately NOT candidates; corrections flow through the memory ledger, and this clip's route (gold) decides which of the two pools — bench or memory — this clip may ever feed."
+}

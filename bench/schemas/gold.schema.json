@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.dev/bench/schemas/gold.schema.json",
+  "title": "Per-clip gold candidate",
+  "description": "One clip's drafted gold: time-keyed units with pre-registered critical meaning. A gold file NEVER claims to be frozen — its status is pinned to 'candidate' and frozenness is established only by an external freeze receipt that binds these exact bytes together with two blinded human adjudication receipts. Amending gold produces a new file whose bytes the old receipts no longer match, so a stale adjudication cannot freeze edited gold.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "pack_id", "clip_id", "status", "drafter", "source", "mined_from", "units", "notes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "studio.bench.gold.v1" },
+    "pack_id": { "type": "string", "minLength": 1 },
+    "clip_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "const": "candidate",
+      "description": "Pinned. A gold file cannot self-promote; only a freeze receipt binding these bytes plus two distinct blinded human accept receipts makes it scoreable."
+    },
+    "drafter": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who produced this draft — an agent id or a human. Recorded so adjudication can enforce reviewer != drafter."
+    },
+    "source": {
+      "type": "object",
+      "description": "Same provenance shape ingest-clip.mjs emits. Publishing this evidence does not imply permission to redistribute the media.",
+      "required": ["kind", "channel", "licence", "attribution"],
+      "properties": {
+        "kind": { "type": "string" },
+        "url": { "type": ["string", "null"] },
+        "channel": { "type": "string" },
+        "licence": { "type": "string" },
+        "window": { "type": ["object", "null"] },
+        "attribution": { "type": "string" }
+      }
+    },
+    "mined_from": {
+      "description": "Candidates-manifest binding when this gold was mined from the system's own misses (exclusive routing: that clip then contributes nothing to glossary, rules, corrections, or training exports). null for independently sourced control clips.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "content_id", "bytes"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "bytes": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["t_start", "t_end", "korean_gold", "english_guidance", "critical_units"],
+        "properties": {
+          "t_start": { "type": "number", "minimum": 0 },
+          "t_end": { "type": "number", "exclusiveMinimum": 0 },
+          "korean_gold": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What was actually said, written by the drafter and verified by two blinded human reviewers before any freeze. Keyed by TIME, never cue id: the diarizer is not deterministic and gold pinned to one execution's cue ids would rot on the next run."
+          },
+          "english_guidance": {
+            "type": ["string", "null"],
+            "description": "Guidance for graders, not a single canonical translation."
+          },
+          "critical_units": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "phenomenon", "facts", "catastrophic_if"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "phenomenon": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A ko-v3 phenomenon id (ko.kinship_address, ko.counter_homophone, ...) or 'none'."
+                },
+                "facts": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "description": "Human-checkable statements a correct English rendering must preserve. These are for reviewers grading output, not predicates a model evaluates: v1 grading is human-only."
+                },
+                "catastrophic_if": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "description": "Statements whose violation a reviewer must count as a catastrophic emitted error."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": { "type": "string", "minLength": 1 }
+  }
+}

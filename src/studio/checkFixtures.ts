@@ -19,10 +19,13 @@ import type {
 } from "./types";
 import { deriveCheckpoints } from "./lab/checkpoints";
 import { PREFLIGHT_SCENARIOS, validatePreflightScenario } from "./lab/preflightScenarios";
+import { RUNTIME_CONTRACT_FIXTURES } from "./lab/runtimeFixtures";
 import { SCENARIOS, validateScenarioEvidence } from "./lab/scenarios";
 import { projectRun } from "./replayProjection";
 import { assessRecordedRequest, recordedPreflight } from "./preflight/model";
 import { classifySourceUrl } from "./preflight/sourceAdapters";
+import { checkRuntimeContractPolicies } from "./runtime/checkContractPolicies";
+import { validateRuntimeContractFixture } from "./runtime/validateContractFixture";
 
 const RUNS = pathToFileURL(`${resolve(process.cwd(), "public/demo/runs")}/`);
 const PACKS = pathToFileURL(`${resolve(process.cwd(), "public/demo/packs")}/`);
@@ -110,6 +113,8 @@ export async function checkRecordedRuns(): Promise<void> {
     validateScenarioEvidence(bundle, scenario);
   }
   for (const scenario of PREFLIGHT_SCENARIOS) validatePreflightScenario(scenario);
+  for (const fixture of RUNTIME_CONTRACT_FIXTURES) validateRuntimeContractFixture(fixture);
+  checkRuntimeContractPolicies(RUNTIME_CONTRACT_FIXTURES[0]);
 
   const current = bundles.get("run-006");
   if (!current) throw new Error("Studio lab checkpoints require run-006");

@@ -9,6 +9,7 @@ dist/
 .env
 .env.*
 !.env.example
+.studio/
 
 # the wav is what the recogniser reads on this machine, not something the site serves.
 # the mp4 and the waveform ship; the working track does not.

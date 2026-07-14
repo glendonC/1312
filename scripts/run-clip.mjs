@@ -48,6 +48,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { detectPhenomena, entityGate, PACK_GATES } from "./packs/ko-v3.mjs";
+import { normalizeSourceReceipt } from "./lib/source-receipts.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -84,7 +85,7 @@ const KEY = (readFileSync(join(ROOT, ".env"), "utf8").match(/^OPENAI_API_KEY=(.+
 if (!KEY) die("no OPENAI_API_KEY in .env");
 
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
-const source = readJson(join(DIR, "source.json"));
+const source = normalizeSourceReceipt(readJson(join(DIR, "source.json")));
 const wave = readJson(join(DIR, "waveform.json"));
 const pack = readJson(join(ROOT, "public/demo/packs/ko-v3.json"));
 const wav = join(DIR, "clip.wav");
@@ -268,7 +269,7 @@ async function main() {
     "orchestrator",
     "inspect",
     RUN,
-    `${source.duration}s · ${source.licence.split(" ").slice(0, 2).join(" ")} · 16k mono · ${(bytes / 1024).toFixed(0)} KB · ${wave.peaks.length} peaks`,
+    `${source.selection.duration}s · ${source.rights.label} · 16k mono · ${(bytes / 1024).toFixed(0)} KB · ${wave.peaks.length} peaks`,
     { effects: [agentFx("orchestrator", "working")] },
   );
 
@@ -327,7 +328,7 @@ async function main() {
     "scan",
     "clip.wav",
     `${env.length} × 100ms windows · peak ${Math.max(...env.map((e) => e.rms)).toFixed(3)} · ${quiet} under the ${floor} floor`,
-    { clip_t: source.duration, view: { playhead: source.duration } },
+    { clip_t: source.selection.duration, view: { playhead: source.selection.duration } },
   );
 
   /* -- cues: one per real speech segment. No merging, no invention. ------- */
@@ -348,8 +349,8 @@ async function main() {
     const gap = cues[i].t_start - cues[i - 1].t_end;
     if (gap >= SILENCE_MIN_S) silence.push([cues[i - 1].t_end, cues[i].t_start]);
   }
-  if (source.duration - cues.at(-1).t_end >= SILENCE_MIN_S) {
-    silence.push([Number(cues.at(-1).t_end.toFixed(2)), source.duration]);
+  if (source.selection.duration - cues.at(-1).t_end >= SILENCE_MIN_S) {
+    silence.push([Number(cues.at(-1).t_end.toFixed(2)), source.selection.duration]);
   }
   for (const [a, b] of silence) {
     emit("segment-01", "gap", a.toFixed(2), `${(b - a).toFixed(2)}s with no speech segment · no caption is owed here`, {
@@ -760,7 +761,7 @@ async function main() {
 
   function row(cue, raw, final, withhold) {
     return {
-      source_video: source.video_id ?? RUN,
+      source_video: source.sourceId ?? RUN,
       t_start: cue.t_start,
       t_end: cue.t_end,
       raw,
@@ -844,11 +845,11 @@ async function main() {
   }, 0);
 
   const clip = {
-    id: source.video_id ?? RUN,
-    title: source.label,
-    title_target: source.label,
+    id: source.sourceId ?? RUN,
+    title: source.title,
+    title_target: source.title,
     lang: "ko",
-    duration: source.duration,
+    duration: source.selection.duration,
     speakers: labels.map((l) => ({
       id: l,
       label: unconfirmed.includes(l)
@@ -859,10 +860,10 @@ async function main() {
     silence,
     source: {
       kind: source.kind,
-      label: source.channel,
-      url: source.url,
-      licence: source.licence,
-      note: `Speaker labels are the recogniser's own, not ours: nobody is named in this window, so we do not know which voice is the host and a run that guessed would be inventing the one thing a viewer could check by watching. music[] is empty because no music detector ran, NOT because the clip is known to be clean. silence[] is derived from VAD segment boundaries (gaps ≥ ${SILENCE_MIN_S}s), not from an energy floor.`,
+      label: source.creator ?? "Creator not recorded",
+      ...(source.locator.url ? { url: source.locator.url } : {}),
+      ...(source.rights.basis === "redistribution_licence" ? { licence: source.rights.label } : {}),
+      note: `${source.note} Speaker labels are the recogniser's own, not ours: nobody is named in this window, so we do not know which voice is the host and a run that guessed would be inventing the one thing a viewer could check by watching. music[] is empty because no music detector ran, NOT because the clip is known to be clean. silence[] is derived from VAD segment boundaries (gaps ≥ ${SILENCE_MIN_S}s), not from an energy floor.`,
     },
     media: "clip.mp4",
   };
@@ -895,7 +896,7 @@ async function main() {
       { id: "qc-01", role: "qc", label: "qc-01", parent: "orchestrator" },
     ],
     artifacts: ["captions.json", "corrections.json", "glossary.json", "score.json", "traces.json"],
-    note: `A run that actually happened on ${new Date().toISOString().slice(0, 10)}, against real CC-BY media. Source lines are ${ASR}; the confidence the gates read is cross-recogniser agreement with ${ASR2}, because ${ASR} returns no logprobs and a confidence we cannot measure is one we do not print.`,
+    note: `A run that actually happened on ${new Date().toISOString().slice(0, 10)}, against rights-receipted media (${source.rights.label}). Source lines are ${ASR}; the confidence the gates read is cross-recogniser agreement with ${ASR2}, because ${ASR} returns no logprobs and a confidence we cannot measure is one we do not print.`,
   });
 
   write("captions.json", {

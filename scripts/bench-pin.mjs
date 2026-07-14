@@ -30,6 +30,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { normalizeSourceReceipt } from "./lib/source-receipts.mjs";
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function arg(name, fallback = null) {
@@ -47,7 +49,7 @@ const run = read("run.json");
 const captions = read("captions.json");
 const score = read("score.json");
 const traces = read("traces.json");
-const source = read("source.json");
+const source = normalizeSourceReceipt(read("source.json"));
 const glossary = read("glossary.json");
 const corrections = read("corrections.json");
 
@@ -129,11 +131,12 @@ const capture = {
     media: run.clip.media,
     source: {
       kind: source.kind,
-      url: source.url,
-      channel: source.channel,
-      licence: source.licence,
-      window: source.window,
-      attribution: source.attribution,
+      url: source.locator.url,
+      channel: source.creator,
+      licence: source.rights.label,
+      window: { start: source.selection.start, end: source.selection.end },
+      attribution: source.rights.attribution,
+      content_id: source.contentId,
     },
   },
 

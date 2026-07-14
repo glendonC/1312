@@ -95,7 +95,7 @@ if (!REDISTRIBUTABLE.test(licence)) {
       "",
       "  Two ways forward:",
       "    - find a Creative Commons video (YouTube: Filters > Features > Creative Commons)",
-      "    - keep owned media local until a rights-receipted upload adapter is implemented",
+      "    - register media you own with scripts/ingest-owned-media.mjs (local by default)",
       "",
       "  For the BENCH, none of this applies: score a hard clip locally and publish the",
       "  numbers, the url and the timestamps. Evidence travels; the media does not have to.",

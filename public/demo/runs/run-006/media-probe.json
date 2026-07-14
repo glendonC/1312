@@ -3,6 +3,14 @@
   "producer": "scripts/probe-media.mjs",
   "run": "run-006",
   "media": "clip.mp4",
+  "input": {
+    "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+    "hash": {
+      "algorithm": "sha256",
+      "digest": "4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f"
+    },
+    "bytes": 3465772
+  },
   "duration": 40.04,
   "container": [
     "mov",
@@ -12,11 +20,14 @@
     "3g2",
     "mj2"
   ],
+  "container_long_name": "QuickTime / MOV",
+  "bit_rate": 692461,
   "tracks": [
     {
       "index": 0,
       "type": "video",
       "codec": "h264",
+      "duration": 40.04,
       "width": 1280,
       "height": 720
     },
@@ -24,6 +35,7 @@
       "index": 1,
       "type": "audio",
       "codec": "aac",
+      "duration": 40,
       "sample_rate": 48000,
       "channels": 2
     }

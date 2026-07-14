@@ -2,7 +2,12 @@
 
 This directory is the evidence boundary for Benchmarks. The public page may render only what these artifacts can support.
 
-Current state: **protocol draft with the conveyor tooling in place**. There are still no sourced benchmark clips, no drafted or adjudicated gold, no frozen pack, no captured foils, no reviewer labels, and no scores. What now exists in code is the machinery that refuses to let any of those appear dishonestly.
+Current state: **protocol draft with the conveyor tooling and drafting handoff in place**. There
+are still no sourced pack clips, no audio-grounded or human-adjudicated gold, no frozen pack, no
+captured foils, no reviewer labels, and no scores. The gold-shaped file under `bench/examples/`
+is explicitly a non-authoritative dry run because this implementation interface could not
+audition the audio; it is not pack gold. What exists in code is the machinery that refuses to
+let any of those artifacts appear dishonestly.
 
 ```text
 bench/
@@ -13,6 +18,10 @@ bench/
     adjudication.schema.json  # one blinded human decision, bound to exact candidate bytes
   examples/
     unscored-report.json      # honest sample rendered by /benchmarks/
+    gold-drafts/              # non-authoritative drafting-contract fixture; never pack gold
+  prompts/
+    gold-drafter-v1/          # content-addressed agent prompt + bound run-006 evidence
+  ADJUDICATION.md             # blinded human worksheet and complete freeze handoff
   candidates/                 # mined miss manifests (studio.bench.candidates.v1)
   packs/<pack_id>/            # future pack.json + per-clip gold + freeze receipt
   reviews/                    # future adjudication receipts (two distinct humans per clip)
@@ -51,6 +60,8 @@ Agents draft; humans decide; code freezes; nothing scores itself.
 | Step | Tool | What it refuses |
 |---|---|---|
 | Mine | `scripts/mine-gold-candidates.mjs` | Mining without an explicit `--route gold\|training`; a candidate carrying gold text |
+| Draft | `scripts/draft-gold-from-candidates.mjs` + `bench/prompts/gold-drafter-v1/` | Schema drift; unstable/non-agent drafter id; copied English in `korean_gold`; missing/duplicate time windows; stale prompt, manifest, media, source, or schema bytes; a dry-run fixture entering `bench/packs/` |
+| Adjudicate | `scripts/write-adjudication-receipt.mjs` + `bench/ADJUDICATION.md` | A hand-authored/divergent review id; candidate-byte drift; decisions not aligned to every gold time window; a declared Git identity different from the reviewer's checkout identity |
 | Freeze | `scripts/freeze-pack.mjs` | Freezing without two blinded accept receipts per clip from reviewers with distinct declared names AND git identities, neither the drafter; a control clip mined from our own misses; a training-routed clip |
 | Score | `scripts/score-run.mjs` | Non-frozen or amended gold; a capture dated on or before the freeze day (pre-registration); an emitted line with no human label; a label for a line nothing emitted; any LLM judge (`judge` is pinned null) |
 | Check | `scripts/check-bench.mjs` | Route conflicts; a memory proposal drawing on a pack or gold-routed clip (clip-level, not byte-level); a post-freeze capture without a score receipt (score-everything); byte drift in anything a receipt bound |
@@ -60,17 +71,32 @@ nothing to glossary, rules, correction pairs, or future training exports — eve
 routed to training may never enter a pack. `bench/candidates/run-006/` is the first mined
 manifest (routed gold, 13 candidates from 15 cues).
 
+The versioned drafting prompt is `bench/prompts/gold-drafter-v1/prompt.md`; its companion
+`manifest.json` content-binds the prompt, gold schema, candidates manifest, run evidence, ko-v3
+registry, and source media. The materializer always validates `studio.bench.gold.v1`, pins
+`status: "candidate"`, requires the stable `agent:gold-drafter-v1` identity, binds
+`mined_from` to current manifest bytes, and writes immutably. The only produced example is
+`bench/examples/gold-drafts/Ux-TMWnmntM.gold.json`, clearly marked as non-authoritative and
+unreviewable because direct audio audition was unavailable here. A Korean-fluent audio-grounded
+draft must replace machinery with human-checkable evidence before any pack transition.
+
+Human reviewers follow `bench/ADJUDICATION.md`. The receipt helper uses the existing canonical
+`bench-review:` id derivation and preserves `minutes_spent` as a measured number or `null`; it
+does not infer decisions, fabricate time, freeze, or score.
+
 Rule promotion is ablation-bound: `scripts/lib/memory-review.mjs` accepts a behavioral rule only
 against a PAIR of scored reports on the identical frozen pack whose subject configs provably
 differ by exactly the proposed rule (`config.rules` content ids), with the measured delta
 recorded on the decision receipt. One scored report is not evidence about a rule.
 
-**What still cannot happen, and why:** nothing can freeze and nothing can score until a second
-Korean-fluent human reviewer exists. Two receipts under one person's two names would satisfy the
-string checks and be receipt theater; the check enforces distinct declared identities and the
-documented expectation is that each reviewer commits their own receipts from their own git
-identity. Recruiting that reviewer is the pipeline's binding constraint and is not solvable in
-code.
+**What still cannot happen, and why:** nothing can freeze and nothing can score until a real
+audio-grounded candidate exists for every clip, a second Korean-fluent human reviewer exists,
+and at least two independently sourced control clips have their own gold and two reviews each.
+run-006 alone cannot freeze `hard-ko-v1`. Two receipts under one person's two names would satisfy
+the string checks and be receipt theater; the check enforces distinct declared identities and
+the documented expectation is that each reviewer commits their own receipts from their own Git
+identity. Recruiting that reviewer and sourcing the controls are human/source blockers, not
+missing automation.
 
 Two dating anchors are honest-but-incomplete in v1 and documented rather than pretended:
 `frozen_at` is stamped by the tool (never operator-supplied) and cannot predate its adjudication

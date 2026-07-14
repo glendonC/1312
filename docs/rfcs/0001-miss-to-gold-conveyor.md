@@ -4,10 +4,14 @@ Status: **scaffold implemented** (2026-07-14, same day as proposal). The contrac
 guards below are code: `bench/schemas/gold.schema.json` + `adjudication.schema.json`,
 `scripts/lib/bench-gold.mjs`, `scripts/mine-gold-candidates.mjs`, `scripts/freeze-pack.mjs`,
 `scripts/score-run.mjs`, the extended `scripts/check-bench.mjs` (discovery, contamination and
-routing guards, score-everything, fail-closed drills), and the ablation-bound rule gate in
+routing guards, score-everything, fail-closed drills), the content-bound drafting prompt at
+`bench/prompts/gold-drafter-v1/`, its fail-closed materializer, the human worksheet at
+`bench/ADJUDICATION.md`, and the ablation-bound rule gate in
 `scripts/lib/memory-review.mjs` (invariant 6 — the skeleton key is closed). run-006 is mined and
-routed gold (13 candidates). Nothing is drafted, adjudicated, frozen, or scored: the binding
-constraint is recruiting the second Korean-fluent blinded reviewer, which is a person, not code.
+routed gold (13 candidates). The only candidate-shaped draft is explicitly a non-authoritative
+example produced without direct audio audition; no real gold is drafted or adjudicated, and
+nothing is frozen or scored. The remaining constraints are an audio-grounded Korean draft, a
+second Korean-fluent blinded reviewer, and at least two independently sourced control clips.
 Scope: `bench/` contracts, `scripts/` producers, `docs/`. No contact with `src/studio/preflight/*`
 (language-detection workstream), `src/features/*`, or `src/pages/*` (UI workstream).
 Deliverable of: the 1321 technical north-star review (six repo evidence readers, seven bet
@@ -167,7 +171,13 @@ re-derive fails the build.
 1. ✅ `bench/schemas/gold.schema.json` + `adjudication.schema.json`.
 2. ✅ `scripts/mine-gold-candidates.mjs` — derive-only; run-006 mined with `--route gold`
    (4 withheld, 3 uncorroborated, 5 phenomenon, 9 contrast signals over 13 candidates).
-   The drafting prompt pack for agent-proposed annotations is NOT built yet.
+   ✅ The missing agent drafting step is now built: content-addressed prompt/evidence bindings at
+   `bench/prompts/gold-drafter-v1/`, immutable fail-closed materialization through
+   `scripts/draft-gold-from-candidates.mjs`, and the blinded human handoff at
+   `bench/ADJUDICATION.md` + `scripts/write-adjudication-receipt.mjs`. The produced run-006 file
+   at `bench/examples/gold-drafts/Ux-TMWnmntM.gold.json` is deliberately a non-authoritative
+   dry-run fixture, not real gold, because this implementation interface could not audition the
+   audio. `status` remains `candidate`; no review or pack state is implied.
 3. ✅ `scripts/score-run.mjs` — frozen gold + capture + human output labels → per-line four-way
    outcomes + headline + `delta_vs_cold` in an immutable score receipt under `bench/scores/`.
    Human-labels only; `judge` is pinned null.
@@ -181,10 +191,11 @@ re-derive fails the build.
    self-control report all fail; only the honest pair accepts, and the delta is recorded on the
    decision receipt.
 
-Post-week: recruit the second Korean-fluent blinded reviewer (a contractor is fine — this is the
-binding constraint on the whole bet; without a real second human, gold is receipt theater),
-freeze `hard-ko-v1` (5 clips), first scored report, first ablation-bound rule acceptance,
-report-series comparator, pack v2.
+Post-week: have a Korean-fluent drafter/reviewer audition and correct the real run-006 candidate,
+recruit the second Korean-fluent blinded reviewer (a contractor is fine — without a real second
+human, gold is receipt theater), source at least two independent controls, then complete and
+freeze `hard-ko-v1` (5 clips). Only after that: first scored report, first ablation-bound rule
+acceptance, report-series comparator, pack v2.
 
 ## Failure modes
 

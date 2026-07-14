@@ -27,6 +27,9 @@ artifacts.
 9. Require review and evidence before a run can promote a correction, glossary entry, or rule.
 10. Keep the normal Studio deterministic while the runtime develops. Put inspection controls in a
     development-only lab.
+11. Query normalized runtime events and receipts, not raw logs or reconstructed prose.
+12. Keep forecasts versioned and auditable. Never present reserved budgets or estimated cost as
+    measured usage or provider billing.
 
 ## Optimize the media before spawning the full swarm
 
@@ -221,6 +224,65 @@ At the learning level:
 - Who or what accepted it?
 - Can it be evaluated or rolled back?
 
+## Observability, search, and forecasting
+
+Observability is part of the runtime evidence model, not a secondary log viewer. Raw logs remain
+useful for diagnostics, but they are not a stable query contract and may contain private prompts,
+media paths, provider payloads, or implementation-specific prose. Cross-run search should consume
+validated events and immutable receipts, retain links back to their sources, and expose unknown
+values when a real producer did not record them.
+
+The query layer should be able to answer:
+
+- How many agents, tasks, child requests, and media operations participated in a run or range?
+- Which worker sought backward, replayed media, retried work, or reprocessed a scene?
+- Which task spent the longest queued, actively executing, waiting on dependencies, or reporting?
+- Which task or operation occupied the critical path rather than merely accumulating worker time?
+- Which agents consumed the most measured tokens, tool calls, media seconds, or provider units?
+- Which operations failed, retried, produced withheld evidence, or created accepted artifacts?
+- How did the frozen pre-run forecast compare with the completed run?
+
+These questions require explicit semantics. A media seek is not a task retry; a deterministic
+Studio replay is not production re-execution; summed worker duration is not elapsed run time; a
+reserved token budget is not measured usage. Executors should receipt monotonic active duration
+where possible, while the journal preserves event time for ordering and wall-clock analysis.
+Provider-specific model and billing payloads stay behind model-execution adapters. A normalized
+usage receipt may expose common measured units and an opaque raw receipt reference, but must leave
+unsupported fields null.
+
+The first production query path should be:
+
+```text
+append-only runtime events + execution, tool, and model-usage receipts
+  -> validated immutable observability index
+  -> structured filters, aggregations, and source links
+  -> Run Explorer and forecast calibration
+```
+
+Do not search all raw JSONL in the browser or expand the Studio store into an analytics database.
+Keep event validation, indexing, query planning, aggregation, and UI projection in separate
+modules. The initial local index may be built after a run, as recorded evidence is today, while the
+production query-store interface remains independent of a particular database.
+
+### Forecast planner
+
+The planner should let a user drag a media range and vary analysis operations, model or quality
+tier, agent limits, and concurrency. It should show deterministic workload floors plus expected and
+conservative ranges for elapsed time and cost. Media duration establishes input volume and some
+billing floors, but does not by itself establish wall time because operations can run concurrently
+or faster than real time.
+
+Every saved forecast must identify its input artifact and range, requested work plan, estimator
+version, calibration evidence, pricing snapshot, currency, assumptions, and uncertainty. Pricing
+must come from a versioned price-book adapter rather than hard-coded UI copy. The original forecast
+is frozen when a run begins; a separate evaluation compares it with receipted actual usage without
+rewriting either record. Until model usage and prices have real producers, the UI may show known
+media and operation floors but must leave token and API-cost predictions unavailable.
+
+The primary visualization should combine a draggable range selector, parallel task lanes, critical
+path, and cost breakdown. It should label baseline, expected, conservative, measured, and billed
+values distinctly and explain which assumptions dominate the estimate.
+
 ## Current foundation and gaps
 
 | Area | Current foundation | Required next layer |
@@ -234,6 +296,8 @@ At the learning level:
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
+| Observability | Append-only production journal with task, agent, operation, artifact, and handoff events | Real executor spans, model-usage receipts, immutable cross-run index, and structured query service |
+| Forecasting | Preflight has measured media duration and explicit user-selected range | Versioned work planner, price-book adapter, historical calibration, interactive comparison, and forecast evaluation |
 
 The Studio visualizes recorded legacy runs. A production runtime library now exists separately, but
 the static Studio is not its host and does not claim that local smoke-test activity happened in a
@@ -252,6 +316,8 @@ recorded run.
 | 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real derived-media lineage and structured handoff. Legacy report/merge prose is not recast as provenance. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
 | 8 — verification | Partially implemented | Build, bench, receipt policy, runtime smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
+| 9 — observability | Planned, producer-blocked | The journal can support future indexing, but there are no real worker execution spans, model-usage receipts, or cross-run query index. Legacy labels must not be presented as production worker analytics. |
+| 10 — forecasting | Planned, partially unblocked | Measured media duration and selected range can support workload floors. Token, cost, and calibrated time ranges remain unavailable until real worker, usage, price-book, and historical producers exist. |
 
 ## Submission and customization UX
 
@@ -376,6 +442,12 @@ runtime cannot represent honestly today.
 | Structured handoff | A parent must know what a child reported and whether it was accepted | Parent worker/orchestrator |
 | Control acknowledgement | Live pause or cancellation cannot be claimed before the runtime accepts it | Live orchestrator transport |
 | Memory proposal decision | Learning needs evidence, review, and rollback provenance | QC/memory promotion gate |
+| Execution span receipt | Queue, active, dependency-wait, and report time need distinct measured intervals | Worker executor using a monotonic clock |
+| Model-usage receipt | Token and provider-unit analytics cannot come from budgets or text length | Model-execution adapter retaining the raw provider receipt |
+| Pricing snapshot | Cost estimates must remain reproducible after provider prices change | Versioned price-book adapter |
+| Observability index | Cross-run queries need validated dimensions, measures, and source links | Deterministic post-run indexer over production receipts |
+| Forecast scenario | Interactive estimates need frozen inputs, assumptions, and estimator identity | Forecast engine over measured preflight and explicit work-plan inputs |
+| Forecast evaluation | Calibration must compare estimates with actuals without rewriting history | Post-run evaluator over a frozen forecast and receipted usage |
 
 Loading, cancellation display, and lab selection are client/session state. They do not require new
 `RunBundle` fields.
@@ -480,6 +552,33 @@ truth.
 Done when the deterministic replay, difficult-media scenarios, and future live transport all drive
 the same reducer and user-visible evidence model.
 
+### Phase 9: Index and query runtime observability
+
+- Add executor-produced queue, active, dependency-wait, and reporting spans.
+- Add model-adapter usage receipts with normalized measured units and raw receipt references.
+- Record media seek, replay, retry, and reprocessing as distinct operations with exact scopes.
+- Build an immutable post-run observability index with dimensions, measures, and source hashes.
+- Add structured cross-run filters and aggregations before any free-text log search.
+- Show critical path, parallel work, failures, retries, tool use, and measured usage in a separate
+  Run Explorer module.
+- Apply redaction, retention, and access policy before indexing user or provider text.
+
+Done when a query result can be traced to real production events and receipts, and unavailable
+measurements cannot silently become zero or estimates.
+
+### Phase 10: Forecast time and cost
+
+- Convert the selected media range and explicit analysis plan into deterministic work units.
+- Add a versioned estimator and price-book adapter with reproducible snapshots.
+- Keep baseline, expected, conservative, measured, and billed values distinct.
+- Add an interactive range and scenario planner with task lanes, concurrency, and critical path.
+- Freeze the accepted forecast at run start and evaluate it against receipted actual usage.
+- Calibrate only from compatible producer, model, configuration, and workload cohorts.
+- Fail closed when historical evidence, usage, or pricing is missing or stale.
+
+Done when a user can change range and work-plan inputs, understand the resulting time and cost
+range, inspect every assumption, and later compare the prediction with immutable actual evidence.
+
 ## Near-term sequence
 
 The next production slices, in dependency order:
@@ -490,11 +589,17 @@ The next production slices, in dependency order:
    its model/version/configuration and unknown results. Keep pack policy outside the detector/runtime.
 3. Implement a real local worker launcher and adapt production runtime events into a separate Studio
    projection. Do not connect or translate the fixture-only contract events.
-4. Add the next media capability one operation at a time, starting with a real frame request or
+4. Have the launcher receipt executor spans and model usage from the start so observability does not
+   depend on reconstructing metrics from logs later.
+5. Add the next media capability one operation at a time, starting with a real frame request or
    bounded seek observation, and require the same authorization/receipt standard as extraction.
-5. Add reviewer-facing memory proposal and rollback inspection before any accepted snapshot is fed
+6. Build the immutable observability index and structured Run Explorer after the launcher has
+   produced real events; keep raw diagnostic log search separate and access-controlled.
+7. Add the deterministic forecast floor from measured media range and explicit work-plan inputs,
+   then add token, cost, and historical calibration only when their producers exist.
+8. Add reviewer-facing memory proposal and rollback inspection before any accepted snapshot is fed
    into a new run; record the exact snapshot content id when that first happens.
-6. Run the authored browser matrix in an environment with an available in-app browser, then add only
+9. Run the authored browser matrix in an environment with an available in-app browser, then add only
    evidence-backed difficult-media scenarios produced by the new detectors.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow

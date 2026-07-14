@@ -1,0 +1,103 @@
+.runtime-inspector {
+  min-height: 100vh;
+  padding: clamp(1.25rem, 4vw, 4rem);
+  color: #17231f;
+  background:
+    radial-gradient(circle at 85% 8%, rgb(109 212 167 / 16%), transparent 30rem),
+    #f4f7f5;
+  font-family: "Instrument Sans", sans-serif;
+}
+
+.runtime-inspector * { box-sizing: border-box; }
+
+.runtime-hero,
+.runtime-loader,
+.runtime-projection,
+.runtime-empty,
+.runtime-error {
+  width: min(76rem, 100%);
+  margin-inline: auto;
+}
+
+.runtime-back,
+.runtime-kicker,
+.runtime-kind,
+.runtime-proof,
+.runtime-detail dt,
+.runtime-summary dt,
+.runtime-receipt span,
+.runtime-report span {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .72rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.runtime-back { color: inherit; }
+.runtime-kicker { margin: 3.5rem 0 .8rem; color: #287354; }
+.runtime-hero h1 { max-width: 14ch; margin: 0; font-size: clamp(2.4rem, 7vw, 5.5rem); font-weight: 400; line-height: .96; letter-spacing: -.055em; }
+.runtime-lede { max-width: 44rem; margin: 1.5rem 0 0; color: #53635d; font-size: 1.06rem; line-height: 1.6; }
+
+.runtime-loader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  margin-top: clamp(3rem, 8vw, 6rem);
+  padding: 1.25rem;
+  border: 1px solid #cad5d0;
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 70%);
+}
+
+.runtime-loader h2 { margin: 0; font-size: 1rem; font-weight: 500; }
+.runtime-loader p { margin: .35rem 0 0; color: #66756f; font-size: .86rem; }
+.runtime-file { position: relative; flex: 0 0 auto; padding: .8rem 1rem; overflow: hidden; border-radius: .75rem; background: #183d30; color: white; cursor: pointer; }
+.runtime-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.runtime-empty,
+.runtime-error { margin-top: 1rem; padding: 3rem 1.25rem; border: 1px dashed #bdcac4; border-radius: 1.25rem; text-align: center; }
+.runtime-empty p { margin: 0; font-size: 1.2rem; }
+.runtime-empty span { color: #73817b; font-size: .88rem; }
+.runtime-error { color: #8a302d; border-color: #d7aaa7; background: #fff8f7; }
+
+.runtime-projection { margin-top: 2rem; }
+.runtime-summary { display: flex; align-items: end; justify-content: space-between; gap: 2rem; padding: 1.25rem 0; border-bottom: 1px solid #cbd6d1; }
+.runtime-proof { color: #287354; }
+.runtime-summary h2 { margin: .45rem 0 0; font-size: 1.5rem; font-weight: 500; }
+.runtime-summary dl { display: flex; gap: 1.5rem; margin: 0; }
+.runtime-summary dl div { text-align: right; }
+.runtime-summary dt { color: #6b7873; }
+.runtime-summary dd { margin: .25rem 0 0; font-size: 1.35rem; }
+
+.runtime-workers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; margin-top: 1rem; }
+.runtime-worker { padding: 1.25rem; border: 1px solid #cbd6d1; border-radius: 1.25rem; background: rgb(255 255 255 / 82%); box-shadow: 0 1rem 3rem rgb(36 61 51 / 6%); }
+.runtime-worker > header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.runtime-kind { color: #287354; }
+.runtime-worker h3 { margin: .3rem 0 0; font-size: 1.25rem; font-weight: 500; }
+.runtime-status { padding: .35rem .55rem; border-radius: 999px; background: #e5eee9; font-size: .72rem; }
+.runtime-worker[data-status="failed"] .runtime-status,
+.runtime-worker[data-status="withheld"] .runtime-status { background: #f4dedd; color: #852e2b; }
+.runtime-objective { min-height: 3.2em; color: #40504a; line-height: 1.5; }
+.runtime-detail { display: grid; gap: .55rem; margin: 1.2rem 0 0; }
+.runtime-detail div { display: grid; grid-template-columns: 6.5rem 1fr; gap: .7rem; }
+.runtime-detail dt { color: #718079; }
+.runtime-detail dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: .84rem; }
+
+.runtime-receipt { display: grid; gap: .65rem; margin-top: 1.2rem; padding: .85rem; border-radius: .85rem; background: #edf3f0; }
+.runtime-receipt div { display: grid; gap: .2rem; }
+.runtime-receipt span { color: #64736d; }
+.runtime-receipt b { font-size: .86rem; font-weight: 500; }
+.runtime-receipt small { color: #6b7973; }
+.runtime-unavailable { margin: 1.2rem 0 0; color: #74827c; font-size: .84rem; }
+.runtime-report { margin: 1rem 0 0; padding: .85rem; border: 0; border-left: 2px solid #4a9474; background: #f4f8f6; }
+.runtime-report span { color: #287354; }
+.runtime-report p { margin: .4rem 0 0; font-size: .88rem; line-height: 1.45; }
+
+@media (max-width: 680px) {
+  .runtime-loader,
+  .runtime-summary { align-items: stretch; flex-direction: column; }
+  .runtime-file { text-align: center; }
+  .runtime-summary dl { justify-content: space-between; }
+  .runtime-summary dl div { text-align: left; }
+}

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { appendFile, mkdtemp, readFile, rm } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -16,8 +16,10 @@ import {
   type EventJournal,
 } from "../src/studio/runtime/production/journal.ts";
 import { FfmpegCapabilityHost } from "../src/studio/runtime/production/mediaHost.ts";
+import { CodexExecWorkerLauncher } from "../src/studio/runtime/production/launcher.ts";
 import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
 import { applyRuntimeEvent, initialRuntimeProjection } from "../src/studio/runtime/production/projection.ts";
+import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
 import type {
   RuntimeLimits,
   SourceArtifactDescriptor,
@@ -156,6 +158,72 @@ function childInput(runtime: RuntimeHarness): SpawnRequestInput {
   };
 }
 
+function codexChildInput(runtime: RuntimeHarness): SpawnRequestInput {
+  return {
+    workloadKey: "worker:bounded-report",
+    objective: "Return an honest acknowledgement of this bounded child contract without making media claims.",
+    workerKind: "analysis",
+    workerLabel: "bounded-local-worker",
+    mediaScope: [],
+    inputArtifactIds: [runtime.sourceArtifactId],
+    requiredOutputs: [{ name: "execution report", artifactKind: "worker-execution-report", required: true }],
+    requiredCapabilities: ["report.submit"],
+    dependencies: [],
+    budget: { wallMs: 10_000, toolCalls: 1 },
+  };
+}
+
+async function fakeCodex(runtime: RuntimeHarness, mode = "valid"): Promise<{ executable: string; prefix: string[] }> {
+  const path = join(runtime.directory, `fake-codex-${mode}.mjs`);
+  await writeFile(
+    path,
+    `
+import { readFile } from "node:fs/promises";
+
+const mode = ${JSON.stringify(mode)};
+const args = process.argv.slice(2);
+if (args[0] === "--version") {
+  process.stdout.write("codex-cli test-1.0.0\\n");
+  process.exit(0);
+}
+const required = ["exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only", "--skip-git-repo-check", "-c", "shell_environment_policy.inherit=none", "--output-schema"];
+for (const value of required) {
+  if (!args.includes(value)) throw new Error("missing fixed launcher argument " + value);
+}
+if (args.at(-1) !== "-") throw new Error("worker prompt must arrive on stdin");
+let prompt = "";
+for await (const chunk of process.stdin) prompt += chunk;
+if (!prompt.includes("exposes no media bytes") || !prompt.includes("bounded child contract")) {
+  throw new Error("bounded prompt was not supplied");
+}
+if (mode === "hang") await new Promise((resolve) => setTimeout(resolve, 60_000));
+const schemaPath = args[args.indexOf("--output-schema") + 1];
+const schema = JSON.parse(await readFile(schemaPath, "utf8"));
+const name = schema.properties.outputs.items.properties.name.enum[0];
+const kind = schema.properties.outputs.items.properties.kind.enum[0];
+const output = {
+  summary: "The isolated child completed its bounded acknowledgement and made no media claim.",
+  outputs: [{ name, kind, content: "Bounded worker execution acknowledged; media inspection was unavailable." }],
+};
+if (mode === "open-output") output.unreceipted = true;
+const events = [
+  { type: "thread.started", thread_id: "thread:test" },
+  { type: "turn.started" },
+  { type: "item.completed", item: { id: "item:test", type: "agent_message", text: JSON.stringify(output) } },
+  { type: "turn.completed", provider_request_id: "raw-provider-receipt-test", usage: {
+    input_tokens: 120,
+    cached_input_tokens: mode === "bad-usage" ? 121 : 20,
+    output_tokens: 35,
+    reasoning_output_tokens: 5,
+  } },
+];
+process.stdout.write(events.map((event) => JSON.stringify(event)).join("\\n") + "\\n");
+`,
+    { encoding: "utf8", mode: 0o600, flag: "wx" },
+  );
+  return { executable: process.execPath, prefix: [path] };
+}
+
 async function cleanup(runtime: RuntimeHarness): Promise<void> {
   await rm(runtime.directory, { recursive: true, force: true });
 }
@@ -290,6 +358,237 @@ test("scheduler fails closed on each bounded spawn policy", async (suite) => {
       }
     });
   }
+});
+
+test("Codex launcher registers a bounded child, receipts active time and measured usage, then reports up", async () => {
+  const runtime = await harness(BASE_LIMITS, "file");
+  try {
+    const decision = await runtime.scheduler.requestSpawn(
+      runtime.rootTaskId,
+      runtime.rootAgentId,
+      codexChildInput(runtime),
+    );
+    assert.equal(decision.accepted, true);
+    const fake = await fakeCodex(runtime);
+    const reports = new BoundedReportHost(runtime.ledger, () => "report:codex-worker");
+    const times = [
+      new Date("2026-07-14T12:00:00.000Z"),
+      new Date("2026-07-14T12:00:00.045Z"),
+    ];
+    const monotonic = [1_000, 1_045];
+    const launcher = new CodexExecWorkerLauncher(runtime.ledger, runtime.scheduler, runtime.store, reports, {
+      executable: fake.executable,
+      executableArgsPrefix: fake.prefix,
+      now: () => times.shift() ?? new Date("2026-07-14T12:00:00.045Z"),
+      monotonicNow: () => monotonic.shift() ?? 1_045,
+      nextExecutionId: () => "execution:codex-worker",
+      maximumWallMs: 5_000,
+    });
+
+    const result = await launcher.launch(decision.permit!);
+    assert.equal(result.execution.outcome, "completed");
+    assert.equal(result.execution.monotonicDurationMs, 45);
+    assert.equal(result.execution.process.exitCode, 0);
+    assert.equal(result.usage.measured.inputTokens, 120);
+    assert.equal(result.usage.measured.cachedInputTokens, 20);
+    assert.equal(result.usage.measured.outputTokens, 35);
+    assert.equal(result.usage.measured.reasoningOutputTokens, 5);
+    assert.equal(result.usage.model, null);
+    assert.equal(result.usage.providerUnits, null);
+    assert.deepEqual(result.usage.billing, { amount: null, currency: null });
+    assert.equal(result.artifacts.length, 1);
+    assert.equal(result.artifacts[0].kind, "worker-execution-report");
+    assert.equal(result.artifacts[0].mediaClass, "non_media");
+    assert.equal(result.artifacts[0].origin.kind, "worker_output");
+    assert.equal(result.report.status, "submitted");
+
+    const rawUsage = JSON.parse(
+      (await runtime.store.receiptBytes(result.usage.rawReceipt.contentId)).toString("utf8"),
+    ) as { provider_request_id: string };
+    assert.equal(rawUsage.provider_request_id, "raw-provider-receipt-test");
+
+    await reports.decide({
+      reportId: result.report.id,
+      decidedByTaskId: runtime.rootTaskId,
+      decidedByAgentId: runtime.rootAgentId,
+      accepted: true,
+      reason: "The child returned its required structured output and made no unsupported media claim.",
+    });
+    const state = runtime.ledger.state();
+    assert.equal(state.executions["execution:codex-worker"].status, "completed");
+    assert.equal(state.tasks[decision.permit!.taskId].status, "completed");
+    assert.equal(state.agents[decision.permit!.agentId].status, "retired");
+
+    const events = await runtime.ledger.events();
+    assert.ok(events.some((event) => event.type === "executor.started" && event.producer.kind === "launcher"));
+    assert.ok(events.some((event) => event.type === "model.usage_recorded" && event.producer.kind === "launcher"));
+    assert.ok(events.some((event) => event.type === "executor.finished" && event.producer.kind === "launcher"));
+    assert.ok(events.every((event) => !("fixtureOnly" in event)));
+
+    const usageEvent = events.find((event) => event.type === "model.usage_recorded");
+    assert.ok(usageEvent);
+    const inventedBilling = structuredClone(usageEvent) as unknown as {
+      data: { receipt: { billing: { amount: number | null } } };
+    };
+    inventedBilling.data.receipt.billing.amount = 0;
+    assert.throws(() => assertRuntimeEvent(inventedBilling), /must remain null without a billing producer/);
+    const escapedRawReceipt = structuredClone(usageEvent) as unknown as {
+      data: { receipt: { rawReceipt: { storageKey: string } } };
+    };
+    escapedRawReceipt.data.receipt.rawReceipt.storageKey = "../usage.json";
+    assert.throws(() => assertRuntimeEvent(escapedRawReceipt), /must be a relative contained key/);
+
+    const spanEvent = events.find((event) => event.type === "executor.finished");
+    assert.ok(spanEvent);
+    const inventedQueueSpan = structuredClone(spanEvent) as unknown as {
+      data: { receipt: Record<string, unknown> };
+    };
+    inventedQueueSpan.data.receipt.queueDurationMs = 1;
+    assert.throws(() => assertRuntimeEvent(inventedQueueSpan), /queueDurationMs is not allowed/);
+
+    const studio = projectProductionRuntimeJournal(events);
+    assert.equal(studio.source.kind, "production_runtime_journal");
+    assert.equal(studio.source.recordedDemo, false);
+    const child = studio.workers.find((worker) => worker.agentId === decision.permit!.agentId)!;
+    assert.equal(child.label, "bounded-local-worker");
+    assert.equal(child.objective, codexChildInput(runtime).objective);
+    assert.deepEqual(child.capabilities, ["report.submit"]);
+    assert.equal(child.execution?.activeDurationMs, 45);
+    assert.equal(child.execution?.usage?.inputTokens, 120);
+    assert.equal(child.execution?.usage?.billedAmount, null);
+    assert.equal(child.report?.status, "accepted");
+
+    const reopened = await RuntimeLedger.open("runtime-test", runtime.journal);
+    assert.deepEqual(reopened.state(), state);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("Codex launcher fails closed on unsupported capabilities and invalid child output", async (suite) => {
+  await suite.test("unsupported capability is rejected before registration", async () => {
+    const runtime = await harness();
+    try {
+      const decision = await runtime.scheduler.requestSpawn(
+        runtime.rootTaskId,
+        runtime.rootAgentId,
+        childInput(runtime),
+      );
+      const fake = await fakeCodex(runtime);
+      const launcher = new CodexExecWorkerLauncher(
+        runtime.ledger,
+        runtime.scheduler,
+        runtime.store,
+        new BoundedReportHost(runtime.ledger),
+        { executable: fake.executable, executableArgsPrefix: fake.prefix },
+      );
+      const before = (await runtime.ledger.events()).length;
+      await assert.rejects(launcher.launch(decision.permit!), /supports only the structured report.submit capability/);
+      assert.equal((await runtime.ledger.events()).length, before);
+      assert.equal(runtime.ledger.state().tasks[decision.permit!.taskId].ownerAgentId, null);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  await suite.test("open worker response is receipted as a failed execution without a report", async () => {
+    const runtime = await harness();
+    try {
+      const decision = await runtime.scheduler.requestSpawn(
+        runtime.rootTaskId,
+        runtime.rootAgentId,
+        codexChildInput(runtime),
+      );
+      const fake = await fakeCodex(runtime, "open-output");
+      const launcher = new CodexExecWorkerLauncher(
+        runtime.ledger,
+        runtime.scheduler,
+        runtime.store,
+        new BoundedReportHost(runtime.ledger),
+        {
+          executable: fake.executable,
+          executableArgsPrefix: fake.prefix,
+          nextExecutionId: () => "execution:invalid-output",
+        },
+      );
+      await assert.rejects(launcher.launch(decision.permit!), /must contain only summary and outputs/);
+      const state = runtime.ledger.state();
+      assert.equal(state.executions["execution:invalid-output"].status, "failed");
+      assert.equal(state.executions["execution:invalid-output"].outputArtifactIds.length, 0);
+      assert.equal(state.tasks[decision.permit!.taskId].status, "failed");
+      assert.equal(Object.keys(state.reports).length, 0);
+      assert.ok(state.executions["execution:invalid-output"].modelUsageReceiptId);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  await suite.test("invalid measured usage produces no usage or output artifact", async () => {
+    const runtime = await harness();
+    try {
+      const decision = await runtime.scheduler.requestSpawn(
+        runtime.rootTaskId,
+        runtime.rootAgentId,
+        codexChildInput(runtime),
+      );
+      const fake = await fakeCodex(runtime, "bad-usage");
+      const launcher = new CodexExecWorkerLauncher(
+        runtime.ledger,
+        runtime.scheduler,
+        runtime.store,
+        new BoundedReportHost(runtime.ledger),
+        {
+          executable: fake.executable,
+          executableArgsPrefix: fake.prefix,
+          nextExecutionId: () => "execution:bad-usage",
+        },
+      );
+      await assert.rejects(launcher.launch(decision.permit!), /cached input tokens exceed input tokens/);
+      const state = runtime.ledger.state();
+      assert.equal(state.executions["execution:bad-usage"].status, "failed");
+      assert.equal(state.executions["execution:bad-usage"].modelUsageReceiptId, null);
+      assert.equal(Object.keys(state.modelUsage).length, 0);
+      assert.equal(Object.values(state.artifacts).filter((artifact) => artifact.origin.kind === "worker_output").length, 0);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  await suite.test("wall-time exhaustion terminates the child and records a timed-out span", async () => {
+    const runtime = await harness();
+    try {
+      const decision = await runtime.scheduler.requestSpawn(
+        runtime.rootTaskId,
+        runtime.rootAgentId,
+        codexChildInput(runtime),
+      );
+      const fake = await fakeCodex(runtime, "hang");
+      const launcher = new CodexExecWorkerLauncher(
+        runtime.ledger,
+        runtime.scheduler,
+        runtime.store,
+        new BoundedReportHost(runtime.ledger),
+        {
+          executable: fake.executable,
+          executableArgsPrefix: fake.prefix,
+          nextExecutionId: () => "execution:timed-out",
+          maximumWallMs: 30,
+        },
+      );
+      await assert.rejects(launcher.launch(decision.permit!), /timed out/);
+      const execution = runtime.ledger.state().executions["execution:timed-out"];
+      assert.equal(execution.status, "timed_out");
+      assert.equal(execution.modelUsageReceiptId, null);
+      assert.equal(runtime.ledger.state().tasks[decision.permit!.taskId].status, "failed");
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  assert.throws(
+    () => projectProductionRuntimeJournal([{ fixtureOnly: true, type: "spawn_requested" }]),
+    /fixtureOnly is not allowed/,
+  );
 });
 
 test("capability host performs a real authorized ffmpeg extraction with receipted lineage", async () => {

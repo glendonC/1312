@@ -3,12 +3,18 @@ import { createReadStream } from "node:fs";
 import { copyFile, link, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { assertRuntimeArtifact, assertSourceArtifactDescriptor } from "./assertions.ts";
+import {
+  assertRuntimeArtifact,
+  assertSourceArtifactDescriptor,
+  assertWorkerOutputEnvelope,
+} from "./assertions.ts";
 import type {
   ContentIdentity,
+  ExecutorSpanReceipt,
   MediaOperationReceipt,
   MediaTrackDescriptor,
   RuntimeArtifact,
+  WorkerOutputEnvelope,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
@@ -159,14 +165,86 @@ export class ContentAddressedArtifactStore {
   }
 
   async storeReceipt(receipt: MediaOperationReceipt): Promise<{ content: ContentIdentity; storageKey: string }> {
+    return this.storeJson(receipt);
+  }
+
+  async storeJson(value: unknown): Promise<{ content: ContentIdentity; storageKey: string }> {
+    await mkdir(this.absoluteRoot, { recursive: true, mode: 0o700 });
     const directory = await mkdtemp(join(this.absoluteRoot, ".receipt-"));
     const path = join(directory, "receipt.json");
     try {
-      await writeFile(path, `${canonical(receipt)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
+      await writeFile(path, `${canonical(value)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
       return await this.storeFile(path);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  }
+
+  async prepareWorkerOutput(runId: string, envelopeValue: unknown): Promise<{
+    artifactId: string;
+    envelope: WorkerOutputEnvelope;
+    content: ContentIdentity;
+    storageKey: string;
+  }> {
+    assertWorkerOutputEnvelope(envelopeValue);
+    const envelope = structuredClone(envelopeValue);
+    const stored = await this.storeJson(envelope);
+    return {
+      artifactId: `artifact:${canonicalSha256({
+        runId,
+        executionId: envelope.executionId,
+        outputName: envelope.output.name,
+        outputKind: envelope.output.kind,
+        contentId: stored.content.contentId,
+      })}`,
+      envelope,
+      ...stored,
+    };
+  }
+
+  buildWorkerOutputArtifact(input: {
+    runId: string;
+    receipt: ExecutorSpanReceipt;
+    receiptContentId: string;
+    prepared: {
+      artifactId: string;
+      envelope: WorkerOutputEnvelope;
+      content: ContentIdentity;
+      storageKey: string;
+    };
+  }): RuntimeArtifact {
+    const { envelope } = input.prepared;
+    if (
+      envelope.executionId !== input.receipt.executionId ||
+      envelope.taskId !== input.receipt.taskId ||
+      envelope.agentId !== input.receipt.agentId ||
+      !input.receipt.outputArtifactIds.includes(input.prepared.artifactId)
+    ) {
+      throw new Error("Worker output envelope does not match its executor receipt");
+    }
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: input.prepared.artifactId,
+      runId: input.runId,
+      kind: envelope.output.kind,
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.prepared.content,
+      storageKey: input.prepared.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [],
+      producerTaskId: envelope.taskId,
+      producerAgentId: envelope.agentId,
+      origin: {
+        kind: "worker_output",
+        executionId: envelope.executionId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.receiptContentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
   }
 
   buildDerivedArtifact(input: {

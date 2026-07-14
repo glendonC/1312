@@ -1,8 +1,10 @@
 import type {
   AgentRecord,
   CapabilityGrant,
+  ExecutorSpanReceipt,
   MediaExtractRequest,
   MediaOperationReceipt,
+  ModelUsageReceipt,
   ReportRecord,
   RuntimeArtifact,
   SpawnRejection,
@@ -11,7 +13,13 @@ import type {
   TaskStatus,
 } from "./model.ts";
 
-export type RuntimeProducerKind = "scheduler" | "registry" | "artifact_store" | "media_host" | "handoff_host";
+export type RuntimeProducerKind =
+  | "scheduler"
+  | "registry"
+  | "artifact_store"
+  | "media_host"
+  | "handoff_host"
+  | "launcher";
 
 export interface RuntimeEventBase {
   schema: "studio.runtime.event.v1";
@@ -66,6 +74,26 @@ export interface TaskTransitionedEvent extends RuntimeEventBase {
   data: { taskId: string; agentId: string; status: TaskStatus; reason: string | null };
 }
 
+export interface ExecutorStartedEvent extends RuntimeEventBase {
+  type: "executor.started";
+  data: {
+    executionId: string;
+    taskId: string;
+    agentId: string;
+    startedAt: string;
+  };
+}
+
+export interface ModelUsageRecordedEvent extends RuntimeEventBase {
+  type: "model.usage_recorded";
+  data: { receipt: ModelUsageReceipt };
+}
+
+export interface ExecutorFinishedEvent extends RuntimeEventBase {
+  type: "executor.finished";
+  data: { receipt: ExecutorSpanReceipt };
+}
+
 export interface MediaOperationStartedEvent extends RuntimeEventBase {
   type: "media.operation_started";
   data: { request: MediaExtractRequest; grantId: string };
@@ -108,6 +136,9 @@ export type RuntimeEvent =
   | SpawnDecidedEvent
   | AgentRegisteredEvent
   | TaskTransitionedEvent
+  | ExecutorStartedEvent
+  | ModelUsageRecordedEvent
+  | ExecutorFinishedEvent
   | MediaOperationStartedEvent
   | MediaOperationCompletedEvent
   | MediaOperationFailedEvent

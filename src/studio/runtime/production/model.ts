@@ -121,6 +121,13 @@ export interface MediaOperationArtifactOrigin {
   receiptContentId: string;
 }
 
+export interface WorkerOutputArtifactOrigin {
+  kind: "worker_output";
+  executionId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
 export interface RuntimeArtifact {
   schema: "studio.runtime.artifact.v1";
   id: string;
@@ -135,7 +142,19 @@ export interface RuntimeArtifact {
   sourceArtifactIds: string[];
   producerTaskId: string | null;
   producerAgentId: string | null;
-  origin: SourceArtifactOrigin | MediaOperationArtifactOrigin;
+  origin: SourceArtifactOrigin | MediaOperationArtifactOrigin | WorkerOutputArtifactOrigin;
+}
+
+export interface WorkerOutputEnvelope {
+  schema: "studio.worker-output.v1";
+  executionId: string;
+  taskId: string;
+  agentId: string;
+  output: {
+    name: string;
+    kind: string;
+    content: string;
+  };
 }
 
 export interface SpawnRequestInput {
@@ -229,6 +248,76 @@ export interface OperationRecord {
   failure: string | null;
 }
 
+export type ExecutorOutcome = "completed" | "failed" | "timed_out";
+
+export interface ExecutorSpanReceipt {
+  schema: "studio.executor-span.receipt.v1";
+  receiptId: string;
+  executionId: string;
+  taskId: string;
+  agentId: string;
+  phase: "active";
+  producer: {
+    id: "codex.exec";
+    version: string;
+    sandbox: "read-only";
+    ephemeral: true;
+  };
+  startedAt: string;
+  endedAt: string;
+  monotonicDurationMs: number;
+  outcome: ExecutorOutcome;
+  process: {
+    exitCode: number | null;
+    signal: string | null;
+  };
+  outputArtifactIds: string[];
+  modelUsageReceiptId: string | null;
+  failure: string | null;
+}
+
+export interface ModelUsageReceipt {
+  schema: "studio.model-usage.receipt.v1";
+  receiptId: string;
+  executionId: string;
+  taskId: string;
+  agentId: string;
+  producer: {
+    id: "codex.exec";
+    version: string;
+  };
+  /** The CLI JSONL contract does not currently identify the selected model. */
+  model: string | null;
+  measured: {
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    reasoningOutputTokens: number;
+  };
+  /** No provider-unit or billing producer exists in this launcher. */
+  providerUnits: null;
+  billing: {
+    amount: null;
+    currency: null;
+  };
+  rawReceipt: {
+    source: "codex.exec.turn.completed";
+    contentId: string;
+    storageKey: string;
+  };
+}
+
+export interface ExecutorRecord {
+  id: string;
+  taskId: string;
+  agentId: string;
+  startedAt: string;
+  status: "active" | ExecutorOutcome;
+  receipt: ExecutorSpanReceipt | null;
+  outputArtifactIds: string[];
+  modelUsageReceiptId: string | null;
+}
+
 export interface ReportRecord {
   id: string;
   taskId: string;
@@ -275,5 +364,7 @@ export interface RuntimeProjection {
   artifacts: Record<string, RuntimeArtifact>;
   spawnRequests: Record<string, SpawnRequestRecord>;
   operations: Record<string, OperationRecord>;
+  executions: Record<string, ExecutorRecord>;
+  modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;
 }

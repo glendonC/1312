@@ -1,0 +1,13 @@
+---
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+import ProductionRuntimeInspector from "../../../studio/runtime/production/ProductionRuntimeInspector";
+import "../../../studio/runtime/production/inspector.css";
+---
+
+<SiteLayout
+  title="Production runtime inspector | 1321 Studio"
+  description="Validate and inspect a local 1321 Studio production worker journal."
+  noIndex
+>
+  <ProductionRuntimeInspector client:load />
+</SiteLayout>

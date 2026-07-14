@@ -33,6 +33,8 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     artifacts: {},
     spawnRequests: {},
     operations: {},
+    executions: {},
+    modelUsage: {},
     reports: {},
   };
 }
@@ -82,6 +84,14 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
       invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active media operation`);
       invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `artifact ${artifact.id} changed its operation producer`);
       invariant(artifact.sourceArtifactIds.includes(operation.artifactId), event, `artifact ${artifact.id} omits its operation input`);
+    } else if (artifact.origin.kind === "worker_output") {
+      const execution = next.executions[artifact.origin.executionId];
+      invariant(execution?.status === "active", event, `artifact ${artifact.id} has no active worker execution`);
+      invariant(
+        execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId,
+        event,
+        `artifact ${artifact.id} changed its worker execution producer`,
+      );
     }
     next.artifacts[artifact.id] = artifact;
     return next;
@@ -151,11 +161,95 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
       (operation) => operation.taskId === task.id && operation.status === "started",
     );
     invariant(!activeOperation || event.data.status === "working", event, `task ${task.id} has an active media operation`);
+    const activeExecution = Object.values(next.executions).some(
+      (execution) => execution.taskId === task.id && execution.status === "active",
+    );
+    invariant(!activeExecution || event.data.status === "working", event, `task ${task.id} has an active executor`);
     task.status = event.data.status;
     const agent = next.agents[event.data.agentId];
     if (event.data.status === "working") agent.status = "working";
     else if (event.data.status === "reported") agent.status = "reporting";
     else agent.status = "retired";
+    return next;
+  }
+
+  if (event.type === "executor.started") {
+    invariant(event.producer.kind === "launcher", event, "executor start evidence must come from the launcher");
+    const task = next.tasks[event.data.taskId];
+    invariant(
+      task?.status === "working" && task.ownerAgentId === event.data.agentId,
+      event,
+      `execution ${event.data.executionId} has no working owner`,
+    );
+    invariant(!next.executions[event.data.executionId], event, `execution ${event.data.executionId} is duplicated`);
+    invariant(
+      !Object.values(next.executions).some(
+        (execution) => execution.taskId === task.id && execution.status === "active",
+      ),
+      event,
+      `task ${task.id} already has an active executor`,
+    );
+    next.executions[event.data.executionId] = {
+      id: event.data.executionId,
+      taskId: task.id,
+      agentId: event.data.agentId,
+      startedAt: event.data.startedAt,
+      status: "active",
+      receipt: null,
+      outputArtifactIds: [],
+      modelUsageReceiptId: null,
+    };
+    return next;
+  }
+
+  if (event.type === "model.usage_recorded") {
+    invariant(event.producer.kind === "launcher", event, "model usage evidence must come from the launcher");
+    const receipt = event.data.receipt;
+    const execution = next.executions[receipt.executionId];
+    invariant(execution?.status === "active", event, `usage ${receipt.receiptId} has no active executor`);
+    invariant(
+      execution.taskId === receipt.taskId && execution.agentId === receipt.agentId,
+      event,
+      `usage ${receipt.receiptId} changed its executor owner`,
+    );
+    invariant(!next.modelUsage[receipt.receiptId], event, `usage receipt ${receipt.receiptId} is duplicated`);
+    invariant(execution.modelUsageReceiptId === null, event, `execution ${execution.id} recorded usage twice`);
+    next.modelUsage[receipt.receiptId] = receipt;
+    execution.modelUsageReceiptId = receipt.receiptId;
+    return next;
+  }
+
+  if (event.type === "executor.finished") {
+    invariant(event.producer.kind === "launcher", event, "executor finish evidence must come from the launcher");
+    const receipt = event.data.receipt;
+    const execution = next.executions[receipt.executionId];
+    invariant(execution?.status === "active", event, `execution ${receipt.executionId} is not active`);
+    invariant(
+      execution.taskId === receipt.taskId && execution.agentId === receipt.agentId,
+      event,
+      `execution ${receipt.executionId} changed owner`,
+    );
+    invariant(execution.startedAt === receipt.startedAt, event, `execution ${receipt.executionId} changed start time`);
+    invariant(
+      execution.modelUsageReceiptId === receipt.modelUsageReceiptId,
+      event,
+      `execution ${receipt.executionId} usage receipt changed`,
+    );
+    invariant(
+      receipt.outputArtifactIds.every((id) => {
+        const artifact = next.artifacts[id];
+        return (
+          artifact?.origin.kind === "worker_output" &&
+          artifact.origin.executionId === execution.id &&
+          artifact.origin.receiptId === receipt.receiptId
+        );
+      }),
+      event,
+      `execution ${receipt.executionId} contains an unreceipted output`,
+    );
+    execution.status = receipt.outcome;
+    execution.receipt = receipt;
+    execution.outputArtifactIds = [...receipt.outputArtifactIds];
     return next;
   }
 
@@ -208,6 +302,13 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     const task = next.tasks[report.taskId];
     invariant(task?.status === "working" && task.ownerAgentId === report.agentId, event, `report ${report.id} has no working owner`);
     invariant(task.grants.some((grant) => grant.capability === "report.submit"), event, `task ${task.id} cannot submit reports`);
+    invariant(
+      !Object.values(next.executions).some(
+        (execution) => execution.taskId === task.id && execution.status === "active",
+      ),
+      event,
+      `task ${task.id} cannot report while its executor is active`,
+    );
     invariant(task.parentTaskId === report.parentTaskId && task.parentAgentId === report.parentAgentId, event, `report ${report.id} parentage changed`);
     invariant(!next.reports[report.id], event, `report ${report.id} is duplicated`);
     invariant(report.status === "submitted" && report.decisionReason === null, event, `report ${report.id} has a premature decision`);

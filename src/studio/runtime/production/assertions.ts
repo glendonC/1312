@@ -3,9 +3,11 @@ import {
   type AgentRecord,
   type Capability,
   type CapabilityGrant,
+  type ExecutorSpanReceipt,
   type MediaExtractRequest,
   type MediaOperationReceipt,
   type MediaScope,
+  type ModelUsageReceipt,
   type ReportDecisionRequest,
   type ReportRecord,
   type ReportSubmitRequest,
@@ -16,6 +18,7 @@ import {
   type SourceArtifactDescriptor,
   type SpawnRequestInput,
   type TaskRecord,
+  type WorkerOutputEnvelope,
 } from "./model.ts";
 import type { RuntimeEvent } from "./protocol.ts";
 
@@ -71,11 +74,21 @@ function nullableString(value: unknown, context: string, path: string): string |
   return value === null ? null : string(value, context, path);
 }
 
+function isoTimestamp(value: unknown, context: string, path: string): string {
+  const timestamp = string(value, context, path);
+  if (!Number.isFinite(Date.parse(timestamp))) fail(context, path, "must be an ISO timestamp");
+  return timestamp;
+}
+
 function integer(value: unknown, context: string, path: string, minimum = 0): number {
   if (!Number.isSafeInteger(value) || (value as number) < minimum) {
     fail(context, path, `must be a safe integer at least ${minimum}`);
   }
   return value as number;
+}
+
+function nullableInteger(value: unknown, context: string, path: string, minimum = 0): number | null {
+  return value === null ? null : integer(value, context, path, minimum);
 }
 
 function boolean(value: unknown, context: string, path: string): boolean {
@@ -315,6 +328,17 @@ function artifact(value: unknown, context: string, path: string): asserts value 
     if (mediaClass !== "derived" || sources.length === 0 || task === null || agent === null) {
       fail(context, path, "media operation artifacts require derived lineage and a task producer");
     }
+  } else if (kind === "worker_output") {
+    exact(origin, ["kind", "executionId", "receiptId", "receiptContentId"], context, `${path}.origin`);
+    string(origin.executionId, context, `${path}.origin.executionId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    string(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    if (mediaClass !== "non_media" || item.durationMs !== null || (item.tracks as unknown[]).length !== 0) {
+      fail(context, path, "worker output artifacts must be non-media without duration or tracks");
+    }
+    if (sources.length !== 0 || task === null || agent === null) {
+      fail(context, path, "worker output artifacts require a task producer and cannot claim media lineage");
+    }
   } else {
     fail(context, `${path}.origin.kind`, `has unknown value ${kind}`);
   }
@@ -322,6 +346,23 @@ function artifact(value: unknown, context: string, path: string): asserts value 
 
 export function assertRuntimeArtifact(value: unknown, context = "Runtime artifact"): asserts value is RuntimeArtifact {
   artifact(value, context, "artifact");
+}
+
+export function assertWorkerOutputEnvelope(
+  value: unknown,
+  context = "Worker output",
+): asserts value is WorkerOutputEnvelope {
+  const item = object(value, context, "envelope");
+  exact(item, ["schema", "executionId", "taskId", "agentId", "output"], context, "envelope");
+  literal(item.schema, "studio.worker-output.v1", context, "envelope.schema");
+  string(item.executionId, context, "envelope.executionId");
+  string(item.taskId, context, "envelope.taskId");
+  string(item.agentId, context, "envelope.agentId");
+  const output = object(item.output, context, "envelope.output");
+  exact(output, ["name", "kind", "content"], context, "envelope.output");
+  string(output.name, context, "envelope.output.name");
+  string(output.kind, context, "envelope.output.kind");
+  string(output.content, context, "envelope.output.content");
 }
 
 function task(value: unknown, context: string, path: string): asserts value is TaskRecord {
@@ -438,6 +479,140 @@ function receipt(value: unknown, context: string, path: string): asserts value i
   if (sources.length === 0) fail(context, `${path}.sourceArtifactIds`, "must retain lineage");
 }
 
+function executorSpanReceipt(
+  value: unknown,
+  context: string,
+  path: string,
+): asserts value is ExecutorSpanReceipt {
+  const item = object(value, context, path);
+  exact(
+    item,
+    [
+      "schema",
+      "receiptId",
+      "executionId",
+      "taskId",
+      "agentId",
+      "phase",
+      "producer",
+      "startedAt",
+      "endedAt",
+      "monotonicDurationMs",
+      "outcome",
+      "process",
+      "outputArtifactIds",
+      "modelUsageReceiptId",
+      "failure",
+    ],
+    context,
+    path,
+  );
+  literal(item.schema, "studio.executor-span.receipt.v1", context, `${path}.schema`);
+  string(item.receiptId, context, `${path}.receiptId`);
+  string(item.executionId, context, `${path}.executionId`);
+  string(item.taskId, context, `${path}.taskId`);
+  string(item.agentId, context, `${path}.agentId`);
+  literal(item.phase, "active", context, `${path}.phase`);
+  const producer = object(item.producer, context, `${path}.producer`);
+  exact(producer, ["id", "version", "sandbox", "ephemeral"], context, `${path}.producer`);
+  literal(producer.id, "codex.exec", context, `${path}.producer.id`);
+  string(producer.version, context, `${path}.producer.version`);
+  literal(producer.sandbox, "read-only", context, `${path}.producer.sandbox`);
+  if (producer.ephemeral !== true) fail(context, `${path}.producer.ephemeral`, "must be true");
+  const startedAt = isoTimestamp(item.startedAt, context, `${path}.startedAt`);
+  const endedAt = isoTimestamp(item.endedAt, context, `${path}.endedAt`);
+  if (Date.parse(endedAt) < Date.parse(startedAt)) fail(context, path, "cannot end before it starts");
+  integer(item.monotonicDurationMs, context, `${path}.monotonicDurationMs`);
+  const outcome = oneOf<string>(
+    item.outcome,
+    new Set(["completed", "failed", "timed_out"]),
+    context,
+    `${path}.outcome`,
+  );
+  const process = object(item.process, context, `${path}.process`);
+  exact(process, ["exitCode", "signal"], context, `${path}.process`);
+  const exitCode = nullableInteger(process.exitCode, context, `${path}.process.exitCode`);
+  nullableString(process.signal, context, `${path}.process.signal`);
+  const outputs = uniqueStrings(item.outputArtifactIds, context, `${path}.outputArtifactIds`);
+  const usage = nullableString(item.modelUsageReceiptId, context, `${path}.modelUsageReceiptId`);
+  const failure = nullableString(item.failure, context, `${path}.failure`);
+  if (outcome === "completed" && (exitCode !== 0 || outputs.length === 0 || usage === null || failure !== null)) {
+    fail(context, path, "completed spans require exit zero, outputs, measured usage, and no failure");
+  }
+  if (outcome !== "completed" && (outputs.length !== 0 || failure === null)) {
+    fail(context, path, "unsuccessful spans require a failure and cannot claim outputs");
+  }
+}
+
+function modelUsageReceipt(
+  value: unknown,
+  context: string,
+  path: string,
+): asserts value is ModelUsageReceipt {
+  const item = object(value, context, path);
+  exact(
+    item,
+    [
+      "schema",
+      "receiptId",
+      "executionId",
+      "taskId",
+      "agentId",
+      "producer",
+      "model",
+      "measured",
+      "providerUnits",
+      "billing",
+      "rawReceipt",
+    ],
+    context,
+    path,
+  );
+  literal(item.schema, "studio.model-usage.receipt.v1", context, `${path}.schema`);
+  string(item.receiptId, context, `${path}.receiptId`);
+  string(item.executionId, context, `${path}.executionId`);
+  string(item.taskId, context, `${path}.taskId`);
+  string(item.agentId, context, `${path}.agentId`);
+  const producer = object(item.producer, context, `${path}.producer`);
+  exact(producer, ["id", "version"], context, `${path}.producer`);
+  literal(producer.id, "codex.exec", context, `${path}.producer.id`);
+  string(producer.version, context, `${path}.producer.version`);
+  nullableString(item.model, context, `${path}.model`);
+  const measured = object(item.measured, context, `${path}.measured`);
+  exact(
+    measured,
+    ["inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens"],
+    context,
+    `${path}.measured`,
+  );
+  const input = integer(measured.inputTokens, context, `${path}.measured.inputTokens`);
+  const cached = integer(measured.cachedInputTokens, context, `${path}.measured.cachedInputTokens`);
+  integer(measured.outputTokens, context, `${path}.measured.outputTokens`);
+  integer(measured.reasoningOutputTokens, context, `${path}.measured.reasoningOutputTokens`);
+  if (cached > input) fail(context, `${path}.measured.cachedInputTokens`, "cannot exceed input tokens");
+  if (item.providerUnits !== null) fail(context, `${path}.providerUnits`, "must remain null without a producer");
+  const billing = object(item.billing, context, `${path}.billing`);
+  exact(billing, ["amount", "currency"], context, `${path}.billing`);
+  if (billing.amount !== null || billing.currency !== null) {
+    fail(context, `${path}.billing`, "must remain null without a billing producer");
+  }
+  const raw = object(item.rawReceipt, context, `${path}.rawReceipt`);
+  exact(raw, ["source", "contentId", "storageKey"], context, `${path}.rawReceipt`);
+  literal(raw.source, "codex.exec.turn.completed", context, `${path}.rawReceipt.source`);
+  const contentId = string(raw.contentId, context, `${path}.rawReceipt.contentId`);
+  if (!/^sha256:[a-f0-9]{64}$/.test(contentId)) {
+    fail(context, `${path}.rawReceipt.contentId`, "must be a SHA-256 content id");
+  }
+  const storageKey = string(raw.storageKey, context, `${path}.rawReceipt.storageKey`);
+  if (storageKey.startsWith("/") || storageKey.split("/").includes("..")) {
+    fail(context, `${path}.rawReceipt.storageKey`, "must be a relative contained key");
+  }
+  const digest = contentId.slice("sha256:".length);
+  if (storageKey !== `objects/sha256/${digest.slice(0, 2)}/${digest}`) {
+    fail(context, `${path}.rawReceipt.storageKey`, "must match the raw receipt content id");
+  }
+}
+
 function report(value: unknown, context: string, path: string): asserts value is ReportRecord {
   const item = object(value, context, path);
   exact(
@@ -502,11 +677,15 @@ export function assertRuntimeEvent(value: unknown, context = "Runtime event"): a
   string(item.runId, context, "event.runId");
   integer(item.seq, context, "event.seq", 1);
   string(item.eventId, context, "event.eventId");
-  const recordedAt = string(item.recordedAt, context, "event.recordedAt");
-  if (!Number.isFinite(Date.parse(recordedAt))) fail(context, "event.recordedAt", "must be an ISO timestamp");
+  isoTimestamp(item.recordedAt, context, "event.recordedAt");
   const producer = object(item.producer, context, "event.producer");
   exact(producer, ["kind", "id"], context, "event.producer");
-  oneOf(producer.kind, new Set(["scheduler", "registry", "artifact_store", "media_host", "handoff_host"]), context, "event.producer.kind");
+  oneOf(
+    producer.kind,
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "handoff_host", "launcher"]),
+    context,
+    "event.producer.kind",
+  );
   string(producer.id, context, "event.producer.id");
   nullableString(item.causationId, context, "event.causationId");
   nullableString(item.correlationId, context, "event.correlationId");
@@ -548,6 +727,18 @@ export function assertRuntimeEvent(value: unknown, context = "Runtime event"): a
     string(data.agentId, context, "event.data.agentId");
     oneOf(data.status, TASK_STATUSES, context, "event.data.status");
     nullableString(data.reason, context, "event.data.reason");
+  } else if (type === "executor.started") {
+    exact(data, ["executionId", "taskId", "agentId", "startedAt"], context, "event.data");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.taskId, context, "event.data.taskId");
+    string(data.agentId, context, "event.data.agentId");
+    isoTimestamp(data.startedAt, context, "event.data.startedAt");
+  } else if (type === "model.usage_recorded") {
+    exact(data, ["receipt"], context, "event.data");
+    modelUsageReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "executor.finished") {
+    exact(data, ["receipt"], context, "event.data");
+    executorSpanReceipt(data.receipt, context, "event.data.receipt");
   } else if (type === "media.operation_started") {
     exact(data, ["request", "grantId"], context, "event.data");
     assertMediaExtractRequest(data.request, context);

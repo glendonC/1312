@@ -18,5 +18,3 @@ npm run dev
 - `/` landing
 - `/method/` `/journey/` `/benchmarks/`
 - `/studio/`
-
-Private repo for now.

@@ -103,6 +103,10 @@
   white-space: nowrap;
 }
 
+.hero-closing {
+  white-space: nowrap;
+}
+
 /* An inline-block whose overflow is not visible takes its bottom margin edge as its
    baseline, which is how the chip rests its bottom border on the line of text rather
    than hanging under it. .button already hides its overflow, so the chip only has to
@@ -212,11 +216,59 @@
 }
 
 @media (max-width: 640px) {
+  .hero-content {
+    gap: 20px;
+  }
+
   .hero-copy h1 {
-    font-size: 2.1rem;
+    margin-bottom: 0;
+    font-size: clamp(1.95rem, 10.4vw, 2.35rem);
+    line-height: 1.05;
   }
 
   .hero-line {
     white-space: normal;
+  }
+
+  .hero-aside {
+    justify-self: start;
+  }
+
+  .hero-aside p {
+    margin-bottom: 0;
+    font-size: 1rem;
+    line-height: 1.62;
+    text-wrap: pretty;
+  }
+
+  .cta-inline {
+    display: flex;
+    width: max-content;
+    height: 44px;
+    min-height: 44px;
+    margin: 14px 0 0;
+    padding: 0 16px;
+    line-height: 44px;
+    vertical-align: middle;
+  }
+
+  .hero-closing {
+    display: contents;
+    white-space: normal;
+  }
+}
+
+/* Fixed bottom positioning is useful when the photograph has room to breathe.
+   On short screens, natural flow lets the hero grow instead of forcing its
+   heading, explanation, and controls into the header or beyond the viewport. */
+@media (max-height: 620px) {
+  .hero-content {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    min-height: 100svh;
+    align-content: end;
+    padding: 96px var(--page-x) clamp(28px, 6vw, 72px);
   }
 }

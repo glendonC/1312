@@ -218,6 +218,10 @@
     clip: rect(0, 0, 0, 0);
   }
 
+  .instrument-select select {
+    font-size: 0.875rem;
+  }
+
   .instrument-panel {
     padding: 26px 18px 22px;
   }
@@ -228,6 +232,78 @@
 
   .panel-heading h2 {
     font-size: 1.95rem;
+  }
+
+  .bench-summary article > span,
+  .panel-heading > div > p,
+  .stage-marker,
+  .evidence-progress small,
+  .evidence-facts article > span,
+  .difficulty-stack article > span,
+  .comparison-notes article > span,
+  .clip-number,
+  .clip-frame-body > span,
+  .condition-role,
+  .condition-topline > span:first-child,
+  .condition-board article > p,
+  .empty-score-topline,
+  .empty-track-label,
+  .outcome-key article > span,
+  .result-card header span:first-child,
+  .result-headlines span,
+  .outcome-values dt,
+  .ledger-heading,
+  .receipt-summary > span,
+  .receipt-details > summary span,
+  .receipt-details li > span:last-child,
+  .protocol-strip span {
+    font-size: 0.6875rem;
+  }
+
+  .bench-summary article > p,
+  .panel-heading > p,
+  .board-summary p,
+  .evidence-facts p,
+  .difficulty-stack p,
+  .comparison-notes p,
+  .clip-frame-body p,
+  .empty-scorecard > p,
+  .outcome-key p,
+  .work-ledger p,
+  .receipt-summary p,
+  .receipt-details li small,
+  .bench-footer {
+    font-size: 0.78125rem;
+  }
+
+  .state-chip,
+  .support-mark,
+  .priority-mark,
+  .tag-list li {
+    font-size: 0.6875rem;
+  }
+
+  .matrix-head {
+    font-size: 0.65625rem;
+    letter-spacing: 0.02em;
+  }
+
+  .matrix-label,
+  .method-item > summary div > span,
+  .method-detail dt,
+  .method-detail code,
+  .receipt-details code {
+    font-size: 0.6875rem;
+  }
+
+  .method-detail dd,
+  .method-detail footer a,
+  .protocol-strip strong {
+    font-size: 0.75rem;
+  }
+
+  .evidence-progress li {
+    overflow-wrap: anywhere;
   }
 
   .evidence-progress {
@@ -301,7 +377,18 @@
   }
 
   .same-reel-rule {
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 5px;
+    font-size: 0.6875rem;
+    text-align: center;
+  }
+
+  .condition-board article > p,
+  .empty-score-topline,
+  .method-detail footer {
+    flex-wrap: wrap;
   }
 
   .outcome-key {
@@ -405,6 +492,30 @@
 
   .bench-footer summary {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .matrix-row {
+    grid-template-columns: 34px repeat(4, minmax(32px, 1fr));
+    gap: 5px;
+  }
+
+  .evidence-facts article {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .evidence-facts article > strong,
+  .evidence-facts article > div {
+    grid-column: 2;
+  }
+
+  .outcome-key {
+    grid-template-columns: 1fr;
+  }
+
+  .outcome-key article {
+    min-height: 160px;
   }
 }
 

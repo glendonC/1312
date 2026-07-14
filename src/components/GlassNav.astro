@@ -40,7 +40,27 @@ const currentLabel =
     })}
   </nav>
 
-  <a class="cta-link" href="/studio/">Open Studio</a>
+  <div class="header-actions">
+    <details class="mobile-nav">
+      <summary class="mobile-nav-summary">
+        <span>Menu</span>
+        <span class="mobile-nav-chevron" aria-hidden="true"></span>
+      </summary>
+
+      <nav class="mobile-nav-panel" aria-label="Site sections">
+        {navItems.map((item) => {
+          const isCurrent = currentPath === item.href || currentPath.startsWith(item.href);
+          return (
+            <a href={item.href} class="mobile-nav-link" aria-current={isCurrent ? "page" : undefined}>
+              {item.label}
+            </a>
+          );
+        })}
+      </nav>
+    </details>
+
+    <a class="cta-link" href="/studio/">Open Studio</a>
+  </div>
 </header>
 
 <script>

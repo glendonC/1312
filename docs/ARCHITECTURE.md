@@ -14,7 +14,7 @@ Last updated: 2026-07-13
 | Layer | Choice | Why |
 |-------|--------|-----|
 | Marketing + Studio UI | **Astro static** + light CSS (this repo) | Fast, matches Sori site pattern |
-| Studio interactivity | Progressive: Astro islands / small client JS → later React island if needed | Don’t boil the ocean day one |
+| Studio interactivity | **React island** inside the static Astro route | Event-sourced product state without turning the public site into an SPA |
 | Agent runtime | **Codex app / `codex exec`** + orchestrator scripts (Yolodex-like skills) | Contest-native; parallel worktrees/workspaces |
 | Media ingest | Source adapter → rights receipt → content-addressed workspace media | YouTube and owned/local producers exist; hosted upload remains unimplemented |
 | ASR (v1) | Whisper-family or cloud ASR behind a seam | Swappable; not the brand |
@@ -70,6 +70,12 @@ loading checks the closed receipt shapes and cross-receipt identities; the produ
 the artifacts on disk and rejects a mismatch. Provider-specific fields are not optionalized into a
 shared bag, and scripts that consume `source.json` normalize it through a source adapter first.
 
+`scripts/preflight-owned-media.mjs` composes those two existing producers into an immutable,
+standalone `studio.preflight-bundle.v1` index. The index contains only the normalized raw artifact,
+source receipt, and ffprobe receipt. Speech activity, language ranges, acoustic ranges, overlap,
+and complexity remain explicit nulls until a pinned producer exists. `run-005/preflight.json` is the
+checked production fixture; the build re-hashes every artifact it names.
+
 Language detection, acoustic classification, overlap estimation, and range recommendation are
 separate producers. A source adapter cannot infer any of those facts from a provider or filename.
 
@@ -81,6 +87,26 @@ separate producers. A source adapter cannot infer any of those facts from a prov
 | Time-ranged language distribution | None | Withheld |
 | Music, speech, noise, speakers, and overlap | None | Withheld |
 | Suggested range and processing class | None | Withheld |
+
+## Production runtime boundary
+
+The proposal fixtures in `src/studio/runtime/contracts.ts` remain fixture-only and production-inert.
+Production work lives under `src/studio/runtime/production/` and does not import those shapes.
+
+The first production runtime slice provides a versioned event protocol, append-only journal, pure
+projection, bounded scheduler, dynamic registry, content-addressed artifact store, centralized
+authorization, one real ffmpeg audio-range extraction operation, and structured child report-up.
+Media scopes use exact track ids and half-open integer-millisecond ranges. The scheduler derives
+task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
+state. The media host re-hashes its source before execution, accepts no caller output path or
+arbitrary executable arguments, and records the tool version, input and output identities, grant,
+range, receipt, and lineage.
+
+This is a local runtime library and exact smoke-tested production path, not a hosted service. No
+Codex worker launcher or live Studio adapter is connected yet. The legacy `LiveTransport` accepts
+only validated legacy traces for predeclared agents; production runtime events require a deliberate
+adapter after a real worker host exists. Seek, step, loop, mark, track selection, frames, live control
+acknowledgement, and detector/model calls remain unavailable capabilities rather than UI claims.
 
 ### Explicitly deferred
 
@@ -114,14 +140,19 @@ runs/<video_id>/
   glossary.json       # terms / entities
   score.json          # metrics
   traces/             # per-agent action logs
+  evidence.json       # deterministic post-run byte and terminal-decision index
 ```
 
 Shared across runs:
 
 ```text
 memory/
-  glossary.sqlite|json
-  rules/              # code-enforced playbooks
+  glossary/           # legacy unreviewed inputs; never silently promoted
+  review/
+    proposals/        # immutable, evidence-bound proposed values
+    decisions/        # separate reviewer decisions and revocations
+    materializations/ # accepted heads plus complete receipt provenance
+  rules/              # code-enforced playbooks after a scored promotion gate
 bench/
   clips/ + expectations + scorer
 ```
@@ -133,6 +164,16 @@ bench/
 3. **Fine-tune later** a small cleanup/gist model on correction pairs.
 
 MD is optional human receipt only.
+
+### Memory promotion boundary
+
+Future runs write run-scoped glossary output and immutable proposal receipts. They do not write
+accepted cross-run memory. A different actor must record an accept, reject, or revoke decision with
+a reason; accepted materializations retain proposal, decision, and evidence hashes. Replacement is
+an explicit supersession edge and revocation restores the preceding accepted head. The existing
+`memory/glossary/ko.json` is preserved byte-for-byte behind a `legacy_unreviewed` snapshot and is not
+treated as reviewed memory. Behavioral rules additionally require a matching fully frozen, scored
+benchmark receipt; the current protocol draft therefore fails closed.
 
 ## Stable correction schema (anti-debt)
 
@@ -173,15 +214,17 @@ This row shape is future fine-tune data.
 ## Implementation order
 
 1. ✅ Marketing pages scaffold (`/`, `/method/`, `/journey/`, `/benchmarks/`)
-2. 🔄 Studio UI redesign: `/studio/` empty shell
-3. Local run folder schema + fake scored demo data for Benchmarks UI  
-4. Orchestrator stub + one real workspace worker on a short clip  
-5. Parallel spawn + report-up merge  
-6. Bench harness + YouTube foil  
-7. Study export thin slice  
+2. ✅ Event-sourced Studio replay shell and development lab
+3. ✅ Recorded run schema, build validation, and bench protocol
+4. ✅ Provider-separated ingest, owned/local rights receipt, and real ffprobe slice
+5. ✅ Standalone preflight index with unsupported detector findings withheld
+6. ✅ Local bounded runtime foundation and one scoped media operation
+7. ✅ Proposal-first memory gate and retrospective evidence index
+8. 🔄 Pinned VAD/language producers, real worker launcher, and production runtime projection
+9. ⏳ Acoustic/overlap/separation producers and study export
 
 ## Open questions (do not block UI)
 
 - Exact computer-use host for squircles (Codex CUA vs embedded browser/player).  
-- Whether Studio stays Astro islands or becomes a Vite app under `/studio`.  
+- Which process boundary should host the local worker runtime beside the static Studio.
 - Public GitHub visibility when Devpost rules require it.

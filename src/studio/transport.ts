@@ -25,7 +25,7 @@ import type {
   WaveFile,
 } from "./types";
 import type { RecordedEvidenceIndex } from "./evidence/types";
-import type { PreflightBundle, SpeechActivityReceipt } from "./preflight/contracts";
+import type { LanguageRangesReceipt, PreflightBundle, SpeechActivityReceipt } from "./preflight/contracts";
 import { assertPreflightEvidence } from "./preflight/evidenceValidation";
 import { assertRunBundle } from "./bundle";
 import { assertTrace } from "./traceValidation";
@@ -42,10 +42,12 @@ export interface RunBundle {
   /** Optional ingest receipt. Older synthetic fixtures have no source producer. */
   ingestReceipt?: IngestReceipt | null;
   mediaProbe?: MediaProbeReceipt | null;
-  /** Optional immutable preflight index. V2 is valid only with its speech receipt. */
+  /** Optional immutable preflight index. Detector-backed versions require their paired receipts. */
   preflightBundle?: PreflightBundle | null;
-  /** Optional detector receipt validated against source identity, probe facts, and preflight V2. */
+  /** Optional detector receipt validated against source identity, probe facts, and detector-backed preflight. */
   speechActivity?: SpeechActivityReceipt | null;
+  /** Optional language detector receipt validated only over receipted speech windows. */
+  languageRanges?: LanguageRangesReceipt | null;
   /** Optional deterministic post-run index. It is not original runtime provenance. */
   evidence?: RecordedEvidenceIndex | null;
 }
@@ -126,9 +128,11 @@ export class ReplayTransport implements RunTransport {
       corrections,
       ingestReceipt,
       mediaProbe,
+      preflightV3,
       preflightV2,
       preflightV1,
       speechActivity,
+      languageRanges,
       evidence,
     ] = await Promise.all([
       json<RunManifest>(`${base}/run.json`),
@@ -140,9 +144,11 @@ export class ReplayTransport implements RunTransport {
       json<CorrectionsFile>(`${base}/corrections.json`),
       optionalJson<IngestReceipt>(`${base}/source.json`),
       optionalJson<MediaProbeReceipt>(`${base}/media-probe.json`),
+      optionalJson<PreflightBundle>(`${base}/preflight-v3.json`),
       optionalJson<PreflightBundle>(`${base}/preflight-v2.json`),
       optionalJson<PreflightBundle>(`${base}/preflight.json`),
       optionalJson<SpeechActivityReceipt>(`${base}/speech-activity.json`),
+      optionalJson<LanguageRangesReceipt>(`${base}/language-ranges.json`),
       optionalJson<RecordedEvidenceIndex>(`${base}/evidence.json`),
     ]);
 
@@ -161,8 +167,9 @@ export class ReplayTransport implements RunTransport {
       corrections,
       ingestReceipt,
       mediaProbe,
-      preflightBundle: preflightV2 ?? preflightV1,
+      preflightBundle: preflightV3 ?? preflightV2 ?? preflightV1,
       speechActivity,
+      languageRanges,
       evidence,
     };
     assertRunBundle(bundle, `Studio run ${this.runId}`);

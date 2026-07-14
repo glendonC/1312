@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useBundle, useStudio } from "../store";
 import type { MediaProbeTrack } from "../types";
 import ConfirmationForm, { AdvancedFields } from "./ConfirmationForm";
+import type { RecordedLanguageRange } from "./languageProjection";
 import { assessRecordedRequest, formatSeconds, type PreflightSession } from "./model";
 
 import "./preflight.css";
@@ -130,9 +131,39 @@ export default function Preflight() {
             </dd>
           </div>
         )}
+        {facts.languageRanges && (
+          <div data-testid="language-range-evidence">
+            <dt>Language detector ranges</dt>
+            <dd>
+              {facts.languageRanges.ranges.length} receipted speech-range{" "}
+              {facts.languageRanges.ranges.length === 1 ? "result" : "results"}
+              {facts.languageRanges.ranges.map((range) => (
+                <span
+                  key={`${range.speechWindowIndex}:${range.chunkIndex}`}
+                  data-testid="language-range"
+                  data-language-status={range.decision.status}
+                >
+                  <br />
+                  {formatDetectorSeconds(range.startSeconds)}–{formatDetectorSeconds(range.endSeconds)} ·{" "}
+                  {languageRangeDecision(range)}
+                </span>
+              ))}
+              <br />
+              {facts.languageRanges.producer.id} {facts.languageRanges.producer.version} ·{" "}
+              {facts.languageRanges.producer.modelId} {facts.languageRanges.producer.quantization} · model revision{" "}
+              {facts.languageRanges.producer.modelRevision.slice(0, 12)}…
+              <br />
+              Probabilities are uncalibrated model softmax scores.
+            </dd>
+          </div>
+        )}
         <div>
-          <dt>Language</dt>
-          <dd>{facts.declaredLanguage} declared for the job · not detector output</dd>
+          <dt>Clip language declaration</dt>
+          <dd>{facts.declaredLanguage} recorded in run.clip.lang · not detector output</dd>
+        </div>
+        <div>
+          <dt>Language pack</dt>
+          <dd>{bundle.run.pack} selected for the recorded job · not detector output</dd>
         </div>
       </dl>
 
@@ -157,6 +188,23 @@ function formatBytes(bytes: number): string {
 
 function formatDetectorSeconds(seconds: number): string {
   return `${seconds.toFixed(3).replace(/\.?(?:0+)$/, "")}s`;
+}
+
+function languageRangeDecision(range: RecordedLanguageRange): string {
+  const decision = range.decision;
+  if (decision.status === "classified") {
+    const probability =
+      decision.probability === null
+        ? "probability unavailable"
+        : `model probability ${(decision.probability * 100).toFixed(1)}%`;
+    const margin =
+      decision.margin === null
+        ? "margin unavailable"
+        : `model score margin ${(decision.margin * 100).toFixed(1)}%`;
+    return `${decision.code ?? "Unknown"} classified · ${probability} · ${margin}`;
+  }
+  const reason = decision.reason?.replaceAll("_", " ") ?? "no decision reason receipted";
+  return `${decision.status === "unknown" ? "Unknown" : "Withheld"} · ${reason}`;
 }
 
 function mediaSummary(containers: string[], tracks: MediaProbeTrack[]): string {

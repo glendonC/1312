@@ -85,7 +85,7 @@ test("reduced motion disables decorative animation", async ({ page }) => {
   expect(animations).toBe(0);
 });
 
-test("owned-media preflight shows receipted speech windows without inferring language", async ({ page }) => {
+test("owned-media preflight keeps receipted language decisions separate from job configuration", async ({ page }) => {
   await openLab(page);
   await scenario(page).selectOption("regression");
   await expect(readout(page)).toHaveText(/\d+ \/ 72/);
@@ -98,6 +98,35 @@ test("owned-media preflight shows receipted speech windows without inferring lan
   await expect(speech).toContainText(/\d+(?:\.\d+)?s speech · \d+\.\d% of decoded samples · \d+ speech windows?/);
   await expect(speech).toContainText(/\d+(?:\.\d+)?s–\d+(?:\.\d+)?s/);
   await expect(speech).toContainText("silero-vad 6.2.1");
-  await expect(page.getByText(/declared for the job · not detector output/)).toBeVisible();
-  await expect(page.getByLabel(/Whole detected .* range · no language detector output/)).toBeDisabled();
+
+  const languages = page.getByTestId("language-range-evidence");
+  await expect(languages).toBeVisible();
+  await expect(languages).toContainText("21 receipted speech-range results");
+  await expect(languages).toContainText("whisper-language-id 1.0.0");
+  await expect(languages).toContainText("uncalibrated model softmax scores");
+  await expect(page.getByTestId("language-range").first()).toContainText(
+    "0.002s–1.982s · ko classified · model probability 98.4% · model score margin 97.7%",
+  );
+  await expect(page.locator('[data-language-status="classified"]')).toHaveCount(10);
+  await expect(page.locator('[data-language-status="unknown"]')).toHaveCount(4);
+  await expect(page.locator('[data-language-status="withheld"]')).toHaveCount(7);
+  await expect(page.locator('[data-language-status="unknown"]').first()).toContainText("Unknown · below probability");
+  await expect(page.locator('[data-language-status="withheld"]').first()).toContainText(
+    "Withheld · insufficient samples",
+  );
+
+  await expect(page.getByText(/recorded in run\.clip\.lang · not detector output/)).toBeVisible();
+  await expect(page.getByText(/selected for the recorded job · not detector output/)).toBeVisible();
+  await expect(
+    page.getByLabel(/Measured language ranges · preflight evidence only; no replayable detected-language subrange/),
+  ).toBeDisabled();
+
+  await page.getByText("Producer coverage").click();
+  for (const withheld of [
+    "Music and noise classifier",
+    "Preflight speaker and overlap estimator",
+    "Measured range recommender",
+  ]) {
+    await expect(page.getByText(withheld, { exact: true })).toBeVisible();
+  }
 });

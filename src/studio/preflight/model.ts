@@ -1,4 +1,5 @@
 import type { RunBundle } from "../transport";
+import { projectLanguageRanges, type RecordedLanguageRangeFacts } from "./languageProjection";
 import { classifySourceUrl, normalizeIngestReceipt, type RecordedSourceFacts } from "./sourceAdapters";
 import { projectSpeechActivity, type RecordedSpeechActivityFacts } from "./speechProjection";
 
@@ -50,6 +51,7 @@ export interface PreflightProvenance {
 
 export interface RecordedPreflightFacts extends RecordedSourceFacts {
   speechActivity: RecordedSpeechActivityFacts | null;
+  languageRanges: RecordedLanguageRangeFacts | null;
 }
 
 export interface PreflightSession {
@@ -194,20 +196,24 @@ export function recordedPreflight(bundle: RunBundle): PreflightSession {
   const facts: RecordedPreflightFacts = {
     ...sourceFacts,
     speechActivity: projectSpeechActivity(bundle.speechActivity),
+    languageRanges: projectLanguageRanges(bundle.languageRanges),
   };
 
   return {
     status: "ready",
     title: "Recorded source ready for confirmation",
-    message: facts.speechActivity
-      ? "Source facts came from the recorded ingest receipt; speech windows came from its validated detector receipt. No new live probe ran."
-      : "These facts came from the ingest receipt for the already-recorded run. This is not a new live probe.",
+    message: facts.languageRanges
+      ? "Source facts came from the recorded ingest receipt; speech and language ranges came from validated detector receipts. No new live probe ran."
+      : facts.speechActivity
+        ? "Source facts came from the recorded ingest receipt; speech windows came from its validated detector receipt. No new live probe ran."
+        : "These facts came from the ingest receipt for the already-recorded run. This is not a new live probe.",
     facts,
     request: initialRequest(bundle.run.pair.target, facts.selection.duration),
     missing: PRODUCER_GAPS.filter(
       (gap) =>
         (gap.id !== "container" || facts.mediaProbe === null) &&
-        (gap.id !== "speech" || facts.speechActivity === null),
+        (gap.id !== "speech" || facts.speechActivity === null) &&
+        (gap.id !== "language" || facts.languageRanges === null),
     ),
     provenance: {
       kind: "recorded_ingest",
@@ -317,7 +323,15 @@ export function assessRecordedRequest(
     return { duration, canReplay: false, reason: "No range recommender ran for this source.", recommendation, localWarning: overHostedCap };
   }
   if (rangeMode === "detected") {
-    return { duration, canReplay: false, reason: "No time-ranged language detector ran for this source.", recommendation, localWarning: overHostedCap };
+    return {
+      duration,
+      canReplay: false,
+      reason: session.facts.languageRanges
+        ? "Language ranges are measured preflight evidence, but this recording has no replayable detected-language subrange."
+        : "No time-ranged language detector ran for this source.",
+      recommendation,
+      localWarning: overHostedCap,
+    };
   }
   if (Math.abs(start) > 0.01 || Math.abs(end - bundle.run.clip.duration) > 0.01) {
     return {

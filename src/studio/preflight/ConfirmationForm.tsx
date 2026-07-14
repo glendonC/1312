@@ -4,17 +4,17 @@ import {
   RECOMMENDED_RANGE_S,
   formatSeconds,
   type AnalysisRequest,
+  type RecordedPreflightFacts,
   type PreflightSession,
   type RangeAssessment,
 } from "./model";
-import type { RecordedSourceFacts } from "./sourceAdapters";
 
 const LANGUAGE_NAMES: Record<string, string> = { en: "English", ko: "Korean", ja: "Japanese" };
 
 interface ConfirmationFormProps {
   bundle: RunBundle;
   session: PreflightSession;
-  facts: RecordedSourceFacts;
+  facts: RecordedPreflightFacts;
   assessment: RangeAssessment | null;
   update: (request: Partial<AnalysisRequest>) => void;
   cancel: () => void;
@@ -63,7 +63,11 @@ export default function ConfirmationForm({
           value="detected"
           checked={false}
           disabled
-          label={`Whole detected ${LANGUAGE_NAMES[facts.declaredLanguage] ?? facts.declaredLanguage} range · no language detector output`}
+          label={
+            facts.languageRanges
+              ? "Measured language ranges · preflight evidence only; no replayable detected-language subrange"
+              : "Whole detected-language range · no language detector output"
+          }
         />
         <Choice
           name="range"
@@ -106,7 +110,7 @@ export default function ConfirmationForm({
 
       <div className="preflight-primary">
         <label>
-          <span>Target language</span>
+          <span>Translation target</span>
           <select value={request.targetLanguage} onChange={(event) => update({ targetLanguage: event.currentTarget.value })}>
             <option value={bundle.run.pair.target}>{languageName(bundle.run.pair.target)}</option>
           </select>
@@ -145,6 +149,16 @@ export default function ConfirmationForm({
           {facts.content && (
             <>
               {" "}Raw content identity and {facts.content.derivedArtifacts} derived receipt: <code>SHA-256</code>.
+            </>
+          )}
+          {facts.speechActivity && (
+            <>
+              {" "}Speech windows: <code>{facts.speechActivity.producer.id} {facts.speechActivity.producer.version}</code>.
+            </>
+          )}
+          {facts.languageRanges && (
+            <>
+              {" "}Language ranges: <code>{facts.languageRanges.producer.id} {facts.languageRanges.producer.version}</code>.
             </>
           )}
         </p>

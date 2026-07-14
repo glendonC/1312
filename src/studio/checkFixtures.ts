@@ -32,7 +32,8 @@ import { classifySourceUrl } from "./preflight/sourceAdapters";
 import { checkSourceReceiptPolicies } from "./preflight/checkReceiptPolicies";
 import { checkPreflightBundlePolicies } from "./preflight/checkPreflightBundlePolicies";
 import { checkSpeechReceiptPolicies } from "./preflight/checkSpeechReceiptPolicies";
-import type { PreflightBundle, SpeechActivityReceipt } from "./preflight/contracts";
+import { checkLanguageReceiptPolicies } from "./preflight/checkLanguageReceiptPolicies";
+import type { LanguageRangesReceipt, PreflightBundle, SpeechActivityReceipt } from "./preflight/contracts";
 import { assertPreflightEvidence } from "./preflight/evidenceValidation";
 import { checkRuntimeContractPolicies } from "./runtime/checkContractPolicies";
 import { validateRuntimeContractFixture } from "./runtime/validateContractFixture";
@@ -106,7 +107,9 @@ export async function checkRecordedRuns(): Promise<void> {
       mediaProbe,
       preflightV1,
       preflightV2,
+      preflightV3,
       speechActivity,
+      languageRanges,
       evidenceIndex,
     ] = await Promise.all([
       json<RunManifest>(new URL("run.json", base)),
@@ -120,7 +123,9 @@ export async function checkRecordedRuns(): Promise<void> {
       optionalJson<MediaProbeReceipt>(new URL("media-probe.json", base)),
       optionalJson<PreflightBundle>(new URL("preflight.json", base)),
       optionalJson<PreflightBundle>(new URL("preflight-v2.json", base)),
+      optionalJson<PreflightBundle>(new URL("preflight-v3.json", base)),
       optionalJson<SpeechActivityReceipt>(new URL("speech-activity.json", base)),
+      optionalJson<LanguageRangesReceipt>(new URL("language-ranges.json", base)),
       json<RecordedEvidenceIndex>(new URL("evidence.json", base)),
     ]);
     const pack = await json<LanguagePack>(new URL(`${run.pack}.json`, PACKS));
@@ -141,8 +146,9 @@ export async function checkRecordedRuns(): Promise<void> {
       pack,
       ingestReceipt,
       mediaProbe,
-      preflightBundle: preflightV2 ?? preflightV1,
+      preflightBundle: preflightV3 ?? preflightV2 ?? preflightV1,
       speechActivity,
+      languageRanges,
       evidence: evidenceIndex,
     };
 
@@ -182,7 +188,7 @@ export async function checkRecordedRuns(): Promise<void> {
     }
     if (preflightV1) {
       assertPreflightEvidence(
-        { ...bundle, preflightBundle: preflightV1, speechActivity: null },
+        { ...bundle, preflightBundle: preflightV1, speechActivity: null, languageRanges: null },
         `Recorded Studio fixture ${entry.name} preflight V1 evidence`,
       );
       if (preflightV1.schema !== "studio.preflight-bundle.v1") {
@@ -191,16 +197,52 @@ export async function checkRecordedRuns(): Promise<void> {
     }
     if (preflightV2) {
       assertPreflightEvidence(
-        { ...bundle, preflightBundle: preflightV2, speechActivity },
+        { ...bundle, preflightBundle: preflightV2, speechActivity, languageRanges: null },
         `Recorded Studio fixture ${entry.name} preflight V2 evidence`,
       );
       if (preflightV2.schema !== "studio.preflight-bundle.v2") {
         throw new Error(`Recorded Studio fixture ${entry.name}: preflight-v2.json must contain the V2 schema`);
       }
     }
+    if (preflightV3) {
+      assertPreflightEvidence(
+        { ...bundle, preflightBundle: preflightV3, speechActivity, languageRanges },
+        `Recorded Studio fixture ${entry.name} preflight V3 evidence`,
+      );
+      if (preflightV3.schema !== "studio.preflight-bundle.v3") {
+        throw new Error(`Recorded Studio fixture ${entry.name}: preflight-v3.json must contain the V3 schema`);
+      }
+      expectPreflightFailure(
+        () =>
+          assertPreflightEvidence(
+            { ...bundle, preflightBundle: preflightV3, languageRanges: null },
+            `${entry.name} V3 missing language receipt`,
+          ),
+        "studio.preflight-bundle.v3 requires its language receipt",
+      );
+      expectPreflightFailure(
+        () =>
+          assertPreflightEvidence(
+            { ...bundle, preflightBundle: preflightV3, speechActivity: null },
+            `${entry.name} V3 missing speech receipt`,
+          ),
+        "studio.preflight-bundle.v3 requires its speech receipt",
+      );
+    }
+    if (preflightV2 && languageRanges) {
+      expectPreflightFailure(
+        () =>
+          assertPreflightEvidence(
+            { ...bundle, preflightBundle: preflightV2 },
+            `${entry.name} V2 with language receipt`,
+          ),
+        "language receipt requires studio.preflight-bundle.v3",
+      );
+    }
     for (const [indexName, preflightBundle] of [
       ["V1", preflightV1],
       ["V2", preflightV2],
+      ["V3", preflightV3],
     ] as const) {
       if (!preflightBundle) continue;
       for (const artifact of preflightBundle.artifacts) {
@@ -217,6 +259,16 @@ export async function checkRecordedRuns(): Promise<void> {
       const expected = speechActivity.producer.model.content;
       if (expected.id !== actual.contentId || expected.bytes !== actual.bytes) {
         throw new Error(`Recorded Studio fixture ${entry.name}: pinned speech model does not match its receipted bytes`);
+      }
+    }
+    if (languageRanges) {
+      for (const file of languageRanges.producer.model.files) {
+        const actual = await contentIdentity(new URL(file.path, ROOT));
+        if (file.content.id !== actual.contentId || file.content.bytes !== actual.bytes) {
+          throw new Error(
+            `Recorded Studio fixture ${entry.name}: pinned language model file ${file.role} does not match its receipted bytes`,
+          );
+        }
       }
     }
 
@@ -244,6 +296,7 @@ export async function checkRecordedRuns(): Promise<void> {
   checkSourceReceiptPolicies();
   checkPreflightBundlePolicies();
   checkSpeechReceiptPolicies();
+  checkLanguageReceiptPolicies();
   checkTracePolicies();
   for (const fixture of RUNTIME_CONTRACT_FIXTURES) validateRuntimeContractFixture(fixture);
   checkRuntimeContractPolicies(RUNTIME_CONTRACT_FIXTURES[0]);
@@ -277,12 +330,23 @@ export async function checkRecordedRuns(): Promise<void> {
   const owned = bundles.get("run-005");
   if (!owned) throw new Error("owned local adapter checks require run-005");
   expectPreflightFailure(
-    () => assertPreflightEvidence({ ...owned, preflightBundle: null }, "run-005 unpaired speech receipt"),
-    "speech receipt requires studio.preflight-bundle.v2",
+    () =>
+      assertPreflightEvidence(
+        { ...owned, preflightBundle: null, languageRanges: null },
+        "run-005 unpaired speech receipt",
+      ),
+    "speech receipt requires studio.preflight-bundle.v2 or v3",
+  );
+  if (owned.preflightBundle?.schema !== "studio.preflight-bundle.v3") {
+    throw new Error("run-005 must expose its sealed V3 speech and language preflight index");
+  }
+  expectPreflightFailure(
+    () => assertPreflightEvidence({ ...owned, speechActivity: null }, "run-005 V3 without speech receipt"),
+    "studio.preflight-bundle.v3 requires its speech receipt",
   );
   expectPreflightFailure(
-    () => assertPreflightEvidence({ ...owned, speechActivity: null }, "run-005 unpaired preflight V2"),
-    "studio.preflight-bundle.v2 requires its speech receipt",
+    () => assertPreflightEvidence({ ...owned, languageRanges: null }, "run-005 unpaired preflight V3"),
+    "studio.preflight-bundle.v3 requires its language receipt",
   );
   const ownedPreflight = recordedPreflight(owned);
   if (
@@ -296,9 +360,60 @@ export async function checkRecordedRuns(): Promise<void> {
   if (
     !ownedPreflight.facts.speechActivity ||
     ownedPreflight.missing.some((gap) => gap.id === "speech") ||
-    !ownedPreflight.missing.some((gap) => gap.id === "language")
+    !ownedPreflight.facts.languageRanges ||
+    ownedPreflight.missing.some((gap) => gap.id === "language")
   ) {
-    throw new Error("run-005 must expose validated speech windows while retaining unavailable language detection");
+    throw new Error("run-005 must expose validated speech and language ranges");
+  }
+  const ownedLanguageRanges = owned.languageRanges;
+  if (
+    !ownedLanguageRanges ||
+    ownedPreflight.facts.languageRanges.ranges.length !== ownedLanguageRanges.ranges.length ||
+    ownedPreflight.facts.declaredLanguage !== owned.run.clip.lang ||
+    !["acoustic", "overlap", "complexity"].every((id) =>
+      ownedPreflight.missing.some((gap) => gap.id === id),
+    )
+  ) {
+    throw new Error("run-005 language projection must preserve every range and leave unrelated detector gaps withheld");
+  }
+  if (
+    !ownedPreflight.facts.languageRanges.ranges.every((projected, index) => {
+      const receipted = ownedLanguageRanges.ranges[index];
+      return (
+        receipted !== undefined &&
+        projected.speechWindowIndex === receipted.speech_window_index &&
+        projected.chunkIndex === receipted.chunk_index &&
+        projected.startSample === receipted.start_sample &&
+        projected.endSample === receipted.end_sample &&
+        projected.startSeconds === receipted.start_sample / ownedLanguageRanges.input.sample_rate_hz &&
+        projected.endSeconds === receipted.end_sample / ownedLanguageRanges.input.sample_rate_hz &&
+        JSON.stringify(projected.scores) === JSON.stringify(receipted.scores) &&
+        JSON.stringify(projected.decision) === JSON.stringify(receipted.decision)
+      );
+    })
+  ) {
+    throw new Error("run-005 language projection must preserve exact range order, model scores, and decisions");
+  }
+  const languageDecisionCounts = ownedPreflight.facts.languageRanges.ranges.reduce(
+    (counts, range) => ({ ...counts, [range.decision.status]: counts[range.decision.status] + 1 }),
+    { classified: 0, unknown: 0, withheld: 0 },
+  );
+  if (
+    languageDecisionCounts.classified !== 10 ||
+    languageDecisionCounts.unknown !== 4 ||
+    languageDecisionCounts.withheld !== 7
+  ) {
+    throw new Error("run-005 must preserve 10 classified, 4 unknown, and 7 withheld language decisions");
+  }
+  const detectedRange = {
+    ...ownedPreflight,
+    request: { ...ownedPreflight.request, rangeMode: "detected" as const },
+  };
+  if (
+    assessRecordedRequest(detectedRange, owned, false).canReplay ||
+    !assessRecordedRequest(detectedRange, owned, false).reason?.includes("no replayable detected-language subrange")
+  ) {
+    throw new Error("measured language ranges must not become a replayable recorded-runtime subrange");
   }
   if (ownedPreflight.relevance.music || ownedPreflight.relevance.backgroundSpeech || ownedPreflight.relevance.speakerFocus) {
     throw new Error("owned/local source facts must not infer acoustic or speaker relevance");

@@ -26,7 +26,10 @@ function usage(message = null) {
   node scripts/memory-review.mjs decide \\
     --store memory/review --proposal <proposal-id> \\
     --action <accept|reject|revoke> --decided-by <reviewer> --reason <reason> \\
-    [--bench-report <scored-report.json>]
+    [--bench-with <scored-report-with-rule.json> --bench-without <scored-report-without-rule.json>]
+
+  Accepting a behavioral rule requires BOTH ablation reports: the same frozen pack scored with
+  the rule and without it. One scored report is not evidence about a rule.
 
   node scripts/memory-review.mjs materialize --store memory/review
 `);
@@ -89,7 +92,7 @@ async function main() {
             "created-at",
           ]
         : command === "decide"
-          ? ["store", "proposal", "action", "decided-by", "reason", "bench-report", "created-at"]
+          ? ["store", "proposal", "action", "decided-by", "reason", "bench-with", "bench-without", "created-at"]
           : command === "materialize"
             ? ["store", "created-at"]
             : [],
@@ -132,13 +135,18 @@ async function main() {
   }
 
   if (command === "decide") {
+    const benchWith = one(flags, "bench-with", { required: false });
+    const benchWithout = one(flags, "bench-without", { required: false });
+    if ((benchWith === null) !== (benchWithout === null)) {
+      usage("--bench-with and --bench-without must be supplied together; a rule ablation needs both sides");
+    }
     const result = await recordDecision({
       store,
       proposalId: one(flags, "proposal"),
       action: one(flags, "action"),
       decidedBy: one(flags, "decided-by"),
       reason: one(flags, "reason"),
-      benchReport: one(flags, "bench-report", { required: false }),
+      benchReports: benchWith === null ? null : { withRule: benchWith, withoutRule: benchWithout },
       createdAt: at ?? undefined,
     });
     console.log(`${result.decision.decision_id}\n${result.path}`);

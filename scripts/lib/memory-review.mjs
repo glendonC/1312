@@ -4,6 +4,11 @@ import { isAbsolute, join, resolve } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import {
+  validateFreezeReceipt,
+  validatePack,
+  validateScoreReceipt,
+} from "./bench-gold.mjs";
+import {
   contentIdForJson,
   digestFromContentId,
   fileReceipt,
@@ -225,17 +230,38 @@ export function validateDecision(decision) {
   requiredText(decision.reason, "memory decision reason");
   createdAt(decision.created_at);
   if (decision.benchmark_receipt !== null) {
+    // One scored report used to satisfy this gate on its own, which made the first scored
+    // report a skeleton key: it could accept unlimited unrelated rules, each technically
+    // "receipt-backed". Acceptance now requires an ABLATION PAIR — two scored reports on the
+    // identical frozen pack whose subject configs provably differ by exactly the proposed rule
+    // — with the measured delta recorded here, where a reviewer and a rollback can see it.
     const bench = decision.benchmark_receipt;
     exactKeys(
       bench,
-      ["path", "content_id", "bytes", "pack_id", "status", "generated_at"],
+      ["pack_id", "rule_content_id", "with_rule", "without_rule", "delta"],
       "benchmark receipt",
     );
-    requiredText(bench.path, "benchmark receipt path");
-    digestFromContentId(bench.content_id, "benchmark receipt content id");
-    if (!Number.isInteger(bench.bytes) || bench.bytes <= 0) throw new Error("benchmark receipt bytes are invalid");
     requiredText(bench.pack_id, "benchmark receipt pack id");
-    if (bench.status !== "scored") throw new Error("benchmark receipt must be scored");
+    digestFromContentId(bench.rule_content_id, "benchmark receipt rule content id");
+    for (const side of ["with_rule", "without_rule"]) {
+      exactKeys(bench[side], ["path", "content_id", "bytes", "generated_at"], `benchmark receipt ${side}`);
+      requiredText(bench[side].path, `benchmark receipt ${side} path`);
+      digestFromContentId(bench[side].content_id, `benchmark receipt ${side} content id`);
+      if (!Number.isInteger(bench[side].bytes) || bench[side].bytes <= 0) {
+        throw new Error(`benchmark receipt ${side} bytes are invalid`);
+      }
+      requiredText(bench[side].generated_at, `benchmark receipt ${side} generated_at`);
+    }
+    if (bench.with_rule.content_id === bench.without_rule.content_id) {
+      throw new Error("benchmark receipt ablation reports must be distinct; one report cannot be its own control");
+    }
+    exactKeys(bench.delta, ["critical_meaning_rate", "catastrophic_count"], "benchmark receipt delta");
+    if (typeof bench.delta.critical_meaning_rate !== "number" || !Number.isFinite(bench.delta.critical_meaning_rate)) {
+      throw new Error("benchmark receipt delta meaning rate must be a finite number");
+    }
+    if (!Number.isInteger(bench.delta.catastrophic_count)) {
+      throw new Error("benchmark receipt delta catastrophic count must be an integer");
+    }
   }
   if (receiptId("memory-decision", decisionBody(decision)) !== decision.decision_id) {
     throw new Error("memory decision id does not match its canonical contents");
@@ -314,11 +340,13 @@ async function loadProposalFile(path, workspaceRoot, verifyEvidence = true) {
 async function loadDecisionFile(path, workspaceRoot, verifyEvidence) {
   const decision = validateDecision(await readJson(path, `memory decision ${path}`));
   if (verifyEvidence && decision.benchmark_receipt !== null) {
-    await verifyFileReceipt(
-      decision.benchmark_receipt,
-      workspaceRoot,
-      `decision ${decision.decision_id} benchmark receipt`,
-    );
+    for (const side of ["with_rule", "without_rule"]) {
+      await verifyFileReceipt(
+        decision.benchmark_receipt[side],
+        workspaceRoot,
+        `decision ${decision.decision_id} benchmark ${side} receipt`,
+      );
+    }
   }
   return decision;
 }
@@ -374,17 +402,32 @@ export async function loadLedger({ store, workspaceRoot = process.cwd(), verifyE
       if (decision.benchmark_receipt.pack_id !== proposal.review_requirements.benchmark.pack_id) {
         throw new Error(`accepted rule ${proposal.proposal_id} carries the wrong benchmark pack`);
       }
-      if (verifyEvidence) {
-        const verified = await scoredBenchReceipt(
-          decision.benchmark_receipt.path,
-          proposal.review_requirements.benchmark.pack_id,
-          workspaceRoot,
+      if (decision.benchmark_receipt.rule_content_id !== contentIdForJson(proposal.value)) {
+        throw new Error(
+          `accepted rule ${proposal.proposal_id} benchmark receipt was measured for a different rule value`,
         );
+      }
+      if (verifyEvidence) {
+        const verified = await ablationBenchReceipts({
+          withPath: decision.benchmark_receipt.with_rule.path,
+          withoutPath: decision.benchmark_receipt.without_rule.path,
+          packId: proposal.review_requirements.benchmark.pack_id,
+          ruleContentId: decision.benchmark_receipt.rule_content_id,
+          workspaceRoot,
+        });
+        for (const side of ["with_rule", "without_rule"]) {
+          if (
+            verified[side].content_id !== decision.benchmark_receipt[side].content_id ||
+            verified[side].bytes !== decision.benchmark_receipt[side].bytes
+          ) {
+            throw new Error(`accepted rule ${proposal.proposal_id} benchmark receipt changed`);
+          }
+        }
         if (
-          verified.content_id !== decision.benchmark_receipt.content_id ||
-          verified.bytes !== decision.benchmark_receipt.bytes
+          Math.abs(verified.delta.critical_meaning_rate - decision.benchmark_receipt.delta.critical_meaning_rate) >= 1e-9 ||
+          verified.delta.catastrophic_count !== decision.benchmark_receipt.delta.catastrophic_count
         ) {
-          throw new Error(`accepted rule ${proposal.proposal_id} benchmark receipt changed`);
+          throw new Error(`accepted rule ${proposal.proposal_id} records a delta its reports do not support`);
         }
       }
     } else if (decision.benchmark_receipt !== null) {
@@ -560,12 +603,164 @@ async function scoredBenchReceipt(path, expectedPackId, workspaceRoot) {
       throw new Error("behavioral rule benchmark lacks scored outcomes or evidence artifacts");
     }
   }
+
+  // A "scored" report is only as real as the conveyor artifacts beneath it, so every number in
+  // it is bound to bytes another check re-derives: the pack's actual freeze receipt must exist
+  // and predate the report, and each result must link the immutable bench/scores/ receipt whose
+  // headline it repeats. A hand-authored scored report — the obvious way to counterfeit an
+  // ablation pair — dies here.
+  if (report.systems.filter((system) => system.role === "subject").length !== 1) {
+    throw new Error("behavioral rule benchmark must contain exactly one subject system");
+  }
+  const packDir = resolveFile(join("bench/packs", report.pack_id), workspaceRoot);
+  const pack = validatePack(await readJson(join(packDir, "pack.json"), `benchmark pack ${report.pack_id}`));
+  if (pack.pack_id !== report.pack_id || !pack.frozen || pack.freeze_receipt === null) {
+    throw new Error(`behavioral rule benchmark pack ${report.pack_id} is not frozen on disk`);
+  }
+  const freezePath = join(packDir, pack.freeze_receipt);
+  const freeze = validateFreezeReceipt(await readJson(freezePath, `freeze receipt ${report.pack_id}`));
+  if (freeze.pack_id !== report.pack_id) throw new Error("benchmark pack freeze receipt names a different pack");
+  if (Date.parse(report.generated_at) < Date.parse(freeze.frozen_at)) {
+    throw new Error("behavioral rule benchmark report predates its pack freeze");
+  }
+  const freezeFile = await fileReceipt(freezePath, pack.freeze_receipt);
+  const frozenClipIds = new Set(freeze.clips.map((clip) => clip.clip_id));
+  const rateEqual = (left, right) =>
+    (left === null) === (right === null) && (left === null || Math.abs(left - right) < 1e-9);
+  for (const result of report.results) {
+    const expectedScore = `bench/scores/${result.run_id}/score.json`;
+    if (result.artifacts.score !== expectedScore) {
+      throw new Error(`benchmark result ${result.system_id} must link its score receipt at ${expectedScore}`);
+    }
+    const scoreReceipt = validateScoreReceipt(
+      await readJson(resolveFile(expectedScore, workspaceRoot), `score receipt ${expectedScore}`),
+    );
+    if (scoreReceipt.pack_id !== report.pack_id || scoreReceipt.run !== result.run_id) {
+      throw new Error(`score receipt ${expectedScore} names a different pack or run`);
+    }
+    if (!frozenClipIds.has(scoreReceipt.clip_id)) {
+      throw new Error(`score receipt ${expectedScore} scores a clip the pack freeze does not contain`);
+    }
+    if (scoreReceipt.preregistration.frozen_at !== freeze.frozen_at) {
+      throw new Error(`score receipt ${expectedScore} was scored against a different freeze`);
+    }
+    if (
+      scoreReceipt.bindings.freeze.content_id !== freezeFile.content_id ||
+      scoreReceipt.bindings.freeze.bytes !== freezeFile.bytes
+    ) {
+      throw new Error(`score receipt ${expectedScore} does not bind the pack's actual freeze receipt bytes`);
+    }
+    const scored = scoreReceipt.systems[result.system_id];
+    if (!scored) throw new Error(`score receipt ${expectedScore} does not score system ${result.system_id}`);
+    const h = scored.headline;
+    const r = result.headline;
+    const matches =
+      h.critical_meaning.passes === r.critical_meaning.passes &&
+      h.critical_meaning.total === r.critical_meaning.total &&
+      rateEqual(h.critical_meaning.rate, r.critical_meaning.rate) &&
+      h.critical_outcomes.correct === r.critical_outcomes.correct &&
+      h.critical_outcomes.wrong === r.critical_outcomes.wrong &&
+      h.critical_outcomes.withheld === r.critical_outcomes.withheld &&
+      h.critical_outcomes.missing === r.critical_outcomes.missing &&
+      h.critical_outcomes.total === r.critical_outcomes.total &&
+      h.catastrophic.count === r.catastrophic.count &&
+      h.catastrophic.denominator === r.catastrophic.denominator &&
+      rateEqual(h.catastrophic.rate, r.catastrophic.rate) &&
+      h.latency.first_usable_s === r.latency.first_usable_s &&
+      h.latency.complete_s === r.latency.complete_s;
+    if (!matches) {
+      throw new Error(
+        `benchmark result ${result.system_id} headline does not match its score receipt ${expectedScore}`,
+      );
+    }
+  }
+
   const receipt = await fileReceipt(absolute, recordedPath);
   return {
-    ...receipt,
-    pack_id: report.pack_id,
-    status: report.status,
-    generated_at: report.generated_at,
+    receipt: {
+      path: receipt.path,
+      content_id: receipt.content_id,
+      bytes: receipt.bytes,
+      generated_at: report.generated_at,
+    },
+    report,
+  };
+}
+
+function subjectResult(report, context) {
+  const subjects = report.systems.filter((system) => system.role === "subject");
+  if (subjects.length !== 1) throw new Error(`${context} must contain exactly one subject system`);
+  const result = report.results.find((candidate) => candidate.system_id === subjects[0].id);
+  if (!result) throw new Error(`${context} subject system has no result`);
+  return { system: subjects[0], result };
+}
+
+function configRules(result, context) {
+  const rules = result.config?.rules;
+  if (!Array.isArray(rules) || rules.some((rule) => typeof rule !== "string" || !rule.trim())) {
+    throw new Error(
+      `${context} subject config must carry a rules array of content ids; a config that does not declare its rules cannot prove an ablation`,
+    );
+  }
+  const set = new Set(rules);
+  if (set.size !== rules.length) throw new Error(`${context} subject config repeats a rule`);
+  return set;
+}
+
+/**
+ * The ablation pair a rule acceptance must present: two scored reports on the identical frozen
+ * pack whose subject configs are the same rule set except for exactly the proposed rule, so the
+ * recorded delta is attributable to that rule and nothing else the configs admit to. One scored
+ * report can no longer accept anything.
+ */
+async function ablationBenchReceipts({ withPath, withoutPath, packId, ruleContentId, workspaceRoot }) {
+  digestFromContentId(ruleContentId, "ablation rule content id");
+  const withRule = await scoredBenchReceipt(withPath, packId, workspaceRoot);
+  const withoutRule = await scoredBenchReceipt(withoutPath, packId, workspaceRoot);
+
+  if (withRule.receipt.content_id === withoutRule.receipt.content_id) {
+    throw new Error("rule ablation requires two distinct scored reports; one report cannot be its own control");
+  }
+  if (contentIdForJson(withRule.report.pack) !== contentIdForJson(withoutRule.report.pack)) {
+    throw new Error("rule ablation reports were scored against different pack contents; the comparison proves nothing");
+  }
+
+  const withSubject = subjectResult(withRule.report, "with-rule benchmark");
+  const withoutSubject = subjectResult(withoutRule.report, "without-rule benchmark");
+  if (withSubject.system.id !== withoutSubject.system.id) {
+    throw new Error("rule ablation reports score different subject systems");
+  }
+
+  const withRules = configRules(withSubject.result, "with-rule benchmark");
+  const withoutRules = configRules(withoutSubject.result, "without-rule benchmark");
+  if (!withRules.has(ruleContentId)) {
+    throw new Error("with-rule benchmark subject config does not include the proposed rule");
+  }
+  if (withoutRules.has(ruleContentId)) {
+    throw new Error("without-rule benchmark subject config includes the proposed rule; it is not a control");
+  }
+  if (withRules.size !== withoutRules.size + 1 || ![...withoutRules].every((rule) => withRules.has(rule))) {
+    throw new Error("rule ablation configs differ by more than the proposed rule");
+  }
+  const stripped = (result) => {
+    const { rules: _rules, ...rest } = result.config;
+    return rest;
+  };
+  if (contentIdForJson(stripped(withSubject.result)) !== contentIdForJson(stripped(withoutSubject.result))) {
+    throw new Error("rule ablation subject configs differ beyond their rules; the delta is not attributable to the rule");
+  }
+
+  const withHeadline = withSubject.result.headline;
+  const withoutHeadline = withoutSubject.result.headline;
+  return {
+    pack_id: packId,
+    rule_content_id: ruleContentId,
+    with_rule: withRule.receipt,
+    without_rule: withoutRule.receipt,
+    delta: {
+      critical_meaning_rate: withHeadline.critical_meaning.rate - withoutHeadline.critical_meaning.rate,
+      catastrophic_count: withHeadline.catastrophic.count - withoutHeadline.catastrophic.count,
+    },
   };
 }
 
@@ -575,7 +770,7 @@ export async function recordDecision({
   action: actionValue,
   decidedBy,
   reason,
-  benchReport = null,
+  benchReports = null,
   createdAt: at,
   workspaceRoot = process.cwd(),
 }) {
@@ -591,7 +786,7 @@ export async function recordDecision({
 
   if (nextAction === "revoke") {
     if (state.status !== "accepted") throw new Error("only an accepted, non-revoked proposal can be revoked");
-    if (benchReport !== null) throw new Error("revocation does not accept a benchmark receipt");
+    if (benchReports !== null) throw new Error("revocation does not accept a benchmark receipt");
   } else if (state.status !== "pending") {
     throw new Error(`proposal ${proposal.proposal_id} already has a primary decision`);
   }
@@ -609,13 +804,27 @@ export async function recordDecision({
 
   let benchmarkReceipt = null;
   if (nextAction === "accept" && proposal.kind === "rule") {
-    if (benchReport === null) throw new Error("behavioral rule acceptance requires a scored benchmark receipt");
-    benchmarkReceipt = await scoredBenchReceipt(
-      benchReport,
-      proposal.review_requirements.benchmark.pack_id,
+    if (benchReports === null) {
+      throw new Error("behavioral rule acceptance requires a scored benchmark ablation pair");
+    }
+    if (
+      typeof benchReports !== "object" ||
+      Array.isArray(benchReports) ||
+      !benchReports.withRule ||
+      !benchReports.withoutRule
+    ) {
+      throw new Error(
+        "behavioral rule acceptance requires both ablation reports: one scored with the rule and one scored without it; a single report is a skeleton key and no longer opens this gate",
+      );
+    }
+    benchmarkReceipt = await ablationBenchReceipts({
+      withPath: benchReports.withRule,
+      withoutPath: benchReports.withoutRule,
+      packId: proposal.review_requirements.benchmark.pack_id,
+      ruleContentId: contentIdForJson(proposal.value),
       workspaceRoot,
-    );
-  } else if (benchReport !== null) {
+    });
+  } else if (benchReports !== null) {
     throw new Error("benchmark receipts are only valid when accepting a behavioral rule");
   }
 

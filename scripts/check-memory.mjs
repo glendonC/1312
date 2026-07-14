@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+import { receiptIdFor } from "./lib/bench-gold.mjs";
 import {
   loadLedger,
   materializeMemory,
@@ -11,7 +12,7 @@ import {
   validateRunProposalManifest,
 } from "./lib/memory-review.mjs";
 import { fingerprintFile } from "./lib/content-id.mjs";
-import { contentIdForJson } from "./lib/immutable-receipts.mjs";
+import { contentIdForJson, fileReceipt } from "./lib/immutable-receipts.mjs";
 
 const LEGACY = new URL("../memory/glossary/ko.json", import.meta.url);
 const LEGACY_RECEIPT = new URL(
@@ -37,7 +38,10 @@ async function rejects(operation, pattern, message) {
   throw new Error(`memory check failed: ${message}; operation was accepted`);
 }
 
-async function scoredReport(path) {
+async function scoredReport(
+  path,
+  { runPrefix = "memory-policy", subjectRules = [], subjectMeaning = null, subjectOutcomes = null, subjectCatastrophic = null } = {},
+) {
   const report = JSON.parse(await readFile(UNSCORED_REPORT, "utf8"));
   report.status = "scored";
   report.generated_at = "2026-07-13T12:00:00.000Z";
@@ -58,25 +62,38 @@ async function scoredReport(path) {
     };
     for (const key of Object.keys(clip.annotations)) clip.annotations[key] = true;
   }
+  const subjectId = report.systems.find((system) => system.role === "subject").id;
   for (const system of report.systems) {
     system.status = "scored";
     system.version = "memory-policy-check";
     system.capture_date = "2026-07-13";
   }
   for (const [index, result] of report.results.entries()) {
-    result.run_id = `memory-policy-run-${index + 1}`;
+    result.run_id = `${runPrefix}-run-${index + 1}`;
     result.status = "scored";
-    result.config = { fixture: "memory-policy-check" };
+    result.config =
+      result.system_id === subjectId
+        ? { fixture: "memory-policy-check", rules: subjectRules }
+        : { fixture: "memory-policy-check" };
     result.headline = {
-      critical_meaning: { passes: 1, total: 1, rate: 1 },
-      critical_outcomes: { correct: 1, wrong: 0, withheld: 0, missing: 0, total: 1 },
-      catastrophic: { count: 0, rate: 0, denominator: 1 },
+      critical_meaning:
+        result.system_id === subjectId && subjectMeaning !== null
+          ? subjectMeaning
+          : { passes: 1, total: 1, rate: 1 },
+      critical_outcomes:
+        result.system_id === subjectId && subjectOutcomes !== null
+          ? subjectOutcomes
+          : { correct: 1, wrong: 0, withheld: 0, missing: 0, total: 1 },
+      catastrophic:
+        result.system_id === subjectId && subjectCatastrophic !== null
+          ? subjectCatastrophic
+          : { count: 0, rate: 0, denominator: 1 },
       latency: { first_usable_s: 1, complete_s: 2 },
     };
     result.artifacts = {
       output: `output-${index}.json`,
       runtime: `runtime-${index}.json`,
-      score: `score-${index}.json`,
+      score: `bench/scores/${result.run_id}/score.json`,
       review: `review-${index}.json`,
     };
   }
@@ -84,11 +101,131 @@ async function scoredReport(path) {
   return report;
 }
 
+/**
+ * A "scored" report is no longer self-supporting: the rule gate binds it to a frozen pack and
+ * per-result score receipts on disk. This builds that synthetic conveyor inside the temp
+ * workspace — a frozen pack manifest, its freeze receipt, and one immutable-shaped score
+ * receipt per report result whose headline matches the report exactly. Everything is labelled
+ * fixture and lives in the temp dir; nothing here is evidence about any real clip.
+ */
+async function syntheticConveyor(temp) {
+  const packDir = join(temp, "bench/packs/hard-ko-v1");
+  await mkdir(packDir, { recursive: true });
+  const clips = [
+    { slot: "slot-control-01", role: "control", clip_id: "fixture-control-1" },
+    { slot: "slot-control-02", role: "control", clip_id: "fixture-control-2" },
+    { slot: "slot-hard-01", role: "hard", clip_id: "fixture-hard-1" },
+  ];
+  const pack = {
+    schema: "studio.bench.pack.v1",
+    pack_id: "hard-ko-v1",
+    label: "Memory-policy fixture pack (synthetic; never evidence)",
+    frozen: true,
+    target_clip_count: clips.length,
+    clips: clips.map((clip) => ({
+      slot: clip.slot,
+      role: clip.role,
+      status: "frozen",
+      clip_id: clip.clip_id,
+      source: { kind: "owned", note: "memory-policy fixture" },
+      gold_path: `${clip.clip_id}.gold.json`,
+      candidates_manifest: null,
+    })),
+    freeze_receipt: "freeze.json",
+  };
+  const freezeBody = {
+    schema: "studio.bench.freeze.v1",
+    pack_id: "hard-ko-v1",
+    frozen_at: "2026-07-12T00:00:00.000Z",
+    protocol: { minimum_reviewers: 2, blinded_review: true, adjudication_required: true },
+    clips: clips.map((clip, index) => ({
+      clip_id: clip.clip_id,
+      role: clip.role,
+      source_url: null,
+      gold: {
+        path: `bench/packs/hard-ko-v1/${clip.clip_id}.gold.json`,
+        content_id: `sha256:${String(index).repeat(64)}`,
+        bytes: 1,
+      },
+      candidates_manifest: null,
+      adjudications: [
+        {
+          path: `bench/reviews/fixture-${clip.clip_id}-1.json`,
+          content_id: `sha256:${"a".repeat(64)}`,
+          bytes: 1,
+          review_id: `bench-review:sha256:${"a".repeat(64)}`,
+          reviewer_name: "Fixture Reviewer One",
+          reviewer_git_identity: "fixture-one <one@example.test>",
+        },
+        {
+          path: `bench/reviews/fixture-${clip.clip_id}-2.json`,
+          content_id: `sha256:${"b".repeat(64)}`,
+          bytes: 1,
+          review_id: `bench-review:sha256:${"b".repeat(64)}`,
+          reviewer_name: "Fixture Reviewer Two",
+          reviewer_git_identity: "fixture-two <two@example.test>",
+        },
+      ],
+    })),
+  };
+  const freeze = { freeze_id: receiptIdFor("bench-freeze", { freeze_id: null, ...freezeBody }, "freeze_id"), ...freezeBody };
+  await writeFile(join(packDir, "pack.json"), `${JSON.stringify(pack, null, 2)}\n`);
+  await writeFile(join(packDir, "freeze.json"), `${JSON.stringify(freeze, null, 2)}\n`);
+  const freezeFile = await fileReceipt(join(packDir, "freeze.json"), "bench/packs/hard-ko-v1/freeze.json");
+  await mkdir(join(temp, "memory/glossary"), { recursive: true });
+  await copyFile(LEGACY, join(temp, "memory/glossary/ko.json"));
+  return { freeze, freezeFile };
+}
+
+async function writeScoreReceipts(temp, report, freeze, freezeFile) {
+  for (const result of report.results) {
+    const system = report.systems.find((candidate) => candidate.id === result.system_id);
+    const h = result.headline;
+    const line = {
+      t_start: 0,
+      t_end: 2,
+      disposition: "emitted",
+      meaning_preserved: h.critical_meaning.passes === 1,
+      critical_units: [
+        {
+          id: "fixture-u1",
+          outcome: h.critical_outcomes.correct === 1 ? "correct" : "wrong",
+          catastrophic: h.catastrophic.count === 1,
+        },
+      ],
+      basis: "human_label",
+    };
+    const body = {
+      schema: "studio.bench.score.v1",
+      pack_id: report.pack_id,
+      clip_id: "fixture-hard-1",
+      run: result.run_id,
+      scored_at: "2026-07-13T11:00:00.000Z",
+      judge: null,
+      bindings: {
+        gold: { path: "bench/packs/hard-ko-v1/fixture-hard-1.gold.json", content_id: `sha256:${"2".repeat(64)}`, bytes: 1 },
+        freeze: { path: freezeFile.path, content_id: freezeFile.content_id, bytes: freezeFile.bytes },
+        capture: { path: `bench/runs/${result.run_id}/capture.json`, content_id: `sha256:${"c".repeat(64)}`, bytes: 1 },
+        labels: { path: `bench/reviews/labels/${result.run_id}.json`, content_id: `sha256:${"d".repeat(64)}`, bytes: 1 },
+      },
+      preregistration: { frozen_at: freeze.frozen_at, captured_at: "2026-07-13", capture_after_freeze: true },
+      systems: { [result.system_id]: { role: system.role, per_line: [line], headline: h } },
+      delta_vs_cold: null,
+      notes: "Synthetic memory-policy fixture; never evidence about any real clip.",
+    };
+    const receipt = { score_id: receiptIdFor("bench-score", { score_id: null, ...body }, "score_id"), ...body };
+    await mkdir(join(temp, "bench/scores", result.run_id), { recursive: true });
+    await writeFile(join(temp, "bench/scores", result.run_id, "score.json"), `${JSON.stringify(receipt, null, 2)}\n`);
+  }
+}
+
 const temp = await mkdtemp(join(tmpdir(), "studio-memory-check-"));
 const store = join(temp, "review");
 const evidence = join(temp, "evidence.json");
 const evidenceTwo = join(temp, "evidence-two.json");
-const scored = join(temp, "scored-report.json");
+const scoredWith = join(temp, "scored-with-rule.json");
+const scoredWithout = join(temp, "scored-without-rule.json");
+const scoredWithoutButIncludes = join(temp, "scored-without-but-includes.json");
 const wrongPack = join(temp, "wrong-pack-report.json");
 
 try {
@@ -317,6 +454,7 @@ try {
     benchmarkPackId: "hard-ko-v1",
     createdAt: "2026-07-13T00:12:00.000Z",
   });
+  const ruleContentId = contentIdForJson(rule.proposal.value);
   await rejects(
     () =>
       recordDecision({
@@ -326,9 +464,48 @@ try {
         decidedBy: "memory-gate-01",
         reason: "A rule needs scored evidence.",
         createdAt: "2026-07-13T00:13:00.000Z",
+        workspaceRoot: temp,
       }),
-    /requires a scored benchmark/i,
+    /requires a scored benchmark ablation pair/i,
     "behavioral rule was accepted without a benchmark",
+  );
+
+  // The skeleton-key hole: ONE scored report must never accept a rule again. Build the honest
+  // ablation pair — and the synthetic conveyor (frozen pack, freeze receipt, score receipts)
+  // the gate now binds every report to — so every negative below differs from a working
+  // positive by exactly one thing.
+  const conveyor = await syntheticConveyor(temp);
+  const withReport = await scoredReport(scoredWith, {
+    runPrefix: "with",
+    subjectRules: ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ruleContentId],
+    subjectMeaning: { passes: 1, total: 1, rate: 1 },
+    subjectOutcomes: { correct: 1, wrong: 0, withheld: 0, missing: 0, total: 1 },
+    subjectCatastrophic: { count: 0, rate: 0, denominator: 1 },
+  });
+  const withoutReport = await scoredReport(scoredWithout, {
+    runPrefix: "without",
+    subjectRules: ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+    subjectMeaning: { passes: 0, total: 1, rate: 0 },
+    subjectOutcomes: { correct: 0, wrong: 1, withheld: 0, missing: 0, total: 1 },
+    subjectCatastrophic: { count: 1, rate: 1, denominator: 1 },
+  });
+  await writeScoreReceipts(temp, withReport, conveyor.freeze, conveyor.freezeFile);
+  await writeScoreReceipts(temp, withoutReport, conveyor.freeze, conveyor.freezeFile);
+
+  await rejects(
+    () =>
+      recordDecision({
+        store,
+        proposalId: rule.proposal.proposal_id,
+        action: "accept",
+        decidedBy: "memory-gate-01",
+        reason: "A single scored report must no longer open the gate.",
+        benchReports: { withRule: scoredWith },
+        createdAt: "2026-07-13T00:13:00.000Z",
+        workspaceRoot: temp,
+      }),
+    /skeleton key|both ablation reports/i,
+    "a single scored report accepted a rule",
   );
   await rejects(
     () =>
@@ -338,15 +515,15 @@ try {
         action: "accept",
         decidedBy: "memory-gate-01",
         reason: "The current protocol draft must fail closed.",
-        benchReport: UNSCORED_REPORT.pathname,
+        benchReports: { withRule: UNSCORED_REPORT.pathname, withoutRule: scoredWithout },
         createdAt: "2026-07-13T00:13:00.000Z",
+        workspaceRoot: temp,
       }),
     /requires scored frozen benchmark/i,
     "protocol draft was accepted as a scored benchmark",
   );
 
-  const valid = await scoredReport(scored);
-  const mismatched = structuredClone(valid);
+  const mismatched = JSON.parse(await readFile(scoredWith, "utf8"));
   mismatched.pack_id = "different-pack";
   await writeFile(wrongPack, `${JSON.stringify(mismatched, null, 2)}\n`);
   await rejects(
@@ -357,25 +534,90 @@ try {
         action: "accept",
         decidedBy: "memory-gate-01",
         reason: "The wrong pack must fail.",
-        benchReport: wrongPack,
+        benchReports: { withRule: wrongPack, withoutRule: scoredWithout },
         createdAt: "2026-07-13T00:13:00.000Z",
+        workspaceRoot: temp,
       }),
     /requires scored frozen benchmark pack hard-ko-v1/i,
     "mismatched benchmark pack was accepted",
   );
-  await recordDecision({
+  await rejects(
+    () =>
+      recordDecision({
+        store,
+        proposalId: rule.proposal.proposal_id,
+        action: "accept",
+        decidedBy: "memory-gate-01",
+        reason: "One report cannot be its own control.",
+        benchReports: { withRule: scoredWith, withoutRule: scoredWith },
+        createdAt: "2026-07-13T00:13:00.000Z",
+        workspaceRoot: temp,
+      }),
+    /cannot be its own control/i,
+    "one report served as both ablation sides",
+  );
+  await rejects(
+    () =>
+      recordDecision({
+        store,
+        proposalId: rule.proposal.proposal_id,
+        action: "accept",
+        decidedBy: "memory-gate-01",
+        reason: "The with-report must actually include the rule.",
+        benchReports: { withRule: scoredWithout, withoutRule: scoredWith },
+        createdAt: "2026-07-13T00:13:00.000Z",
+        workspaceRoot: temp,
+      }),
+    /does not include the proposed rule/i,
+    "a with-report that excludes the rule was accepted",
+  );
+  const wbiReport = await scoredReport(scoredWithoutButIncludes, {
+    runPrefix: "wbi",
+    subjectRules: ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ruleContentId],
+    subjectMeaning: { passes: 0, total: 1, rate: 0 },
+    subjectOutcomes: { correct: 0, wrong: 1, withheld: 0, missing: 0, total: 1 },
+    subjectCatastrophic: { count: 1, rate: 1, denominator: 1 },
+  });
+  await writeScoreReceipts(temp, wbiReport, conveyor.freeze, conveyor.freezeFile);
+  await rejects(
+    () =>
+      recordDecision({
+        store,
+        proposalId: rule.proposal.proposal_id,
+        action: "accept",
+        decidedBy: "memory-gate-01",
+        reason: "A control that contains the rule is not a control.",
+        benchReports: { withRule: scoredWith, withoutRule: scoredWithoutButIncludes },
+        createdAt: "2026-07-13T00:13:00.000Z",
+        workspaceRoot: temp,
+      }),
+    /is not a control/i,
+    "a non-ablation pair was accepted",
+  );
+
+  const ruleDecision = await recordDecision({
     store,
     proposalId: rule.proposal.proposal_id,
     action: "accept",
     decidedBy: "memory-gate-01",
-    reason: "Exact scored pack receipt satisfies the rule gate.",
-    benchReport: scored,
+    reason: "Exact scored ablation pair satisfies the rule gate.",
+    benchReports: { withRule: scoredWith, withoutRule: scoredWithout },
     createdAt: "2026-07-13T00:13:00.000Z",
+        workspaceRoot: temp,
   });
+  assert(
+    ruleDecision.decision.benchmark_receipt.rule_content_id === ruleContentId,
+    "rule decision does not bind the exact rule value",
+  );
+  assert(
+    Math.abs(ruleDecision.decision.benchmark_receipt.delta.critical_meaning_rate - 1) < 1e-9 &&
+      ruleDecision.decision.benchmark_receipt.delta.catastrophic_count === -1,
+    "rule decision does not record the measured ablation delta",
+  );
   const withRule = await materializeMemory({
     store,
     createdAt: "2026-07-13T00:14:00.000Z",
-    workspaceRoot: new URL("../", import.meta.url).pathname,
+    workspaceRoot: temp,
   });
   assert(withRule.materialization.entries.some((entry) => entry.kind === "rule"), "scored rule was not materialized");
 
@@ -428,20 +670,20 @@ try {
   const evidenceTwoOriginal = await readFile(evidenceTwo, "utf8");
   await writeFile(evidenceTwo, '{"measured":"tampered"}\n');
   await rejects(
-    () => loadLedger({ store, workspaceRoot: new URL("../", import.meta.url).pathname }),
+    () => loadLedger({ store, workspaceRoot: temp }),
     /no longer matches its recorded bytes/i,
     "evidence hash drift was accepted",
   );
   await writeFile(evidenceTwo, evidenceTwoOriginal);
 
-  const scoredOriginal = await readFile(scored, "utf8");
-  await writeFile(scored, `${scoredOriginal.trim()} `);
+  const scoredOriginal = await readFile(scoredWith, "utf8");
+  await writeFile(scoredWith, `${scoredOriginal.trim()} `);
   await rejects(
-    () => loadLedger({ store, workspaceRoot: new URL("../", import.meta.url).pathname }),
+    () => loadLedger({ store, workspaceRoot: temp }),
     /no longer matches its recorded bytes/i,
     "benchmark receipt hash drift was accepted",
   );
-  await writeFile(scored, scoredOriginal);
+  await writeFile(scoredWith, scoredOriginal);
 
   const runSource = await readFile(RUN_SCRIPT, "utf8");
   assert(!runSource.includes("writeFileSync(MEM"), "run-clip still writes cross-run memory directly");
@@ -475,7 +717,7 @@ try {
   }
 
   console.log(
-    `memory check passed: immutable legacy input, evidence hashes, separate review, supersession, rollback, and scored-rule gate`,
+    `memory check passed: immutable legacy input, evidence hashes, separate review, supersession, rollback, and ablation-bound rule gate (single scored report refused)`,
   );
 } finally {
   await rm(temp, { recursive: true, force: true });

@@ -159,16 +159,27 @@
   transition-duration: 80ms;
 }
 
+/* The pill belongs to the paragraph's baseline; its contents need their own
+   alignment context so the SVG is centered on the label instead of the text baseline. */
+.cta-content {
+  display: inline-flex;
+  height: 100%;
+  align-items: center;
+  line-height: 1;
+  vertical-align: top;
+}
+
 /* An arrow only says "elsewhere". The studio is a thing you run — the dock holds a run
    and lets it go again — so the mark is the run itself. Phosphor's filled play, not an
    outline one: astro-icon renders through a <use> clone, so an outline glyph cannot be
    filled from CSS, and a hollow triangle reads as a scratch at this size. It sits back
    at 68% and comes forward on hover, which is all the emphasis an 11px glyph can take. */
 .cta-icon {
+  display: block;
   width: 11px;
   height: 11px;
+  flex: none;
   margin-left: 6px;
-  vertical-align: middle;
   opacity: 0.68;
   transition: opacity 160ms ease;
 }

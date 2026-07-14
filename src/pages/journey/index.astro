@@ -29,6 +29,10 @@ const posts = (await getCollection("journey", ({ data }) => !data.draft)).sort(
                 <span>2026</span>
               </p>
             </div>
+            <p class="journey-deck">
+              Building a system that lets autonomous agents investigate real media.
+              Korean-to-English is the first proof case, not the boundary.
+            </p>
           </header>
 
           <div class="journey-log" aria-label="Build Week entries">
@@ -46,7 +50,10 @@ const posts = (await getCollection("journey", ({ data }) => !data.draft)).sort(
                       href={`/journey/${post.id}/`}
                     >
                       <time datetime={post.data.date.toISOString()}>{formatLogDate(post.data.date)}</time>
-                      <span class="journey-entry-title">{post.data.title}</span>
+                      <span class="journey-entry-copy">
+                        <span class="journey-entry-title">{post.data.title}</span>
+                        <span class="journey-entry-description">{post.data.description}</span>
+                      </span>
                       <span class="journey-entry-end">
                         <span class="journey-entry-type">{post.data.type}</span>
                         <span class="journey-entry-arrow" aria-hidden="true">
@@ -75,7 +82,7 @@ const posts = (await getCollection("journey", ({ data }) => !data.draft)).sort(
 
       <figure
         class="journey-visual"
-        aria-label="An abstract paper field where layered Korean and English signals converge"
+        aria-label="An abstract paper field where layered media signals and agent findings converge"
       >
         <JourneyAtmosphere />
       </figure>

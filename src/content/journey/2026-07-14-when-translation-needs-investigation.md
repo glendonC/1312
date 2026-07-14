@@ -1,6 +1,6 @@
 ---
 title: When translation needs investigation
-description: "A localization workflow converts media efficiently. 1321 is testing what changes when uncertainty decides what gets investigated next."
+description: "Traditional localization tools follow a configured route. 1321 lets the evidence decide which agents, tools, and investigations are needed next."
 date: 2026-07-14
 type: note
 author: "1321"

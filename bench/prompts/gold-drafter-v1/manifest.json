@@ -1,0 +1,70 @@
+{
+  "schema": "studio.bench.gold-prompt-pack.v1",
+  "prompt_id": "bench-gold-prompt:sha256:a102dfeeca96b2b721145d7aba40efe57abf928428b74ea5dc4cb8966ffb641c",
+  "name": "gold-drafter-v1",
+  "version": "1.0.0",
+  "drafter_id": "agent:gold-drafter-v1",
+  "pack_id": "hard-ko-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "prompt": {
+    "path": "bench/prompts/gold-drafter-v1/prompt.md",
+    "content_id": "sha256:1a058ed4ba869ba4917837a936ca563674858f0dad800780a65f3b1c67c70ac6",
+    "bytes": 4788
+  },
+  "inputs": [
+    {
+      "role": "candidates",
+      "path": "bench/candidates/run-006/candidates.json",
+      "content_id": "sha256:c4e6fa69698ece83ed3a75943f159286462f1bea60614b247a7cef2221124dce",
+      "bytes": 12970
+    },
+    {
+      "role": "gold_schema",
+      "path": "bench/schemas/gold.schema.json",
+      "content_id": "sha256:a0dd937dbe2450db86bd7ac86257608c250e3a10400adf7b4041cdb0174dfb8a",
+      "bytes": 4954
+    },
+    {
+      "role": "source",
+      "path": "public/demo/runs/run-006/source.json",
+      "content_id": "sha256:8f7c3748e5bc7cd8bde01ba15577d6936ce482225a16f20f8827c0cd52404f30",
+      "bytes": 807
+    },
+    {
+      "role": "captions",
+      "path": "public/demo/runs/run-006/captions.json",
+      "content_id": "sha256:45b3ff96cef4a0112586e6bfb6e530e7cb227d48147f90a65e4ace3fd3f6690c",
+      "bytes": 13502
+    },
+    {
+      "role": "corrections",
+      "path": "public/demo/runs/run-006/corrections.json",
+      "content_id": "sha256:868e38880fc66c5f96908ab6a4a0dc1c0de0f64e9314cb63f815daa804877a0f",
+      "bytes": 1489
+    },
+    {
+      "role": "run",
+      "path": "public/demo/runs/run-006/run.json",
+      "content_id": "sha256:bdedff75be4a01c580fa7ee3b46710124ff003761bace376ee40d3d1856664bf",
+      "bytes": 2562
+    },
+    {
+      "role": "media",
+      "path": "public/demo/runs/run-006/clip.mp4",
+      "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+      "bytes": 3465772
+    },
+    {
+      "role": "ko_pack",
+      "path": "public/demo/packs/ko-v3.json",
+      "content_id": "sha256:9b938e5b4fe38cebb532c861a1c966aaa881274feff1ae369eaf3fbdefd530e5",
+      "bytes": 4150
+    }
+  ],
+  "output_contract": {
+    "schema": "studio.bench.gold.v1",
+    "status": "candidate",
+    "materializer": "scripts/draft-gold-from-candidates.mjs"
+  },
+  "notes": "Content-addressed drafting inputs for run-006. System outputs are visible to the drafting agent only as context; they are not Korean gold. A later human review is blinded only if that human did not see those outputs."
+}

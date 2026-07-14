@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -342,6 +342,31 @@ if (existsSync(capturesDir)) {
  */
 
 const manifests = await loadCandidatesManifests(join(ROOT, "bench/candidates"), ROOT);
+
+// The only gold-shaped example is intentionally outside bench/packs: this environment could
+// not audition run-006 audio, so committing ASR-derived text as real gold would be dishonest.
+// Re-run the same content-addressed prompt/evidence and materializer checks used for a real
+// proposal, while requiring the dry-run marker and example-only path.
+const draftingFixture = "bench/examples/gold-drafts/Ux-TMWnmntM.gold.json";
+try {
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/draft-gold-from-candidates.mjs",
+      "--draft",
+      draftingFixture,
+      "--example",
+      "--out",
+      draftingFixture,
+      "--check",
+    ],
+    { cwd: ROOT, encoding: "utf8", stdio: "pipe" },
+  );
+} catch (error) {
+  const detail = error?.stderr?.toString().trim() || error?.message || String(error);
+  throw new Error(`bench check failed: gold drafting prompt/fixture validation failed: ${detail}`);
+}
+console.log("gold drafting check passed: 1 content-bound prompt pack, 1 non-authoritative candidate-shaped fixture");
 
 // Routing is forever: writeImmutableJson stops a manifest from being rewritten in place, but
 // nothing on disk stops `git rm`. Every candidates manifest this branch's history has ever

@@ -1,0 +1,279 @@
+{
+  "schema": "studio.bench.gold.v1",
+  "pack_id": "hard-ko-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "status": "candidate",
+  "drafter": "agent:gold-drafter-v1",
+  "source": {
+    "kind": "youtube",
+    "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+    "channel": "Didi's Korean Culture Podcast",
+    "licence": "Creative Commons Attribution license (reuse allowed)",
+    "window": {
+      "start": "00:05:10",
+      "end": "00:05:50",
+      "duration": 40
+    },
+    "attribution": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed)."
+  },
+  "mined_from": {
+    "path": "bench/candidates/run-006/candidates.json",
+    "content_id": "sha256:c4e6fa69698ece83ed3a75943f159286462f1bea60614b247a7cef2221124dce",
+    "bytes": 12970
+  },
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "korean_gold": "분들이 몇 분 계신데",
+      "english_guidance": "The fragment says that there are a few/some people; 몇 분 is the honorific counter for people here, not a duration in minutes. Preserve that the thought continues.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0000-0155-counter",
+          "phenomenon": "ko.counter_homophone",
+          "facts": [
+            "몇 분 counts people honorifically in a clause about people being present.",
+            "The utterance is an incomplete lead-in to following context."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "korean_gold": "네",
+      "english_guidance": "A short affirmative or conversational acknowledgment such as yes/yeah; do not expand it into a substantive claim.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0155-0195-backchannel",
+          "phenomenon": "none",
+          "facts": [
+            "The unit is a brief affirmative or acknowledgment."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "korean_gold": "어떤 분은 태국 갔다 오셨다고 했거든요. 근데 태국이 진짜 좋았다고 그러시더라구요.",
+      "english_guidance": "Someone had said they went to or had been to Thailand, and that person reported that Thailand was really good. Natural English may combine the two reported-speech clauses.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0195-0770-thailand-report",
+          "phenomenon": "none",
+          "facts": [
+            "An unspecified person is reported to have visited Thailand.",
+            "That person is reported to have found Thailand really good."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "korean_gold": "네",
+      "english_guidance": "A short affirmative or acknowledgment such as yes/yeah.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1190-1235-backchannel",
+          "phenomenon": "none",
+          "facts": [
+            "The unit is a brief affirmative or acknowledgment."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 12.7,
+      "t_end": 13.6,
+      "korean_gold": "왜요 왜요?",
+      "english_guidance": "The speaker asks why twice in quick succession; preserve the repetition or its pragmatic force rather than reducing it to an unrelated question.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1270-1360-why-repeat",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker asks why.",
+            "The why-question is repeated."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 14,
+      "t_end": 18.8,
+      "korean_gold": "아니 그 예전에 코로나 사태 이전에 누나랑",
+      "english_guidance": "An incomplete turn begins with a discourse-level no/well and locates the story before the COVID pandemic, continuing with 누나랑 ('with nuna/an older sister'). Later audio context must determine the relationship; do not complete the clause here.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1400-1880-before-covid",
+          "phenomenon": "none",
+          "facts": [
+            "The story is placed before the COVID pandemic.",
+            "The phrase remains incomplete at this unit boundary."
+          ],
+          "catastrophic_if": [
+            "The rendering reverses the timeframe and places the story after the pandemic."
+          ]
+        },
+        {
+          "id": "Ux-TMWnmntM-1400-1880-nuna",
+          "phenomenon": "ko.kinship_address",
+          "facts": [
+            "The unit includes 누나랑, introducing a woman addressed or described as nuna into the continuing phrase."
+          ],
+          "catastrophic_if": [
+            "The rendering assigns a family relationship that contradicts the relationship established by the adjoining audio."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 18.8,
+      "t_end": 19,
+      "korean_gold": "네",
+      "english_guidance": "Dry-run transcription lead only: the primary transcript marks a short acknowledgment, while the second recognizer heard carry-over from 누나랑. A real drafter must resolve this 0.2-second window from audio.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1880-1900-short-utterance",
+          "phenomenon": "none",
+          "facts": [
+            "The primary transcript treats the unit as a brief acknowledgment; this fixture does not resolve the recognizer conflict."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 19,
+      "t_end": 19.15,
+      "korean_gold": "친누나가",
+      "english_guidance": "A fragment explicitly referring to the speaker's biological older sister; the subject marker shows the phrase continues.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1900-1915-biological-sister",
+          "phenomenon": "ko.kinship_address",
+          "facts": [
+            "친누나 explicitly denotes the speaker's biological older sister.",
+            "The marked subject fragment continues into later speech."
+          ],
+          "catastrophic_if": [
+            "The rendering changes the biological older sister into a different person or family relationship."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 19.15,
+      "t_end": 20.2,
+      "korean_gold": "네",
+      "english_guidance": "Dry-run transcription lead only: the primary transcript marks an acknowledgment, while the second recognizer heard 친누나가. A real drafter must resolve this boundary from audio.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1915-2020-short-utterance",
+          "phenomenon": "none",
+          "facts": [
+            "The primary transcript treats the unit as a brief acknowledgment; this fixture does not resolve the recognizer conflict."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 20.2,
+      "t_end": 25.2,
+      "korean_gold": "그 막 그 매형이랑 태국에 한 달 살기를 하려고 했는데",
+      "english_guidance": "The continuing story involves the speaker's brother-in-law and a plan to spend/live one month in Thailand; the clause ends with a contrastive 'but' and continues. Avoid forcing an English subject not established inside this window.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2020-2520-brother-in-law",
+          "phenomenon": "ko.kinship_address",
+          "facts": [
+            "매형 identifies the speaker's older sister's husband/brother-in-law.",
+            "The plan involves spending one month in Thailand.",
+            "The clause is contrastive and unfinished at the boundary."
+          ],
+          "catastrophic_if": [
+            "The rendering changes the brother-in-law into a different family relationship or unrelated participant."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 25.52,
+      "t_end": 28.12,
+      "korean_gold": "그 내용이 너무 바쁘셔가지고 남는 사람이",
+      "english_guidance": "Dry-run transcription lead only: the primary transcript has 내용이, while the corroborating recognizer heard 매형이. The clause says someone or something was very busy and continues toward 'the person left/available'; a real drafter must resolve the noun from audio.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2552-2812-busy-reason",
+          "phenomenon": "none",
+          "facts": [
+            "The clause gives being very busy as the reason and continues into identifying the person left or available.",
+            "This fixture does not resolve the 내용이 versus 매형이 recognizer conflict."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 28.12,
+      "t_end": 28.32,
+      "korean_gold": "네.",
+      "english_guidance": "Dry-run transcription lead only: the primary transcript marks a short acknowledgment, while the second recognizer heard 사람이. A real drafter must resolve this boundary from audio.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2812-2832-short-utterance",
+          "phenomenon": "none",
+          "facts": [
+            "The primary transcript treats the unit as a brief acknowledgment; this fixture does not resolve the recognizer conflict."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "korean_gold": "저밖에 없어서 그 공짜로 태국 한 달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한 달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어",
+      "english_guidance": "The speaker was the only person available and therefore once stayed/lived in Thailand for a month for free. They lived in Chiang Mai for a month, found the neighborhood very pretty and the people very kind, then the clip cuts off after beginning 'Korean...'. Preserve the repeated one-month duration and the unfinished ending.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2832-3987-free-month",
+          "phenomenon": "ko.numeral_boundary",
+          "facts": [
+            "The speaker was the only person available.",
+            "The speaker once spent one month in Thailand for free."
+          ],
+          "catastrophic_if": [
+            "The rendering changes who went to Thailand or reverses the fact that the stay was free."
+          ]
+        },
+        {
+          "id": "Ux-TMWnmntM-2832-3987-chiang-mai",
+          "phenomenon": "ko.numeral_boundary",
+          "facts": [
+            "The speaker lived in Chiang Mai for one month.",
+            "The neighborhood was very pretty and the people were very kind."
+          ],
+          "catastrophic_if": []
+        },
+        {
+          "id": "Ux-TMWnmntM-2832-3987-cutoff",
+          "phenomenon": "none",
+          "facts": [
+            "The recorded window cuts off after the word Korean begins the next thought."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    }
+  ],
+  "notes": "[NON-AUTHORITATIVE DRY-RUN FIXTURE] Derived from recorded transcript and manifest text because this interface could not directly audition the audio. This is schema and workflow evidence only: it must never be reviewed, copied into bench/packs/, passed to freeze-pack, or treated as a claim about what was actually said. Prompt pack bench-gold-prompt:sha256:a102dfeeca96b2b721145d7aba40efe57abf928428b74ea5dc4cb8966ffb641c."
+}

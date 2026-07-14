@@ -1,0 +1,136 @@
+{
+  "schema": "studio.preflight-bundle.v3",
+  "producer": "scripts/seal-language-preflight.mjs",
+  "preflight_id": "preflight:sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e:speech-v1:language-v1",
+  "source": {
+    "receipt_id": "owned-local:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+    "receipt_artifact_id": "source-receipt",
+    "raw_artifact_id": "raw-media"
+  },
+  "artifacts": [
+    {
+      "artifact_id": "raw-media",
+      "kind": "raw_media",
+      "class": "raw",
+      "path": "clip.m4a",
+      "content": {
+        "id": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e"
+        },
+        "bytes": 329662
+      },
+      "producer": "scripts/ingest-owned-media.mjs",
+      "source_content_ids": []
+    },
+    {
+      "artifact_id": "source-receipt",
+      "kind": "source_receipt",
+      "class": "receipt",
+      "path": "source.json",
+      "content": {
+        "id": "sha256:ced8e654d0bba45d118d73276d76c12d4fb45dae17a25a8a0cf9fb843dc96735",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "ced8e654d0bba45d118d73276d76c12d4fb45dae17a25a8a0cf9fb843dc96735"
+        },
+        "bytes": 1854
+      },
+      "producer": "scripts/ingest-owned-media.mjs",
+      "source_content_ids": [
+        "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e"
+      ]
+    },
+    {
+      "artifact_id": "container-probe",
+      "kind": "media_probe_receipt",
+      "class": "receipt",
+      "path": "media-probe.json",
+      "content": {
+        "id": "sha256:def1dcaeeabe4dbc24247279638d1ce666fdc397de3dfa557a924dd12cb8b0c2",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "def1dcaeeabe4dbc24247279638d1ce666fdc397de3dfa557a924dd12cb8b0c2"
+        },
+        "bytes": 726
+      },
+      "producer": "scripts/probe-media.mjs",
+      "source_content_ids": [
+        "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e"
+      ]
+    },
+    {
+      "artifact_id": "speech-detector-audio",
+      "kind": "detector_audio",
+      "class": "derived",
+      "path": "speech-input.pcm",
+      "content": {
+        "id": "sha256:d94c0bf80b21f672c3f8baabbebce1f41d36fc486d82c26471b9bc42b1578d57",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "d94c0bf80b21f672c3f8baabbebce1f41d36fc486d82c26471b9bc42b1578d57"
+        },
+        "bytes": 1511424
+      },
+      "producer": "scripts/detect-speech.mjs",
+      "source_content_ids": [
+        "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e"
+      ]
+    },
+    {
+      "artifact_id": "speech-activity",
+      "kind": "speech_activity_receipt",
+      "class": "receipt",
+      "path": "speech-activity.json",
+      "content": {
+        "id": "sha256:b9ed72412af50f1ec6996fac1f49c4a651a3f42cc094e6712b1e3b2f6f732730",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "b9ed72412af50f1ec6996fac1f49c4a651a3f42cc094e6712b1e3b2f6f732730"
+        },
+        "bytes": 157766
+      },
+      "producer": "scripts/detect-speech.mjs",
+      "source_content_ids": [
+        "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+        "sha256:d94c0bf80b21f672c3f8baabbebce1f41d36fc486d82c26471b9bc42b1578d57",
+        "sha256:7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49"
+      ]
+    },
+    {
+      "artifact_id": "language-ranges",
+      "kind": "language_ranges_receipt",
+      "class": "receipt",
+      "path": "language-ranges.json",
+      "content": {
+        "id": "sha256:a61f2157005daa7cb51419c01229993f5397fbbc48845e6668fdd37cbb24924d",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "a61f2157005daa7cb51419c01229993f5397fbbc48845e6668fdd37cbb24924d"
+        },
+        "bytes": 214018
+      },
+      "producer": "scripts/detect-language.mjs",
+      "source_content_ids": [
+        "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+        "sha256:b9ed72412af50f1ec6996fac1f49c4a651a3f42cc094e6712b1e3b2f6f732730",
+        "sha256:d94c0bf80b21f672c3f8baabbebce1f41d36fc486d82c26471b9bc42b1578d57",
+        "sha256:fd9d995b9dcb0520f0dbf6cf68651af639fc385f594d9d876e69ca2802dc438e",
+        "sha256:6c0c125986b007d2e3734bec84c18bda0152071b90b87fadac6d7764499927a0",
+        "sha256:2b2e4e519084e0ea028b19b153f95202735a971870d6844aa26e559edd292e94",
+        "sha256:68ac791fcb4999461a313472125042934656240ba1cba7d1c2627fcbb19ac24c",
+        "sha256:a6a76d28c93edb273669eb9e0b0636a2bddbb1272c3261e47b7ca6dfdbac1b8d"
+      ]
+    }
+  ],
+  "findings": {
+    "container_tracks": "container-probe",
+    "speech_activity": "speech-activity",
+    "language_ranges": "language-ranges",
+    "acoustic_ranges": null,
+    "speaker_overlap": null,
+    "complexity": null
+  },
+  "note": "Immutable speech- and language-backed preflight index. Language decisions cover receipted speech windows only; scores are not calibrated confidence, and acoustic, speaker, overlap, and complexity findings remain unavailable."
+}

@@ -10,8 +10,9 @@
     "evidence:check": "node scripts/index-recorded-evidence.mjs --run run-005 --check && node scripts/index-recorded-evidence.mjs --run run-006 --check",
     "memory:check": "node scripts/check-memory.mjs",
     "speech:check": "node --test tests/studio-speech-production.test.ts",
+    "language:check": "node --test tests/studio-language-production.test.ts",
     "runtime:check": "node --test tests/studio-runtime-production.test.ts",
-    "studio:check": "npm run build && npm run bench:check && npm run evidence:check && npm run memory:check && npm run speech:check && npm run runtime:check && npm run studio:qa:list",
+    "studio:check": "npm run build && npm run bench:check && npm run evidence:check && npm run memory:check && npm run speech:check && npm run language:check && npm run runtime:check && npm run studio:qa:list",
     "studio:qa": "playwright test",
     "studio:qa:list": "playwright test --list",
     "preview": "astro preview"
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "@astrojs/react": "^6.0.1",
+    "@huggingface/transformers": "4.2.0",
     "@iconify-json/ph": "^1.2.2",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/react": "^19.2.17",

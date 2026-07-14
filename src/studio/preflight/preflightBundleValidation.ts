@@ -1,4 +1,5 @@
 import type {
+  LanguageRangesReceipt,
   PreflightArtifact,
   PreflightArtifactKind,
   PreflightBundle,
@@ -81,7 +82,7 @@ function relativeArtifactPath(value: unknown, context: string, path: string): st
 
 function artifact(
   value: unknown,
-  version: "v1" | "v2",
+  version: "v1" | "v2" | "v3",
   context: string,
   path: string,
 ): PreflightArtifact {
@@ -96,7 +97,9 @@ function artifact(
   const kind = text(item.kind, context, `${path}.kind`) as PreflightArtifactKind;
   const v1Kinds: PreflightArtifactKind[] = ["raw_media", "source_receipt", "media_probe_receipt"];
   const v2Kinds: PreflightArtifactKind[] = [...v1Kinds, "detector_audio", "speech_activity_receipt"];
-  if (!(version === "v1" ? v1Kinds : v2Kinds).includes(kind)) {
+  const v3Kinds: PreflightArtifactKind[] = [...v2Kinds, "language_ranges_receipt"];
+  const registeredKinds = version === "v1" ? v1Kinds : version === "v2" ? v2Kinds : v3Kinds;
+  if (!registeredKinds.includes(kind)) {
     fail(context, `${path}.kind`, `has no registered ${version} artifact kind ${kind}`);
   }
   const artifactClass = text(item.class, context, `${path}.class`);
@@ -156,7 +159,7 @@ function exactSources(
 function commonArtifacts(
   bundle: Record<string, unknown>,
   binding: PreflightSourceBinding,
-  version: "v1" | "v2",
+  version: "v1" | "v2" | "v3",
   expectedCount: number,
   context: string,
 ): { artifacts: Map<string, PreflightArtifact>; findings: Record<string, unknown> } {
@@ -169,7 +172,9 @@ function commonArtifacts(
       "bundle.artifacts",
       version === "v1"
         ? "must contain the exact raw, source, and media-probe artifacts"
-        : "must contain the exact raw, source, media-probe, detector-audio, and speech-activity artifacts",
+        : version === "v2"
+          ? "must contain the exact raw, source, media-probe, detector-audio, and speech-activity artifacts"
+          : "must contain the exact raw, source, media-probe, detector-audio, speech-activity, and language-ranges artifacts",
     );
   }
   const artifacts = new Map(entries.map((entry) => [entry.artifact_id, entry]));
@@ -225,6 +230,61 @@ function commonArtifacts(
   return { artifacts, findings };
 }
 
+function validateSpeechArtifacts(
+  artifacts: Map<string, PreflightArtifact>,
+  findings: Record<string, unknown>,
+  binding: PreflightSourceBinding,
+  speechActivity: SpeechActivityReceipt,
+  version: "v2" | "v3",
+  context: string,
+): { normalized: PreflightArtifact; speechReceipt: PreflightArtifact } {
+  const expectedIds = version === "v2"
+    ? ["raw-media", "source-receipt", "container-probe", "speech-detector-audio", "speech-activity"]
+    : ["raw-media", "source-receipt", "container-probe", "speech-detector-audio", "speech-activity", "language-ranges"];
+  if (expectedIds.some((id) => !artifacts.has(id))) {
+    fail(context, "bundle.artifacts", `must use the exact ${version} artifact ids ${expectedIds.join(", ")}`);
+  }
+  if (version === "v3" && Array.from(artifacts.keys()).some((id, index) => id !== expectedIds[index])) {
+    fail(context, "bundle.artifacts", `must use the exact ordered v3 artifact ids ${expectedIds.join(", ")}`);
+  }
+  exact(findings.speech_activity, "speech-activity", context, "bundle.findings.speech_activity");
+  const normalized = oneArtifact(
+    artifacts,
+    "speech-detector-audio",
+    "detector_audio",
+    context,
+    "bundle.artifacts.speech-detector-audio",
+  );
+  const normalizedReceipt = speechActivity.normalization.artifact;
+  if (
+    normalized.path !== normalizedReceipt.path ||
+    normalized.content.id !== normalizedReceipt.content.id ||
+    normalized.content.bytes !== normalizedReceipt.content.bytes ||
+    normalized.producer !== speechActivity.producer.implementation
+  ) {
+    fail(context, "bundle.artifacts.speech-detector-audio", "does not match the normalized detector audio receipt");
+  }
+  exactSources(normalized, [binding.raw.contentId], context, "bundle.artifacts.speech-detector-audio.source_content_ids");
+
+  const speechReceipt = oneArtifact(
+    artifacts,
+    findings.speech_activity,
+    "speech_activity_receipt",
+    context,
+    "bundle.findings.speech_activity",
+  );
+  if (speechReceipt.path !== "speech-activity.json" || speechReceipt.producer !== speechActivity.producer.implementation) {
+    fail(context, "bundle.findings.speech_activity", "does not match the registered speech-activity receipt artifact");
+  }
+  exactSources(
+    speechReceipt,
+    [binding.raw.contentId, normalized.content.id, speechActivity.producer.model.content.id],
+    context,
+    "bundle.findings.speech_activity.source_content_ids",
+  );
+  return { normalized, speechReceipt };
+}
+
 function validateV1(
   bundle: Record<string, unknown>,
   binding: PreflightSourceBinding,
@@ -266,60 +326,105 @@ function validateV2(
   }
 
   const { artifacts, findings } = commonArtifacts(bundle, binding, "v2", 5, context);
-  const expectedIds = ["raw-media", "source-receipt", "container-probe", "speech-detector-audio", "speech-activity"];
-  if (expectedIds.some((id) => !artifacts.has(id))) {
-    fail(context, "bundle.artifacts", `must use the exact v2 artifact ids ${expectedIds.join(", ")}`);
+  validateSpeechArtifacts(artifacts, findings, binding, speechActivity, "v2", context);
+  for (const key of ["language_ranges", "acoustic_ranges", "speaker_overlap", "complexity"] as const) {
+    if (findings[key] !== null) fail(context, `bundle.findings.${key}`, "has no registered deterministic producer");
   }
-  exact(findings.speech_activity, "speech-activity", context, "bundle.findings.speech_activity");
-  const normalized = oneArtifact(
-    artifacts,
-    "speech-detector-audio",
-    "detector_audio",
-    context,
-    "bundle.artifacts.speech-detector-audio",
-  );
-  const normalizedReceipt = speechActivity.normalization.artifact;
-  if (
-    normalized.path !== normalizedReceipt.path ||
-    normalized.content.id !== normalizedReceipt.content.id ||
-    normalized.content.bytes !== normalizedReceipt.content.bytes ||
-    normalized.producer !== speechActivity.producer.implementation
-  ) {
-    fail(context, "bundle.artifacts.speech-detector-audio", "does not match the normalized detector audio receipt");
-  }
-  exactSources(normalized, [binding.raw.contentId], context, "bundle.artifacts.speech-detector-audio.source_content_ids");
+}
 
-  const speechReceipt = oneArtifact(
+function validateV3(
+  bundle: Record<string, unknown>,
+  binding: PreflightSourceBinding,
+  speechActivity: SpeechActivityReceipt | null | undefined,
+  languageRanges: LanguageRangesReceipt | null | undefined,
+  context: string,
+): void {
+  exact(bundle.producer, "scripts/seal-language-preflight.mjs", context, "bundle.producer");
+  exact(bundle.preflight_id, `preflight:${binding.raw.contentId}:speech-v1:language-v1`, context, "bundle.preflight_id");
+  if (!speechActivity) fail(context, "speechActivity", "is required to validate a v3 preflight bundle");
+  if (!languageRanges) fail(context, "languageRanges", "is required to validate a v3 preflight bundle");
+  if (
+    speechActivity.schema !== "studio.speech-activity.v1" ||
+    speechActivity.producer.id !== "silero-vad" ||
+    speechActivity.producer.version !== "6.2.1" ||
+    speechActivity.producer.implementation !== "scripts/detect-speech.mjs"
+  ) {
+    fail(context, "speechActivity.producer", "is not the registered speech-activity receipt");
+  }
+  if (
+    speechActivity.input.media !== binding.raw.path ||
+    speechActivity.input.content_id !== binding.raw.contentId ||
+    speechActivity.input.bytes !== binding.raw.bytes
+  ) {
+    fail(context, "speechActivity.input", "does not match the receipted raw media");
+  }
+  if (
+    languageRanges.schema !== "studio.language-ranges.v1" ||
+    languageRanges.producer.id !== "whisper-language-id" ||
+    languageRanges.producer.version !== "1.0.0" ||
+    languageRanges.producer.implementation !== "scripts/detect-language.mjs"
+  ) {
+    fail(context, "languageRanges.producer", "is not the registered language-ranges receipt");
+  }
+
+  const { artifacts, findings } = commonArtifacts(bundle, binding, "v3", 6, context);
+  const { normalized, speechReceipt } = validateSpeechArtifacts(
     artifacts,
-    findings.speech_activity,
-    "speech_activity_receipt",
+    findings,
+    binding,
+    speechActivity,
+    "v3",
     context,
-    "bundle.findings.speech_activity",
   );
-  if (speechReceipt.path !== "speech-activity.json" || speechReceipt.producer !== speechActivity.producer.implementation) {
-    fail(context, "bundle.findings.speech_activity", "does not match the registered speech-activity receipt artifact");
+  exact(findings.language_ranges, "language-ranges", context, "bundle.findings.language_ranges");
+  const languageReceipt = oneArtifact(
+    artifacts,
+    findings.language_ranges,
+    "language_ranges_receipt",
+    context,
+    "bundle.findings.language_ranges",
+  );
+  if (languageReceipt.path !== "language-ranges.json" || languageReceipt.producer !== languageRanges.producer.implementation) {
+    fail(context, "bundle.findings.language_ranges", "does not match the registered language-ranges receipt artifact");
+  }
+  if (
+    languageRanges.run !== speechActivity.run ||
+    languageRanges.input.normalized_audio.path !== normalized.path ||
+    languageRanges.input.normalized_audio.content.id !== normalized.content.id ||
+    languageRanges.input.normalized_audio.content.bytes !== normalized.content.bytes ||
+    languageRanges.input.speech_activity.path !== speechReceipt.path ||
+    languageRanges.input.speech_activity.content.id !== speechReceipt.content.id ||
+    languageRanges.input.speech_activity.content.bytes !== speechReceipt.content.bytes
+  ) {
+    fail(context, "languageRanges.input", "does not match the indexed speech receipt and normalized audio");
+  }
+  const modelLineage = languageRanges.producer.model.files.slice(0, 5).map((file) => file.content.id);
+  if (modelLineage.length !== 5) {
+    fail(context, "languageRanges.producer.model.files", "must provide the five executable model lineage inputs");
   }
   exactSources(
-    speechReceipt,
-    [binding.raw.contentId, normalized.content.id, speechActivity.producer.model.content.id],
+    languageReceipt,
+    [binding.raw.contentId, speechReceipt.content.id, normalized.content.id, ...modelLineage],
     context,
-    "bundle.findings.speech_activity.source_content_ids",
+    "bundle.findings.language_ranges.source_content_ids",
   );
-  for (const key of ["language_ranges", "acoustic_ranges", "speaker_overlap", "complexity"] as const) {
+  for (const key of ["acoustic_ranges", "speaker_overlap", "complexity"] as const) {
     if (findings[key] !== null) fail(context, `bundle.findings.${key}`, "has no registered deterministic producer");
   }
 }
 
 /**
  * Validate an immutable preflight index against normalized source facts. V1 keeps its original
- * three-argument API. V2 additionally requires a separately loaded, fully validated speech receipt
- * as the fourth argument so the bundle can cross-bind its normalized audio and model lineage.
+ * three-argument API. V2 additionally requires a separately loaded, fully validated speech receipt.
+ * V3 also requires the validated language receipt so its speech input and model lineage can be
+ * cross-bound without reconstructing evidence from prose or filenames.
  */
 export function assertPreflightBundle(
   value: unknown,
   binding: PreflightSourceBinding,
   context?: string,
   speechActivity?: SpeechActivityReceipt | null,
+  languageRanges?: LanguageRangesReceipt | null,
 ): asserts value is PreflightBundle {
   const label = context ?? "Studio preflight bundle";
   const bundle = record(value, label, "bundle");
@@ -327,12 +432,17 @@ export function assertPreflightBundle(
   const schema = text(bundle.schema, label, "bundle.schema");
   text(bundle.note, label, "bundle.note");
   if (schema === "studio.preflight-bundle.v1") {
-    if (speechActivity) fail(label, "speechActivity", "requires studio.preflight-bundle.v2");
+    if (speechActivity || languageRanges) fail(label, "detectorReceipts", "require studio.preflight-bundle.v2 or v3");
     validateV1(bundle, binding, label);
     return;
   }
   if (schema === "studio.preflight-bundle.v2") {
+    if (languageRanges) fail(label, "languageRanges", "requires studio.preflight-bundle.v3");
     validateV2(bundle, binding, speechActivity, label);
+    return;
+  }
+  if (schema === "studio.preflight-bundle.v3") {
+    validateV3(bundle, binding, speechActivity, languageRanges, label);
     return;
   }
   fail(label, "bundle.schema", `has no registered preflight schema ${schema}`);

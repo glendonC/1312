@@ -1,9 +1,10 @@
 /**
  * Content-addressed preflight indexes, independent of a completed Studio run.
  *
- * V1 is an immutable source/probe-only contract. V2 adds one real speech-activity producer while
- * keeping language, acoustic, speaker/overlap, and complexity findings unavailable. Provider wire
- * fields remain in their source receipt; neither version permits them in the normalized bundle.
+ * V1 is an immutable source/probe-only contract. V2 adds one real speech-activity producer. V3 adds
+ * time-ranged language decisions over those receipted speech windows while keeping acoustic,
+ * speaker/overlap, and complexity findings unavailable. Provider wire fields remain in their source
+ * receipt; no bundle generation permits them in this normalized boundary.
  */
 
 export interface Sha256Content {
@@ -17,7 +18,8 @@ export type PreflightArtifactKindV2 =
   | PreflightArtifactKindV1
   | "detector_audio"
   | "speech_activity_receipt";
-export type PreflightArtifactKind = PreflightArtifactKindV2;
+export type PreflightArtifactKindV3 = PreflightArtifactKindV2 | "language_ranges_receipt";
+export type PreflightArtifactKind = PreflightArtifactKindV3;
 export type PreflightArtifactClassV1 = "raw" | "receipt";
 export type PreflightArtifactClassV2 = PreflightArtifactClassV1 | "derived";
 export type PreflightArtifactClass = PreflightArtifactClassV2;
@@ -44,7 +46,11 @@ export type PreflightArtifactV2 =
   | PreflightArtifactBase<"detector_audio", "derived">
   | PreflightArtifactBase<"speech_activity_receipt", "receipt">;
 
-export type PreflightArtifact = PreflightArtifactV2;
+export type PreflightArtifactV3 =
+  | PreflightArtifactV2
+  | PreflightArtifactBase<"language_ranges_receipt", "receipt">;
+
+export type PreflightArtifact = PreflightArtifactV3;
 
 export interface PreflightFindingsV1 {
   container_tracks: string;
@@ -64,7 +70,16 @@ export interface PreflightFindingsV2 {
   complexity: null;
 }
 
-export type PreflightFindings = PreflightFindingsV1 | PreflightFindingsV2;
+export interface PreflightFindingsV3 {
+  container_tracks: string;
+  speech_activity: string;
+  language_ranges: string;
+  acoustic_ranges: null;
+  speaker_overlap: null;
+  complexity: null;
+}
+
+export type PreflightFindings = PreflightFindingsV1 | PreflightFindingsV2 | PreflightFindingsV3;
 
 interface PreflightSourceReference {
   receipt_id: string;
@@ -92,7 +107,17 @@ export interface PreflightBundleV2 {
   note: string;
 }
 
-export type PreflightBundle = PreflightBundleV1 | PreflightBundleV2;
+export interface PreflightBundleV3 {
+  schema: "studio.preflight-bundle.v3";
+  producer: "scripts/seal-language-preflight.mjs";
+  preflight_id: string;
+  source: PreflightSourceReference;
+  artifacts: PreflightArtifactV3[];
+  findings: PreflightFindingsV3;
+  note: string;
+}
+
+export type PreflightBundle = PreflightBundleV1 | PreflightBundleV2 | PreflightBundleV3;
 
 export interface SpeechActivityReceipt {
   schema: "studio.speech-activity.v1";
@@ -149,6 +174,111 @@ export interface SpeechActivityReceipt {
   frames: Array<{ start_sample: number; end_sample: number; probability: number }>;
   speech_windows: Array<{ start_sample: number; end_sample: number }>;
   non_speech_windows: Array<{ start_sample: number; end_sample: number }>;
+  note: string;
+}
+
+export type LanguageModelFileRole =
+  | "encoder"
+  | "decoder"
+  | "model_config"
+  | "generation_config"
+  | "preprocessor_config"
+  | "license_evidence"
+  | "upstream_license";
+
+export interface LanguageCodeToken {
+  code: string;
+  token_id: number;
+}
+
+export interface LanguageRangeScore extends LanguageCodeToken {
+  logit: number;
+  probability: number;
+}
+
+export interface LanguageRangeDecision {
+  status: "classified" | "unknown" | "withheld";
+  code: string | null;
+  token_id: number | null;
+  probability: number | null;
+  margin: number | null;
+  reason:
+    | null
+    | "insufficient_samples"
+    | "below_probability"
+    | "below_margin"
+    | "below_probability_and_margin";
+}
+
+export interface LanguageRange {
+  speech_window_index: number;
+  chunk_index: number;
+  start_sample: number;
+  end_sample: number;
+  scores: LanguageRangeScore[];
+  decision: LanguageRangeDecision;
+}
+
+export interface LanguageRangesReceipt {
+  schema: "studio.language-ranges.v1";
+  producer: {
+    id: "whisper-language-id";
+    version: "1.0.0";
+    implementation: "scripts/detect-language.mjs";
+    model: {
+      id: "Xenova/whisper-tiny";
+      revision: "5332fcc35e32a33b86612b9a57a89be7906102b1";
+      base_model: "openai/whisper-tiny";
+      quantization: "q8";
+      license: "Apache-2.0";
+      upstream_license: "MIT";
+      files: Array<{
+        role: LanguageModelFileRole;
+        path: string;
+        content: Sha256Content;
+      }>;
+    };
+    runtime: {
+      id: "@huggingface/transformers";
+      version: "4.2.0";
+      revision: "54652ba3366ccd1e3b64e689a96504309e6fb53b";
+      license: "Apache-2.0";
+      package: {
+        manifest: { path: string; content: Sha256Content };
+        entry: { path: string; content: Sha256Content };
+        license: { path: string; content: Sha256Content };
+      };
+      engine: {
+        id: "onnxruntime-node";
+        version: "1.24.3";
+        execution_provider: "cpu";
+        execution_mode: "sequential";
+        graph_optimization_level: "all";
+        intra_op_threads: 1;
+        inter_op_threads: 1;
+        binary: { path: string; content: Sha256Content };
+      };
+      platform: { os: string; arch: string; node: string };
+    };
+  };
+  run: string;
+  input: {
+    speech_activity: { path: "speech-activity.json"; content: Sha256Content };
+    normalized_audio: { path: "speech-input.pcm"; content: Sha256Content };
+    sample_rate_hz: 16000;
+    sample_count: number;
+  };
+  configuration: {
+    max_chunk_samples: 480000;
+    min_chunk_samples: 16000;
+    min_probability: 0.5;
+    min_margin: 0.15;
+    rounding_digits: 8;
+    tie_break: "lowest_token_id";
+    window_source: "speech_windows";
+  };
+  languages: LanguageCodeToken[];
+  ranges: LanguageRange[];
   note: string;
 }
 

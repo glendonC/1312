@@ -1,6 +1,8 @@
 import type {
+  LanguageRangesReceipt,
   PreflightBundleV1,
   PreflightBundleV2,
+  PreflightBundleV3,
   PreflightSourceBinding,
   SpeechActivityReceipt,
 } from "./contracts";
@@ -8,6 +10,10 @@ import {
   SPEECH_BINDING_POLICY_FIXTURE,
   SPEECH_RECEIPT_POLICY_FIXTURE,
 } from "./checkSpeechReceiptPolicies";
+import {
+  LANGUAGE_RECEIPT_POLICY_FIXTURE,
+  LANGUAGE_SPEECH_POLICY_FIXTURE,
+} from "./checkLanguageReceiptPolicies";
 import { assertPreflightBundle } from "./preflightBundleValidation";
 
 const RAW_DIGEST = "a".repeat(64);
@@ -15,6 +21,9 @@ const SOURCE_DIGEST = "b".repeat(64);
 const PROBE_DIGEST = "c".repeat(64);
 const NORMALIZED_DIGEST = "d".repeat(64);
 const SPEECH_DIGEST = "e".repeat(64);
+const V3_NORMALIZED_DIGEST = "6".repeat(64);
+const V3_SPEECH_DIGEST = "7".repeat(64);
+const LANGUAGE_DIGEST = "8".repeat(64);
 const RAW_ID = `sha256:${RAW_DIGEST}`;
 
 const BINDING: PreflightSourceBinding = {
@@ -157,8 +166,109 @@ const BUNDLE_V2: PreflightBundleV2 = {
   note: "Exact content-bound speech preflight fixture; unsupported findings remain withheld.",
 };
 
+const SPEECH_RECEIPT_V3: SpeechActivityReceipt = {
+  ...structuredClone(LANGUAGE_SPEECH_POLICY_FIXTURE),
+  input: {
+    ...structuredClone(LANGUAGE_SPEECH_POLICY_FIXTURE.input),
+    content_id: RAW_ID,
+    bytes: BINDING.raw.bytes,
+    media: BINDING.raw.path,
+  },
+  normalization: {
+    ...structuredClone(LANGUAGE_SPEECH_POLICY_FIXTURE.normalization),
+    artifact: {
+      path: "speech-input.pcm",
+      content: {
+        id: `sha256:${V3_NORMALIZED_DIGEST}`,
+        hash: { algorithm: "sha256", digest: V3_NORMALIZED_DIGEST },
+        bytes: 40_000,
+      },
+    },
+  },
+};
+
+const LANGUAGE_RECEIPT: LanguageRangesReceipt = {
+  ...structuredClone(LANGUAGE_RECEIPT_POLICY_FIXTURE),
+  run: SPEECH_RECEIPT_V3.run,
+  input: {
+    ...structuredClone(LANGUAGE_RECEIPT_POLICY_FIXTURE.input),
+    speech_activity: {
+      path: "speech-activity.json",
+      content: {
+        id: `sha256:${V3_SPEECH_DIGEST}`,
+        hash: { algorithm: "sha256", digest: V3_SPEECH_DIGEST },
+        bytes: 8192,
+      },
+    },
+    normalized_audio: {
+      path: "speech-input.pcm",
+      content: structuredClone(SPEECH_RECEIPT_V3.normalization.artifact.content),
+    },
+  },
+};
+
+const BUNDLE_V3: PreflightBundleV3 = {
+  schema: "studio.preflight-bundle.v3",
+  producer: "scripts/seal-language-preflight.mjs",
+  preflight_id: `preflight:${RAW_ID}:speech-v1:language-v1`,
+  source: structuredClone(BUNDLE_V1.source),
+  artifacts: [
+    ...structuredClone(BUNDLE_V1.artifacts),
+    {
+      artifact_id: "speech-detector-audio",
+      kind: "detector_audio",
+      class: "derived",
+      path: "speech-input.pcm",
+      content: structuredClone(SPEECH_RECEIPT_V3.normalization.artifact.content),
+      producer: SPEECH_RECEIPT_V3.producer.implementation,
+      source_content_ids: [RAW_ID],
+    },
+    {
+      artifact_id: "speech-activity",
+      kind: "speech_activity_receipt",
+      class: "receipt",
+      path: "speech-activity.json",
+      content: structuredClone(LANGUAGE_RECEIPT.input.speech_activity.content),
+      producer: SPEECH_RECEIPT_V3.producer.implementation,
+      source_content_ids: [
+        RAW_ID,
+        `sha256:${V3_NORMALIZED_DIGEST}`,
+        SPEECH_RECEIPT_V3.producer.model.content.id,
+      ],
+    },
+    {
+      artifact_id: "language-ranges",
+      kind: "language_ranges_receipt",
+      class: "receipt",
+      path: "language-ranges.json",
+      content: {
+        id: `sha256:${LANGUAGE_DIGEST}`,
+        hash: { algorithm: "sha256", digest: LANGUAGE_DIGEST },
+        bytes: 65_536,
+      },
+      producer: LANGUAGE_RECEIPT.producer.implementation,
+      source_content_ids: [
+        RAW_ID,
+        `sha256:${V3_SPEECH_DIGEST}`,
+        `sha256:${V3_NORMALIZED_DIGEST}`,
+        ...LANGUAGE_RECEIPT.producer.model.files.slice(0, 5).map((file) => file.content.id),
+      ],
+    },
+  ],
+  findings: {
+    container_tracks: "container-probe",
+    speech_activity: "speech-activity",
+    language_ranges: "language-ranges",
+    acoustic_ranges: null,
+    speaker_overlap: null,
+    complexity: null,
+  },
+  note: "Exact language preflight fixture; unsupported detector findings remain unavailable.",
+};
+
 type MutableV1 = PreflightBundleV1 & { findings: PreflightBundleV1["findings"] & Record<string, unknown> };
 type MutableV2 = PreflightBundleV2 & { findings: PreflightBundleV2["findings"] & Record<string, unknown> };
+type MutableV3 = PreflightBundleV3 & { findings: PreflightBundleV3["findings"] & Record<string, unknown> };
 
 function expectFailure(label: string, expected: string, operation: () => void): void {
   let message: string | null = null;
@@ -172,10 +282,17 @@ function expectFailure(label: string, expected: string, operation: () => void): 
   }
 }
 
-/** Prove V1 remains immutable and V2 rejects unreceipted speech evidence or broken lineage. */
+/** Prove every bundle generation rejects unreceipted evidence and broken ordered lineage. */
 export function checkPreflightBundlePolicies(): void {
   assertPreflightBundle(BUNDLE_V1, BINDING, "Preflight bundle v1 reference");
   assertPreflightBundle(BUNDLE_V2, BINDING, "Preflight bundle v2 reference", SPEECH_RECEIPT);
+  assertPreflightBundle(
+    BUNDLE_V3,
+    BINDING,
+    "Preflight bundle v3 reference",
+    SPEECH_RECEIPT_V3,
+    LANGUAGE_RECEIPT,
+  );
 
   const v1Cases: Array<{
     label: string;
@@ -363,6 +480,101 @@ export function checkPreflightBundlePolicies(): void {
     test.mutate(bundle, receipt);
     expectFailure(test.label, test.expected, () =>
       assertPreflightBundle(bundle, BINDING, `Preflight bundle ${test.label}`, receipt),
+    );
+  }
+
+  expectFailure("v1 detector pairing", "detectorReceipts require studio.preflight-bundle.v2 or v3", () =>
+    assertPreflightBundle(BUNDLE_V1, BINDING, "Preflight bundle v1 language receipt", undefined, LANGUAGE_RECEIPT),
+  );
+  expectFailure("v2 language pairing", "languageRanges requires studio.preflight-bundle.v3", () =>
+    assertPreflightBundle(BUNDLE_V2, BINDING, "Preflight bundle v2 language receipt", SPEECH_RECEIPT, LANGUAGE_RECEIPT),
+  );
+  expectFailure("v3 missing speech receipt", "speechActivity is required", () =>
+    assertPreflightBundle(BUNDLE_V3, BINDING, "Preflight bundle v3 missing speech", undefined, LANGUAGE_RECEIPT),
+  );
+  expectFailure("v3 missing language receipt", "languageRanges is required", () =>
+    assertPreflightBundle(BUNDLE_V3, BINDING, "Preflight bundle v3 missing language", SPEECH_RECEIPT_V3),
+  );
+
+  const v3Cases: Array<{
+    label: string;
+    expected: string;
+    mutate: (bundle: MutableV3, speech: SpeechActivityReceipt, language: LanguageRangesReceipt) => void;
+  }> = [
+    {
+      label: "v3 wrong producer",
+      expected: "bundle.producer must equal scripts/seal-language-preflight.mjs",
+      mutate: (bundle) => { bundle.producer = "scripts/seal-speech-preflight.mjs" as "scripts/seal-language-preflight.mjs"; },
+    },
+    {
+      label: "v3 unstable identity",
+      expected: "bundle.preflight_id must equal",
+      mutate: (bundle) => { bundle.preflight_id = `preflight:${RAW_ID}:language-v1`; },
+    },
+    {
+      label: "v3 missing artifact",
+      expected: "must contain the exact raw, source, media-probe, detector-audio, speech-activity, and language-ranges artifacts",
+      mutate: (bundle) => { bundle.artifacts.pop(); },
+    },
+    {
+      label: "v3 language kind",
+      expected: "bundle.findings.language_ranges must reference a language_ranges_receipt artifact",
+      mutate: (bundle) => { bundle.artifacts[5].kind = "speech_activity_receipt"; },
+    },
+    {
+      label: "v3 artifact order",
+      expected: "must use the exact ordered v3 artifact ids",
+      mutate: (bundle) => { [bundle.artifacts[4], bundle.artifacts[5]] = [bundle.artifacts[5], bundle.artifacts[4]]; },
+    },
+    {
+      label: "v3 language producer",
+      expected: "does not match the registered language-ranges receipt artifact",
+      mutate: (bundle) => { bundle.artifacts[5].producer = "whisper-language-id"; },
+    },
+    {
+      label: "v3 language finding",
+      expected: "bundle.findings.language_ranges must equal language-ranges",
+      mutate: (bundle) => { bundle.findings.language_ranges = "speech-activity"; },
+    },
+    {
+      label: "v3 speech receipt hash binding",
+      expected: "languageRanges.input does not match the indexed speech receipt and normalized audio",
+      mutate: (_bundle, _speech, language) => { language.input.speech_activity.content.bytes += 1; },
+    },
+    {
+      label: "v3 normalized audio binding",
+      expected: "languageRanges.input does not match the indexed speech receipt and normalized audio",
+      mutate: (_bundle, _speech, language) => { language.input.normalized_audio.content.bytes += 2; },
+    },
+    {
+      label: "v3 receipt lineage order",
+      expected: "bundle.findings.language_ranges.source_content_ids must contain exactly",
+      mutate: (bundle) => { bundle.artifacts[5].source_content_ids.reverse(); },
+    },
+    {
+      label: "v3 receipt model lineage",
+      expected: "bundle.findings.language_ranges.source_content_ids must contain exactly",
+      mutate: (bundle) => { bundle.artifacts[5].source_content_ids[3] = `sha256:${"9".repeat(64)}`; },
+    },
+    {
+      label: "v3 unsupported acoustic finding",
+      expected: "bundle.findings.acoustic_ranges has no registered deterministic producer",
+      mutate: (bundle) => { (bundle.findings as Record<string, unknown>).acoustic_ranges = "invented"; },
+    },
+    {
+      label: "v3 receipt identity",
+      expected: "languageRanges.producer is not the registered language-ranges receipt",
+      mutate: (_bundle, _speech, language) => { language.producer.version = "latest" as "1.0.0"; },
+    },
+  ];
+
+  for (const test of v3Cases) {
+    const bundle = structuredClone(BUNDLE_V3) as MutableV3;
+    const speech = structuredClone(SPEECH_RECEIPT_V3);
+    const language = structuredClone(LANGUAGE_RECEIPT);
+    test.mutate(bundle, speech, language);
+    expectFailure(test.label, test.expected, () =>
+      assertPreflightBundle(bundle, BINDING, `Preflight bundle ${test.label}`, speech, language),
     );
   }
 

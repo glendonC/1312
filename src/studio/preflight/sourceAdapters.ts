@@ -1,5 +1,6 @@
 import type { RunBundle } from "../transport";
 import type { MediaProbeTrack, OwnedLocalIngestReceipt, YouTubeIngestReceipt } from "../types";
+import type { PreflightSourceBinding } from "./contracts";
 
 /** Provider-neutral facts consumed by preflight. Provider wire fields stop at this adapter. */
 export interface RecordedSourceFacts {
@@ -149,6 +150,35 @@ export function normalizeIngestReceipt(bundle: RunBundle): RecordedSourceFacts |
   if (receipt.kind === "youtube") return youtubeReceiptAdapter.normalize(receipt, bundle);
   if (receipt.kind === "owned_local") return ownedLocalReceiptAdapter.normalize(receipt, bundle);
   return null;
+}
+
+/**
+ * Bind a content-addressed source receipt to the provider-neutral standalone preflight index.
+ * Providers without stable raw identity are deliberately ineligible until their own adapter can
+ * supply equivalent facts; the index never reaches into provider wire fields itself.
+ */
+export function preflightSourceBinding(
+  receipt: OwnedLocalIngestReceipt | YouTubeIngestReceipt | null,
+): PreflightSourceBinding | null {
+  if (!receipt || receipt.kind !== "owned_local") return null;
+  const probe = receipt.derived_artifacts.find((artifact) => artifact.kind === "media_probe");
+  if (!probe) return null;
+  return {
+    receiptId: receipt.receipt_id,
+    receiptProducer: receipt.producer,
+    receiptPath: "source.json",
+    raw: {
+      path: receipt.raw_media.path,
+      contentId: receipt.content.id,
+      bytes: receipt.content.bytes,
+      producer: receipt.producer,
+    },
+    mediaProbe: {
+      path: probe.path,
+      contentId: probe.content_hash,
+      producer: probe.producer,
+    },
+  };
 }
 
 function formatTime(value: number): string {

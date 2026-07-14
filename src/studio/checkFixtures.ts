@@ -25,10 +25,14 @@ import { RUNTIME_CONTRACT_FIXTURES } from "./lab/runtimeFixtures";
 import { SCENARIOS, validateScenarioEvidence } from "./lab/scenarios";
 import { projectRun } from "./replayProjection";
 import { assessRecordedRequest, recordedPreflight } from "./preflight/model";
-import { classifySourceUrl } from "./preflight/sourceAdapters";
+import { classifySourceUrl, preflightSourceBinding } from "./preflight/sourceAdapters";
 import { checkSourceReceiptPolicies } from "./preflight/checkReceiptPolicies";
+import { checkPreflightBundlePolicies } from "./preflight/checkPreflightBundlePolicies";
+import type { PreflightBundle } from "./preflight/contracts";
+import { assertPreflightBundle } from "./preflight/preflightBundleValidation";
 import { checkRuntimeContractPolicies } from "./runtime/checkContractPolicies";
 import { validateRuntimeContractFixture } from "./runtime/validateContractFixture";
+import { checkTracePolicies } from "./checkTracePolicies";
 
 const RUNS = pathToFileURL(`${resolve(process.cwd(), "public/demo/runs")}/`);
 const PACKS = pathToFileURL(`${resolve(process.cwd(), "public/demo/packs")}/`);
@@ -75,7 +79,7 @@ export async function checkRecordedRuns(): Promise<void> {
   const bundles = new Map<string, RunBundle>();
   for (const entry of entries) {
     const base = new URL(`${entry.name}/`, RUNS);
-    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe] = await Promise.all([
+    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe, preflightBundle] = await Promise.all([
       json<RunManifest>(new URL("run.json", base)),
       json<CaptionsFile>(new URL("captions.json", base)),
       json<ScoreFile>(new URL("score.json", base)),
@@ -85,6 +89,7 @@ export async function checkRecordedRuns(): Promise<void> {
       json<CorrectionsFile>(new URL("corrections.json", base)),
       optionalJson<IngestReceipt>(new URL("source.json", base)),
       optionalJson<MediaProbeReceipt>(new URL("media-probe.json", base)),
+      optionalJson<PreflightBundle>(new URL("preflight.json", base)),
     ]);
     const pack = await json<LanguagePack>(new URL(`${run.pack}.json`, PACKS));
     if (traceFile.run !== run.id || traceFile.clip !== run.clip.id) {
@@ -129,6 +134,21 @@ export async function checkRecordedRuns(): Promise<void> {
         throw new Error(`Recorded Studio fixture ${entry.name}: derived media probe receipt does not match its artifact bytes`);
       }
     }
+    if (preflightBundle) {
+      const binding = preflightSourceBinding(ingestReceipt);
+      if (!binding) {
+        throw new Error(`Recorded Studio fixture ${entry.name}: preflight index has no content-addressed source adapter`);
+      }
+      assertPreflightBundle(preflightBundle, binding, `Recorded Studio fixture ${entry.name} preflight index`);
+      for (const artifact of preflightBundle.artifacts) {
+        const actual = await contentIdentity(new URL(artifact.path, base));
+        if (artifact.content.id !== actual.contentId || artifact.content.bytes !== actual.bytes) {
+          throw new Error(
+            `Recorded Studio fixture ${entry.name}: preflight artifact ${artifact.artifact_id} does not match its indexed bytes`,
+          );
+        }
+      }
+    }
 
     for (let cursor = 0; cursor <= bundle.traces.length; cursor += 1) {
       const projected = projectRun(bundle, cursor);
@@ -152,6 +172,8 @@ export async function checkRecordedRuns(): Promise<void> {
   }
   for (const scenario of PREFLIGHT_SCENARIOS) validatePreflightScenario(scenario);
   checkSourceReceiptPolicies();
+  checkPreflightBundlePolicies();
+  checkTracePolicies();
   for (const fixture of RUNTIME_CONTRACT_FIXTURES) validateRuntimeContractFixture(fixture);
   checkRuntimeContractPolicies(RUNTIME_CONTRACT_FIXTURES[0]);
 

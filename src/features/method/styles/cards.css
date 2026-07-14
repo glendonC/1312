@@ -101,6 +101,11 @@
   background: currentColor;
 }
 
+.card-state > span:last-child {
+  transform-origin: center;
+  transition: transform 200ms ease;
+}
+
 .card-panel {
   display: grid;
   min-height: 0;

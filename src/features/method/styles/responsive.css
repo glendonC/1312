@@ -57,10 +57,6 @@
     padding-bottom: 0;
   }
 
-  .process-eyebrow {
-    margin-bottom: 22px;
-  }
-
   .process-layout {
     gap: 42px;
   }
@@ -113,7 +109,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .process-card {
+  .process-card,
+  .card-state > span:last-child {
     transition: none;
   }
 }

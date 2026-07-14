@@ -11,6 +11,22 @@ import "../features/method/styles/index.css";
 >
   <GlassNav />
   <main class="method-page">
-    <MethodProcess client:load />
+    <MethodProcess />
   </main>
 </SiteLayout>
+
+<script>
+  import { enhanceMethodProcess } from "../features/method/enhanceMethodProcess";
+
+  let teardownMethodProcess = () => {};
+
+  const setupMethodProcess = () => {
+    teardownMethodProcess();
+
+    const root = document.querySelector<HTMLElement>("[data-method-process]");
+    teardownMethodProcess = root ? enhanceMethodProcess(root) : () => {};
+  };
+
+  document.addEventListener("astro:page-load", setupMethodProcess);
+  setupMethodProcess();
+</script>

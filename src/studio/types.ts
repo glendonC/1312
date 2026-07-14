@@ -96,12 +96,11 @@ export interface ClipSource {
   label: string;
   note: string;
   /**
-   * Where the clip came from, and what lets us republish it.
+   * Provider-facing credit for sources licensed for redistribution.
    *
-   * These are not metadata. A Creative Commons licence is the only reason this demo may host
-   * somebody else's video, and it is granted on the condition that the work is credited — so
-   * the credit is a term of the licence, not a courtesy, and the UI prints it wherever the clip
-   * plays. A run whose media has no `licence` here has no business being shipped.
+   * These are not generic rights metadata. A Creative Commons provider source must carry and
+   * display its licence and credit here. Owned media instead carries a closed ownership and scope
+   * receipt in source.json; it must not pretend an attestation is a provider licence.
    */
   url?: string;
   licence?: string;
@@ -125,17 +124,71 @@ export interface YouTubeIngestReceipt {
   note: string;
 }
 
+export interface Sha256Hash {
+  algorithm: "sha256";
+  digest: string;
+}
+
+export interface OwnedLocalDerivedArtifactReceipt {
+  kind: "media_probe";
+  path: "media-probe.json";
+  schema: "studio.media-probe.v1";
+  producer: "scripts/probe-media.mjs";
+  source_content_ids: string[];
+  content_hash: string;
+}
+
+/**
+ * Receipt written only after an operator explicitly attests the rights to a local file.
+ * The original filename is provenance, never a producer of title, ownership, identity,
+ * language, or acoustic facts.
+ */
+export interface OwnedLocalIngestReceipt {
+  schema: "studio.ingest.owned-local.v1";
+  kind: "owned_local";
+  producer: "scripts/ingest-owned-media.mjs";
+  receipt_id: string;
+  label: string;
+  origin: {
+    kind: "local_file";
+    filename: string;
+    path_disclosure: "basename_only";
+  };
+  content: {
+    id: string;
+    hash: Sha256Hash;
+    bytes: number;
+  };
+  rights: {
+    basis: "ownership_attestation";
+    asserted_by: string;
+    asserted_at: string;
+    scope: "local_processing" | "redistribution";
+    statement: string;
+  };
+  selection: { start: number; end: number; duration: number };
+  raw_media: {
+    path: string;
+    content_id: string;
+    bytes: number;
+    preservation: "byte_identical_copy" | "adopted_existing_bytes";
+  };
+  derived_artifacts: OwnedLocalDerivedArtifactReceipt[];
+  note: string;
+}
+
 /**
  * Closed over producers that actually exist. Add another receipt variant only with the
  * corresponding ingest producer and runtime assertion; do not make provider fields optional.
  */
-export type IngestReceipt = YouTubeIngestReceipt;
+export type IngestReceipt = YouTubeIngestReceipt | OwnedLocalIngestReceipt;
 
 /** Exact local media facts written by scripts/probe-media.mjs from ffprobe output. */
 export interface MediaProbeTrack {
   index: number;
   type: string;
   codec: string;
+  duration?: number;
   width?: number;
   height?: number;
   sample_rate?: number;
@@ -147,8 +200,15 @@ export interface MediaProbeReceipt {
   producer: "scripts/probe-media.mjs";
   run: string;
   media: string;
+  input: {
+    content_id: string;
+    hash: Sha256Hash;
+    bytes: number;
+  };
   duration: number;
   container: string[];
+  container_long_name: string;
+  bit_rate: number | null;
   tracks: MediaProbeTrack[];
 }
 

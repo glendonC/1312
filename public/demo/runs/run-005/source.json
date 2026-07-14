@@ -1,0 +1,51 @@
+{
+  "schema": "studio.ingest.owned-local.v1",
+  "kind": "owned_local",
+  "producer": "scripts/ingest-owned-media.mjs",
+  "receipt_id": "owned-local:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+  "label": "Project-generated Korean conversation fixture",
+  "origin": {
+    "kind": "local_file",
+    "filename": "clip.m4a",
+    "path_disclosure": "basename_only"
+  },
+  "content": {
+    "id": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+    "hash": {
+      "algorithm": "sha256",
+      "digest": "e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e"
+    },
+    "bytes": 329662
+  },
+  "rights": {
+    "basis": "ownership_attestation",
+    "asserted_by": "1321 project",
+    "asserted_at": "2026-07-14T02:45:01.713Z",
+    "scope": "redistribution",
+    "statement": "1321 project attests that it owns or controls the media rights and authorizes local processing and redistribution of this copy."
+  },
+  "selection": {
+    "start": 0,
+    "end": 47.2,
+    "duration": 47.2
+  },
+  "raw_media": {
+    "path": "clip.m4a",
+    "content_id": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+    "bytes": 329662,
+    "preservation": "adopted_existing_bytes"
+  },
+  "derived_artifacts": [
+    {
+      "kind": "media_probe",
+      "path": "media-probe.json",
+      "schema": "studio.media-probe.v1",
+      "producer": "scripts/probe-media.mjs",
+      "source_content_ids": [
+        "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e"
+      ],
+      "content_hash": "sha256:def1dcaeeabe4dbc24247279638d1ce666fdc397de3dfa557a924dd12cb8b0c2"
+    }
+  ],
+  "note": "Ownership and processing scope are explicit user attestations. The filename is retained only as raw provenance; it supplied no language, music, identity, overlap, ownership, or title fact."
+}

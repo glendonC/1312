@@ -38,8 +38,8 @@
       ]
     ],
     "source": {
-      "kind": "synthetic",
-      "label": "synthetic dev clip",
+      "kind": "owned_local",
+      "label": "project-generated synthetic fixture",
       "note": "Scripted and voiced with TTS. Fictional cast, no real people. Built to contain 8 known ko->en failure modes so the answers are known in advance. It is a test fixture, not a benchmark clip: Hard-KO Clip Pack v1 is separate and its gold is not frozen."
     },
     "media": "clip.m4a"

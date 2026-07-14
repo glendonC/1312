@@ -136,10 +136,15 @@ export default function ConfirmationForm({
       <details className="preflight-coverage">
         <summary>Producer coverage</summary>
         <p>
-          Licence, source window, and duration: <code>{facts.producer}</code>.
+          Rights, raw source window, and duration: <code>{facts.producer}</code>.
           {facts.mediaProbe && (
             <>
               {" "}Tracks and codecs: <code>{facts.mediaProbe.producer}</code>.
+            </>
+          )}
+          {facts.content && (
+            <>
+              {" "}Raw content identity and {facts.content.derivedArtifacts} derived receipt: <code>SHA-256</code>.
             </>
           )}
         </p>

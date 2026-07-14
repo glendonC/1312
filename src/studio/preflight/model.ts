@@ -192,8 +192,11 @@ export function recordedPreflight(bundle: RunBundle): PreflightSession {
     missing: PRODUCER_GAPS.filter((gap) => gap.id !== "container" || facts.mediaProbe === null),
     provenance: {
       kind: "recorded_ingest",
-      producer: "scripts/ingest-clip.mjs",
-      note: "Licence, selected duration, source window, media, and waveform were produced during ingest.",
+      producer: facts.producer,
+      note:
+        facts.rights.basis === "ownership_attestation"
+          ? "Ownership scope, stable raw content identity, full-file selection, and derived probe lineage were recorded during local ingest."
+          : "Redistribution licence, selected duration, source window, media, and waveform were produced during ingest.",
     },
     relevance: { backgroundSpeech: false, music: false, speakerFocus: false },
   };

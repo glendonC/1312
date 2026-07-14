@@ -16,7 +16,7 @@ Last updated: 2026-07-13
 | Marketing + Studio UI | **Astro static** + light CSS (this repo) | Fast, matches Sori site pattern |
 | Studio interactivity | Progressive: Astro islands / small client JS → later React island if needed | Don’t boil the ocean day one |
 | Agent runtime | **Codex app / `codex exec`** + orchestrator scripts (Yolodex-like skills) | Contest-native; parallel worktrees/workspaces |
-| Media ingest | Provider adapter → rights receipt → workspace media | YouTube receipt exists; owned upload/local adapters remain unimplemented |
+| Media ingest | Source adapter → rights receipt → content-addressed workspace media | YouTube and owned/local producers exist; hosted upload remains unimplemented |
 | ASR (v1) | Whisper-family or cloud ASR behind a seam | Swappable; not the brand |
 | Translation / repair | GPT-5.6 specialists + QC gates | Model does language work; code enforces honesty |
 | Persistence | Local workspace folders + **JSON/SQLite** | Accountless compounding on one machine |
@@ -57,11 +57,18 @@ provider input
   -> normalized preflight facts
 ```
 
-Today, `scripts/ingest-clip.mjs` is the only producer and `YouTubeIngestReceipt` is therefore the
-only receipt variant. Its `channel` and `video_id` fields stop at the YouTube adapter. A future owned
-upload must bring its own producer, ownership or licence evidence, stable content identifier, and
-runtime assertion before a receipt variant or adapter is added. Optional provider fields are not a
-substitute for that contract.
+`scripts/ingest-clip.mjs` produces the YouTube receipt. Its `channel` and `video_id` fields stop at
+the YouTube adapter. `scripts/ingest-owned-media.mjs` is the owned/local producer. It requires an
+explicit operator label, rights holder, processing scope, and attestation; identifies the exact raw
+bytes with SHA-256; defaults to the ignored `.studio/runs/` workspace; and refuses a public
+destination unless redistribution was explicitly authorized. The original basename is retained as
+provenance only. It cannot supply a title, owner, creator, identity, language, or acoustic claim.
+
+The owned/local receipt records the byte-identical raw artifact and a hash of each derived receipt.
+The media probe in turn records the raw content id and byte count it actually inspected. Runtime
+loading checks the closed receipt shapes and cross-receipt identities; the production build hashes
+the artifacts on disk and rejects a mismatch. Provider-specific fields are not optionalized into a
+shared bag, and scripts that consume `source.json` normalize it through a source adapter first.
 
 Language detection, acoustic classification, overlap estimation, and range recommendation are
 separate producers. A source adapter cannot infer any of those facts from a provider or filename.
@@ -69,7 +76,8 @@ separate producers. A source adapter cannot infer any of those facts from a prov
 | Preflight fact | Current producer | Receipt / status |
 |---|---|---|
 | Source URL, creator, redistribution licence, selected range | `scripts/ingest-clip.mjs` | `YouTubeIngestReceipt` in `source.json` |
-| Container, codecs, sample rate, channels, dimensions | `scripts/probe-media.mjs` using `ffprobe` | `studio.media-probe.v1` in `media-probe.json` |
+| Owned local bytes, SHA-256 identity, explicit rights scope, full-file selection, raw/derived lineage | `scripts/ingest-owned-media.mjs` | `OwnedLocalIngestReceipt` in `source.json` |
+| Container, codecs, track durations, sample rate, channels, dimensions | `scripts/probe-media.mjs` using `ffprobe` | content-bound `studio.media-probe.v1` in `media-probe.json` |
 | Time-ranged language distribution | None | Withheld |
 | Music, speech, noise, speakers, and overlap | None | Withheld |
 | Suggested range and processing class | None | Withheld |
@@ -157,8 +165,9 @@ This row shape is future fine-tune data.
 
 - User-armed ingest; no silent always-on capture in v1.
 - Fail closed / withhold when confidence is junk.
-- Only registered source adapters may ingest. Owned files remain local and unsupported until an
-  upload/local adapter records rights evidence and provenance.
+- Only registered source adapters may ingest. Owned files default to the ignored local workspace;
+  moving one under `public/` requires both an explicit public flag and redistribution scope.
+- Filenames and UI state are not evidence of language, music, identity, overlap, or ownership.
 - Don’t log secrets into traces.
 
 ## Implementation order

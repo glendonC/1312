@@ -1,4 +1,6 @@
-import { access, readdir, readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { access, readdir, readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
@@ -24,6 +26,7 @@ import { SCENARIOS, validateScenarioEvidence } from "./lab/scenarios";
 import { projectRun } from "./replayProjection";
 import { assessRecordedRequest, recordedPreflight } from "./preflight/model";
 import { classifySourceUrl } from "./preflight/sourceAdapters";
+import { checkSourceReceiptPolicies } from "./preflight/checkReceiptPolicies";
 import { checkRuntimeContractPolicies } from "./runtime/checkContractPolicies";
 import { validateRuntimeContractFixture } from "./runtime/validateContractFixture";
 
@@ -45,6 +48,20 @@ async function optionalJson<T>(url: URL): Promise<T | null> {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw new Error(`Studio fixture ${fileURLToPath(url)} could not be read`, { cause: error });
   }
+}
+
+async function contentIdentity(url: URL): Promise<{ contentId: string; bytes: number }> {
+  const [digest, details] = await Promise.all([
+    new Promise<string>((resolveDigest, reject) => {
+      const hash = createHash("sha256");
+      const input = createReadStream(url);
+      input.on("error", reject);
+      input.on("data", (chunk) => hash.update(chunk));
+      input.on("end", () => resolveDigest(hash.digest("hex")));
+    }),
+    stat(url),
+  ]);
+  return { contentId: `sha256:${digest}`, bytes: details.size };
 }
 
 /** Executed from the Studio route during Astro's production build. */
@@ -92,6 +109,27 @@ export async function checkRecordedRuns(): Promise<void> {
     assertRunBundle(bundle, `Recorded Studio fixture ${entry.name}`);
     bundles.set(run.id, bundle);
 
+    if (mediaProbe && run.clip.media) {
+      const actual = await contentIdentity(new URL(run.clip.media, base));
+      if (mediaProbe.input.content_id !== actual.contentId || mediaProbe.input.bytes !== actual.bytes) {
+        throw new Error(`Recorded Studio fixture ${entry.name}: media probe input identity does not match the raw media bytes`);
+      }
+    }
+    if (ingestReceipt?.kind === "owned_local") {
+      if (ingestReceipt.rights.scope !== "redistribution") {
+        throw new Error(`Recorded Studio fixture ${entry.name}: public owned media lacks redistribution scope`);
+      }
+      const raw = await contentIdentity(new URL(ingestReceipt.raw_media.path, base));
+      if (ingestReceipt.content.id !== raw.contentId || ingestReceipt.content.bytes !== raw.bytes) {
+        throw new Error(`Recorded Studio fixture ${entry.name}: owned local receipt does not match the raw media bytes`);
+      }
+      const probeArtifact = ingestReceipt.derived_artifacts[0];
+      const derived = await contentIdentity(new URL(probeArtifact.path, base));
+      if (probeArtifact.content_hash !== derived.contentId) {
+        throw new Error(`Recorded Studio fixture ${entry.name}: derived media probe receipt does not match its artifact bytes`);
+      }
+    }
+
     for (let cursor = 0; cursor <= bundle.traces.length; cursor += 1) {
       const projected = projectRun(bundle, cursor);
       if (projected.cursor !== cursor) {
@@ -113,6 +151,7 @@ export async function checkRecordedRuns(): Promise<void> {
     validateScenarioEvidence(bundle, scenario);
   }
   for (const scenario of PREFLIGHT_SCENARIOS) validatePreflightScenario(scenario);
+  checkSourceReceiptPolicies();
   for (const fixture of RUNTIME_CONTRACT_FIXTURES) validateRuntimeContractFixture(fixture);
   checkRuntimeContractPolicies(RUNTIME_CONTRACT_FIXTURES[0]);
 
@@ -140,6 +179,20 @@ export async function checkRecordedRuns(): Promise<void> {
   }
   if (classifySourceUrl("https://example.com/media").kind !== "unsupported") {
     throw new Error("an unregistered source provider was accepted");
+  }
+  const owned = bundles.get("run-005");
+  if (!owned) throw new Error("owned local adapter checks require run-005");
+  const ownedPreflight = recordedPreflight(owned);
+  if (
+    ownedPreflight.status !== "ready" ||
+    ownedPreflight.facts?.rights.basis !== "ownership_attestation" ||
+    !ownedPreflight.facts.content?.id.startsWith("sha256:") ||
+    ownedPreflight.facts.creator !== null
+  ) {
+    throw new Error("run-005 must retain its content-addressed owned/local receipt without inferring a creator");
+  }
+  if (ownedPreflight.relevance.music || ownedPreflight.relevance.backgroundSpeech || ownedPreflight.relevance.speakerFocus) {
+    throw new Error("owned/local source facts must not infer acoustic or speaker relevance");
   }
   for (const checkpoint of deriveCheckpoints(current)) {
     if (checkpoint.phase !== "Ready" && checkpoint.cursor === null) {

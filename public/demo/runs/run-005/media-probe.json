@@ -1,0 +1,35 @@
+{
+  "schema": "studio.media-probe.v1",
+  "producer": "scripts/probe-media.mjs",
+  "run": "run-005",
+  "media": "clip.m4a",
+  "input": {
+    "content_id": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+    "hash": {
+      "algorithm": "sha256",
+      "digest": "e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e"
+    },
+    "bytes": 329662
+  },
+  "duration": 47.2,
+  "container": [
+    "mov",
+    "mp4",
+    "m4a",
+    "3gp",
+    "3g2",
+    "mj2"
+  ],
+  "container_long_name": "QuickTime / MOV",
+  "bit_rate": 55874,
+  "tracks": [
+    {
+      "index": 0,
+      "type": "audio",
+      "codec": "aac",
+      "duration": 47.2,
+      "sample_rate": 16000,
+      "channels": 1
+    }
+  ]
+}

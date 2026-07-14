@@ -68,16 +68,19 @@ export default function Preflight() {
 
       <dl className="preflight-facts">
         <div>
-          <dt>Access receipt</dt>
-          <dd>Successfully ingested when recorded</dd>
+          <dt>Source receipt</dt>
+          <dd>{facts.rights.basis === "ownership_attestation" ? "Owned local bytes receipted" : "Remote source ingested when recorded"}</dd>
         </div>
         <div>
-          <dt>Source</dt>
-          <dd>{facts.creator ?? "Creator not recorded"}</dd>
+          <dt>{facts.creator ? "Source" : "Creator"}</dt>
+          <dd>{facts.creator ?? "Not inferred from ownership or filename"}</dd>
         </div>
         <div>
-          <dt>Licence</dt>
-          <dd>{facts.rights.label}</dd>
+          <dt>Rights</dt>
+          <dd>
+            {facts.rights.label}
+            {facts.rights.assertedBy ? ` · attested by ${facts.rights.assertedBy}` : ""}
+          </dd>
         </div>
         <div>
           <dt>Selected window</dt>
@@ -97,6 +100,14 @@ export default function Preflight() {
             <dd>{mediaSummary(facts.mediaProbe.container, facts.mediaProbe.tracks)}</dd>
           </div>
         )}
+        {facts.content && (
+          <div>
+            <dt>Raw provenance</dt>
+            <dd>
+              SHA-256 {facts.content.hash.slice(0, 12)}… · {formatBytes(facts.content.bytes)} · {facts.content.preservation.replaceAll("_", " ")}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Language</dt>
           <dd>{facts.declaredLanguage} declared for the job · not detector output</dd>
@@ -114,6 +125,12 @@ export default function Preflight() {
       />
     </section>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function mediaSummary(containers: string[], tracks: MediaProbeTrack[]): string {

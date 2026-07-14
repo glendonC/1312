@@ -50,7 +50,8 @@ export function enhanceMethodProcess(root: HTMLElement) {
 
   const render = (progress: number, requestedIndex?: number) => {
     const desktop = desktopQuery.matches;
-    const nextIndex = requestedIndex ?? Math.round(progress * (cards.length - 1));
+    const nextIndex = requestedIndex
+      ?? (desktop ? Math.round(progress * (cards.length - 1)) : activeIndex);
 
     if (nextIndex !== activeIndex) {
       activeIndex = nextIndex;
@@ -69,7 +70,7 @@ export function enhanceMethodProcess(root: HTMLElement) {
       const stateLine = card.querySelector<HTMLElement>(".card-state > span:last-child");
 
       card.classList.toggle("is-active", active);
-      card.style.flexGrow = String(Math.max(0.001, openness));
+      card.style.flexGrow = String(desktop ? Math.max(0.001, openness) : 0);
       heading?.setAttribute("aria-expanded", String(active));
       panel?.setAttribute("aria-hidden", String(!active));
 
@@ -81,7 +82,7 @@ export function enhanceMethodProcess(root: HTMLElement) {
       if (stateLine) stateLine.style.transform = `rotate(${active ? 0 : 90}deg)`;
     });
 
-    if (progressBar) progressBar.style.transform = `scaleX(${desktop ? progress : 1})`;
+    if (progressBar) progressBar.style.transform = `scaleX(${desktop ? progress : 0})`;
   };
 
   const getProgress = () => {

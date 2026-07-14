@@ -8,18 +8,26 @@ export type MethodStep = {
   description: string;
   className: string;
   graphic: ReactNode;
+  mobileDiagram: {
+    label: string;
+    nodes: string[];
+  };
 };
 
 export const steps: MethodStep[] = [
   {
     title: "Ingest",
-    principle: "Source before transcript",
-    headline: "Normalize the source.",
+    principle: "Media becomes evidence",
+    headline: "Make the source inspectable.",
     detail:
-      "A YouTube URL or owned file becomes one isolated run: audio to hear, frames to inspect, and source metadata to preserve. Context is discovered later; it is not treated like a media track.",
+      "A link or owned file becomes one bounded run with audio to hear, frames to inspect, and source information to preserve. Agents begin from the media itself instead of treating a transcript as the whole truth.",
     description:
-      "One source becomes a clean run package with audio, frames, and provenance intact.",
+      "One source becomes an inspectable workspace with its media, boundaries, and provenance intact.",
     className: "card-ingest",
+    mobileDiagram: {
+      label: "A source becomes an isolated, inspectable run",
+      nodes: ["Source media", "Audio + frames", "Run context"],
+    },
     graphic: (
       <svg className="card-graphic" viewBox="0 0 720 300" role="img" aria-label="A media clip is opened and inspected">
         <g className="diagram-stroke">
@@ -47,16 +55,20 @@ export const steps: MethodStep[] = [
     ),
   },
   {
-    title: "Analyze",
-    principle: "Adaptive, not fixed",
-    headline: "Spawn what the clip needs.",
+    title: "Investigate",
+    principle: "Let uncertainty shape the work",
+    headline: "Spawn the investigation the media needs.",
     detail:
-      "The orchestrator inspects first, then creates and retires isolated workers as needed. Open any workspace during or after the run to inspect its actions, drafts, failures, and final handoff.",
+      "The orchestrator identifies unresolved questions, then creates and retires isolated workers as needed. Within their granted scope, workers can revisit a moment, inspect audio or frames, use tools, gather outside context, and request a narrower specialist.",
     description:
-      "Every worker acts in its own workspace and reports structured evidence up. The trace stays open for inspection.",
+      "The evidence determines which workers and tools are needed. Actions, sources, drafts, and handoffs remain inspectable.",
     className: "card-analyze",
+    mobileDiagram: {
+      label: "Uncertainty determines the next investigation",
+      nodes: ["Orchestrator", "Focused workspaces", "Tools + sources", "Evidence"],
+    },
     graphic: (
-      <svg className="card-graphic" viewBox="0 0 720 300" role="img" aria-label="Specialists analyze timing, context, and language in parallel">
+      <svg className="card-graphic" viewBox="0 0 720 300" role="img" aria-label="Specialists inspect audio, visuals, context, and outside sources in parallel">
         <g className="diagram-stroke">
           <circle cx="360" cy="31" r="23" />
           <path d="M360 54v22M106 76h508M106 76v18M360 76v18M614 76v18" />
@@ -73,30 +85,34 @@ export const steps: MethodStep[] = [
         </g>
         <g className="diagram-labels label-centered">
           <text x="360" y="35">ORCH</text>
-          <text x="106" y="119">SEGMENT</text>
-          <text x="360" y="119">CONTEXT</text>
-          <text x="614" y="119">TRANSLATE</text>
+          <text x="106" y="119">AUDIO</text>
+          <text x="360" y="119">VISUAL</text>
+          <text x="614" y="119">CONTEXT</text>
           <text className="diagram-small" x="106" y="181">ACTIVE WORKSPACES · REPORT UP ↑</text>
           <text x="149" y="215">OCR</text>
           <text x="360" y="215">ENTITY</text>
-          <text x="571" y="215">DIALECT</text>
+          <text x="571" y="215">RESEARCH</text>
           <text className="diagram-small" x="360" y="243">SPECIALISTS SPAWNED ONLY AS NEEDED</text>
-          <text x="360" y="278">OPEN WORKSPACE · ACTIONS · DRAFTS · FAILURES · HANDOFF</text>
+          <text x="360" y="278">OPEN WORKSPACE · MEDIA ACTIONS · SOURCES · DRAFTS · HANDOFF</text>
         </g>
       </svg>
     ),
   },
   {
-    title: "Validate",
-    principle: "Clean before confidence",
-    headline: "Reconcile, clean, validate.",
+    title: "Reconcile",
+    principle: "Claims need receipts",
+    headline: "Reconcile every finding.",
     detail:
-      "Worker reports are merged, timing and language are cleaned, and hard lines are checked against the source. Unsupported entities, numbers, or meanings are withheld instead of polished.",
+      "Worker reports are compared with one another, the source media, and any outside evidence they used. Conflicts stay visible. Unsupported names, events, numbers, or meanings are revised, withheld, or sent back for another pass.",
     description:
-      "Clean timing and wording, reconcile the reports, then pass or withhold each hard line.",
+      "Trace each claim to its evidence, resolve disagreements, then accept, revise, or withhold it.",
     className: "card-verify",
+    mobileDiagram: {
+      label: "Every finding is checked against its support",
+      nodes: ["Worker reports", "Trace + compare", "Accept / revise / withhold"],
+    },
     graphic: (
-      <svg className="card-graphic" viewBox="0 0 720 300" role="img" aria-label="Draft reports are cleaned, reconciled, and validated">
+      <svg className="card-graphic" viewBox="0 0 720 300" role="img" aria-label="Worker observations and claims are traced, compared, and reconciled">
         <g className="diagram-stroke">
           <rect x="30" y="72" width="150" height="142" rx="10" />
           <path d="M54 111h102M54 145h78M54 179h94" />
@@ -111,32 +127,36 @@ export const steps: MethodStep[] = [
         </g>
         <g className="diagram-labels">
           <text x="30" y="55">WORKER REPORTS</text>
-          <text x="54" y="104">TIMING</text>
-          <text x="54" y="138">KOREAN</text>
-          <text x="54" y="172">ENGLISH</text>
-          <text x="282" y="55">CLEAN + RECONCILE</text>
-          <text x="307" y="105">ALIGN</text>
-          <text x="307" y="137">REPAIR</text>
+          <text x="54" y="104">OBSERVE</text>
+          <text x="54" y="138">CONTEXT</text>
+          <text x="54" y="172">CLAIM</text>
+          <text x="282" y="55">TRACE + RECONCILE</text>
+          <text x="307" y="105">COMPARE</text>
+          <text x="307" y="137">VERIFY</text>
           <text x="307" y="169">MERGE</text>
           <text x="545" y="147">QC</text>
           <text x="620" y="109">PASS</text>
           <text x="620" y="159">WITHHOLD</text>
-          <text className="diagram-small" x="360" y="252">ENTITY · MEANING · SYNC · HONESTY</text>
+          <text className="diagram-small" x="360" y="252">SOURCE · CONFLICT · PROVENANCE · SUPPORT</text>
         </g>
       </svg>
     ),
   },
   {
-    title: "Deliver",
-    principle: "One run, three useful outputs",
-    headline: "Watch, learn, improve.",
+    title: "Apply",
+    principle: "Understanding is reusable",
+    headline: "Turn evidence into useful outputs.",
     detail:
-      "Prepared captions make the media usable; hard lines and glossary entries become transferable learning material; corrections, rules, and scores condition and evaluate later runs.",
+      "One checked investigation can support captions, translations, explanations, structured facts, learning material, or evidence for another system. Corrections and scored failures become reusable cases that improve later work.",
     description:
-      "Playback-ready captions, transferable learning material, and structured improvement artifacts from the same checked run.",
+      "Use the same checked understanding for the task at hand, then preserve what should inform the next one.",
     className: "card-deliver",
+    mobileDiagram: {
+      label: "Checked understanding supports many outputs",
+      nodes: ["Checked claims", "Useful outputs", "Reusable cases"],
+    },
     graphic: (
-      <svg className="card-graphic" viewBox="0 0 720 300" role="img" aria-label="Checked captions, hard lines, and corrections are delivered">
+      <svg className="card-graphic" viewBox="0 0 720 300" role="img" aria-label="Checked evidence becomes useful outputs and reusable cases">
         <g className="diagram-stroke">
           <rect x="298" y="26" width="124" height="54" rx="10" />
           <path d="M360 80v36M110 116h500M110 116v28M360 116v28M610 116v28" />
@@ -147,14 +167,14 @@ export const steps: MethodStep[] = [
         </g>
         <path className="diagram-dashed" d="M610 244c0 35-182 42-210 5m-13 8 13-8 8 13" />
         <g className="diagram-labels">
-          <text x="323" y="59">CHECKED RUN</text>
+          <text x="311" y="59">CHECKED CLAIMS</text>
           <text x="48" y="174">WATCH</text>
-          <text className="diagram-small" x="48" y="188">TIMED KO + EN</text>
-          <text x="298" y="174">LEARN</text>
-          <text className="diagram-small" x="298" y="188">HARD LINES + GLOSSARY</text>
-          <text x="548" y="174">IMPROVE</text>
-          <text className="diagram-small" x="548" y="188">CORRECTIONS + SCORES</text>
-          <text className="diagram-small" x="442" y="282">CONDITION + GRADE THE NEXT RUN</text>
+          <text className="diagram-small" x="48" y="188">CAPTIONS + TRANSLATION</text>
+          <text x="298" y="174">UNDERSTAND</text>
+          <text className="diagram-small" x="298" y="188">EXPLANATIONS + FACTS</text>
+          <text x="548" y="174">REUSE</text>
+          <text className="diagram-small" x="548" y="188">CASES + EVIDENCE</text>
+          <text className="diagram-small" x="442" y="282">INFORM + GRADE LATER WORK</text>
         </g>
       </svg>
     ),

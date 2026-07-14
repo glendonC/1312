@@ -170,3 +170,8 @@
   font-size: clamp(0.9rem, 1vw, 1.05rem);
   line-height: 1.5;
 }
+
+.card-detail-mobile,
+.card-mobile-diagram {
+  display: none;
+}

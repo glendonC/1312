@@ -23,7 +23,21 @@ export default function MethodProcess() {
     >
       <div className="process-layout">
         <header className="process-intro">
+          <p className="process-kicker">How 1321 understands media</p>
           <h1 id="process-title">Our method</h1>
+          <p className="process-intro-copy">
+            1321 gives autonomous agents a working environment for media. An orchestrator
+            inspects the source, opens focused workspaces, and assigns unresolved questions to
+            specialists.
+          </p>
+          <p className="process-intro-copy process-intro-copy-secondary">
+            Each worker can revisit the media, use permitted tools, gather context, and return
+            structured evidence for the system to reconcile.
+          </p>
+          <p className="process-proof-case">
+            <span>First proof case</span>
+            <strong>Korean to English real media</strong>
+          </p>
           <div className="process-progress" aria-hidden="true">
             <span style={{ transform: "scaleX(0)" }} />
           </div>

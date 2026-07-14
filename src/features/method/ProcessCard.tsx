@@ -44,7 +44,32 @@ export default function ProcessCard({
           transform: `translateY(${active ? 0 : 22}px)`,
         }}
       >
+        <div className="card-detail-mobile">
+          <p className="card-detail-principle">{step.principle}</p>
+          <p className="card-detail-title">{step.headline}</p>
+          <p className="card-detail-copy">{step.detail}</p>
+        </div>
+
         {step.graphic}
+
+        <div
+          className="card-mobile-diagram"
+          role="img"
+          aria-label={step.mobileDiagram.label}
+        >
+          <p aria-hidden="true">{step.mobileDiagram.label}</p>
+          <div className="card-mobile-flow" aria-hidden="true">
+            {step.mobileDiagram.nodes.map((node, nodeIndex) => (
+              <span key={node}>
+                <span>{node}</span>
+                {nodeIndex < step.mobileDiagram.nodes.length - 1 && (
+                  <span className="card-mobile-arrow">↓</span>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+
         <footer>{step.description}</footer>
       </div>
     </li>

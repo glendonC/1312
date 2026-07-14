@@ -2,6 +2,7 @@ export const CAPABILITIES = [
   "task.spawn.request",
   "report.submit",
   "media.extract",
+  "media.seek",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -121,6 +122,13 @@ export interface MediaOperationArtifactOrigin {
   receiptContentId: string;
 }
 
+export interface MediaObservationArtifactOrigin {
+  kind: "media_observation";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
 export interface WorkerOutputArtifactOrigin {
   kind: "worker_output";
   executionId: string;
@@ -142,7 +150,11 @@ export interface RuntimeArtifact {
   sourceArtifactIds: string[];
   producerTaskId: string | null;
   producerAgentId: string | null;
-  origin: SourceArtifactOrigin | MediaOperationArtifactOrigin | WorkerOutputArtifactOrigin;
+  origin:
+    | SourceArtifactOrigin
+    | MediaOperationArtifactOrigin
+    | MediaObservationArtifactOrigin
+    | WorkerOutputArtifactOrigin;
 }
 
 export interface WorkerOutputEnvelope {
@@ -198,7 +210,19 @@ export interface MediaExtractRequest {
   endMs: number;
 }
 
-export interface MediaOperationReceipt {
+export interface MediaSeekRequest {
+  operationId: string;
+  taskId: string;
+  agentId: string;
+  artifactId: string;
+  trackId: string;
+  startMs: number;
+  endMs: number;
+}
+
+export type MediaOperationRequest = MediaExtractRequest | MediaSeekRequest;
+
+export interface MediaExtractReceipt {
   schema: "studio.media-operation.receipt.v1";
   receiptId: string;
   operationId: string;
@@ -232,9 +256,42 @@ export interface MediaOperationReceipt {
   sourceArtifactIds: string[];
 }
 
+export interface MediaSeekObservationReceipt {
+  schema: "studio.media-operation.receipt.v1";
+  receiptId: string;
+  operationId: string;
+  capability: "media.seek";
+  authorization: {
+    grantId: string;
+    taskId: string;
+    agentId: string;
+  };
+  request: {
+    artifactId: string;
+    trackId: string;
+    startMs: number;
+    endMs: number;
+  };
+  producer: {
+    id: "ffmpeg.bounded-seek-observation";
+    version: string;
+  };
+  input: {
+    artifactId: string;
+    contentId: string;
+  };
+  observation: {
+    status: "decoded";
+    decodedDurationUs: number;
+  };
+  sourceArtifactIds: string[];
+}
+
+export type MediaOperationReceipt = MediaExtractReceipt | MediaSeekObservationReceipt;
+
 export interface OperationRecord {
   id: string;
-  capability: "media.extract";
+  capability: "media.extract" | "media.seek";
   taskId: string;
   agentId: string;
   grantId: string;

@@ -6,6 +6,7 @@ import {
   type ExecutorSpanReceipt,
   type MediaExtractRequest,
   type MediaOperationReceipt,
+  type MediaSeekRequest,
   type MediaScope,
   type ModelUsageReceipt,
   type ReportDecisionRequest,
@@ -121,6 +122,12 @@ function hash(value: unknown, context: string, path: string): void {
   if (!/^[a-f0-9]{64}$/.test(digest)) fail(context, `${path}.digest`, "must be a lowercase SHA-256 digest");
   if (item.contentId !== `sha256:${digest}`) fail(context, `${path}.contentId`, "must match the digest");
   integer(item.bytes, context, `${path}.bytes`, 1);
+}
+
+function contentId(value: unknown, context: string, path: string): string {
+  const id = string(value, context, path);
+  if (!/^sha256:[a-f0-9]{64}$/.test(id)) fail(context, path, "must be a SHA-256 content id");
+  return id;
 }
 
 function budget(value: unknown, context: string, path: string): asserts value is RuntimeBudget {
@@ -328,6 +335,22 @@ function artifact(value: unknown, context: string, path: string): asserts value 
     if (mediaClass !== "derived" || sources.length === 0 || task === null || agent === null) {
       fail(context, path, "media operation artifacts require derived lineage and a task producer");
     }
+  } else if (kind === "media_observation") {
+    exact(origin, ["kind", "operationId", "receiptId", "receiptContentId"], context, `${path}.origin`);
+    string(origin.operationId, context, `${path}.origin.operationId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    if (
+      mediaClass !== "non_media" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      sources.length === 0 ||
+      task === null ||
+      agent === null ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) {
+      fail(context, path, "media observation artifacts must be their content-addressed receipt with source lineage and a task producer");
+    }
   } else if (kind === "worker_output") {
     exact(origin, ["kind", "executionId", "receiptId", "receiptContentId"], context, `${path}.origin`);
     string(origin.executionId, context, `${path}.origin.executionId`);
@@ -425,10 +448,7 @@ function agent(value: unknown, context: string, path: string): asserts value is 
   oneOf(item.status, AGENT_STATUSES, context, `${path}.status`);
 }
 
-export function assertMediaExtractRequest(
-  value: unknown,
-  context = "Media extract request",
-): asserts value is MediaExtractRequest {
+function mediaRangeRequest(value: unknown, context: string): void {
   const item = object(value, context, "request");
   exact(item, ["operationId", "taskId", "agentId", "artifactId", "trackId", "startMs", "endMs"], context, "request");
   string(item.operationId, context, "request.operationId");
@@ -441,13 +461,39 @@ export function assertMediaExtractRequest(
   if (end <= start) fail(context, "request", "must be a non-empty half-open range");
 }
 
+export function assertMediaExtractRequest(
+  value: unknown,
+  context = "Media extract request",
+): asserts value is MediaExtractRequest {
+  mediaRangeRequest(value, context);
+}
+
+export function assertMediaSeekRequest(
+  value: unknown,
+  context = "Media seek request",
+): asserts value is MediaSeekRequest {
+  mediaRangeRequest(value, context);
+}
+
 function receipt(value: unknown, context: string, path: string): asserts value is MediaOperationReceipt {
   const item = object(value, context, path);
-  exact(item, ["schema", "receiptId", "operationId", "capability", "authorization", "request", "producer", "input", "output", "sourceArtifactIds"], context, path);
+  const capability = oneOf<"media.extract" | "media.seek">(
+    item.capability,
+    new Set(["media.extract", "media.seek"]),
+    context,
+    `${path}.capability`,
+  );
+  exact(
+    item,
+    capability === "media.extract"
+      ? ["schema", "receiptId", "operationId", "capability", "authorization", "request", "producer", "input", "output", "sourceArtifactIds"]
+      : ["schema", "receiptId", "operationId", "capability", "authorization", "request", "producer", "input", "observation", "sourceArtifactIds"],
+    context,
+    path,
+  );
   literal(item.schema, "studio.media-operation.receipt.v1", context, `${path}.schema`);
   string(item.receiptId, context, `${path}.receiptId`);
   string(item.operationId, context, `${path}.operationId`);
-  literal(item.capability, "media.extract", context, `${path}.capability`);
   const authorization = object(item.authorization, context, `${path}.authorization`);
   exact(authorization, ["grantId", "taskId", "agentId"], context, `${path}.authorization`);
   string(authorization.grantId, context, `${path}.authorization.grantId`);
@@ -462,19 +508,39 @@ function receipt(value: unknown, context: string, path: string): asserts value i
   if (end <= start) fail(context, `${path}.request`, "must be a non-empty range");
   const producer = object(item.producer, context, `${path}.producer`);
   exact(producer, ["id", "version"], context, `${path}.producer`);
-  literal(producer.id, "ffmpeg.audio-range-extract", context, `${path}.producer.id`);
+  literal(
+    producer.id,
+    capability === "media.extract" ? "ffmpeg.audio-range-extract" : "ffmpeg.bounded-seek-observation",
+    context,
+    `${path}.producer.id`,
+  );
   string(producer.version, context, `${path}.producer.version`);
   const input = object(item.input, context, `${path}.input`);
   exact(input, ["artifactId", "contentId"], context, `${path}.input`);
   string(input.artifactId, context, `${path}.input.artifactId`);
-  string(input.contentId, context, `${path}.input.contentId`);
-  const output = object(item.output, context, `${path}.output`);
-  exact(output, ["artifactId", "contentId", "bytes", "durationMs", "trackId"], context, `${path}.output`);
-  string(output.artifactId, context, `${path}.output.artifactId`);
-  string(output.contentId, context, `${path}.output.contentId`);
-  integer(output.bytes, context, `${path}.output.bytes`, 1);
-  integer(output.durationMs, context, `${path}.output.durationMs`, 1);
-  string(output.trackId, context, `${path}.output.trackId`);
+  contentId(input.contentId, context, `${path}.input.contentId`);
+  if (capability === "media.extract") {
+    const output = object(item.output, context, `${path}.output`);
+    exact(output, ["artifactId", "contentId", "bytes", "durationMs", "trackId"], context, `${path}.output`);
+    string(output.artifactId, context, `${path}.output.artifactId`);
+    contentId(output.contentId, context, `${path}.output.contentId`);
+    integer(output.bytes, context, `${path}.output.bytes`, 1);
+    integer(output.durationMs, context, `${path}.output.durationMs`, 1);
+    string(output.trackId, context, `${path}.output.trackId`);
+  } else {
+    const observation = object(item.observation, context, `${path}.observation`);
+    exact(observation, ["status", "decodedDurationUs"], context, `${path}.observation`);
+    literal(observation.status, "decoded", context, `${path}.observation.status`);
+    const decodedDurationUs = integer(
+      observation.decodedDurationUs,
+      context,
+      `${path}.observation.decodedDurationUs`,
+      1,
+    );
+    if (decodedDurationUs > (end - start) * 1_000) {
+      fail(context, `${path}.observation.decodedDurationUs`, "exceeds the authorized range duration");
+    }
+  }
   const sources = uniqueStrings(item.sourceArtifactIds, context, `${path}.sourceArtifactIds`);
   if (sources.length === 0) fail(context, `${path}.sourceArtifactIds`, "must retain lineage");
 }
@@ -740,8 +806,15 @@ export function assertRuntimeEvent(value: unknown, context = "Runtime event"): a
     exact(data, ["receipt"], context, "event.data");
     executorSpanReceipt(data.receipt, context, "event.data.receipt");
   } else if (type === "media.operation_started") {
-    exact(data, ["request", "grantId"], context, "event.data");
-    assertMediaExtractRequest(data.request, context);
+    exact(data, ["capability", "request", "grantId"], context, "event.data");
+    const capability = oneOf<"media.extract" | "media.seek">(
+      data.capability,
+      new Set(["media.extract", "media.seek"]),
+      context,
+      "event.data.capability",
+    );
+    if (capability === "media.extract") assertMediaExtractRequest(data.request, context);
+    else assertMediaSeekRequest(data.request, context);
     string(data.grantId, context, "event.data.grantId");
   } else if (type === "media.operation_completed") {
     exact(data, ["operationId", "outputArtifactId", "receipt"], context, "event.data");

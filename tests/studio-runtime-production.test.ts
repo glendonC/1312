@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
-import { assertRuntimeEvent, assertSourceArtifactDescriptor } from "../src/studio/runtime/production/assertions.ts";
+import {
+  assertRuntimeEvent,
+  assertSourceArtifactDescriptor,
+} from "../src/studio/runtime/production/assertions.ts";
 import {
   ContentAddressedArtifactStore,
   identifyFile,
@@ -18,7 +21,11 @@ import {
 import { FfmpegCapabilityHost } from "../src/studio/runtime/production/mediaHost.ts";
 import { CodexExecWorkerLauncher } from "../src/studio/runtime/production/launcher.ts";
 import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
-import { applyRuntimeEvent, initialRuntimeProjection } from "../src/studio/runtime/production/projection.ts";
+import {
+  applyRuntimeEvent,
+  initialRuntimeProjection,
+  projectRuntimeEvents,
+} from "../src/studio/runtime/production/projection.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
 import type {
   RuntimeLimits,
@@ -50,7 +57,7 @@ const BASE_LIMITS: RuntimeLimits = {
   maxDepth: 2,
   maxActiveWorkers: 4,
   runBudget: { wallMs: 180_000, toolCalls: 30 },
-  grantableCapabilities: ["task.spawn.request", "report.submit", "media.extract"],
+  grantableCapabilities: ["task.spawn.request", "report.submit", "media.extract", "media.seek"],
 };
 
 async function sourceDescriptor(): Promise<SourceArtifactDescriptor> {
@@ -153,6 +160,23 @@ function childInput(runtime: RuntimeHarness): SpawnRequestInput {
     inputArtifactIds: [runtime.sourceArtifactId],
     requiredOutputs: [{ name: "audio range", artifactKind: "media-range-audio", required: true }],
     requiredCapabilities: ["media.extract", "report.submit"],
+    dependencies: [],
+    budget: { wallMs: 20_000, toolCalls: 1 },
+  };
+}
+
+function seekChildInput(runtime: RuntimeHarness): SpawnRequestInput {
+  return {
+    workloadKey: "seek:source:1000-1800",
+    objective: "Seek and decode only the authorized audio range, then return its receipted observation.",
+    workerKind: "media",
+    workerLabel: "bounded-seek-worker",
+    mediaScope: [
+      { artifactId: runtime.sourceArtifactId, trackId: "stream:0", startMs: 1_000, endMs: 1_800 },
+    ],
+    inputArtifactIds: [runtime.sourceArtifactId],
+    requiredOutputs: [{ name: "seek observation", artifactKind: "media-seek-observation", required: true }],
+    requiredCapabilities: ["media.seek", "report.submit"],
     dependencies: [],
     budget: { wallMs: 20_000, toolCalls: 1 },
   };
@@ -357,6 +381,34 @@ test("scheduler fails closed on each bounded spawn policy", async (suite) => {
         await cleanup(runtime);
       }
     });
+  }
+});
+
+test("scheduler issues media.seek only when the capability is grantable", async () => {
+  const runtime = await harness({
+    ...BASE_LIMITS,
+    grantableCapabilities: ["task.spawn.request", "report.submit", "media.extract"],
+  });
+  try {
+    const decision = await runtime.scheduler.requestSpawn(
+      runtime.rootTaskId,
+      runtime.rootAgentId,
+      seekChildInput(runtime),
+    );
+    assert.equal(decision.accepted, false);
+    assert.equal(decision.rejection, "capability_not_grantable");
+    assert.equal(decision.permit, null);
+
+    const unsupported = {
+      ...seekChildInput(runtime),
+      requiredCapabilities: ["media.frame"],
+    };
+    await assert.rejects(
+      runtime.scheduler.requestSpawn(runtime.rootTaskId, runtime.rootAgentId, unsupported),
+      /has unknown value media.frame/,
+    );
+  } finally {
+    await cleanup(runtime);
   }
 });
 
@@ -732,6 +784,271 @@ test("capability host performs a real authorized ffmpeg extraction with receipte
   } finally {
     await cleanup(runtime);
   }
+});
+
+test("capability host performs a real bounded seek with a content-addressed observation receipt", async () => {
+  const runtime = await harness(BASE_LIMITS, "file");
+  try {
+    const decision = await runtime.scheduler.requestSpawn(
+      runtime.rootTaskId,
+      runtime.rootAgentId,
+      seekChildInput(runtime),
+    );
+    assert.equal(decision.accepted, true);
+    const permit = decision.permit!;
+    const task = runtime.ledger.state().tasks[permit.taskId];
+    assert.deepEqual(
+      task.grants.map((grant) => grant.capability).sort(),
+      ["media.seek", "report.submit"],
+    );
+    await runtime.scheduler.registerAgent(permit);
+    await runtime.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
+    const host = new FfmpegCapabilityHost(runtime.ledger, runtime.store, { timeoutMs: 20_000 });
+
+    const beforeRejectedCalls = (await runtime.ledger.events()).length;
+    await assert.rejects(
+      host.seek({
+        operationId: "operation:seek-path-escape",
+        taskId: permit.taskId,
+        agentId: permit.agentId,
+        artifactId: runtime.sourceArtifactId,
+        trackId: "stream:0",
+        startMs: 1_000,
+        endMs: 1_800,
+        sourcePath: "../caller-controlled.m4a",
+      }),
+      /sourcePath is not allowed/,
+    );
+    await assert.rejects(
+      host.seek({
+        operationId: "operation:malformed-seek",
+        taskId: permit.taskId,
+        agentId: permit.agentId,
+        artifactId: runtime.sourceArtifactId,
+        trackId: "stream:0",
+        startMs: 1_000,
+        endMs: 1_000,
+      }),
+      /must be a non-empty half-open range/,
+    );
+    await assert.rejects(
+      host.seek({
+        operationId: "operation:seek-outside-scope",
+        taskId: permit.taskId,
+        agentId: permit.agentId,
+        artifactId: runtime.sourceArtifactId,
+        trackId: "stream:0",
+        startMs: 999,
+        endMs: 1_800,
+      }),
+      /outside the task's authoritative capability grant/,
+    );
+    assert.equal((await runtime.ledger.events()).length, beforeRejectedCalls);
+
+    const result = await host.seek({
+      operationId: "operation:authorized-seek",
+      taskId: permit.taskId,
+      agentId: permit.agentId,
+      artifactId: runtime.sourceArtifactId,
+      trackId: "stream:0",
+      startMs: 1_000,
+      endMs: 1_800,
+    });
+    assert.equal(result.artifact.kind, "media-seek-observation");
+    assert.equal(result.artifact.mediaClass, "non_media");
+    assert.equal(result.artifact.publication, "private");
+    assert.deepEqual(result.artifact.sourceArtifactIds, [runtime.sourceArtifactId]);
+    assert.equal(result.artifact.origin.kind, "media_observation");
+    assert.equal(result.receipt.capability, "media.seek");
+    assert.equal(result.receipt.request.startMs, 1_000);
+    assert.equal(result.receipt.request.endMs, 1_800);
+    assert.equal(result.receipt.observation.status, "decoded");
+    assert.ok(result.receipt.observation.decodedDurationUs > 0);
+    assert.ok(result.receipt.observation.decodedDurationUs <= 800_000);
+    assert.match(result.receipt.producer.version, /^ffmpeg version /);
+
+    assert.equal(result.artifact.origin.kind, "media_observation");
+    const receiptBytes = await runtime.store.receiptBytes(
+      result.artifact.origin.kind === "media_observation" ? result.artifact.origin.receiptContentId : "",
+    );
+    const storedReceipt = JSON.parse(receiptBytes.toString("utf8")) as {
+      receiptId: string;
+      input: { contentId: string };
+    };
+    assert.equal(storedReceipt.receiptId, result.receipt.receiptId);
+    assert.equal(storedReceipt.input.contentId, result.receipt.input.contentId);
+    const measuredReceipt = await identifyFile(join(runtime.storeRoot, result.artifact.storageKey));
+    assert.equal(measuredReceipt.contentId, result.artifact.content.contentId);
+
+    const state = runtime.ledger.state();
+    assert.equal(state.operations["operation:authorized-seek"].capability, "media.seek");
+    assert.equal(state.operations["operation:authorized-seek"].status, "completed");
+    assert.equal(state.operations["operation:authorized-seek"].outputArtifactId, result.artifact.id);
+
+    const operationEvents = await runtime.ledger.events();
+    const started = operationEvents.find(
+      (event) => event.type === "media.operation_started" && event.data.request.operationId === "operation:authorized-seek",
+    );
+    const completedIndex = operationEvents.findIndex(
+      (event) => event.type === "media.operation_completed" && event.data.operationId === "operation:authorized-seek",
+    );
+    assert.equal(started?.producer.kind, "media_host");
+    assert.ok(completedIndex >= 0);
+    assert.equal(operationEvents[completedIndex].producer.kind, "media_host");
+
+    const wrongProducer = structuredClone(operationEvents);
+    wrongProducer[completedIndex].producer.kind = "artifact_store";
+    assert.throws(
+      () => projectRuntimeEvents("runtime-test", wrongProducer),
+      /media completion evidence must come from the media host/,
+    );
+
+    const changedInput = structuredClone(operationEvents);
+    const changedInputCompletion = changedInput[completedIndex];
+    assert.equal(changedInputCompletion.type, "media.operation_completed");
+    if (changedInputCompletion.type === "media.operation_completed") {
+      changedInputCompletion.data.receipt.input.contentId = `sha256:${"0".repeat(64)}`;
+    }
+    assert.throws(
+      () => projectRuntimeEvents("runtime-test", changedInput),
+      /receipt changed its input lineage/,
+    );
+
+    const changedArtifact = structuredClone(operationEvents);
+    const changedArtifactCompletion = changedArtifact[completedIndex];
+    assert.equal(changedArtifactCompletion.type, "media.operation_completed");
+    if (changedArtifactCompletion.type === "media.operation_completed") {
+      changedArtifactCompletion.data.outputArtifactId = runtime.sourceArtifactId;
+    }
+    assert.throws(
+      () => projectRuntimeEvents("runtime-test", changedArtifact),
+      /observation artifact is not bound to its content-addressed receipt/,
+    );
+
+    const beforeDuplicate = (await runtime.ledger.events()).length;
+    await assert.rejects(
+      host.seek({
+        operationId: "operation:authorized-seek",
+        taskId: permit.taskId,
+        agentId: permit.agentId,
+        artifactId: runtime.sourceArtifactId,
+        trackId: "stream:0",
+        startMs: 1_000,
+        endMs: 1_800,
+      }),
+      /already exists/,
+    );
+    await assert.rejects(
+      host.seek({
+        operationId: "operation:seek-over-budget",
+        taskId: permit.taskId,
+        agentId: permit.agentId,
+        artifactId: runtime.sourceArtifactId,
+        trackId: "stream:0",
+        startMs: 1_000,
+        endMs: 1_800,
+      }),
+      /tool-call budget/,
+    );
+    assert.equal((await runtime.ledger.events()).length, beforeDuplicate);
+
+    const reports = new BoundedReportHost(runtime.ledger, () => "report:authorized-seek");
+    const report = await reports.submit({
+      taskId: permit.taskId,
+      agentId: permit.agentId,
+      outputArtifactIds: [result.artifact.id],
+      summary: "The host decoded only the granted range and stored its observation receipt by content address.",
+    });
+    await reports.decide({
+      reportId: report.id,
+      decidedByTaskId: runtime.rootTaskId,
+      decidedByAgentId: runtime.rootAgentId,
+      accepted: true,
+      reason: "The seek receipt, source lineage, and host-produced observation artifact are present.",
+    });
+    const finalState = runtime.ledger.state();
+    assert.equal(finalState.reports[report.id].status, "accepted");
+    assert.equal(finalState.tasks[permit.taskId].status, "completed");
+
+    const reopened = await RuntimeLedger.open("runtime-test", runtime.journal, {
+      now: () => new Date("2026-07-14T03:00:00.000Z"),
+    });
+    assert.deepEqual(reopened.state(), finalState);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("media.seek rejects an extract-only caller and source-byte drift", async (suite) => {
+  await suite.test("extract grant cannot authorize seek", async () => {
+    const runtime = await harness();
+    try {
+      const decision = await runtime.scheduler.requestSpawn(
+        runtime.rootTaskId,
+        runtime.rootAgentId,
+        childInput(runtime),
+      );
+      const permit = decision.permit!;
+      await runtime.scheduler.registerAgent(permit);
+      await runtime.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
+      const host = new FfmpegCapabilityHost(runtime.ledger, runtime.store);
+      const before = (await runtime.ledger.events()).length;
+      await assert.rejects(
+        host.seek({
+          operationId: "operation:unauthorized-seek",
+          taskId: permit.taskId,
+          agentId: permit.agentId,
+          artifactId: runtime.sourceArtifactId,
+          trackId: "stream:0",
+          startMs: 1_000,
+          endMs: 1_800,
+        }),
+        /outside the task's authoritative capability grant/,
+      );
+      assert.equal((await runtime.ledger.events()).length, before);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  await suite.test("registered source bytes are re-hashed before seek execution", async () => {
+    const runtime = await harness();
+    try {
+      const decision = await runtime.scheduler.requestSpawn(
+        runtime.rootTaskId,
+        runtime.rootAgentId,
+        seekChildInput(runtime),
+      );
+      const permit = decision.permit!;
+      await runtime.scheduler.registerAgent(permit);
+      await runtime.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
+      const source = runtime.ledger.state().artifacts[runtime.sourceArtifactId];
+      await appendFile(join(runtime.storeRoot, source.storageKey), "tampered");
+      const artifactCount = Object.keys(runtime.ledger.state().artifacts).length;
+      const host = new FfmpegCapabilityHost(runtime.ledger, runtime.store);
+      await assert.rejects(
+        host.seek({
+          operationId: "operation:tampered-seek-source",
+          taskId: permit.taskId,
+          agentId: permit.agentId,
+          artifactId: runtime.sourceArtifactId,
+          trackId: "stream:0",
+          startMs: 1_000,
+          endMs: 1_800,
+        }),
+        /no longer matches its registered content identity/,
+      );
+      const state = runtime.ledger.state();
+      assert.equal(state.operations["operation:tampered-seek-source"].status, "failed");
+      assert.equal(
+        state.operations["operation:tampered-seek-source"].failure,
+        "ffmpeg bounded seek observation failed",
+      );
+      assert.equal(Object.keys(state.artifacts).length, artifactCount);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
 });
 
 test("capability host rehashes source bytes and records tool failure without an artifact", async () => {

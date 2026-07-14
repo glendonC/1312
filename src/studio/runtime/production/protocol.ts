@@ -1,8 +1,9 @@
 import type {
   AgentRecord,
+  Capability,
   CapabilityGrant,
   ExecutorSpanReceipt,
-  MediaExtractRequest,
+  MediaOperationRequest,
   MediaOperationReceipt,
   ModelUsageReceipt,
   ReportRecord,
@@ -96,7 +97,11 @@ export interface ExecutorFinishedEvent extends RuntimeEventBase {
 
 export interface MediaOperationStartedEvent extends RuntimeEventBase {
   type: "media.operation_started";
-  data: { request: MediaExtractRequest; grantId: string };
+  data: {
+    capability: Extract<Capability, "media.extract" | "media.seek">;
+    request: MediaOperationRequest;
+    grantId: string;
+  };
 }
 
 export interface MediaOperationCompletedEvent extends RuntimeEventBase {

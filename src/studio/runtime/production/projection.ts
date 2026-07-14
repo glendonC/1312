@@ -79,11 +79,17 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     invariant(artifact.runId === next.runId, event, `artifact ${artifact.id} belongs to another run`);
     invariant(!next.artifacts[artifact.id], event, `artifact ${artifact.id} is duplicated`);
     invariant(artifact.sourceArtifactIds.every((id) => Boolean(next.artifacts[id])), event, `artifact ${artifact.id} has missing lineage`);
-    if (artifact.origin.kind === "media_operation") {
+    if (artifact.origin.kind === "media_operation" || artifact.origin.kind === "media_observation") {
       const operation = next.operations[artifact.origin.operationId];
       invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active media operation`);
       invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `artifact ${artifact.id} changed its operation producer`);
       invariant(artifact.sourceArtifactIds.includes(operation.artifactId), event, `artifact ${artifact.id} omits its operation input`);
+      invariant(
+        (operation.capability === "media.extract" && artifact.origin.kind === "media_operation") ||
+          (operation.capability === "media.seek" && artifact.origin.kind === "media_observation"),
+        event,
+        `artifact ${artifact.id} has the wrong origin for ${operation.capability}`,
+      );
     } else if (artifact.origin.kind === "worker_output") {
       const execution = next.executions[artifact.origin.executionId];
       invariant(execution?.status === "active", event, `artifact ${artifact.id} has no active worker execution`);
@@ -260,12 +266,39 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     invariant(task?.status === "working" && task.ownerAgentId === request.agentId, event, `operation ${request.operationId} has no working owner`);
     invariant(!next.operations[request.operationId], event, `operation ${request.operationId} is duplicated`);
     const grant = task.grants.find((candidate) => candidate.id === event.data.grantId);
-    invariant(grant?.capability === "media.extract", event, `operation ${request.operationId} lacks an extract grant`);
+    invariant(
+      grant?.capability === event.data.capability,
+      event,
+      `operation ${request.operationId} lacks its ${event.data.capability} grant`,
+    );
+    const artifact = next.artifacts[request.artifactId];
+    invariant(artifact, event, `operation ${request.operationId} input artifact is unavailable`);
+    invariant(
+      artifact.tracks.some((track) => track.id === request.trackId && track.kind === "audio"),
+      event,
+      `operation ${request.operationId} has no registered audio track`,
+    );
+    invariant(
+      request.endMs <= (artifact.durationMs ?? 0),
+      event,
+      `operation ${request.operationId} exceeds artifact duration`,
+    );
+    invariant(
+      grant.mediaScope.some(
+        (scope) =>
+          scope.artifactId === request.artifactId &&
+          scope.trackId === request.trackId &&
+          request.startMs >= scope.startMs &&
+          request.endMs <= scope.endMs,
+      ),
+      event,
+      `operation ${request.operationId} exceeds its grant scope`,
+    );
     const calls = Object.values(next.operations).filter((operation) => operation.taskId === task.id).length;
     invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.operations[request.operationId] = {
       id: request.operationId,
-      capability: "media.extract",
+      capability: event.data.capability,
       taskId: request.taskId,
       agentId: request.agentId,
       grantId: event.data.grantId,
@@ -287,9 +320,56 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     const artifact = next.artifacts[event.data.outputArtifactId];
     invariant(operation?.status === "started", event, `operation ${event.data.operationId} is not active`);
     invariant(artifact, event, `operation ${event.data.operationId} output was not recorded`);
-    invariant(event.data.receipt.operationId === operation.id, event, `operation ${operation.id} receipt changed identity`);
-    invariant(event.data.receipt.output.artifactId === artifact.id, event, `operation ${operation.id} receipt names another artifact`);
-    invariant(artifact.origin.kind === "media_operation" && artifact.origin.receiptId === event.data.receipt.receiptId, event, `operation ${operation.id} artifact is not bound to its receipt`);
+    const receipt = event.data.receipt;
+    const source = next.artifacts[operation.artifactId];
+    invariant(receipt.operationId === operation.id, event, `operation ${operation.id} receipt changed identity`);
+    invariant(receipt.capability === operation.capability, event, `operation ${operation.id} receipt changed capability`);
+    invariant(
+      receipt.authorization.grantId === operation.grantId &&
+        receipt.authorization.taskId === operation.taskId &&
+        receipt.authorization.agentId === operation.agentId,
+      event,
+      `operation ${operation.id} receipt changed authorization`,
+    );
+    invariant(
+      receipt.request.artifactId === operation.artifactId &&
+        receipt.request.trackId === operation.trackId &&
+        receipt.request.startMs === operation.startMs &&
+        receipt.request.endMs === operation.endMs,
+      event,
+      `operation ${operation.id} receipt changed its authorized request`,
+    );
+    invariant(
+      source &&
+        receipt.input.artifactId === source.id &&
+        receipt.input.contentId === source.content.contentId &&
+        receipt.sourceArtifactIds.length === 1 &&
+        receipt.sourceArtifactIds[0] === source.id,
+      event,
+      `operation ${operation.id} receipt changed its input lineage`,
+    );
+    if (receipt.capability === "media.extract") {
+      invariant(receipt.output.artifactId === artifact.id, event, `operation ${operation.id} receipt names another artifact`);
+      invariant(
+        receipt.output.contentId === artifact.content.contentId && receipt.output.bytes === artifact.content.bytes,
+        event,
+        `operation ${operation.id} receipt changed its output content`,
+      );
+      invariant(
+        artifact.origin.kind === "media_operation" && artifact.origin.receiptId === receipt.receiptId,
+        event,
+        `operation ${operation.id} artifact is not bound to its receipt`,
+      );
+    } else {
+      invariant(
+        artifact.kind === "media-seek-observation" &&
+          artifact.origin.kind === "media_observation" &&
+          artifact.origin.receiptId === receipt.receiptId &&
+          artifact.origin.receiptContentId === artifact.content.contentId,
+        event,
+        `operation ${operation.id} observation artifact is not bound to its content-addressed receipt`,
+      );
+    }
     operation.status = "completed";
     operation.outputArtifactId = artifact.id;
     operation.receiptId = event.data.receipt.receiptId;

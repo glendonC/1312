@@ -286,6 +286,45 @@ export class ContentAddressedArtifactStore {
     return artifact;
   }
 
+  buildObservationArtifact(input: {
+    runId: string;
+    operationId: string;
+    receiptId: string;
+    sourceArtifactIds: string[];
+    producerTaskId: string;
+    producerAgentId: string;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({
+        runId: input.runId,
+        operationId: input.operationId,
+        kind: "media-seek-observation",
+        contentId: input.storedReceipt.content.contentId,
+      })}`,
+      runId: input.runId,
+      kind: "media-seek-observation",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: input.sourceArtifactIds,
+      producerTaskId: input.producerTaskId,
+      producerAgentId: input.producerAgentId,
+      origin: {
+        kind: "media_observation",
+        operationId: input.operationId,
+        receiptId: input.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
   async record(ledger: RuntimeLedger, artifact: RuntimeArtifact, causationId: string | null = null): Promise<void> {
     assertRuntimeArtifact(artifact);
     await this.resolveVerified(artifact);

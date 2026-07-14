@@ -4,9 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { canonicalSha256, ContentAddressedArtifactStore } from "./artifactStore.ts";
-import { authorizeMediaExtract } from "./authorization.ts";
+import { authorizeMediaExtract, authorizeMediaSeek } from "./authorization.ts";
 import type {
-  MediaOperationReceipt,
+  MediaExtractReceipt,
+  MediaSeekObservationReceipt,
   MediaTrackDescriptor,
   RuntimeArtifact,
 } from "./model.ts";
@@ -36,11 +37,27 @@ function seconds(milliseconds: number): string {
   return (milliseconds / 1000).toFixed(3);
 }
 
-function safeFailure(error: unknown): string {
+function safeFailure(error: unknown, operation: "range extraction" | "bounded seek observation"): string {
   const candidate = error as NodeJS.ErrnoException & { killed?: boolean };
-  if (candidate?.code === "ETIMEDOUT") return "ffmpeg range extraction timed out";
-  if (candidate?.killed) return "ffmpeg range extraction was terminated";
-  return "ffmpeg range extraction failed";
+  if (candidate?.code === "ETIMEDOUT") return `ffmpeg ${operation} timed out`;
+  if (candidate?.killed) return `ffmpeg ${operation} was terminated`;
+  return `ffmpeg ${operation} failed`;
+}
+
+function decodedDurationUs(stdout: string, maximumUs: number): number {
+  const progress = new Map<string, string>();
+  for (const line of stdout.trimEnd().split("\n")) {
+    const separator = line.indexOf("=");
+    if (separator > 0) progress.set(line.slice(0, separator), line.slice(separator + 1).trim());
+  }
+  if (progress.get("progress") !== "end") throw new Error("ffmpeg seek did not report bounded completion");
+  const rawDuration = progress.get("out_time_us");
+  if (!rawDuration || !/^\d+$/.test(rawDuration)) throw new Error("ffmpeg seek did not report decoded duration");
+  const duration = Number(rawDuration);
+  if (!Number.isSafeInteger(duration) || duration <= 0 || duration > maximumUs) {
+    throw new Error("ffmpeg seek decoded outside the authorized duration");
+  }
+  return duration;
 }
 
 export class FfmpegCapabilityHost {
@@ -117,7 +134,7 @@ export class FfmpegCapabilityHost {
     return { durationMs, tracks };
   }
 
-  async extract(requestValue: unknown): Promise<{ artifact: RuntimeArtifact; receipt: MediaOperationReceipt }> {
+  async extract(requestValue: unknown): Promise<{ artifact: RuntimeArtifact; receipt: MediaExtractReceipt }> {
     const started = await this.ledger.transact(
       { producer: { kind: "media_host", id: "ffmpeg-capability-host" } },
       ({ state }) => {
@@ -126,7 +143,11 @@ export class FfmpegCapabilityHost {
           pending: [
             {
               type: "media.operation_started",
-              data: { request: authorization.request, grantId: authorization.grant.id },
+              data: {
+                capability: "media.extract",
+                request: authorization.request,
+                grantId: authorization.grant.id,
+              },
             },
           ] satisfies PendingRuntimeEvent[],
           result: authorization,
@@ -194,7 +215,7 @@ export class FfmpegCapabilityHost {
         },
         sourceArtifactIds: [source.id],
       };
-      const receipt: MediaOperationReceipt = {
+      const receipt: MediaExtractReceipt = {
         schema: "studio.media-operation.receipt.v1",
         receiptId: `receipt:${canonicalSha256(receiptBody)}`,
         ...receiptBody,
@@ -237,7 +258,7 @@ export class FfmpegCapabilityHost {
             pending: [
               {
                 type: "media.operation_failed",
-                data: { operationId: request.operationId, reason: safeFailure(error) },
+                data: { operationId: request.operationId, reason: safeFailure(error, "range extraction") },
               },
             ] satisfies PendingRuntimeEvent[],
             result: undefined,
@@ -247,6 +268,123 @@ export class FfmpegCapabilityHost {
       throw error;
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
+    }
+  }
+
+  async seek(requestValue: unknown): Promise<{ artifact: RuntimeArtifact; receipt: MediaSeekObservationReceipt }> {
+    const started = await this.ledger.transact(
+      { producer: { kind: "media_host", id: "ffmpeg-capability-host" } },
+      ({ state }) => {
+        const authorization = authorizeMediaSeek(state, requestValue);
+        return {
+          pending: [
+            {
+              type: "media.operation_started",
+              data: {
+                capability: "media.seek",
+                request: authorization.request,
+                grantId: authorization.grant.id,
+              },
+            },
+          ] satisfies PendingRuntimeEvent[],
+          result: authorization,
+        };
+      },
+    );
+    const { request, grant, artifact: source, track } = started.result;
+
+    try {
+      const inputPath = await this.artifacts.resolveVerified(source);
+      const timeoutMs = Math.min(
+        this.options.timeoutMs ?? 30_000,
+        this.ledger.state().tasks[request.taskId].budget.wallMs,
+      );
+      const { stdout } = await execute(
+        this.options.ffmpeg ?? "ffmpeg",
+        [
+          "-nostdin",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-ss",
+          seconds(request.startMs),
+          "-t",
+          seconds(request.endMs - request.startMs),
+          "-i",
+          inputPath,
+          "-map",
+          `0:${track.index}`,
+          "-f",
+          "null",
+          "-",
+          "-progress",
+          "pipe:1",
+          "-nostats",
+        ],
+        timeoutMs,
+      );
+      const observedDurationUs = decodedDurationUs(stdout, (request.endMs - request.startMs) * 1_000);
+      const receiptBody = {
+        operationId: request.operationId,
+        capability: "media.seek" as const,
+        authorization: { grantId: grant.id, taskId: request.taskId, agentId: request.agentId },
+        request: {
+          artifactId: request.artifactId,
+          trackId: request.trackId,
+          startMs: request.startMs,
+          endMs: request.endMs,
+        },
+        producer: { id: "ffmpeg.bounded-seek-observation" as const, version: await this.version() },
+        input: { artifactId: source.id, contentId: source.content.contentId },
+        observation: { status: "decoded" as const, decodedDurationUs: observedDurationUs },
+        sourceArtifactIds: [source.id],
+      };
+      const receipt: MediaSeekObservationReceipt = {
+        schema: "studio.media-operation.receipt.v1",
+        receiptId: `receipt:${canonicalSha256(receiptBody)}`,
+        ...receiptBody,
+      };
+      const storedReceipt = await this.artifacts.storeReceipt(receipt);
+      const artifact = this.artifacts.buildObservationArtifact({
+        runId: this.ledger.runId,
+        operationId: request.operationId,
+        receiptId: receipt.receiptId,
+        sourceArtifactIds: [source.id],
+        producerTaskId: request.taskId,
+        producerAgentId: request.agentId,
+        storedReceipt,
+      });
+      await this.artifacts.record(this.ledger, artifact, request.operationId);
+      await this.ledger.transact(
+        { producer: { kind: "media_host", id: "ffmpeg-capability-host" }, causationId: request.operationId },
+        () => ({
+          pending: [
+            {
+              type: "media.operation_completed",
+              data: { operationId: request.operationId, outputArtifactId: artifact.id, receipt },
+            },
+          ] satisfies PendingRuntimeEvent[],
+          result: undefined,
+        }),
+      );
+      return { artifact, receipt };
+    } catch (error) {
+      const state = this.ledger.state();
+      if (state.operations[request.operationId]?.status === "started") {
+        await this.ledger.transact(
+          { producer: { kind: "media_host", id: "ffmpeg-capability-host" }, causationId: request.operationId },
+          () => ({
+            pending: [
+              {
+                type: "media.operation_failed",
+                data: { operationId: request.operationId, reason: safeFailure(error, "bounded seek observation") },
+              },
+            ] satisfies PendingRuntimeEvent[],
+            result: undefined,
+          }),
+        );
+      }
+      throw error;
     }
   }
 }

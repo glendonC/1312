@@ -123,20 +123,36 @@ separate producers. A source adapter cannot infer any of those facts from a prov
 The proposal fixtures in `src/studio/runtime/contracts.ts` remain fixture-only and production-inert.
 Production work lives under `src/studio/runtime/production/` and does not import those shapes.
 
-The first production runtime slice provides a versioned event protocol, append-only journal, pure
-projection, bounded scheduler, dynamic registry, content-addressed artifact store, centralized
-authorization, one real ffmpeg audio-range extraction operation, and structured child report-up.
+The production runtime provides a versioned event protocol, append-only journal, pure projection,
+bounded scheduler, dynamic registry, content-addressed artifact store, centralized authorization,
+one real ffmpeg audio-range extraction operation, structured child report-up, and a bounded local
+`codex exec` launcher.
 Media scopes use exact track ids and half-open integer-millisecond ranges. The scheduler derives
 task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
 state. The media host re-hashes its source before execution, accepts no caller output path or
 arbitrary executable arguments, and records the tool version, input and output identities, grant,
 range, receipt, and lineage.
 
-This is a local runtime library and exact smoke-tested production path, not a hosted service. No
-Codex worker launcher or live Studio adapter is connected yet. The legacy `LiveTransport` accepts
-only validated legacy traces for predeclared agents; production runtime events require a deliberate
-adapter after a real worker host exists. Seek, step, loop, mark, track selection, frames, live control
-acknowledgement, and detector/model calls remain unavailable capabilities rather than UI claims.
+The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
+the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
+read-only sandbox, no host environment inherited by model-generated shell commands, JSONL events,
+and a closed output schema. The
+child currently receives only the structured task contract and can use only `report.submit`; media
+capabilities are rejected because no child-process tool bridge exists. Validated output becomes a
+private content-addressed worker artifact and is submitted through the existing handoff host.
+
+Executor events receipt monotonic active duration and the CLI version. The launcher consumes the
+documented `turn.completed.usage` object rather than logs or budgets, stores the exact raw usage event
+by content address, and journals normalized input, cached-input, output, and reasoning-output token
+counts. A CLI-default model is not named by that event, so model identity remains null unless the
+launcher explicitly requested one; provider units and billing remain null.
+
+This remains a local runtime and exact smoke-tested path, not a hosted service. The legacy
+`LiveTransport` still accepts only validated legacy traces for predeclared agents. A separate
+production adapter folds `studio.runtime.event.v1` directly and `/studio/runtime/` projects an
+operator-selected local journal; neither creates a `RunBundle` nor inserts local activity into a
+recorded demo. Seek, step, loop, mark, track selection, frames, live control acknowledgement, and
+detector/model tool calls remain unavailable capabilities rather than UI claims.
 
 ### Explicitly deferred
 
@@ -250,11 +266,12 @@ This row shape is future fine-tune data.
 5. ✅ Standalone preflight index with unsupported detector findings withheld
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
-8. 🔄 Pinned VAD and speech-window language producer implemented; real worker launcher and production runtime projection remain
-9. ⏳ Acoustic/overlap/separation producers and study export
+8. ✅ Pinned VAD, speech-window language producer, bounded Codex launcher, executor/usage receipts, and separate production-journal Studio projection
+9. 🔄 Add the next individually authorized media operation, then build the immutable observability index from real launcher journals
+10. ⏳ Acoustic/overlap/separation producers and study export
 
 ## Open questions (do not block UI)
 
 - Exact computer-use host for squircles (Codex CUA vs embedded browser/player).  
-- Which process boundary should host the local worker runtime beside the static Studio.
+- Which local service should stream production journals and acknowledged controls to the separate adapter; the static Studio remains an inspector, not the worker host.
 - Public GitHub visibility when Devpost rules require it.

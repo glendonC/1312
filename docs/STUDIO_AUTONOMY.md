@@ -288,20 +288,21 @@ values distinctly and explain which assumptions dominate the estimate.
 | Area | Current foundation | Required next layer |
 |---|---|---|
 | Event replay | Ordered typed traces, pure reducer, cursor reconstruction, fixture validation, and checkpoints | Keep exact scenario coverage current as producers grow |
-| Transport seam | Replay pause/step/seek/speed and single-trace live validation | Production-runtime adapter and acknowledged live control |
-| Agent topology | Legacy parent/divided-from projection plus a separate production scheduler and dynamic registry | Real worker launcher and production-event projection into the graph |
+| Transport seam | Replay pause/step/seek/speed, single-trace legacy live validation, and a separate validated production-journal adapter | Acknowledged production live control; never route production events through legacy traces |
+| Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and production-journal worker projection | Stream the production adapter from a runtime service and add richer production task/lineage views without altering recorded bundles |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, and a receipted ffmpeg range extraction host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
-| Coordination | Legacy trace prose plus production bounded tasks and structured report-up | Real worker execution and live projection; never retrofit legacy prose into handoffs |
+| Coordination | Legacy trace prose plus real bounded Codex child execution, worker-output artifacts, and structured report-up | Parent/orchestrator execution beyond the one-child launcher proof; never retrofit legacy prose into handoffs |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
-| Observability | Append-only production journal with task, agent, operation, artifact, and handoff events | Real executor spans, model-usage receipts, immutable cross-run index, and structured query service |
+| Observability | Append-only production journal with task, agent, operation, artifact, handoff, active-executor-span, and measured Codex-usage events | Queue/dependency/reporting spans, model-adapter identity and provider units where available, immutable cross-run index, and structured query service |
 | Forecasting | Preflight has measured media duration and explicit user-selected range | Versioned work planner, price-book adapter, historical calibration, interactive comparison, and forecast evaluation |
 
-The Studio visualizes recorded legacy runs. A production runtime library now exists separately, but
-the static Studio is not its host and does not claim that local smoke-test activity happened in a
-recorded run.
+The normal Studio visualizes recorded legacy runs. The separate `/studio/runtime/` inspector can
+validate an operator-selected production NDJSON journal and project its dynamic workers, tasks,
+grants, active duration, measured usage, and report state. It does not start the runtime, insert
+events into `run-005` or `run-006`, or claim that local smoke activity is a recorded demo run.
 
 ## Implementation ledger — 2026-07-14
 
@@ -310,13 +311,13 @@ recorded run.
 | 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. Browser automation is authored but interactive execution is unavailable in the current in-app browser environment. |
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
 | 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Pinned Silero VAD receipts preserve normalized PCM, raw frame scores, and exact speech windows. The pinned Whisper language producer consumes only those validated windows and receipts per-range scores plus classified, unknown, or withheld decisions. Studio projects measured speech and language separately from job/pack declarations. Hosted submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
-| 3 — tasks and agents | Production foundation implemented | Bounded scheduling, dynamic registration, journal replay, and report-up are real local modules. No real Codex worker launcher or Studio adapter exists, so a live child is not shown in the product. |
+| 3 — tasks and agents | Local vertical slice implemented | The bounded `codex exec` launcher consumes a scheduler permit, registers one isolated child, journals its lifecycle, stores its structured output, reports through the handoff host, and projects it through a separate production-journal inspector. The static Studio is not a runtime service and no live socket/control path is claimed. |
 | 4 — scoped media | One operation implemented | `media.extract` executes ffmpeg under exact grants and emits content-addressed receipt/lineage. Seek, step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools are not claimed. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
-| 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real derived-media lineage and structured handoff. Legacy report/merge prose is not recast as provenance. |
+| 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real derived-media lineage, worker-output content, executor identity, and structured handoff. Legacy report/merge prose is not recast as provenance. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
-| 8 — verification | Partially implemented | Build, bench, receipt policy, runtime smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
-| 9 — observability | Planned, producer-blocked | The journal can support future indexing, but there are no real worker execution spans, model-usage receipts, or cross-run query index. Legacy labels must not be presented as production worker analytics. |
+| 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
+| 9 — observability | Producer foundation implemented | The launcher receipts monotonic active duration and exact measured token fields from `codex exec` `turn.completed`, retaining the raw JSONL usage event by content address. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, and the cross-run query index remain unavailable. Legacy labels are not production worker analytics. |
 | 10 — forecasting | Planned, partially unblocked | Measured media duration and selected range can support workload floors. Token, cost, and calibrated time ranges remain unavailable until real worker, usage, price-book, and historical producers exist. |
 
 ## Submission and customization UX
@@ -593,10 +594,13 @@ The next production slices, in dependency order:
    99-language logits and softmax scores, classified/unknown/withheld decisions, immutable V3
    lineage, Studio projection, and fail-closed mutation fixtures. Job and pack language remain
    declarations outside the detector/runtime.
-3. Implement a real local worker launcher and adapt production runtime events into a separate Studio
-   projection. Do not connect or translate the fixture-only contract events.
-4. Have the launcher receipt executor spans and model usage from the start so observability does not
-   depend on reconstructing metrics from logs later.
+3. Implemented 2026-07-14: bounded local `codex exec` worker launcher, one-use scheduler permit
+   consumption, dynamic registration, content-addressed worker output, structured report-up, and a
+   separate production-journal Studio adapter/inspector. Fixture-only events and legacy traces remain
+   disconnected.
+4. Implemented 2026-07-14 for the available producer: the launcher receipts monotonic active spans
+   and exact `turn.completed` token usage with a content-addressed raw receipt. Model identity when
+   the CLI default is used, provider units, billing, and non-active span phases stay null/unavailable.
 5. Add the next media capability one operation at a time, starting with a real frame request or
    bounded seek observation, and require the same authorization/receipt standard as extraction.
 6. Build the immutable observability index and structured Run Explorer after the launcher has

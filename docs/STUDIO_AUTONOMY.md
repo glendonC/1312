@@ -296,13 +296,14 @@ values distinctly and explain which assumptions dominate the estimate.
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
-| Observability | Append-only production journal with task, agent, operation, artifact, handoff, active-executor-span, and measured Codex-usage events | Queue/dependency/reporting spans, model-adapter identity and provider units where available, immutable cross-run index, and structured query service |
+| Observability | Append-only production journal plus a deterministic content-addressed post-run index, normalized task/agent/operation/execution/handoff/failure facts, structured in-memory filters and aggregations, source identity links, and the separate local Run Explorer | Queue/dependency/reporting spans, critical-path semantics, model-adapter identity and provider units where available, persistent multi-run storage, and retention/access policy |
 | Forecasting | Preflight has measured media duration and explicit user-selected range | Versioned work planner, price-book adapter, historical calibration, interactive comparison, and forecast evaluation |
 
 The normal Studio visualizes recorded legacy runs. The separate `/studio/runtime/` inspector can
-validate an operator-selected production NDJSON journal and project its dynamic workers, tasks,
-grants, active duration, measured usage, and report state. It does not start the runtime, insert
-events into `run-005` or `run-006`, or claim that local smoke activity is a recorded demo run.
+validate an operator-selected production NDJSON journal, build its immutable observability index,
+query normalized facts, resolve source event/receipt/artifact identities, and project dynamic
+workers. It does not start the runtime, search raw journal text, insert events into `run-005` or
+`run-006`, or claim that local smoke activity is a recorded demo run.
 
 ## Implementation ledger — 2026-07-14
 
@@ -317,7 +318,7 @@ events into `run-005` or `run-006`, or claim that local smoke activity is a reco
 | 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real derived-media lineage, worker-output content, executor identity, and structured handoff. Legacy report/merge prose is not recast as provenance. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
 | 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
-| 9 — observability | Producer foundation implemented | The launcher receipts monotonic active duration and exact measured token fields from `codex exec` `turn.completed`, retaining the raw JSONL usage event by content address. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, and the cross-run query index remain unavailable. Legacy labels are not production worker analytics. |
+| 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
 | 10 — forecasting | Planned, partially unblocked | Measured media duration and selected range can support workload floors. Token, cost, and calibrated time ranges remain unavailable until real worker, usage, price-book, and historical producers exist. |
 
 ## Submission and customization UX
@@ -606,8 +607,12 @@ The next production slices, in dependency order:
    stores its receipt as a content-addressed non-media artifact with raw-source lineage, and journals
    it through the production projection. It is scheduler/host-only: the Codex child still exposes
    only `report.submit`, and no UI playhead, step/loop/mark, frame, or other media operation is claimed.
-6. Build the immutable observability index and structured Run Explorer after the launcher has
-   produced real events; keep raw diagnostic log search separate and access-controlled.
+6. Implemented 2026-07-14: deterministic immutable observability index over validated real
+   production journals, exact journal and canonical source hashes, stored-receipt cross-checks,
+   normalized task/agent/media-operation/handoff/active-span/measured-token/failure facts, typed
+   multi-index filters and aggregations, and a local structured Run Explorer with source identity
+   links. No journal prose or provider payload is indexed; unsupported timing phases, critical
+   path, CLI-default model identity, provider units, and billing remain null/unavailable.
 7. Add the deterministic forecast floor from measured media range and explicit work-plan inputs,
    then add token, cost, and historical calibration only when their producers exist.
 8. Add reviewer-facing memory proposal and rollback inspection before any accepted snapshot is fed

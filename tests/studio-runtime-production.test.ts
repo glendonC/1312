@@ -20,6 +20,12 @@ import {
 } from "../src/studio/runtime/production/journal.ts";
 import { FfmpegCapabilityHost } from "../src/studio/runtime/production/mediaHost.ts";
 import { CodexExecWorkerLauncher } from "../src/studio/runtime/production/launcher.ts";
+import { buildRuntimeObservabilityIndex } from "../src/studio/runtime/production/observability/indexer.ts";
+import { ImmutableObservabilityQueryStore } from "../src/studio/runtime/production/observability/query.ts";
+import {
+  assertRuntimeObservabilityIndex,
+  validateRuntimeObservabilityIndex,
+} from "../src/studio/runtime/production/observability/validation.ts";
 import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
 import {
   applyRuntimeEvent,
@@ -278,6 +284,10 @@ test("production projection rejects a gapped journal before projecting evidence"
       () => applyRuntimeEvent(initialRuntimeProjection("runtime-test"), gapped),
       /sequence expected 1, received 2/,
     );
+    await assert.rejects(
+      buildRuntimeObservabilityIndex(`${JSON.stringify(gapped)}\n`),
+      /sequence expected 1, received 2/,
+    );
   } finally {
     await cleanup(runtime);
   }
@@ -476,6 +486,62 @@ test("Codex launcher registers a bounded child, receipts active time and measure
     assert.ok(events.some((event) => event.type === "model.usage_recorded" && event.producer.kind === "launcher"));
     assert.ok(events.some((event) => event.type === "executor.finished" && event.producer.kind === "launcher"));
     assert.ok(events.every((event) => !("fixtureOnly" in event)));
+
+    const rawJournal = await readFile(join(runtime.directory, "events.ndjson"), "utf8");
+    const observability = await buildRuntimeObservabilityIndex(rawJournal);
+    const rebuilt = await buildRuntimeObservabilityIndex(rawJournal);
+    assert.deepEqual(rebuilt, observability);
+    assert.equal((await validateRuntimeObservabilityIndex(observability)).indexId, observability.indexId);
+    assert.equal(observability.sourceJournal.runId, "runtime-test");
+    assert.equal(observability.sourceJournal.eventCount, events.length);
+    assert.equal(observability.summary.counts.tasks, 2);
+    assert.equal(observability.summary.counts.agents, 2);
+    assert.equal(observability.summary.counts.executions, 1);
+    assert.equal(observability.summary.counts.handoffs, 1);
+    assert.equal(observability.summary.measured.activeDurationMs, 45);
+    assert.equal(observability.summary.measured.inputTokens, 120);
+    assert.equal(observability.summary.measured.outputTokens, 35);
+    assert.equal(observability.summary.unavailable.queueDurationMs, null);
+    assert.equal(observability.summary.unavailable.providerUnits, null);
+    assert.deepEqual(observability.summary.unavailable.billing, { amount: null, currency: null });
+    assert.ok(
+      observability.sources.receipts.some(
+        (source) =>
+          source.kind === "model_usage" &&
+          source.rawReceiptContentId === result.usage.rawReceipt.contentId,
+      ),
+    );
+    assert.equal(JSON.stringify(observability).includes(codexChildInput(runtime).objective), false);
+
+    const query = new ImmutableObservabilityQueryStore([observability]).query({
+      agentIds: [decision.permit!.agentId],
+      taskStatuses: ["completed"],
+    });
+    assert.equal(query.records.tasks.length, 1);
+    assert.equal(query.records.executions.length, 1);
+    assert.equal(query.records.handoffs.length, 1);
+    assert.equal(query.aggregate.measured.inputTokens, 120);
+    assert.ok(query.records.executions[0].sources.receiptIds.includes(result.usage.receiptId));
+
+    const inventedAccuracy = structuredClone(observability) as unknown as {
+      summary: { measured: Record<string, unknown> };
+    };
+    inventedAccuracy.summary.measured.accuracy = 1;
+    assert.throws(
+      () => assertRuntimeObservabilityIndex(inventedAccuracy),
+      /summary does not equal the aggregation of indexed measured facts/,
+    );
+    const inventedRank = structuredClone(observability) as unknown as {
+      records: { executions: Array<Record<string, unknown>> };
+    };
+    inventedRank.records.executions[0].rank = 1;
+    assert.throws(() => assertRuntimeObservabilityIndex(inventedRank), /rank is not allowed/);
+    const inventedProviderUnits = structuredClone(observability);
+    (inventedProviderUnits.records.executions[0] as unknown as { providerUnits: number }).providerUnits = 0;
+    assert.throws(
+      () => assertRuntimeObservabilityIndex(inventedProviderUnits),
+      /providerUnits must remain null without a producer/,
+    );
 
     const usageEvent = events.find((event) => event.type === "model.usage_recorded");
     assert.ok(usageEvent);
@@ -969,6 +1035,19 @@ test("capability host performs a real bounded seek with a content-addressed obse
     const finalState = runtime.ledger.state();
     assert.equal(finalState.reports[report.id].status, "accepted");
     assert.equal(finalState.tasks[permit.taskId].status, "completed");
+
+    const observability = await buildRuntimeObservabilityIndex(
+      await readFile(join(runtime.directory, "events.ndjson"), "utf8"),
+    );
+    const seekQuery = new ImmutableObservabilityQueryStore([observability]).query({
+      operationCapabilities: ["media.seek"],
+    });
+    assert.equal(seekQuery.records.operations.length, 1);
+    assert.equal(seekQuery.records.operations[0].operationId, "operation:authorized-seek");
+    assert.equal(seekQuery.records.operations[0].requestedDurationMs, 800);
+    assert.equal(seekQuery.aggregate.measured.mediaRequestedDurationMs, 800);
+    assert.ok(seekQuery.records.operations[0].sources.receiptIds.includes(result.receipt.receiptId));
+    assert.ok(seekQuery.records.operations[0].sources.artifactIds.includes(result.artifact.id));
 
     const reopened = await RuntimeLedger.open("runtime-test", runtime.journal, {
       now: () => new Date("2026-07-14T03:00:00.000Z"),

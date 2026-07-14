@@ -12,6 +12,7 @@
     "speech:check": "node --test tests/studio-speech-production.test.ts",
     "language:check": "node --test tests/studio-language-production.test.ts",
     "runtime:check": "node --test tests/studio-runtime-production.test.ts",
+    "runtime:index": "node scripts/index-runtime-observability.ts",
     "runtime:smoke:codex": "node scripts/run-local-worker.ts",
     "studio:check": "npm run build && npm run bench:check && npm run evidence:check && npm run memory:check && npm run speech:check && npm run language:check && npm run runtime:check && npm run studio:qa:list",
     "studio:qa": "playwright test",

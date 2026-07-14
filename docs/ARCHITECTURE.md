@@ -125,13 +125,14 @@ Production work lives under `src/studio/runtime/production/` and does not import
 
 The production runtime provides a versioned event protocol, append-only journal, pure projection,
 bounded scheduler, dynamic registry, content-addressed artifact store, centralized authorization,
-one real ffmpeg audio-range extraction operation, structured child report-up, and a bounded local
-`codex exec` launcher.
+one real ffmpeg audio-range extraction operation, one bounded ffmpeg seek observation, structured
+child report-up, and a bounded local `codex exec` launcher.
 Media scopes use exact track ids and half-open integer-millisecond ranges. The scheduler derives
 task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
-state. The media host re-hashes its source before execution, accepts no caller output path or
-arbitrary executable arguments, and records the tool version, input and output identities, grant,
-range, receipt, and lineage.
+state. The media host re-hashes its source before execution and accepts no caller path or arbitrary
+executable arguments. Extraction records tool, input/output, grant, range, receipt, and derived
+lineage; bounded seek decodes the granted audio interval to a null sink and stores its receipt as a
+content-addressed non-media observation artifact with raw-source lineage.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
@@ -151,8 +152,9 @@ This remains a local runtime and exact smoke-tested path, not a hosted service. 
 `LiveTransport` still accepts only validated legacy traces for predeclared agents. A separate
 production adapter folds `studio.runtime.event.v1` directly and `/studio/runtime/` projects an
 operator-selected local journal; neither creates a `RunBundle` nor inserts local activity into a
-recorded demo. Seek, step, loop, mark, track selection, frames, live control acknowledgement, and
-detector/model tool calls remain unavailable capabilities rather than UI claims.
+recorded demo. Step, loop, mark, track selection, frames, live control acknowledgement, and
+detector/model tool calls remain unavailable capabilities rather than UI claims. The bounded seek
+host operation does not drive a UI playhead and is not bridged into the Codex child.
 
 ### Explicitly deferred
 
@@ -267,7 +269,7 @@ This row shape is future fine-tune data.
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
 8. ✅ Pinned VAD, speech-window language producer, bounded Codex launcher, executor/usage receipts, and separate production-journal Studio projection
-9. 🔄 Add the next individually authorized media operation, then build the immutable observability index from real launcher journals
+9. 🔄 Build the immutable observability index from real launcher journals; add further media operations only as separate authorized slices
 10. ⏳ Acoustic/overlap/separation producers and study export
 
 ## Open questions (do not block UI)

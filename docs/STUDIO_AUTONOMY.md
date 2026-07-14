@@ -291,7 +291,7 @@ values distinctly and explain which assumptions dominate the estimate.
 | Transport seam | Replay pause/step/seek/speed, single-trace legacy live validation, and a separate validated production-journal adapter | Acknowledged production live control; never route production events through legacy traces |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and production-journal worker projection | Stream the production adapter from a runtime service and add richer production task/lineage views without altering recorded bundles |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
-| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, and a receipted ffmpeg range extraction host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
+| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, a receipted ffmpeg range extraction host, and a bounded receipted seek observation host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
 | Coordination | Legacy trace prose plus real bounded Codex child execution, worker-output artifacts, and structured report-up | Parent/orchestrator execution beyond the one-child launcher proof; never retrofit legacy prose into handoffs |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
@@ -312,7 +312,7 @@ events into `run-005` or `run-006`, or claim that local smoke activity is a reco
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
 | 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Pinned Silero VAD receipts preserve normalized PCM, raw frame scores, and exact speech windows. The pinned Whisper language producer consumes only those validated windows and receipts per-range scores plus classified, unknown, or withheld decisions. Studio projects measured speech and language separately from job/pack declarations. Hosted submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
 | 3 — tasks and agents | Local vertical slice implemented | The bounded `codex exec` launcher consumes a scheduler permit, registers one isolated child, journals its lifecycle, stores its structured output, reports through the handoff host, and projects it through a separate production-journal inspector. The static Studio is not a runtime service and no live socket/control path is claimed. |
-| 4 — scoped media | One operation implemented | `media.extract` executes ffmpeg under exact grants and emits content-addressed receipt/lineage. Seek, step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools are not claimed. |
+| 4 — scoped media | Two operations implemented | `media.extract` emits a derived audio artifact and `media.seek` decodes a granted audio interval to a null sink, storing the receipt itself as a content-addressed observation artifact with source lineage. Both re-hash the source and enforce exact grants. The Codex child cannot invoke either operation; step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools are not claimed. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
 | 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real derived-media lineage, worker-output content, executor identity, and structured handoff. Legacy report/merge prose is not recast as provenance. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
@@ -601,8 +601,11 @@ The next production slices, in dependency order:
 4. Implemented 2026-07-14 for the available producer: the launcher receipts monotonic active spans
    and exact `turn.completed` token usage with a content-addressed raw receipt. Model identity when
    the CLI default is used, provider units, billing, and non-active span phases stay null/unavailable.
-5. Add the next media capability one operation at a time, starting with a real frame request or
-   bounded seek observation, and require the same authorization/receipt standard as extraction.
+5. Implemented 2026-07-14: bounded `media.seek` observation re-hashes the source, invokes ffmpeg with
+   fixed host arguments to seek and decode only the exact granted audio interval to a null sink,
+   stores its receipt as a content-addressed non-media artifact with raw-source lineage, and journals
+   it through the production projection. It is scheduler/host-only: the Codex child still exposes
+   only `report.submit`, and no UI playhead, step/loop/mark, frame, or other media operation is claimed.
 6. Build the immutable observability index and structured Run Explorer after the launcher has
    produced real events; keep raw diagnostic log search separate and access-controlled.
 7. Add the deterministic forecast floor from measured media range and explicit work-plan inputs,

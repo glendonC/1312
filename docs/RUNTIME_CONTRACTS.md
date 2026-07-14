@@ -21,17 +21,21 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
 - a bounded scheduler that derives task ids, depth, parentage, ownership, grants, and reservations;
 - a dynamic registry that registers only a scheduler-issued launch permit;
 - a content-addressed artifact store with closed ingest and media-operation origins;
-- a capability host that performs one real, scoped ffmpeg audio-range extraction and receipts it;
+- a capability host that performs real, scoped ffmpeg audio-range extraction and bounded audio seek
+  observation, with content-addressed receipts and source lineage;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
 The exact runtime test executes that path against the receipted run-005 media and reopens the event
 journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
 duplicate work, limit violations, scope escalation, invalid registration, source-byte drift,
-unauthorized media calls, and invalid handoffs.
+unauthorized media calls, caller-controlled paths, malformed requests, changed receipt lineage, and
+invalid handoffs.
 
-This does not make the Studio live. No production Codex worker launcher, hosted runtime service,
-production-event-to-UI adapter, or live control acknowledgement producer exists. Only
-`media.extract` and structured report-up are implemented production capabilities; the other media
+This does not make the Studio live. A bounded local `codex exec` worker launcher and a separate
+production-journal Studio adapter now exist, but `/studio/runtime/` is an inspector and does not
+start workers. No hosted runtime service or live control acknowledgement producer exists. The
+launcher still exposes only `report.submit` to its child because no child-process media tool bridge
+exists. `media.extract` and `media.seek` are real scheduler/host capabilities; the other media
 operations and detector/model calls in this proposal remain unavailable. The tables below continue
 to document the fixture contract itself and should not be read as the production wire schema.
 

@@ -33,22 +33,86 @@ import "../styles/hero.css";
         </h1>
       </div>
 
-      <div class="hero-aside">
-        <p>
-          Building the foundation for AI to understand <span class="nowrap">real-world</span> media
-          through autonomous,{" "}
-          <span class="nowrap">self-improving</span>{" "}
-          <span class="hero-closing">
-            <span class="nowrap">investigation.</span>{" "}
-            <a class="button button-primary cta-inline" href="/studio/">
-              <span class="cta-content">
-                View demo
-                <Icon class="cta-icon" name="ph:play-fill" aria-hidden="true" />
-              </span>
-            </a>
-          </span>
-        </p>
+      <div class="hero-aside" data-hero-story>
+        <div class="hero-story" aria-live="polite" aria-atomic="true">
+          <p
+            id="hero-story-foundation"
+            class="hero-story-panel"
+            data-story-panel="foundation"
+            data-active="true"
+            aria-hidden="false"
+          >
+            <span class="hero-story-line">Building the foundation for AI to</span>{" "}
+            <span class="hero-story-line">understand real-world media through</span>{" "}
+            <span class="hero-story-line">autonomous, self-improving investigation.</span>
+          </p>
+
+          <p
+            id="hero-story-education"
+            class="hero-story-panel"
+            data-story-panel="education"
+            data-active="false"
+            aria-hidden="true"
+            inert
+          >
+            <span class="hero-story-line">This foundation can turn real media</span>{" "}
+            <span class="hero-story-line">into a learning environment. Learners</span>{" "}
+            <span class="hero-story-line">can explore how language works in context</span>{" "}
+            <span class="hero-story-line">and trace each explanation back to the source.</span>
+          </p>
+        </div>
+
+        <div class="hero-story-actions">
+          <button
+            class="hero-story-turn"
+            type="button"
+            data-story-target="education"
+            aria-controls="hero-story-foundation hero-story-education"
+          >
+            Then what?
+          </button>
+          <a class="button button-primary cta-inline" href="/studio/">
+            <span class="cta-content">
+              View demo
+              <Icon class="cta-icon" name="ph:play-fill" aria-hidden="true" />
+            </span>
+          </a>
+        </div>
       </div>
     </section>
   </main>
 </SiteLayout>
+
+<script>
+  const setupHeroStory = () => {
+    document.querySelectorAll<HTMLElement>("[data-hero-story]").forEach((story) => {
+      if (story.dataset.ready === "true") return;
+
+      const panels = [...story.querySelectorAll<HTMLElement>("[data-story-panel]")];
+
+      story.addEventListener("click", (event) => {
+        const origin = event.target;
+        if (!(origin instanceof Element)) return;
+
+        const turn = origin.closest<HTMLButtonElement>("[data-story-target]");
+        const target = turn?.dataset.storyTarget;
+        if (!turn || !target || !story.contains(turn)) return;
+
+        panels.forEach((panel) => {
+          const active = panel.dataset.storyPanel === target;
+          panel.dataset.active = String(active);
+          panel.setAttribute("aria-hidden", String(!active));
+          panel.toggleAttribute("inert", !active);
+        });
+
+        turn.dataset.storyTarget = target === "education" ? "foundation" : "education";
+        turn.textContent = target === "education" ? "What makes that possible?" : "Then what?";
+      });
+
+      story.dataset.ready = "true";
+    });
+  };
+
+  document.addEventListener("astro:page-load", setupHeroStory);
+  setupHeroStory();
+</script>

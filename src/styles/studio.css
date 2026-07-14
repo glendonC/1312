@@ -8,6 +8,8 @@
  */
 
 @import "./studio/dock.css";
+@import "./studio/identity.css";
+@import "./studio/welcome.css";
 @import "./studio/canvas.css";
 @import "./studio/drawer.css";
 @import "./studio/workspace.css";

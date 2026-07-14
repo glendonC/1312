@@ -2,8 +2,8 @@
  * The two kinds of node on the canvas.
  *
  * A worker gets a squircle carrying its own live workspace — the same renderer the drawer
- * uses, at cell scale. The orchestrator gets a disc, because it is the one agent with no
- * workspace to show: it reads the job and spawns the workers that do the work.
+ * uses, at cell scale. The orchestrator gets an identity field rather than a workspace: it
+ * reads the job and spawns the workers that do the work.
  *
  * Each card subscribes to its own agent and nothing else, so a trace landing on qc-01
  * re-renders qc-01 and leaves the other four workspaces and the layout alone.
@@ -12,6 +12,8 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { memo, useEffect, useState } from "react";
 
+import AgentMark from "./AgentMark";
+import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { useAgent, useStudio } from "./store";
 import Workspace from "./Workspace";
 import type { SwarmNode } from "./swarm";
@@ -139,7 +141,7 @@ export const HubNode = memo(function HubNode() {
       title={note}
     >
       <Pins />
-      <span className="hub-disc" />
+      <AgentMark identity={ORCHESTRATOR_IDENTITY} status={status} />
       <span className="node-name">orchestrator</span>
     </div>
   );

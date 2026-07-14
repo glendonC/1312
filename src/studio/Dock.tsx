@@ -1,9 +1,9 @@
 /**
- * The dock is the one control surface, and it never leaves.
+ * The dock is the run control surface, and it never leaves while work is active.
  *
- * Collapsed it offers a source. Running it shows the status verb and holds the stop.
- * Finished it offers another run. Hiding it mid-run would strand the user with no way
- * to stop what they started.
+ * It shows the status verb and holds the stop. Finished it offers another run. Hiding it
+ * mid-run would strand the user with no way to stop what they started. Source setup belongs
+ * to SourceEntry, where the welcome sequence can grow without changing the run controls.
  *
  * The run's progress travels the pill's own outline (DockTrace), measured from the dock's
  * real box rather than guessed.
@@ -16,38 +16,26 @@
  */
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import DockTrace from "./DockTrace";
-import { Arrow, Chevron, Cross, Edit, Hold, LinkSource, YouTube } from "./glyphs";
-import { presentSource } from "./previewSession";
-import { useBundle, useComplete, usePaused, useProgress, useStage, useStudio } from "./store";
+import { Chevron, Cross, Hold } from "./glyphs";
+import { useBundle, useComplete, usePaused, useProgress, useStudio } from "./store";
 
 const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as const;
 
 export default function Dock() {
-  const stage = useStage();
   const complete = useComplete();
   const bundle = useBundle();
   const paused = usePaused();
   const start = useStudio((s) => s.start);
-  const openRecordedPreflight = useStudio((s) => s.openRecordedPreflight);
-  const submitSource = useStudio((s) => s.submitSource);
-  const dismissPreflight = useStudio((s) => s.dismissPreflight);
   const reset = useStudio((s) => s.reset);
   const cancelRun = useStudio((s) => s.cancel);
   const togglePause = useStudio((s) => s.togglePause);
   const pausePending = useStudio((s) => s.pausePending);
   const { phase, done } = useProgress();
 
-  const [open, setOpen] = useState(false);
   const [mini, setMini] = useState(false);
-  const [url, setUrl] = useState("");
-  const [editingSource, setEditingSource] = useState(true);
-  const [fieldOverflow, setFieldOverflow] = useState({ left: false, right: false });
-  const [sourceOverflow, setSourceOverflow] = useState(false);
-  const field = useRef<HTMLInputElement>(null);
-  const sourceUrl = useRef<HTMLSpanElement>(null);
 
   const dock = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -63,70 +51,13 @@ export default function Dock() {
     return () => ro.disconnect();
   }, []);
 
-  const sourcePresentation = presentSource(url);
-  const reviewingSource = sourcePresentation !== null && !editingSource;
-
-  function syncFieldOverflow(): void {
-    const input = field.current;
-    if (!input) return;
-
-    const maxScroll = Math.max(0, input.scrollWidth - input.clientWidth);
-    const next = {
-      left: input.scrollLeft > 1,
-      right: input.scrollLeft < maxScroll - 1,
-    };
-
-    setFieldOverflow((current) =>
-      current.left === next.left && current.right === next.right ? current : next,
-    );
-  }
-
-  useEffect(() => {
-    if (!open || !editingSource) return;
-    field.current?.focus();
-  }, [editingSource, open]);
-
-  useLayoutEffect(() => {
-    if (!open || !editingSource) return;
-    const frame = window.requestAnimationFrame(syncFieldOverflow);
-    return () => window.cancelAnimationFrame(frame);
-  }, [box.w, editingSource, open, url]);
-
-  useLayoutEffect(() => {
-    if (!reviewingSource) {
-      setSourceOverflow(false);
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      const source = sourceUrl.current;
-      setSourceOverflow(Boolean(source && source.scrollWidth > source.clientWidth + 1));
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [box.w, reviewingSource, url]);
-
-  function submit(e: SyntheticEvent<HTMLFormElement>): void {
-    e.preventDefault();
-    const raw = url.trim();
-    if (!raw) return;
-    submitSource(raw);
-    setOpen(false);
-  }
-
   function clear(): void {
-    setOpen(false);
     setMini(false);
-    setUrl("");
-    setEditingSource(true);
-    setFieldOverflow({ left: false, right: false });
     if (running) cancelRun();
-    else {
-      dismissPreflight();
-      reset();
-    }
+    else reset();
   }
 
-  const running = stage === "run" && !complete;
+  const running = !complete;
   const percent = Math.round(done * 100);
 
   /*
@@ -182,10 +113,10 @@ export default function Dock() {
         data-running={running}
         data-paused={paused}
       >
-        {stage === "run" && <DockTrace box={box} done={done} />}
+        <DockTrace box={box} done={done} />
 
         <AnimatePresence mode="popLayout" initial={false}>
-          {stage === "run" && mini ? (
+          {mini ? (
             /*
              * Folded. The run does not pause because you stopped looking at the controls,
              * so the capsule keeps reporting: the verb, the percentage, and the same border
@@ -211,7 +142,7 @@ export default function Dock() {
 
               <Chevron up />
             </motion.button>
-          ) : stage === "run" ? (
+          ) : (
             <motion.div
               key="run"
               className="dock-bar dock-bar-run"
@@ -276,122 +207,6 @@ export default function Dock() {
                 <Cross />
               </button>
             </motion.div>
-          ) : !open ? (
-            <motion.button
-              key="closed"
-              type="button"
-              className="dock-fab"
-              onClick={() => {
-                setEditingSource(true);
-                setOpen(true);
-              }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              layout
-            >
-              Add a source
-            </motion.button>
-          ) : (
-            <motion.form
-              key="open"
-              className={`dock-bar${reviewingSource ? " dock-bar-source" : ""}`}
-              onSubmit={submit}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, delay: 0.06 }}
-              layout
-            >
-              {reviewingSource ? (
-                <>
-                  <button
-                    type="button"
-                    className="dock-source-edit"
-                    aria-label={`Edit source: ${sourcePresentation.accessibleName}`}
-                    onClick={() => setEditingSource(true)}
-                  >
-                    <Edit />
-                  </button>
-
-                  <div className="dock-source" title={url}>
-                    <span className="dock-source-glyph" data-kind={sourcePresentation.kind}>
-                      {sourcePresentation.kind === "youtube" ? <YouTube /> : <LinkSource />}
-                    </span>
-                    <span
-                      ref={sourceUrl}
-                      className="dock-source-url"
-                      data-overflow={sourceOverflow}
-                    >
-                      <span
-                        className={`dock-source-url-full${sourcePresentation.compactUrl ? " has-compact" : ""}`}
-                      >
-                        {sourcePresentation.displayUrl}
-                      </span>
-                      {sourcePresentation.compactUrl && (
-                        <span className="dock-source-url-compact">{sourcePresentation.compactUrl}</span>
-                      )}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <span
-                  className="dock-field-shell"
-                  data-overflow-left={fieldOverflow.left}
-                  data-overflow-right={fieldOverflow.right}
-                >
-                  <input
-                    ref={field}
-                    className="dock-field"
-                    type="text"
-                    inputMode="url"
-                    autoComplete="off"
-                    spellCheck={false}
-                    placeholder="Paste a link"
-                    aria-label="Clip link"
-                    value={url}
-                    onBlur={() => {
-                      if (sourcePresentation) {
-                        window.requestAnimationFrame(() => setEditingSource(false));
-                      }
-                    }}
-                    onChange={(e) => {
-                      setUrl(e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") setOpen(false);
-                      window.requestAnimationFrame(syncFieldOverflow);
-                    }}
-                    onScroll={syncFieldOverflow}
-                    onSelect={syncFieldOverflow}
-                  />
-                </span>
-              )}
-
-              {!reviewingSource && (
-                <>
-                  <span className="dock-sep" aria-hidden="true" />
-
-                  <button
-                    type="button"
-                    className="dock-demo"
-                    onClick={() => {
-                      setOpen(false);
-                      openRecordedPreflight();
-                    }}
-                    disabled={!bundle}
-                    title={bundle?.run.clip.title_target}
-                  >
-                    Demo clip
-                  </button>
-                </>
-              )}
-
-              <button type="submit" className="dock-go" aria-label="Analyze">
-                <Arrow />
-              </button>
-            </motion.form>
           )}
         </AnimatePresence>
       </motion.div>

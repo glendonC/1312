@@ -4,6 +4,8 @@
 
 .act-input {
   position: relative;
+  height: 100svh;
+  min-height: 100svh;
   flex: 1;
 }
 
@@ -169,7 +171,8 @@
 }
 
 /* the dock expands out of its own centre, so it grows left and right at once */
-.dock {
+.dock,
+.source-entry {
   position: relative;
   display: flex;
   overflow: hidden;

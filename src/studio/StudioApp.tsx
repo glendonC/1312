@@ -91,7 +91,7 @@ export default function StudioApp({ runId }: { runId: string }) {
         )}
       </AnimatePresence>
 
-      <Dock />
+      {stage === "run" && <Dock />}
       {lab && DevLab && (
         <Suspense fallback={null}>
           <DevLab defaultRunId={runId} />

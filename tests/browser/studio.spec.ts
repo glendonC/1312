@@ -22,6 +22,84 @@ test("the lab is opt-in during development", async ({ page }) => {
   await openLab(page);
 });
 
+test("the input stage introduces the orchestrator before asking for a source", async ({ page }) => {
+  await page.goto("/studio/");
+
+  await expect(page.getByRole("heading", { name: "Bring me a piece of real-world media." })).toBeVisible();
+  await expect(page.getByText(/show how each finding connects back to its source/)).toBeVisible();
+
+  const identity = page.locator('[data-agent-identity="orchestrator-root"]');
+  await expect(identity).toBeVisible();
+  const mesh = identity.locator(".agent-mark-mesh");
+  await expect(mesh).toHaveAttribute("data-mesh-ready", /true|fallback/);
+  await expect(mesh).toHaveAttribute("data-mesh-motion", "still");
+  expect(
+    await identity.evaluate((mark) => ({
+      animation: getComputedStyle(mark).animationName,
+      fieldMotion: mark.getAttribute("data-field-motion"),
+      shape: getComputedStyle(mark).borderRadius,
+      ring: getComputedStyle(mark.closest(".welcome-orchestrator-core") as Element, "::before").content,
+    })),
+  ).toEqual({
+    animation: "none",
+    fieldMotion: "still",
+    shape: "50%",
+    ring: "none",
+  });
+
+  const addSource = page.getByRole("button", { name: "Add a source" });
+  await addSource.click();
+  await expect(page.getByRole("textbox", { name: "Clip link" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(addSource).toBeFocused();
+});
+
+test("the welcome composition fits every supported viewport", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive viewport contract");
+
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/studio/");
+    await expect(page.getByRole("heading", { name: "Bring me a piece of real-world media." })).toBeVisible();
+
+    const orchestrator = page.locator(".welcome-orchestrator-anchor");
+    const message = page.locator(".welcome-message");
+    const addSource = page.getByRole("button", { name: "Add a source" });
+    const [orchestratorBox, addSourceBox] = await Promise.all([
+      orchestrator.boundingBox(),
+      addSource.boundingBox(),
+    ]);
+
+    expect(orchestratorBox).not.toBeNull();
+    expect(addSourceBox).not.toBeNull();
+    expect(
+      Math.abs((orchestratorBox?.x ?? 0) + (orchestratorBox?.width ?? 0) / 2 - viewport.width / 2),
+    ).toBeLessThanOrEqual(0.5);
+    expect(
+      Math.abs((orchestratorBox?.y ?? 0) + (orchestratorBox?.height ?? 0) / 2 - viewport.height / 2),
+    ).toBeLessThanOrEqual(0.5);
+    expect(addSourceBox?.y ?? 0).toBeGreaterThan(
+      (orchestratorBox?.y ?? 0) + (orchestratorBox?.height ?? 0),
+    );
+
+    for (const locator of [message, addSource]) {
+      const box = await locator.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
+      expect(box?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
+      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height + 0.5);
+    }
+  }
+});
+
 test("a submitted source launches the recorded interface preview", async ({ page }) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Add a source" }).click();
@@ -29,6 +107,10 @@ test("a submitted source launches the recorded interface preview", async ({ page
   await page.keyboard.press("Enter");
 
   await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
+  await expect(page.locator('.hub [data-agent-identity="orchestrator-root"]')).toBeVisible();
+  const thinking = page.locator('.hub [data-field-motion="thinking"]');
+  await expect(thinking).toBeVisible();
+  await expect(thinking.locator(".agent-mark-mesh")).toHaveAttribute("data-mesh-motion", "running");
   await expect(
     page.getByRole("note", {
       name: "Recorded interface preview for YouTube video link dQw4w9WgXcQ. The submitted source was not processed.",
@@ -117,6 +199,14 @@ test("mobile controls remain in the viewport", async ({ page }, testInfo) => {
 
 test("reduced motion disables decorative animation", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Add a source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await page.keyboard.press("Enter");
+  const thinkingMesh = page.locator('.hub [data-field-motion="thinking"] .agent-mark-mesh');
+  await expect(thinkingMesh).toBeVisible();
+  await expect(thinkingMesh).toHaveAttribute("data-mesh-motion", "still");
+
   await openLab(page);
   await scenario(page).selectOption("withheld");
 
@@ -134,6 +224,7 @@ test("owned-media preflight keeps receipted language decisions separate from job
   await scenario(page).selectOption("regression");
   await expect(readout(page)).toHaveText(/\d+ \/ 72/);
   await page.getByRole("button", { name: "Ready", exact: true }).click();
+  await page.getByRole("button", { name: "Collapse trace lab" }).click();
   await page.getByRole("button", { name: "Add a source" }).click();
   await page.getByRole("button", { name: "Demo clip" }).click();
 

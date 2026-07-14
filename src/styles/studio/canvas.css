@@ -167,9 +167,8 @@
 /* ---------- the orchestrator: the one node with no workspace ---------- */
 
 /*
- * It stays a disc while the workers are squircles, and that is the point: a squircle is a
- * workspace, and the orchestrator does not have one. It reads the job and spawns the
- * workers that do.
+ * Its circular mesh is an identity mark, not a workspace. Workers remain squircles because they
+ * contain tools and evidence; the orchestrator only reads the job and divides the work.
  */
 .hub {
   position: relative;
@@ -183,45 +182,28 @@
   place-items: center;
 }
 
-.hub-disc {
+.hub .agent-mark {
   width: 60px;
   height: 60px;
-  border-radius: 50%;
-  background: var(--ink);
-  transition:
-    background-color 240ms ease,
-    box-shadow 240ms ease;
 }
 
-.hub[data-status="working"] .hub-disc {
-  box-shadow: 0 0 0 8px var(--accent-soft);
-  animation: halo 1.8s ease-in-out infinite;
+.hub[data-on="true"] .agent-mark {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
-.hub[data-on="true"] .hub-disc {
-  background: var(--accent);
-}
-
-.hub:hover .hub-disc {
-  box-shadow: 0 0 0 8px var(--accent-soft);
+.hub:hover .agent-mark {
+  filter: brightness(1.08) saturate(1.08);
+  transform: scale(1.035);
 }
 
 .hub:focus-visible {
   outline: none;
 }
 
-.hub:focus-visible .hub-disc {
-  box-shadow: 0 0 0 3px var(--accent);
-}
-
-@keyframes halo {
-  0%,
-  100% {
-    box-shadow: 0 0 0 8px var(--accent-soft);
-  }
-  50% {
-    box-shadow: 0 0 0 2px var(--accent-soft);
-  }
+.hub:focus-visible .agent-mark {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .node-name {
@@ -407,7 +389,6 @@
   animation: none;
 }
 
-.studio[data-paused="true"] .hub-disc,
 .studio[data-paused="true"] .drawer-dot[data-status] {
   animation: none;
 }
@@ -419,7 +400,6 @@
 /* ---------- responsive ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .hub[data-status] .hub-disc,
   .cell-dot[data-status] {
     animation: none;
   }

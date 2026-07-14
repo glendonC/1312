@@ -1,9 +1,52 @@
 import { motion } from "motion/react";
 
+import AgentMark from "./AgentMark";
+import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import Preflight from "./preflight/Preflight";
+import SourceEntry from "./SourceEntry";
 import { useStudio } from "./store";
 
-/** A blank canvas. Everything the user can do lives in the dock. */
+/** The orchestrator's invitation, before any runtime or evidence state exists. */
+function StudioWelcome() {
+  return (
+    <section className="studio-welcome" aria-labelledby="studio-welcome-title">
+      <div className="welcome-orchestrator-anchor" aria-hidden="true">
+        <motion.div
+          className="welcome-orchestrator-core"
+          initial={{ opacity: 0, scale: 0.72 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <AgentMark identity={ORCHESTRATOR_IDENTITY} status="idle" />
+          <span className="node-name">orchestrator</span>
+        </motion.div>
+      </div>
+
+      <motion.div
+        className="welcome-message"
+        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.42, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <span className="welcome-kicker">Studio</span>
+        <h1 id="studio-welcome-title">Bring me a piece of real-world media.</h1>
+        <p>
+          I’ll organize the investigation and show how each finding connects back to its source.
+        </p>
+      </motion.div>
+
+      <motion.div
+        className="welcome-source"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.36, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <SourceEntry />
+      </motion.div>
+    </section>
+  );
+}
+
 export default function InputAct() {
   const loadStatus = useStudio((state) => state.loadStatus);
   const error = useStudio((state) => state.error);
@@ -23,6 +66,8 @@ export default function InputAct() {
       <div className="canvas" aria-hidden="true" />
 
       {preflightStatus !== "idle" && <Preflight />}
+
+      {preflightStatus === "idle" && loadStatus === "ready" && !outcome && <StudioWelcome />}
 
       {preflightStatus === "idle" && loadStatus === "loading" && (
         <div className="input-status" role="status" aria-live="polite">

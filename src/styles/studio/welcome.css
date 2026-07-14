@@ -1,0 +1,181 @@
+/* The invitation before a source exists. The orchestrator occupies the canvas centre;
+   its message and source control attach to it without becoming runtime nodes. */
+
+.studio-welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.welcome-orchestrator-anchor {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 68px;
+  height: 68px;
+  transform: translate(-50%, -50%);
+}
+
+.welcome-orchestrator-core {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.welcome-orchestrator-core .agent-mark {
+  display: block;
+  width: 68px;
+  height: 68px;
+}
+
+.welcome-orchestrator-core .node-name {
+  top: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.welcome-message {
+  position: absolute;
+  bottom: calc(50% + 54px);
+  left: calc(50% + 54px);
+  width: min(360px, calc(50vw - 76px));
+  padding: 17px 19px 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px 20px 20px 7px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+}
+
+.welcome-message::after {
+  position: absolute;
+  bottom: -6px;
+  left: 17px;
+  width: 12px;
+  height: 12px;
+  border-right: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.68);
+  transform: rotate(45deg);
+  content: "";
+}
+
+.welcome-kicker {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.welcome-message h1,
+.welcome-message p {
+  margin: 0;
+}
+
+.welcome-message h1 {
+  color: var(--ink);
+  font-size: 1.08rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+}
+
+.welcome-message p {
+  margin-top: 7px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.welcome-source {
+  position: absolute;
+  top: calc(50% + 94px);
+  left: 50%;
+  max-width: calc(100vw - 32px);
+  translate: -50% 0;
+}
+
+.source-entry {
+  max-width: calc(100vw - 32px);
+}
+
+.source-entry .dock-bar {
+  width: min(580px, calc(100vw - 32px));
+}
+
+.source-entry .dock-bar-source {
+  width: fit-content;
+}
+
+.source-entry .dock-fab:focus-visible {
+  border-radius: 999px;
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+}
+
+@media (max-width: 900px) {
+  .welcome-message {
+    bottom: calc(50% + 58px);
+    left: 50%;
+    width: min(360px, calc(100vw - 32px));
+    border-radius: 20px 20px 7px;
+    translate: -50% 0;
+  }
+
+  .welcome-message::after {
+    left: calc(50% - 6px);
+  }
+}
+
+@media (max-width: 480px) {
+  .welcome-orchestrator-anchor {
+    width: 60px;
+    height: 60px;
+  }
+
+  .welcome-orchestrator-core .agent-mark {
+    width: 60px;
+    height: 60px;
+  }
+
+  .welcome-message {
+    bottom: calc(50% + 53px);
+    padding: 15px 16px 16px;
+  }
+
+  .welcome-message h1 {
+    font-size: 1rem;
+  }
+
+  .welcome-message p {
+    font-size: 0.78rem;
+  }
+
+  .welcome-source {
+    top: calc(50% + 86px);
+  }
+}
+
+@media (max-height: 480px) {
+  .welcome-message {
+    bottom: calc(50% + 48px);
+    padding-top: 13px;
+    padding-bottom: 14px;
+  }
+
+  .welcome-message p {
+    margin-top: 5px;
+    line-height: 1.38;
+  }
+
+  .welcome-source {
+    top: calc(50% + 82px);
+  }
+}

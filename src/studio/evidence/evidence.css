@@ -1,0 +1,73 @@
+.recorded-evidence {
+  margin-top: 28px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.recorded-evidence header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.recorded-evidence header span,
+.recorded-evidence dt {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.recorded-evidence h3 {
+  margin: 4px 0 0;
+  font-size: 0.92rem;
+}
+
+.recorded-evidence header a {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.recorded-evidence-summary,
+.recorded-evidence-limit {
+  margin: 12px 0 0;
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.recorded-evidence dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 16px 0 0;
+}
+
+.recorded-evidence dl div {
+  min-width: 0;
+}
+
+.recorded-evidence dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .recorded-evidence header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .recorded-evidence dl {
+    grid-template-columns: 1fr;
+  }
+}

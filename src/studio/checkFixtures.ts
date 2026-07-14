@@ -7,6 +7,8 @@ import { pathToFileURL } from "node:url";
 
 import { assertRunBundle } from "./bundle";
 import { checkBundlePolicies } from "./checkBundlePolicies";
+import { checkRecordedEvidencePolicies } from "./evidence/checkPolicies";
+import type { RecordedEvidenceIndex } from "./evidence/types";
 import type { RunBundle } from "./transport";
 import type {
   CaptionsFile,
@@ -80,7 +82,7 @@ export async function checkRecordedRuns(): Promise<void> {
   const bundles = new Map<string, RunBundle>();
   for (const entry of entries) {
     const base = new URL(`${entry.name}/`, RUNS);
-    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe, preflightBundle] = await Promise.all([
+    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe, preflightBundle, evidenceIndex] = await Promise.all([
       json<RunManifest>(new URL("run.json", base)),
       json<CaptionsFile>(new URL("captions.json", base)),
       json<ScoreFile>(new URL("score.json", base)),
@@ -91,6 +93,7 @@ export async function checkRecordedRuns(): Promise<void> {
       optionalJson<IngestReceipt>(new URL("source.json", base)),
       optionalJson<MediaProbeReceipt>(new URL("media-probe.json", base)),
       optionalJson<PreflightBundle>(new URL("preflight.json", base)),
+      json<RecordedEvidenceIndex>(new URL("evidence.json", base)),
     ]);
     const pack = await json<LanguagePack>(new URL(`${run.pack}.json`, PACKS));
     if (traceFile.run !== run.id || traceFile.clip !== run.clip.id) {
@@ -110,10 +113,21 @@ export async function checkRecordedRuns(): Promise<void> {
       pack,
       ingestReceipt,
       mediaProbe,
+      evidence: evidenceIndex,
     };
 
     assertRunBundle(bundle, `Recorded Studio fixture ${entry.name}`);
+    checkRecordedEvidencePolicies(evidenceIndex, bundle);
     bundles.set(run.id, bundle);
+
+    for (const artifact of evidenceIndex.artifacts) {
+      const actual = await contentIdentity(new URL(artifact.path, base));
+      if (artifact.content.id !== actual.contentId || artifact.content.bytes !== actual.bytes) {
+        throw new Error(
+          `Recorded Studio fixture ${entry.name}: evidence artifact ${artifact.artifact_id} does not match its indexed bytes`,
+        );
+      }
+    }
 
     if (mediaProbe && run.clip.media) {
       const actual = await contentIdentity(new URL(run.clip.media, base));

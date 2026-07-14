@@ -3,6 +3,7 @@ import type { AgentStatus, CueState, Effect, Trace } from "./types";
 import { canTransition } from "./lifecycle";
 import { assertSourceReceipts } from "./preflight/receiptValidation";
 import { assertTrace } from "./traceValidation";
+import { assertRecordedEvidenceIndex } from "./evidence/validation";
 
 const ROLES = new Set(["orchestrator", "segment", "context", "translate", "qc"]);
 const STATUSES = new Set<AgentStatus>([
@@ -335,5 +336,8 @@ export function assertRunBundle(value: unknown, context = "Studio run bundle"): 
   const last = traces.at(-1) as Trace;
   if (last.agent !== "orchestrator" || last.action !== "done") {
     fail(context, "traces", "must end with an orchestrator done trace");
+  }
+  if (bundle.evidence !== undefined && bundle.evidence !== null) {
+    assertRecordedEvidenceIndex(bundle.evidence, value as RunBundle, `${context} evidence index`);
   }
 }

@@ -1,0 +1,350 @@
+{
+  "schema": "studio.recorded-evidence-index.v1",
+  "producer": "scripts/index-recorded-evidence.mjs",
+  "mode": "post_run_index",
+  "run": "run-005",
+  "clip": "ko-clip-01",
+  "claims": {
+    "artifact_byte_identity": true,
+    "terminal_caption_decisions": true,
+    "original_worker_lineage": false,
+    "structured_handoffs": false
+  },
+  "artifacts": [
+    {
+      "artifact_id": "captions",
+      "kind": "captions",
+      "path": "captions.json",
+      "content": {
+        "id": "sha256:9cca966b718b53e8daa8abf6d0bcd808949d00566b8502996508825325542fc4",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "9cca966b718b53e8daa8abf6d0bcd808949d00566b8502996508825325542fc4"
+        },
+        "bytes": 13161
+      },
+      "source_artifact_ids": []
+    },
+    {
+      "artifact_id": "corrections",
+      "kind": "corrections",
+      "path": "corrections.json",
+      "content": {
+        "id": "sha256:3a1ac5144b9f2a6f86098cae7a84c9feedc76ad4396a6f15d334e7ecf0dfc77a",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "3a1ac5144b9f2a6f86098cae7a84c9feedc76ad4396a6f15d334e7ecf0dfc77a"
+        },
+        "bytes": 2522
+      },
+      "source_artifact_ids": []
+    },
+    {
+      "artifact_id": "glossary",
+      "kind": "glossary",
+      "path": "glossary.json",
+      "content": {
+        "id": "sha256:680f155e8023f6a4aa1073c4e3d54d37f974621224f319a98430e9b5fbd99611",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "680f155e8023f6a4aa1073c4e3d54d37f974621224f319a98430e9b5fbd99611"
+        },
+        "bytes": 1136
+      },
+      "source_artifact_ids": []
+    },
+    {
+      "artifact_id": "score",
+      "kind": "score",
+      "path": "score.json",
+      "content": {
+        "id": "sha256:a647d999f12847328ebeed00f62ca7912bbb53efe54b31397c61bede31f686f7",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "a647d999f12847328ebeed00f62ca7912bbb53efe54b31397c61bede31f686f7"
+        },
+        "bytes": 6464
+      },
+      "source_artifact_ids": []
+    },
+    {
+      "artifact_id": "traces",
+      "kind": "traces",
+      "path": "traces.json",
+      "content": {
+        "id": "sha256:36dbda8657b0d4c0a1ac72a6b611b3321e73d188739cf085e2e3c4ecd45c3827",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "36dbda8657b0d4c0a1ac72a6b611b3321e73d188739cf085e2e3c4ecd45c3827"
+        },
+        "bytes": 30141
+      },
+      "source_artifact_ids": []
+    }
+  ],
+  "cue_decisions": [
+    {
+      "cue_id": "c01",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 33,
+        "at": 56,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c02",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 37,
+        "at": 64,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c03",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 41,
+        "at": 71.2,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c04",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 43,
+        "at": 74.8,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c05",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 47,
+        "at": 83.6,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c06",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 51,
+        "at": 91.6,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c08",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 55,
+        "at": 100.4,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c09",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 59,
+        "at": 108.4,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c10",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-02",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 35,
+        "at": 59.6,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c11",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-02",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 39,
+        "at": 67.6,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c12",
+      "terminal_state": "withheld",
+      "caption_owner_id": "translate-02",
+      "gate": {
+        "id": "music",
+        "reason": "speech SNR -5 dB, lexical confidence 0.31 < 0.60"
+      },
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 45,
+        "at": 79.2,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c13",
+      "terminal_state": "withheld",
+      "caption_owner_id": "translate-02",
+      "gate": {
+        "id": "music",
+        "reason": "music + laugh transient, lexical confidence 0.38 < 0.60"
+      },
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 49,
+        "at": 87.2,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c14",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-02",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 53,
+        "at": 96,
+        "agent_id": "qc-01",
+        "action": "pass"
+      }
+    },
+    {
+      "cue_id": "c15",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-02",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 57,
+        "at": 104.8,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c16",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-02",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 61,
+        "at": 112,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c17",
+      "terminal_state": "dropped",
+      "caption_owner_id": "qc-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 62,
+        "at": 113.6,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    }
+  ],
+  "note": "Deterministic post-run index over recorded artifact bytes and terminal cue effects. Caption owner and event agent ids are copied labels; original worker lineage and structured handoffs are not reconstructed."
+}

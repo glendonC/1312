@@ -24,6 +24,7 @@ import type {
   Trace,
   WaveFile,
 } from "./types";
+import type { RecordedEvidenceIndex } from "./evidence/types";
 import { assertRunBundle } from "./bundle";
 import { assertTrace } from "./traceValidation";
 
@@ -39,6 +40,8 @@ export interface RunBundle {
   /** Optional ingest receipt. Older synthetic fixtures have no source producer. */
   ingestReceipt?: IngestReceipt | null;
   mediaProbe?: MediaProbeReceipt | null;
+  /** Optional deterministic post-run index. It is not original runtime provenance. */
+  evidence?: RecordedEvidenceIndex | null;
 }
 
 export interface StreamOptions {
@@ -107,7 +110,7 @@ export class ReplayTransport implements RunTransport {
   async load(): Promise<RunBundle> {
     const base = `/demo/runs/${this.runId}`;
 
-    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe] = await Promise.all([
+    const [run, captions, score, wave, traceFile, glossary, corrections, ingestReceipt, mediaProbe, evidence] = await Promise.all([
       json<RunManifest>(`${base}/run.json`),
       json<CaptionsFile>(`${base}/captions.json`),
       json<ScoreFile>(`${base}/score.json`),
@@ -117,6 +120,7 @@ export class ReplayTransport implements RunTransport {
       json<CorrectionsFile>(`${base}/corrections.json`),
       optionalJson<IngestReceipt>(`${base}/source.json`),
       optionalJson<MediaProbeReceipt>(`${base}/media-probe.json`),
+      optionalJson<RecordedEvidenceIndex>(`${base}/evidence.json`),
     ]);
 
     // The language pack is cross-run memory, so it lives outside the run folder.
@@ -134,6 +138,7 @@ export class ReplayTransport implements RunTransport {
       corrections,
       ingestReceipt,
       mediaProbe,
+      evidence,
     };
     assertRunBundle(bundle, `Studio run ${this.runId}`);
     return bundle;

@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { clock, rate, signed } from "./format";
+import RecordedEvidence from "./evidence/RecordedEvidence";
 import { useBundle, useStudio } from "./store";
 import type { Cue, View } from "./types";
 
@@ -123,6 +124,8 @@ export default function Results() {
           sub={timingNote(prep?.time_to_complete_s ?? null, cold?.time_to_usable_s ?? null)}
         />
       </div>}
+
+      {showEvidence && <RecordedEvidence />}
 
       <footer className="result-foot">
         <p className="caveat">{score.rubric.note}</p>

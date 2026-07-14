@@ -43,11 +43,13 @@
  * Requires: ffmpeg, and OPENAI_API_KEY in .env.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { detectPhenomena, entityGate, PACK_GATES } from "./packs/ko-v3.mjs";
+import { contentIdForJson } from "./lib/immutable-receipts.mjs";
+import { acceptedHead, loadLedger, recordProposal } from "./lib/memory-review.mjs";
 import { normalizeSourceReceipt } from "./lib/source-receipts.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -895,7 +897,14 @@ async function main() {
         : []),
       { id: "qc-01", role: "qc", label: "qc-01", parent: "orchestrator" },
     ],
-    artifacts: ["captions.json", "corrections.json", "glossary.json", "score.json", "traces.json"],
+    artifacts: [
+      "captions.json",
+      "corrections.json",
+      "glossary.json",
+      "memory-proposals.json",
+      "score.json",
+      "traces.json",
+    ],
     note: `A run that actually happened on ${new Date().toISOString().slice(0, 10)}, against rights-receipted media (${source.rights.label}). Source lines are ${ASR}; the confidence the gates read is cross-recogniser agreement with ${ASR2}, because ${ASR} returns no logprobs and a confidence we cannot measure is one we do not print.`,
   });
 
@@ -922,26 +931,23 @@ async function main() {
   traces.sort((a, b) => a.t - b.t);
   write("traces.json", { run: RUN, clip: clip.id, wall_s: wall, traces });
 
-  // The glossary really is promoted, so the claim that it was is true. Merge by term: a later
-  // run over different media inherits what this one resolved, which is the whole point of
-  // memory being a run artifact and not a prompt.
-  const MEM = join(ROOT, "memory/glossary/ko.json");
-  mkdirSync(dirname(MEM), { recursive: true });
-  const memory = existsSync(MEM) ? readJson(MEM) : { lang: "ko", entries: [] };
-  for (const g of glossary) {
-    const at = memory.entries.findIndex((e) => e.term === g.term);
-    if (at === -1) memory.entries.push(g);
-    else memory.entries[at] = g;
-  }
-  memory.entries.sort((a, b) => a.term.localeCompare(b.term));
-  writeFileSync(MEM, JSON.stringify(memory, null, 2) + "\n");
-
+  // A model-produced run glossary is evidence for a proposal, not cross-run truth. Earlier
+  // runs merged these rows directly into memory/glossary/ko.json, allowing the producer to
+  // approve its own output and overwriting prior values without a decision receipt. Preserve
+  // that historical file as legacy input, but future runs stop here until a separate reviewer
+  // records a reasoned decision through scripts/memory-review.mjs.
   write("glossary.json", {
     run: RUN,
     clip: clip.id,
     pack: pack.id,
     scope: "run",
-    promoted_to: "memory/glossary/ko.json",
+    promoted_to: null,
+    promotion: {
+      status: "pending_review",
+      proposal_kind: "glossary",
+      proposal_manifest: "memory-proposals.json",
+      note: "Run-scoped evidence only. No cross-run memory was changed by this run.",
+    },
     // FALSE, and it has to be. A closed cast means we hold the show's real cast list and can
     // demote any name outside it. This is a podcast between two people who are never named in
     // the window: there is no cast to close. Declaring it closed would arm ko.cast_closed
@@ -1002,6 +1008,56 @@ async function main() {
     trail: [],
     delta_vs_cold: null,
     per_line: [],
+  });
+
+  // Proposal recording happens only after the complete evidence artifacts exist, so each
+  // immutable proposal can bind the exact glossary, captions, and trace bytes it asks a
+  // different actor to review. Creating a proposal changes no materialized memory.
+  const memoryStore = join(ROOT, "memory/review");
+  const ledger = await loadLedger({ store: memoryStore, workspaceRoot: ROOT });
+  const proposalReceipts = [];
+  for (const entry of glossary) {
+    const prior = acceptedHead(ledger, {
+      namespace: "language/ko/glossary",
+      kind: "glossary",
+      key: entry.term,
+    });
+    const { proposal } = await recordProposal({
+      store: memoryStore,
+      namespace: "language/ko/glossary",
+      kind: "glossary",
+      key: entry.term,
+      value: entry,
+      proposedBy: "context-01",
+      evidencePaths: [
+        `public/demo/runs/${RUN}/glossary.json`,
+        `public/demo/runs/${RUN}/captions.json`,
+        `public/demo/runs/${RUN}/traces.json`,
+      ],
+      supersedes: prior?.proposal_id ?? null,
+      source: { run_id: RUN, clip_id: clip.id, pack_id: pack.id, artifact: "glossary.json" },
+      workspaceRoot: ROOT,
+    });
+    proposalReceipts.push({
+      proposal_id: proposal.proposal_id,
+      proposal_content_id: contentIdForJson(proposal),
+      namespace: proposal.namespace,
+      kind: proposal.kind,
+      key: proposal.key,
+      status: "pending_review",
+    });
+    ledger.proposals.push(proposal);
+  }
+  const proposalManifestBody = {
+    schema: "studio.memory.run-proposals.v1",
+    run: RUN,
+    clip: clip.id,
+    status: "pending_review",
+    proposals: proposalReceipts,
+  };
+  write("memory-proposals.json", {
+    manifest_id: `memory-proposal-manifest:${contentIdForJson(proposalManifestBody)}`,
+    ...proposalManifestBody,
   });
 
   console.log(`\n  ${RUN}: ${traces.length} traces · ${wall.toFixed(1)}s wall · ${committed} committed · ${withheld} withheld\n`);

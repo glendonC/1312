@@ -380,9 +380,16 @@ export interface GlossaryFile {
   run: string;
   clip: string;
   pack: string;
-  /** Run-scoped delta. Promoted into cross-run memory after the run. */
+  /** Run-scoped delta. Historical runs may name the legacy file they mutated. */
   scope: string;
-  promoted_to: string;
+  promoted_to: string | null;
+  /** Present on proposal-first runs, which cannot promote their own model output. */
+  promotion?: {
+    status: "pending_review";
+    proposal_kind: "glossary";
+    proposal_manifest: string;
+    note: string;
+  };
   cast_closed: boolean;
   entries: GlossaryEntry[];
 }

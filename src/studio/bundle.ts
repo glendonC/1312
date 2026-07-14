@@ -277,6 +277,28 @@ export function assertRunBundle(value: unknown, context = "Studio run bundle"): 
   const glossary = record(bundle.glossary, context, "glossary");
   if (text(glossary.run, context, "glossary.run") !== runId) fail(context, "glossary.run", "does not match run.id");
   if (text(glossary.clip, context, "glossary.clip") !== clipId) fail(context, "glossary.clip", "does not match run.clip.id");
+  if (glossary.promotion !== undefined) {
+    if (glossary.promoted_to !== null) fail(context, "glossary.promoted_to", "must be null while review is pending");
+    const promotion = record(glossary.promotion, context, "glossary.promotion");
+    const expected = ["status", "proposal_kind", "proposal_manifest", "note"];
+    const keys = Object.keys(promotion);
+    if (keys.length !== expected.length || keys.some((key) => !expected.includes(key))) {
+      fail(context, "glossary.promotion", "must use the closed pending-review shape");
+    }
+    if (text(promotion.status, context, "glossary.promotion.status") !== "pending_review") {
+      fail(context, "glossary.promotion.status", "must equal pending_review");
+    }
+    if (text(promotion.proposal_kind, context, "glossary.promotion.proposal_kind") !== "glossary") {
+      fail(context, "glossary.promotion.proposal_kind", "must equal glossary");
+    }
+    const manifest = text(promotion.proposal_manifest, context, "glossary.promotion.proposal_manifest");
+    if (!declaredArtifacts.includes(manifest)) {
+      fail(context, "glossary.promotion.proposal_manifest", "must be declared in run.artifacts");
+    }
+    text(promotion.note, context, "glossary.promotion.note");
+  } else {
+    text(glossary.promoted_to, context, "glossary.promoted_to");
+  }
   list(glossary.entries, context, "glossary.entries");
   const corrections = record(bundle.corrections, context, "corrections");
   if (text(corrections.run, context, "corrections.run") !== runId) fail(context, "corrections.run", "does not match run.id");

@@ -1,0 +1,14 @@
+{
+  "schema": "studio.memory.legacy-snapshot.v1",
+  "snapshot_id": "memory-legacy:sha256:711a843e8e4fa4f31d46ec6938b3250a9912b4b40ed303fc47e60eb16e0db7c3",
+  "namespace": "language/ko/glossary",
+  "status": "legacy_unreviewed",
+  "created_at": "2026-07-13T00:00:00.000Z",
+  "source": {
+    "path": "memory/glossary/ko.json",
+    "content_id": "sha256:441cf9ce7ee49b04acbff4cdc2ac8a46c4c54dd3b24c8e507cd2ed2e19beadbd",
+    "bytes": 1621
+  },
+  "entry_count": 9,
+  "note": "Imported only as legacy, unreviewed input. No entry is accepted or promoted by this receipt."
+}

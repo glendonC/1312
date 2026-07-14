@@ -1,0 +1,262 @@
+import { assertRuntimeEvent } from "./assertions.ts";
+import type { CapabilityGrant, RuntimeProjection, TaskRecord, TaskStatus } from "./model.ts";
+import type { RuntimeEvent } from "./protocol.ts";
+
+function invariant(condition: unknown, event: RuntimeEvent, message: string): asserts condition {
+  if (!condition) throw new Error(`Runtime event ${event.eventId}: ${message}`);
+}
+
+function sameGrants(left: CapabilityGrant[], right: CapabilityGrant[]): boolean {
+  const canonical = (grants: CapabilityGrant[]) =>
+    [...grants]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((grant) => ({ ...grant, mediaScope: [...grant.mediaScope] }));
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+}
+
+const TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
+  scheduled: ["working", "failed", "withheld"],
+  working: ["reported", "completed", "failed", "withheld"],
+  reported: ["completed", "failed", "withheld"],
+  completed: [],
+  failed: [],
+  withheld: [],
+};
+
+export function initialRuntimeProjection(runId: string): RuntimeProjection {
+  if (!runId.trim()) throw new Error("Runtime projection requires a run id");
+  return {
+    runId,
+    lastSeq: 0,
+    tasks: {},
+    agents: {},
+    artifacts: {},
+    spawnRequests: {},
+    operations: {},
+    reports: {},
+  };
+}
+
+function validateTaskReferences(next: RuntimeProjection, event: RuntimeEvent, task: TaskRecord): void {
+  invariant(task.runId === next.runId, event, `task ${task.id} belongs to another run`);
+  invariant(!next.tasks[task.id], event, `task ${task.id} is duplicated`);
+  invariant(!Object.values(next.tasks).some((candidate) => candidate.assignedAgentId === task.assignedAgentId), event, `agent ${task.assignedAgentId} is already assigned`);
+  invariant(task.inputArtifactIds.every((id) => Boolean(next.artifacts[id])), event, `task ${task.id} references an unknown input artifact`);
+  invariant(task.dependencies.every((id) => next.tasks[id]?.status === "completed"), event, `task ${task.id} has an incomplete dependency`);
+  for (const scope of task.mediaScope) {
+    const artifact = next.artifacts[scope.artifactId];
+    invariant(artifact, event, `task ${task.id} scope references unknown artifact ${scope.artifactId}`);
+    invariant(artifact.tracks.some((track) => track.id === scope.trackId), event, `task ${task.id} scope references unknown track ${scope.trackId}`);
+    invariant(scope.endMs <= (artifact.durationMs ?? 0), event, `task ${task.id} scope exceeds artifact duration`);
+  }
+  if (task.parentTaskId === null) {
+    invariant(task.parentAgentId === null && task.depth === 0, event, `root task ${task.id} has invalid parentage`);
+  } else {
+    const parent = next.tasks[task.parentTaskId];
+    invariant(parent, event, `task ${task.id} references unknown parent ${task.parentTaskId}`);
+    invariant(task.parentAgentId === parent.ownerAgentId, event, `task ${task.id} parent agent changed`);
+    invariant(task.depth === parent.depth + 1, event, `task ${task.id} depth is not derived from its parent`);
+  }
+  invariant(task.grants.every((grant) => grant.taskId === task.id && grant.agentId === task.assignedAgentId), event, `task ${task.id} has grants for another owner`);
+}
+
+/** Fold one asserted, ordered production event into an immutable normalized projection. */
+export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown): RuntimeProjection {
+  assertRuntimeEvent(candidate);
+  const event = candidate;
+  invariant(event.runId === state.runId, event, `run ${event.runId} does not match ${state.runId}`);
+  invariant(event.seq === state.lastSeq + 1, event, `sequence expected ${state.lastSeq + 1}, received ${event.seq}`);
+  invariant(event.eventId === `event:${event.runId}:${event.seq}`, event, "event identity does not match run and sequence");
+
+  const next = structuredClone(state);
+  next.lastSeq = event.seq;
+
+  if (event.type === "artifact.recorded") {
+    const artifact = event.data.artifact;
+    invariant(event.producer.kind === "artifact_store", event, "artifact evidence must come from the artifact store");
+    invariant(artifact.runId === next.runId, event, `artifact ${artifact.id} belongs to another run`);
+    invariant(!next.artifacts[artifact.id], event, `artifact ${artifact.id} is duplicated`);
+    invariant(artifact.sourceArtifactIds.every((id) => Boolean(next.artifacts[id])), event, `artifact ${artifact.id} has missing lineage`);
+    if (artifact.origin.kind === "media_operation") {
+      const operation = next.operations[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active media operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `artifact ${artifact.id} changed its operation producer`);
+      invariant(artifact.sourceArtifactIds.includes(operation.artifactId), event, `artifact ${artifact.id} omits its operation input`);
+    }
+    next.artifacts[artifact.id] = artifact;
+    return next;
+  }
+
+  if (event.type === "task.created") {
+    invariant(event.producer.kind === "scheduler", event, "task creation must come from the scheduler");
+    const task = event.data.task;
+    validateTaskReferences(next, event, task);
+    if (task.parentTaskId !== null) {
+      const request = Object.values(next.spawnRequests).find((candidate) => candidate.taskId === task.id);
+      invariant(request?.accepted === true && request.agentId === task.assignedAgentId, event, `task ${task.id} has no accepted spawn decision`);
+    }
+    next.tasks[task.id] = task;
+    return next;
+  }
+
+  if (event.type === "spawn.requested") {
+    invariant(event.producer.kind === "scheduler", event, "normalized spawn requests must come from the scheduler");
+    invariant(!next.spawnRequests[event.data.requestId], event, `spawn request ${event.data.requestId} is duplicated`);
+    next.spawnRequests[event.data.requestId] = {
+      id: event.data.requestId,
+      requestedByTaskId: event.data.requestedByTaskId,
+      requestedByAgentId: event.data.requestedByAgentId,
+      input: event.data.input,
+      accepted: null,
+      rejection: null,
+      taskId: null,
+      agentId: null,
+    };
+    return next;
+  }
+
+  if (event.type === "spawn.decided") {
+    invariant(event.producer.kind === "scheduler", event, "spawn decisions must come from the scheduler");
+    const request = next.spawnRequests[event.data.requestId];
+    invariant(request, event, `spawn decision ${event.data.requestId} has no request`);
+    invariant(request.accepted === null, event, `spawn request ${event.data.requestId} was decided twice`);
+    request.accepted = event.data.accepted;
+    request.rejection = event.data.rejection;
+    request.taskId = event.data.taskId;
+    request.agentId = event.data.agentId;
+    return next;
+  }
+
+  if (event.type === "agent.registered") {
+    invariant(event.producer.kind === "registry", event, "agent registration must come from the registry");
+    const agent = event.data.agent;
+    const task = next.tasks[agent.taskId];
+    invariant(task, event, `agent ${agent.id} references unknown task ${agent.taskId}`);
+    invariant(task.assignedAgentId === agent.id && task.ownerAgentId === null, event, `task ${task.id} cannot register agent ${agent.id}`);
+    invariant(!next.agents[agent.id], event, `agent ${agent.id} is duplicated`);
+    invariant(agent.parentTaskId === task.parentTaskId && agent.parentAgentId === task.parentAgentId, event, `agent ${agent.id} parentage changed`);
+    invariant(agent.kind === task.workerKind && agent.label === task.workerLabel, event, `agent ${agent.id} presentation changed`);
+    invariant(sameGrants(agent.grants, task.grants), event, `agent ${agent.id} grants differ from the scheduler decision`);
+    task.ownerAgentId = agent.id;
+    next.agents[agent.id] = agent;
+    return next;
+  }
+
+  if (event.type === "task.transitioned") {
+    invariant(event.producer.kind === "scheduler", event, "task transitions must come from the scheduler");
+    const task = next.tasks[event.data.taskId];
+    invariant(task?.ownerAgentId === event.data.agentId, event, `task ${event.data.taskId} transition has no owner`);
+    invariant(TRANSITIONS[task.status].includes(event.data.status), event, `illegal task transition ${task.status} -> ${event.data.status}`);
+    const activeOperation = Object.values(next.operations).some(
+      (operation) => operation.taskId === task.id && operation.status === "started",
+    );
+    invariant(!activeOperation || event.data.status === "working", event, `task ${task.id} has an active media operation`);
+    task.status = event.data.status;
+    const agent = next.agents[event.data.agentId];
+    if (event.data.status === "working") agent.status = "working";
+    else if (event.data.status === "reported") agent.status = "reporting";
+    else agent.status = "retired";
+    return next;
+  }
+
+  if (event.type === "media.operation_started") {
+    invariant(event.producer.kind === "media_host", event, "media operation evidence must come from the media host");
+    const request = event.data.request;
+    const task = next.tasks[request.taskId];
+    invariant(task?.status === "working" && task.ownerAgentId === request.agentId, event, `operation ${request.operationId} has no working owner`);
+    invariant(!next.operations[request.operationId], event, `operation ${request.operationId} is duplicated`);
+    const grant = task.grants.find((candidate) => candidate.id === event.data.grantId);
+    invariant(grant?.capability === "media.extract", event, `operation ${request.operationId} lacks an extract grant`);
+    const calls = Object.values(next.operations).filter((operation) => operation.taskId === task.id).length;
+    invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
+    next.operations[request.operationId] = {
+      id: request.operationId,
+      capability: "media.extract",
+      taskId: request.taskId,
+      agentId: request.agentId,
+      grantId: event.data.grantId,
+      artifactId: request.artifactId,
+      trackId: request.trackId,
+      startMs: request.startMs,
+      endMs: request.endMs,
+      status: "started",
+      outputArtifactId: null,
+      receiptId: null,
+      failure: null,
+    };
+    return next;
+  }
+
+  if (event.type === "media.operation_completed") {
+    invariant(event.producer.kind === "media_host", event, "media completion evidence must come from the media host");
+    const operation = next.operations[event.data.operationId];
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    invariant(operation?.status === "started", event, `operation ${event.data.operationId} is not active`);
+    invariant(artifact, event, `operation ${event.data.operationId} output was not recorded`);
+    invariant(event.data.receipt.operationId === operation.id, event, `operation ${operation.id} receipt changed identity`);
+    invariant(event.data.receipt.output.artifactId === artifact.id, event, `operation ${operation.id} receipt names another artifact`);
+    invariant(artifact.origin.kind === "media_operation" && artifact.origin.receiptId === event.data.receipt.receiptId, event, `operation ${operation.id} artifact is not bound to its receipt`);
+    operation.status = "completed";
+    operation.outputArtifactId = artifact.id;
+    operation.receiptId = event.data.receipt.receiptId;
+    return next;
+  }
+
+  if (event.type === "report.submitted") {
+    invariant(event.producer.kind === "handoff_host", event, "reports must come from the handoff host");
+    const report = event.data.report;
+    const task = next.tasks[report.taskId];
+    invariant(task?.status === "working" && task.ownerAgentId === report.agentId, event, `report ${report.id} has no working owner`);
+    invariant(task.grants.some((grant) => grant.capability === "report.submit"), event, `task ${task.id} cannot submit reports`);
+    invariant(task.parentTaskId === report.parentTaskId && task.parentAgentId === report.parentAgentId, event, `report ${report.id} parentage changed`);
+    invariant(!next.reports[report.id], event, `report ${report.id} is duplicated`);
+    invariant(report.status === "submitted" && report.decisionReason === null, event, `report ${report.id} has a premature decision`);
+    invariant(report.outputArtifactIds.length > 0, event, `report ${report.id} has no output artifacts`);
+    invariant(
+      report.outputArtifactIds.every((id) => {
+        const artifact = next.artifacts[id];
+        return artifact?.producerTaskId === task.id && artifact.producerAgentId === report.agentId;
+      }),
+      event,
+      `report ${report.id} contains an artifact owned by another task`,
+    );
+    for (const output of task.requiredOutputs.filter((candidate) => candidate.required)) {
+      invariant(
+        report.outputArtifactIds.some((id) => next.artifacts[id]?.kind === output.artifactKind),
+        event,
+        `report ${report.id} does not satisfy ${output.name}`,
+      );
+    }
+    next.reports[report.id] = report;
+    task.status = "reported";
+    next.agents[report.agentId].status = "reporting";
+    return next;
+  }
+
+  if (event.type === "report.decided") {
+    invariant(event.producer.kind === "handoff_host", event, "report decisions must come from the handoff host");
+    const report = next.reports[event.data.reportId];
+    invariant(report?.status === "submitted", event, `report ${event.data.reportId} is not pending`);
+    const parent = next.tasks[report.parentTaskId];
+    const child = next.tasks[report.taskId];
+    invariant(parent?.ownerAgentId === event.data.decidedByAgentId && parent.id === event.data.decidedByTaskId, event, `report ${report.id} was decided outside its parent`);
+    invariant(child?.status === "reported", event, `report ${report.id} child is not reported`);
+    report.status = event.data.accepted ? "accepted" : "rejected";
+    report.decisionReason = event.data.reason;
+    child.status = event.data.accepted ? "completed" : "working";
+    next.agents[report.agentId].status = event.data.accepted ? "retired" : "working";
+    return next;
+  }
+
+  invariant(event.type === "media.operation_failed", event, "unknown runtime event");
+  invariant(event.producer.kind === "media_host", event, "media failure evidence must come from the media host");
+  const operation = next.operations[event.data.operationId];
+  invariant(operation?.status === "started", event, `operation ${event.data.operationId} is not active`);
+  operation.status = "failed";
+  operation.failure = event.data.reason;
+  return next;
+}
+
+export function projectRuntimeEvents(runId: string, events: readonly unknown[]): RuntimeProjection {
+  return events.reduce(applyRuntimeEvent, initialRuntimeProjection(runId));
+}

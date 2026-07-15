@@ -1,28 +1,14 @@
-/** The dock's glyphs. Drawn at one size, coloured by whatever they sit inside. */
+/** Studio glyphs. Drawn at one size and coloured by their control. */
 
-export function Chevron({ up = false }: { up?: boolean }) {
+export function Play() {
   return (
-    <svg
-      className="chevron"
-      viewBox="0 0 16 16"
-      width="14"
-      height="14"
-      aria-hidden="true"
-      style={up ? { transform: "rotate(180deg)" } : undefined}
-    >
-      <path
-        d="M4 6.5 8 10.5l4-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path d="M5 3.4 12.5 8 5 12.6z" fill="currentColor" />
     </svg>
   );
 }
 
-/** The hold and the release: one control, two moods, the same box so nothing shifts. */
+/** Pause and resume share one footprint so the control never shifts when its state changes. */
 export function Hold({ paused }: { paused: boolean }) {
   return (
     <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
@@ -40,20 +26,6 @@ export function Hold({ paused }: { paused: boolean }) {
           <rect x="9" y="3.6" width="2.4" height="8.8" rx="1" fill="currentColor" />
         </>
       )}
-    </svg>
-  );
-}
-
-export function Cross() {
-  return (
-    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-      <path
-        d="M4.4 4.4l7.2 7.2M11.6 4.4l-7.2 7.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
     </svg>
   );
 }

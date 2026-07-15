@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 
-import { Arrow, Edit, LinkSource, YouTube } from "./glyphs";
+import { Arrow, Edit } from "./glyphs";
 import { presentSource } from "./previewSession";
-import { useBundle, useStudio } from "./store";
+import SourceDisplay from "./SourceDisplay";
+import { useStudio } from "./store";
 
 const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as const;
 
@@ -13,17 +14,14 @@ const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as con
  * the two surfaces remain free to evolve around different jobs.
  */
 export default function SourceEntry() {
-  const bundle = useBundle();
-  const openRecordedPreflight = useStudio((state) => state.openRecordedPreflight);
   const submitSource = useStudio((state) => state.submitSource);
+  const dismissPreflight = useStudio((state) => state.dismissPreflight);
 
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [editingSource, setEditingSource] = useState(true);
   const [fieldOverflow, setFieldOverflow] = useState({ left: false, right: false });
-  const [sourceOverflow, setSourceOverflow] = useState(false);
   const field = useRef<HTMLInputElement>(null);
-  const sourceUrl = useRef<HTMLSpanElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const control = useRef<HTMLDivElement>(null);
   const [controlWidth, setControlWidth] = useState(0);
@@ -66,19 +64,6 @@ export default function SourceEntry() {
     return () => window.cancelAnimationFrame(frame);
   }, [controlWidth, editingSource, open, url]);
 
-  useLayoutEffect(() => {
-    if (!reviewingSource) {
-      setSourceOverflow(false);
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      const source = sourceUrl.current;
-      setSourceOverflow(Boolean(source && source.scrollWidth > source.clientWidth + 1));
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [controlWidth, reviewingSource, url]);
-
   function close(): void {
     setOpen(false);
     window.requestAnimationFrame(() => trigger.current?.focus());
@@ -107,6 +92,7 @@ export default function SourceEntry() {
             type="button"
             className="dock-fab"
             onClick={() => {
+              dismissPreflight();
               setEditingSource(true);
               setOpen(true);
             }}
@@ -116,7 +102,7 @@ export default function SourceEntry() {
             transition={{ duration: 0.15 }}
             layout
           >
-            Add a source
+            Input Source
           </motion.button>
         ) : (
           <motion.form
@@ -133,28 +119,15 @@ export default function SourceEntry() {
               <>
                 <button
                   type="button"
-                  className="dock-source-edit"
+                  className="dock-source-review"
                   aria-label={`Edit source: ${sourcePresentation.accessibleName}`}
                   onClick={() => setEditingSource(true)}
                 >
-                  <Edit />
+                  <span className="dock-source-edit-mark" aria-hidden="true">
+                    <Edit />
+                  </span>
+                  <SourceDisplay source={sourcePresentation} title={url} />
                 </button>
-
-                <div className="dock-source" title={url}>
-                  <span className="dock-source-glyph" data-kind={sourcePresentation.kind}>
-                    {sourcePresentation.kind === "youtube" ? <YouTube /> : <LinkSource />}
-                  </span>
-                  <span ref={sourceUrl} className="dock-source-url" data-overflow={sourceOverflow}>
-                    <span
-                      className={`dock-source-url-full${sourcePresentation.compactUrl ? " has-compact" : ""}`}
-                    >
-                      {sourcePresentation.displayUrl}
-                    </span>
-                    {sourcePresentation.compactUrl && (
-                      <span className="dock-source-url-compact">{sourcePresentation.compactUrl}</span>
-                    )}
-                  </span>
-                </div>
               </>
             ) : (
               <span
@@ -177,7 +150,10 @@ export default function SourceEntry() {
                       window.requestAnimationFrame(() => setEditingSource(false));
                     }
                   }}
-                  onChange={(event) => setUrl(event.target.value)}
+                  onChange={(event) => {
+                    dismissPreflight();
+                    setUrl(event.target.value);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") close();
                     window.requestAnimationFrame(syncFieldOverflow);
@@ -186,21 +162,6 @@ export default function SourceEntry() {
                   onSelect={syncFieldOverflow}
                 />
               </span>
-            )}
-
-            {!reviewingSource && (
-              <>
-                <span className="dock-sep" aria-hidden="true" />
-                <button
-                  type="button"
-                  className="dock-demo"
-                  onClick={openRecordedPreflight}
-                  disabled={!bundle}
-                  title={bundle?.run.clip.title_target}
-                >
-                  Demo clip
-                </button>
-              </>
             )}
 
             <button type="submit" className="dock-go" aria-label="Launch investigation">

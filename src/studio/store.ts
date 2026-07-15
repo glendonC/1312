@@ -284,16 +284,13 @@ export const useStudio = create<StudioStore>((set, get) => ({
     handle?.stop();
     handle = null;
     set({
-      stage: "input",
-      state: initialState(),
+      stage: "run",
       selected: null,
-      clipT: 0,
       playing: false,
       paused: false,
       pausePending: false,
       outcome: { kind: "cancelled", reason },
       preflight: idlePreflight(),
-      previewSession: null,
     });
   },
 

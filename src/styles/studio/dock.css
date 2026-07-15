@@ -1,6 +1,4 @@
-/* The dock: the one control surface. It never leaves, and it holds the stop and the hold. */
-
-/* ---------- ACT 1: blank canvas, one glass dock ---------- */
+/* Source entry before a run, and the single global control while a run is active. */
 
 .act-input {
   position: relative;
@@ -9,7 +7,6 @@
   flex: 1;
 }
 
-/* something for the glass to refract, or it reads as a grey box */
 .canvas {
   position: absolute;
   inset: 0;
@@ -63,7 +60,6 @@
   font-size: 0.64rem;
 }
 
-/* the one control surface: fixed, always present, never hidden mid-run */
 .dock-well {
   position: fixed;
   bottom: clamp(20px, 4vh, 34px);
@@ -72,50 +68,27 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   transform: translateX(-50%);
 }
 
-.dock-note {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.dock-note[data-tone="deny"] {
-  color: var(--flag);
-}
-
-.dock-note[data-tone="allow"] {
-  color: var(--accent);
-}
-
-/*
- * The hold, on its own small pane of the same glass.
- *
- * It sits above the bar instead of inside it because it has to outlive the bar's shape:
- * fold the dock into its capsule and the hold is still there. Pausing is not the same
- * decision as stopping, so it does not live next to the stop and it is not red — a held
- * run is suspended, not killed.
- */
+/* Pause is reversible, so it sits on a separate quiet plane above the destructive Stop. */
 .rail {
   display: flex;
   overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.54);
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.7),
-    0 10px 26px rgba(26, 70, 66, 0.1);
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    inset 0 1px 1px rgba(255, 255, 255, 0.72),
+    0 9px 24px rgba(26, 70, 66, 0.09);
+  backdrop-filter: blur(20px) saturate(1.55);
+  -webkit-backdrop-filter: blur(20px) saturate(1.55);
 }
 
 .rail[data-paused="true"] {
   border-color: var(--hold-line);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.74);
 }
 
 .rail-btn {
@@ -123,12 +96,12 @@
   height: 34px;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
+  padding: 0 14px;
   border: 0;
-  background: transparent;
   color: var(--ink-soft);
+  background: transparent;
   font-family: var(--font-sans);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   letter-spacing: -0.005em;
   white-space: nowrap;
   cursor: pointer;
@@ -142,26 +115,6 @@
   background: rgba(22, 29, 27, 0.05);
 }
 
-.rail-btn:disabled,
-.dock-hold:disabled {
-  cursor: wait;
-  opacity: 0.7;
-}
-
-/* printed because it works: space holds the run and lets it go again */
-.rail-btn kbd {
-  padding: 2px 5px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  corner-shape: squircle;
-  color: var(--ink-muted);
-  background: rgba(22, 29, 27, 0.04);
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  line-height: 1;
-}
-
-/* resuming is the go, so it takes the accent the stop never gets to touch */
 .rail[data-paused="true"] .rail-btn {
   color: var(--accent);
 }
@@ -170,7 +123,23 @@
   background: var(--accent-soft);
 }
 
-/* the dock expands out of its own centre, so it grows left and right at once */
+.rail-btn:disabled,
+.dock-hold:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.rail-btn kbd {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink-muted);
+  background: rgba(22, 29, 27, 0.04);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  line-height: 1;
+}
+
 .dock,
 .source-entry {
   position: relative;
@@ -184,143 +153,29 @@
   -webkit-backdrop-filter: blur(26px) saturate(1.7);
 }
 
-/*
- * The run's progress traces the dock's own outline. A bar sitting on the inside floor
- * of the pill reads as a foreign object dropped into the glass. The border is already
- * a closed loop the eye follows, so the progress just fills it.
- */
 .dock-trace {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
 
-.dock-trace-bed {
+.dock-trace-bed,
+.dock-trace-run {
   fill: none;
-  stroke: rgba(22, 29, 27, 0.07);
   stroke-width: 2;
+}
+
+.dock-trace-bed {
+  stroke: rgba(22, 29, 27, 0.07);
 }
 
 .dock-trace-run {
-  fill: none;
   stroke: var(--accent);
-  stroke-width: 2;
   stroke-linecap: round;
-  transition: stroke 240ms ease;
 }
 
-/* the trace does not stop where it is by accident: a held run went exactly this far */
 .dock[data-paused="true"] .dock-trace-run {
   stroke: var(--hold);
-}
-
-.dock-status {
-  display: inline-flex;
-  min-width: 7.4rem;
-  align-items: center;
-  font-size: 0.92rem;
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-}
-
-.dock-done {
-  color: var(--accent);
-}
-
-/* no shimmer: the sweep is the run's pulse and a held run does not have one */
-.dock-held {
-  color: var(--hold);
-}
-
-.dock-clip {
-  overflow: hidden;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/*
- * The stop and the go are the same object in two moods: same 40px circle, same fill
- * weight, same hover lift. Only the colour differs, and only while a run is in flight,
- * because stopping the swarm is the one irreversible thing on this screen.
- */
-.dock-go,
-.dock-x {
-  display: inline-flex;
-  width: 40px;
-  height: 40px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 50%;
-  color: #f7faf8;
-  background: var(--ink);
-  cursor: pointer;
-  transition:
-    background-color 160ms ease,
-    transform 160ms ease;
-}
-
-.dock-go:hover,
-.dock-x:hover {
-  background: var(--accent);
-  transform: scale(1.06);
-}
-
-.dock-x[data-running="true"] {
-  background: var(--stop);
-  box-shadow: 0 0 0 0 var(--stop-line);
-  animation: stop-pulse 1.9s ease-out infinite;
-}
-
-.dock-x[data-running="true"]:hover {
-  background: var(--stop-hot);
-  box-shadow: none;
-  animation: none;
-}
-
-/*
- * A held run still has something to stop, so the stop stays red — but it stops pulsing.
- * The pulse is a heartbeat, and this run does not have one right now.
- */
-.dock[data-paused="true"] .dock-x[data-running="true"] {
-  box-shadow: none;
-  animation: none;
-}
-
-@keyframes stop-pulse {
-  0% {
-    box-shadow: 0 0 0 0 var(--stop-line);
-  }
-  70% {
-    box-shadow: 0 0 0 9px rgba(226, 61, 45, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(226, 61, 45, 0);
-  }
-}
-
-.dock-fab {
-  height: 54px;
-  padding: 0 30px;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 0.92rem;
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: color 160ms ease;
-}
-
-.dock-fab:hover {
-  color: var(--accent);
 }
 
 .dock-bar {
@@ -332,38 +187,88 @@
   padding: 0 7px 0 22px;
 }
 
-.dock-bar-source {
-  width: fit-content;
-  max-width: min(480px, 86vw);
-  padding-inline: 7px;
-}
-
-.dock-bar-source .dock-source {
-  flex: 0 1 auto;
-}
-
-.dock-bar-source .dock-source-url {
-  max-width: 300px;
-  flex: 0 1 auto;
-}
-
-/* the fold control takes the left inset the text used to hold */
 .dock-bar-run {
-  padding-left: 10px;
+  width: fit-content;
+  min-width: 0;
+  padding-left: 20px;
 }
 
-/* pushes the stop to the right edge, opposite where the go circle sits */
-.dock-gap {
-  flex: 1;
+.dock-status {
+  display: inline-flex;
+  min-width: 7.4rem;
+  align-items: center;
+  font-size: 0.88rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
-/*
- * The hold, in the bar.
- *
- * Only on narrow screens, where the rail above has nowhere to live. It takes the left seat
- * so the bar reads hold · state · stop — a control at each end, and the run's state between
- * them. On a wide screen this is dead and the rail does the job.
- */
+.dock-done {
+  color: var(--accent);
+}
+
+.dock-cancelled {
+  color: var(--ink-soft);
+}
+
+.dock-held {
+  color: var(--hold);
+}
+
+.dock[data-outcome="cancelled"] .dock-trace-run {
+  stroke: var(--ink-muted);
+}
+
+.dock-pct {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-again,
+.dock-stop {
+  height: 40px;
+  flex: none;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.52);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.dock-again:hover {
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.dock-stop {
+  margin-left: 4px;
+  border-color: var(--line);
+}
+
+.dock-stop:hover {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.dock-stop[data-running="true"] {
+  border-color: transparent;
+  color: #fff;
+  background: var(--stop);
+}
+
+.dock-stop[data-running="true"]:hover {
+  background: var(--stop-hot);
+}
+
+/* Narrow layouts move Pause into the bar so the detached rail never crowds the canvas. */
 .dock-hold {
   display: none;
   width: 40px;
@@ -393,68 +298,38 @@
   background: var(--accent-soft);
 }
 
-/*
- * The fold. Quiet by design: minimizing is a comfort, not a decision, so it should
- * never compete with the stop for attention.
- */
-.dock-fold {
-  display: inline-flex;
-  width: 30px;
-  height: 30px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
+.dock-fab {
+  height: 52px;
+  padding: 0 26px;
   border: 0;
-  border-radius: 50%;
-  color: var(--ink-muted);
-  background: transparent;
-  cursor: pointer;
-  transition:
-    color 160ms ease,
-    background-color 160ms ease;
-}
-
-.dock-fold:hover {
   color: var(--ink);
-  background: rgba(22, 29, 27, 0.06);
-}
-
-/*
- * Folded. The swarm keeps working whether or not the controls are on screen, so the
- * capsule still carries the verb, the percentage, and the border trace. It is the
- * handle back to the bar, which is why the whole thing is the button.
- */
-.dock-mini {
-  display: flex;
-  height: 42px;
-  align-items: center;
-  gap: 12px;
-  padding: 0 18px 0 22px;
-  border: 0;
   background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   cursor: pointer;
-}
-
-.dock-mini .chevron {
-  color: var(--ink-muted);
   transition: color 160ms ease;
 }
 
-.dock-mini:hover .chevron {
-  color: var(--ink);
+.dock-fab:hover {
+  color: var(--accent);
 }
 
-.dock-status-mini {
-  min-width: 6.6rem;
-  font-size: 0.88rem;
+.dock-bar-source {
+  width: fit-content;
+  max-width: min(480px, 86vw);
+  padding-inline: 7px;
 }
 
-.dock-pct {
-  flex: none;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
+.dock-bar-source .dock-source-review {
+  flex: 0 1 auto;
+}
+
+.dock-bar-source .source-display-url {
+  max-width: 300px;
+  flex: 0 1 auto;
 }
 
 .dock-field-shell {
@@ -470,10 +345,15 @@
   min-width: 0;
   height: 100%;
   border: 0;
-  background: transparent;
+  outline: none;
   color: var(--ink);
+  background: transparent;
   font-family: var(--font-sans);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+}
+
+.dock-field::placeholder {
+  color: var(--ink-muted);
 }
 
 .dock-field-shell[data-overflow-left="true"] .dock-field {
@@ -483,7 +363,12 @@
 
 .dock-field-shell[data-overflow-right="true"] .dock-field {
   mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
 }
 
 .dock-field-shell[data-overflow-left="true"][data-overflow-right="true"] .dock-field {
@@ -503,15 +388,82 @@
   );
 }
 
-.dock-field:focus {
-  outline: none;
+.dock-source-edit-mark,
+.dock-go {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
 }
 
-.dock-field::placeholder {
-  color: var(--ink-muted);
+.dock-source-review {
+  display: flex;
+  min-width: 0;
+  height: 44px;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  color: var(--ink-soft);
+  background: transparent;
+  text-align: left;
+  cursor: text;
 }
 
-.dock-source {
+.dock-source-edit-mark {
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.58);
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.dock-source-review:hover .dock-source-edit-mark {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.dock-source-review:hover .source-display-url {
+  color: var(--ink);
+}
+
+.dock-source-review:focus-visible,
+.dock-go:focus-visible,
+.dock-stop:focus-visible,
+.dock-again:focus-visible,
+.rail-btn:focus-visible,
+.dock-hold:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dock-source-review:focus-visible {
+  border-radius: 999px;
+  outline-offset: -2px;
+}
+
+.dock-go {
+  border: 0;
+  color: #f7faf8;
+  background: var(--ink);
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.dock-go:hover {
+  background: var(--accent);
+  transform: scale(1.05);
+}
+
+.source-display {
   display: flex;
   min-width: 0;
   height: 44px;
@@ -523,32 +475,7 @@
   font-family: var(--font-sans);
 }
 
-.dock-source-edit {
-  display: inline-flex;
-  width: 40px;
-  height: 40px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.58);
-  cursor: pointer;
-}
-
-.dock-source-edit:hover {
-  border-color: var(--accent-line);
-  color: var(--accent);
-  background: rgba(255, 255, 255, 0.86);
-}
-
-.dock-source-edit:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.dock-source-glyph {
+.source-display-glyph {
   display: inline-flex;
   width: 34px;
   height: 30px;
@@ -558,19 +485,18 @@
   color: var(--ink-muted);
 }
 
-.dock-source-url {
+.source-display-url {
   min-width: 0;
   overflow: hidden;
   flex: 1;
   color: var(--ink-soft);
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   letter-spacing: -0.01em;
   line-height: 1.2;
-  text-overflow: clip;
   white-space: nowrap;
 }
 
-.dock-source-url[data-overflow="true"] {
+.source-display-url[data-overflow="true"] {
   mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
   -webkit-mask-image: linear-gradient(
     to right,
@@ -580,58 +506,11 @@
   );
 }
 
-.dock-source-url-compact {
+.source-display-url-compact {
   display: none;
 }
 
-.dock-sep {
-  width: 1px;
-  height: 22px;
-  flex: none;
-  background: rgba(22, 29, 27, 0.14);
-}
-
-.dock-demo {
-  height: 40px;
-  flex: none;
-  padding: 0 15px;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.52);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 0.82rem;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease;
-}
-
-.dock-demo:hover:not(:disabled) {
-  color: var(--accent);
-  background: rgba(255, 255, 255, 0.82);
-}
-
-.dock-demo:disabled {
-  cursor: progress;
-  opacity: 0.5;
-}
-
-/* ---------- responsive ---------- */
-
-@media (prefers-reduced-motion: reduce) {
-  .dock-x[data-running="true"] {
-    animation: none;
-  }
-}
-
 @media (max-width: 720px) {
-  /*
-   * Compact: the rail folds into the bar. The hold takes the left seat, the stop keeps the
-   * right, and the run's state sits between two balanced circles. The fold chevron goes —
-   * a bar this small is already out of the way.
-   */
   .rail {
     display: none;
   }
@@ -640,23 +519,21 @@
     display: inline-flex;
   }
 
-  .dock-fold {
-    display: none;
-  }
-
   .dock-bar {
     width: min(440px, 92vw);
     gap: 6px;
-    padding: 0 7px;
+    padding-inline: 7px;
+  }
+
+  .dock-bar-run {
+    width: fit-content;
+    min-width: 0;
+    padding-left: 7px;
   }
 
   .dock-bar-source {
     width: fit-content;
     max-width: 92vw;
-  }
-
-  .dock-clip {
-    display: none;
   }
 
   .dock-status {
@@ -667,11 +544,11 @@
 }
 
 @media (max-width: 480px) {
-  .dock-source-url-full.has-compact {
+  .source-display-url-full.has-compact {
     display: none;
   }
 
-  .dock-source-url-compact {
+  .source-display-url-compact {
     display: inline;
   }
 }

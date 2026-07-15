@@ -92,16 +92,18 @@
   transform: translateY(-1px);
 }
 
-/* what is on the canvas: the clip, and the pair it is being read into */
+/* The active source, using the same provider identity as the welcome control. */
 .top-mid {
-  display: inline-flex;
+  display: flex;
+  width: min(520px, calc(100vw - 152px));
   min-width: 0;
-  align-items: center;
-  gap: 9px;
+  flex-direction: column;
+  gap: 1px;
   justify-self: center;
-  padding: 5px 7px 5px 13px;
+  padding: 7px 14px 8px 10px;
   border: 1px solid var(--glass-border);
-  border-radius: 999px;
+  border-radius: 18px;
+  corner-shape: squircle;
   background: rgba(255, 255, 255, 0.6);
   box-shadow: 0 8px 22px rgba(26, 70, 66, 0.07);
   backdrop-filter: blur(18px) saturate(1.6);
@@ -109,7 +111,23 @@
 }
 
 .top-mid[data-preview="true"] {
-  max-width: min(680px, calc(100vw - 160px));
+  width: min(520px, calc(100vw - 152px));
+}
+
+.top-mid .source-display {
+  height: 28px;
+  gap: 8px;
+}
+
+.top-mid .source-display-glyph {
+  width: 34px;
+  height: 26px;
+  flex-basis: 34px;
+}
+
+.top-mid .source-display-url {
+  color: var(--ink);
+  font-size: 0.82rem;
 }
 
 /* nothing to say before a clip is loaded, so it does not sit there as an empty pill */
@@ -119,22 +137,24 @@
 
 .top-clip {
   overflow: hidden;
+  min-height: 26px;
+  padding-left: 4px;
   color: var(--ink);
   font-size: 0.82rem;
+  line-height: 26px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.top-pair {
-  padding: 3px 8px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  corner-shape: squircle;
+.top-source-note {
+  overflow: hidden;
+  margin-left: 42px;
   color: var(--ink-muted);
-  background: rgba(255, 255, 255, 0.7);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
+  font-size: 0.56rem;
+  letter-spacing: 0.025em;
+  line-height: 1.35;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -149,22 +169,15 @@
 /* ---------- responsive ---------- */
 
 @media (max-width: 720px) {
-  /* no room for the clip's name next to the mark, and the dock is already saying its id */
-  .top-clip,
-  .top-pair {
-    display: none;
-  }
-
+  .top-mid,
   .top-mid[data-preview="true"] {
-    max-width: calc(100vw - 132px);
-    padding-left: 7px;
+    width: calc(100vw - 132px);
+    padding-right: 10px;
   }
 
-  .top-mid[data-preview="true"] .top-pair {
-    display: inline-flex;
-    overflow: hidden;
-    max-width: 100%;
-    text-overflow: ellipsis;
+  .top-source-note {
+    margin-left: 38px;
+    font-size: 0.52rem;
   }
 }
 

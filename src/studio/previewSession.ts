@@ -70,7 +70,7 @@ export function presentSource(raw: string): SourcePresentation | null {
 export function createStudioPreviewSession(raw: string): StudioPreviewSession | null {
   const trimmed = raw.trim();
   const presentation = presentSource(trimmed);
-  if (!presentation) return null;
+  if (!presentation || presentation.kind !== "youtube") return null;
 
   return {
     mode: "submitted_source",

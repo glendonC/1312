@@ -3,7 +3,9 @@ import { lazy, Suspense, useEffect, useState } from "react";
 
 import Dock from "./Dock";
 import InputAct from "./InputAct";
+import { presentSource } from "./previewSession";
 import RunAct from "./RunAct";
+import SourceDisplay from "./SourceDisplay";
 import { replayTransport, useBundle, usePaused, useStage, useStudio } from "./store";
 import useShortcuts from "./useShortcuts";
 
@@ -28,6 +30,11 @@ export default function StudioApp({ runId }: { runId: string }) {
     setLab(new URLSearchParams(window.location.search).get("lab") === "1");
   }, []);
 
+  const recordedSource = bundle?.run.clip.source.url
+    ? presentSource(bundle.run.clip.source.url)
+    : null;
+  const visibleSource = previewSession?.source ?? recordedSource;
+
   // Held is a property of the whole instrument, not of one control: everything that
   // animates to say "alive" reads this and stops.
   return (
@@ -50,23 +57,27 @@ export default function StudioApp({ runId }: { runId: string }) {
           role={previewSession ? "note" : undefined}
           aria-label={
             previewSession
-              ? `Recorded interface preview for ${previewSession.source.accessibleName}. The submitted source was not processed.`
+              ? `Recorded investigation for ${previewSession.source.accessibleName}. The submitted source was not processed.`
               : undefined
           }
         >
           {bundle && stage !== "input" && (
             previewSession ? (
               <>
-                <span className="top-clip" title={previewSession.source.raw}>
-                  {previewSession.source.displayUrl}
+                <SourceDisplay source={previewSession.source} title={previewSession.source.raw} />
+                <span className="top-source-note">
+                  Recorded run. Source not processed.
                 </span>
-                <span className="top-pair">Recorded interface preview</span>
               </>
             ) : (
               <>
-                <span className="top-clip">{bundle.run.clip.title_target}</span>
-                <span className="top-pair">
-                  {bundle.run.pair.source} &rarr; {bundle.run.pair.target} · {bundle.run.pack}
+                {visibleSource ? (
+                  <SourceDisplay source={visibleSource} title={bundle.run.clip.source.url} />
+                ) : (
+                  <span className="top-clip">{bundle.run.clip.title_target}</span>
+                )}
+                <span className="top-source-note">
+                  {bundle.run.pair.source} &rarr; {bundle.run.pair.target} using {bundle.run.pack}
                 </span>
               </>
             )

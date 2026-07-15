@@ -1,117 +1,119 @@
-/* The invitation before a source exists. The orchestrator occupies the canvas centre;
-   its message and source control attach to it without becoming runtime nodes. */
+/* The invitation is one lockup: identity on the left, decision on the right. */
 
 .studio-welcome {
   position: absolute;
   inset: 0;
   z-index: 1;
+  display: grid;
   overflow: hidden;
+  padding: 72px 32px 64px;
+  place-items: center;
 }
 
-.welcome-orchestrator-anchor {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 68px;
-  height: 68px;
-  transform: translate(-50%, -50%);
+.welcome-lockup {
+  display: grid;
+  width: min(700px, 100%);
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 36px;
 }
 
+.welcome-orchestrator-anchor,
+.welcome-orchestrator-core,
+.welcome-orchestrator-core .agent-mark {
+  width: 112px;
+  height: 112px;
+}
+
+.welcome-orchestrator-anchor,
 .welcome-orchestrator-core {
   position: relative;
-  width: 100%;
-  height: 100%;
 }
 
 .welcome-orchestrator-core .agent-mark {
   display: block;
-  width: 68px;
-  height: 68px;
 }
 
-.welcome-orchestrator-core .node-name {
-  top: calc(100% + 9px);
+.welcome-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.welcome-panel {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: 16px 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.76),
+    0 16px 42px rgba(26, 70, 66, 0.1);
+  backdrop-filter: blur(24px) saturate(1.55);
+  -webkit-backdrop-filter: blur(24px) saturate(1.55);
+  transform-origin: top;
+}
+
+.welcome-panel h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: var(--weight-regular);
+  letter-spacing: -0.008em;
+  line-height: 1.55;
+}
+
+.studio-source-dock {
+  position: fixed;
+  bottom: clamp(20px, 4vh, 34px);
   left: 50%;
+  z-index: 20;
+  display: flex;
+  width: min(680px, calc(100vw - 32px));
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   transform: translateX(-50%);
 }
 
-.welcome-message {
-  position: absolute;
-  bottom: calc(50% + 54px);
-  left: calc(50% + 54px);
-  width: min(360px, calc(50vw - 76px));
-  padding: 17px 19px 18px;
-  border: 1px solid var(--glass-border);
-  border-radius: 20px 20px 20px 7px;
-  corner-shape: squircle;
-  background: rgba(255, 255, 255, 0.68);
-  box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-}
-
-.welcome-message::after {
-  position: absolute;
-  bottom: -6px;
-  left: 17px;
-  width: 12px;
-  height: 12px;
-  border-right: 1px solid var(--glass-border);
-  border-bottom: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.68);
-  transform: rotate(45deg);
-  content: "";
-}
-
-.welcome-kicker {
-  display: block;
-  margin-bottom: 7px;
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.welcome-message h1,
-.welcome-message p {
+.source-check-note {
+  max-width: min(560px, calc(100vw - 40px));
   margin: 0;
-}
-
-.welcome-message h1 {
-  color: var(--ink);
-  font-size: 1.08rem;
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.018em;
-  line-height: 1.25;
-}
-
-.welcome-message p {
-  margin-top: 7px;
   color: var(--ink-soft);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: center;
 }
 
-.welcome-source {
-  position: absolute;
-  top: calc(50% + 94px);
-  left: 50%;
-  max-width: calc(100vw - 32px);
-  translate: -50% 0;
+.source-check-note[data-tone="deny"] {
+  color: var(--flag);
+}
+
+.source-dock-actions {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .source-entry {
-  max-width: calc(100vw - 32px);
+  max-width: 100%;
 }
 
-.source-entry .dock-bar {
-  width: min(580px, calc(100vw - 32px));
+.source-dock-actions .source-entry .dock-bar {
+  width: min(520px, calc(100vw - 32px));
 }
 
-.source-entry .dock-bar-source {
+.source-dock-actions .source-entry .dock-bar-source {
   width: fit-content;
+  max-width: min(480px, calc(100vw - 32px));
 }
 
 .source-entry .dock-fab:focus-visible {
@@ -120,62 +122,119 @@
   outline-offset: -4px;
 }
 
-@media (max-width: 900px) {
-  .welcome-message {
-    bottom: calc(50% + 58px);
-    left: 50%;
-    width: min(360px, calc(100vw - 32px));
-    border-radius: 20px 20px 7px;
-    translate: -50% 0;
-  }
-
-  .welcome-message::after {
-    left: calc(50% - 6px);
-  }
+.studio-demo-control {
+  position: fixed;
+  top: 14px;
+  right: clamp(14px, 2vw, 22px);
+  z-index: 11;
+  display: inline-flex;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 13px;
+  corner-shape: squircle;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 22px rgba(26, 70, 66, 0.07);
+  cursor: pointer;
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  transition:
+    color 160ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
-@media (max-width: 480px) {
-  .welcome-orchestrator-anchor {
-    width: 60px;
-    height: 60px;
+.studio-demo-control:hover:not(:disabled) {
+  color: var(--accent);
+  box-shadow: 0 10px 26px rgba(26, 70, 66, 0.15);
+  transform: translateY(-1px);
+}
+
+.studio-demo-control:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.studio-demo-control:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+@media (max-width: 600px) {
+  .studio-welcome {
+    padding: 64px 16px 48px;
   }
 
+  .welcome-lockup {
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .welcome-orchestrator-anchor,
+  .welcome-orchestrator-core,
   .welcome-orchestrator-core .agent-mark {
-    width: 60px;
-    height: 60px;
+    width: 80px;
+    height: 80px;
   }
 
-  .welcome-message {
-    bottom: calc(50% + 53px);
-    padding: 15px 16px 16px;
+  .welcome-content {
+    display: contents;
   }
 
-  .welcome-message h1 {
-    font-size: 1rem;
+  .welcome-panel {
+    grid-column: 2;
+    padding: 14px 15px;
   }
 
-  .welcome-message p {
-    font-size: 0.78rem;
+  .source-dock-actions {
+    width: 100%;
   }
 
-  .welcome-source {
-    top: calc(50% + 86px);
+  .source-dock-actions .source-entry:has(.dock-bar) {
+    width: 100%;
+  }
+
+  .source-dock-actions .source-entry .dock-bar {
+    width: 100%;
+  }
+
+  .source-dock-actions .source-entry:has(.dock-bar-source),
+  .source-dock-actions .source-entry .dock-bar-source {
+    width: fit-content;
+  }
+
+  .welcome-panel h1 {
+    font-size: 0.8rem;
+    line-height: 1.5;
   }
 }
 
-@media (max-height: 480px) {
-  .welcome-message {
-    bottom: calc(50% + 48px);
-    padding-top: 13px;
-    padding-bottom: 14px;
+@media (max-height: 480px) and (min-width: 601px) {
+  .studio-welcome {
+    padding-block: 56px 42px;
   }
 
-  .welcome-message p {
-    margin-top: 5px;
-    line-height: 1.38;
+  .welcome-lockup {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 28px;
   }
 
-  .welcome-source {
-    top: calc(50% + 82px);
+  .welcome-orchestrator-anchor,
+  .welcome-orchestrator-core,
+  .welcome-orchestrator-core .agent-mark {
+    width: 92px;
+    height: 92px;
+  }
+
+  .welcome-content {
+    gap: 14px;
   }
 }

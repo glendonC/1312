@@ -206,11 +206,16 @@ test("a submitted source launches the recorded interface preview", async ({ page
   const thinking = page.locator('.hub [data-field-motion="thinking"]');
   await expect(thinking).toBeVisible();
   await expect(thinking.locator(".agent-mark-mesh")).toHaveAttribute("data-mesh-motion", "running");
-  await expect(
-    page.getByRole("note", {
-      name: "Recorded investigation for YouTube video link dQw4w9WgXcQ. The submitted source was not processed.",
-    }),
-  ).toBeVisible();
+  const sourceIdentity = page.getByRole("group", {
+    name: "Source: YouTube video link dQw4w9WgXcQ",
+  });
+  const provenance = page.getByRole("note").filter({
+    hasText: "This interface preview uses a recorded run. Your source was not processed.",
+  });
+  await expect(sourceIdentity).toBeVisible();
+  await expect(provenance).toBeVisible();
+  expect(await provenance.evaluate((element) => element.closest(".top-mid"))).toBeNull();
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByText("Hosted source probe unavailable")).toHaveCount(0);
 
   const runDock = page.locator(".dock");
@@ -372,6 +377,8 @@ test("workers use distinct inherited identity materials", async ({ page }) => {
 test("the submitted preview fits every supported viewport", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive viewport contract");
 
+  const longVideoId = "source-identity-".repeat(12);
+
   for (const viewport of [
     { width: 320, height: 568 },
     { width: 360, height: 800 },
@@ -381,13 +388,21 @@ test("the submitted preview fits every supported viewport", async ({ page }, tes
     { width: 844, height: 390 },
   ]) {
     await page.setViewportSize(viewport);
-    await page.goto("/studio/");
+    await page.goto("/studio/?lab=1");
+    await page.getByRole("button", { name: "Collapse trace lab" }).click();
     await page.getByRole("button", { name: "Input Source" }).click();
-    await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/dQw4w9WgXcQ");
+    await page.getByRole("textbox", { name: "Clip link" }).fill(`https://youtu.be/${longVideoId}`);
     await page.keyboard.press("Enter");
     await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
 
-    for (const locator of [page.locator(".top-mid"), page.locator(".dock")]) {
+    const capsule = page.locator(".top-mid");
+    const sourceLabel = capsule.locator(".source-display-url");
+    await expect(sourceLabel).toHaveAttribute("data-overflow", "true");
+    expect(
+      await sourceLabel.evaluate((element) => getComputedStyle(element).maskImage),
+    ).not.toBe("none");
+
+    for (const locator of [capsule, page.locator(".dock")]) {
       const box = await locator.boundingBox();
       expect(box).not.toBeNull();
       expect(box?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
@@ -395,7 +410,66 @@ test("the submitted preview fits every supported viewport", async ({ page }, tes
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
       expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height + 0.5);
     }
+
+    const [capsuleBox, markBox, labBox] = await Promise.all([
+      capsule.boundingBox(),
+      page.locator(".top-mark").boundingBox(),
+      page.getByRole("complementary", { name: "Studio trace lab" }).boundingBox(),
+    ]);
+    expect(capsuleBox).not.toBeNull();
+    expect(markBox).not.toBeNull();
+    expect(labBox).not.toBeNull();
+    const overlaps = (
+      first: NonNullable<typeof capsuleBox>,
+      second: NonNullable<typeof capsuleBox>,
+    ) =>
+      first.x < second.x + second.width
+      && first.x + first.width > second.x
+      && first.y < second.y + second.height
+      && first.y + first.height > second.y;
+    expect(overlaps(capsuleBox!, markBox!)).toBe(false);
+    expect(overlaps(capsuleBox!, labBox!)).toBe(false);
   }
+});
+
+test("the source capsule sizes to content before applying its maximum", async ({ page }) => {
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/dQw4w9WgXcQ");
+  await page.keyboard.press("Enter");
+
+  const capsule = page.locator(".top-mid");
+  const label = capsule.locator(".source-display-url");
+  await expect(label).toHaveAttribute("data-overflow", "false");
+  const shortWidth = await capsule.evaluate((element) => element.getBoundingClientRect().width);
+  expect(shortWidth).toBeLessThan(360);
+
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page
+    .getByRole("textbox", { name: "Clip link" })
+    .fill(`https://youtu.be/${"deliberately-long-source-id-".repeat(12)}`);
+  await page.keyboard.press("Enter");
+
+  await expect(label).toHaveAttribute("data-overflow", "true");
+  const longWidth = await capsule.evaluate((element) => element.getBoundingClientRect().width);
+  expect(longWidth).toBeGreaterThan(shortWidth + 30);
+  expect(longWidth).toBeLessThanOrEqual(480.5);
+});
+
+test("the recorded run uses its receipted source identity", async ({ page }) => {
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Run Demo" }).click();
+  await page.getByRole("button", { name: "Replay recorded analysis" }).click();
+
+  const source = page.getByRole("group", {
+    name: "Source: YouTube source Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
+  });
+  await expect(source).toBeVisible();
+  await expect(source.locator(".source-display-url")).toContainText(
+    "Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
+  );
+  await expect(page.locator(".top-source-provenance")).toHaveCount(0);
 });
 
 test("pause freezes the replay cursor and step advances exactly once", async ({ page }) => {
@@ -456,7 +530,7 @@ test("reduced motion disables decorative animation", async ({ page }) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Input Source" }).click();
   await page.getByRole("textbox", { name: "Clip link" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Launch investigation" }).click();
   const thinkingMesh = page.locator('.hub [data-field-motion="thinking"] .agent-mark-mesh');
   await expect(thinkingMesh).toBeVisible();
   await expect(thinkingMesh).toHaveAttribute("data-mesh-motion", "still");

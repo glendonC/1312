@@ -1,3 +1,5 @@
+import type { ClipSource, IngestReceipt } from "./types";
+
 const YOUTUBE_HOSTS = new Set(["youtube.com", "m.youtube.com", "youtu.be"]);
 
 export interface SourcePresentation {
@@ -64,6 +66,40 @@ export function presentSource(raw: string): SourcePresentation | null {
     kind: "web",
     displayUrl: `${host}${identifier === "Home" ? "" : identifier}`,
     accessibleName: `Web source ${host} ${identifier}`,
+  };
+}
+
+/**
+ * Name a recorded source from its producer-backed receipt when one exists. A submitted
+ * preview never reaches this path, so recorded metadata cannot be attached to a new URL.
+ */
+export function presentRecordedSource(
+  source: ClipSource,
+  receipt?: IngestReceipt | null,
+): SourcePresentation | null {
+  const normalized = source.url ? presentSource(source.url) : null;
+
+  if (
+    receipt?.kind === "youtube"
+    && receipt.url === source.url
+    && normalized?.kind === "youtube"
+  ) {
+    return {
+      ...normalized,
+      displayUrl: receipt.label,
+      accessibleName: `YouTube source ${receipt.label}`,
+    };
+  }
+
+  if (normalized) return normalized;
+
+  const label = receipt?.kind === "owned_local" ? receipt.label.trim() : source.label.trim();
+  if (!label) return null;
+
+  return {
+    kind: "web",
+    displayUrl: label,
+    accessibleName: `${receipt?.kind === "owned_local" ? "Local" : "Recorded"} source ${label}`,
   };
 }
 

@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 
 import Dock from "./Dock";
 import InputAct from "./InputAct";
-import { presentSource } from "./previewSession";
+import { presentRecordedSource } from "./previewSession";
 import RunAct from "./RunAct";
 import SourceDisplay from "./SourceDisplay";
 import { replayTransport, useBundle, usePaused, useStage, useStudio } from "./store";
@@ -30,8 +30,8 @@ export default function StudioApp({ runId }: { runId: string }) {
     setLab(new URLSearchParams(window.location.search).get("lab") === "1");
   }, []);
 
-  const recordedSource = bundle?.run.clip.source.url
-    ? presentSource(bundle.run.clip.source.url)
+  const recordedSource = bundle
+    ? presentRecordedSource(bundle.run.clip.source, bundle.ingestReceipt)
     : null;
   const visibleSource = previewSession?.source ?? recordedSource;
 
@@ -51,38 +51,26 @@ export default function StudioApp({ runId }: { runId: string }) {
           <img src="/favicon.svg" alt="" width="30" height="30" />
         </a>
 
-        <div
-          className="top-mid"
-          data-preview={previewSession ? "true" : undefined}
-          role={previewSession ? "note" : undefined}
-          aria-label={
-            previewSession
-              ? `Recorded investigation for ${previewSession.source.accessibleName}. The submitted source was not processed.`
-              : undefined
-          }
-        >
-          {bundle && stage !== "input" && (
-            previewSession ? (
-              <>
-                <SourceDisplay source={previewSession.source} title={previewSession.source.raw} />
-                <span className="top-source-note">
-                  Recorded run. Source not processed.
-                </span>
-              </>
-            ) : (
-              <>
-                {visibleSource ? (
-                  <SourceDisplay source={visibleSource} title={bundle.run.clip.source.url} />
-                ) : (
-                  <span className="top-clip">{bundle.run.clip.title_target}</span>
-                )}
-                <span className="top-source-note">
-                  {bundle.run.pair.source} &rarr; {bundle.run.pair.target} using {bundle.run.pack}
-                </span>
-              </>
-            )
-          )}
-        </div>
+        {bundle && stage !== "input" && visibleSource && (
+          <div className="top-source">
+            <div
+              className="top-mid"
+              role="group"
+              aria-label={`Source: ${visibleSource.accessibleName}`}
+              aria-describedby={previewSession ? "top-source-provenance" : undefined}
+            >
+              <SourceDisplay
+                source={visibleSource}
+                title={previewSession?.source.raw ?? visibleSource.displayUrl}
+              />
+            </div>
+            {previewSession && (
+              <p id="top-source-provenance" className="top-source-provenance" role="note">
+                This interface preview uses a recorded run. Your source was not processed.
+              </p>
+            )}
+          </div>
+        )}
 
         {/*
          * Nothing in the third seat.

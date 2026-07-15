@@ -92,15 +92,21 @@
   transform: translateY(-1px);
 }
 
-/* The active source, using the same provider identity as the welcome control. */
-.top-mid {
-  display: flex;
-  width: min(520px, calc(100vw - 152px));
+/* The source identity stays compact; preview provenance sits on a separate plane below it. */
+.top-source {
+  position: relative;
+  width: fit-content;
   min-width: 0;
-  flex-direction: column;
-  gap: 1px;
+  max-width: min(480px, calc(100vw - 152px));
   justify-self: center;
-  padding: 7px 14px 8px 10px;
+}
+
+.top-mid {
+  display: inline-flex;
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 14px 7px 10px;
   border: 1px solid var(--glass-border);
   border-radius: 18px;
   corner-shape: squircle;
@@ -110,12 +116,11 @@
   -webkit-backdrop-filter: blur(18px) saturate(1.6);
 }
 
-.top-mid[data-preview="true"] {
-  width: min(520px, calc(100vw - 152px));
-}
-
 .top-mid .source-display {
+  width: fit-content;
   height: 28px;
+  max-width: 100%;
+  flex: 0 1 auto;
   gap: 8px;
 }
 
@@ -126,36 +131,24 @@
 }
 
 .top-mid .source-display-url {
+  max-width: 400px;
+  flex: 0 1 auto;
   color: var(--ink);
   font-size: 0.82rem;
 }
 
-/* nothing to say before a clip is loaded, so it does not sit there as an empty pill */
-.top-mid:empty {
-  display: none;
-}
-
-.top-clip {
-  overflow: hidden;
-  min-height: 26px;
-  padding-left: 4px;
-  color: var(--ink);
-  font-size: 0.82rem;
-  line-height: 26px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.top-source-note {
-  overflow: hidden;
-  margin-left: 42px;
+.top-source-provenance {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  width: max-content;
+  max-width: min(390px, calc(100vw - 32px));
+  margin: 0;
   color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  letter-spacing: 0.025em;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  text-align: center;
+  transform: translateX(-50%);
 }
 
 /* ---------- acts ---------- */
@@ -169,15 +162,12 @@
 /* ---------- responsive ---------- */
 
 @media (max-width: 720px) {
-  .top-mid,
-  .top-mid[data-preview="true"] {
-    width: calc(100vw - 132px);
-    padding-right: 10px;
+  .top-source {
+    max-width: calc(100vw - 132px);
   }
 
-  .top-source-note {
-    margin-left: 38px;
-    font-size: 0.52rem;
+  .top-mid {
+    padding-right: 10px;
   }
 }
 

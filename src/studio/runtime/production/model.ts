@@ -1,3 +1,9 @@
+import type {
+  ForecastArtifact,
+  ForecastWorkPlan,
+  FrozenForecastArtifact,
+} from "./forecast/model.ts";
+
 export const CAPABILITIES = [
   "task.spawn.request",
   "report.submit",
@@ -38,6 +44,28 @@ export interface RequiredOutput {
 export type WorkerKind = "orchestrator" | "media" | "analysis" | "translation" | "quality";
 export type TaskStatus = "scheduled" | "working" | "reported" | "completed" | "failed" | "withheld";
 export type AgentStatus = "registered" | "working" | "reporting" | "retired";
+
+/** The requested source language is policy input. Detector evidence never mutates this value. */
+export type RequestedSourceLanguage =
+  | { mode: "declared"; languages: [string]; reason: null }
+  | { mode: "automatic"; languages: []; reason: null }
+  | { mode: "mixed"; languages: [string, string, ...string[]]; reason: null }
+  | { mode: "unknown"; languages: []; reason: null }
+  | { mode: "withheld"; languages: []; reason: string };
+
+/**
+ * Language context carried by the production AnalysisRequest. A run has one explicit target
+ * language; pack selection and detector evidence are separate, immutable inputs. Scheduler task
+ * propagation is a later contract revision, not implied by this run-start slice.
+ */
+export interface LanguageJobContext {
+  languagePair: {
+    requestedSource: RequestedSourceLanguage;
+    targetLanguage: string;
+  };
+  selectedLanguagePackId: string | null;
+  detectedLanguageEvidenceContentIds: string[];
+}
 
 export interface TaskRecord {
   id: string;
@@ -107,6 +135,70 @@ export interface SourceArtifactDescriptor {
   content: ContentIdentity;
   durationMs: number;
   tracks: MediaTrackDescriptor[];
+}
+
+export interface ProductionSourceSession {
+  schema: "studio.source-session.v1";
+  sessionId: string;
+  revisionId: string;
+  adapterId: "owned-local-source-adapter.v1";
+  sourceReceipt: {
+    schema: "studio.ingest.owned-local.v1";
+    receiptId: string;
+    contentId: string;
+    rightsScope: "local_processing" | "redistribution";
+  };
+  source: {
+    contentId: string;
+    bytes: number;
+    durationMs: number;
+  };
+  mediaProbe: {
+    schema: "studio.media-probe.v1";
+    producer: "scripts/probe-media.mjs";
+    contentId: string;
+  };
+  preflight: {
+    schema: "studio.preflight-bundle.v1" | "studio.preflight-bundle.v2" | "studio.preflight-bundle.v3";
+    preflightId: string;
+    contentId: string;
+  };
+  detectedLanguageEvidenceContentIds: string[];
+}
+
+export interface ProductionAnalysisRequest {
+  schema: "studio.analysis-request.v1";
+  requestId: string;
+  sourceSessionId: string;
+  sourceRevisionId: string;
+  sourceContentId: string;
+  range: { startMs: number; endMs: number };
+  language: LanguageJobContext;
+  outputDepth: "captions" | "evidence";
+  options: {
+    speechScope: "foreground" | "all";
+    includeLyrics: boolean;
+    speaker: string | null;
+    honorifics: "preserve" | "naturalize";
+    translationStyle: "literal" | "natural";
+    captionDensity: "compact" | "balanced" | "relaxed";
+    slowAnalysis: boolean;
+  };
+}
+
+export interface RuntimeStartRecord {
+  schema: "studio.runtime-start.v1";
+  producer: { id: "studio.local-runtime-start"; version: "1" };
+  commandId: string;
+  runtimeId: string;
+  journalId: string;
+  sourceSession: ProductionSourceSession;
+  sourceArtifactId: string;
+  analysisRequest: ProductionAnalysisRequest;
+  workPlan: ForecastWorkPlan;
+  forecast: ForecastArtifact;
+  frozenForecast: FrozenForecastArtifact;
+  startedAt: string;
 }
 
 export interface SourceArtifactOrigin {

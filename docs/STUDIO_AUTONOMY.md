@@ -289,6 +289,7 @@ values distinctly and explain which assumptions dominate the estimate.
 |---|---|---|
 | Event replay | Ordered typed traces, pure reducer, cursor reconstruction, fixture validation, and checkpoints | Keep exact scenario coverage current as producers grow |
 | Transport seam | Replay pause/step/seek/speed, single-trace legacy live validation, and a separate validated production-journal adapter | Acknowledged production live control; never route production events through legacy traces |
+| Source and run start | A development-only owned-source loader revalidates the highest sealed V1/V2/V3 preflight index and every indexed byte, derives a stable source-session revision, binds an explicit language-aware `studio.analysis-request.v1`, and writes an immutable `studio.runtime-start.v1` receipt beside the journal | Idempotent runtime service command, production start event/version, scheduler task propagation of the accepted language context, and main-Studio invocation |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and production-journal worker projection | Stream the production adapter from a runtime service and add richer production task/lineage views without altering recorded bundles |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, a receipted ffmpeg range extraction host, and a bounded receipted seek observation host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
@@ -311,15 +312,15 @@ workers. It does not start the runtime, search raw journal text, insert events i
 |---|---|---|
 | 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. Browser automation is authored but interactive execution is unavailable in the current in-app browser environment. |
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
-| 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Pinned Silero VAD receipts preserve normalized PCM, raw frame scores, and exact speech windows. The pinned Whisper language producer consumes only those validated windows and receipts per-range scores plus classified, unknown, or withheld decisions. Studio projects measured speech and language separately from job/pack declarations. Hosted submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
-| 3 — tasks and agents | Local vertical slice implemented | The bounded `codex exec` launcher consumes a scheduler permit, registers one isolated child, journals its lifecycle, stores its structured output, reports through the handoff host, and projects it through a separate production-journal inspector. The static Studio is not a runtime service and no live socket/control path is claimed. |
+| 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Pinned Silero VAD receipts preserve normalized PCM, raw frame scores, and exact speech windows. The pinned Whisper language producer consumes only those validated windows and receipts per-range scores plus classified, unknown, or withheld decisions. The development source-session loader now re-hashes every artifact in the highest available sealed index and preserves language-receipt content ids as evidence without changing the requested source, target, pack, or range. Hosted submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
+| 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` no longer reads a fixed `run-005` path internally: it requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the existing bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, journals its lifecycle, stores its structured output, and reports through the handoff host. `run-005` remains only the explicit npm smoke/test input. The static Studio is not a runtime service and no live socket/control path is claimed. |
 | 4 — scoped media | Two operations implemented | `media.extract` emits a derived audio artifact and `media.seek` decodes a granted audio interval to a null sink, storing the receipt itself as a content-addressed observation artifact with source lineage. Both re-hash the source and enforce exact grants. The Codex child cannot invoke either operation; step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools are not claimed. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
 | 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real derived-media lineage, worker-output content, executor identity, and structured handoff. Legacy report/merge prose is not recast as provenance. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
 | 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
-| 10 — forecasting | Deterministic floor implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `studio.forecast-freeze.v1` can bind the accepted forecast identity to a run start without embedding actuals; evaluation remains a separate future artifact. No runtime-start or UI integration is claimed. |
+| 10 — forecasting | Deterministic floor plus local start receipt implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. The development launcher now freezes that forecast into `run-start.json` before scheduling its proof child. The receipt is adjacent to, not an event inside, `events.ndjson`; no runtime service, idempotent start acknowledgement, forecast UI, pricing, calibration, or evaluation producer is claimed. |
 
 ## Submission and customization UX
 
@@ -620,16 +621,24 @@ The next production slices, in dependency order:
    floor, not elapsed time or usage; expected and conservative workloads, elapsed time, model
    usage, calibration, price-book snapshot, currency, and API cost stay null/unavailable. A
    separate `studio.forecast-freeze.v1` binds acceptance to a run start by forecast content id and
-   leaves future receipted-actual evaluation separate. Runtime-start wiring, UI, pricing, and
-   calibration producers are not claimed.
-8. Implemented 2026-07-14: the dedicated memory review inspector validates an operator-selected
+   leaves future receipted-actual evaluation separate. UI, pricing, and calibration producers are
+   not claimed.
+8. Implemented 2026-07-14 for the development-only owned-source path: a strict loader revalidates
+   the registered rights/source/probe receipts, highest sealed V1/V2/V3 preflight, and every indexed
+   byte; derives stable source-session and revision identities; preserves detector receipt content
+   ids as evidence; accepts declared, automatic, mixed, unknown, or withheld source-language policy
+   separately from one explicit target and optional pack; validates the selected range; creates the
+   proof-only work plan and deterministic forecast; and writes a frozen `studio.runtime-start.v1`
+   receipt before the existing one-child launcher. The receipt is not yet a production journal event,
+   scheduler tasks do not yet carry this language context, and `/studio/` remains replay-only.
+9. Implemented 2026-07-14: the dedicated memory review inspector validates an operator-selected
    set of proposal, decision, revocation, legacy, materialization, and consumption receipts; derives
    supersession and rollback from those receipts; and exposes both the accepted snapshot content id
    and the full materialization receipt content id. The run-input boundary returns no entries until
    its exact run/snapshot consumption receipt has been recorded. No production run calls that
    boundary yet, so current consumption remains unavailable; the browser view is not repository
    discovery and displays, but does not re-read, externally referenced evidence bytes.
-9. Run the authored browser matrix in an environment with an available in-app browser, then add only
+10. Run the authored browser matrix in an environment with an available in-app browser, then add only
    evidence-backed difficult-media scenarios produced by the new detectors.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow

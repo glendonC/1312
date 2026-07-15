@@ -8,7 +8,7 @@
     "build": "astro check && astro build",
     "bench:check": "node scripts/check-bench.mjs",
     "evidence:check": "node scripts/index-recorded-evidence.mjs --run run-005 --check && node scripts/index-recorded-evidence.mjs --run run-006 --check",
-    "memory:check": "node scripts/check-memory.mjs",
+    "memory:check": "node --test tests/studio-memory-producer.test.mjs && node scripts/check-memory.mjs",
     "speech:check": "node --test tests/studio-speech-production.test.ts",
     "language:check": "node --test tests/studio-language-production.test.ts",
     "runtime:check": "node --test tests/studio-runtime-production.test.ts tests/studio-runtime-validation.test.ts tests/studio-executor-contract.test.ts tests/studio-run-start-production.test.ts tests/studio-forecast-production.test.ts tests/studio-memory-inspection.test.ts",

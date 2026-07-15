@@ -384,6 +384,14 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     );
     assert.equal(inspector.projection.runId, ack.runtimeId);
     assert.equal(inspector.projection.lastSeq, cursor);
+    assert.equal(inspector.projection.tasks.length, 2);
+    assert.equal(inspector.projection.workers.length, 2);
+    assert.deepEqual(
+      inspector.projection.grants.map((grant) => grant.capability).sort(),
+      ["report.submit", "task.spawn.request"],
+    );
+    assert.equal(inspector.projection.reports.length, 1);
+    assert.equal(inspector.projection.reports[0].status, "accepted");
 
     const reopened = await RuntimeStartService.open({
       store: runtime.store,

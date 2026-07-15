@@ -9,6 +9,11 @@ import type {
   RuntimeHostStartRequest,
   RuntimeHostStatus,
 } from "../runtime/production/runtimeHost/model";
+import {
+  ProductionStudioAdapter,
+  type ProductionStudioGrantView,
+  type ProductionStudioProjection,
+} from "../runtime/production/studioProjection";
 import { LocalRuntimeHostClient } from "./client";
 import {
   isLocalRuntimeLanguageTag,
@@ -28,6 +33,7 @@ interface ReviewedPlan {
 
 interface RuntimeView {
   status: RuntimeStatusView;
+  production: ProductionStudioProjection;
   cursor: number;
   eventCount: number;
   lastEventType: string | null;
@@ -53,6 +59,135 @@ function seconds(milliseconds: number): string {
   return `${(milliseconds / 1_000).toFixed(3).replace(/\.?(?:0+)$/, "")}s`;
 }
 
+function scopeSummary(scopes: ProductionStudioGrantView["mediaScope"]): string {
+  if (scopes.length === 0) return "No media scope granted";
+  return scopes
+    .map((scope) => `${scope.artifactId} · ${scope.trackId} [${scope.startMs}, ${scope.endMs}) ms`)
+    .join("; ");
+}
+
+function ProductionJournalFacts({ projection }: { projection: ProductionStudioProjection }) {
+  return (
+    <section
+      className="product-runtime-production"
+      data-production-projection="journal"
+      aria-labelledby="product-runtime-production-title"
+    >
+      <header>
+        <span>Validated production adapter · never added to RunBundle</span>
+        <h3 id="product-runtime-production-title">Production task and handoff facts</h3>
+        <p>
+          Latest validated journal facts. They are recorded production evidence, not a presence
+          signal, progress estimate, or replay topology.
+        </p>
+      </header>
+
+      <section aria-labelledby="product-runtime-tasks-title">
+        <h4 id="product-runtime-tasks-title">Production tasks</h4>
+        {projection.tasks.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="tasks">
+            Unavailable until a <code>task.created</code> event is validated.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.tasks.map((task) => (
+              <article key={task.taskId} data-production-task-id={task.taskId} data-status={task.status}>
+                <header><h5>{task.label}</h5><span>{task.status}</span></header>
+                <p>{task.objective}</p>
+                <dl>
+                  <div><dt>Task</dt><dd>{task.taskId}</dd></div>
+                  <div><dt>Assigned worker</dt><dd>{task.assignedAgentId}</dd></div>
+                  <div><dt>Registered owner</dt><dd>{task.ownerAgentId ?? "Unavailable until agent registration"}</dd></div>
+                  <div><dt>Parent task</dt><dd>{task.parentTaskId ?? "Root task"}</dd></div>
+                  <div><dt>Dependencies</dt><dd>{task.dependencies.join(", ") || "None in task contract"}</dd></div>
+                  <div>
+                    <dt>Required outputs</dt>
+                    <dd>
+                      {task.requiredOutputs.map((output) => (
+                        `${output.name} · ${output.artifactKind} · ${output.required ? "required" : "optional"}`
+                      )).join("; ") || "None in task contract"}
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="product-runtime-workers-title">
+        <h4 id="product-runtime-workers-title">Registered workers</h4>
+        {projection.workers.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="workers">
+            Unavailable until an <code>agent.registered</code> event is validated.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.workers.map((worker) => (
+              <article key={worker.agentId} data-production-worker-id={worker.agentId} data-status={worker.status}>
+                <header><h5>{worker.label}</h5><span>{worker.status}</span></header>
+                <dl>
+                  <div><dt>Worker</dt><dd>{worker.agentId}</dd></div>
+                  <div><dt>Task</dt><dd>{worker.taskId}</dd></div>
+                  <div><dt>Kind</dt><dd>{worker.kind}</dd></div>
+                  <div><dt>Parent worker</dt><dd>{worker.parentAgentId ?? "Root worker"}</dd></div>
+                  <div><dt>Journal task status</dt><dd>{worker.taskStatus}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="product-runtime-grants-title">
+        <h4 id="product-runtime-grants-title">Capability grants</h4>
+        {projection.grants.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="grants">
+            Unavailable until scheduler-issued grants are validated.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.grants.map((grant) => (
+              <article key={grant.grantId} data-production-grant-id={grant.grantId}>
+                <header><h5>{grant.capability}</h5></header>
+                <dl>
+                  <div><dt>Grant</dt><dd>{grant.grantId}</dd></div>
+                  <div><dt>Task / worker</dt><dd>{grant.taskId} / {grant.agentId}</dd></div>
+                  <div><dt>Enforced scope</dt><dd>{scopeSummary(grant.mediaScope)}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="product-runtime-reports-title">
+        <h4 id="product-runtime-reports-title">Structured reports</h4>
+        {projection.reports.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="reports">
+            Unavailable until a <code>report.submitted</code> event is validated.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.reports.map((report) => (
+              <article key={report.reportId} data-production-report-id={report.reportId} data-status={report.status}>
+                <header><h5>{report.reportId}</h5><span>{report.status}</span></header>
+                <p>{report.summary}</p>
+                <dl>
+                  <div><dt>Reporter</dt><dd>{report.taskId} / {report.agentId}</dd></div>
+                  <div><dt>Reports to</dt><dd>{report.parentTaskId} / {report.parentAgentId}</dd></div>
+                  <div><dt>Output artifacts</dt><dd>{report.outputArtifactIds.join(", ")}</dd></div>
+                  <div><dt>Decision reason</dt><dd>{report.decisionReason ?? "Unavailable until report.decided is validated"}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}
+
 export default function ProductLocalRuntime({ onClose }: { onClose: () => void }) {
   const [baseUrl, setBaseUrl] = useState(defaultHostUrl);
   const [token, setToken] = useState("");
@@ -73,6 +208,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
   const [runtime, setRuntime] = useState<RuntimeView | null>(null);
   const pollGeneration = useRef(0);
   const ingestGeneration = useRef(0);
+  const productionAdapter = useRef<ProductionStudioAdapter | null>(null);
 
   const selectedSource = sources.find((source) => source.sourceSessionId === sourceId) ?? null;
   const lifecycle = runtime
@@ -106,6 +242,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
 
   function clearReviewedState(): void {
     stopPolling();
+    productionAdapter.current = null;
     setReviewed(null);
     setRuntime(null);
     setError(null);
@@ -123,6 +260,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
 
   async function connect(): Promise<void> {
     stopPolling();
+    productionAdapter.current = null;
     setBusy("connect");
     setError(null);
     setReviewed(null);
@@ -159,6 +297,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
   async function ingestOwnedMedia(): Promise<void> {
     if (!client || !ownedFile || !ingestValid) return;
     stopPolling();
+    productionAdapter.current = null;
     const generation = ++ingestGeneration.current;
     setBusy("ingest");
     setError(null);
@@ -225,6 +364,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
   async function reviewPlan(): Promise<void> {
     if (!client) return;
     stopPolling();
+    productionAdapter.current = null;
     setBusy("plan");
     setError(null);
     setRuntime(null);
@@ -244,6 +384,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
     activeClient: LocalRuntimeHostClient,
     identity: RuntimeStatusView,
     cursor: number,
+    adapter: ProductionStudioAdapter,
   ): Promise<void> {
     const generation = ++pollGeneration.current;
     setRuntime((current) => current && current.status.runtimeId === identity.runtimeId
@@ -266,11 +407,19 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         if (poll.commandId !== identity.commandId) {
           throw new Error("Runtime host event polling returned another command identity.");
         }
+        if (adapter.view().lastSeq !== after) {
+          throw new Error("Production adapter cursor changed outside the validated poll path.");
+        }
+        const production = adapter.appendBatch(poll.events);
+        if (production.lastSeq !== poll.nextCursor) {
+          throw new Error("Production adapter cursor does not match the validated host cursor.");
+        }
         after = poll.nextCursor;
         setRuntime((current) => {
           if (!current || current.status.runtimeId !== identity.runtimeId) return current;
           return {
             ...current,
+            production,
             status: {
               ...statusView(status),
               lifecycle: poll.lifecycle,
@@ -325,8 +474,10 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
       ) {
         throw new Error("The frozen runtime forecast does not match the reviewed forecast content.");
       }
+      const adapter = new ProductionStudioAdapter(acknowledgement.runtimeId);
       const nextRuntime: RuntimeView = {
         status: statusView(acknowledgement),
+        production: adapter.view(),
         cursor: 0,
         eventCount: 0,
         lastEventType: null,
@@ -335,9 +486,10 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
           ? "Start accepted and exact reviewed forecast frozen; event cursor begins at 0."
           : "Start was accepted, but no frozen forecast or journal was initialized.",
       };
+      productionAdapter.current = adapter;
       setRuntime(nextRuntime);
       if (acknowledgement.runStartReceipt) {
-        void beginPolling(client, nextRuntime.status, 0);
+        void beginPolling(client, nextRuntime.status, 0, adapter);
       }
     } catch (nextError) {
       setError(errorMessage(nextError));
@@ -668,14 +820,18 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
             <div><dt>Journal poll</dt><dd>{runtime.pollMessage}</dd></div>
             <div><dt>Consumed evidence</dt><dd>Cursor {runtime.cursor} · {runtime.eventCount} validated events{runtime.lastEventType ? ` · last ${runtime.lastEventType}` : ""}</dd></div>
           </dl>
-          {runtime.pollState === "error" && client && (
-            <button type="button" onClick={() => void beginPolling(client, runtime.status, runtime.cursor)}>
+          {runtime.pollState === "error" && client && productionAdapter.current && (
+            <button type="button" onClick={() => {
+              const adapter = productionAdapter.current;
+              if (adapter) void beginPolling(client, runtime.status, runtime.cursor, adapter);
+            }}>
               Retry polling from cursor {runtime.cursor}
             </button>
           )}
           <p>
             Audit the host journal separately in <a href="/studio/runtime/">Production Run Explorer</a>. These events are not inserted into the recorded RunBundle or agent graph.
           </p>
+          <ProductionJournalFacts projection={runtime.production} />
         </section>
       )}
     </section>

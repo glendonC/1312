@@ -290,10 +290,10 @@ values distinctly and explain which assumptions dominate the estimate.
 | Event replay | Ordered typed traces, pure reducer, cursor reconstruction, fixture validation, and checkpoints | Keep exact scenario coverage current as producers grow |
 | Transport seam | Replay pause/step/seek/speed, single-trace legacy live validation, and a separate validated production-journal adapter | Acknowledged production live control; never route production events through legacy traces |
 | Source and run start | A loopback runtime-start host accepts explicitly attested bounded owned bytes or operator-selected preflight directories, invokes the existing ingest/ffprobe/V1-seal chain for browser media, revalidates every indexed byte, hot-registers and resolves stable session/revision identities, exposes a read-only exact plan, durably claims `commandId`, writes an immutable adjacent `studio.runtime-start.v1`, and launches one bounded child at most once. Default Studio can ingest, select, plan, start, and poll without entering replay state | Hosted/link ingest, speech/language detection for browser V1 ingest, a separately versioned production start event if later required, and scheduler task propagation of the accepted language context |
-| Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and production-journal worker projection | Stream the production adapter from a runtime service and add richer production task/lineage views without altering recorded bundles |
+| Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and an atomic production-only task/worker/grant/report projection streamed by the owned-source host poll | Add spawn-decision, operation, artifact, and richer lineage views without altering recorded bundles or claiming a complete swarm |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, a receipted ffmpeg range extraction host, and a bounded receipted seek observation host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
-| Coordination | Legacy trace prose plus real bounded Codex child execution, worker-output artifacts, and structured report-up | Parent/orchestrator execution beyond the one-child launcher proof; never retrofit legacy prose into handoffs |
+| Coordination | Legacy trace prose plus real bounded Codex child execution, worker-output artifacts, structured report-up, and a separate validated report projection in the owned-source product path | Parent/orchestrator execution beyond the one-child launcher proof; never retrofit legacy prose into handoffs |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
@@ -301,8 +301,9 @@ values distinctly and explain which assumptions dominate the estimate.
 | Forecasting | Versioned, content-addressed forecast and run-start freeze artifacts derive a deterministic workload floor from the measured media envelope, selected range, and explicit operation ranges. Default Studio validates and shows the exact pre-start floor and assumptions while rendering elapsed, usage, amount, and currency unavailable | Operation/tier selection, price-book adapter, model-usage estimate producer, elapsed-time and historical calibration, interactive comparison, and separate forecast evaluation |
 
 The URL/demo branch of normal Studio visualizes recorded legacy runs. Its separate owned-source
-branch can start and poll the bounded production proof, but never inserts those production events
-into the recorded canvas. The separate `/studio/runtime/` inspector can
+branch can start and poll the bounded production proof and now projects validated task, worker,
+grant, and report facts through a dedicated adapter, but never inserts those production events into
+the recorded canvas. The separate `/studio/runtime/` inspector can
 validate an operator-selected production NDJSON journal, build its immutable observability index,
 query normalized facts, resolve source event/receipt/artifact identities, and project dynamic
 workers. It does not start the runtime, search raw journal text, insert events into `run-005` or
@@ -312,7 +313,7 @@ workers. It does not start the runtime, search raw journal text, insert events i
 
 | Phase | Status | Honest boundary |
 |---|---|---|
-| 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. Browser automation is authored but interactive execution is unavailable in the current in-app browser environment. |
+| 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. One targeted desktop Playwright case exercised the host-backed production projection on 2026-07-15; the in-app browser surface and full desktop/mobile matrix were unavailable for this slice. |
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
 | 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Default Studio now sends explicitly attested owned bytes to the development host, which composes the existing ingest and V1 seal producers and hot-registers the validated source. This browser path does not run speech or language detection, so those findings remain honestly unavailable. Pinned Silero VAD and Whisper language producers remain available to the CLI preflight chain. Hosted/link submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
 | 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` no longer reads a fixed `run-005` path internally: it requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the existing bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, journals its lifecycle, stores its structured output, and reports through the handoff host. `run-005` remains only the explicit npm smoke/test input. The static Studio is not a runtime service and no live socket/control path is claimed. |
@@ -320,10 +321,10 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
 | 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real derived-media lineage, worker-output content, executor identity, and structured handoff. Legacy report/merge prose is not recast as provenance. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
-| 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
+| 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. The targeted desktop host-backed task/worker/grant/report case passed; the full desktop/mobile browser matrix was not run, the in-app browser surface was unavailable, and no live control producer exists. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
 | 10 — forecasting | Deterministic floor plus product forecast surface implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `POST /v1/runtime-plans` returns the exact forecast without creating a command or runtime directory. Default Studio validates it, shows its range/floor/operation/assumptions, and leaves unavailable values unavailable. Start freezes that same content into `run-start.json`; no pricing, calibration, operation-choice, or evaluation producer is claimed. |
-| 11 — local runtime-start host | Local product fragment implemented | A transport-independent service plus Node HTTP adapter now also accepts bounded owned bytes through authenticated create/upload/status endpoints, uses only host-chosen ignored paths and fixed producer arguments, hot-registers the sealed V1 source, then preserves the existing stable-identity plan/start/poll path. Default Studio provides explicit file/rights/progress/select/plan/start/poll controls; the lab remains available. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
+| 11 — local runtime-start host | Local product fragment implemented | A transport-independent service plus Node HTTP adapter accepts bounded owned bytes through authenticated create/upload/status endpoints, uses only host-chosen ignored paths and fixed producer arguments, hot-registers the sealed V1 source, then preserves the stable-identity plan/start/poll path. Default Studio provides explicit file/rights/progress/select/plan/start/poll controls and atomically projects validated task/worker/grant/report facts through a dedicated production adapter; the lab remains available. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
 
 ## Local runtime-start host
 
@@ -421,9 +422,11 @@ only the existing one-child proof objective: no child media tools, media inspect
 translation, captions, study output, parent/orchestrator model execution, or multi-worker swarm.
 Default `/studio/` now offers an explicit **Use owned local source** path that lists registered
 sessions, shows validated source facts, reviews the exact floor, starts, reads lifecycle, and polls
-validated events. The URL/demo path remains recorded replay. `/studio/?lab=1` retains its lower-level
-proof controls. Neither path inserts production events into `RunBundle`, legacy traces, or the
-recorded graph.
+validated events. The product poll sends complete validated batches through the production-only
+adapter and renders separate task, registered-worker, capability-grant, and structured-report facts.
+A rejected batch leaves the last completely accepted projection in place and stops polling. The
+URL/demo path remains recorded replay. `/studio/?lab=1` retains its lower-level proof controls.
+Neither path inserts production events into `RunBundle`, legacy traces, or the recorded graph.
 
 ### Deterministic operator path
 
@@ -443,7 +446,8 @@ Review the range, workload floor, operation, assumptions, and unavailable values
 **Accept forecast and start local runtime**. The lab's **Repeat
 identical start** still confirms the same
 command/runtime/journal/receipt/forecast identities. The UI polls from `after=0` until
-`reachedHead` and `terminal` are true. Stop and restart the same command with
+`reachedHead` and `terminal` are true and shows the validated production task, worker, grant, and
+report facts below the runtime identities. Stop and restart the same command with
 the same ignored `.studio/runtime-host` root, query its command/runtime status, and continue from the
 prior cursor. The emitted `events.ndjson` remains directly loadable through the existing manual
 `/studio/runtime/` file picker. `npm run runtime:host:codex` is the separately guarded real-executor
@@ -780,7 +784,9 @@ The next production slices, in dependency order:
     durable command and launch claims, explicit lifecycle records, restart interruption/terminal
     reconciliation, bounded validated cursor polling, deterministic executor controls, authenticated
     loopback HTTP adapter, shared CLI/host application composition, and default-Studio owned-source
-    start wiring. No child media, caption, study, swarm, or hosted-runtime capability is implied.
+    start wiring. The default owned-source path now folds polled events atomically into dedicated
+    task/worker/grant/report view-models and renders them outside legacy replay state. No child media,
+    caption, study, swarm completeness, or hosted-runtime capability is implied.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow
 the same rule: choose a real deterministic producer first, then add the contract, fixture, policy,

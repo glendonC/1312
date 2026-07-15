@@ -106,14 +106,17 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
   and validated cursor polling. The shared browser client lists registered sources, validates the
   returned `studio.forecast.v1`, sends product inputs plus stable session/revision identities,
   consumes the acknowledgement and frozen identities, and polls validated events from the last
-  consumed cursor. This is a real and wired local product fragment, not a caption or swarm loop.
+  consumed cursor. An atomic production-only adapter now folds those events into separate task,
+  worker, grant, and report view-models in the owned-source status surface. This is a real and wired
+  local product fragment, not a caption or swarm loop.
 - `/studio/runtime/` validates one operator-selected local NDJSON journal and projects normalized
   facts. A host journal remains manually loadable there, but the inspector does not start or
   connect to the host. Its own page states that it “does not start a worker, search raw logs, or
   insert activity into a recorded demo.”
 - The local scheduler, artifact store, journal, one-child launcher, forecast freeze, and structured
   report-up remain composed only into the host's bounded proof. Default Studio can now plan, start,
-  and poll that proof, but does not project it into the recorded canvas or publish results.
+  poll, and project its validated task/worker/grant/report facts in a separate production region,
+  but does not project them into the recorded canvas or publish results.
   `media.extract` and `media.seek` are also real fragments, but remain unavailable to the child.
 - `scripts/run-clip.mjs` performs the older real API-backed clip pipeline and writes a recorded run
   folder. Its emitted legacy traces look like a swarm, but it is not the production scheduler or a
@@ -130,12 +133,12 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 | 4. Choose result | Target language, captions/evidence depth, relevant advanced options | Owned-source path maps explicit declared/target language, optional pack, range, and output contract into `studio.analysis-request.v1`; this does not imply a corresponding output producer | B / real and wired request mapping | Extend only when producers support more options |
 | 5. Review plan | Work operations, agent/task limits, assumptions, workload, elapsed-time range, cost range | Default Studio calls the read-only host planner and shows exact selected range, explicit proof operation, deterministic workload floor, assumptions, and unavailable elapsed/usage/cost | B+C / real floor wired; estimators and interactive task planner missing | Add producer-backed operation/tier choices and estimators |
 | 6. Start analysis | Accepted plan becomes a run; exact forecast is frozen | **Replay recorded analysis** still starts `ReplayTransport`. Separately, default Studio can **Accept forecast and start local runtime** for a registered owned source; the existing host start freezes the exact reviewed forecast and returns durable identities | A+B / replay plus real and wired local product fragment | Add complete analysis operations and results; do not recast bounded proof as them |
-| 7. Spawn agents | Scheduler creates bounded tasks and workers | Recorded manifest/traces animate only for replay; the owned-source path starts the host's bounded one-child proof and shows lifecycle/journal health without inserting its worker into replay topology | A+B / local start wired; production topology UI unwired | Stream production task/agent registry through its own adapter |
-| 8. Coordinate | Children inspect scoped inputs and report structured outputs upward | Recorded prose is replayed; local one-child report-up is real but isolated | A+B / partial local fragment | Parent/orchestrator executor, dependencies, handoffs, retries, and child tool bridge |
+| 7. Spawn agents | Scheduler creates bounded tasks and workers | Recorded manifest/traces animate only for replay; the owned-source path projects validated scheduler tasks and registered workers through a dedicated production adapter without inserting them into replay topology | A+B / bounded local task and worker facts wired separately from replay | Add spawn-decision, operation, and richer lineage views without creating a swarm-completeness claim |
+| 8. Coordinate | Children inspect scoped inputs and report structured outputs upward | Recorded prose remains replay-only; the local one-child report and parent decision are projected as structured production facts, while the child still cannot inspect media | A+B / bounded report-up wired; larger coordination missing | Parent/orchestrator execution, dependencies, retries, and child tool bridge |
 | 9. Work through media | Agents seek, loop, mark, extract, inspect frames/tracks, and run detectors | Recorded workspaces are projections; host has only real extract and seek; child can call neither | A+B+C / partial | Capability bridge plus remaining media/detector operations and receipts |
-| 10. Control run | Pause, resume, cancel, reconnect, and show accepted state | Pause/resume/stop control replay only. Lab and product local clients project host lifecycle and retry polling from the last consumed journal cursor; the host has no pause/resume/cancel endpoint | A+B+C / recorded controls; real local polling wired; runtime controls missing | Add a separate request/ack protocol for live controls without changing replay controls |
+| 10. Control run | Pause, resume, cancel, reconnect, and show accepted state | Pause/resume/stop control replay only. Lab and product local clients project host lifecycle and retry polling from the last consumed journal cursor; product polling atomically updates the separate production fact projection. The host has no pause/resume/cancel endpoint | A+B+C / recorded controls; real local polling/projection wired; runtime controls missing | Add a separate request/ack protocol for live controls without changing replay controls |
 | 11. Publish output | Timed source, translation, withheld lines, captions, study, evidence, exports | Recorded captions, comparison, scores, evidence, glossary, and artifact links render | A / recorded replay | Merge/QC/publish task producing immutable result artifacts |
-| 12. Inspect real run | Operator can audit actual tasks, operations, usage, handoffs, and failures | Local journal can be loaded manually in `/studio/runtime/` | B / real and inspector-wired | Link a Studio run to its production journal without merging protocols |
+| 12. Inspect real run | Operator can audit actual tasks, operations, usage, handoffs, and failures | The owned-source status surface projects polled task/worker/grant/report facts; the fuller local journal remains manually loadable in `/studio/runtime/` | B / bounded product projection plus full inspector | Add operation/artifact source links to the product projection without merging protocols |
 
 ## Surface and control inventory
 
@@ -244,6 +247,10 @@ visibly labelled as example data and must never enter recorded or production evi
 | `run.layout` | Layout segmented control | Rearranges the local graph only | Presentation-only; may remain independent of runtime | A / real UI over replay data |
 | `run.pan` | Canvas drag | Pans local graph | Presentation-only | A / real UI over replay data |
 | `run.agent.open` | Click agent/orchestrator node | Opens recorded role workspace and history | Inspect the selected production agent/task and its receipts | A / recorded replay |
+| `run.production.tasks` | **Production tasks** | Shows scheduler-owned identity, objective, owner, parent, dependencies, required outputs, and journal status from the validated local poll | Keep this production-only; absence is unavailable until `task.created` is validated | B / real and wired bounded facts |
+| `run.production.workers` | **Registered workers** | Shows registry identity, kind, task, parent, and journal status from validated production events | Do not treat recorded status as a presence signal or insert the worker into the replay graph | B / real and wired bounded facts |
+| `run.production.grants` | **Capability grants** | Shows scheduler-issued capability, task/worker binding, and exact grant scope | Empty media scope means no media scope was granted; it does not imply a media operation ran | B / real and wired bounded facts |
+| `run.production.reports` | **Structured reports** | Shows the validated report summary, output artifact ids, parent edge, status, and decision reason when present | A submitted report keeps its decision reason unavailable until `report.decided` is validated | B / real and wired bounded facts |
 | `run.phase` | Phase label and percentage | Derived from replay cursor and trace count | Derive live progress from explicit tasks; never invent a percentage from animation time | A / recorded replay |
 | `run.pause` | **Pause/Resume**, space shortcut | Stops/resumes the replay clock exactly | Send a correlated control request; show paused only after runtime acknowledgement | A / recorded replay |
 | `run.stop` | **Stop** | Stops replay and marks the client session cancelled | Request cancellation; distinguish requested, accepted, draining, cancelled, and failed | A / recorded replay |
@@ -371,15 +378,15 @@ submit-to-result wiring slice.
 | Pricing snapshot/currency/API cost | Planner | None | Unavailable | Architecture |
 | Frozen accepted forecast | Runtime start/audit | Runtime host and forecast freeze function | Real local; product requires frozen content to equal the reviewed plan and consumes immutable identities | Shared Studio-host wiring |
 | Run id/runtime id/journal identity | Run/reconnect/inspector | Runtime-start host acknowledgements, status, and run-start receipt | Real local, durable, and projected in product and development lab | Shared Studio-host wiring |
-| Task definitions/dependencies/budgets | Swarm/agent focus | Production scheduler | Real local; main Studio unwired | Architecture |
-| Dynamic agent registry/grants/scopes | Swarm/agent focus | Production scheduler/registry | Real local; main Studio unwired | Architecture |
+| Task definitions/dependencies/budgets | Swarm/agent focus | Production scheduler | Real local; selected task definitions/dependencies are projected in the default owned-source surface, while budgets remain undisplayed in this slice | Architecture |
+| Dynamic agent registry/grants/scopes | Swarm/agent focus | Production scheduler/registry | Real local; worker identities and exact grants/scopes are projected in the default owned-source surface without entering the replay graph | Architecture |
 | Live events and cursor | Swarm/reconnect | Authenticated runtime-host polling over the append-only journal | Product and lab poll from the last consumed cursor and surface validation errors; events do not enter replay topology | Shared Studio-host wiring |
 | Control request/ack | Dock | None | Missing | Architecture |
 | Media-operation receipts | Agent workspace/evidence | `media.extract`, `media.seek` | Real local; child and main Studio unwired | Architecture |
 | Remaining media tools/detectors | Agent workspace | None | Missing | Architecture |
 | Worker execution and measured usage | Agent/observability | Codex launcher | Real for one child | Architecture |
 | Worker output artifact | Agent/result | Codex launcher/artifact store | Real for one child | Architecture |
-| Structured handoff and decision | Coordination/result | Report host | Real for one child/parent fixture | Architecture |
+| Structured handoff and decision | Coordination/result | Report host | Real for one child and projected from the validated host journal in the default owned-source surface | Architecture |
 | Captions and cue decisions | Results | Legacy run pipeline/recorded bundles | Real recorded output; no production runtime publisher | Architecture |
 | Glossary/corrections/study artifact | Results/study | Legacy run pipeline and memory proposal path | Partial recorded artifacts | Shared product definition then architecture |
 | Production observability index | Run Explorer | Post-run indexer | Real local and inspector-wired | Architecture |
@@ -407,6 +414,7 @@ operator starts the loopback host and connects Studio with its bearer token
   -> host validates, freezes the exact reviewed forecast, and acknowledges one durable command
   -> Studio reads lifecycle status without equating accepted/initializing with running
   -> Studio polls from the last consumed event sequence
+  -> an atomic production adapter projects task, worker, grant, and report facts outside replay state
   -> Studio projects terminal, failed, or interrupted state with the host's safe reason
 ```
 
@@ -495,11 +503,13 @@ create a registered V1 source from explicitly attested browser-selected bytes. I
   requires validated journal/executor evidence, and surfaces closed `failed`/`interrupted` reasons
 - Authenticated bounded cursor polling from the last consumed sequence, with visible cursor and
   journal-validation failures
+- An atomic dedicated production adapter and boring task/worker/grant/report region; rejected
+  batches preserve the last completely accepted view and never create legacy traces or a `RunBundle`
 - Explicit UI labels for the production local one-child proof versus recorded demonstration
 
-Still open: hosted/link ingest, speech/language detection for browser V1 ingest, dynamic production
-worker/task/report projection in the main Studio, operation/tier choices, calibrated estimation,
-and every larger-runtime item below. This slice does not produce autonomous media captions.
+Still open: hosted/link ingest, speech/language detection for browser V1 ingest, production
+spawn-decision/operation/artifact-lineage views, operation/tier choices, calibrated estimation, and
+every larger-runtime item below. This slice does not produce autonomous media captions.
 
 ### Larger runtime work
 
@@ -549,7 +559,7 @@ semantics without updating this contract with the UIUX owner.
 | Main Studio loads `run-006` | `src/pages/studio/index.astro` |
 | Main Studio uses replay transport | `src/studio/StudioApp.tsx`, `src/studio/store.ts`, `src/studio/transport.ts` |
 | Submitted source is recorded-preview-only | `src/studio/previewSession.ts`, `src/studio/StudioApp.tsx` |
-| Product owned-source path and forecast/status regions | `src/studio/localRuntime/ProductLocalRuntime.tsx` |
+| Product owned-source path, forecast/status regions, and production fact selectors | `src/studio/localRuntime/ProductLocalRuntime.tsx` |
 | Browser-owned ingest composition and progress protocol | `src/studio/runtime/production/runtimeHost/ownedMediaIngest.ts`, `src/studio/localRuntime/client.ts` |
 | Range and output controls | `src/studio/preflight/ConfirmationForm.tsx` |
 | Changed ranges/options cannot replay | `src/studio/preflight/model.ts` |
@@ -560,6 +570,7 @@ semantics without updating this contract with the UIUX owner.
 | Local real legacy clip pipeline | `scripts/run-clip.mjs` |
 | Local bounded Codex child | `scripts/run-local-worker.ts`, `src/studio/runtime/production/launcher.ts` |
 | Scheduler/journal/media/handoff fragments | `src/studio/runtime/production/` |
+| Dedicated task/worker/grant/report adapter | `src/studio/runtime/production/studioProjection.ts` |
 | Workload floor and unavailable estimates | `src/studio/runtime/production/forecast/`, `tests/studio-forecast-production.test.ts` |
 | Local host lifecycle and public identities | `src/studio/runtime/production/runtimeHost/model.ts` |
 | Local host endpoints, bearer authentication, and loopback binding | `src/studio/runtime/production/runtimeHost/httpServer.ts` |

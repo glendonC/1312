@@ -1,7 +1,32 @@
 import { assertRuntimeEvent } from "./assertions.ts";
-import type { MediaScope, RuntimeProjection, WorkerKind } from "./model.ts";
+import type {
+  Capability,
+  MediaScope,
+  RequiredOutput,
+  RuntimeProjection,
+  TaskStatus,
+  WorkerKind,
+} from "./model.ts";
 import type { RuntimeEvent } from "./protocol.ts";
 import { applyRuntimeEvent, initialRuntimeProjection } from "./projection.ts";
+
+export interface ProductionStudioTaskView {
+  taskId: string;
+  workloadKey: string;
+  objective: string;
+  kind: WorkerKind;
+  label: string;
+  parentTaskId: string | null;
+  parentAgentId: string | null;
+  depth: number;
+  assignedAgentId: string;
+  ownerAgentId: string | null;
+  status: TaskStatus;
+  mediaScope: MediaScope[];
+  inputArtifactIds: string[];
+  requiredOutputs: RequiredOutput[];
+  dependencies: string[];
+}
 
 export interface ProductionStudioWorkerView {
   agentId: string;
@@ -36,6 +61,26 @@ export interface ProductionStudioWorkerView {
   };
 }
 
+export interface ProductionStudioGrantView {
+  grantId: string;
+  taskId: string;
+  agentId: string;
+  capability: Capability;
+  mediaScope: MediaScope[];
+}
+
+export interface ProductionStudioReportView {
+  reportId: string;
+  taskId: string;
+  agentId: string;
+  parentTaskId: string;
+  parentAgentId: string;
+  outputArtifactIds: string[];
+  summary: string;
+  status: "submitted" | "accepted" | "rejected";
+  decisionReason: string | null;
+}
+
 export interface ProductionStudioProjection {
   schema: "studio.production-projection.v1";
   source: {
@@ -44,16 +89,67 @@ export interface ProductionStudioProjection {
   };
   runId: string;
   lastSeq: number;
+  tasks: ProductionStudioTaskView[];
   workers: ProductionStudioWorkerView[];
+  grants: ProductionStudioGrantView[];
+  reports: ProductionStudioReportView[];
   counts: {
     tasks: number;
     workers: number;
+    grants: number;
     executions: number;
     reports: number;
   };
 }
 
 export function adaptProductionRuntime(state: RuntimeProjection): ProductionStudioProjection {
+  const tasks = Object.values(state.tasks)
+    .map((task): ProductionStudioTaskView => ({
+      taskId: task.id,
+      workloadKey: task.workloadKey,
+      objective: task.objective,
+      kind: task.workerKind,
+      label: task.workerLabel,
+      parentTaskId: task.parentTaskId,
+      parentAgentId: task.parentAgentId,
+      depth: task.depth,
+      assignedAgentId: task.assignedAgentId,
+      ownerAgentId: task.ownerAgentId,
+      status: task.status,
+      mediaScope: structuredClone(task.mediaScope),
+      inputArtifactIds: [...task.inputArtifactIds],
+      requiredOutputs: structuredClone(task.requiredOutputs),
+      dependencies: [...task.dependencies],
+    }))
+    .sort((left, right) => left.depth - right.depth || left.taskId.localeCompare(right.taskId));
+
+  const grants = Object.values(state.tasks)
+    .flatMap((task) => task.grants.map((grant): ProductionStudioGrantView => ({
+      grantId: grant.id,
+      taskId: grant.taskId,
+      agentId: grant.agentId,
+      capability: grant.capability,
+      mediaScope: structuredClone(grant.mediaScope),
+    })))
+    .sort((left, right) => left.taskId.localeCompare(right.taskId) || left.grantId.localeCompare(right.grantId));
+  if (new Set(grants.map((grant) => grant.grantId)).size !== grants.length) {
+    throw new Error("Production Studio projection: grant identities must be unique across tasks");
+  }
+
+  const reports = Object.values(state.reports)
+    .map((report): ProductionStudioReportView => ({
+      reportId: report.id,
+      taskId: report.taskId,
+      agentId: report.agentId,
+      parentTaskId: report.parentTaskId,
+      parentAgentId: report.parentAgentId,
+      outputArtifactIds: [...report.outputArtifactIds],
+      summary: report.summary,
+      status: report.status,
+      decisionReason: report.decisionReason,
+    }))
+    .sort((left, right) => left.reportId.localeCompare(right.reportId));
+
   const workers = Object.values(state.agents)
     .map((agent): ProductionStudioWorkerView => {
       const task = state.tasks[agent.taskId];
@@ -108,12 +204,16 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     source: { kind: "production_runtime_journal", recordedDemo: false },
     runId: state.runId,
     lastSeq: state.lastSeq,
+    tasks,
     workers,
+    grants,
+    reports,
     counts: {
-      tasks: Object.keys(state.tasks).length,
+      tasks: tasks.length,
       workers: workers.length,
+      grants: grants.length,
       executions: Object.keys(state.executions).length,
-      reports: Object.keys(state.reports).length,
+      reports: reports.length,
     },
   };
 }
@@ -130,8 +230,16 @@ export class ProductionStudioAdapter {
   }
 
   append(candidate: unknown): ProductionStudioProjection {
-    this.state = applyRuntimeEvent(this.state, candidate);
-    return this.view();
+    return this.appendBatch([candidate]);
+  }
+
+  /** A rejected event leaves the adapter at the last completely accepted poll batch. */
+  appendBatch(candidates: readonly unknown[]): ProductionStudioProjection {
+    let next = this.state;
+    for (const candidate of candidates) next = applyRuntimeEvent(next, candidate);
+    const view = adaptProductionRuntime(next);
+    this.state = next;
+    return view;
   }
 
   view(): ProductionStudioProjection {
@@ -144,9 +252,6 @@ export function projectProductionRuntimeJournal(events: readonly unknown[]): Pro
   assertRuntimeEvent(events[0], "Production Studio journal event 1");
   const first = events[0] as RuntimeEvent;
   const adapter = new ProductionStudioAdapter(first.runId);
-  events.forEach((event, index) => {
-    assertRuntimeEvent(event, `Production Studio journal event ${index + 1}`);
-    adapter.append(event);
-  });
-  return adapter.view();
+  events.forEach((event, index) => assertRuntimeEvent(event, `Production Studio journal event ${index + 1}`));
+  return adapter.appendBatch(events);
 }

@@ -14,6 +14,11 @@ function readout(page: Page) {
   return page.locator(".lab-readout b");
 }
 
+function productStudioUrl(): string {
+  const runtimeHost = process.env.STUDIO_RUNTIME_HOST_URL;
+  return runtimeHost ? `/studio/?runtimeHost=${encodeURIComponent(runtimeHost)}` : "/studio/";
+}
+
 function ownedWav(seed: number): Buffer {
   const sampleRate = 8_000;
   const samples = sampleRate;
@@ -150,7 +155,7 @@ test("owned browser media requires rights, registers, and continues through the 
   test.skip(testInfo.project.name !== "desktop", "one ingest is sufficient across browser projects");
   test.skip(!token, "requires an operator-started deterministic runtime host");
 
-  await page.goto("/studio/");
+  await page.goto(productStudioUrl());
   await page.getByRole("button", { name: "Use owned local source" }).click();
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await productRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
@@ -190,7 +195,7 @@ test("the product path reviews and freezes an exact local forecast without enter
   const token = process.env.STUDIO_RUNTIME_HOST_TOKEN;
   test.skip(!token, "requires an operator-started deterministic runtime host");
 
-  await page.goto("/studio/");
+  await page.goto(productStudioUrl());
   await page.getByRole("button", { name: "Use owned local source" }).click();
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await productRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
@@ -212,6 +217,17 @@ test("the product path reviews and freezes an exact local forecast without enter
   const status = productRuntime.getByRole("region", { name: "Local runtime status" });
   await expect(status.getByText(/Terminal/)).toBeVisible({ timeout: 10_000 });
   await expect(status.getByText(/Closed at validated journal head/)).toBeVisible();
+  const production = status.getByRole("region", { name: "Production task and handoff facts" });
+  await expect(production).toBeVisible();
+  await expect(production.getByText(/recorded production evidence, not a presence signal/)).toBeVisible();
+  await expect(production.locator("[data-production-task-id]")).toHaveCount(2);
+  await expect(production.locator("[data-production-worker-id]")).toHaveCount(2);
+  await expect(production.locator("[data-production-grant-id]")).toHaveCount(2);
+  await expect(production.locator("[data-production-report-id]")).toHaveCount(1);
+  await expect(production.getByRole("heading", { name: "Production tasks" })).toBeVisible();
+  await expect(production.getByRole("heading", { name: "Registered workers" })).toBeVisible();
+  await expect(production.getByRole("heading", { name: "Capability grants" })).toBeVisible();
+  await expect(production.getByRole("heading", { name: "Structured reports" })).toBeVisible();
   await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
   await expect(page.locator(".hub")).toHaveCount(0);
 });

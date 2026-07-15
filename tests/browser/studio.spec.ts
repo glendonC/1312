@@ -461,16 +461,28 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
         rootPosition: getComputedStyle(root).position,
         spatialDisplay: getComputedStyle(spatial).display,
         environmentDisplay: getComputedStyle(environment).display,
+        environmentBackground: getComputedStyle(environment).backgroundImage,
         environmentRadius: getComputedStyle(environment).borderRadius,
         closeWidth: getComputedStyle(close).width,
+        identityBefore: getComputedStyle(
+          root.querySelector(".agent-focus-identity") as Element,
+          "::before",
+        ).content,
+        identityAfter: getComputedStyle(
+          root.querySelector(".agent-focus-identity") as Element,
+          "::after",
+        ).content,
       };
     }),
   ).toEqual({
     rootPosition: "absolute",
     spatialDisplay: "grid",
     environmentDisplay: "flex",
-    environmentRadius: "48px",
+    environmentBackground: "none",
+    environmentRadius: "32px",
     closeWidth: "44px",
+    identityBefore: "none",
+    identityAfter: "none",
   });
 });
 

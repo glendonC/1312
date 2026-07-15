@@ -8,9 +8,7 @@
   height: 100%;
   padding: 0;
   border: 0;
-  background: rgba(236, 241, 235, 0.58);
-  backdrop-filter: blur(8px) saturate(0.86);
-  -webkit-backdrop-filter: blur(8px) saturate(0.86);
+  background: rgba(247, 250, 248, 0.5);
   cursor: zoom-out;
 }
 
@@ -69,33 +67,12 @@
   height: clamp(174px, 19vw, 244px);
 }
 
-.agent-focus-identity::before,
-.agent-focus-identity::after {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  content: "";
-}
-
-.agent-focus-identity::before {
-  inset: -22px;
-  border: 1px solid color-mix(in srgb, var(--agent-current) 35%, transparent);
-  box-shadow:
-    0 0 58px color-mix(in srgb, var(--agent-current) 17%, transparent),
-    inset 0 0 34px color-mix(in srgb, var(--agent-body) 9%, transparent);
-}
-
-.agent-focus-identity::after {
-  inset: -42px;
-  border: 1px solid color-mix(in srgb, var(--agent-counter) 14%, transparent);
-}
-
 .agent-focus-identity .agent-mark {
   width: 100%;
   height: 100%;
   box-shadow:
-    0 28px 70px rgba(11, 29, 25, 0.24),
-    0 5px 16px rgba(11, 29, 25, 0.14);
+    0 20px 48px rgba(11, 29, 25, 0.16),
+    0 2px 8px rgba(11, 29, 25, 0.1);
 }
 
 .agent-focus-hero-copy {
@@ -182,10 +159,8 @@
   border: 1px solid var(--glass-border);
   border-radius: 50%;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.68);
-  box-shadow: 0 9px 24px rgba(22, 29, 27, 0.09);
-  backdrop-filter: blur(18px) saturate(1.5);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 4px 12px rgba(22, 29, 27, 0.06);
   cursor: pointer;
   transition:
     color 160ms ease,
@@ -231,30 +206,13 @@
   overflow: hidden;
   padding: clamp(22px, 2.5vw, 34px);
   padding-bottom: clamp(148px, 18vh, 174px);
-  border: 1px solid color-mix(in srgb, var(--agent-current) 18%, var(--glass-border));
-  border-radius: clamp(30px, 4vw, 48px);
+  border: 1px solid var(--line);
+  border-radius: 32px;
   corner-shape: squircle;
-  background:
-    radial-gradient(
-      circle at 10% 5%,
-      color-mix(in srgb, var(--agent-current) 10%, transparent),
-      transparent 35%
-    ),
-    rgba(255, 255, 255, 0.79);
-  box-shadow:
-    0 36px 100px rgba(18, 32, 28, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(30px) saturate(1.45);
-  -webkit-backdrop-filter: blur(30px) saturate(1.45);
-}
-
-.agent-focus-environment::before {
-  position: absolute;
-  inset: 10px;
-  border: 1px solid color-mix(in srgb, var(--agent-current) 10%, transparent);
-  border-radius: calc(clamp(30px, 4vw, 48px) - 8px);
-  pointer-events: none;
-  content: "";
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 24px 64px rgba(18, 32, 28, 0.11);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .agent-focus-environment-head {
@@ -300,7 +258,7 @@
   width: 44px;
   height: 44px;
   flex: none;
-  border-color: color-mix(in srgb, var(--agent-current) 25%, var(--glass-border));
+  border-color: var(--line);
   color: var(--ink);
   font-size: 1.15rem;
 }
@@ -340,13 +298,13 @@
   width: min(350px, 30vw);
   max-height: min(220px, 28vh);
   overflow: hidden;
-  border: 1px solid var(--glass-border);
-  border-radius: 21px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
   corner-shape: squircle;
-  background: rgba(252, 253, 250, 0.82);
-  box-shadow: 0 22px 58px rgba(22, 29, 27, 0.16);
-  backdrop-filter: blur(26px) saturate(1.55);
-  -webkit-backdrop-filter: blur(26px) saturate(1.55);
+  background: rgba(252, 253, 250, 0.9);
+  box-shadow: 0 14px 36px rgba(22, 29, 27, 0.1);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .agent-focus-activity summary {
@@ -464,7 +422,7 @@
 .coordination-note {
   align-self: center;
   padding: 20px;
-  border-left: 2px solid color-mix(in srgb, var(--agent-current) 55%, var(--line));
+  border-left: 2px solid var(--accent-line);
 }
 
 .coordination-note p {
@@ -479,38 +437,17 @@
   margin: 0;
   padding: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
+  column-gap: 22px;
   list-style: none;
 }
 
 .coordination-workers li {
-  position: relative;
   display: flex;
   min-width: 0;
   flex-direction: column;
   justify-content: center;
-  padding: 12px 14px 12px 18px;
-  border: 1px solid var(--line);
-  border-radius: 15px;
-  corner-shape: squircle;
-  background: rgba(247, 250, 248, 0.68);
-}
-
-.coordination-workers li::before {
-  position: absolute;
-  top: 17px;
-  bottom: 17px;
-  left: 8px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--line-strong);
-  content: "";
-}
-
-.coordination-workers li[data-status="working"]::before,
-.coordination-workers li[data-status="reporting"]::before,
-.coordination-workers li[data-status="gating"]::before {
-  background: var(--accent);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .coordination-worker-role,
@@ -565,14 +502,6 @@
     grid-row: 1 / -1;
   }
 
-  .agent-focus-identity::before {
-    inset: -11px;
-  }
-
-  .agent-focus-identity::after {
-    inset: -20px;
-  }
-
   .agent-focus-hero-copy {
     align-self: end;
     margin: 0;
@@ -606,12 +535,7 @@
     min-height: 0;
     flex: none;
     padding: 20px 18px 24px;
-    border-radius: 27px;
-  }
-
-  .agent-focus-environment::before {
-    inset: 7px;
-    border-radius: 21px;
+    border-radius: 24px;
   }
 
   .agent-focus-environment-head {
@@ -686,14 +610,6 @@
     height: 92px;
   }
 
-  .agent-focus-identity::before {
-    inset: -11px;
-  }
-
-  .agent-focus-identity::after {
-    display: none;
-  }
-
   .agent-focus-hero-copy {
     margin-top: 18px;
   }
@@ -722,12 +638,7 @@
 
   .agent-focus-environment {
     padding: 14px 16px 74px;
-    border-radius: 24px;
-  }
-
-  .agent-focus-environment::before {
-    inset: 6px;
-    border-radius: 18px;
+    border-radius: 22px;
   }
 
   .agent-focus-environment-head h3 {

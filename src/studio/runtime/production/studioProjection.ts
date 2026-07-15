@@ -4,6 +4,7 @@ import type {
   MediaScope,
   RequiredOutput,
   RuntimeProjection,
+  SpawnRejection,
   TaskStatus,
   WorkerKind,
 } from "./model.ts";
@@ -81,6 +82,54 @@ export interface ProductionStudioReportView {
   decisionReason: string | null;
 }
 
+export interface ProductionStudioSpawnView {
+  requestId: string;
+  requestedByTaskId: string;
+  requestedByAgentId: string;
+  workloadKey: string;
+  objective: string;
+  workerKind: WorkerKind;
+  workerLabel: string;
+  mediaScope: MediaScope[];
+  inputArtifactIds: string[];
+  requiredOutputs: RequiredOutput[];
+  requiredCapabilities: Capability[];
+  dependencies: string[];
+  decision: "pending" | "accepted" | "rejected";
+  rejection: SpawnRejection | null;
+  taskId: string | null;
+  agentId: string | null;
+}
+
+export type ProductionStudioOutputArtifactOrigin =
+  | {
+      kind: "media_operation" | "media_observation";
+      operationId: string;
+      receiptId: string;
+      receiptContentId: string;
+    }
+  | {
+      kind: "worker_output";
+      executionId: string;
+      receiptId: string;
+      receiptContentId: string;
+    };
+
+export interface ProductionStudioOutputArtifactView {
+  artifactId: string;
+  kind: string;
+  mediaClass: "derived" | "non_media";
+  publication: "private" | "public";
+  contentId: string;
+  bytes: number;
+  durationMs: number | null;
+  producerTaskId: string;
+  producerAgentId: string;
+  sourceArtifactIds: string[];
+  origin: ProductionStudioOutputArtifactOrigin;
+  reportIds: string[];
+}
+
 export interface ProductionStudioProjection {
   schema: "studio.production-projection.v1";
   source: {
@@ -93,12 +142,16 @@ export interface ProductionStudioProjection {
   workers: ProductionStudioWorkerView[];
   grants: ProductionStudioGrantView[];
   reports: ProductionStudioReportView[];
+  spawnRequests: ProductionStudioSpawnView[];
+  outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
     workers: number;
     grants: number;
     executions: number;
     reports: number;
+    spawnRequests: number;
+    outputArtifacts: number;
   };
 }
 
@@ -149,6 +202,59 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       decisionReason: report.decisionReason,
     }))
     .sort((left, right) => left.reportId.localeCompare(right.reportId));
+
+  const spawnRequests = Object.values(state.spawnRequests)
+    .map((request): ProductionStudioSpawnView => ({
+      requestId: request.id,
+      requestedByTaskId: request.requestedByTaskId,
+      requestedByAgentId: request.requestedByAgentId,
+      workloadKey: request.input.workloadKey,
+      objective: request.input.objective,
+      workerKind: request.input.workerKind,
+      workerLabel: request.input.workerLabel,
+      mediaScope: structuredClone(request.input.mediaScope),
+      inputArtifactIds: [...request.input.inputArtifactIds],
+      requiredOutputs: structuredClone(request.input.requiredOutputs),
+      requiredCapabilities: [...request.input.requiredCapabilities].sort(),
+      dependencies: [...request.input.dependencies],
+      decision: request.accepted === null ? "pending" : request.accepted ? "accepted" : "rejected",
+      rejection: request.rejection,
+      taskId: request.taskId,
+      agentId: request.agentId,
+    }))
+    .sort((left, right) => left.requestId.localeCompare(right.requestId));
+
+  const outputArtifacts = Object.values(state.artifacts)
+    .filter((artifact) => artifact.origin.kind !== "ingest")
+    .map((artifact): ProductionStudioOutputArtifactView => {
+      if (artifact.origin.kind === "ingest") {
+        throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
+      }
+      if (artifact.producerTaskId === null || artifact.producerAgentId === null) {
+        throw new Error(`Production Studio projection: output artifact ${artifact.id} has no task and worker producer`);
+      }
+      if (artifact.mediaClass === "raw") {
+        throw new Error(`Production Studio projection: output artifact ${artifact.id} is incorrectly marked raw`);
+      }
+      const reportIds = reports
+        .filter((report) => report.outputArtifactIds.includes(artifact.id))
+        .map((report) => report.reportId);
+      return {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        mediaClass: artifact.mediaClass,
+        publication: artifact.publication,
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        durationMs: artifact.durationMs,
+        producerTaskId: artifact.producerTaskId,
+        producerAgentId: artifact.producerAgentId,
+        sourceArtifactIds: [...artifact.sourceArtifactIds],
+        origin: structuredClone(artifact.origin),
+        reportIds,
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
 
   const workers = Object.values(state.agents)
     .map((agent): ProductionStudioWorkerView => {
@@ -208,12 +314,16 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     workers,
     grants,
     reports,
+    spawnRequests,
+    outputArtifacts,
     counts: {
       tasks: tasks.length,
       workers: workers.length,
       grants: grants.length,
       executions: Object.keys(state.executions).length,
       reports: reports.length,
+      spawnRequests: spawnRequests.length,
+      outputArtifacts: outputArtifacts.length,
     },
   };
 }

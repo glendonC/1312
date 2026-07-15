@@ -77,8 +77,9 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
         <span>Validated production adapter · never added to RunBundle</span>
         <h3 id="product-runtime-production-title">Production task and handoff facts</h3>
         <p>
-          Latest validated journal facts. They are recorded production evidence, not a presence
-          signal, progress estimate, or replay topology.
+          Latest validated journal facts, including scheduler decisions and output lineage. They
+          are recorded production evidence, not a presence signal, progress estimate, or replay
+          topology.
         </p>
       </header>
 
@@ -111,6 +112,63 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                 </dl>
               </article>
             ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="spawn-requests"
+        aria-labelledby="product-runtime-spawns-title"
+      >
+        <h4 id="product-runtime-spawns-title">Spawn requests and decisions</h4>
+        {projection.spawnRequests.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="spawn-requests">
+            Unavailable until a <code>spawn.requested</code> event is validated.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.spawnRequests.map((spawn) => {
+              const decidedTarget = spawn.decision === "accepted"
+                ? `${spawn.taskId} / ${spawn.agentId}`
+                : spawn.decision === "rejected"
+                  ? "Not created — request rejected"
+                  : "Unavailable until spawn.decided is validated";
+              const decisionReason = spawn.decision === "rejected"
+                ? spawn.rejection
+                : spawn.decision === "accepted"
+                  ? "Not applicable — request accepted"
+                  : "Unavailable until spawn.decided is validated";
+              return (
+                <article
+                  key={spawn.requestId}
+                  data-production-spawn-request-id={spawn.requestId}
+                  data-decision={spawn.decision}
+                >
+                  <header><h5>{spawn.workerLabel}</h5><span>{spawn.decision}</span></header>
+                  <p>{spawn.objective}</p>
+                  <dl>
+                    <div><dt>Request</dt><dd>{spawn.requestId}</dd></div>
+                    <div><dt>Requested by</dt><dd>{spawn.requestedByTaskId} / {spawn.requestedByAgentId}</dd></div>
+                    <div><dt>Requested worker kind</dt><dd>{spawn.workerKind}</dd></div>
+                    <div><dt>Workload key</dt><dd>{spawn.workloadKey}</dd></div>
+                    <div><dt>Requested capabilities</dt><dd>{spawn.requiredCapabilities.join(", ") || "None in request contract"}</dd></div>
+                    <div><dt>Requested media scope</dt><dd>{scopeSummary(spawn.mediaScope)}</dd></div>
+                    <div><dt>Requested input artifacts</dt><dd>{spawn.inputArtifactIds.join(", ") || "None in request contract"}</dd></div>
+                    <div>
+                      <dt>Required outputs</dt>
+                      <dd>
+                        {spawn.requiredOutputs.map((output) => (
+                          `${output.name} · ${output.artifactKind} · ${output.required ? "required" : "optional"}`
+                        )).join("; ") || "None in request contract"}
+                      </dd>
+                    </div>
+                    <div><dt>Dependencies</dt><dd>{spawn.dependencies.join(", ") || "None in request contract"}</dd></div>
+                    <div><dt>Decision target</dt><dd>{decidedTarget}</dd></div>
+                    <div><dt>Decision reason</dt><dd>{decisionReason}</dd></div>
+                  </dl>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
@@ -157,6 +215,47 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                 </dl>
               </article>
             ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="output-artifacts"
+        aria-labelledby="product-runtime-output-artifacts-title"
+      >
+        <h4 id="product-runtime-output-artifacts-title">Output artifact lineage</h4>
+        {projection.outputArtifacts.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="output-artifacts">
+            Unavailable until an output-producing <code>artifact.recorded</code> event is validated.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.outputArtifacts.map((artifact) => {
+              const originIdentity = artifact.origin.kind === "worker_output"
+                ? `Execution ${artifact.origin.executionId}`
+                : `Operation ${artifact.origin.operationId}`;
+              return (
+                <article
+                  key={artifact.artifactId}
+                  data-production-output-artifact-id={artifact.artifactId}
+                  data-origin-kind={artifact.origin.kind}
+                >
+                  <header><h5>{artifact.kind}</h5><span>{artifact.mediaClass}</span></header>
+                  <dl>
+                    <div><dt>Artifact</dt><dd>{artifact.artifactId}</dd></div>
+                    <div><dt>Produced by</dt><dd>{artifact.producerTaskId} / {artifact.producerAgentId}</dd></div>
+                    <div><dt>Origin</dt><dd>{artifact.origin.kind} · {originIdentity}</dd></div>
+                    <div><dt>Receipt</dt><dd>{artifact.origin.receiptId}</dd></div>
+                    <div><dt>Receipt content</dt><dd>{artifact.origin.receiptContentId}</dd></div>
+                    <div><dt>Content</dt><dd>{artifact.contentId} · {artifact.bytes} bytes</dd></div>
+                    <div><dt>Upstream artifacts</dt><dd>{artifact.sourceArtifactIds.join(", ") || "No upstream artifact ids recorded"}</dd></div>
+                    <div><dt>Report references</dt><dd>{artifact.reportIds.join(", ") || "No validated report references"}</dd></div>
+                    <div><dt>Publication</dt><dd>{artifact.publication}</dd></div>
+                    <div><dt>Duration</dt><dd>{artifact.durationMs === null ? "Not applicable for this artifact" : `${artifact.durationMs} ms`}</dd></div>
+                  </dl>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

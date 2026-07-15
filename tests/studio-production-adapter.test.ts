@@ -243,7 +243,7 @@ function productionJournal(): unknown[] {
   ];
 }
 
-test("production adapter projects task, worker, grant, and report facts without legacy topology", () => {
+test("production adapter projects spawn and output lineage with existing facts outside legacy topology", () => {
   const projection = projectProductionRuntimeJournal(productionJournal());
 
   assert.deepEqual(projection.source, {
@@ -257,6 +257,8 @@ test("production adapter projects task, worker, grant, and report facts without 
     grants: 2,
     executions: 1,
     reports: 1,
+    spawnRequests: 1,
+    outputArtifacts: 1,
   });
   assert.deepEqual(
     projection.tasks.map((task) => ({ id: task.taskId, owner: task.ownerAgentId, status: task.status })),
@@ -293,9 +295,69 @@ test("production adapter projects task, worker, grant, and report facts without 
     status: "accepted",
     decisionReason: "The required acknowledgement artifact is present.",
   }]);
+  assert.deepEqual(projection.spawnRequests, [{
+    requestId: "request:child",
+    requestedByTaskId: ROOT_TASK_ID,
+    requestedByAgentId: ROOT_AGENT_ID,
+    workloadKey: CHILD_INPUT.workloadKey,
+    objective: CHILD_INPUT.objective,
+    workerKind: CHILD_INPUT.workerKind,
+    workerLabel: CHILD_INPUT.workerLabel,
+    mediaScope: [],
+    inputArtifactIds: [],
+    requiredOutputs: CHILD_INPUT.requiredOutputs,
+    requiredCapabilities: ["report.submit"],
+    dependencies: [],
+    decision: "accepted",
+    rejection: null,
+    taskId: CHILD_TASK_ID,
+    agentId: CHILD_AGENT_ID,
+  }]);
+  assert.deepEqual(projection.outputArtifacts, [{
+    artifactId: OUTPUT_ARTIFACT_ID,
+    kind: "worker-ack",
+    mediaClass: "non_media",
+    publication: "private",
+    contentId: `sha256:${"a".repeat(64)}`,
+    bytes: 1,
+    durationMs: null,
+    producerTaskId: CHILD_TASK_ID,
+    producerAgentId: CHILD_AGENT_ID,
+    sourceArtifactIds: [],
+    origin: {
+      kind: "worker_output",
+      executionId: "execution:child",
+      receiptId: "span:child",
+      receiptContentId: `sha256:${"b".repeat(64)}`,
+    },
+    reportIds: ["report:child"],
+  }]);
   assert.equal("agents" in projection, false);
   assert.equal("traces" in projection, false);
   assert.equal("bundle" in projection, false);
+});
+
+test("production adapter keeps pending and rejected spawn decisions explicit", () => {
+  const journal = productionJournal();
+  const adapter = new ProductionStudioAdapter(RUN_ID);
+  const pending = adapter.appendBatch(journal.slice(0, 4));
+  assert.equal(pending.spawnRequests[0].decision, "pending");
+  assert.equal(pending.spawnRequests[0].rejection, null);
+  assert.equal(pending.spawnRequests[0].taskId, null);
+  assert.equal(pending.spawnRequests[0].agentId, null);
+
+  const rejected = adapter.append(event(5, "scheduler", "spawn.decided", {
+    requestId: "request:child",
+    accepted: false,
+    rejection: "max_active_workers",
+    taskId: null,
+    agentId: null,
+    grants: [],
+  }));
+  assert.equal(rejected.spawnRequests[0].decision, "rejected");
+  assert.equal(rejected.spawnRequests[0].rejection, "max_active_workers");
+  assert.equal(rejected.spawnRequests[0].taskId, null);
+  assert.equal(rejected.spawnRequests[0].agentId, null);
 });
 
 test("production adapter applies a poll batch atomically and keeps the last valid view on rejection", () => {

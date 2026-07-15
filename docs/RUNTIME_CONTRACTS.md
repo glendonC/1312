@@ -33,11 +33,16 @@ invalid handoffs.
 
 This does not make the Studio live. A bounded local `codex exec` worker launcher and a separate
 production-journal Studio adapter now exist, but `/studio/runtime/` is an inspector and does not
-start workers. No hosted runtime service or live control acknowledgement producer exists. The
-launcher still exposes only `report.submit` to its child because no child-process media tool bridge
-exists. `media.extract` and `media.seek` are real scheduler/host capabilities; the other media
-operations and detector/model calls in this proposal remain unavailable. The tables below continue
-to document the fixture contract itself and should not be read as the production wire schema.
+start workers. The default owned-source path consumes validated poll batches through that adapter
+and renders production-only task, spawn request/decision, worker, grant, output-artifact lineage,
+and report facts without creating a `RunBundle`, legacy trace, or replay agent. The deterministic
+host exercises worker-output receipt/report lineage; a product operation view and artifact source
+navigation remain missing. No hosted runtime service or live control acknowledgement producer
+exists. The launcher still exposes only `report.submit` to its child because no child-process media
+tool bridge exists. `media.extract` and `media.seek` are real scheduler/host capabilities; the other
+media operations and detector/model calls in this proposal remain unavailable. The tables below
+continue to document the fixture contract itself and should not be read as the production wire
+schema.
 
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a

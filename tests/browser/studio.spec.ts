@@ -224,9 +224,15 @@ test("the product path reviews and freezes an exact local forecast without enter
   await expect(production.locator("[data-production-worker-id]")).toHaveCount(2);
   await expect(production.locator("[data-production-grant-id]")).toHaveCount(2);
   await expect(production.locator("[data-production-report-id]")).toHaveCount(1);
+  await expect(production.locator("[data-production-spawn-request-id]")).toHaveCount(1);
+  await expect(production.locator('[data-production-spawn-request-id][data-decision="accepted"]')).toBeVisible();
+  await expect(production.locator("[data-production-output-artifact-id]")).toHaveCount(1);
+  await expect(production.locator('[data-production-output-artifact-id][data-origin-kind="worker_output"]')).toBeVisible();
   await expect(production.getByRole("heading", { name: "Production tasks" })).toBeVisible();
+  await expect(production.getByRole("heading", { name: "Spawn requests and decisions" })).toBeVisible();
   await expect(production.getByRole("heading", { name: "Registered workers" })).toBeVisible();
   await expect(production.getByRole("heading", { name: "Capability grants" })).toBeVisible();
+  await expect(production.getByRole("heading", { name: "Output artifact lineage" })).toBeVisible();
   await expect(production.getByRole("heading", { name: "Structured reports" })).toBeVisible();
   await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
   await expect(page.locator(".hub")).toHaveCount(0);

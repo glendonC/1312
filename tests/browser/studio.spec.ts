@@ -41,6 +41,11 @@ async function settledBox(page: Page, locator: Locator) {
   throw new Error("Agent node did not settle before focus opened.");
 }
 
+async function expectFocusSettled(focus: Locator): Promise<void> {
+  await expect(focus.locator(".agent-focus-hero")).toHaveCSS("opacity", "1");
+  await expect(focus.locator(".agent-focus-environment-frame")).toHaveCSS("opacity", "1");
+}
+
 async function renderedDifference(
   page: Page,
   before: Uint8Array,
@@ -420,15 +425,86 @@ test("worker focus becomes a role-specific spatial environment", async ({ page }
     "data-agent-identity",
     sourceIdentity ?? "",
   );
-  await expect(focus.getByText("Agent environment", { exact: true })).toBeVisible();
+  await expect(focus.getByText("Recorded focus", { exact: true })).toBeVisible();
   await expect(focus.getByRole("heading", { name: "Translation draft" })).toBeVisible();
   await expect(focus.locator('.env[data-role="translate"]')).toBeVisible();
-  await expect(focus.getByText("Recorded activity", { exact: true })).toBeVisible();
+  const environment = focus.locator(".agent-focus-environment");
+  const activity = environment.locator(":scope > .agent-focus-activity");
+  const sectionTabs = focus.getByRole("tablist", { name: "Focused worker sections" });
+  const [environmentBox, workspaceTabBox, activityTabBox] = await Promise.all([
+    environment.boundingBox(),
+    sectionTabs.getByRole("tab", { name: "Workspace" }).boundingBox(),
+    sectionTabs.getByRole("tab", { name: "Recorded activity" }).boundingBox(),
+  ]);
+  expect(environmentBox).not.toBeNull();
+  expect(workspaceTabBox).not.toBeNull();
+  expect(activityTabBox).not.toBeNull();
+  if ((page.viewportSize()?.width ?? 0) > 720) {
+    expect(workspaceTabBox?.x ?? 0).toBeGreaterThanOrEqual(
+      (environmentBox?.x ?? 0) + (environmentBox?.width ?? 0),
+    );
+  } else {
+    expect((activityTabBox?.x ?? 0) + (activityTabBox?.width ?? 0)).toBeLessThanOrEqual(
+      (environmentBox?.x ?? 0) + (environmentBox?.width ?? 0),
+    );
+    expect(
+      (environmentBox?.x ?? 0) + (environmentBox?.width ?? 0)
+      - ((activityTabBox?.x ?? 0) + (activityTabBox?.width ?? 0)),
+    ).toBeLessThanOrEqual(13);
+    expect((activityTabBox?.y ?? 0) + (activityTabBox?.height ?? 0)).toBeLessThanOrEqual(
+      environmentBox?.y ?? 0,
+    );
+  }
+  await expect(sectionTabs.getByRole("tab", { name: "Workspace" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(activity).toHaveCount(0);
+  await sectionTabs.getByRole("tab", { name: "Recorded activity" }).click();
+  await expect(focus.getByRole("heading", { name: "Recorded activity" })).toBeVisible();
+  await expect(activity).toBeVisible();
   await expect(focus.locator(".agent-focus-log-row")).not.toHaveCount(0);
+  await expect(sectionTabs.getByRole("tab", { name: "Recorded activity" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.keyboard.press("Home");
+  await expect(sectionTabs.getByRole("tab", { name: "Workspace" })).toBeFocused();
+  await expect(focus.getByRole("heading", { name: "Translation draft" })).toBeVisible();
+  await page.keyboard.press("End");
+  await expect(sectionTabs.getByRole("tab", { name: "Recorded activity" })).toBeFocused();
+  await expect(focus.getByRole("heading", { name: "Recorded activity" })).toBeVisible();
+  await expect(
+    focus.locator(".agent-focus-hero-copy").getByText("Translator", { exact: true }),
+  ).toHaveCount(0);
+  await expect(focus.getByText("Latest recorded action", { exact: true })).toHaveCount(0);
+  await expect(
+    environment.locator(".agent-focus-environment-foot").getByText("translate-01", { exact: true }),
+  ).toBeVisible();
+  expect(await activity.evaluate((element) => getComputedStyle(element).position)).toBe("relative");
+  await expect(focus.getByRole("navigation", { name: "Agent focus commands" })).toBeVisible();
   await expect(focus.getByText("Reasoning", { exact: true })).toHaveCount(0);
+  await expectFocusSettled(focus);
 
   await focus.getByRole("button", { name: "Next agent" }).click();
   await expect(focus.getByRole("heading", { name: "Translator 01" })).toHaveCount(0);
+  await expect(focus).toHaveAccessibleName("Verifier 01");
+  await expect(focus.getByRole("heading", { name: "Gate review" })).toBeVisible();
+  await expect(focus.locator('.env[data-role="qc"]')).toBeVisible();
+  await expectFocusSettled(focus);
+  await focus.getByRole("button", { name: "Next agent" }).click();
+  await expect(focus.getByRole("heading", { name: "Translator 02" })).toBeVisible();
+  await expectFocusSettled(focus);
+  await focus.getByRole("button", { name: "Next agent" }).click();
+  await expect(focus).toHaveAccessibleName("Orchestrator");
+  await expect(focus.getByRole("heading", { name: "Run coordination" })).toBeVisible();
+  await expect(focus.locator(".coordination-env")).toBeVisible();
+  await expectFocusSettled(focus);
+  await focus.getByRole("button", { name: "Next agent" }).click();
+  await expect(focus).toHaveAccessibleName("Segmenter 01");
+  await expect(focus.getByRole("heading", { name: "Recorded media" })).toBeVisible();
+  await expect(focus.locator('.env[data-role="segment"]')).toBeVisible();
+  await expectFocusSettled(focus);
   await focus.getByRole("button", { name: "Close agent focus" }).click();
   await expect(focus).toHaveCount(0);
 });
@@ -451,39 +527,63 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
 
   const focus = page.getByRole("dialog", { name: "Orchestrator" });
   await expect(focus).toBeVisible();
-  expect(
-    await focus.evaluate((root) => {
-      const spatial = root.querySelector(".agent-focus-spatial");
-      const environment = root.querySelector(".agent-focus-environment");
-      const close = root.querySelector(".agent-focus-close");
-      if (!spatial || !environment || !close) return null;
-      return {
-        rootPosition: getComputedStyle(root).position,
-        spatialDisplay: getComputedStyle(spatial).display,
-        environmentDisplay: getComputedStyle(environment).display,
-        environmentBackground: getComputedStyle(environment).backgroundImage,
-        environmentRadius: getComputedStyle(environment).borderRadius,
-        closeWidth: getComputedStyle(close).width,
-        identityBefore: getComputedStyle(
-          root.querySelector(".agent-focus-identity") as Element,
-          "::before",
-        ).content,
-        identityAfter: getComputedStyle(
-          root.querySelector(".agent-focus-identity") as Element,
-          "::after",
-        ).content,
-      };
-    }),
-  ).toEqual({
+  await expectFocusSettled(focus);
+  await expect(page.locator(".top")).toHaveCSS("opacity", "0.08");
+  await expect(focus.getByRole("note")).toHaveText(
+    "Recorded preview · The submitted source was not processed",
+  );
+  const focusStyles = await focus.evaluate((root) => {
+    const spatial = root.querySelector(".agent-focus-spatial");
+    const environment = root.querySelector(".agent-focus-environment");
+    const sectionRail = root.querySelector(".agent-focus-section-rail");
+    const close = root.querySelector(".agent-focus-close");
+    const top = document.querySelector(".top");
+    const topMark = document.querySelector(".top-mark");
+    const dock = document.querySelector(".dock");
+    if (!spatial || !environment || !sectionRail || !close || !top || !topMark || !dock) {
+      return null;
+    }
+    const environmentBox = environment.getBoundingClientRect();
+    const sectionRailBox = sectionRail.getBoundingClientRect();
+    return {
+      rootPosition: getComputedStyle(root).position,
+      spatialDisplay: getComputedStyle(spatial).display,
+      environmentDisplay: getComputedStyle(environment).display,
+      environmentBackground: getComputedStyle(environment).backgroundImage,
+      environmentRadius: getComputedStyle(environment).borderRadius,
+      sectionRailIsRight: sectionRailBox.left >= environmentBox.right,
+      closeWidth: getComputedStyle(close).width,
+      topFilter: getComputedStyle(top).filter,
+      topOpacity: getComputedStyle(top).opacity,
+      topMarkPointerEvents: getComputedStyle(topMark).pointerEvents,
+      dockFilter: getComputedStyle(dock).filter,
+      dockOpacity: getComputedStyle(dock).opacity,
+      identityBefore: getComputedStyle(
+        root.querySelector(".agent-focus-identity") as Element,
+        "::before",
+      ).content,
+      identityAfter: getComputedStyle(
+        root.querySelector(".agent-focus-identity") as Element,
+        "::after",
+      ).content,
+    };
+  });
+  expect(focusStyles).toMatchObject({
     rootPosition: "absolute",
     spatialDisplay: "grid",
     environmentDisplay: "flex",
-    environmentBackground: "none",
-    environmentRadius: "32px",
-    closeWidth: "44px",
+    environmentRadius: "14px",
+    sectionRailIsRight: true,
+    closeWidth: "38px",
+    topOpacity: "0.08",
+    topMarkPointerEvents: "none",
+    dockFilter: "none",
+    dockOpacity: "1",
     identityBefore: "none",
     identityAfter: "none",
   });
+  expect(focusStyles?.environmentBackground).toContain("linear-gradient");
+  expect(focusStyles?.topFilter).toContain("blur(10px)");
 });
 
 test("agent focus moves the canvas and fits every supported viewport", async ({ page }, testInfo) => {

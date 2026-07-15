@@ -8,8 +8,25 @@
   height: 100%;
   padding: 0;
   border: 0;
-  background: rgba(247, 250, 248, 0.5);
+  background: rgba(247, 250, 248, 0.38);
   cursor: zoom-out;
+}
+
+/* Focus owns the canvas while open. The global replay dock stays legible below; only the
+ * source/header furniture recedes, and its preview warning is repeated inside the dialog. */
+.studio:has(.agent-focus) .top {
+  opacity: 0.08;
+  filter: blur(10px) saturate(0.7);
+  transform: translateY(-2px) scale(0.985);
+  transform-origin: top center;
+  transition:
+    opacity 220ms ease,
+    filter 260ms ease,
+    transform 260ms ease;
+}
+
+.studio:has(.agent-focus) .top > * {
+  pointer-events: none;
 }
 
 .agent-focus {
@@ -36,8 +53,7 @@
 }
 
 .agent-focus-hero,
-.agent-focus-environment,
-.agent-focus-activity {
+.agent-focus-environment-frame {
   pointer-events: auto;
 }
 
@@ -77,20 +93,11 @@
 
 .agent-focus-hero-copy {
   min-width: 0;
-  margin-top: clamp(30px, 5vh, 48px);
-}
-
-.agent-focus-hero-copy > span,
-.agent-focus-latest > span {
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.57rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  margin-top: clamp(26px, 4.4vh, 42px);
 }
 
 .agent-focus-hero-copy h2 {
-  margin: 7px 0 0;
+  margin: 0;
   color: var(--ink);
   font-size: clamp(1.45rem, 2.6vw, 2.15rem);
   font-weight: var(--weight-medium);
@@ -109,110 +116,171 @@
   color: var(--gold-ink);
 }
 
-.agent-focus-hero-copy code {
-  display: block;
-  margin-top: 6px;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-}
-
-.agent-focus-latest {
-  width: min(260px, 100%);
-  margin-top: clamp(20px, 3.4vh, 34px);
-}
-
-.agent-focus-latest strong {
-  display: block;
-  margin-top: 7px;
+.agent-focus-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
-  color: var(--ink);
-  font-size: 0.78rem;
-  font-weight: var(--weight-medium);
-  text-overflow: ellipsis;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
+  border: 0;
 }
 
-.agent-focus-latest p {
-  display: -webkit-box;
-  margin: 5px 0 0;
-  overflow: hidden;
-  color: var(--ink-muted);
-  font-size: 0.68rem;
-  line-height: 1.5;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.agent-focus-switcher {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 18px;
-}
-
-.agent-focus-switcher button,
 .agent-focus-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--glass-border);
-  border-radius: 50%;
+  border-radius: 8px;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 4px 12px rgba(22, 29, 27, 0.06);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.78),
+    0 5px 16px rgba(22, 29, 27, 0.06);
   cursor: pointer;
   transition:
     color 160ms ease,
+    border-color 160ms ease,
     background-color 160ms ease,
     transform 160ms ease;
 }
 
-.agent-focus-switcher button {
-  width: 38px;
-  height: 38px;
-}
-
-.agent-focus-switcher span {
-  min-width: 38px;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.57rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.agent-focus-switcher button:hover,
 .agent-focus-close:hover {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.94);
+  border-color: var(--accent-line);
+  background: rgba(255, 255, 255, 0.7);
   transform: translateY(-1px);
 }
 
-.agent-focus-switcher button:focus-visible,
 .agent-focus-close:focus-visible,
-.agent-focus-activity summary:focus-visible {
+.agent-focus-section-rail button:focus-visible,
+.agent-focus-commands button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
-/* The squircle is the agent's working medium. It is the dominant object in focus mode. */
+/* One compact instrument: section controls outside, glass plane within, commands below. */
+.agent-focus-environment-frame {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 100%;
+  height: min(590px, 100%);
+  min-width: 0;
+  min-height: 0;
+  align-self: center;
+  grid-template-columns: minmax(0, 1fr) 46px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 10px;
+  row-gap: 10px;
+}
+
+.agent-focus-section-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.agent-focus-section-rail button {
+  position: relative;
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 9px;
+  color: var(--ink-muted);
+  background: rgba(247, 252, 250, 0.46);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.82),
+    0 8px 24px rgba(18, 32, 28, 0.07);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-focus-section-rail button::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  right: -6px;
+  width: 2px;
+  opacity: 0;
+  background: var(--accent);
+  transition: opacity 160ms ease;
+}
+
+.agent-focus-section-rail button:hover,
+.agent-focus-section-rail button[aria-selected="true"] {
+  color: var(--accent);
+  border-color: rgba(42, 107, 102, 0.34);
+  background: rgba(232, 247, 243, 0.72);
+  transform: translateX(-2px);
+}
+
+.agent-focus-section-rail button[aria-selected="true"]::after {
+  opacity: 1;
+}
+
+.agent-focus-section-rail svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
 .agent-focus-environment {
   position: relative;
   z-index: 1;
   display: flex;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  padding: clamp(22px, 2.5vw, 34px);
-  padding-bottom: clamp(148px, 18vh, 174px);
-  border: 1px solid var(--line);
-  border-radius: 32px;
-  corner-shape: squircle;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 24px 64px rgba(18, 32, 28, 0.11);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  padding: clamp(20px, 2.2vw, 30px);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.88), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.56), rgba(222, 240, 236, 0.3));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(22, 29, 27, 0.035),
+    0 22px 58px rgba(18, 32, 28, 0.1);
+  backdrop-filter: blur(30px) saturate(1.45);
+  -webkit-backdrop-filter: blur(30px) saturate(1.45);
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.agent-focus-environment::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 14px;
+  left: 14px;
+  height: 1px;
+  opacity: 0.9;
+  background: linear-gradient(90deg, transparent, #ffffff 18%, #ffffff 82%, transparent);
+  pointer-events: none;
 }
 
 .agent-focus-environment-head {
@@ -255,12 +323,12 @@
 }
 
 .agent-focus-close {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   flex: none;
-  border-color: var(--line);
+  border-color: rgba(22, 29, 27, 0.1);
   color: var(--ink);
-  font-size: 1.15rem;
+  font-size: 1rem;
 }
 
 .agent-focus-workspace {
@@ -268,7 +336,7 @@
   z-index: 1;
   display: flex;
   min-height: 0;
-  flex: 1;
+  flex: 1 1 auto;
   margin-top: clamp(18px, 3vh, 28px);
   overflow: auto;
 }
@@ -278,53 +346,79 @@
 }
 
 .agent-focus-environment-foot {
-  position: absolute;
-  bottom: 22px;
-  left: clamp(22px, 2.5vw, 34px);
+  position: relative;
   z-index: 1;
-  max-width: calc(100% - 390px);
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 12px;
   color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 0.53rem;
   line-height: 1.4;
 }
 
-/* Activity floats across the environment edge as secondary evidence, not another main panel. */
-.agent-focus-activity {
-  position: absolute;
-  right: clamp(8px, 2.5vw, 38px);
-  bottom: clamp(104px, 13vh, 126px);
-  z-index: 3;
-  width: min(350px, 30vw);
-  max-height: min(220px, 28vh);
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  corner-shape: squircle;
-  background: rgba(252, 253, 250, 0.9);
-  box-shadow: 0 14px 36px rgba(22, 29, 27, 0.1);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+.agent-focus-environment-foot p {
+  max-width: 430px;
+  margin: 0;
 }
 
-.agent-focus-activity summary {
+.agent-focus-environment-foot dl {
   display: flex;
-  min-height: 48px;
+  flex: none;
+  gap: 14px;
+  margin: 0;
+}
+
+.agent-focus-environment-foot dl > div {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.agent-focus-environment-foot dt {
+  color: var(--ink-faint, var(--ink-muted));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.agent-focus-environment-foot dd {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.agent-focus-environment-foot code {
+  font: inherit;
+}
+
+/* Activity occupies the same plane as the role workspace; the rail chooses between them. */
+.agent-focus-activity {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  margin-top: clamp(18px, 2.5vh, 26px);
+  overflow: hidden;
+}
+
+.agent-focus-activity-head {
+  display: flex;
+  min-height: 34px;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 0 15px;
+  padding: 0 2px 10px;
+  border-bottom: 1px solid var(--line);
   color: var(--ink-soft);
-  cursor: pointer;
-  list-style: none;
 }
 
-.agent-focus-activity summary::-webkit-details-marker {
-  display: none;
-}
-
-.agent-focus-activity summary span,
-.agent-focus-activity summary strong {
+.agent-focus-activity-head span,
+.agent-focus-activity-head strong {
   font-family: var(--font-mono);
   font-size: 0.56rem;
   font-weight: var(--weight-regular);
@@ -332,18 +426,18 @@
   text-transform: uppercase;
 }
 
-.agent-focus-activity summary strong {
+.agent-focus-activity-head strong {
   color: var(--ink-muted);
   letter-spacing: 0;
   text-transform: none;
 }
 
 .agent-focus-log {
-  max-height: calc(min(220px, 28vh) - 48px);
+  min-height: 0;
+  flex: 1 1 auto;
   margin: 0;
   padding: 0;
   overflow-y: auto;
-  border-top: 1px solid var(--line);
   list-style: none;
 }
 
@@ -408,6 +502,70 @@
   border-top: 1px solid var(--line);
   color: var(--ink-muted);
   font-size: 0.7rem;
+}
+
+.agent-focus-commands {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 4px;
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.agent-focus-commands > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-focus-commands button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  color: var(--ink-muted);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-focus-commands button:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.agent-focus-commands button > span[aria-hidden="true"] {
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.agent-focus-command-position {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.53rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-focus-commands kbd {
+  min-width: 28px;
+  padding: 3px 5px;
+  border: 1px solid rgba(22, 29, 27, 0.12);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 -1px rgba(22, 29, 27, 0.06);
+  font: inherit;
+  text-align: center;
 }
 
 /* Orchestration has a topology projection instead of an invented generic workspace. */
@@ -486,19 +644,19 @@
 
   .agent-focus-hero {
     display: grid;
-    min-height: 112px;
+    min-height: 96px;
     padding: 4px 14px;
-    grid-template-columns: 94px minmax(0, 1fr);
-    grid-template-rows: 1fr auto;
-    gap: 0 18px;
+    grid-template-columns: 82px minmax(0, 1fr);
+    grid-template-rows: 1fr;
+    gap: 0 16px;
     align-items: center;
     text-align: left;
   }
 
   .agent-focus-identity,
   .agent-focus[data-role="orchestrator"] .agent-focus-identity {
-    width: 88px;
-    height: 88px;
+    width: 78px;
+    height: 78px;
     grid-row: 1 / -1;
   }
 
@@ -515,27 +673,54 @@
     margin-top: 5px;
   }
 
-  .agent-focus-latest {
-    display: none;
+  .agent-focus-environment-frame {
+    display: grid;
+    width: 100%;
+    height: min(500px, max(286px, calc(100svh - 306px)));
+    flex: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 36px minmax(0, 1fr) auto;
+    gap: 8px;
   }
 
-  .agent-focus-switcher {
-    align-self: start;
-    margin-top: 9px;
+  .agent-focus-section-rail {
+    justify-content: flex-end;
+    flex-direction: row;
+    gap: 6px;
+    padding: 0 12px 0 0;
+    grid-column: 1;
+    grid-row: 1;
   }
 
-  .agent-focus-switcher button {
-    width: 32px;
-    height: 32px;
+  .agent-focus-section-rail button {
+    width: 36px;
+    height: 36px;
+    border-radius: 7px;
+  }
+
+  .agent-focus-section-rail button::after {
+    top: auto;
+    right: 7px;
+    bottom: -5px;
+    left: 7px;
+    width: auto;
+    height: 2px;
+  }
+
+  .agent-focus-section-rail button:hover,
+  .agent-focus-section-rail button[aria-selected="true"] {
+    transform: translateY(1px);
   }
 
   .agent-focus-environment {
     width: 100%;
-    height: min(520px, max(250px, calc(100svh - 314px)));
+    height: 100%;
     min-height: 0;
     flex: none;
-    padding: 20px 18px 24px;
-    border-radius: 24px;
+    padding: 18px 16px 16px;
+    border-radius: 11px;
+    grid-column: 1;
+    grid-row: 2;
   }
 
   .agent-focus-environment-head {
@@ -551,8 +736,8 @@
   }
 
   .agent-focus-close {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
   }
 
   .agent-focus-workspace {
@@ -561,21 +746,37 @@
   }
 
   .agent-focus-environment-foot {
-    display: none;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 8px;
+  }
+
+  .agent-focus-environment-foot dl {
+    gap: 10px;
   }
 
   .agent-focus-activity {
-    position: fixed;
-    right: 10px;
-    bottom: 96px;
-    left: 10px;
-    width: auto;
-    max-height: 230px;
-    border-radius: 18px;
+    margin-top: 14px;
   }
 
-  .agent-focus-log {
-    max-height: 182px;
+  .agent-focus-activity-head {
+    min-height: 30px;
+  }
+
+  .agent-focus-commands {
+    padding: 0 3px;
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .agent-focus-commands > div {
+    gap: 8px;
+  }
+
+  .agent-focus-commands button {
+    gap: 5px;
+    font-size: 0.52rem;
   }
 
   .coordination-env {
@@ -589,6 +790,20 @@
 
   .coordination-workers {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) and (max-height: 640px) {
+  .agent-focus-environment-frame {
+    height: min(500px, max(276px, calc(100svh - 280px)));
+  }
+
+  .agent-focus-environment-head p {
+    display: none;
+  }
+
+  .agent-focus-workspace {
+    margin-top: 10px;
   }
 }
 
@@ -623,22 +838,26 @@
     font-size: 0.66rem;
   }
 
-  .agent-focus-latest {
-    display: none;
+  .agent-focus-environment-frame {
+    grid-template-columns: minmax(0, 1fr) 38px;
+    column-gap: 8px;
+    row-gap: 6px;
   }
 
-  .agent-focus-switcher {
-    margin-top: 12px;
+  .agent-focus-section-rail {
+    gap: 6px;
+    padding-top: 8px;
   }
 
-  .agent-focus-switcher button {
-    width: 30px;
-    height: 30px;
+  .agent-focus-section-rail button {
+    width: 36px;
+    height: 36px;
+    border-radius: 7px;
   }
 
   .agent-focus-environment {
-    padding: 14px 16px 74px;
-    border-radius: 22px;
+    padding: 14px 16px;
+    border-radius: 10px;
   }
 
   .agent-focus-environment-head h3 {
@@ -660,23 +879,36 @@
   }
 
   .agent-focus-environment-foot {
-    display: none;
+    gap: 10px;
+    padding-top: 7px;
+    font-size: 0.48rem;
+  }
+
+  .agent-focus-environment-foot dl {
+    gap: 9px;
   }
 
   .agent-focus-activity {
-    right: 20px;
-    bottom: 116px;
-    width: 260px;
-    max-height: 92px;
-    border-radius: 16px;
+    margin-top: 8px;
   }
 
-  .agent-focus-activity summary {
-    min-height: 38px;
+  .agent-focus-activity-head {
+    min-height: 28px;
   }
 
-  .agent-focus-log {
-    max-height: 54px;
+  .agent-focus-commands {
+    gap: 8px;
+    padding: 0 2px;
+  }
+
+  .agent-focus-commands > div {
+    gap: 7px;
+  }
+
+  .agent-focus-commands button {
+    min-height: 26px;
+    gap: 4px;
+    font-size: 0.49rem;
   }
 
   .agent-focus-log-row {

@@ -3,7 +3,8 @@
  *
  * Selection changes the canvas state rather than opening an inspector beside it: the topology
  * recedes, the chosen identity becomes the left-hand anchor, and its recorded working medium
- * occupies the main squircle. The activity glass is secondary and never calls itself reasoning.
+ * occupies the main glass plane. Recorded activity stays inside that environment as evidence and
+ * never calls itself reasoning.
  */
 
 import { AnimatePresence, motion } from "motion/react";
@@ -26,7 +27,7 @@ import type { AgentStatus, Role, Trace } from "./types";
 import Workspace from "./Workspace";
 
 const FOCUSABLE = [
-  "button:not([disabled])",
+  'button:not([disabled]):not([tabindex="-1"])',
   "a[href]",
   "input:not([disabled])",
   "select:not([disabled])",
@@ -34,6 +35,8 @@ const FOCUSABLE = [
   "summary",
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
+
+type FocusSection = "workspace" | "activity";
 
 const ENVIRONMENT_COPY: Record<Role, { title: string; description: string }> = {
   orchestrator: {
@@ -58,28 +61,46 @@ const ENVIRONMENT_COPY: Record<Role, { title: string; description: string }> = {
   },
 };
 
-function ActivityLog({ title, log }: { title: string; log: Trace[] }) {
-  const newestFirst = useMemo(() => [...log].reverse(), [log]);
-  const [expanded, setExpanded] = useState(true);
-
-  useEffect(() => {
-    const compact = window.matchMedia("(max-width: 720px)");
-    const sync = () => setExpanded(!compact.matches);
-    sync();
-    compact.addEventListener("change", sync);
-    return () => compact.removeEventListener("change", sync);
-  }, []);
+function FocusSectionIcon({ section }: { section: FocusSection }) {
+  if (section === "activity") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="7.5" />
+        <path d="M12 7.8v4.6l3.2 1.8" />
+        <path d="M7.2 3.9 5.4 5.7M16.8 3.9l1.8 1.8" />
+      </svg>
+    );
+  }
 
   return (
-    <details
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="4.5" width="16" height="15" rx="1.5" />
+      <path d="M4 9h16M9 9v10.5" />
+      <path d="M12.5 13h4M12.5 16h3" />
+    </svg>
+  );
+}
+
+function ActivityLog({
+  title,
+  log,
+}: {
+  title: string;
+  log: Trace[];
+}) {
+  const newestFirst = useMemo(() => [...log].reverse(), [log]);
+
+  return (
+    <section
+      id="agent-focus-activity-panel"
       className="agent-focus-activity"
-      open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
+      role="tabpanel"
+      aria-labelledby="agent-focus-activity-tab"
     >
-      <summary>
-        <span>Recorded activity</span>
+      <header className="agent-focus-activity-head">
+        <span>Newest first</span>
         <strong>{log.length} action{log.length === 1 ? "" : "s"}</strong>
-      </summary>
+      </header>
 
       {newestFirst.length > 0 ? (
         <ol className="agent-focus-log" aria-label={`${title} activity, newest first`}>
@@ -99,7 +120,7 @@ function ActivityLog({ title, log }: { title: string; log: Trace[] }) {
       ) : (
         <p className="agent-focus-empty">No recorded activity yet.</p>
       )}
-    </details>
+    </section>
   );
 }
 
@@ -109,7 +130,7 @@ function CoordinationEnvironment({
   statuses,
 }: {
   note: string;
-  agents: { id: string; role: Role }[];
+  agents: { id: string; role: Role; label: string }[];
   statuses: Record<string, AgentView>;
 }) {
   return (
@@ -125,7 +146,7 @@ function CoordinationEnvironment({
           return (
             <li key={spec.id} data-status={worker?.status ?? "idle"}>
               <span className="coordination-worker-role">{agentRoleTitle(spec.role)}</span>
-              <strong>{agentTitle(spec.id, spec.role)}</strong>
+              <strong>{agentTitle(spec.id, spec.role, spec.label)}</strong>
               <span>{worker ? agentState(worker.status, spec.role) : "Not present yet"}</span>
             </li>
           );
@@ -172,8 +193,10 @@ export default function AgentPanel() {
   const emitted = useStudio((state) => state.state.emitted);
   const cancelled = useStudio((state) => state.outcome?.kind === "cancelled");
   const paused = useStudio((state) => state.paused);
+  const previewSession = useStudio((state) => state.previewSession);
   const closeButton = useRef<HTMLButtonElement>(null);
   const priorFocus = useRef<HTMLElement | null>(null);
+  const [section, setSection] = useState<FocusSection>("workspace");
   const open = selected !== null;
 
   const identities = useMemo(
@@ -208,6 +231,10 @@ export default function AgentPanel() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [open, select]);
 
+  useEffect(() => {
+    setSection("workspace");
+  }, [selected]);
+
   if (!selected || !bundle) return <AnimatePresence />;
 
   const isOrchestrator = selected === "orchestrator";
@@ -217,15 +244,18 @@ export default function AgentPanel() {
   const status = (isOrchestrator ? orchestrator.status : agent!.status) as AgentStatus;
   const identity = identities[selected];
   if (!identity) return <AnimatePresence />;
-  const title = agentTitle(selected, role);
+  const title = agentTitle(selected, role, agent?.label);
   const state = agentState(status, role, cancelled);
   const log = isOrchestrator
     ? emitted.filter((trace) => trace.agent === "orchestrator")
     : history;
-  const latest = log[log.length - 1];
   const inspectableIds = ["orchestrator", ...spawnedIds];
   const selectedIndex = inspectableIds.indexOf(selected);
   const environment = ENVIRONMENT_COPY[role];
+  const environmentTitle = section === "workspace" ? environment.title : "Recorded activity";
+  const environmentDescription = section === "workspace"
+    ? environment.description
+    : "Event-derived actions for this worker, shown newest first.";
 
   const move = (direction: -1 | 1) => {
     if (inspectableIds.length < 2) return;
@@ -248,6 +278,27 @@ export default function AgentPanel() {
       event.preventDefault();
       first.focus();
     }
+  };
+
+  const changeSection = (next: FocusSection, moveFocus = false) => {
+    setSection(next);
+    if (moveFocus) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(`agent-focus-${next}-tab`)?.focus();
+      });
+    }
+  };
+
+  const moveSectionFocus = (event: React.KeyboardEvent<HTMLElement>) => {
+    let next: FocusSection | null = null;
+    if (event.key === "Home") next = "workspace";
+    if (event.key === "End") next = "activity";
+    if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(event.key)) {
+      next = section === "workspace" ? "activity" : "workspace";
+    }
+    if (!next) return;
+    event.preventDefault();
+    changeSection(next, true);
   };
 
   return (
@@ -295,64 +346,130 @@ export default function AgentPanel() {
             </div>
 
             <div className="agent-focus-hero-copy">
-              <span>{agentRoleTitle(role)}</span>
               <h2 id="agent-focus-title">{title}</h2>
-              <p id="agent-focus-state" data-status={status}>{state}</p>
-              <code>{selected}</code>
+              <p id="agent-focus-state" data-status={status}>
+                <span className="agent-focus-visually-hidden">Recorded state: </span>
+                {state}
+              </p>
             </div>
 
-            <div className="agent-focus-latest">
-              <span>{latest ? "Latest recorded action" : "Current state"}</span>
-              <strong>{latest?.target || state}</strong>
-              <p>{latest?.detail || (isOrchestrator ? orchestrator.note : "No activity recorded yet.")}</p>
-            </div>
-
-            <nav className="agent-focus-switcher" aria-label="Choose focused agent">
-              <button type="button" onClick={() => move(-1)} aria-label="Previous agent">←</button>
-              <span>{selectedIndex + 1} / {inspectableIds.length}</span>
-              <button type="button" onClick={() => move(1)} aria-label="Next agent">→</button>
-            </nav>
           </motion.section>
 
-          <motion.section
-            className="agent-focus-environment"
+          <motion.div
+            className="agent-focus-environment-frame"
             key={`environment-${selected}`}
-            aria-labelledby="agent-environment-title"
             initial={{ opacity: 0, x: 48, scale: 0.94 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 220, damping: 30, delay: 0.03 }}
           >
-            <header className="agent-focus-environment-head">
-              <div>
-                <span>Agent environment</span>
-                <h3 id="agent-environment-title">{environment.title}</h3>
-                <p>{environment.description}</p>
-              </div>
+            <nav
+              className="agent-focus-section-rail"
+              role="tablist"
+              aria-label="Focused worker sections"
+              onKeyDown={moveSectionFocus}
+            >
               <button
-                ref={closeButton}
+                id="agent-focus-workspace-tab"
                 type="button"
-                className="agent-focus-close"
-                onClick={() => select(null)}
-                aria-label="Close agent focus"
+                role="tab"
+                aria-selected={section === "workspace"}
+                aria-controls="agent-focus-workspace-panel"
+                tabIndex={section === "workspace" ? 0 : -1}
+                onClick={() => changeSection("workspace")}
+                title="Workspace"
               >
-                ×
+                <FocusSectionIcon section="workspace" />
+                <span className="agent-focus-visually-hidden">Workspace</span>
               </button>
-            </header>
+              <button
+                id="agent-focus-activity-tab"
+                type="button"
+                role="tab"
+                aria-selected={section === "activity"}
+                aria-controls="agent-focus-activity-panel"
+                tabIndex={section === "activity" ? 0 : -1}
+                onClick={() => changeSection("activity")}
+                title="Recorded activity"
+              >
+                <FocusSectionIcon section="activity" />
+                <span className="agent-focus-visually-hidden">Recorded activity</span>
+              </button>
+            </nav>
 
-            <div className="agent-focus-workspace">
-              <AgentEnvironment
-                role={role}
-                agent={isOrchestrator ? null : agent!}
-                orchestratorNote={orchestrator.note}
-              />
-            </div>
+            <section className="agent-focus-environment" aria-labelledby="agent-environment-title">
+              <header className="agent-focus-environment-head">
+                <div>
+                  <span>Recorded focus</span>
+                  <h3 id="agent-environment-title">{environmentTitle}</h3>
+                  <p>{environmentDescription}</p>
+                </div>
+                <button
+                  ref={closeButton}
+                  type="button"
+                  className="agent-focus-close"
+                  onClick={() => select(null)}
+                  aria-label="Close agent focus"
+                >
+                  ×
+                </button>
+              </header>
 
-            <footer className="agent-focus-environment-foot">
-              Projected from this run's recorded artifacts and events
-            </footer>
-          </motion.section>
+              {section === "workspace" ? (
+                <div
+                  id="agent-focus-workspace-panel"
+                  className="agent-focus-workspace"
+                  role="tabpanel"
+                  aria-labelledby="agent-focus-workspace-tab"
+                >
+                  <AgentEnvironment
+                    role={role}
+                    agent={isOrchestrator ? null : agent!}
+                    orchestratorNote={orchestrator.note}
+                  />
+                </div>
+              ) : (
+                <ActivityLog title={title} log={log} />
+              )}
 
-          <ActivityLog title={title} log={log} />
+              <footer className="agent-focus-environment-foot">
+                <p role={previewSession ? "note" : undefined}>
+                  {previewSession
+                    ? "Recorded preview · The submitted source was not processed"
+                    : "Recorded preview · Projected from this run's artifacts and events"}
+                </p>
+                <dl aria-label="Recorded worker identity">
+                  <div>
+                    <dt>Role</dt>
+                    <dd>{agentRoleTitle(role)}</dd>
+                  </div>
+                  <div>
+                    <dt>ID</dt>
+                    <dd><code>{selected}</code></dd>
+                  </div>
+                </dl>
+              </footer>
+            </section>
+
+            <nav className="agent-focus-commands" aria-label="Agent focus commands">
+              <div>
+                <button type="button" onClick={() => move(-1)} aria-label="Previous agent">
+                  <span aria-hidden="true">←</span>
+                  Previous worker
+                </button>
+                <span className="agent-focus-command-position">
+                  {selectedIndex + 1} / {inspectableIds.length}
+                </span>
+                <button type="button" onClick={() => move(1)} aria-label="Next agent">
+                  Next worker
+                  <span aria-hidden="true">→</span>
+                </button>
+              </div>
+              <button type="button" onClick={() => select(null)} aria-label="Close focus">
+                <kbd>Esc</kbd>
+                Close
+              </button>
+            </nav>
+          </motion.div>
         </div>
       </motion.aside>
     </AnimatePresence>

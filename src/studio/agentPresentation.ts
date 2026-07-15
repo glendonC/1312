@@ -16,8 +16,13 @@ const ACTIVE_LABELS: Record<Role, string> = {
   qc: "Checking evidence",
 };
 
-/** A stable public title for the same agent wherever it appears. */
-export function agentTitle(id: string, role: Role): string {
+/**
+ * The manifest label is the run-scoped public name when it differs from the machine id.
+ * Older recorded runs used the id as their label, so they retain the role-title fallback.
+ */
+export function agentTitle(id: string, role: Role, label?: string): string {
+  const publicLabel = label?.trim();
+  if (publicLabel && publicLabel !== id) return publicLabel;
   if (role === "orchestrator") return ROLE_TITLES.orchestrator;
   const sequence = id.match(/(\d+)$/)?.[1];
   return sequence ? `${ROLE_TITLES[role]} ${sequence}` : ROLE_TITLES[role];

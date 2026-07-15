@@ -1,14 +1,61 @@
 ---
-import BenchmarkFooter from "./BenchmarkFooter.astro";
 import Instrument from "./Instrument.astro";
-import Summary from "./Summary.astro";
+import { benchmarkCopy, report } from "./model";
 import "./styles/index.css";
 ---
 
 <main class="bench-page">
   <div class="bench-shell">
-    <Summary />
     <Instrument />
-    <BenchmarkFooter />
+  </div>
+
+  <div class="bench-boundary" data-bench-boundary>
+    <div
+      id="bench-boundary-panel"
+      class="bench-boundary-panel"
+      role="dialog"
+      aria-modal="false"
+      aria-label="Evidence boundary"
+      aria-hidden="true"
+    >
+      <div class="bench-boundary-panel-head">
+        <span class="bench-boundary-eyebrow">Evidence boundary</span>
+        <button
+          type="button"
+          class="bench-boundary-close"
+          data-bench-boundary-close
+          aria-label="Close"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <p class="bench-boundary-lead">
+        <strong>{benchmarkCopy.evidenceBoundary}</strong> {benchmarkCopy.publicationRule}
+      </p>
+
+      <div class="bench-boundary-notes">
+        <span class="bench-boundary-eyebrow">Report notes</span>
+        <ul>{report.notes.map((note) => <li>{note}</li>)}</ul>
+      </div>
+
+      <p class="bench-boundary-demo">{benchmarkCopy.demoBoundary}</p>
+    </div>
+
+    <button
+      type="button"
+      class="bench-boundary-trigger"
+      data-bench-boundary-trigger
+      aria-expanded="false"
+      aria-controls="bench-boundary-panel"
+    >
+      <span class="bench-boundary-dot" aria-hidden="true">i</span>
+      <span class="bench-boundary-trigger-label">Why no numbers yet</span>
+    </button>
   </div>
 </main>
+
+<script>
+  import { bindBenchmarkBoundary } from "./boundary";
+  bindBenchmarkBoundary();
+</script>

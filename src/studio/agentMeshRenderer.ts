@@ -4,10 +4,9 @@ import type { AgentIdentity } from "./agentIdentity";
 import type { AgentStatus } from "./types";
 
 /**
- * The Studio shares the Journey field's domain-warped noise language, but not its page-sized
- * atmosphere. This shader is the moving mesh layer only; CSS supplies the perfectly circular
- * dark base underneath it. Keeping those layers separate preserves a clean silhouette while
- * allowing the internal field to move without moving the agent itself.
+ * One complete agent material. Role topology establishes the large composition; low-frequency
+ * noise only bends it. Lighting, transmission, caustic and grain are resolved in this pass so a
+ * WebGL identity never becomes a translucent blend of unrelated procedural layers.
  */
 const agentFragmentSource = `#version 300 es
   precision highp float;
@@ -18,10 +17,22 @@ const agentFragmentSource = `#version 300 es
   uniform vec2 u_resolution;
   uniform float u_time;
   uniform float u_seed;
-  uniform vec3 u_deep;
-  uniform vec3 u_current_a;
-  uniform vec3 u_current_b;
-  uniform vec3 u_bloom;
+  uniform float u_topology_kind;
+  uniform float u_angle;
+  uniform float u_scale;
+  uniform float u_band_width;
+  uniform float u_warp;
+  uniform vec2 u_phase;
+  uniform vec2 u_caustic_point;
+  uniform float u_drift_seconds;
+  uniform float u_mirror;
+  uniform vec3 u_absorption;
+  uniform vec3 u_body;
+  uniform vec3 u_current;
+  uniform vec3 u_counter;
+  uniform vec3 u_caustic;
+
+  const float TAU = 6.28318530718;
 
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -42,7 +53,7 @@ const agentFragmentSource = `#version 300 es
     float value = 0.0;
     float amplitude = 0.5;
     mat2 turn = mat2(0.80, -0.60, 0.60, 0.80);
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 4; i++) {
       value += amplitude * noise(p);
       p = turn * p * 2.03 + 17.17;
       amplitude *= 0.5;
@@ -50,49 +61,245 @@ const agentFragmentSource = `#version 300 es
     return value;
   }
 
+  vec2 rotate2d(vec2 p, float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat2(c, -s, s, c) * p;
+  }
+
+  float ribbon(float distanceFromCentre, float width) {
+    return 1.0 - smoothstep(width * 0.88, width * 2.3, distanceFromCentre);
+  }
+
+  vec3 srgbToLinear(vec3 color) {
+    vec3 low = color / 12.92;
+    vec3 high = pow((color + 0.055) / 1.055, vec3(2.4));
+    return mix(low, high, step(vec3(0.04045), color));
+  }
+
+  vec3 linearToSrgb(vec3 color) {
+    color = max(color, vec3(0.0));
+    vec3 low = color * 12.92;
+    vec3 high = 1.055 * pow(color, vec3(1.0 / 2.4)) - 0.055;
+    return mix(low, high, step(vec3(0.0031308), color));
+  }
+
+  vec3 toneMap(vec3 color) {
+    color = max(color, vec3(0.0));
+    return clamp(
+      (color * (2.51 * color + 0.03)) /
+        (color * (2.43 * color + 0.59) + 0.14),
+      0.0,
+      1.0
+    );
+  }
+
+  void topologyField(
+    vec2 p,
+    float cycle,
+    out float primary,
+    out float secondary,
+    out float structure
+  ) {
+    float width = clamp(u_band_width, 0.08, 0.46);
+
+    if (u_topology_kind < 0.5) {
+      // Confluence: two broad currents visibly approach and share one outlet.
+      float join = smoothstep(-0.86, 0.72, p.x);
+      float upper = mix(0.42, 0.035, join)
+        + sin(p.x * 1.7 + u_phase.x + cycle * 0.82) * 0.105;
+      float lower = mix(-0.42, -0.035, join)
+        + sin(p.x * 1.55 + u_phase.y - cycle * 0.68) * 0.105;
+      primary = ribbon(abs(p.y - upper), width);
+      secondary = ribbon(abs(p.y - lower), width * 0.94);
+      structure = smoothstep(0.28, 0.88, join) * primary * secondary;
+      return;
+    }
+
+    if (u_topology_kind < 1.5) {
+      // Strata: a small number of deliberate, readable layers rather than noise bands.
+      float upper = p.y + 0.25
+        + sin(p.x * 1.45 + u_phase.x + cycle * 0.48) * 0.065;
+      float lower = p.y - 0.27
+        + sin(p.x * 1.25 + u_phase.y - cycle * 0.38) * 0.075;
+      primary = ribbon(abs(upper), width * 1.05);
+      secondary = ribbon(abs(lower), width * 0.92);
+      structure = ribbon(abs(p.y + sin(p.x + cycle * 0.3) * 0.035), width * 0.48);
+      return;
+    }
+
+    if (u_topology_kind < 2.5) {
+      // Basin: nested masses and a luminous shore, kept broad enough to survive compact nodes.
+      vec2 centreA = vec2(-0.18 + u_phase.x * 0.12, -0.06 + u_phase.y * 0.1);
+      vec2 centreB = vec2(0.34 - u_phase.y * 0.08, 0.23 + u_phase.x * 0.08);
+      centreA += vec2(
+        sin(cycle * 0.76 + u_phase.y),
+        cos(cycle * 0.62 + u_phase.x)
+      ) * 0.11;
+      centreB += vec2(
+        cos(cycle * 0.68 + u_phase.x),
+        sin(cycle * 0.72 + u_phase.y)
+      ) * 0.085;
+      float distanceA = length((p - centreA) * vec2(0.88, 1.08));
+      float distanceB = length((p - centreB) * vec2(1.12, 0.9));
+      primary = 1.0 - smoothstep(0.25 + width * 0.35, 0.82 + width * 0.45, distanceA);
+      secondary = 1.0 - smoothstep(0.18 + width * 0.28, 0.67 + width * 0.35, distanceB);
+      structure = ribbon(abs(distanceA - (0.48 + sin(cycle * 0.4) * 0.025)), width * 0.68);
+      return;
+    }
+
+    if (u_topology_kind < 3.5) {
+      // Braid: two independent ribbons cross without dissolving into a single cloudy average.
+      float waveA = sin(p.x * 1.92 + u_phase.x + cycle * 0.7) * 0.22;
+      float waveB = -sin(p.x * 1.92 + u_phase.y + cycle * 0.7) * 0.22;
+      primary = ribbon(abs(p.y - waveA), width);
+      secondary = ribbon(abs(p.y - waveB), width * 0.96);
+      structure = smoothstep(0.18, 0.74, primary * secondary) * 0.56;
+      return;
+    }
+
+    // Interference: two low-frequency directional fields produce broad lenses, not pinstripes.
+    float waveA = sin((p.x * 0.92 + p.y * 0.42) * 2.5 + u_phase.x + cycle * 0.54);
+    float waveB = sin((p.y * 0.9 - p.x * 0.48) * 2.35 + u_phase.y - cycle * 0.44);
+    primary = smoothstep(-0.28, 0.62, waveA);
+    secondary = smoothstep(-0.24, 0.66, waveB);
+    structure = smoothstep(0.34, 0.82, primary * secondary);
+  }
+
   void main() {
     vec2 uv = v_uv;
     float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-    vec2 seedOffset = vec2(fract(u_seed * 0.013), fract(u_seed * 0.021)) * 8.0;
-    vec2 p = (uv - 0.5) * vec2(aspect, 1.0) * 1.55 + seedOffset;
-    float time = u_time * 0.046;
+    vec2 spherePoint = (uv - 0.5) * 2.0 * vec2(aspect, 1.0);
+    vec2 composedPoint = rotate2d(
+      vec2(spherePoint.x * u_mirror, spherePoint.y),
+      u_angle
+    ) * u_scale;
+    composedPoint += u_phase * 0.12;
 
-    vec2 q = vec2(
-      fbm(p + vec2(0.0, time)),
-      fbm(p + vec2(4.7, 1.9) - vec2(time * 0.72, time * 0.36))
+    float cycle = (u_time / max(u_drift_seconds, 1.0)) * TAU;
+    vec2 seedOffset = vec2(
+      fract(u_seed * 0.013),
+      fract(u_seed * 0.021)
+    ) * 7.0;
+    vec2 drift = vec2(cycle * 0.38, -cycle * 0.29);
+    float warpX = fbm(composedPoint * 0.86 + seedOffset + drift);
+    float warpY = fbm(composedPoint * 0.86 + seedOffset.yx + vec2(5.2, 1.7) - drift.yx);
+    vec2 warpVector = vec2(warpX, warpY) - 0.5;
+    vec2 fieldDrift = vec2(
+      sin(cycle * 0.82 + u_phase.x),
+      cos(cycle * 0.7 + u_phase.y)
+    ) * 0.19;
+    vec2 p = composedPoint + fieldDrift + warpVector * u_warp;
+
+    float primary;
+    float secondary;
+    float structure;
+    topologyField(p, cycle, primary, secondary, structure);
+    primary = clamp(primary, 0.0, 1.0);
+    secondary = clamp(secondary, 0.0, 1.0);
+    structure = clamp(structure, 0.0, 1.0);
+    float travelingFlow = smoothstep(
+      -0.72,
+      0.72,
+      sin(dot(p, vec2(1.12, -0.76)) * 1.7 - cycle * 0.92 + u_phase.x * 1.4)
     );
-    vec2 r = vec2(
-      fbm(p + 2.15 * q + vec2(1.8, 7.4) + time * 0.42),
-      fbm(p + 2.35 * q + vec2(8.3, 2.8) - time * 0.31)
+
+    float depthNoise = fbm(p * 1.22 + seedOffset * 0.41 - drift * 0.52);
+    float internalOcclusion = smoothstep(0.48, 0.86, depthNoise + (1.0 - max(primary, secondary)) * 0.12);
+
+    vec2 movingCausticPoint = u_caustic_point + vec2(
+      cos(cycle * 0.42 + u_phase.x),
+      sin(cycle * 0.34 + u_phase.y)
+    ) * 0.09;
+    float causticDistance = length((uv - movingCausticPoint) * vec2(aspect, 1.0));
+    float causticFalloff = 1.0 - smoothstep(0.035, 0.49, causticDistance);
+    float causticMask = clamp(
+      causticFalloff * (0.42 + max(primary, secondary) * 0.58) + structure * 0.32,
+      0.0,
+      1.0
     );
-    float field = fbm(p + 2.8 * r);
 
-    float body = smoothstep(0.14, 0.86, field);
-    vec3 color = mix(u_current_a, u_current_b, smoothstep(0.28, 0.88, q.y));
-    color = mix(color, u_bloom, smoothstep(0.66, 0.95, r.x + field * 0.14) * 0.44);
-    color = mix(color, u_deep, smoothstep(0.64, 0.96, r.y + q.x * 0.20) * 0.38);
-
-    // A fixed material light gives the mesh volume without turning activity into a pulse.
-    // The field moves while thinking; the light and the circular silhouette do not.
-    vec2 spherePoint = uv * 2.0 - 1.0;
+    // Macro fields lift the otherwise smooth sphere normal, making the material and pattern one
+    // surface instead of a flat texture pasted beneath unrelated lighting.
+    float surfaceField = primary * 0.28
+      + secondary * 0.22
+      + causticMask * 0.16
+      - internalOcclusion * 0.24
+      + (warpX - warpY) * 0.07;
+    float pixelSpan = min(u_resolution.x, u_resolution.y);
+    vec2 fieldGradient = clamp(
+      vec2(dFdx(surfaceField), dFdy(surfaceField)) * pixelSpan * 0.12,
+      vec2(-0.42),
+      vec2(0.42)
+    );
     float sphereZ = sqrt(max(0.0, 1.0 - dot(spherePoint, spherePoint)));
-    vec3 normal = normalize(vec3(spherePoint, sphereZ));
-    vec3 light = normalize(vec3(-0.62, 0.68, 0.76));
+    vec3 normal = normalize(vec3(spherePoint - fieldGradient * 0.16, sphereZ + 0.045));
+
+    vec3 absorption = srgbToLinear(u_absorption);
+    vec3 bodyColor = srgbToLinear(u_body);
+    vec3 currentColor = srgbToLinear(u_current);
+    vec3 counterColor = srgbToLinear(u_counter);
+    vec3 causticColor = srgbToLinear(u_caustic);
+
+    vec3 material = mix(absorption, bodyColor, 0.58 + sphereZ * 0.22);
+    material = mix(material, currentColor, primary * 0.68);
+    material = mix(material, counterColor, secondary * 0.62);
+    material = mix(
+      material,
+      (currentColor + counterColor) * 0.5,
+      structure * 0.28
+    );
+    vec3 travelingColor = mix(
+      counterColor,
+      mix(currentColor, causticColor, 0.42),
+      travelingFlow
+    );
+    material = mix(
+      material,
+      travelingColor,
+      0.04 + travelingFlow * 0.12 + max(primary, secondary) * 0.07
+    );
+    material = mix(material, absorption, 0.1 + internalOcclusion * 0.29);
+
+    // Fixed lights describe the material. Only the internal field above changes with activity.
+    vec3 keyLight = normalize(vec3(-0.58, 0.64, 0.72));
+    vec3 fillLight = normalize(vec3(0.74, -0.18, 0.58));
     vec3 view = vec3(0.0, 0.0, 1.0);
-    vec3 halfway = normalize(light + view);
-    float diffuse = max(dot(normal, light), 0.0);
-    float specular = pow(max(dot(normal, halfway), 0.0), 5.5);
-    float refraction = smoothstep(0.36, 1.0, 1.0 - sphereZ);
+    vec3 keyHalfway = normalize(keyLight + view);
+    float keyDiffuse = max(dot(normal, keyLight), 0.0);
+    float fillDiffuse = max(dot(normal, fillLight), 0.0);
+    float diffuse = 0.42 + keyDiffuse * 0.48 + fillDiffuse * 0.14;
+    float tightSpecular = pow(max(dot(normal, keyHalfway), 0.0), 44.0);
+    float broadSpecular = pow(max(dot(normal, keyHalfway), 0.0), 8.0);
 
-    color *= 0.70 + diffuse * 0.52;
-    color = mix(color, u_bloom, specular * 0.48);
-    color = mix(color, u_deep * 0.68, refraction * 0.34);
+    float nDotV = clamp(dot(normal, view), 0.0, 1.0);
+    float fresnel = pow(1.0 - nDotV, 2.6);
+    vec2 transmissionDirection = normalize(vec2(0.76, -0.65));
+    float transmissionSide = smoothstep(
+      -0.34,
+      0.92,
+      dot(spherePoint, transmissionDirection)
+    );
+    vec3 edgeColor = mix(counterColor, currentColor, transmissionSide);
 
-    float grain = hash(gl_FragCoord.xy + u_seed) - 0.5;
-    color += grain * 0.032;
+    vec3 color = material * diffuse;
+    color += currentColor * primary * 0.11;
+    color += counterColor * secondary * 0.095;
+    color += causticColor * causticMask * 0.48;
+    color += mix(causticColor, vec3(1.0), 0.34)
+      * (tightSpecular * 0.42 + broadSpecular * 0.08);
+    color += edgeColor * fresnel * (0.13 + transmissionSide * 0.2);
+    color += causticColor * fresnel * transmissionSide * 0.12;
 
-    float alpha = 0.62 + body * 0.28 + smoothstep(0.68, 0.94, r.x) * 0.08;
-    outColor = vec4(color, alpha);
+    color = linearToSrgb(toneMap(color));
+
+    // One static, monochrome, pixel-scale grain pass. It never swims with the active field.
+    float grain = hash(gl_FragCoord.xy + vec2(u_seed, u_seed * 0.37)) - 0.5;
+    float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    color += grain * mix(0.015, 0.009, luminance);
+
+    // The parent owns the circular clip. Inside it, WebGL is the single opaque material.
+    outColor = vec4(clamp(color, 0.0, 1.0), 1.0);
   }
 `;
 
@@ -128,21 +335,32 @@ function rgb(hex: string): [number, number, number] {
 }
 
 function motionRate(status: AgentStatus): number {
-  if (status === "spawning") return 1.18;
-  if (status === "reporting") return 0.58;
-  return 0.86;
+  if (status === "spawning") return 1.3;
+  if (status === "reporting") return 0.88;
+  return 1.08;
 }
 
-/** Mount one compact field. Idle marks draw once; thinking marks redraw at a restrained 24fps. */
+const TOPOLOGY_INDEX: Record<AgentIdentity["topology"], number> = {
+  confluence: 0,
+  strata: 1,
+  basin: 2,
+  braid: 3,
+  interference: 4,
+};
+
+const MAX_BACKING_SCALE = 2.5;
+
+/** Mount one compact field. Still marks hold their exact frame; active marks redraw near 30fps. */
 export function mountAgentMesh(
   canvas: HTMLCanvasElement,
   identity: AgentIdentity,
   status: AgentStatus,
+  fieldMotion: "auto" | "still" = "auto",
 ): () => void {
   const gl = canvas.getContext("webgl2", {
-    alpha: true,
+    alpha: false,
     antialias: false,
-    premultipliedAlpha: false,
+    premultipliedAlpha: true,
     powerPreference: "low-power",
   });
   if (!gl) {
@@ -184,34 +402,62 @@ export function mountAgentMesh(
   const resolution = gl.getUniformLocation(program, "u_resolution");
   const time = gl.getUniformLocation(program, "u_time");
   const seed = gl.getUniformLocation(program, "u_seed");
-  const deep = gl.getUniformLocation(program, "u_deep");
-  const currentA = gl.getUniformLocation(program, "u_current_a");
-  const currentB = gl.getUniformLocation(program, "u_current_b");
-  const bloom = gl.getUniformLocation(program, "u_bloom");
+  const topologyKind = gl.getUniformLocation(program, "u_topology_kind");
+  const angle = gl.getUniformLocation(program, "u_angle");
+  const fieldScale = gl.getUniformLocation(program, "u_scale");
+  const bandWidth = gl.getUniformLocation(program, "u_band_width");
+  const warp = gl.getUniformLocation(program, "u_warp");
+  const phase = gl.getUniformLocation(program, "u_phase");
+  const causticPoint = gl.getUniformLocation(program, "u_caustic_point");
+  const driftSeconds = gl.getUniformLocation(program, "u_drift_seconds");
+  const mirror = gl.getUniformLocation(program, "u_mirror");
+  const absorption = gl.getUniformLocation(program, "u_absorption");
+  const body = gl.getUniformLocation(program, "u_body");
+  const current = gl.getUniformLocation(program, "u_current");
+  const counter = gl.getUniformLocation(program, "u_counter");
+  const caustic = gl.getUniformLocation(program, "u_caustic");
 
   gl.uniform1f(seed, identity.seed % 10000);
-  gl.uniform3fv(deep, rgb(identity.palette.deep));
-  gl.uniform3fv(currentA, rgb(identity.palette.currentA));
-  gl.uniform3fv(currentB, rgb(identity.palette.currentB));
-  gl.uniform3fv(bloom, rgb(identity.palette.bloom));
+  gl.uniform1f(topologyKind, TOPOLOGY_INDEX[identity.topology]);
+  gl.uniform1f(angle, (identity.geometry.angle * Math.PI) / 180);
+  gl.uniform1f(fieldScale, identity.geometry.scale);
+  gl.uniform1f(bandWidth, identity.geometry.bandWidth);
+  gl.uniform1f(warp, identity.geometry.warp);
+  gl.uniform2f(phase, identity.geometry.phaseX, identity.geometry.phaseY);
+  gl.uniform2f(
+    causticPoint,
+    identity.geometry.causticX / 100,
+    identity.geometry.causticY / 100,
+  );
+  gl.uniform1f(driftSeconds, identity.geometry.driftSeconds);
+  gl.uniform1f(mirror, identity.geometry.mirror);
+  gl.uniform3fv(absorption, rgb(identity.palette.absorption));
+  gl.uniform3fv(body, rgb(identity.palette.body));
+  gl.uniform3fv(current, rgb(identity.palette.current));
+  gl.uniform3fv(counter, rgb(identity.palette.counter));
+  gl.uniform3fv(caustic, rgb(identity.palette.caustic));
 
   const media = window.matchMedia("(prefers-reduced-motion: reduce)");
   const staticTime = (identity.seed % 997) / 83;
-  const active = isAgentThinking(status);
-  const rate = motionRate(status);
+  let currentStatus = status;
+  let motionPolicy = fieldMotion;
   let reducedMotion = media.matches;
   let animationFrame = 0;
   let lastFrame = 0;
-  let startedAt = 0;
+  let lastTimestamp = 0;
+  let elapsed = 0;
   let disposed = false;
 
+  const shouldAnimate = () =>
+    motionPolicy === "auto" && isAgentThinking(currentStatus) && !reducedMotion;
+
   const syncMotionState = () => {
-    canvas.dataset.meshMotion = active && !reducedMotion ? "running" : "still";
+    canvas.dataset.meshMotion = shouldAnimate() ? "running" : "still";
   };
 
   const resize = () => {
     const bounds = canvas.getBoundingClientRect();
-    const scale = Math.min(window.devicePixelRatio || 1, 1.5);
+    const scale = Math.min(window.devicePixelRatio || 1, MAX_BACKING_SCALE);
     const width = Math.max(1, Math.round(bounds.width * scale));
     const height = Math.max(1, Math.round(bounds.height * scale));
     if (canvas.width !== width || canvas.height !== height) {
@@ -221,46 +467,76 @@ export function mountAgentMesh(
     }
   };
 
-  const draw = (elapsed = 0) => {
+  const draw = () => {
     resize();
-    gl.clearColor(0, 0, 0, 0);
+    gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(resolution, canvas.width, canvas.height);
-    gl.uniform1f(time, staticTime + elapsed * rate);
+    gl.uniform1f(time, staticTime + elapsed);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     canvas.dataset.meshReady = "true";
   };
 
   const tick = (timestamp: number) => {
-    if (disposed || !canvas.isConnected || !active || reducedMotion) return;
-    if (!startedAt) startedAt = timestamp;
-    if (timestamp - lastFrame >= 42) {
-      draw((timestamp - startedAt) / 1000);
+    if (disposed || !canvas.isConnected || !shouldAnimate()) return;
+    if (lastTimestamp) {
+      elapsed += ((timestamp - lastTimestamp) / 1000) * motionRate(currentStatus);
+    }
+    lastTimestamp = timestamp;
+    if (timestamp - lastFrame >= 34) {
+      draw();
       lastFrame = timestamp;
     }
     animationFrame = window.requestAnimationFrame(tick);
   };
 
+  const syncRuntimeState = () => {
+    const nextStatus = canvas.dataset.agentStatus as AgentStatus | undefined;
+    if (nextStatus) currentStatus = nextStatus;
+    motionPolicy = canvas.dataset.motionPolicy === "still" ? "still" : "auto";
+
+    window.cancelAnimationFrame(animationFrame);
+    lastTimestamp = 0;
+    syncMotionState();
+    if (shouldAnimate()) animationFrame = window.requestAnimationFrame(tick);
+  };
+
   const updateMotionPreference = (event: MediaQueryListEvent) => {
     reducedMotion = event.matches;
-    syncMotionState();
-    window.cancelAnimationFrame(animationFrame);
-    startedAt = 0;
-    draw();
-    if (active && !reducedMotion) animationFrame = window.requestAnimationFrame(tick);
+    syncRuntimeState();
   };
 
   const resizeObserver = new ResizeObserver(() => draw());
   resizeObserver.observe(canvas);
+  const runtimeObserver = new MutationObserver(syncRuntimeState);
+  runtimeObserver.observe(canvas, {
+    attributes: true,
+    attributeFilter: ["data-agent-status", "data-motion-policy"],
+  });
+  const transformObserver = new MutationObserver(() => draw());
+  const transformedAncestors = [
+    canvas.closest(".react-flow__node"),
+    canvas.closest(".react-flow__viewport"),
+  ].filter((element): element is Element => Boolean(element));
+  for (const element of transformedAncestors) {
+    transformObserver.observe(element, {
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+  }
+  const drawAfterWindowResize = () => draw();
+  window.addEventListener("resize", drawAfterWindowResize);
   media.addEventListener("change", updateMotionPreference);
-  syncMotionState();
+  syncRuntimeState();
   draw();
-  if (active && !reducedMotion) animationFrame = window.requestAnimationFrame(tick);
 
   return () => {
     disposed = true;
     window.cancelAnimationFrame(animationFrame);
     resizeObserver.disconnect();
+    runtimeObserver.disconnect();
+    transformObserver.disconnect();
+    window.removeEventListener("resize", drawAfterWindowResize);
     media.removeEventListener("change", updateMotionPreference);
     gl.deleteBuffer(buffer);
     gl.deleteProgram(program);

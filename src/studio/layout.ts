@@ -4,14 +4,13 @@
  * The swarm is a tree — the orchestrator spawns workers, and a divided worker hangs off the
  * worker it divided out of — so it gets a tree layout, not a force simulation. That is not a
  * taste call. A force sim is stochastic relaxation: it settles somewhere different every run,
- * it jitters on the way there, and the card you are reading drifts out from under you. This
+ * it jitters on the way there, and the agent you are reading drifts out from under you. This
  * is d3-hierarchy's `tree`, the Reingold–Tilford tidy layout, and it is a pure function of
  * the swarm: same workers, same picture, every time, with no random seed anywhere in it.
  *
- * Nothing here knows how big a card is. Sizes are MEASURED by the renderer and passed in, so
- * a card can change its padding, its font, or its content and the geometry follows on its
- * own. The one constant is the air between two cards, which is a design decision, not a
- * measurement.
+ * Nothing here knows how big an identity is. Sizes are MEASURED by the renderer and passed in,
+ * so presentation can evolve and the geometry follows. The one constant is the air between
+ * nodes, which is a design decision, not a measurement.
  */
 
 import { hierarchy, tree, type HierarchyPointNode } from "d3-hierarchy";
@@ -46,16 +45,16 @@ export interface Frame {
   centre: Record<string, Point>;
 }
 
-/** The air between two workers. A design decision — everything else is measured. */
+/** The air between two workers. Everything else is measured. */
 const AIR = { across: 36, along: 64 };
 
 /** Only ever used for a node the renderer has not measured yet, on its very first frame. */
-const UNMEASURED: Size = { w: 168, h: 118 };
+const UNMEASURED: Size = { w: 112, h: 100 };
 
 /**
  * Place every spawned worker.
  *
- * `sizes` comes from the renderer's own measurements of the real cards. Give this function
+ * `sizes` comes from the renderer's own measurements of the real nodes. Give this function
  * the same workers, the same sizes and the same orientation and it returns the same
  * coordinates — there is nothing to settle and nothing to converge.
  */

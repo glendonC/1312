@@ -1,16 +1,16 @@
 /**
- * The swarm, as it actually is: a topology of live workspaces on an open canvas.
+ * The swarm, as it actually is: a topology of live agents on an open canvas.
  *
  * A grid of cards cannot say that translate-02 DIVIDED OUT OF translate-01 — that is an edge,
  * and mitosis is the whole point. So this is a real node graph on a real graph engine, and the
- * engine owns everything that should never be hand-written: it measures the cards, it routes
+ * engine owns everything that should never be hand-written: it measures the nodes, it routes
  * the wires between their faces, and it owns the viewport. Nothing in this file computes a
  * bezier, a bounding box or a zoom level, which is exactly why none of that can rot.
  *
  * What is ours is what is actually about this product:
  *   - the tree layout (layout.ts), because a swarm that divides has a shape, and that shape
  *     is a function of the swarm — not something a solver relaxes its way toward
- *   - the card (SwarmNodes.tsx), which is a worker's live workspace, not a labelled dot
+ *   - the identity node (SwarmNodes.tsx), which carries role, state, and lineage at canvas scale
  *   - the birth, because a worker is born on the worker it came out of and travels from there
  */
 
@@ -28,8 +28,9 @@ import {
 import { useCallback, useEffect, useMemo } from "react";
 import { useReducedMotion } from "motion/react";
 
+import { createAgentIdentityMap, ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { place, type Layout, type Size, type Spec } from "./layout";
-import { useAgentIds, useBundle, useLayout, usePaused, useStudio } from "./store";
+import { useAgentIds, useBundle, useLayout, useStudio } from "./store";
 import { sideOf, type SwarmNode } from "./swarm";
 import { HubNode, WorkerNode } from "./SwarmNodes";
 
@@ -52,7 +53,6 @@ export default function SwarmGraph() {
 function Swarm() {
   const bundle = useBundle();
   const ids = useAgentIds();
-  const paused = usePaused();
   const reduceMotion = useReducedMotion();
   const layout = useLayout();
   const setLayout = useStudio((s) => s.setLayout);
@@ -65,6 +65,10 @@ function Swarm() {
 
   const { getNodes, fitView } = useReactFlow<SwarmNode>();
   const measured = useNodesInitialized();
+  const identities = useMemo(
+    () => createAgentIdentityMap(bundle?.run.agents ?? []),
+    [bundle],
+  );
 
   /**
    * The swarm the event log has actually spawned — never the manifest's full roster. A worker
@@ -103,7 +107,7 @@ function Swarm() {
           id: s.id,
           type: s.id === "orchestrator" ? "hub" : "worker",
           position: parent ? { ...parent.position } : { x: 0, y: 0 },
-          data: { agent: s.id },
+          data: { agent: s.id, identity: identities[s.id] ?? ORCHESTRATOR_IDENTITY },
           draggable: false,
           selectable: false,
           connectable: false,
@@ -111,9 +115,9 @@ function Swarm() {
       }
       return next;
     });
-  }, [specs, setNodes]);
+  }, [identities, specs, setNodes]);
 
-  // Lay the tree out from the cards' own measured sizes, wire it up, and fit it to the canvas.
+  // Lay the tree out from the nodes' measured sizes, wire it up, and fit it to the canvas.
   useEffect(() => {
     if (!measured || specs.length === 0) return;
 
@@ -148,7 +152,13 @@ function Swarm() {
     );
 
     const t = window.setTimeout(() => {
-      void fitView({ padding: 0.16, duration: reduceMotion ? 0 : 420, maxZoom: 1, minZoom: 0.45 });
+      const onlyOrchestrator = specs.length === 1;
+      void fitView({
+        padding: onlyOrchestrator ? 0.28 : 0.2,
+        duration: reduceMotion ? 0 : 520,
+        maxZoom: onlyOrchestrator ? 1.34 : 1.08,
+        minZoom: 0.45,
+      });
     }, 30);
     return () => clearTimeout(t);
   }, [specs, layout, measured, getNodes, fitView, reduceMotion, setNodes, setEdges]);
@@ -164,13 +174,7 @@ function Swarm() {
   const types = useMemo(() => ({ worker: WorkerNode, hub: HubNode }), []);
 
   return (
-    <div className="graph" data-paused={paused}>
-      {paused && (
-        <span className="graph-hold" aria-live="polite">
-          Paused
-        </span>
-      )}
-
+    <div className="graph">
       <div className="seg graph-seg" role="group" aria-label="Swarm layout">
         {LAYOUTS.map((l) => (
           <button

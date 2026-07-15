@@ -1,10 +1,9 @@
 /**
  * One worker, opened up: what it is doing right now, and everything it has ever done.
  *
- * The environment at the top is the same renderer the worker's own squircle on the graph
- * uses, at panel scale — the card is the glance, this is the read. What the drawer adds is
- * the history, and the history is not stored anywhere special: it is the event log filtered
- * by agent. That is the payoff of making agent state a projection instead of component state.
+ * The canvas keeps the agent legible as an identity. This drawer is where its workspace and
+ * history become readable. The history is the event log filtered by agent, not separate UI
+ * state, so opening a worker cannot change what it has done.
  */
 
 import { AnimatePresence, motion } from "motion/react";

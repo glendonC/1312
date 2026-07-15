@@ -1,12 +1,11 @@
 /**
  * The two kinds of node on the canvas.
  *
- * A worker gets a squircle carrying its own live workspace — the same renderer the drawer
- * uses, at cell scale. The orchestrator gets an identity field rather than a workspace: it
- * reads the job and spawns the workers that do the work.
+ * Every agent gets an identity field on the topology. Detailed tools and evidence belong in
+ * the drawer, where they can be read without forcing the entire graph to zoom out.
  *
- * Each card subscribes to its own agent and nothing else, so a trace landing on qc-01
- * re-renders qc-01 and leaves the other four workspaces and the layout alone.
+ * Each node subscribes to its own agent and nothing else, so a trace landing on qc-01
+ * re-renders qc-01 and leaves every other identity and the layout alone.
  */
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
@@ -15,20 +14,56 @@ import { memo, useEffect, useState } from "react";
 import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { useAgent, useStudio } from "./store";
-import Workspace from "./Workspace";
 import type { SwarmNode } from "./swarm";
+import type { AgentStatus, Role } from "./types";
 
 /** How long a worker keeps its just-born look before it is simply another worker. */
 const BIRTH_MS = 720;
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
 
+const ROLE_TITLES: Record<Exclude<Role, "orchestrator">, string> = {
+  segment: "Segmenter",
+  context: "Context",
+  translate: "Translator",
+  qc: "Verifier",
+};
+
+const ACTIVE_LABELS: Record<Exclude<Role, "orchestrator">, string> = {
+  segment: "Mapping media",
+  context: "Reading context",
+  translate: "Translating",
+  qc: "Checking evidence",
+};
+
+function workerTitle(id: string, role: Exclude<Role, "orchestrator">): string {
+  const sequence = id.match(/(\d+)$/)?.[1];
+  return sequence ? `${ROLE_TITLES[role]} ${sequence}` : ROLE_TITLES[role];
+}
+
+function workerState(status: AgentStatus, role: Exclude<Role, "orchestrator">): string {
+  if (status === "spawning") return "Joining";
+  if (status === "working") return ACTIVE_LABELS[role];
+  if (status === "reporting") return "Reporting";
+  if (status === "gating") return "Testing a gate";
+  if (status === "retired" || status === "done") return "Complete";
+  return "Waiting";
+}
+
+function orchestratorState(status: AgentStatus): string {
+  if (status === "spawning") return "Starting";
+  if (status === "working") return "Coordinating";
+  if (status === "reporting") return "Gathering reports";
+  if (status === "gating") return "Resolving a gate";
+  if (status === "retired" || status === "done") return "Complete";
+  return "Waiting";
+}
+
 /**
  * A wire can arrive at any face, so every face has a pin.
  *
- * This is what keeps a wire off a card's front: the graph engine routes to the pin on the
- * side that actually faces the other node, so a connector lands on an edge and stops there
- * instead of being drawn to the card's centre and straight across its contents.
+ * This is what keeps a wire from cutting through an identity: the graph engine routes to the
+ * pin on the side that faces the other node, so a connector lands at the material edge.
  */
 function Pins() {
   return (
@@ -71,7 +106,7 @@ function useBorn(): boolean {
  * Enter and Space open a worker.
  *
  * The graph engine handles the click, but a node is a div, so the keyboard is ours to wire —
- * and a workspace you can tab to but not open is worse than one you cannot reach at all.
+ * and an agent you can tab to but not open is worse than one you cannot reach at all.
  */
 function useOpen(id: string): {
   onKeyDown: (e: React.KeyboardEvent) => void;
@@ -88,36 +123,44 @@ function useOpen(id: string): {
   };
 }
 
-/** One worker's live workspace, on the canvas. */
+/** One worker identity on the canvas. Its readable workspace opens in the drawer. */
 export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode>) {
   const agent = useAgent(data.agent);
   const on = useStudio((s) => s.selected === data.agent);
+  const cancelled = useStudio((s) => s.outcome?.kind === "cancelled");
+  const paused = useStudio((s) => s.paused);
   const born = useBorn();
   const open = useOpen(data.agent);
 
   if (!agent) return null;
 
+  const role = agent.role as Exclude<Role, "orchestrator">;
+  const title = workerTitle(agent.id, role);
+  const state = cancelled ? "Stopped" : workerState(agent.status, role);
+
   return (
     <div
-      className="cell"
+      className="agent-node worker-node"
       data-role={agent.role}
       data-status={agent.status}
+      data-run-state={cancelled ? "cancelled" : "active"}
       data-on={on}
       data-born={born}
       role="button"
       tabIndex={0}
       onKeyDown={open.onKeyDown}
-      aria-label={`${agent.label}, ${agent.role}, ${agent.status}, ${agent.actions} actions`}
+      aria-label={`${title}, ${state}, ${agent.actions} actions`}
     >
-      <Pins />
-
-      <span className="cell-head">
-        <span className="cell-dot" data-status={agent.status} aria-hidden="true" />
-        <span className="cell-name">{agent.label}</span>
-        <span className="cell-count">{agent.actions}</span>
+      <span className="agent-node-identity">
+        <Pins />
+        <AgentMark
+          identity={data.identity}
+          status={agent.status}
+          fieldMotion={cancelled || paused ? "still" : "auto"}
+        />
       </span>
-
-      <Workspace agent={agent} scale="cell" />
+      <span className="node-name">{title}</span>
+      <span className="node-state">{state}</span>
     </div>
   );
 });
@@ -127,22 +170,33 @@ export const HubNode = memo(function HubNode() {
   const status = useStudio((s) => s.state.orchestrator.status);
   const note = useStudio((s) => s.state.orchestrator.note);
   const on = useStudio((s) => s.selected === "orchestrator");
+  const cancelled = useStudio((s) => s.outcome?.kind === "cancelled");
+  const paused = useStudio((s) => s.paused);
   const open = useOpen("orchestrator");
+  const state = cancelled ? "Stopped" : orchestratorState(status);
 
   return (
     <div
       className="hub"
       data-status={status}
+      data-run-state={cancelled ? "cancelled" : "active"}
       data-on={on}
       role="button"
       tabIndex={0}
       onKeyDown={open.onKeyDown}
-      aria-label={`orchestrator, ${status}. ${note}`}
+      aria-label={`orchestrator, ${state}. ${note}`}
       title={note}
     >
-      <Pins />
-      <AgentMark identity={ORCHESTRATOR_IDENTITY} status={status} />
-      <span className="node-name">orchestrator</span>
+      <span className="agent-node-identity">
+        <Pins />
+        <AgentMark
+          identity={ORCHESTRATOR_IDENTITY}
+          status={status}
+          fieldMotion={cancelled || paused ? "still" : "auto"}
+        />
+      </span>
+      <span className="node-name">Orchestrator</span>
+      <span className="node-state">{state}</span>
     </div>
   );
 });

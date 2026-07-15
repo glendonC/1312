@@ -8,11 +8,12 @@
 import type { Node } from "@xyflow/react";
 import { Position } from "@xyflow/react";
 
+import type { AgentIdentity } from "./agentIdentity";
 import type { Layout, Point } from "./layout";
 
-/** A node on the canvas carries only the id of the agent it is showing. The agent itself is
- *  read from the store by the card, so a trace re-renders one card and not the graph. */
-export type SwarmNode = Node<{ agent: string }>;
+/** A node carries stable identity data. Live state is still read by id so one trace updates
+ *  one agent rather than re-rendering the whole graph. */
+export type SwarmNode = Node<{ agent: string; identity: AgentIdentity }>;
 
 /**
  * Which face a wire leaves by, and which face it arrives at.

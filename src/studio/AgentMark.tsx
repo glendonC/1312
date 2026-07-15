@@ -8,6 +8,7 @@ interface AgentMarkProps {
   identity: AgentIdentity;
   status: AgentStatus;
   className?: string;
+  fieldMotion?: "auto" | "still";
 }
 
 /**
@@ -15,14 +16,27 @@ interface AgentMarkProps {
  * how that surface behaves. The surrounding node remains responsible for labels, selection,
  * focus, and every other semantic or interactive concern.
  */
-export default function AgentMark({ identity, status, className }: AgentMarkProps) {
+export default function AgentMark({
+  identity,
+  status,
+  className,
+  fieldMotion = "auto",
+}: AgentMarkProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const initialRenderState = useRef({ status, fieldMotion });
+  initialRenderState.current = { status, fieldMotion };
   const thinking = isAgentThinking(status);
+  const moving = thinking && fieldMotion === "auto";
 
   useEffect(() => {
     if (!canvas.current) return undefined;
-    return mountAgentMesh(canvas.current, identity, status);
-  }, [identity, status]);
+    return mountAgentMesh(
+      canvas.current,
+      identity,
+      initialRenderState.current.status,
+      initialRenderState.current.fieldMotion,
+    );
+  }, [identity]);
 
   return (
     <span
@@ -30,13 +44,19 @@ export default function AgentMark({ identity, status, className }: AgentMarkProp
       data-agent-identity={identity.key}
       data-relation={identity.relation}
       data-role={identity.role}
+      data-topology={identity.topology}
       data-status={status}
-      data-field-motion={thinking ? "thinking" : "still"}
+      data-field-motion={moving ? "thinking" : "still"}
       style={agentIdentityStyle(identity)}
       aria-hidden="true"
     >
       <span className="agent-mark-fallback" />
-      <canvas ref={canvas} className="agent-mark-mesh" />
+      <canvas
+        ref={canvas}
+        className="agent-mark-mesh"
+        data-agent-status={status}
+        data-motion-policy={fieldMotion}
+      />
       <span className="agent-mark-grain" />
     </span>
   );

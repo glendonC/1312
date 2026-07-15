@@ -8,15 +8,27 @@
   position: relative;
   display: flex;
   min-height: 470px;
-  padding: clamp(25px, 3vw, 40px);
+  padding: clamp(28px, 3.2vw, 46px);
   flex-direction: column;
-  overflow: hidden;
   border: 1px solid var(--bench-line-strong);
-  background:
-    linear-gradient(rgba(21, 32, 29, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(21, 32, 29, 0.025) 1px, transparent 1px),
-    #f0f1ed;
-  background-size: 30px 30px;
+  border-radius: var(--bench-r-card);
+  background: var(--bench-surface);
+}
+
+.null-hero {
+  display: block;
+  width: clamp(96px, 12vw, 156px);
+  height: 9px;
+  margin-top: auto;
+  background: var(--bench-ink);
+}
+
+.null-mark {
+  display: inline-block;
+  width: 26px;
+  height: 4px;
+  background: rgba(21, 32, 29, 0.34);
+  vertical-align: middle;
 }
 
 .empty-score-topline {
@@ -106,6 +118,7 @@
   padding: 20px;
   flex-direction: column;
   border: 1px solid var(--bench-line-strong);
+  border-radius: var(--bench-r-card);
   overflow: hidden;
 }
 
@@ -147,6 +160,7 @@
 .result-card {
   padding: 22px;
   border: 1px solid var(--bench-line-strong);
+  border-radius: var(--bench-r-card);
   background: #fff;
 }
 

@@ -79,6 +79,7 @@
   min-height: 190px;
   padding: 22px;
   flex-direction: column;
+  border-radius: var(--bench-r-card);
   color: #fff;
   background: #17201e;
 }
@@ -111,7 +112,9 @@
 }
 
 .receipt-details {
+  overflow: hidden;
   border: 1px solid var(--bench-line-strong);
+  border-radius: var(--bench-r-card);
   background: #f3f4f1;
 }
 

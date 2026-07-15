@@ -44,6 +44,11 @@
     border-top: 1px solid var(--bench-line);
   }
 
+  .section-split {
+    grid-template-columns: 1fr;
+    gap: 38px;
+  }
+
   .panel-split,
   .pack-split,
   .result-split,
@@ -121,10 +126,13 @@
 
   .instrument-select {
     display: grid;
-    padding: 10px 14px;
+    padding: 12px 14px;
     align-items: center;
     grid-template-columns: auto minmax(0, 1fr);
     gap: 10px;
+    border: 1px solid var(--bench-line-strong);
+    border-radius: 14px;
+    background: var(--bench-surface);
   }
 
   .instrument-select label {

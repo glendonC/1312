@@ -6,7 +6,9 @@
 }
 
 .method-group {
+  overflow: hidden;
   border: 1px solid var(--bench-line-strong);
+  border-radius: var(--bench-r-card);
   background: #f3f4f1;
 }
 
@@ -74,7 +76,9 @@
 }
 
 .method-item {
+  overflow: hidden;
   border: 1px solid var(--bench-line);
+  border-radius: var(--bench-r-inner);
   background: #fff;
 }
 

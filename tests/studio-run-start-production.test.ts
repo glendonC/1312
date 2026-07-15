@@ -7,6 +7,7 @@ import test from "node:test";
 import { assertProductionAnalysisRequest } from "../src/studio/runtime/production/assertions.ts";
 import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
 import type { RequestedSourceLanguage } from "../src/studio/runtime/production/model.ts";
+import * as runStart from "../src/studio/runtime/production/runStart.ts";
 import {
   createProductionAnalysisRequest,
   createRuntimeStart,
@@ -16,6 +17,15 @@ import {
 import { assertRuntimeStartRecord } from "../src/studio/runtime/production/runStartValidation.ts";
 
 const FIXTURE = resolve("public/demo/runs/run-005");
+
+test("run-start facade preserves its exact runtime export surface", () => {
+  assert.deepEqual(Object.keys(runStart).sort(), [
+    "createProductionAnalysisRequest",
+    "createRuntimeStart",
+    "loadOwnedSourceSession",
+    "writeRuntimeStartReceipt",
+  ]);
+});
 
 test("owned preflight becomes a stable source session and frozen language-aware run start", async (suite) => {
   const directory = await mkdtemp(join(tmpdir(), "studio-run-start-test-"));

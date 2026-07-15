@@ -11,6 +11,7 @@ export const CAPABILITIES = [
   "media.seek",
   "evidence.read",
   "analysis.evidence.assess",
+  "analysis.evidence.decide",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -57,6 +58,12 @@ export interface EvidenceAssessmentScope {
   maxCitations: number;
   /** Host-defined deterministic structured-token units, not model/provider usage. */
   maxTokens: number;
+}
+
+/** Scheduler-issued hard envelope for decisions over live, fully audited assessment identities. */
+export interface EvidenceDecisionScope {
+  maxDecisions: number;
+  maxAuditedAssessments: number;
 }
 
 export interface RequiredOutput {
@@ -120,6 +127,7 @@ export interface CapabilityGrant {
   mediaScope: MediaScope[];
   evidenceScope: EvidenceReadScope[];
   assessmentScope: EvidenceAssessmentScope | null;
+  decisionScope: EvidenceDecisionScope | null;
 }
 
 export interface AgentRecord {
@@ -284,6 +292,17 @@ export interface EvidenceAssessmentArtifactOrigin {
   readReceiptContentIds: string[];
 }
 
+export interface EvidenceDecisionArtifactOrigin {
+  kind: "evidence_decision";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  assessmentOperationIds: string[];
+  assessmentArtifactIds: string[];
+  assessmentReceiptIds: string[];
+  assessmentReceiptContentIds: string[];
+}
+
 export interface RuntimeArtifact {
   schema: "studio.runtime.artifact.v1";
   id: string;
@@ -304,7 +323,8 @@ export interface RuntimeArtifact {
     | MediaObservationArtifactOrigin
     | WorkerOutputArtifactOrigin
     | PreflightEvidenceArtifactOrigin
-    | EvidenceAssessmentArtifactOrigin;
+    | EvidenceAssessmentArtifactOrigin
+    | EvidenceDecisionArtifactOrigin;
 }
 
 export interface WorkerOutputEnvelope {
@@ -583,6 +603,56 @@ export interface EvidenceAssessmentReceipt {
   };
 }
 
+export interface AuditedEvidenceAssessmentIdentity {
+  operationId: string;
+  artifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface EvidenceDecisionRequest {
+  operationId: string;
+  taskId: string;
+  agentId: string;
+  auditedAssessments: AuditedEvidenceAssessmentIdentity[];
+}
+
+export type EvidenceDecisionOutcome = "withheld" | "proceed_to_publish_review";
+
+export type EvidenceDecisionReasonCode =
+  | "all_audited_claims_supported"
+  | "audited_claim_withheld"
+  | "audited_claim_unknown"
+  | "audited_claim_truncated";
+
+export interface EvidenceDecisionReceipt {
+  schema: "studio.evidence-decision.receipt.v1";
+  receiptId: string;
+  operationId: string;
+  capability: "analysis.evidence.decide";
+  authorization: {
+    grantId: string;
+    taskId: string;
+    agentId: string;
+    maxDecisions: number;
+    maxAuditedAssessments: number;
+  };
+  inputs: AuditedEvidenceAssessmentIdentity[];
+  producer: {
+    id: "studio.deterministic-audited-assessment-decision";
+    version: "1";
+    policy: "withhold_on_preserved_gap_state";
+  };
+  decision: {
+    outcome: EvidenceDecisionOutcome;
+    reasonCodes: EvidenceDecisionReasonCode[];
+  };
+  result: {
+    auditedAssessmentCount: number;
+    auditedClaimCount: number;
+  };
+}
+
 export interface OperationRecord {
   id: string;
   capability: "media.extract" | "media.seek";
@@ -635,6 +705,26 @@ export interface EvidenceAssessmentRecord {
   claimCount: number | null;
   citationCount: number | null;
   tokenCount: number | null;
+  failure: string | null;
+}
+
+export interface EvidenceDecisionRecord {
+  id: string;
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  assessmentOperationIds: string[];
+  assessmentArtifactIds: string[];
+  assessmentReceiptIds: string[];
+  assessmentReceiptContentIds: string[];
+  maxAuditedAssessments: number;
+  status: "started" | "completed" | "failed";
+  artifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  outcome: EvidenceDecisionOutcome | null;
+  reasonCodes: EvidenceDecisionReasonCode[];
+  auditedClaimCount: number | null;
   failure: string | null;
 }
 
@@ -763,6 +853,7 @@ export interface RuntimeProjection {
   operations: Record<string, OperationRecord>;
   evidenceReads: Record<string, EvidenceReadRecord>;
   evidenceAssessments: Record<string, EvidenceAssessmentRecord>;
+  evidenceDecisions: Record<string, EvidenceDecisionRecord>;
   executions: Record<string, ExecutorRecord>;
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;

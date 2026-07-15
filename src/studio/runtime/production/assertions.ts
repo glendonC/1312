@@ -11,6 +11,10 @@ export {
   validateEvidenceAssessmentReceipt,
 } from "./validation/assessment.ts";
 export {
+  assertEvidenceDecisionRequest,
+  validateEvidenceDecisionReceipt,
+} from "./validation/decision.ts";
+export {
   assertEvidenceReadRequest,
   validateEvidenceReadReceipt,
 } from "./validation/evidence.ts";

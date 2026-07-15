@@ -47,6 +47,7 @@ const ROOT_GRANT = {
   mediaScope: [],
   evidenceScope: [],
   assessmentScope: null,
+  decisionScope: null,
 };
 
 const REPORT_GRANT = {
@@ -57,6 +58,7 @@ const REPORT_GRANT = {
   mediaScope: [],
   evidenceScope: [],
   assessmentScope: null,
+  decisionScope: null,
 };
 
 const CHILD_INPUT = {
@@ -264,6 +266,7 @@ function operationJournal(): unknown[] {
     mediaScope: scope,
     evidenceScope: [],
     assessmentScope: null,
+    decisionScope: null,
   };
   return [
     event(1, "artifact_store", "artifact.recorded", {
@@ -422,9 +425,11 @@ test("production adapter projects spawn and output lineage with existing facts o
     operations: 0,
     evidenceReads: 0,
     evidenceAssessments: 0,
+    evidenceDecisions: 0,
     sourceArtifacts: 0,
     evidenceArtifacts: 0,
     assessmentArtifacts: 0,
+    decisionArtifacts: 0,
     outputArtifacts: 1,
   });
   assert.deepEqual(
@@ -451,6 +456,7 @@ test("production adapter projects spawn and output lineage with existing facts o
       mediaScope: [],
       evidenceScope: [],
       assessmentScope: null,
+      decisionScope: null,
     },
   );
   assert.deepEqual(projection.reports, [{

@@ -128,6 +128,8 @@ export function workerPrompt(task: TaskRecord): string {
       .flatMap((grant) => grant.evidenceScope),
     grantedAssessment: task.grants
       .find((grant) => grant.capability === "analysis.evidence.assess")?.assessmentScope ?? null,
+    grantedDecision: task.grants
+      .find((grant) => grant.capability === "analysis.evidence.decide")?.decisionScope ?? null,
   };
   const mediaBoundary = mediaTools.length === 0
     ? "This executor exposes no media bytes and no media tools. Do not claim that you inspected, heard, translated, or measured media."
@@ -161,12 +163,24 @@ export function workerPrompt(task: TaskRecord): string {
         "Unknown, withheld, and truncated upstream states remain explicit in the receipted assessment; never upgrade them to supported.",
         "Include the returned assessment operation, output-artifact, receipt, and receipt-content identities in the required worker output.",
       ].join(" ");
+  const decisionScope = task.grants
+    .find((grant) => grant.capability === "analysis.evidence.decide")?.decisionScope ?? null;
+  const decisionBoundary = decisionScope === null
+    ? "This executor exposes no evidence_decide tool. Do not claim that an assessment passed a publication or publish-review gate."
+    : [
+        "After the required evidence_assess completes, invoke evidence_decide exactly once with only its returned assessment operation, artifact, receipt, and receipt-content identities.",
+        "Do not submit raw receipt bytes, assessment claims, paths, prose, a desired outcome, caption content, or publication controls.",
+        "The host reopens the stored assessment and cited reads and deterministically emits withheld or proceed_to_publish_review with closed reason codes.",
+        "Proceed_to_publish_review means only that a future publish-review producer may inspect the run; it does not mean captions exist or anything was published.",
+        "Include the returned decision operation, output-artifact, receipt, receipt-content, outcome, and reason codes in the required worker output.",
+      ].join(" ");
   return [
     "You are one isolated child in the 1321 Studio production runtime.",
     "Complete only the bounded task contract below and return the JSON required by the supplied output schema.",
     mediaBoundary,
     evidenceBoundary,
     assessmentBoundary,
+    decisionBoundary,
     "Output content is a worker-authored artifact proposal; the parent decides whether to accept it.",
     JSON.stringify(contract),
   ].join("\n\n");

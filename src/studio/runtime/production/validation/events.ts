@@ -2,6 +2,7 @@ import type { RuntimeEvent } from "../protocol.ts";
 import { validateRuntimeArtifact } from "./artifacts.ts";
 import { assertEvidenceReadRequest, validateEvidenceReadReceipt } from "./evidence.ts";
 import { assertEvidenceAssessmentRequest, validateEvidenceAssessmentReceipt } from "./assessment.ts";
+import { assertEvidenceDecisionRequest, validateEvidenceDecisionReceipt } from "./decision.ts";
 import {
   validateExecutorSpanReceipt,
   validateModelUsageReceipt,
@@ -76,7 +77,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "handoff_host", "launcher"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "handoff_host", "launcher"]),
     context,
     "event.producer.kind",
   );
@@ -206,6 +207,21 @@ export function assertRuntimeEvent(
     contentId(data.receiptContentId, context, "event.data.receiptContentId");
     validateEvidenceAssessmentReceipt(data.receipt, context, "event.data.receipt");
   } else if (type === "analysis.evidence.assessment_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.reason, context, "event.data.reason");
+  } else if (type === "analysis.evidence.decision_started") {
+    exact(data, ["request", "grantId", "maxAuditedAssessments"], context, "event.data");
+    assertEvidenceDecisionRequest(data.request, context);
+    string(data.grantId, context, "event.data.grantId");
+    integer(data.maxAuditedAssessments, context, "event.data.maxAuditedAssessments", 1);
+  } else if (type === "analysis.evidence.decision_completed") {
+    exact(data, ["operationId", "outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateEvidenceDecisionReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "analysis.evidence.decision_failed") {
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     string(data.reason, context, "event.data.reason");

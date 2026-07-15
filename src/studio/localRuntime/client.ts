@@ -3,6 +3,7 @@ import type {
   OwnedMediaIngestRequest,
   OwnedMediaIngestStatus,
   RuntimeHostAssessmentAuditResponse,
+  RuntimeHostDecisionReceiptResponse,
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
@@ -796,6 +797,122 @@ function assessmentAuditResponse(
   };
 }
 
+function decisionReceiptResponse(
+  value: unknown,
+  expectedRuntimeId: string,
+): RuntimeHostDecisionReceiptResponse {
+  const context = "Runtime host decision receipts";
+  const item = object(value, context);
+  exact(item, ["schema", "commandId", "runtimeId", "journalHead", "decisions"], context);
+  if (item.schema !== "studio.local-runtime-decision-receipts.v1") fail(context, "schema is unsupported.");
+  const runtimeId = identity(item.runtimeId, `${context}.runtimeId`);
+  if (runtimeId !== expectedRuntimeId) fail(context, "runtime identity changed.");
+  if (!Array.isArray(item.decisions)) fail(`${context}.decisions`, "must be an array.");
+  const operationIds = new Set<string>();
+  const decisions = item.decisions.map((candidate, decisionIndex) => {
+    const decisionContext = `${context}.decisions[${decisionIndex}]`;
+    const decision = object(candidate, decisionContext);
+    exact(decision, [
+      "operationId",
+      "artifactId",
+      "receiptId",
+      "receiptContentId",
+      "taskId",
+      "agentId",
+      "integrity",
+      "producer",
+      "inputs",
+      "outcome",
+      "reasonCodes",
+      "auditedAssessmentCount",
+      "auditedClaimCount",
+    ], decisionContext);
+    const operationId = identity(decision.operationId, `${decisionContext}.operationId`);
+    if (operationIds.has(operationId)) fail(`${decisionContext}.operationId`, "is duplicated.");
+    operationIds.add(operationId);
+    if (decision.integrity !== "stored_decision_and_audited_inputs_verified") {
+      fail(`${decisionContext}.integrity`, "does not carry the closed decision verification result.");
+    }
+    if (decision.producer !== "deterministic_audit_state_gate_v1") {
+      fail(`${decisionContext}.producer`, "is unsupported.");
+    }
+    if (!Array.isArray(decision.inputs) || decision.inputs.length === 0 || decision.inputs.length > 4) {
+      fail(`${decisionContext}.inputs`, "must contain bounded audited assessment identities.");
+    }
+    const inputOperations = new Set<string>();
+    const inputs = decision.inputs.map((candidateInput, inputIndex) => {
+      const inputContext = `${decisionContext}.inputs[${inputIndex}]`;
+      const input = object(candidateInput, inputContext);
+      exact(input, ["operationId", "artifactId", "receiptId", "receiptContentId"], inputContext);
+      const inputOperationId = identity(input.operationId, `${inputContext}.operationId`);
+      if (inputOperations.has(inputOperationId)) fail(`${inputContext}.operationId`, "is duplicated.");
+      inputOperations.add(inputOperationId);
+      return {
+        operationId: inputOperationId,
+        artifactId: identity(input.artifactId, `${inputContext}.artifactId`),
+        receiptId: identity(input.receiptId, `${inputContext}.receiptId`),
+        receiptContentId: contentId(input.receiptContentId, `${inputContext}.receiptContentId`),
+      };
+    });
+    const outcome = decision.outcome;
+    if (outcome !== "withheld" && outcome !== "proceed_to_publish_review") {
+      fail(`${decisionContext}.outcome`, "is unsupported.");
+    }
+    if (!Array.isArray(decision.reasonCodes) || decision.reasonCodes.length === 0) {
+      fail(`${decisionContext}.reasonCodes`, "must contain closed reason codes.");
+    }
+    const reasonOrder = [
+      "audited_claim_withheld",
+      "audited_claim_unknown",
+      "audited_claim_truncated",
+      "all_audited_claims_supported",
+    ] as const;
+    const reasonCodes = decision.reasonCodes.map((reason, reasonIndex) => {
+      if (!reasonOrder.includes(reason as (typeof reasonOrder)[number])) {
+        fail(`${decisionContext}.reasonCodes[${reasonIndex}]`, "is unsupported.");
+      }
+      return reason as (typeof reasonOrder)[number];
+    });
+    if (
+      new Set(reasonCodes).size !== reasonCodes.length ||
+      JSON.stringify(reasonCodes) !== JSON.stringify(reasonOrder.filter((reason) => reasonCodes.includes(reason))) ||
+      (outcome === "proceed_to_publish_review" &&
+        (reasonCodes.length !== 1 || reasonCodes[0] !== "all_audited_claims_supported")) ||
+      (outcome === "withheld" && reasonCodes.includes("all_audited_claims_supported"))
+    ) fail(`${decisionContext}.reasonCodes`, "do not agree with the outcome or canonical order.");
+    const auditedAssessmentCount = integer(
+      decision.auditedAssessmentCount,
+      `${decisionContext}.auditedAssessmentCount`,
+      1,
+    );
+    if (auditedAssessmentCount !== inputs.length) {
+      fail(`${decisionContext}.auditedAssessmentCount`, "must equal the input count.");
+    }
+    return {
+      operationId,
+      artifactId: identity(decision.artifactId, `${decisionContext}.artifactId`),
+      receiptId: identity(decision.receiptId, `${decisionContext}.receiptId`),
+      receiptContentId: contentId(decision.receiptContentId, `${decisionContext}.receiptContentId`),
+      taskId: identity(decision.taskId, `${decisionContext}.taskId`),
+      agentId: identity(decision.agentId, `${decisionContext}.agentId`),
+      integrity: "stored_decision_and_audited_inputs_verified" as const,
+      producer: "deterministic_audit_state_gate_v1" as const,
+      inputs,
+      outcome: outcome as "withheld" | "proceed_to_publish_review",
+      reasonCodes,
+      auditedAssessmentCount,
+      auditedClaimCount: integer(decision.auditedClaimCount, `${decisionContext}.auditedClaimCount`, 1),
+    };
+  });
+  return {
+    schema: "studio.local-runtime-decision-receipts.v1",
+    commandId: identity(item.commandId, `${context}.commandId`),
+    runtimeId,
+    journalHead: integer(item.journalHead, `${context}.journalHead`),
+    decisions,
+  };
+}
+
 export function normalizeLocalRuntimeHostBaseUrl(value: string): string {
   let url: URL;
   try {
@@ -968,6 +1085,13 @@ export class LocalRuntimeHostClient {
   async assessmentAudits(runtimeId: string): Promise<RuntimeHostAssessmentAuditResponse> {
     return assessmentAuditResponse(
       await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/assessment-audits`),
+      runtimeId,
+    );
+  }
+
+  async decisionReceipts(runtimeId: string): Promise<RuntimeHostDecisionReceiptResponse> {
+    return decisionReceiptResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/decision-receipts`),
       runtimeId,
     );
   }

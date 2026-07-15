@@ -126,9 +126,9 @@ Production work lives under `src/studio/runtime/production/` and does not import
 The production runtime provides a versioned event protocol, append-only journal, pure projection,
 bounded scheduler, dynamic registry, content-addressed artifact store, centralized authorization,
 one real ffmpeg audio-range extraction operation, one bounded ffmpeg seek observation, structured
-child report-up, bounded reads of already-produced pinned speech/language evidence, and a bounded
-structured assessment over completed evidence-read receipts, and a bounded local `codex exec`
-launcher.
+child report-up, bounded reads of already-produced pinned speech/language evidence, a bounded
+structured assessment over completed evidence-read receipts, a deterministic bounded decision over
+audited assessment identities, and a bounded local `codex exec` launcher.
 Media scopes use exact track ids and half-open integer-millisecond ranges. The scheduler derives
 task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
 state. The media host re-hashes its source before execution and accepts no caller path or arbitrary
@@ -155,6 +155,14 @@ It reopens the stored assessment and cited read receipts by content identity, ve
 hashes and exact claim/citation derivation against the complete runtime projection, and returns an
 honest empty list when no completed assessment exists. This is not another runtime event or finding,
 and passing the audit proves integrity and citation closure rather than truth or semantic quality.
+`analysis.evidence.decide` is a separate gate over exact assessment operation/artifact/receipt/
+content identities that pass that audit. The host rechecks live ownership, grant and tool budgets,
+re-runs the audit after decision start, and applies a closed deterministic policy: any preserved
+withheld/unknown/truncated claim state yields `withheld` with stable reason codes; otherwise it
+yields `proceed_to_publish_review`. It emits a private content-addressed
+`studio.evidence-decision.receipt.v1`. A separate authenticated read endpoint re-hashes the stored
+decision, re-runs every input audit, and re-derives the policy before returning it. This does not
+certify media truth or semantic quality and does not create captions, uploads, or publication.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
@@ -164,14 +172,16 @@ a task-private authenticated loopback bridge plus a required stdio MCP adapter. 
 bridge/MCP pair exposes `evidence_read` only when an `evidence.read` grant is present. The adapters
 publish only scheduler-granted tool names and exact scopes. A third required bridge/MCP pair exposes
 the path-free `evidence_assess` tool only for an `analysis.evidence.assess` grant and injects the
-task, agent, and operation identities. Child requests cannot choose paths, process arguments,
+task, agent, and operation identities. A fourth bridge/MCP pair exposes path-free
+`evidence_decide` only for an `analysis.evidence.decide` grant and accepts no raw assessment,
+worker prose, reason, outcome, or publication controls. Child requests cannot choose paths, process arguments,
 task/agent identity, operation ids, evidence excerpt controls, or open assessment controls; the
-ffmpeg, evidence, and assessment hosts remain the authorities for live ownership, budgets, stored
+ffmpeg, evidence, assessment, and decision hosts remain the authorities for live ownership, budgets, stored
 content identity, journal events, artifacts, and receipts.
 Validated output becomes a private content-addressed worker artifact and is submitted through the
 existing handoff host. A missing completed operation for any granted media capability, or a missing
 completed read for any evidence artifact in a grant, fails closed. A granted assessment likewise
-must complete before child output can be accepted.
+must complete before child output can be accepted, and a granted decision must complete after it.
 
 Executor events receipt monotonic active duration and the CLI version. The launcher consumes the
 documented `turn.completed.usage` object rather than logs or budgets, stores the exact raw usage event
@@ -189,9 +199,10 @@ media bridge returns receipt and artifact identities, not media bytes or semanti
 seek does not drive a UI playhead. The evidence bridge may return only the bounded facts that were
 already in a pinned producer receipt; empty, unavailable, unknown, withheld, and truncated are not
 converted into new claims.
-The default deterministic run-005 proof executes one seek, two evidence reads, and one assessment
-over those receipts. Browser-ingested V1 has no evidence-read or assessment grant and projects both
-regions as unavailable/empty.
+The default deterministic run-005 proof executes one seek, two evidence reads, one assessment, and
+one decision over the audited assessment. Browser-ingested V1 has no evidence-read, assessment, or
+decision grant and projects those regions as unavailable/empty. `proceed_to_publish_review` names
+only eligibility for a future review producer; this runtime has no such consumer or publisher.
 
 ### Explicitly deferred
 

@@ -20,6 +20,7 @@ import type {
 
 const CONTENT = `sha256:${"a".repeat(64)}`;
 const RECEIPT_CONTENT = `sha256:${"b".repeat(64)}`;
+const DECISION_CONTENT = `sha256:${"c".repeat(64)}`;
 const SOURCE: RuntimeHostSourceSummary = {
   sourceSessionId: "source-session:fixture",
   sourceRevisionId: "source-revision:fixture",
@@ -282,6 +283,34 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
         }],
       });
     }
+    if (url.endsWith("/v1/runtimes/runtime%3Afixture/decision-receipts")) {
+      return json({
+        schema: "studio.local-runtime-decision-receipts.v1",
+        commandId: "runtime-start:fixture",
+        runtimeId: "runtime:fixture",
+        journalHead: 7,
+        decisions: [{
+          operationId: "operation:decision:fixture",
+          artifactId: "artifact:decision:fixture",
+          receiptId: "evidence-decision:fixture",
+          receiptContentId: DECISION_CONTENT,
+          taskId: "task:fixture",
+          agentId: "agent:fixture",
+          integrity: "stored_decision_and_audited_inputs_verified",
+          producer: "deterministic_audit_state_gate_v1",
+          inputs: [{
+            operationId: "operation:assessment:fixture",
+            artifactId: "artifact:assessment:fixture",
+            receiptId: "evidence-assessment:fixture",
+            receiptContentId: RECEIPT_CONTENT,
+          }],
+          outcome: "withheld",
+          reasonCodes: ["audited_claim_unknown", "audited_claim_truncated"],
+          auditedAssessmentCount: 1,
+          auditedClaimCount: 1,
+        }],
+      });
+    }
     return json({ error: { code: "not_found", message: "Unexpected test URL." } }, 404);
   };
   const client = new LocalRuntimeHostClient({
@@ -301,6 +330,7 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
   const status = await client.status(start.runtimeId);
   const poll = await client.poll(start.runtimeId, 7);
   const assessmentAudit = await client.assessmentAudits(start.runtimeId);
+  const decisionReceipts = await client.decisionReceipts(start.runtimeId);
 
   assert.equal(client.baseUrl, "http://127.0.0.1:4312");
   assert.equal(plan.forecast.schema, "studio.forecast.v1");
@@ -316,7 +346,13 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
   assert.equal(assessmentAudit.audits.length, 1);
   assert.equal(assessmentAudit.audits[0].claims[0].states.join(","), "unknown,truncated");
   assert.deepEqual(assessmentAudit.audits[0].claims[0].citations[0].factIndexes, [0]);
-  assert.equal(calls.length, 6);
+  assert.equal(decisionReceipts.decisions.length, 1);
+  assert.equal(decisionReceipts.decisions[0].outcome, "withheld");
+  assert.deepEqual(decisionReceipts.decisions[0].reasonCodes, [
+    "audited_claim_unknown",
+    "audited_claim_truncated",
+  ]);
+  assert.equal(calls.length, 7);
   for (const call of calls) {
     assert.equal(new Headers(call.init?.headers).get("Authorization"), `Bearer ${"t".repeat(64)}`);
   }
@@ -523,6 +559,40 @@ test("browser client rejects an open or incomplete assessment audit instead of e
     (error: unknown) => error instanceof RuntimeHostClientError &&
       error.code === "invalid_host_response" &&
       /closed audit result/.test(error.message),
+  );
+});
+
+test("browser client rejects an open or incomplete decision receipt instead of exposing it", async () => {
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => json({
+      schema: "studio.local-runtime-decision-receipts.v1",
+      commandId: "runtime-start:fixture",
+      runtimeId: "runtime:fixture",
+      journalHead: 7,
+      decisions: [{
+        operationId: "operation:decision:fixture",
+        artifactId: "artifact:decision:fixture",
+        receiptId: "evidence-decision:fixture",
+        receiptContentId: DECISION_CONTENT,
+        taskId: "task:fixture",
+        agentId: "agent:fixture",
+        integrity: "best_effort",
+        producer: "deterministic_audit_state_gate_v1",
+        inputs: [],
+        outcome: "proceed_to_publish_review",
+        reasonCodes: [],
+        auditedAssessmentCount: 0,
+        auditedClaimCount: 0,
+      }],
+    }),
+  });
+  await assert.rejects(
+    client.decisionReceipts("runtime:fixture"),
+    (error: unknown) => error instanceof RuntimeHostClientError &&
+      error.code === "invalid_host_response" &&
+      /closed decision verification result/.test(error.message),
   );
 });
 

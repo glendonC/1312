@@ -4,6 +4,7 @@ import {
   type Capability,
   type CapabilityGrant,
   type EvidenceAssessmentScope,
+  type EvidenceDecisionScope,
   type EvidenceReadScope,
   type MediaScope,
   type RequiredOutput,
@@ -51,6 +52,8 @@ export const MAX_EVIDENCE_ASSESS_READ_RECEIPTS = 4;
 export const MAX_EVIDENCE_ASSESS_CLAIMS = 8;
 export const MAX_EVIDENCE_ASSESS_CITATIONS = 32;
 export const MAX_EVIDENCE_ASSESS_TOKENS = 512;
+export const MAX_EVIDENCE_DECISIONS = 1;
+export const MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS = 4;
 
 function budget(value: unknown, context: string, path: string): asserts value is RuntimeBudget {
   const item = object(value, context, path);
@@ -133,6 +136,19 @@ function assessmentScope(
   return item as unknown as EvidenceAssessmentScope;
 }
 
+function decisionScope(value: unknown, context: string, path: string): EvidenceDecisionScope | null {
+  if (value === null) return null;
+  const item = object(value, context, path);
+  exact(item, ["maxDecisions", "maxAuditedAssessments"], context, path);
+  const maxDecisions = integer(item.maxDecisions, context, `${path}.maxDecisions`, 1);
+  const maxAuditedAssessments = integer(item.maxAuditedAssessments, context, `${path}.maxAuditedAssessments`, 1);
+  if (
+    maxDecisions > MAX_EVIDENCE_DECISIONS ||
+    maxAuditedAssessments > MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS
+  ) fail(context, path, "exceeds hard evidence-decision bounds");
+  return item as unknown as EvidenceDecisionScope;
+}
+
 function outputs(value: unknown, context: string, path: string): RequiredOutput[] {
   const result = array(value, context, path);
   result.forEach((entry, index) => {
@@ -157,7 +173,7 @@ function capabilities(value: unknown, context: string, path: string): Capability
 
 function grant(value: unknown, context: string, path: string): asserts value is CapabilityGrant {
   const item = object(value, context, path);
-  exact(item, ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope"], context, path);
+  exact(item, ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope"], context, path);
   string(item.id, context, `${path}.id`);
   const capability = oneOf<Capability>(
     item.capability,
@@ -170,6 +186,7 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   const mediaScope = scopes(item.mediaScope, context, `${path}.mediaScope`);
   const readScope = evidenceScopes(item.evidenceScope, context, `${path}.evidenceScope`);
   const assessScope = assessmentScope(item.assessmentScope, context, `${path}.assessmentScope`);
+  const decideScope = decisionScope(item.decisionScope, context, `${path}.decisionScope`);
   if (capability.startsWith("media.") && mediaScope.length === 0) {
     fail(context, path, "media grants require scope");
   }
@@ -187,6 +204,12 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   }
   if (capability !== "analysis.evidence.assess" && assessScope !== null) {
     fail(context, path, "non-assessment grants cannot carry assessment scope");
+  }
+  if (capability === "analysis.evidence.decide" && decideScope === null) {
+    fail(context, path, "analysis.evidence.decide grants require decision scope");
+  }
+  if (capability !== "analysis.evidence.decide" && decideScope !== null) {
+    fail(context, path, "non-decision grants cannot carry decision scope");
   }
 }
 

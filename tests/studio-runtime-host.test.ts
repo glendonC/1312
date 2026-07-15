@@ -388,7 +388,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.workers.length, 2);
     assert.deepEqual(
       inspector.projection.grants.map((grant) => grant.capability).sort(),
-      ["analysis.evidence.assess", "evidence.read", "media.seek", "report.submit", "task.spawn.request"],
+      ["analysis.evidence.assess", "analysis.evidence.decide", "evidence.read", "media.seek", "report.submit", "task.spawn.request"],
     );
     assert.equal(inspector.projection.reports.length, 1);
     assert.equal(inspector.projection.reports[0].status, "accepted");
@@ -397,7 +397,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.spawnRequests[0].requestedByTaskId, inspector.projection.tasks[0].taskId);
     assert.deepEqual(
       inspector.projection.spawnRequests[0].requiredCapabilities,
-      ["analysis.evidence.assess", "evidence.read", "media.seek", "report.submit"],
+      ["analysis.evidence.assess", "analysis.evidence.decide", "evidence.read", "media.seek", "report.submit"],
     );
     assert.equal(inspector.projection.operations.length, 1);
     assert.equal(inspector.projection.operations[0].capability, "media.seek");
@@ -435,6 +435,18 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(assessmentGrant.assessmentScope.maxTokens, 512);
     assert.equal(inspector.projection.assessmentArtifacts.length, 1);
     assert.equal(inspector.projection.assessmentArtifacts[0].receiptId, assessment.receiptId);
+    assert.equal(inspector.projection.evidenceDecisions.length, 1);
+    const decision = inspector.projection.evidenceDecisions[0];
+    assert.equal(decision.status, "completed");
+    assert.deepEqual(decision.assessmentOperationIds, [assessment.operationId]);
+    assert.equal(decision.outcome === "withheld" || decision.outcome === "proceed_to_publish_review", true);
+    assert.ok(decision.reasonCodes.length > 0);
+    const decisionGrant = inspector.projection.grants.find((grant) => grant.capability === "analysis.evidence.decide");
+    assert.ok(decisionGrant?.decisionScope);
+    assert.equal(decisionGrant.decisionScope.maxDecisions, 1);
+    assert.equal(decisionGrant.decisionScope.maxAuditedAssessments, 4);
+    assert.equal(inspector.projection.decisionArtifacts.length, 1);
+    assert.equal(inspector.projection.decisionArtifacts[0].receiptId, decision.receiptId);
     assert.equal(inspector.projection.outputArtifacts.length, 2);
     const workerOutput = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "worker_output");
     const seekObservation = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "media_observation");
@@ -482,6 +494,21 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
       })),
       completedAssessmentEvent.data.receipt.claims,
     );
+    const decisionReceipts = await runtime.service.decisionReceipts(ack.runtimeId);
+    assert.equal(decisionReceipts.schema, "studio.local-runtime-decision-receipts.v1");
+    assert.equal(decisionReceipts.commandId, ack.commandId);
+    assert.equal(decisionReceipts.journalHead, cursor);
+    assert.equal(decisionReceipts.decisions.length, 1);
+    assert.equal(decisionReceipts.decisions[0].integrity, "stored_decision_and_audited_inputs_verified");
+    assert.equal(decisionReceipts.decisions[0].producer, "deterministic_audit_state_gate_v1");
+    assert.equal(decisionReceipts.decisions[0].outcome, decision.outcome);
+    assert.deepEqual(decisionReceipts.decisions[0].reasonCodes, decision.reasonCodes);
+    assert.deepEqual(decisionReceipts.decisions[0].inputs, [{
+      operationId: assessment.operationId,
+      artifactId: assessment.outputArtifactId,
+      receiptId: assessment.receiptId,
+      receiptContentId: assessment.receiptContentId,
+    }]);
 
     const reopened = await RuntimeStartService.open({
       store: runtime.store,
@@ -493,6 +520,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.deepEqual(continued.events, []);
     assert.equal(continued.nextCursor, cursor);
     assert.deepEqual(await reopened.assessmentAudits(ack.runtimeId), assessmentAudit);
+    assert.deepEqual(await reopened.decisionReceipts(ack.runtimeId), decisionReceipts);
   } finally {
     await cleanup(runtime);
   }
@@ -507,6 +535,8 @@ test("assessment audit fails closed after restart for stored-byte, content, rece
     const journal = await readValidatedRuntimeJournal(paths.journalPath, ack.runtimeId);
     const healthy = await runtime.service.assessmentAudits(ack.runtimeId);
     assert.equal(healthy.audits.length, 1);
+    const healthyDecision = await runtime.service.decisionReceipts(ack.runtimeId);
+    assert.equal(healthyDecision.decisions.length, 1);
     const receiptContentId = healthy.audits[0].receiptContentId;
     const receiptDigest = receiptContentId.slice("sha256:".length);
     const receiptPath = join(
@@ -529,8 +559,30 @@ test("assessment audit fails closed after restart for stored-byte, content, rece
       reopenedAfterTamper.assessmentAudits(ack.runtimeId),
       (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
     );
+    await assert.rejects(
+      reopenedAfterTamper.decisionReceipts(ack.runtimeId),
+      (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
+    );
     await writeFile(receiptPath, originalReceiptBytes);
     assert.equal((await reopenedAfterTamper.assessmentAudits(ack.runtimeId)).audits.length, 1);
+
+    const decisionContentId = healthyDecision.decisions[0].receiptContentId;
+    const decisionDigest = decisionContentId.slice("sha256:".length);
+    const decisionPath = join(
+      paths.artifactStoreRoot,
+      "objects",
+      "sha256",
+      decisionDigest.slice(0, 2),
+      decisionDigest,
+    );
+    const originalDecisionBytes = await readFile(decisionPath);
+    await appendFile(decisionPath, "tampered");
+    await assert.rejects(
+      reopenedAfterTamper.decisionReceipts(ack.runtimeId),
+      (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
+    );
+    await writeFile(decisionPath, originalDecisionBytes);
+    assert.equal((await reopenedAfterTamper.decisionReceipts(ack.runtimeId)).decisions.length, 1);
 
     const originalJournal = await readFile(paths.journalPath, "utf8");
     const assessmentArtifactEvent = journal.events.find((event) =>
@@ -956,6 +1008,22 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     assert.equal(auditBody.audits.length, 1);
     assert.equal(JSON.stringify(auditBody).includes(runtime.directory), false);
     assert.equal(JSON.stringify(auditBody).includes(FIXTURE), false);
+    const decisions = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/decision-receipts`,
+      { headers: authorized },
+    );
+    assert.equal(decisions.status, 200);
+    const decisionBody = await decisions.json() as {
+      schema: string;
+      decisions: Array<{ integrity: string; outcome: string; producer: string }>;
+    };
+    assert.equal(decisionBody.schema, "studio.local-runtime-decision-receipts.v1");
+    assert.equal(decisionBody.decisions.length, 1);
+    assert.equal(decisionBody.decisions[0].integrity, "stored_decision_and_audited_inputs_verified");
+    assert.equal(decisionBody.decisions[0].producer, "deterministic_audit_state_gate_v1");
+    assert.equal(decisionBody.decisions[0].outcome, "proceed_to_publish_review");
+    assert.equal(JSON.stringify(decisionBody).includes(runtime.directory), false);
+    assert.equal(JSON.stringify(decisionBody).includes(FIXTURE), false);
   } finally {
     await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     await cleanup(runtime);
@@ -1186,11 +1254,15 @@ test("browser-owned ingest fails closed on rights and paths, preserves bytes, ho
     );
     assert.equal(v1Inspector.projection.grants.some((grant) => grant.capability === "evidence.read"), false);
     assert.equal(v1Inspector.projection.grants.some((grant) => grant.capability === "analysis.evidence.assess"), false);
+    assert.equal(v1Inspector.projection.grants.some((grant) => grant.capability === "analysis.evidence.decide"), false);
     assert.equal(v1Inspector.projection.evidenceArtifacts.length, 0);
     assert.equal(v1Inspector.projection.evidenceReads.length, 0);
     assert.equal(v1Inspector.projection.evidenceAssessments.length, 0);
     assert.equal(v1Inspector.projection.assessmentArtifacts.length, 0);
+    assert.equal(v1Inspector.projection.evidenceDecisions.length, 0);
+    assert.equal(v1Inspector.projection.decisionArtifacts.length, 0);
     assert.deepEqual((await service.assessmentAudits(acknowledgement.runtimeId)).audits, []);
+    assert.deepEqual((await service.decisionReceipts(acknowledgement.runtimeId)).decisions, []);
 
     const reopenedSources = await RuntimeSourceRegistry.open({ sourceDirectories: [] });
     await OwnedMediaIngestService.open({

@@ -4,6 +4,8 @@ import type {
   CapabilityGrant,
   EvidenceAssessmentReceipt,
   EvidenceAssessmentRequest,
+  EvidenceDecisionReceipt,
+  EvidenceDecisionRequest,
   ExecutorSpanReceipt,
   EvidenceReadReceipt,
   EvidenceReadRequest,
@@ -25,6 +27,7 @@ export type RuntimeProducerKind =
   | "media_host"
   | "evidence_host"
   | "assessment_host"
+  | "decision_host"
   | "handoff_host"
   | "launcher";
 
@@ -172,6 +175,26 @@ export interface EvidenceAssessmentFailedEvent extends RuntimeEventBase {
   data: { operationId: string; reason: string };
 }
 
+export interface EvidenceDecisionStartedEvent extends RuntimeEventBase {
+  type: "analysis.evidence.decision_started";
+  data: { request: EvidenceDecisionRequest; grantId: string; maxAuditedAssessments: number };
+}
+
+export interface EvidenceDecisionCompletedEvent extends RuntimeEventBase {
+  type: "analysis.evidence.decision_completed";
+  data: {
+    operationId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: EvidenceDecisionReceipt;
+  };
+}
+
+export interface EvidenceDecisionFailedEvent extends RuntimeEventBase {
+  type: "analysis.evidence.decision_failed";
+  data: { operationId: string; reason: string };
+}
+
 export interface ReportSubmittedEvent extends RuntimeEventBase {
   type: "report.submitted";
   data: { report: ReportRecord };
@@ -207,6 +230,9 @@ export type RuntimeEvent =
   | EvidenceAssessmentStartedEvent
   | EvidenceAssessmentCompletedEvent
   | EvidenceAssessmentFailedEvent
+  | EvidenceDecisionStartedEvent
+  | EvidenceDecisionCompletedEvent
+  | EvidenceDecisionFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent;
 

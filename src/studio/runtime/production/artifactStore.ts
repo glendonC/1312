@@ -12,6 +12,7 @@ import {
 import type {
   ContentIdentity,
   EvidenceAssessmentReceipt,
+  EvidenceDecisionReceipt,
   ExecutorSpanReceipt,
   MediaOperationReceipt,
   MediaTrackDescriptor,
@@ -422,6 +423,45 @@ export class ContentAddressedArtifactStore {
         receiptContentId: input.storedReceipt.content.contentId,
         readReceiptIds: input.receipt.inputs.map((receipt) => receipt.receiptId),
         readReceiptContentIds: input.receipt.inputs.map((receipt) => receipt.receiptContentId),
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildEvidenceDecisionArtifact(input: {
+    runId: string;
+    receipt: EvidenceDecisionReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({
+        runId: input.runId,
+        operationId: input.receipt.operationId,
+        kind: "evidence-decision-receipt",
+        contentId: input.storedReceipt.content.contentId,
+      })}`,
+      runId: input.runId,
+      kind: "evidence-decision-receipt",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: input.receipt.inputs.map((assessment) => assessment.artifactId),
+      producerTaskId: input.receipt.authorization.taskId,
+      producerAgentId: input.receipt.authorization.agentId,
+      origin: {
+        kind: "evidence_decision",
+        operationId: input.receipt.operationId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+        assessmentOperationIds: input.receipt.inputs.map((assessment) => assessment.operationId),
+        assessmentArtifactIds: input.receipt.inputs.map((assessment) => assessment.artifactId),
+        assessmentReceiptIds: input.receipt.inputs.map((assessment) => assessment.receiptId),
+        assessmentReceiptContentIds: input.receipt.inputs.map((assessment) => assessment.receiptContentId),
       },
     };
     assertRuntimeArtifact(artifact);

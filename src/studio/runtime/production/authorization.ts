@@ -2,8 +2,11 @@ import { assertMediaExtractRequest, assertMediaSeekRequest } from "./assertions.
 import type {
   Capability,
   CapabilityGrant,
+  EvidenceAssessmentRecord,
   EvidenceAssessmentRequest,
   EvidenceAssessmentScope,
+  EvidenceDecisionRequest,
+  EvidenceDecisionScope,
   EvidenceReadRecord,
   EvidenceReadRequest,
   EvidenceReadScope,
@@ -15,12 +18,14 @@ import type {
 } from "./model.ts";
 import { assertEvidenceReadRequest } from "./validation/evidence.ts";
 import { assertEvidenceAssessmentRequest, countAssessmentTokens } from "./validation/assessment.ts";
+import { assertEvidenceDecisionRequest } from "./validation/decision.ts";
 
 function taskCapabilityCalls(state: RuntimeProjection, taskId: string): number {
   return [
     ...Object.values(state.operations),
     ...Object.values(state.evidenceReads),
     ...Object.values(state.evidenceAssessments),
+    ...Object.values(state.evidenceDecisions),
   ].filter((operation) => operation.taskId === taskId).length;
 }
 
@@ -48,7 +53,12 @@ function authorizeMediaRange<Request extends MediaExtractRequest | MediaSeekRequ
   if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
     throw new Error(`${operation} requires a working task owned by the requesting agent`);
   }
-  if (state.operations[request.operationId]) throw new Error(`Media operation ${request.operationId} already exists`);
+  if (
+    state.operations[request.operationId] ||
+    state.evidenceReads[request.operationId] ||
+    state.evidenceAssessments[request.operationId] ||
+    state.evidenceDecisions[request.operationId]
+  ) throw new Error(`Media operation ${request.operationId} already exists`);
   const artifact = state.artifacts[request.artifactId];
   if (!artifact || artifact.runId !== state.runId) throw new Error(`${operation} input artifact is unavailable`);
   const track = artifact.tracks.find((candidate) => candidate.id === request.trackId);
@@ -90,7 +100,12 @@ export function authorizeEvidenceRead(
   if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
     throw new Error("Evidence read requires a working task owned by the requesting agent");
   }
-  if (state.evidenceReads[request.operationId] || state.operations[request.operationId]) {
+  if (
+    state.evidenceReads[request.operationId] ||
+    state.evidenceAssessments[request.operationId] ||
+    state.evidenceDecisions[request.operationId] ||
+    state.operations[request.operationId]
+  ) {
     throw new Error(`Evidence read operation ${request.operationId} already exists`);
   }
   const artifact = state.artifacts[request.artifactId];
@@ -146,6 +161,7 @@ export function authorizeEvidenceAssessment(
   }
   if (
     state.evidenceAssessments[request.operationId] ||
+    state.evidenceDecisions[request.operationId] ||
     state.evidenceReads[request.operationId] ||
     state.operations[request.operationId]
   ) throw new Error(`Evidence assessment operation ${request.operationId} already exists`);
@@ -187,6 +203,61 @@ export function authorizeEvidenceAssessment(
     throw new Error("Evidence assessment exceeds the grant's claim, citation, or token budget");
   }
   return { request, grant, scope, reads, claimCount, citationCount, tokenCount };
+}
+
+export interface AuthorizedEvidenceDecision {
+  request: EvidenceDecisionRequest;
+  grant: CapabilityGrant;
+  scope: EvidenceDecisionScope;
+  assessments: EvidenceAssessmentRecord[];
+}
+
+export function authorizeEvidenceDecision(
+  state: RuntimeProjection,
+  requestValue: unknown,
+): AuthorizedEvidenceDecision {
+  assertEvidenceDecisionRequest(requestValue);
+  const request = requestValue;
+  const task = state.tasks[request.taskId];
+  if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
+    throw new Error("Evidence decision requires a working task owned by the requesting agent");
+  }
+  if (
+    state.evidenceDecisions[request.operationId] ||
+    state.evidenceAssessments[request.operationId] ||
+    state.evidenceReads[request.operationId] ||
+    state.operations[request.operationId]
+  ) throw new Error(`Evidence decision operation ${request.operationId} already exists`);
+  const grant = task.grants.find((candidate) =>
+    candidate.capability === "analysis.evidence.decide" && candidate.decisionScope !== null);
+  const scope = grant?.decisionScope;
+  if (!grant || !scope) throw new Error("Evidence decision is outside the task's authoritative grant");
+  if (taskCapabilityCalls(state, task.id) >= task.budget.toolCalls) {
+    throw new Error("Evidence decision exceeds the task tool-call budget");
+  }
+  const prior = Object.values(state.evidenceDecisions).filter(
+    (operation) => operation.taskId === task.id && operation.grantId === grant.id,
+  );
+  if (prior.length >= scope.maxDecisions) {
+    throw new Error("Evidence decision exceeds the grant's decision-count budget");
+  }
+  if (request.auditedAssessments.length > scope.maxAuditedAssessments) {
+    throw new Error("Evidence decision exceeds the grant's audited-assessment budget");
+  }
+  const assessments = request.auditedAssessments.map((identity) => {
+    const assessment = state.evidenceAssessments[identity.operationId];
+    if (
+      !assessment ||
+      assessment.status !== "completed" ||
+      assessment.taskId !== task.id ||
+      assessment.agentId !== request.agentId ||
+      assessment.artifactId !== identity.artifactId ||
+      assessment.receiptId !== identity.receiptId ||
+      assessment.receiptContentId !== identity.receiptContentId
+    ) throw new Error("Evidence decision input is not a completed same-task assessment identity");
+    return assessment;
+  });
+  return { request, grant, scope, assessments };
 }
 
 export function authorizeMediaExtract(state: RuntimeProjection, requestValue: unknown): AuthorizedMediaExtract {

@@ -8,6 +8,10 @@ import {
   BoundedChildEvidenceAssessmentBridge,
   type ChildEvidenceAssessmentToolResult,
 } from "../executor/childEvidenceAssessmentBridge.ts";
+import {
+  BoundedChildEvidenceDecisionBridge,
+  type ChildEvidenceDecisionToolResult,
+} from "../executor/childEvidenceDecisionBridge.ts";
 import type {
   ExecutorSpanReceipt,
   LaunchPermit,
@@ -166,6 +170,7 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
     let mediaResult: ChildMediaToolResult;
     const evidenceResults: ChildEvidenceToolResult[] = [];
     let assessmentResult: ChildEvidenceAssessmentToolResult | null = null;
+    let decisionResult: ChildEvidenceDecisionToolResult | null = null;
     try {
       const scope = task.mediaScope[0];
       if (!scope) throw new Error("The deterministic media proof has no scheduler scope");
@@ -224,9 +229,26 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
           })),
           claims,
         });
+        const decisionGrant = task.grants.find((grant) => grant.capability === "analysis.evidence.decide");
+        if (!decisionGrant) throw new Error("The deterministic assessment proof has no paired decision grant");
+        const decisionBridge = new BoundedChildEvidenceDecisionBridge(task, this.context.decisionHost, {
+          nextOperationId: () => `operation:evidence-decide:${canonicalSha256({
+            runId: ledger.runId,
+            taskId: task.id,
+            assessmentReceiptId: assessmentResult?.receiptId,
+          })}`,
+        });
+        decisionResult = await decisionBridge.call({
+          auditedAssessments: [{
+            operationId: assessmentResult.operationId,
+            artifactId: assessmentResult.outputArtifactId,
+            receiptId: assessmentResult.receiptId,
+            receiptContentId: assessmentResult.receiptContentId,
+          }],
+        });
       }
     } catch (error) {
-      const reason = "The deterministic child bridge did not complete every required receipted media/evidence/assessment operation.";
+      const reason = "The deterministic child bridge did not complete every required receipted media/evidence/assessment/decision operation.";
       const span = this.span(task, executionId, startedAt, {
         outcome: "failed",
         outputArtifactIds: [],
@@ -263,7 +285,10 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
           (assessmentResult
             ? `It produced bounded assessment ${assessmentResult.receiptId} as ${assessmentResult.outputArtifactId} with ${assessmentResult.receipt.result.claimCount} range-bound claims. `
             : "No evidence assessment was granted or produced. ") +
-          "No new detector or media-content finding was produced.",
+          (decisionResult
+            ? `The deterministic audit-state gate emitted ${decisionResult.receipt.decision.outcome} as ${decisionResult.receiptId} with reasons ${decisionResult.receipt.decision.reasonCodes.join(", ")}. `
+            : "No evidence decision was granted or produced. ") +
+          "No new detector or media-content finding, caption, or publication was produced.",
       },
     };
     const prepared = await artifacts.prepareWorkerOutput(ledger.runId, envelope);
@@ -295,7 +320,8 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
         `Deterministic child completed one authorized ${mediaResult.capability} operation with ` +
         `receipt ${mediaResult.receiptId} and ${evidenceResults.length} authorized evidence reads; ` +
         `${assessmentResult ? "one bounded structured evidence assessment completed" : "no evidence assessment was granted"}; ` +
-        "no model, detector rerun, caption, translation, or raw-media interpretation ran.",
+        `${decisionResult ? `one deterministic audited decision completed as ${decisionResult.receipt.decision.outcome}` : "no evidence decision was granted"}; ` +
+        "no model, detector rerun, caption, translation, publication, or raw-media interpretation ran.",
     });
     return { report };
   }

@@ -316,6 +316,50 @@ export function validateRuntimeArtifact(
     ) {
       fail(context, path, "evidence assessment artifacts must be their content-addressed receipt with read-receipt lineage and a task producer");
     }
+  } else if (kind === "evidence_decision") {
+    exact(
+      origin,
+      [
+        "kind",
+        "operationId",
+        "receiptId",
+        "receiptContentId",
+        "assessmentOperationIds",
+        "assessmentArtifactIds",
+        "assessmentReceiptIds",
+        "assessmentReceiptContentIds",
+      ],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.operationId, context, `${path}.origin.operationId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    const assessmentOperationIds = uniqueStrings(origin.assessmentOperationIds, context, `${path}.origin.assessmentOperationIds`);
+    const assessmentArtifactIds = uniqueStrings(origin.assessmentArtifactIds, context, `${path}.origin.assessmentArtifactIds`);
+    const assessmentReceiptIds = uniqueStrings(origin.assessmentReceiptIds, context, `${path}.origin.assessmentReceiptIds`);
+    const assessmentReceiptContentIds = uniqueStrings(
+      origin.assessmentReceiptContentIds,
+      context,
+      `${path}.origin.assessmentReceiptContentIds`,
+    );
+    assessmentReceiptContentIds.forEach((id, index) =>
+      contentId(id, context, `${path}.origin.assessmentReceiptContentIds[${index}]`));
+    if (
+      mediaClass !== "non_media" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      task === null ||
+      agent === null ||
+      assessmentOperationIds.length === 0 ||
+      assessmentOperationIds.length !== assessmentArtifactIds.length ||
+      assessmentOperationIds.length !== assessmentReceiptIds.length ||
+      assessmentOperationIds.length !== assessmentReceiptContentIds.length ||
+      JSON.stringify(sources) !== JSON.stringify(assessmentArtifactIds) ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) {
+      fail(context, path, "evidence decision artifacts must be their content-addressed receipt with audited assessment lineage and a task producer");
+    }
   } else {
     fail(context, `${path}.origin.kind`, `has unknown value ${kind}`);
   }

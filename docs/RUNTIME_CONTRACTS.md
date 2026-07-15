@@ -36,12 +36,19 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
 - an authenticated read-only assessment-audit endpoint that reopens the stored assessment and every
   cited evidence-read receipt by content identity, re-hashes canonical bytes, closes exact ranges,
   states, fact indexes, and task/artifact/journal lineage, and returns no partial audit;
+- an `analysis.evidence.decide` host plus path-free task-private `evidence_decide` bridge that
+  accepts only exact audited assessment operation/artifact/receipt/content identities, re-runs the
+  live audit, and emits one content-addressed `studio.evidence-decision.receipt.v1` with a closed
+  `withheld` or `proceed_to_publish_review` outcome and canonical reason codes;
+- an authenticated decision-receipt read endpoint that re-hashes the stored decision, re-runs every
+  input assessment audit, re-derives policy, and returns no partial verification;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
-The exact runtime test executes that path against the receipted run-005 media, performs two reads
-and one assessment, and reopens the event journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
+The exact runtime test executes that path against the receipted run-005 media, performs two reads,
+one assessment, and one audited decision, and reopens the event journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
 duplicate work, limit violations, scope escalation, invalid registration, source/evidence-byte
-drift, unauthorized media/evidence/assessment calls, unread assessment inputs, out-of-bounds fact
+drift, unauthorized media/evidence/assessment/decision calls, unread assessment inputs, non-audited
+decision inputs, out-of-bounds fact
 indexes, caller-controlled paths, malformed requests, changed receipt lineage, budget overflow, and
 invalid handoffs.
 
@@ -54,14 +61,16 @@ agent. The source region exposes only validated ingest-origin identity and conte
 artifact references link only when their source/output destination is rendered. The deterministic
 host exercises one real bounded seek plus worker-output receipt/report lineage. No hosted runtime
 service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
-`media_seek`, `evidence_read`, and/or `evidence_assess` only for matching live task grants, in addition to the closed
+`media_seek`, `evidence_read`, `evidence_assess`, and/or `evidence_decide` only for matching live task grants, in addition to the closed
 structured report output. `evidence.read` is not a detector call: it reads registered, immutable
 V2/V3 receipt artifacts under per-artifact 32 KiB/64-fact ceilings and the shared task tool-call
 budget. `analysis.evidence.assess` adds a separate 1-assessment/4-receipt/8-claim/32-cited-index/
 512-structured-token ceiling and requires exact fact indexes and bounding ranges. V1 and absent
-receipts produce neither grant. `media.extract`, `media.seek`, `evidence.read`, and
-`analysis.evidence.assess` are real scheduler/host/child-bridge capabilities; assessment is an
-opinion over completed reads, not sensing. The other media operations and
+receipts produce none of those grants. `analysis.evidence.decide` adds a separate one-decision/four-
+audited-assessment ceiling and lets the host, not the caller, derive outcome/reasons. `media.extract`,
+`media.seek`, `evidence.read`, `analysis.evidence.assess`, and `analysis.evidence.decide` are real
+scheduler/host/child-bridge capabilities; assessment is opinion over completed reads and decision is
+an audit-state gate, not sensing or publication. The other media operations and
 detector/model calls in this proposal remain unavailable. The tables below
 continue to document the fixture contract itself and should not be read as the production wire
 schema.
@@ -83,6 +92,15 @@ out-of-lineage read, invalid index/range/state, or disagreement between stored r
 completion event, and full projection rejects the whole response as `stored_content_inconsistent`.
 An empty response is valid when no completed assessment exists, including V1. The audit certifies
 receipt integrity and citation closure only; it does not certify media truth or semantic quality.
+
+The production event union also includes `analysis.evidence.decision_started`,
+`analysis.evidence.decision_completed`, and `analysis.evidence.decision_failed`. The start binds
+exact audited assessment identities and grant bounds; completion binds the deterministic receipt,
+private artifact, outcome, reasons, and audited counts. `GET
+/v1/runtimes/:runtimeId/decision-receipts` returns
+`studio.local-runtime-decision-receipts.v1` only after stored decision bytes, every input audit, and
+the re-derived policy agree with the full journal. `proceed_to_publish_review` means only that a
+future review producer may consume the receipt. No caption, upload, or publication follows.
 
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a

@@ -8,6 +8,7 @@ import {
   identifyFile,
 } from "../artifactStore.ts";
 import { reopenEvidenceAssessmentAudits } from "../assessmentAudit.ts";
+import { reopenEvidenceDecisionReceipts } from "../decisionReceiptAudit.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
 import {
   createRuntimePlan,
@@ -25,6 +26,7 @@ import type {
   InitializedRuntimeApplication,
   RuntimeHostCommandRecord,
   RuntimeHostAssessmentAuditResponse,
+  RuntimeHostDecisionReceiptResponse,
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
@@ -609,6 +611,36 @@ export class RuntimeStartService {
       runtimeId,
       journalHead: journal.head,
       audits,
+    };
+  }
+
+  async decisionReceipts(runtimeId: string): Promise<RuntimeHostDecisionReceiptResponse> {
+    const record = await this.store.findByRuntimeId(runtimeId);
+    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+    const reconciled = await this.reconcile(record, false);
+    const paths = this.store.paths(runtimeId);
+    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
+    let decisions;
+    try {
+      decisions = await reopenEvidenceDecisionReceipts(
+        journal.state,
+        journal.events,
+        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+      );
+    } catch (error) {
+      throw new RuntimeHostError(
+        "stored_content_inconsistent",
+        "A stored evidence decision or its audited assessment lineage failed closed validation.",
+        409,
+        { cause: error },
+      );
+    }
+    return {
+      schema: "studio.local-runtime-decision-receipts.v1",
+      commandId: reconciled.commandId,
+      runtimeId,
+      journalHead: journal.head,
+      decisions,
     };
   }
 

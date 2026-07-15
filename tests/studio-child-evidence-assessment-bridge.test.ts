@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -9,6 +9,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
 import { BoundedEvidenceAssessmentHost } from "../src/studio/runtime/production/evidenceAssessmentHost.ts";
+import { BoundedEvidenceDecisionHost } from "../src/studio/runtime/production/evidenceDecisionHost.ts";
 import { BoundedEvidenceReadHost } from "../src/studio/runtime/production/evidenceHost.ts";
 import {
   BoundedChildEvidenceAssessmentBridge,
@@ -19,6 +20,11 @@ import {
   BoundedChildEvidenceBridge,
   type ChildEvidenceToolResult,
 } from "../src/studio/runtime/production/executor/childEvidenceBridge.ts";
+import {
+  BoundedChildEvidenceDecisionBridge,
+  callChildEvidenceDecisionBridge,
+  openChildEvidenceDecisionBridge,
+} from "../src/studio/runtime/production/executor/childEvidenceDecisionBridge.ts";
 import { MemoryEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import { CodexExecWorkerLauncher } from "../src/studio/runtime/production/launcher.ts";
 import type {
@@ -33,6 +39,7 @@ import { countAssessmentTokens } from "../src/studio/runtime/production/validati
 
 const FIXTURE = resolve("public/demo/runs/run-005");
 const MCP_SERVER = resolve("src/studio/runtime/production/executor/evidenceAssessmentMcpServer.ts");
+const DECISION_MCP_SERVER = resolve("src/studio/runtime/production/executor/evidenceDecisionMcpServer.ts");
 
 class SequenceIdentities implements RuntimeIdentityFactory {
   private value = 0;
@@ -64,7 +71,13 @@ async function assessmentHarness(registerChild = true) {
     maxDepth: 1,
     maxActiveWorkers: 2,
     runBudget: { wallMs: 30_000, toolCalls: 8 },
-    grantableCapabilities: ["task.spawn.request", "report.submit", "evidence.read", "analysis.evidence.assess"],
+    grantableCapabilities: [
+      "task.spawn.request",
+      "report.submit",
+      "evidence.read",
+      "analysis.evidence.assess",
+      "analysis.evidence.decide",
+    ],
   }, new SequenceIdentities());
   const inputArtifactIds = evidence.map((artifact) => artifact.id);
   const root = await scheduler.createRoot({
@@ -89,9 +102,14 @@ async function assessmentHarness(registerChild = true) {
     mediaScope: [],
     inputArtifactIds,
     requiredOutputs: [{ name: "evidence report", artifactKind: "worker-execution-report", required: true }],
-    requiredCapabilities: ["evidence.read", "analysis.evidence.assess", "report.submit"],
+    requiredCapabilities: [
+      "evidence.read",
+      "analysis.evidence.assess",
+      "analysis.evidence.decide",
+      "report.submit",
+    ],
     dependencies: [],
-    budget: { wallMs: 20_000, toolCalls: 3 },
+    budget: { wallMs: 20_000, toolCalls: 4 },
   };
   const decision = await scheduler.requestSpawn(root.taskId, root.agentId, child);
   assert.ok(decision.permit);
@@ -152,6 +170,29 @@ function assessmentArgs(results: ChildEvidenceToolResult[]) {
       receiptContentId: result.receiptContentId,
     })),
     claims: claimsFor(results),
+  };
+}
+
+async function completeAssessment(
+  runtime: Awaited<ReturnType<typeof assessmentHarness>>,
+  reads: ChildEvidenceToolResult[],
+  operationId: string,
+) {
+  return new BoundedChildEvidenceAssessmentBridge(
+    runtime.task,
+    new BoundedEvidenceAssessmentHost(runtime.ledger, runtime.artifacts),
+    { nextOperationId: () => operationId },
+  ).call(assessmentArgs(reads));
+}
+
+function auditedAssessmentIdentity(
+  assessment: Awaited<ReturnType<typeof completeAssessment>>,
+) {
+  return {
+    operationId: assessment.operationId,
+    artifactId: assessment.outputArtifactId,
+    receiptId: assessment.receiptId,
+    receiptContentId: assessment.receiptContentId,
   };
 }
 
@@ -245,6 +286,134 @@ test("assessment rejects raw/open inputs, unread receipts, and out-of-bounds fac
   }
 });
 
+test("stdio evidence_decide emits one withheld receipt over a live audited assessment identity", async () => {
+  const runtime = await assessmentHarness();
+  const reads = await readAll(runtime);
+  const assessment = await completeAssessment(runtime, reads, "operation:evidence-assessment:decision-happy");
+  const bridge = new BoundedChildEvidenceDecisionBridge(
+    runtime.task,
+    new BoundedEvidenceDecisionHost(runtime.ledger, runtime.artifacts),
+    { nextOperationId: () => "operation:evidence-decision:happy" },
+  );
+  const opened = await openChildEvidenceDecisionBridge(bridge);
+  const client = new Client({ name: "studio-child-evidence-decision-test", version: "1" });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [DECISION_MCP_SERVER],
+    env: {
+      STUDIO_CHILD_EVIDENCE_DECISION_BRIDGE_URL: opened.endpoint,
+      STUDIO_CHILD_EVIDENCE_DECISION_BRIDGE_TOKEN: opened.token,
+    },
+    stderr: "pipe",
+  });
+  try {
+    await client.connect(transport);
+    assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name), ["evidence_decide"]);
+    const called = await client.callTool({
+      name: "evidence_decide",
+      arguments: { auditedAssessments: [auditedAssessmentIdentity(assessment)] },
+    });
+    assert.equal(called.isError, undefined);
+    if (!Array.isArray(called.content)) assert.fail("MCP decision result must be an array");
+    const result = JSON.parse(
+      (called.content[0] as { text?: string }).text ?? "{}",
+    ) as Awaited<ReturnType<typeof callChildEvidenceDecisionBridge>>;
+    assert.equal(result.schema, "studio.child-evidence-decision-tool-result.v1");
+    assert.equal(result.receipt.schema, "studio.evidence-decision.receipt.v1");
+    assert.equal(result.receipt.producer.id, "studio.deterministic-audited-assessment-decision");
+    assert.equal(result.receipt.decision.outcome, "withheld");
+    assert.ok(result.receipt.decision.reasonCodes.some((reason) =>
+      reason === "audited_claim_withheld" ||
+      reason === "audited_claim_unknown" ||
+      reason === "audited_claim_truncated"));
+    assert.deepEqual(result.receipt.inputs, [auditedAssessmentIdentity(assessment)]);
+    assert.equal("path" in result, false);
+    assert.equal("caption" in result.receipt, false);
+    assert.equal("publication" in result.receipt, false);
+
+    const events = await runtime.ledger.events();
+    assert.equal(events.filter((event) => event.type === "analysis.evidence.decision_started").length, 1);
+    assert.equal(events.filter((event) => event.type === "analysis.evidence.decision_completed").length, 1);
+    const product = projectProductionRuntimeJournal(events);
+    assert.equal(product.evidenceDecisions.length, 1);
+    assert.equal(product.evidenceDecisions[0].outcome, "withheld");
+    assert.equal(product.decisionArtifacts.length, 1);
+    assert.equal(product.decisionArtifacts[0].receiptId, result.receiptId);
+  } finally {
+    await client.close().catch(() => undefined);
+    await opened.close();
+    await rm(runtime.directory, { recursive: true, force: true });
+  }
+});
+
+test("decision bridge rejects raw, path-like, caller-authored outcomes and non-audited identities", async () => {
+  const runtime = await assessmentHarness();
+  const reads = await readAll(runtime);
+  const assessment = await completeAssessment(runtime, reads, "operation:evidence-assessment:decision-negative");
+  let operation = 0;
+  const bridge = new BoundedChildEvidenceDecisionBridge(
+    runtime.task,
+    new BoundedEvidenceDecisionHost(runtime.ledger, runtime.artifacts),
+    { nextOperationId: () => `operation:evidence-decision:negative:${++operation}` },
+  );
+  try {
+    const identity = auditedAssessmentIdentity(assessment);
+    await assert.rejects(
+      bridge.call({
+        auditedAssessments: [identity],
+        path: "assessment.json",
+        rawAssessmentBytes: "{}",
+      }),
+      /accepts only audited assessment operation, artifact, receipt, and content identities/,
+    );
+    await assert.rejects(
+      bridge.call({ auditedAssessments: [identity], outcome: "proceed_to_publish_review", prose: "looks good" }),
+      /accepts only audited assessment operation, artifact, receipt, and content identities/,
+    );
+    await assert.rejects(
+      bridge.call({
+        auditedAssessments: [{
+          ...identity,
+          artifactId: "artifact:assessment:not-audited",
+        }],
+      }),
+      /rejected or failed/,
+    );
+    const events = await runtime.ledger.events();
+    assert.equal(events.some((event) => event.type === "analysis.evidence.decision_started"), false);
+    assert.equal(Object.keys(runtime.ledger.state().evidenceDecisions).length, 0);
+  } finally {
+    await rm(runtime.directory, { recursive: true, force: true });
+  }
+});
+
+test("decision starts then fails closed when an assessment receipt changes after authorization", async () => {
+  const runtime = await assessmentHarness();
+  const reads = await readAll(runtime);
+  const assessment = await completeAssessment(runtime, reads, "operation:evidence-assessment:decision-tamper");
+  const digest = assessment.receiptContentId.slice("sha256:".length);
+  const receiptPath = join(runtime.directory, "artifacts", "objects", "sha256", digest.slice(0, 2), digest);
+  const bridge = new BoundedChildEvidenceDecisionBridge(
+    runtime.task,
+    new BoundedEvidenceDecisionHost(runtime.ledger, runtime.artifacts),
+    { nextOperationId: () => "operation:evidence-decision:tamper" },
+  );
+  try {
+    await appendFile(receiptPath, "tampered");
+    await assert.rejects(
+      bridge.call({ auditedAssessments: [auditedAssessmentIdentity(assessment)] }),
+      /rejected or failed/,
+    );
+    const events = await runtime.ledger.events();
+    assert.equal(events.filter((event) => event.type === "analysis.evidence.decision_started").length, 1);
+    assert.equal(events.filter((event) => event.type === "analysis.evidence.decision_failed").length, 1);
+    assert.equal(events.some((event) => event.type === "analysis.evidence.decision_completed"), false);
+    assert.equal(runtime.ledger.state().evidenceDecisions["operation:evidence-decision:tamper"].status, "failed");
+  } finally {
+    await rm(runtime.directory, { recursive: true, force: true });
+  }
+});
+
 test("assessment count and structured claim budgets fail closed", async () => {
   const runtime = await assessmentHarness();
   const reads = await readAll(runtime);
@@ -281,16 +450,22 @@ test("assessment count and structured claim budgets fail closed", async () => {
   }
 });
 
-async function fakeAssessmentCodex(directory: string, assess: boolean): Promise<{ executable: string; prefix: string[] }> {
-  const path = join(directory, `fake-assessment-codex-${assess ? "complete" : "skip"}.mjs`);
+async function fakeAssessmentCodex(
+  directory: string,
+  mode: "complete" | "skip-decision" | "skip-assessment",
+): Promise<{ executable: string; prefix: string[] }> {
+  const path = join(directory, `fake-assessment-codex-${mode}.mjs`);
   await writeFile(path, `
 import { readFile } from "node:fs/promises";
-const shouldAssess = ${JSON.stringify(assess)};
+const mode = ${JSON.stringify(mode)};
+const shouldAssess = mode !== "skip-assessment";
+const shouldDecide = mode === "complete";
 const args = process.argv.slice(2);
 if (args[0] === "--version") { process.stdout.write("codex-cli fake-assessment-1.0.0\\n"); process.exit(0); }
 let prompt = "";
 for await (const chunk of process.stdin) prompt += chunk;
 if (!prompt.includes("invoke evidence_assess exactly once")) throw new Error("bounded assessment prompt was not supplied");
+if (!prompt.includes("invoke evidence_decide exactly once")) throw new Error("bounded decision prompt was not supplied");
 const contract = JSON.parse(prompt.split("\\n\\n").at(-1));
 const reads = [];
 for (const scope of contract.grantedEvidence) {
@@ -304,6 +479,7 @@ for (const scope of contract.grantedEvidence) {
   reads.push(body.result);
 }
 let assessment = null;
+let decision = null;
 if (shouldAssess) {
   const claims = reads.map((result) => {
     const fact = result.receipt.facts[0];
@@ -324,14 +500,29 @@ if (shouldAssess) {
   if (!response.ok || body.ok !== true) throw new Error("evidence assessment failed");
   assessment = body.result;
 }
+if (shouldDecide) {
+  const response = await fetch(process.env.STUDIO_CHILD_EVIDENCE_DECISION_BRIDGE_URL + "/v1/call", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + process.env.STUDIO_CHILD_EVIDENCE_DECISION_BRIDGE_TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "evidence_decide", arguments: { auditedAssessments: [{
+      operationId: assessment.operationId,
+      artifactId: assessment.outputArtifactId,
+      receiptId: assessment.receiptId,
+      receiptContentId: assessment.receiptContentId,
+    }] } }),
+  });
+  const body = await response.json();
+  if (!response.ok || body.ok !== true) throw new Error("evidence decision failed");
+  decision = body.result;
+}
 const schemaPath = args[args.indexOf("--output-schema") + 1];
 const schema = JSON.parse(await readFile(schemaPath, "utf8"));
 const output = {
-  summary: assessment ? "Completed bounded evidence assessment." : "Skipped bounded evidence assessment.",
+  summary: decision ? "Completed bounded evidence assessment and decision." : assessment ? "Skipped bounded evidence decision." : "Skipped bounded evidence assessment.",
   outputs: [{
     name: schema.properties.outputs.items.properties.name.enum[0],
     kind: schema.properties.outputs.items.properties.kind.enum[0],
-    content: assessment ? assessment.operationId + "; " + assessment.receiptId + "; " + assessment.receiptContentId : "No assessment completed.",
+    content: decision ? decision.operationId + "; " + decision.receiptId + "; " + decision.receiptContentId + "; " + decision.receipt.decision.outcome : assessment ? assessment.operationId + "; " + assessment.receiptId + "; " + assessment.receiptContentId : "No assessment completed.",
   }],
 };
 const events = [
@@ -345,12 +536,16 @@ process.stdout.write(events.map((event) => JSON.stringify(event)).join("\\n") + 
   return { executable: process.execPath, prefix: [path] };
 }
 
-test("launcher requires a completed granted assessment before accepting child output", async (suite) => {
-  for (const [name, assess] of [["completed assessment", true], ["skipped assessment", false]] as const) {
+test("launcher requires completed granted assessment and decision calls before accepting child output", async (suite) => {
+  for (const [name, mode] of [
+    ["completed assessment and decision", "complete"],
+    ["skipped granted decision", "skip-decision"],
+    ["skipped granted assessment", "skip-assessment"],
+  ] as const) {
     await suite.test(name, async () => {
       const runtime = await assessmentHarness(false);
       try {
-        const fake = await fakeAssessmentCodex(runtime.directory, assess);
+        const fake = await fakeAssessmentCodex(runtime.directory, mode);
         let readOperation = 0;
         const launcher = new CodexExecWorkerLauncher(
           runtime.ledger,
@@ -360,16 +555,23 @@ test("launcher requires a completed granted assessment before accepting child ou
           {
             executable: fake.executable,
             executableArgsPrefix: fake.prefix,
-            nextExecutionId: () => `execution:fake-assessment:${assess ? "complete" : "skip"}`,
+            nextExecutionId: () => `execution:fake-assessment:${mode}`,
             nextEvidenceOperationId: () => `operation:fake-assessment-read:${++readOperation}`,
             nextAssessmentOperationId: () => "operation:fake-assessment",
+            nextDecisionOperationId: () => "operation:fake-decision",
             maximumWallMs: 5_000,
           },
         );
-        if (assess) {
+        if (mode === "complete") {
           const result = await launcher.launch(runtime.permit);
           assert.equal(result.execution.outcome, "completed");
           assert.equal(Object.values(runtime.ledger.state().evidenceAssessments)[0].status, "completed");
+          assert.equal(Object.values(runtime.ledger.state().evidenceDecisions)[0].status, "completed");
+        } else if (mode === "skip-decision") {
+          await assert.rejects(launcher.launch(runtime.permit), /did not complete its granted evidence decision/);
+          assert.equal(runtime.ledger.state().tasks[runtime.permit.taskId].status, "failed");
+          assert.equal(Object.values(runtime.ledger.state().evidenceAssessments)[0].status, "completed");
+          assert.equal(Object.keys(runtime.ledger.state().evidenceDecisions).length, 0);
         } else {
           await assert.rejects(launcher.launch(runtime.permit), /did not complete its granted evidence assessment/);
           assert.equal(runtime.ledger.state().tasks[runtime.permit.taskId].status, "failed");

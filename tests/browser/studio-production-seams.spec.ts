@@ -77,6 +77,10 @@ test("receipted child media/evidence operations and artifact identity hooks proj
   await expect(assessmentGrant).toHaveCount(1);
   await expect(assessmentGrant.getByText(/1 assessment \/ 4 read receipts \/ 8 claims \/ 32 cited indexes \/ 512 structured tokens/)).toBeVisible();
 
+  const decisionGrant = production.locator('[data-production-grant-id]').filter({ hasText: "analysis.evidence.decide" });
+  await expect(decisionGrant).toHaveCount(1);
+  await expect(decisionGrant.getByText(/1 decision \/ 4 audited assessments/)).toBeVisible();
+
   const assessments = production.locator('[data-production-region="evidence-assessments"]');
   await expect(assessments.getByRole("heading", { name: "Evidence assessments" })).toBeVisible();
   await expect(assessments.locator('[data-production-empty="evidence-assessments"]')).toHaveCount(0);
@@ -121,6 +125,48 @@ test("receipted child media/evidence operations and artifact identity hooks proj
     const href = await link.getAttribute("href");
     expect(href).toMatch(/^#product-production-(task|worker|operation|artifact|receipt)-/);
     expect(href).not.toContain("/studio/runtime");
+    expect(
+      await page.evaluate((target) => Boolean(target && document.getElementById(target.slice(1))), href),
+    ).toBe(true);
+  }
+
+  const decisions = production.locator('[data-production-region="evidence-decisions"]');
+  await expect(decisions.getByRole("heading", { name: "Evidence decisions" })).toBeVisible();
+  await expect(decisions.locator('[data-production-empty="evidence-decisions"]')).toHaveCount(0);
+  const decision = decisions.locator('[data-production-evidence-decision-id]');
+  await expect(decision).toHaveCount(1);
+  await expect(decision).toHaveAttribute("data-status", "completed");
+  await expect(decision).toHaveAttribute("data-decision-outcome", "proceed_to_publish_review");
+  await expect(decision.getByRole("heading", { name: "analysis.evidence.decide" })).toBeVisible();
+  await expect(decision.getByText(/^evidence-decision:/)).toBeVisible();
+  await expect(decision.locator('[data-production-navigation="operation"]')).toHaveCount(1);
+  await expect(decision.locator('[data-production-navigation="artifact"]')).toHaveCount(2);
+
+  const decisionArtifacts = production.locator('[data-production-region="decision-artifacts"]');
+  await expect(decisionArtifacts.getByRole("heading", { name: "Decision artifacts" })).toBeVisible();
+  await expect(decisionArtifacts.locator('[data-production-empty="decision-artifacts"]')).toHaveCount(0);
+  const decisionArtifact = decisionArtifacts.locator('[data-production-decision-artifact-id]');
+  await expect(decisionArtifact).toHaveCount(1);
+  await expect(decisionArtifact.getByRole("heading", { name: "evidence-decision-receipt" })).toBeVisible();
+  await expect(decisionArtifact.locator('[data-production-navigation="task"]')).toHaveCount(1);
+  await expect(decisionArtifact.locator('[data-production-navigation="worker"]')).toHaveCount(1);
+  await expect(decisionArtifact.locator('[data-production-navigation="operation"]')).toHaveCount(1);
+
+  const decisionReceipts = production.locator('[data-production-region="decision-receipts"]');
+  await expect(decisionReceipts.getByRole("heading", { name: "Publish-review decision receipts" })).toBeVisible();
+  await expect(decisionReceipts.locator('[data-production-empty="decision-receipts"]')).toHaveCount(0);
+  const decisionReceipt = decisionReceipts.locator('[data-production-decision-receipt-id]');
+  await expect(decisionReceipt).toHaveCount(1);
+  await expect(decisionReceipt).toHaveAttribute("data-integrity", "stored_decision_and_audited_inputs_verified");
+  await expect(decisionReceipt).toHaveAttribute("data-decision-outcome", "proceed_to_publish_review");
+  await expect(decisionReceipt).toHaveAttribute("data-decision-producer", "deterministic_audit_state_gate_v1");
+  await expect(decisionReceipt.locator('[data-production-decision-reason-code]')).toHaveCount(1);
+  await expect(decisionReceipt.locator('[data-production-decision-reason-code="all_audited_claims_supported"]')).toHaveCount(1);
+  await expect(decisionReceipt.locator('[data-production-decision-input-operation-id]')).toHaveCount(1);
+  await expect(decisionReceipts.getByText(/future review producer|does not mean captions exist/)).toBeVisible();
+  for (const link of await decisionReceipt.locator("[data-production-navigation]").all()) {
+    const href = await link.getAttribute("href");
+    expect(href).toMatch(/^#product-production-(operation|artifact)-/);
     expect(
       await page.evaluate((target) => Boolean(target && document.getElementById(target.slice(1))), href),
     ).toBe(true);

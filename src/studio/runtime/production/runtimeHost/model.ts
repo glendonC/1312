@@ -7,6 +7,7 @@ import type {
 import type { ForecastArtifact } from "../forecast/model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import type { EvidenceAssessmentAudit } from "../assessmentAudit.ts";
+import type { EvidenceDecisionReceiptVerification } from "../decisionReceiptAudit.ts";
 
 export const RUNTIME_HOST_LIFECYCLE_STATES = [
   "accepted",
@@ -180,6 +181,14 @@ export interface RuntimeHostAssessmentAuditResponse {
   runtimeId: string;
   journalHead: number;
   audits: EvidenceAssessmentAudit[];
+}
+
+export interface RuntimeHostDecisionReceiptResponse {
+  schema: "studio.local-runtime-decision-receipts.v1";
+  commandId: string;
+  runtimeId: string;
+  journalHead: number;
+  decisions: EvidenceDecisionReceiptVerification[];
 }
 
 export interface InitializedRuntimeApplication {

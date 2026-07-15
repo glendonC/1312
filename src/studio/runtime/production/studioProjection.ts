@@ -2,6 +2,8 @@ import { assertRuntimeEvent } from "./assertions.ts";
 import type {
   Capability,
   EvidenceAssessmentScope,
+  EvidenceDecisionReasonCode,
+  EvidenceDecisionScope,
   EvidenceKind,
   EvidenceReadScope,
   MediaScope,
@@ -73,6 +75,7 @@ export interface ProductionStudioGrantView {
   mediaScope: MediaScope[];
   evidenceScope: EvidenceReadScope[];
   assessmentScope: EvidenceAssessmentScope | null;
+  decisionScope: EvidenceDecisionScope | null;
 }
 
 export interface ProductionStudioEvidenceArtifactView {
@@ -141,6 +144,43 @@ export interface ProductionStudioEvidenceAssessmentArtifactView {
   receiptContentId: string;
   readReceiptIds: string[];
   readReceiptContentIds: string[];
+}
+
+export interface ProductionStudioEvidenceDecisionView {
+  operationId: string;
+  capability: "analysis.evidence.decide";
+  status: "started" | "completed" | "failed";
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  assessmentOperationIds: string[];
+  assessmentArtifactIds: string[];
+  assessmentReceiptIds: string[];
+  assessmentReceiptContentIds: string[];
+  maxAuditedAssessments: number;
+  outputArtifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  outcome: "withheld" | "proceed_to_publish_review" | null;
+  reasonCodes: EvidenceDecisionReasonCode[];
+  auditedClaimCount: number | null;
+  failure: string | null;
+}
+
+export interface ProductionStudioEvidenceDecisionArtifactView {
+  artifactId: string;
+  kind: "evidence-decision-receipt";
+  contentId: string;
+  bytes: number;
+  producerTaskId: string;
+  producerAgentId: string;
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  assessmentOperationIds: string[];
+  assessmentArtifactIds: string[];
+  assessmentReceiptIds: string[];
+  assessmentReceiptContentIds: string[];
 }
 
 export interface ProductionStudioReportView {
@@ -247,9 +287,11 @@ export interface ProductionStudioProjection {
   operations: ProductionStudioOperationView[];
   evidenceReads: ProductionStudioEvidenceReadView[];
   evidenceAssessments: ProductionStudioEvidenceAssessmentView[];
+  evidenceDecisions: ProductionStudioEvidenceDecisionView[];
   sourceArtifacts: ProductionStudioSourceArtifactView[];
   evidenceArtifacts: ProductionStudioEvidenceArtifactView[];
   assessmentArtifacts: ProductionStudioEvidenceAssessmentArtifactView[];
+  decisionArtifacts: ProductionStudioEvidenceDecisionArtifactView[];
   outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
@@ -261,9 +303,11 @@ export interface ProductionStudioProjection {
     operations: number;
     evidenceReads: number;
     evidenceAssessments: number;
+    evidenceDecisions: number;
     sourceArtifacts: number;
     evidenceArtifacts: number;
     assessmentArtifacts: number;
+    decisionArtifacts: number;
     outputArtifacts: number;
   };
 }
@@ -298,6 +342,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       mediaScope: structuredClone(grant.mediaScope),
       evidenceScope: structuredClone(grant.evidenceScope),
       assessmentScope: structuredClone(grant.assessmentScope),
+      decisionScope: structuredClone(grant.decisionScope),
     })))
     .sort((left, right) => left.taskId.localeCompare(right.taskId) || left.grantId.localeCompare(right.grantId));
   if (new Set(grants.map((grant) => grant.grantId)).size !== grants.length) {
@@ -403,6 +448,29 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     }))
     .sort((left, right) => left.operationId.localeCompare(right.operationId));
 
+  const evidenceDecisions = Object.values(state.evidenceDecisions)
+    .map((operation): ProductionStudioEvidenceDecisionView => ({
+      operationId: operation.id,
+      capability: "analysis.evidence.decide",
+      status: operation.status,
+      taskId: operation.taskId,
+      agentId: operation.agentId,
+      grantId: operation.grantId,
+      assessmentOperationIds: [...operation.assessmentOperationIds],
+      assessmentArtifactIds: [...operation.assessmentArtifactIds],
+      assessmentReceiptIds: [...operation.assessmentReceiptIds],
+      assessmentReceiptContentIds: [...operation.assessmentReceiptContentIds],
+      maxAuditedAssessments: operation.maxAuditedAssessments,
+      outputArtifactId: operation.artifactId,
+      receiptId: operation.receiptId,
+      receiptContentId: operation.receiptContentId,
+      outcome: operation.outcome,
+      reasonCodes: [...operation.reasonCodes],
+      auditedClaimCount: operation.auditedClaimCount,
+      failure: operation.failure,
+    }))
+    .sort((left, right) => left.operationId.localeCompare(right.operationId));
+
   const sourceArtifacts = Object.values(state.artifacts)
     .filter((artifact) => artifact.origin.kind === "ingest")
     .map((artifact): ProductionStudioSourceArtifactView => {
@@ -437,7 +505,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       if (
         artifact.origin.kind === "ingest" ||
         artifact.origin.kind === "preflight_evidence" ||
-        artifact.origin.kind === "evidence_assessment"
+        artifact.origin.kind === "evidence_assessment" ||
+        artifact.origin.kind === "evidence_decision"
       ) {
         throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
       }
@@ -523,6 +592,40 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     })
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
 
+  const decisionArtifacts = Object.values(state.artifacts)
+    .filter((artifact) => {
+      if (artifact.origin.kind !== "evidence_decision") return false;
+      const decision = state.evidenceDecisions[artifact.origin.operationId];
+      return decision?.status === "completed" && decision.artifactId === artifact.id;
+    })
+    .map((artifact): ProductionStudioEvidenceDecisionArtifactView => {
+      if (artifact.origin.kind !== "evidence_decision") {
+        throw new Error(`Production Studio projection: decision artifact ${artifact.id} changed origin`);
+      }
+      if (
+        artifact.kind !== "evidence-decision-receipt" ||
+        artifact.producerTaskId === null ||
+        artifact.producerAgentId === null ||
+        artifact.mediaClass !== "non_media"
+      ) throw new Error(`Production Studio projection: decision artifact ${artifact.id} is invalid`);
+      return {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        producerTaskId: artifact.producerTaskId,
+        producerAgentId: artifact.producerAgentId,
+        operationId: artifact.origin.operationId,
+        receiptId: artifact.origin.receiptId,
+        receiptContentId: artifact.origin.receiptContentId,
+        assessmentOperationIds: [...artifact.origin.assessmentOperationIds],
+        assessmentArtifactIds: [...artifact.origin.assessmentArtifactIds],
+        assessmentReceiptIds: [...artifact.origin.assessmentReceiptIds],
+        assessmentReceiptContentIds: [...artifact.origin.assessmentReceiptContentIds],
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+
   const workers = Object.values(state.agents)
     .map((agent): ProductionStudioWorkerView => {
       const task = state.tasks[agent.taskId];
@@ -585,9 +688,11 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     operations,
     evidenceReads,
     evidenceAssessments,
+    evidenceDecisions,
     sourceArtifacts,
     evidenceArtifacts,
     assessmentArtifacts,
+    decisionArtifacts,
     outputArtifacts,
     counts: {
       tasks: tasks.length,
@@ -599,9 +704,11 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       operations: operations.length,
       evidenceReads: evidenceReads.length,
       evidenceAssessments: evidenceAssessments.length,
+      evidenceDecisions: evidenceDecisions.length,
       sourceArtifacts: sourceArtifacts.length,
       evidenceArtifacts: evidenceArtifacts.length,
       assessmentArtifacts: assessmentArtifacts.length,
+      decisionArtifacts: decisionArtifacts.length,
       outputArtifacts: outputArtifacts.length,
     },
   };

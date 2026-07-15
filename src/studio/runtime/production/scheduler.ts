@@ -21,6 +21,8 @@ import {
   MAX_EVIDENCE_ASSESS_CLAIMS,
   MAX_EVIDENCE_ASSESS_READ_RECEIPTS,
   MAX_EVIDENCE_ASSESS_TOKENS,
+  MAX_EVIDENCE_DECISIONS,
+  MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS,
   MAX_EVIDENCE_READ_BYTES,
   MAX_EVIDENCE_READ_ITEMS,
 } from "./validation/scheduling.ts";
@@ -130,6 +132,12 @@ export class BoundedRuntimeScheduler {
               maxTokens: MAX_EVIDENCE_ASSESS_TOKENS,
             }
           : null,
+        decisionScope: capability === "analysis.evidence.decide"
+          ? {
+              maxDecisions: MAX_EVIDENCE_DECISIONS,
+              maxAuditedAssessments: MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS,
+            }
+          : null,
       }));
   }
 
@@ -154,7 +162,9 @@ export class BoundedRuntimeScheduler {
         input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence")) &&
       (!input.requiredCapabilities.includes("analysis.evidence.assess") ||
         (input.requiredCapabilities.includes("evidence.read") &&
-          input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence")))
+          input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence"))) &&
+      (!input.requiredCapabilities.includes("analysis.evidence.decide") ||
+        input.requiredCapabilities.includes("analysis.evidence.assess"))
     );
   }
 

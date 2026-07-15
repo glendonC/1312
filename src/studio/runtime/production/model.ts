@@ -10,6 +10,7 @@ export const CAPABILITIES = [
   "media.extract",
   "media.seek",
   "evidence.read",
+  "analysis.evidence.assess",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -44,6 +45,18 @@ export interface EvidenceReadScope {
   evidenceKind: EvidenceKind;
   maxBytes: number;
   maxItems: number;
+}
+
+/** Scheduler-issued hard envelope for one assessment over completed evidence-read receipts. */
+export interface EvidenceAssessmentScope {
+  evidenceArtifactIds: string[];
+  maxAssessments: number;
+  maxReadReceipts: number;
+  maxClaims: number;
+  /** Maximum total fact indexes across all citation groups. */
+  maxCitations: number;
+  /** Host-defined deterministic structured-token units, not model/provider usage. */
+  maxTokens: number;
 }
 
 export interface RequiredOutput {
@@ -106,6 +119,7 @@ export interface CapabilityGrant {
   agentId: string;
   mediaScope: MediaScope[];
   evidenceScope: EvidenceReadScope[];
+  assessmentScope: EvidenceAssessmentScope | null;
 }
 
 export interface AgentRecord {
@@ -261,6 +275,15 @@ export interface PreflightEvidenceArtifactOrigin {
   preflightContentId: string;
 }
 
+export interface EvidenceAssessmentArtifactOrigin {
+  kind: "evidence_assessment";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  readReceiptIds: string[];
+  readReceiptContentIds: string[];
+}
+
 export interface RuntimeArtifact {
   schema: "studio.runtime.artifact.v1";
   id: string;
@@ -280,7 +303,8 @@ export interface RuntimeArtifact {
     | MediaOperationArtifactOrigin
     | MediaObservationArtifactOrigin
     | WorkerOutputArtifactOrigin
-    | PreflightEvidenceArtifactOrigin;
+    | PreflightEvidenceArtifactOrigin
+    | EvidenceAssessmentArtifactOrigin;
 }
 
 export interface WorkerOutputEnvelope {
@@ -484,6 +508,81 @@ export interface EvidenceReadReceipt {
   };
 }
 
+export interface EvidenceReadReceiptIdentity {
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface EvidenceAssessmentCitation extends EvidenceReadReceiptIdentity {
+  /** Zero-based indexes into the cited evidence-read receipt's returned `facts` array. */
+  factIndexes: number[];
+}
+
+export type EvidenceAssessmentClaim =
+  | {
+      kind: "speech_activity";
+      value: "speech" | "non_speech";
+      range: { startMs: number; endMs: number };
+      citations: EvidenceAssessmentCitation[];
+    }
+  | {
+      kind: "language_identity";
+      value: string | null;
+      range: { startMs: number; endMs: number };
+      citations: EvidenceAssessmentCitation[];
+    };
+
+export interface EvidenceAssessmentRequest {
+  operationId: string;
+  taskId: string;
+  agentId: string;
+  readReceipts: EvidenceReadReceiptIdentity[];
+  claims: EvidenceAssessmentClaim[];
+}
+
+export type EvidenceAssessmentState = "supported" | "unknown" | "withheld" | "truncated";
+
+export type ReceiptedEvidenceAssessmentClaim = EvidenceAssessmentClaim & {
+  claimIndex: number;
+  /** `supported` appears only when no cited upstream state is unknown, withheld, or truncated. */
+  states: EvidenceAssessmentState[];
+};
+
+export interface EvidenceAssessmentReceipt {
+  schema: "studio.evidence-assessment.receipt.v1";
+  receiptId: string;
+  operationId: string;
+  capability: "analysis.evidence.assess";
+  authorization: {
+    grantId: string;
+    taskId: string;
+    agentId: string;
+    maxAssessments: number;
+    maxReadReceipts: number;
+    maxClaims: number;
+    maxCitations: number;
+    maxTokens: number;
+  };
+  inputs: Array<{
+    readOperationId: string;
+    receiptId: string;
+    receiptContentId: string;
+    evidenceArtifactId: string;
+    evidenceKind: EvidenceKind;
+    returnedItems: number;
+    truncated: boolean;
+  }>;
+  producer: { id: "studio.bounded-evidence-assessment"; version: "1" };
+  claims: ReceiptedEvidenceAssessmentClaim[];
+  result: {
+    readReceiptCount: number;
+    claimCount: number;
+    /** Total cited fact indexes, not merely receipt-level citation groups. */
+    citationCount: number;
+    tokenCount: number;
+  };
+}
+
 export interface OperationRecord {
   id: string;
   capability: "media.extract" | "media.seek";
@@ -515,6 +614,27 @@ export interface EvidenceReadRecord {
   returnedItems: number | null;
   returnedFactBytes: number | null;
   truncated: boolean | null;
+  failure: string | null;
+}
+
+export interface EvidenceAssessmentRecord {
+  id: string;
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  readReceiptIds: string[];
+  readReceiptContentIds: string[];
+  maxReadReceipts: number;
+  maxClaims: number;
+  maxCitations: number;
+  maxTokens: number;
+  status: "started" | "completed" | "failed";
+  artifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  claimCount: number | null;
+  citationCount: number | null;
+  tokenCount: number | null;
   failure: string | null;
 }
 
@@ -642,6 +762,7 @@ export interface RuntimeProjection {
   spawnRequests: Record<string, SpawnRequestRecord>;
   operations: Record<string, OperationRecord>;
   evidenceReads: Record<string, EvidenceReadRecord>;
+  evidenceAssessments: Record<string, EvidenceAssessmentRecord>;
   executions: Record<string, ExecutorRecord>;
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;

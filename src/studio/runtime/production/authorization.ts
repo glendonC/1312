@@ -2,6 +2,9 @@ import { assertMediaExtractRequest, assertMediaSeekRequest } from "./assertions.
 import type {
   Capability,
   CapabilityGrant,
+  EvidenceAssessmentRequest,
+  EvidenceAssessmentScope,
+  EvidenceReadRecord,
   EvidenceReadRequest,
   EvidenceReadScope,
   MediaExtractRequest,
@@ -11,6 +14,15 @@ import type {
   RuntimeProjection,
 } from "./model.ts";
 import { assertEvidenceReadRequest } from "./validation/evidence.ts";
+import { assertEvidenceAssessmentRequest, countAssessmentTokens } from "./validation/assessment.ts";
+
+function taskCapabilityCalls(state: RuntimeProjection, taskId: string): number {
+  return [
+    ...Object.values(state.operations),
+    ...Object.values(state.evidenceReads),
+    ...Object.values(state.evidenceAssessments),
+  ].filter((operation) => operation.taskId === taskId).length;
+}
 
 export interface AuthorizedMediaExtract {
   request: MediaExtractRequest;
@@ -54,10 +66,7 @@ function authorizeMediaRange<Request extends MediaExtractRequest | MediaSeekRequ
       ),
   );
   if (!grant) throw new Error(`${operation} is outside the task's authoritative capability grant`);
-  const priorCalls = [
-    ...Object.values(state.operations),
-    ...Object.values(state.evidenceReads),
-  ].filter((operation) => operation.taskId === task.id).length;
+  const priorCalls = taskCapabilityCalls(state, task.id);
   if (priorCalls >= task.budget.toolCalls) throw new Error(`${operation} exceeds the task tool-call budget`);
   return { request, grant, artifact, track };
 }
@@ -96,10 +105,7 @@ export function authorizeEvidenceRead(
   const scope = grant?.evidenceScope.find((candidate) =>
     candidate.artifactId === artifact.id && candidate.evidenceKind === evidenceKind);
   if (!grant || !scope) throw new Error("Evidence read is outside the task's authoritative artifact grant");
-  const priorCalls = [
-    ...Object.values(state.operations),
-    ...Object.values(state.evidenceReads),
-  ].filter((operation) => operation.taskId === task.id).length;
+  const priorCalls = taskCapabilityCalls(state, task.id);
   if (priorCalls >= task.budget.toolCalls) throw new Error("Evidence read exceeds the task tool-call budget");
   const priorReads = Object.values(state.evidenceReads).filter(
     (operation) =>
@@ -116,6 +122,71 @@ export function authorizeEvidenceRead(
     throw new Error("Evidence read exceeds the grant's byte or item budget");
   }
   return { request, grant, scope, artifact, remainingBytes, remainingItems };
+}
+
+export interface AuthorizedEvidenceAssessment {
+  request: EvidenceAssessmentRequest;
+  grant: CapabilityGrant;
+  scope: EvidenceAssessmentScope;
+  reads: EvidenceReadRecord[];
+  claimCount: number;
+  citationCount: number;
+  tokenCount: number;
+}
+
+export function authorizeEvidenceAssessment(
+  state: RuntimeProjection,
+  requestValue: unknown,
+): AuthorizedEvidenceAssessment {
+  assertEvidenceAssessmentRequest(requestValue);
+  const request = requestValue;
+  const task = state.tasks[request.taskId];
+  if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
+    throw new Error("Evidence assessment requires a working task owned by the requesting agent");
+  }
+  if (
+    state.evidenceAssessments[request.operationId] ||
+    state.evidenceReads[request.operationId] ||
+    state.operations[request.operationId]
+  ) throw new Error(`Evidence assessment operation ${request.operationId} already exists`);
+  const grant = task.grants.find((candidate) =>
+    candidate.capability === "analysis.evidence.assess" && candidate.assessmentScope !== null);
+  const scope = grant?.assessmentScope;
+  if (!grant || !scope) throw new Error("Evidence assessment is outside the task's authoritative grant");
+  if (taskCapabilityCalls(state, task.id) >= task.budget.toolCalls) {
+    throw new Error("Evidence assessment exceeds the task tool-call budget");
+  }
+  const prior = Object.values(state.evidenceAssessments).filter(
+    (operation) => operation.taskId === task.id && operation.grantId === grant.id,
+  );
+  if (prior.length >= scope.maxAssessments) {
+    throw new Error("Evidence assessment exceeds the grant's assessment-count budget");
+  }
+  if (request.readReceipts.length > scope.maxReadReceipts) {
+    throw new Error("Evidence assessment exceeds the grant's read-receipt budget");
+  }
+  const reads = request.readReceipts.map((identity) => {
+    const read = Object.values(state.evidenceReads).find((candidate) =>
+      candidate.status === "completed" &&
+      candidate.taskId === task.id &&
+      candidate.agentId === request.agentId &&
+      candidate.receiptId === identity.receiptId &&
+      candidate.receiptContentId === identity.receiptContentId);
+    if (!read || !scope.evidenceArtifactIds.includes(read.artifactId)) {
+      throw new Error("Evidence assessment input is not a completed, granted evidence-read receipt");
+    }
+    return read;
+  });
+  const claimCount = request.claims.length;
+  const citationCount = request.claims.reduce(
+    (total, claim) => total + claim.citations.reduce((subtotal, citation) => subtotal + citation.factIndexes.length, 0),
+    0,
+  );
+  const tokenCount = countAssessmentTokens(request.claims);
+  if (claimCount > scope.maxClaims || citationCount > scope.maxCitations || tokenCount > scope.maxTokens) {
+    throw new Error("Evidence assessment exceeds the grant's claim, citation, or token budget");
+  }
+  return { request, grant, scope, reads, claimCount, citationCount, tokenCount };
 }
 
 export function authorizeMediaExtract(state: RuntimeProjection, requestValue: unknown): AuthorizedMediaExtract {

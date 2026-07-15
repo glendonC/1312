@@ -3,6 +3,7 @@ import {
   type AgentRecord,
   type Capability,
   type CapabilityGrant,
+  type EvidenceAssessmentScope,
   type EvidenceReadScope,
   type MediaScope,
   type RequiredOutput,
@@ -45,6 +46,11 @@ const TRACK_KINDS = new Set(["audio", "video", "subtitle", "data", "attachment"]
 const EVIDENCE_KINDS = new Set(["speech_activity", "language_ranges"]);
 export const MAX_EVIDENCE_READ_BYTES = 32 * 1024;
 export const MAX_EVIDENCE_READ_ITEMS = 64;
+export const MAX_EVIDENCE_ASSESSMENTS = 1;
+export const MAX_EVIDENCE_ASSESS_READ_RECEIPTS = 4;
+export const MAX_EVIDENCE_ASSESS_CLAIMS = 8;
+export const MAX_EVIDENCE_ASSESS_CITATIONS = 32;
+export const MAX_EVIDENCE_ASSESS_TOKENS = 512;
 
 function budget(value: unknown, context: string, path: string): asserts value is RuntimeBudget {
   const item = object(value, context, path);
@@ -97,6 +103,36 @@ function evidenceScopes(value: unknown, context: string, path: string): Evidence
   return result as EvidenceReadScope[];
 }
 
+function assessmentScope(
+  value: unknown,
+  context: string,
+  path: string,
+): EvidenceAssessmentScope | null {
+  if (value === null) return null;
+  const item = object(value, context, path);
+  exact(
+    item,
+    ["evidenceArtifactIds", "maxAssessments", "maxReadReceipts", "maxClaims", "maxCitations", "maxTokens"],
+    context,
+    path,
+  );
+  const evidenceArtifactIds = uniqueStrings(item.evidenceArtifactIds, context, `${path}.evidenceArtifactIds`);
+  if (evidenceArtifactIds.length === 0) fail(context, `${path}.evidenceArtifactIds`, "must name assessment evidence");
+  const maxAssessments = integer(item.maxAssessments, context, `${path}.maxAssessments`, 1);
+  const maxReadReceipts = integer(item.maxReadReceipts, context, `${path}.maxReadReceipts`, 1);
+  const maxClaims = integer(item.maxClaims, context, `${path}.maxClaims`, 1);
+  const maxCitations = integer(item.maxCitations, context, `${path}.maxCitations`, 1);
+  const maxTokens = integer(item.maxTokens, context, `${path}.maxTokens`, 1);
+  if (
+    maxAssessments > MAX_EVIDENCE_ASSESSMENTS ||
+    maxReadReceipts > MAX_EVIDENCE_ASSESS_READ_RECEIPTS ||
+    maxClaims > MAX_EVIDENCE_ASSESS_CLAIMS ||
+    maxCitations > MAX_EVIDENCE_ASSESS_CITATIONS ||
+    maxTokens > MAX_EVIDENCE_ASSESS_TOKENS
+  ) fail(context, path, "exceeds hard evidence-assessment bounds");
+  return item as unknown as EvidenceAssessmentScope;
+}
+
 function outputs(value: unknown, context: string, path: string): RequiredOutput[] {
   const result = array(value, context, path);
   result.forEach((entry, index) => {
@@ -121,7 +157,7 @@ function capabilities(value: unknown, context: string, path: string): Capability
 
 function grant(value: unknown, context: string, path: string): asserts value is CapabilityGrant {
   const item = object(value, context, path);
-  exact(item, ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope"], context, path);
+  exact(item, ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope"], context, path);
   string(item.id, context, `${path}.id`);
   const capability = oneOf<Capability>(
     item.capability,
@@ -133,6 +169,7 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   string(item.agentId, context, `${path}.agentId`);
   const mediaScope = scopes(item.mediaScope, context, `${path}.mediaScope`);
   const readScope = evidenceScopes(item.evidenceScope, context, `${path}.evidenceScope`);
+  const assessScope = assessmentScope(item.assessmentScope, context, `${path}.assessmentScope`);
   if (capability.startsWith("media.") && mediaScope.length === 0) {
     fail(context, path, "media grants require scope");
   }
@@ -144,6 +181,12 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   }
   if (capability !== "evidence.read" && readScope.length !== 0) {
     fail(context, path, "non-evidence grants cannot carry evidence scope");
+  }
+  if (capability === "analysis.evidence.assess" && assessScope === null) {
+    fail(context, path, "analysis.evidence.assess grants require assessment scope");
+  }
+  if (capability !== "analysis.evidence.assess" && assessScope !== null) {
+    fail(context, path, "non-assessment grants cannot carry assessment scope");
   }
 }
 

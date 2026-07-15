@@ -127,7 +127,8 @@ The production runtime provides a versioned event protocol, append-only journal,
 bounded scheduler, dynamic registry, content-addressed artifact store, centralized authorization,
 one real ffmpeg audio-range extraction operation, one bounded ffmpeg seek observation, structured
 child report-up, bounded reads of already-produced pinned speech/language evidence, and a bounded
-local `codex exec` launcher.
+structured assessment over completed evidence-read receipts, and a bounded local `codex exec`
+launcher.
 Media scopes use exact track ids and half-open integer-millisecond ranges. The scheduler derives
 task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
 state. The media host re-hashes its source before execution and accepts no caller path or arbitrary
@@ -141,6 +142,14 @@ exact grant, combined task tool-call budget, stored content identity, receipt sc
 preflight/source lineage before returning bounded structured windows or decisions in another
 content-addressed receipt. It accepts no path, range, query, or caller-selected output bound, exposes
 no raw media bytes, and creates no detector finding.
+`analysis.evidence.assess` is a separate opinion layer: it accepts only completed same-task
+evidence-read receipt/content identities plus closed, range-bound claims. The assessment host
+reopens and re-hashes each receipt, rechecks task ownership and the live grant, verifies cited fact
+indexes and exact bounding ranges, preserves upstream unknown/withheld/truncated states, and
+enforces hard ceilings of one assessment, four read receipts, eight claims, 32 cited indexes, and
+512 deterministic structured tokens. It emits a private content-addressed
+`studio.evidence-assessment.receipt.v1`; it never opens producer paths, reruns a detector, or
+produces captions, translations, or study output.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
@@ -148,13 +157,16 @@ read-only sandbox, no host environment inherited by model-generated shell comman
 and a closed output schema. For tasks with `media.extract` and/or `media.seek` grants, it also starts
 a task-private authenticated loopback bridge plus a required stdio MCP adapter. A separate required
 bridge/MCP pair exposes `evidence_read` only when an `evidence.read` grant is present. The adapters
-publish only scheduler-granted tool names and exact scopes. Child requests cannot choose paths,
-process arguments, task/agent identity, operation ids, or evidence excerpt controls; the ffmpeg and
-evidence hosts remain the authorities for live ownership, budgets, stored content identity, journal
-events, artifacts, and receipts.
+publish only scheduler-granted tool names and exact scopes. A third required bridge/MCP pair exposes
+the path-free `evidence_assess` tool only for an `analysis.evidence.assess` grant and injects the
+task, agent, and operation identities. Child requests cannot choose paths, process arguments,
+task/agent identity, operation ids, evidence excerpt controls, or open assessment controls; the
+ffmpeg, evidence, and assessment hosts remain the authorities for live ownership, budgets, stored
+content identity, journal events, artifacts, and receipts.
 Validated output becomes a private content-addressed worker artifact and is submitted through the
 existing handoff host. A missing completed operation for any granted media capability, or a missing
-completed read for any evidence artifact in a grant, fails closed.
+completed read for any evidence artifact in a grant, fails closed. A granted assessment likewise
+must complete before child output can be accepted.
 
 Executor events receipt monotonic active duration and the CLI version. The launcher consumes the
 documented `turn.completed.usage` object rather than logs or budgets, stores the exact raw usage event
@@ -172,6 +184,9 @@ media bridge returns receipt and artifact identities, not media bytes or semanti
 seek does not drive a UI playhead. The evidence bridge may return only the bounded facts that were
 already in a pinned producer receipt; empty, unavailable, unknown, withheld, and truncated are not
 converted into new claims.
+The default deterministic run-005 proof executes one seek, two evidence reads, and one assessment
+over those receipts. Browser-ingested V1 has no evidence-read or assessment grant and projects both
+regions as unavailable/empty.
 
 ### Explicitly deferred
 
@@ -285,7 +300,7 @@ This row shape is future fine-tune data.
 5. ✅ Standalone preflight index with unsupported detector findings withheld
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
-8. ✅ Pinned VAD, speech-window language producer, bounded Codex launcher, executor/usage receipts, and separate production-journal Studio projection
+8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
 9. 🔄 Build the immutable observability index from real launcher journals; add further media operations only as separate authorized slices
 10. ⏳ Acoustic/overlap/separation producers and study export
 

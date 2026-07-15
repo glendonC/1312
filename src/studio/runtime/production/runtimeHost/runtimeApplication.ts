@@ -4,6 +4,7 @@ import { ContentAddressedArtifactStore } from "../artifactStore.ts";
 import { FileEventJournal, RuntimeLedger } from "../journal.ts";
 import { FfmpegCapabilityHost } from "../mediaHost.ts";
 import { BoundedEvidenceReadHost } from "../evidenceHost.ts";
+import { BoundedEvidenceAssessmentHost } from "../evidenceAssessmentHost.ts";
 import {
   CodexExecWorkerLauncher,
   type CodexWorkerLauncherOptions,
@@ -26,7 +27,7 @@ export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 1,
   maxActiveWorkers: 2,
   runBudget: { wallMs: 120_000, toolCalls: 8 },
-  grantableCapabilities: ["task.spawn.request", "report.submit", "media.extract", "media.seek", "evidence.read"],
+  grantableCapabilities: ["task.spawn.request", "report.submit", "media.extract", "media.seek", "evidence.read", "analysis.evidence.assess"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {
@@ -47,6 +48,7 @@ export interface BoundedWorkerLauncherContext {
   reports: BoundedReportHost;
   mediaHost: FfmpegCapabilityHost;
   evidenceHost: BoundedEvidenceReadHost;
+  assessmentHost: BoundedEvidenceAssessmentHost;
   plannedMediaOperationId: string;
 }
 
@@ -57,11 +59,12 @@ export type BoundedWorkerLauncherFactory = (
 export function codexWorkerLauncherFactory(
   options: CodexWorkerLauncherOptions = {},
 ): BoundedWorkerLauncherFactory {
-  return ({ ledger, scheduler, artifacts, reports, mediaHost, evidenceHost, plannedMediaOperationId }) =>
+  return ({ ledger, scheduler, artifacts, reports, mediaHost, evidenceHost, assessmentHost, plannedMediaOperationId }) =>
     new CodexExecWorkerLauncher(ledger, scheduler, artifacts, reports, {
       ...options,
       mediaHost: options.mediaHost ?? mediaHost,
       evidenceHost: options.evidenceHost ?? evidenceHost,
+      assessmentHost: options.assessmentHost ?? assessmentHost,
       nextMediaOperationId: options.nextMediaOperationId ?? (() => plannedMediaOperationId),
     });
 }
@@ -132,7 +135,7 @@ function childInput(
     objective:
       `Invoke media_seek exactly once for the granted source range for ${request.requestId}, ` +
       (evidenceArtifactIds.length > 0
-        ? `read each of the ${evidenceArtifactIds.length} explicitly granted preflight evidence artifacts, `
+        ? `read each of the ${evidenceArtifactIds.length} explicitly granted preflight evidence artifacts, then create one bounded range assessment over only those completed read receipts, `
         : "retain the honest absence of granted detector evidence, ") +
       "retain the returned operation/artifact/receipt identities and bounded evidence facts, and report them without making " +
       "media-content, transcription, translation, caption, or detector claims.",
@@ -146,10 +149,11 @@ function childInput(
     requiredCapabilities: [
       "media.seek",
       ...(evidenceArtifactIds.length > 0 ? ["evidence.read" as const] : []),
+      ...(evidenceArtifactIds.length > 0 ? ["analysis.evidence.assess" as const] : []),
       "report.submit",
     ],
     dependencies: [],
-    budget: { wallMs: 45_000, toolCalls: 1 + evidenceArtifactIds.length },
+    budget: { wallMs: 45_000, toolCalls: 1 + evidenceArtifactIds.length + (evidenceArtifactIds.length > 0 ? 1 : 0) },
   };
 }
 
@@ -223,6 +227,7 @@ export async function runBoundedRuntimeApplication(
   const reports = new BoundedReportHost(ledger);
   const mediaHost = new FfmpegCapabilityHost(ledger, artifacts);
   const evidenceHost = new BoundedEvidenceReadHost(ledger, artifacts);
+  const assessmentHost = new BoundedEvidenceAssessmentHost(ledger, artifacts);
   const plannedOperation = initialized.runStart.workPlan.operations[0];
   if (
     initialized.runStart.workPlan.operations.length !== 1 ||
@@ -239,6 +244,7 @@ export async function runBoundedRuntimeApplication(
     reports,
     mediaHost,
     evidenceHost,
+    assessmentHost,
     plannedMediaOperationId: plannedOperation.operationId,
   });
   try {
@@ -249,13 +255,13 @@ export async function runBoundedRuntimeApplication(
       decidedByAgentId: rootPermit.agentId,
       accepted: true,
       reason:
-        "The bounded child returned its structured artifact after its authorized receipted seek and any granted evidence reads.",
+        "The bounded child returned its structured artifact after its authorized receipted seek, any granted evidence reads, and required bounded assessment.",
     });
     await scheduler.transitionTask(
       rootPermit.taskId,
       rootPermit.agentId,
       "withheld",
-      "The local launcher proof ended after one receipted seek observation, any available pinned evidence reads, and child report; it produced no captions or study result.",
+      "The local launcher proof ended after one receipted seek observation, any available pinned evidence reads, one bounded assessment when granted, and child report; it produced no captions or study result.",
     );
   } catch (error) {
     if (error instanceof RuntimeApplicationInterrupted) throw error;

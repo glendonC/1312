@@ -11,6 +11,7 @@ import {
 } from "./assertions.ts";
 import type {
   ContentIdentity,
+  EvidenceAssessmentReceipt,
   ExecutorSpanReceipt,
   MediaOperationReceipt,
   MediaTrackDescriptor,
@@ -384,6 +385,43 @@ export class ContentAddressedArtifactStore {
         operationId: input.operationId,
         receiptId: input.receiptId,
         receiptContentId: input.storedReceipt.content.contentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildEvidenceAssessmentArtifact(input: {
+    runId: string;
+    receipt: EvidenceAssessmentReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({
+        runId: input.runId,
+        operationId: input.receipt.operationId,
+        kind: "evidence-assessment-receipt",
+        contentId: input.storedReceipt.content.contentId,
+      })}`,
+      runId: input.runId,
+      kind: "evidence-assessment-receipt",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [],
+      producerTaskId: input.receipt.authorization.taskId,
+      producerAgentId: input.receipt.authorization.agentId,
+      origin: {
+        kind: "evidence_assessment",
+        operationId: input.receipt.operationId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+        readReceiptIds: input.receipt.inputs.map((receipt) => receipt.receiptId),
+        readReceiptContentIds: input.receipt.inputs.map((receipt) => receipt.receiptContentId),
       },
     };
     assertRuntimeArtifact(artifact);

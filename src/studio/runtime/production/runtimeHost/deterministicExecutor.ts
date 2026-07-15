@@ -4,6 +4,10 @@ import {
   BoundedChildEvidenceBridge,
   type ChildEvidenceToolResult,
 } from "../executor/childEvidenceBridge.ts";
+import {
+  BoundedChildEvidenceAssessmentBridge,
+  type ChildEvidenceAssessmentToolResult,
+} from "../executor/childEvidenceAssessmentBridge.ts";
 import type {
   ExecutorSpanReceipt,
   LaunchPermit,
@@ -161,6 +165,7 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
 
     let mediaResult: ChildMediaToolResult;
     const evidenceResults: ChildEvidenceToolResult[] = [];
+    let assessmentResult: ChildEvidenceAssessmentToolResult | null = null;
     try {
       const scope = task.mediaScope[0];
       if (!scope) throw new Error("The deterministic media proof has no scheduler scope");
@@ -179,8 +184,49 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
         });
         evidenceResults.push(await evidenceBridge.call({ artifactId: evidenceScope.artifactId }));
       }
+      const assessmentGrant = task.grants.find((grant) => grant.capability === "analysis.evidence.assess");
+      if (assessmentGrant) {
+        const claims = evidenceResults.map((result) => {
+          const fact = result.receipt.facts[0];
+          if (!fact) throw new Error("The deterministic assessment proof requires one returned fact per read receipt");
+          const citation = [{
+            receiptId: result.receiptId,
+            receiptContentId: result.receiptContentId,
+            factIndexes: [0],
+          }];
+          const range = { startMs: fact.startMs, endMs: fact.endMs };
+          if (fact.kind === "language_range") {
+            return {
+              kind: "language_identity" as const,
+              value: fact.decision.status === "classified" ? fact.decision.code : null,
+              range,
+              citations: citation,
+            };
+          }
+          return {
+            kind: "speech_activity" as const,
+            value: fact.kind === "speech_window" ? "speech" as const : "non_speech" as const,
+            range,
+            citations: citation,
+          };
+        });
+        const assessmentBridge = new BoundedChildEvidenceAssessmentBridge(task, this.context.assessmentHost, {
+          nextOperationId: () => `operation:evidence-assess:${canonicalSha256({
+            runId: ledger.runId,
+            taskId: task.id,
+            readReceiptIds: evidenceResults.map((result) => result.receiptId),
+          })}`,
+        });
+        assessmentResult = await assessmentBridge.call({
+          readReceipts: evidenceResults.map((result) => ({
+            receiptId: result.receiptId,
+            receiptContentId: result.receiptContentId,
+          })),
+          claims,
+        });
+      }
     } catch (error) {
-      const reason = "The deterministic child bridge did not complete every required receipted media/evidence operation.";
+      const reason = "The deterministic child bridge did not complete every required receipted media/evidence/assessment operation.";
       const span = this.span(task, executionId, startedAt, {
         outcome: "failed",
         outputArtifactIds: [],
@@ -214,6 +260,9 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
             ? `It read ${evidenceResults.length} pre-existing evidence artifacts under their receipted bounds: ${evidenceResults.map((result) =>
                 `${result.inputArtifactId} (${result.receipt.result.returnedItems} facts, ${result.receiptId}, ${result.receiptContentId})`).join("; ")}. `
             : "No detector evidence was granted or read. ") +
+          (assessmentResult
+            ? `It produced bounded assessment ${assessmentResult.receiptId} as ${assessmentResult.outputArtifactId} with ${assessmentResult.receipt.result.claimCount} range-bound claims. `
+            : "No evidence assessment was granted or produced. ") +
           "No new detector or media-content finding was produced.",
       },
     };
@@ -245,7 +294,8 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       summary:
         `Deterministic child completed one authorized ${mediaResult.capability} operation with ` +
         `receipt ${mediaResult.receiptId} and ${evidenceResults.length} authorized evidence reads; ` +
-        "no model, detector, or media-content interpretation ran.",
+        `${assessmentResult ? "one bounded structured evidence assessment completed" : "no evidence assessment was granted"}; ` +
+        "no model, detector rerun, caption, translation, or raw-media interpretation ran.",
     });
     return { report };
   }

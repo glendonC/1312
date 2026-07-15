@@ -149,14 +149,38 @@ function ProductionEvidenceScopeSummary({
   ));
 }
 
+function ProductionAssessmentScopeSummary({
+  scope,
+  renderedArtifactIds,
+}: {
+  scope: ProductionStudioGrantView["assessmentScope"];
+  renderedArtifactIds: ReadonlySet<string>;
+}) {
+  if (!scope) return <>No assessment scope granted</>;
+  return (
+    <>
+      <ProductionArtifactList
+        identities={scope.evidenceArtifactIds}
+        renderedArtifactIds={renderedArtifactIds}
+        empty="No evidence artifacts"
+      />
+      {` · ${scope.maxAssessments} assessment / ${scope.maxReadReceipts} read receipts / ${scope.maxClaims} claims / ${scope.maxCitations} cited indexes / ${scope.maxTokens} structured tokens`}
+    </>
+  );
+}
+
 function ProductionJournalFacts({ projection }: { projection: ProductionStudioProjection }) {
   const outputArtifactIds = new Set(projection.outputArtifacts.map((artifact) => artifact.artifactId));
   const renderedArtifactIds = new Set([
     ...projection.sourceArtifacts.map((artifact) => artifact.artifactId),
     ...projection.evidenceArtifacts.map((artifact) => artifact.artifactId),
+    ...projection.assessmentArtifacts.map((artifact) => artifact.artifactId),
     ...outputArtifactIds,
   ]);
-  const operationIds = new Set(projection.operations.map((operation) => operation.operationId));
+  const operationIds = new Set([
+    ...projection.operations.map((operation) => operation.operationId),
+    ...projection.evidenceAssessments.map((operation) => operation.operationId),
+  ]);
   const executionIds = new Set(
     projection.workers.flatMap((worker) => worker.execution ? [worker.execution.id] : []),
   );
@@ -457,6 +481,15 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                       />
                     </dd>
                   </div>
+                  <div>
+                    <dt>Enforced assessment scope</dt>
+                    <dd>
+                      <ProductionAssessmentScopeSummary
+                        scope={grant.assessmentScope}
+                        renderedArtifactIds={renderedArtifactIds}
+                      />
+                    </dd>
+                  </div>
                 </dl>
               </article>
             ))}
@@ -505,6 +538,103 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div><dt>Receipt</dt><dd>{read.receiptId ?? "Unavailable until completion"}</dd></div>
                   <div><dt>Receipt content</dt><dd>{read.receiptContentId ?? "Unavailable until completion"}</dd></div>
                   <div><dt>Failure</dt><dd>{read.failure ?? (read.status === "failed" ? "Failure reason unavailable" : "Not recorded")}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="evidence-assessments"
+        aria-labelledby="product-runtime-evidence-assessments-title"
+      >
+        <h4 id="product-runtime-evidence-assessments-title">Evidence assessments</h4>
+        {projection.evidenceAssessments.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="evidence-assessments">
+            Unavailable until an <code>analysis.evidence.assessment_started</code> event is validated.
+            No assessment is inferred from an evidence artifact, read, or worker output.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.evidenceAssessments.map((assessment) => (
+              <article
+                key={assessment.operationId}
+                id={productionIdentityTarget("operation", assessment.operationId)}
+                data-production-evidence-assessment-id={assessment.operationId}
+                data-status={assessment.status}
+              >
+                <header><h5>{assessment.capability}</h5><span>{assessment.status}</span></header>
+                <dl>
+                  <div><dt>Operation</dt><dd>{assessment.operationId}</dd></div>
+                  <div><dt>Task / worker</dt><dd>{assessment.taskId} / {assessment.agentId}</dd></div>
+                  <div><dt>Grant</dt><dd>{assessment.grantId}</dd></div>
+                  <div><dt>Completed read receipts</dt><dd>{assessment.readReceiptIds.join(", ")}</dd></div>
+                  <div><dt>Read receipt content</dt><dd>{assessment.readReceiptContentIds.join(", ")}</dd></div>
+                  <div><dt>Hard bounds</dt><dd>{assessment.maxReadReceipts} receipts / {assessment.maxClaims} claims / {assessment.maxCitations} cited indexes / {assessment.maxTokens} structured tokens</dd></div>
+                  <div><dt>Used</dt><dd>{assessment.claimCount === null || assessment.citationCount === null || assessment.tokenCount === null ? "Unavailable until assessment completion" : `${assessment.claimCount} claims / ${assessment.citationCount} cited indexes / ${assessment.tokenCount} structured tokens`}</dd></div>
+                  <div>
+                    <dt>Assessment artifact</dt>
+                    <dd>
+                      {assessment.outputArtifactId ? (
+                        <ProductionArtifactReference
+                          identity={assessment.outputArtifactId}
+                          renderedArtifactIds={renderedArtifactIds}
+                        />
+                      ) : "Unavailable until assessment completion"}
+                    </dd>
+                  </div>
+                  <div><dt>Receipt</dt><dd>{assessment.receiptId ?? "Unavailable until completion"}</dd></div>
+                  <div><dt>Receipt content</dt><dd>{assessment.receiptContentId ?? "Unavailable until completion"}</dd></div>
+                  <div><dt>Failure</dt><dd>{assessment.failure ?? (assessment.status === "failed" ? "Failure reason unavailable" : "Not recorded")}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="assessment-artifacts"
+        aria-labelledby="product-runtime-assessment-artifacts-title"
+      >
+        <h4 id="product-runtime-assessment-artifacts-title">Assessment artifacts</h4>
+        {projection.assessmentArtifacts.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="assessment-artifacts">
+            Unavailable until a completed bounded assessment records its content-addressed receipt artifact.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.assessmentArtifacts.map((artifact) => (
+              <article
+                key={artifact.artifactId}
+                id={productionIdentityTarget("artifact", artifact.artifactId)}
+                data-production-assessment-artifact-id={artifact.artifactId}
+              >
+                <header><h5>{artifact.kind}</h5><span>structured opinion</span></header>
+                <dl>
+                  <div><dt>Artifact</dt><dd>{artifact.artifactId}</dd></div>
+                  <div>
+                    <dt>Produced by</dt>
+                    <dd>
+                      <ProductionIdentityLink kind="task" identity={artifact.producerTaskId} />
+                      {" / "}
+                      <ProductionIdentityLink kind="worker" identity={artifact.producerAgentId} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Assessment operation</dt>
+                    <dd>
+                      {operationIds.has(artifact.operationId)
+                        ? <ProductionIdentityLink kind="operation" identity={artifact.operationId} />
+                        : artifact.operationId}
+                    </dd>
+                  </div>
+                  <div><dt>Receipt</dt><dd>{artifact.receiptId}</dd></div>
+                  <div><dt>Receipt content</dt><dd>{artifact.receiptContentId}</dd></div>
+                  <div><dt>Content</dt><dd>{artifact.contentId} · {artifact.bytes} bytes</dd></div>
+                  <div><dt>Input read receipts</dt><dd>{artifact.readReceiptIds.join(", ")}</dd></div>
+                  <div><dt>Input receipt content</dt><dd>{artifact.readReceiptContentIds.join(", ")}</dd></div>
                 </dl>
               </article>
             ))}

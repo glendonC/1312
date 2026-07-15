@@ -29,13 +29,18 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
 - an `evidence.read` host plus separate task-private bridge that publishes only `evidence_read`,
   accepts only an exact scheduler-granted artifact id, injects task/agent/operation identity, and
   returns bounded facts from already-validated pinned VAD/language receipts with original lineage;
+- an `analysis.evidence.assess` host plus separate task-private bridge that publishes only
+  `evidence_assess`, accepts completed same-task evidence-read receipt/content identities and closed
+  range/citation claims, injects task/agent/operation identity, and emits a content-addressed
+  `studio.evidence-assessment.receipt.v1` without reading producer files;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
-The exact runtime test executes that path against the receipted run-005 media and reopens the event
-journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
+The exact runtime test executes that path against the receipted run-005 media, performs two reads
+and one assessment, and reopens the event journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
 duplicate work, limit violations, scope escalation, invalid registration, source/evidence-byte
-drift, unauthorized media/evidence calls, caller-controlled paths, malformed requests, changed
-receipt lineage, and invalid handoffs.
+drift, unauthorized media/evidence/assessment calls, unread assessment inputs, out-of-bounds fact
+indexes, caller-controlled paths, malformed requests, changed receipt lineage, budget overflow, and
+invalid handoffs.
 
 This does not make the Studio live. A bounded local `codex exec` worker launcher and a separate
 production-journal Studio adapter now exist, but `/studio/runtime/` is an inspector and does not
@@ -46,14 +51,24 @@ agent. The source region exposes only validated ingest-origin identity and conte
 artifact references link only when their source/output destination is rendered. The deterministic
 host exercises one real bounded seek plus worker-output receipt/report lineage. No hosted runtime
 service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
-`media_seek`, and/or `evidence_read` only for matching live task grants, in addition to the closed
+`media_seek`, `evidence_read`, and/or `evidence_assess` only for matching live task grants, in addition to the closed
 structured report output. `evidence.read` is not a detector call: it reads registered, immutable
 V2/V3 receipt artifacts under per-artifact 32 KiB/64-fact ceilings and the shared task tool-call
-budget. V1 and absent receipts produce no grant and no finding. `media.extract`, `media.seek`, and
-`evidence.read` are real scheduler/host/child-bridge capabilities; the other media operations and
+budget. `analysis.evidence.assess` adds a separate 1-assessment/4-receipt/8-claim/32-cited-index/
+512-structured-token ceiling and requires exact fact indexes and bounding ranges. V1 and absent
+receipts produce neither grant. `media.extract`, `media.seek`, `evidence.read`, and
+`analysis.evidence.assess` are real scheduler/host/child-bridge capabilities; assessment is an
+opinion over completed reads, not sensing. The other media operations and
 detector/model calls in this proposal remain unavailable. The tables below
 continue to document the fixture contract itself and should not be read as the production wire
 schema.
+
+The production event union now includes
+`analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and
+`analysis.evidence.assessment_failed`. A completed event binds its operation to the private
+assessment artifact and `studio.evidence-assessment.receipt.v1` content identity; failed events
+carry only the closed runtime failure shape. These events stay in the production journal and never
+enter legacy replay.
 
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a

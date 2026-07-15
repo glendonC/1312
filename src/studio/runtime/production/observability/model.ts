@@ -30,7 +30,7 @@ export interface ObservabilityEventSource {
 
 export interface ObservabilityReceiptSource {
   receiptId: string;
-  kind: "media_operation" | "executor_span" | "model_usage";
+  kind: "media_operation" | "evidence_assessment" | "executor_span" | "model_usage";
   eventId: string;
   contentId: string;
   storage: "artifact_store" | "embedded_event";

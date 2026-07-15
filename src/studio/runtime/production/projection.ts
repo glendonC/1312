@@ -1,6 +1,7 @@
 import { assertRuntimeEvent } from "./assertions.ts";
 import type { CapabilityGrant, RuntimeProjection, TaskRecord, TaskStatus } from "./model.ts";
 import type { RuntimeEvent } from "./protocol.ts";
+import { countAssessmentTokens } from "./validation/assessment.ts";
 
 function invariant(condition: unknown, event: RuntimeEvent, message: string): asserts condition {
   if (!condition) throw new Error(`Runtime event ${event.eventId}: ${message}`);
@@ -38,6 +39,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     spawnRequests: {},
     operations: {},
     evidenceReads: {},
+    evidenceAssessments: {},
     executions: {},
     modelUsage: {},
     reports: {},
@@ -102,6 +104,20 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
         execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId,
         event,
         `artifact ${artifact.id} changed its worker execution producer`,
+      );
+    } else if (artifact.origin.kind === "evidence_assessment") {
+      const assessment = next.evidenceAssessments[artifact.origin.operationId];
+      invariant(assessment?.status === "started", event, `artifact ${artifact.id} has no active evidence assessment`);
+      invariant(
+        assessment.taskId === artifact.producerTaskId && assessment.agentId === artifact.producerAgentId,
+        event,
+        `artifact ${artifact.id} changed its assessment producer`,
+      );
+      invariant(
+        JSON.stringify(artifact.origin.readReceiptIds) === JSON.stringify(assessment.readReceiptIds) &&
+          JSON.stringify(artifact.origin.readReceiptContentIds) === JSON.stringify(assessment.readReceiptContentIds),
+        event,
+        `artifact ${artifact.id} changed its assessment receipt inputs`,
       );
     }
     next.artifacts[artifact.id] = artifact;
@@ -174,8 +190,11 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     const activeEvidenceRead = Object.values(next.evidenceReads).some(
       (operation) => operation.taskId === task.id && operation.status === "started",
     );
+    const activeEvidenceAssessment = Object.values(next.evidenceAssessments).some(
+      (operation) => operation.taskId === task.id && operation.status === "started",
+    );
     invariant(
-      (!activeOperation && !activeEvidenceRead) || event.data.status === "working",
+      (!activeOperation && !activeEvidenceRead && !activeEvidenceAssessment) || event.data.status === "working",
       event,
       `task ${task.id} has an active capability operation`,
     );
@@ -309,6 +328,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     const calls = [
       ...Object.values(next.operations),
       ...Object.values(next.evidenceReads),
+      ...Object.values(next.evidenceAssessments),
     ].filter((operation) => operation.taskId === task.id).length;
     invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.operations[request.operationId] = {
@@ -420,6 +440,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     const calls = [
       ...Object.values(next.operations),
       ...Object.values(next.evidenceReads),
+      ...Object.values(next.evidenceAssessments),
     ].filter((operation) => operation.taskId === task.id).length;
     invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.evidenceReads[request.operationId] = {
@@ -492,6 +513,154 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     invariant(event.producer.kind === "evidence_host", event, "evidence failure must come from the evidence host");
     const operation = next.evidenceReads[event.data.operationId];
     invariant(operation?.status === "started", event, `evidence read ${event.data.operationId} is not active`);
+    operation.status = "failed";
+    operation.failure = event.data.reason;
+    return next;
+  }
+
+  if (event.type === "analysis.evidence.assessment_started") {
+    invariant(event.producer.kind === "assessment_host", event, "evidence assessment must come from the assessment host");
+    const request = event.data.request;
+    const task = next.tasks[request.taskId];
+    invariant(
+      task?.status === "working" && task.ownerAgentId === request.agentId,
+      event,
+      `evidence assessment ${request.operationId} has no working owner`,
+    );
+    invariant(
+      !next.evidenceAssessments[request.operationId] &&
+        !next.evidenceReads[request.operationId] &&
+        !next.operations[request.operationId],
+      event,
+      `operation ${request.operationId} is duplicated`,
+    );
+    const grant = task.grants.find((candidate) => candidate.id === event.data.grantId);
+    const scope = grant?.assessmentScope;
+    invariant(
+      grant?.capability === "analysis.evidence.assess" && scope,
+      event,
+      `evidence assessment ${request.operationId} lacks its grant`,
+    );
+    invariant(
+      event.data.maxReadReceipts === scope.maxReadReceipts &&
+        event.data.maxClaims === scope.maxClaims &&
+        event.data.maxCitations === scope.maxCitations &&
+        event.data.maxTokens === scope.maxTokens,
+      event,
+      `evidence assessment ${request.operationId} changed its grant budgets`,
+    );
+    const priorAssessments = Object.values(next.evidenceAssessments).filter((operation) =>
+      operation.taskId === task.id && operation.grantId === grant.id);
+    invariant(
+      priorAssessments.length < scope.maxAssessments,
+      event,
+      `evidence assessment ${request.operationId} exceeds its assessment-count budget`,
+    );
+    const citationCount = request.claims.reduce(
+      (total, claim) => total + claim.citations.reduce(
+        (subtotal, citation) => subtotal + citation.factIndexes.length,
+        0,
+      ),
+      0,
+    );
+    invariant(
+      request.readReceipts.length <= scope.maxReadReceipts &&
+        request.claims.length <= scope.maxClaims &&
+        citationCount <= scope.maxCitations &&
+        countAssessmentTokens(request.claims) <= scope.maxTokens,
+      event,
+      `evidence assessment ${request.operationId} exceeds its content budgets`,
+    );
+    const reads = request.readReceipts.map((identity) => Object.values(next.evidenceReads).find((candidate) =>
+      candidate.status === "completed" &&
+      candidate.taskId === task.id &&
+      candidate.agentId === request.agentId &&
+      candidate.receiptId === identity.receiptId &&
+      candidate.receiptContentId === identity.receiptContentId));
+    invariant(
+      reads.every((read) => read && scope.evidenceArtifactIds.includes(read.artifactId)),
+      event,
+      `evidence assessment ${request.operationId} references an unread or ungranted receipt`,
+    );
+    const calls = [
+      ...Object.values(next.operations),
+      ...Object.values(next.evidenceReads),
+      ...Object.values(next.evidenceAssessments),
+    ].filter((operation) => operation.taskId === task.id).length;
+    invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
+    next.evidenceAssessments[request.operationId] = {
+      id: request.operationId,
+      taskId: request.taskId,
+      agentId: request.agentId,
+      grantId: event.data.grantId,
+      readReceiptIds: request.readReceipts.map((receipt) => receipt.receiptId),
+      readReceiptContentIds: request.readReceipts.map((receipt) => receipt.receiptContentId),
+      maxReadReceipts: event.data.maxReadReceipts,
+      maxClaims: event.data.maxClaims,
+      maxCitations: event.data.maxCitations,
+      maxTokens: event.data.maxTokens,
+      status: "started",
+      artifactId: null,
+      receiptId: null,
+      receiptContentId: null,
+      claimCount: null,
+      citationCount: null,
+      tokenCount: null,
+      failure: null,
+    };
+    return next;
+  }
+
+  if (event.type === "analysis.evidence.assessment_completed") {
+    invariant(event.producer.kind === "assessment_host", event, "evidence assessment completion must come from the assessment host");
+    const operation = next.evidenceAssessments[event.data.operationId];
+    invariant(operation?.status === "started", event, `evidence assessment ${event.data.operationId} is not active`);
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    const receipt = event.data.receipt;
+    const scope = next.tasks[operation.taskId]?.grants.find((grant) =>
+      grant.id === operation.grantId && grant.capability === "analysis.evidence.assess")?.assessmentScope;
+    invariant(
+      artifact?.origin.kind === "evidence_assessment" &&
+        artifact.origin.operationId === operation.id &&
+        artifact.origin.receiptId === receipt.receiptId &&
+        artifact.origin.receiptContentId === event.data.receiptContentId &&
+        artifact.content.contentId === event.data.receiptContentId,
+      event,
+      `evidence assessment ${operation.id} has no content-addressed receipt artifact`,
+    );
+    invariant(
+      receipt.operationId === operation.id &&
+        receipt.authorization.grantId === operation.grantId &&
+        receipt.authorization.taskId === operation.taskId &&
+        receipt.authorization.agentId === operation.agentId &&
+        receipt.authorization.maxAssessments === scope?.maxAssessments &&
+        receipt.authorization.maxReadReceipts === operation.maxReadReceipts &&
+        receipt.authorization.maxClaims === operation.maxClaims &&
+        receipt.authorization.maxCitations === operation.maxCitations &&
+        receipt.authorization.maxTokens === operation.maxTokens,
+      event,
+      `evidence assessment ${operation.id} receipt changed authorization`,
+    );
+    invariant(
+      JSON.stringify(receipt.inputs.map((input) => input.receiptId)) === JSON.stringify(operation.readReceiptIds) &&
+        JSON.stringify(receipt.inputs.map((input) => input.receiptContentId)) === JSON.stringify(operation.readReceiptContentIds),
+      event,
+      `evidence assessment ${operation.id} receipt changed completed-read inputs`,
+    );
+    operation.status = "completed";
+    operation.artifactId = artifact.id;
+    operation.receiptId = receipt.receiptId;
+    operation.receiptContentId = event.data.receiptContentId;
+    operation.claimCount = receipt.result.claimCount;
+    operation.citationCount = receipt.result.citationCount;
+    operation.tokenCount = receipt.result.tokenCount;
+    return next;
+  }
+
+  if (event.type === "analysis.evidence.assessment_failed") {
+    invariant(event.producer.kind === "assessment_host", event, "evidence assessment failure must come from the assessment host");
+    const operation = next.evidenceAssessments[event.data.operationId];
+    invariant(operation?.status === "started", event, `evidence assessment ${event.data.operationId} is not active`);
     operation.status = "failed";
     operation.failure = event.data.reason;
     return next;

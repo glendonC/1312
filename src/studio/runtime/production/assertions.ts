@@ -7,6 +7,10 @@ export {
 } from "./validation/artifacts.ts";
 export { assertRuntimeEvent } from "./validation/events.ts";
 export {
+  assertEvidenceAssessmentRequest,
+  validateEvidenceAssessmentReceipt,
+} from "./validation/assessment.ts";
+export {
   assertEvidenceReadRequest,
   validateEvidenceReadReceipt,
 } from "./validation/evidence.ts";

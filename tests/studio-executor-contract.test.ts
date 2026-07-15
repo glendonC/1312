@@ -36,6 +36,7 @@ function task(): TaskRecord {
         agentId: "agent:worker-contract",
         mediaScope: [],
         evidenceScope: [],
+        assessmentScope: null,
       },
     ],
     status: "working",
@@ -118,6 +119,7 @@ test("worker contract uses one closed schema, validator, and no-media prompt", (
     agentId: mediaContract.assignedAgentId,
     mediaScope: structuredClone(mediaContract.mediaScope),
     evidenceScope: [],
+    assessmentScope: null,
   });
   assert.match(workerPrompt(mediaContract), /scheduler-granted media tools: media_seek/);
   assert.match(workerPrompt(mediaContract), /operation occurred only when the tool returns/);

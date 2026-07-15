@@ -73,6 +73,30 @@ test("receipted child media/evidence operations and artifact identity hooks proj
   await expect(evidenceGrant.getByText(/speech_activity/)).toBeVisible();
   await expect(evidenceGrant.getByText(/language_ranges/)).toBeVisible();
 
+  const assessmentGrant = production.locator('[data-production-grant-id]').filter({ hasText: "analysis.evidence.assess" });
+  await expect(assessmentGrant).toHaveCount(1);
+  await expect(assessmentGrant.getByText(/1 assessment \/ 4 read receipts \/ 8 claims \/ 32 cited indexes \/ 512 structured tokens/)).toBeVisible();
+
+  const assessments = production.locator('[data-production-region="evidence-assessments"]');
+  await expect(assessments.getByRole("heading", { name: "Evidence assessments" })).toBeVisible();
+  await expect(assessments.locator('[data-production-empty="evidence-assessments"]')).toHaveCount(0);
+  const assessment = assessments.locator('[data-production-evidence-assessment-id]');
+  await expect(assessment).toHaveCount(1);
+  await expect(assessment).toHaveAttribute("data-status", "completed");
+  await expect(assessment.getByRole("heading", { name: "analysis.evidence.assess" })).toBeVisible();
+  await expect(assessment.getByText(/^evidence-assessment:/)).toBeVisible();
+  await expect(assessment.locator('[data-production-navigation="artifact"]')).toHaveCount(1);
+
+  const assessmentArtifacts = production.locator('[data-production-region="assessment-artifacts"]');
+  await expect(assessmentArtifacts.getByRole("heading", { name: "Assessment artifacts" })).toBeVisible();
+  await expect(assessmentArtifacts.locator('[data-production-empty="assessment-artifacts"]')).toHaveCount(0);
+  const assessmentArtifact = assessmentArtifacts.locator('[data-production-assessment-artifact-id]');
+  await expect(assessmentArtifact).toHaveCount(1);
+  await expect(assessmentArtifact.getByRole("heading", { name: "evidence-assessment-receipt" })).toBeVisible();
+  await expect(assessmentArtifact.locator('[data-production-navigation="task"]')).toHaveCount(1);
+  await expect(assessmentArtifact.locator('[data-production-navigation="worker"]')).toHaveCount(1);
+  await expect(assessmentArtifact.locator('[data-production-navigation="operation"]')).toHaveCount(1);
+
   await expect(production.locator('[data-production-region="operations"]')).toBeVisible();
   await expect(production.getByRole("heading", { name: "Production operations" })).toBeVisible();
   await expect(production.locator('[data-production-empty="operations"]')).toHaveCount(0);

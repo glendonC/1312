@@ -290,6 +290,32 @@ export function validateRuntimeArtifact(
         "preflight evidence must be one validated non-media receipt with source lineage and no task producer",
       );
     }
+  } else if (kind === "evidence_assessment") {
+    exact(
+      origin,
+      ["kind", "operationId", "receiptId", "receiptContentId", "readReceiptIds", "readReceiptContentIds"],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.operationId, context, `${path}.origin.operationId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    const readReceiptIds = uniqueStrings(origin.readReceiptIds, context, `${path}.origin.readReceiptIds`);
+    const readReceiptContentIds = uniqueStrings(origin.readReceiptContentIds, context, `${path}.origin.readReceiptContentIds`);
+    readReceiptContentIds.forEach((id, index) => contentId(id, context, `${path}.origin.readReceiptContentIds[${index}]`));
+    if (
+      mediaClass !== "non_media" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      sources.length !== 0 ||
+      task === null ||
+      agent === null ||
+      readReceiptIds.length === 0 ||
+      readReceiptIds.length !== readReceiptContentIds.length ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) {
+      fail(context, path, "evidence assessment artifacts must be their content-addressed receipt with read-receipt lineage and a task producer");
+    }
   } else {
     fail(context, `${path}.origin.kind`, `has unknown value ${kind}`);
   }

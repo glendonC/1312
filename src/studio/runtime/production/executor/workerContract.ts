@@ -126,6 +126,8 @@ export function workerPrompt(task: TaskRecord): string {
     grantedEvidence: task.grants
       .filter((grant) => grant.capability === "evidence.read")
       .flatMap((grant) => grant.evidenceScope),
+    grantedAssessment: task.grants
+      .find((grant) => grant.capability === "analysis.evidence.assess")?.assessmentScope ?? null,
   };
   const mediaBoundary = mediaTools.length === 0
     ? "This executor exposes no media bytes and no media tools. Do not claim that you inspected, heard, translated, or measured media."
@@ -148,11 +150,23 @@ export function workerPrompt(task: TaskRecord): string {
         "Preserve operation, input-artifact, receipt, receipt-content, producer, decision, and preflight-lineage identities in the required worker output.",
         "Do not infer claims beyond the returned facts; unknown, withheld, empty, and truncated remain explicit.",
       ].join(" ");
+  const assessmentScope = task.grants
+    .find((grant) => grant.capability === "analysis.evidence.assess")?.assessmentScope ?? null;
+  const assessmentBoundary = assessmentScope === null
+    ? "This executor exposes no evidence_assess tool. Do not turn evidence reads into findings or conclusions."
+    : [
+        "After every required evidence_read completes, invoke evidence_assess exactly once over only those returned read receipt and receipt-content identities.",
+        "Submit only the closed speech_activity or language_identity claims, each with its exact bounding millisecond range and exact returned fact indexes.",
+        "The host rejects raw producer artifact identities, paths, open queries, captions, translations, out-of-range indexes, unsupported values, and budget overflow.",
+        "Unknown, withheld, and truncated upstream states remain explicit in the receipted assessment; never upgrade them to supported.",
+        "Include the returned assessment operation, output-artifact, receipt, and receipt-content identities in the required worker output.",
+      ].join(" ");
   return [
     "You are one isolated child in the 1321 Studio production runtime.",
     "Complete only the bounded task contract below and return the JSON required by the supplied output schema.",
     mediaBoundary,
     evidenceBoundary,
+    assessmentBoundary,
     "Output content is a worker-authored artifact proposal; the parent decides whether to accept it.",
     JSON.stringify(contract),
   ].join("\n\n");

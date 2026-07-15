@@ -2,6 +2,8 @@ import type {
   AgentRecord,
   Capability,
   CapabilityGrant,
+  EvidenceAssessmentReceipt,
+  EvidenceAssessmentRequest,
   ExecutorSpanReceipt,
   EvidenceReadReceipt,
   EvidenceReadRequest,
@@ -22,6 +24,7 @@ export type RuntimeProducerKind =
   | "artifact_store"
   | "media_host"
   | "evidence_host"
+  | "assessment_host"
   | "handoff_host"
   | "launcher";
 
@@ -142,6 +145,33 @@ export interface EvidenceReadFailedEvent extends RuntimeEventBase {
   data: { operationId: string; reason: string };
 }
 
+export interface EvidenceAssessmentStartedEvent extends RuntimeEventBase {
+  type: "analysis.evidence.assessment_started";
+  data: {
+    request: EvidenceAssessmentRequest;
+    grantId: string;
+    maxReadReceipts: number;
+    maxClaims: number;
+    maxCitations: number;
+    maxTokens: number;
+  };
+}
+
+export interface EvidenceAssessmentCompletedEvent extends RuntimeEventBase {
+  type: "analysis.evidence.assessment_completed";
+  data: {
+    operationId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: EvidenceAssessmentReceipt;
+  };
+}
+
+export interface EvidenceAssessmentFailedEvent extends RuntimeEventBase {
+  type: "analysis.evidence.assessment_failed";
+  data: { operationId: string; reason: string };
+}
+
 export interface ReportSubmittedEvent extends RuntimeEventBase {
   type: "report.submitted";
   data: { report: ReportRecord };
@@ -174,6 +204,9 @@ export type RuntimeEvent =
   | EvidenceReadStartedEvent
   | EvidenceReadCompletedEvent
   | EvidenceReadFailedEvent
+  | EvidenceAssessmentStartedEvent
+  | EvidenceAssessmentCompletedEvent
+  | EvidenceAssessmentFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent;
 

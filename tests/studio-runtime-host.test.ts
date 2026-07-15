@@ -356,7 +356,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.ok(first.events.length > 0 && first.events.length <= 2);
     assert.equal(first.nextCursor, first.events.at(-1)?.seq);
     assert.equal(first.events[0].seq, 1);
-    await assert.rejects(runtime.service.poll(ack.runtimeId, first.journalHead + 1, 1), /cursor is beyond/);
+    await assert.rejects(runtime.service.poll(ack.runtimeId, Number.MAX_SAFE_INTEGER, 1), /cursor is beyond/);
 
     control.releaseBeforeFirstEvent();
     const terminalStatus = await waitForLifecycle(runtime.service, ack.commandId, "terminal");
@@ -388,7 +388,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.workers.length, 2);
     assert.deepEqual(
       inspector.projection.grants.map((grant) => grant.capability).sort(),
-      ["evidence.read", "media.seek", "report.submit", "task.spawn.request"],
+      ["analysis.evidence.assess", "evidence.read", "media.seek", "report.submit", "task.spawn.request"],
     );
     assert.equal(inspector.projection.reports.length, 1);
     assert.equal(inspector.projection.reports[0].status, "accepted");
@@ -397,7 +397,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.spawnRequests[0].requestedByTaskId, inspector.projection.tasks[0].taskId);
     assert.deepEqual(
       inspector.projection.spawnRequests[0].requiredCapabilities,
-      ["evidence.read", "media.seek", "report.submit"],
+      ["analysis.evidence.assess", "evidence.read", "media.seek", "report.submit"],
     );
     assert.equal(inspector.projection.operations.length, 1);
     assert.equal(inspector.projection.operations[0].capability, "media.seek");
@@ -420,6 +420,21 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.ok(evidenceGrant);
     assert.equal(evidenceGrant.evidenceScope.length, 2);
     assert.ok(evidenceGrant.evidenceScope.every((scope) => scope.maxBytes === 32 * 1024 && scope.maxItems === 64));
+    assert.equal(inspector.projection.evidenceAssessments.length, 1);
+    const assessment = inspector.projection.evidenceAssessments[0];
+    assert.equal(assessment.status, "completed");
+    assert.equal(assessment.readReceiptIds.length, 2);
+    assert.equal(assessment.claimCount, 2);
+    assert.ok(assessment.citationCount !== null && assessment.citationCount <= assessment.maxCitations);
+    assert.ok(assessment.tokenCount !== null && assessment.tokenCount <= assessment.maxTokens);
+    const assessmentGrant = inspector.projection.grants.find((grant) => grant.capability === "analysis.evidence.assess");
+    assert.ok(assessmentGrant?.assessmentScope);
+    assert.equal(assessmentGrant.assessmentScope.maxAssessments, 1);
+    assert.equal(assessmentGrant.assessmentScope.maxClaims, 8);
+    assert.equal(assessmentGrant.assessmentScope.maxCitations, 32);
+    assert.equal(assessmentGrant.assessmentScope.maxTokens, 512);
+    assert.equal(inspector.projection.assessmentArtifacts.length, 1);
+    assert.equal(inspector.projection.assessmentArtifacts[0].receiptId, assessment.receiptId);
     assert.equal(inspector.projection.outputArtifacts.length, 2);
     const workerOutput = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "worker_output");
     const seekObservation = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "media_observation");
@@ -1024,6 +1039,15 @@ test("browser-owned ingest fails closed on rights and paths, preserves bytes, ho
     assert.equal(acknowledgement.commandId, plan.commandId);
     assert.equal(acknowledgement.runtimeId, plan.runtimeId);
     await waitForLifecycle(service, acknowledgement.commandId, "terminal");
+    const v1Inspector = await loadRuntimeInspectorJournal(
+      await readFile(store.paths(acknowledgement.runtimeId).journalPath, "utf8"),
+    );
+    assert.equal(v1Inspector.projection.grants.some((grant) => grant.capability === "evidence.read"), false);
+    assert.equal(v1Inspector.projection.grants.some((grant) => grant.capability === "analysis.evidence.assess"), false);
+    assert.equal(v1Inspector.projection.evidenceArtifacts.length, 0);
+    assert.equal(v1Inspector.projection.evidenceReads.length, 0);
+    assert.equal(v1Inspector.projection.evidenceAssessments.length, 0);
+    assert.equal(v1Inspector.projection.assessmentArtifacts.length, 0);
 
     const reopenedSources = await RuntimeSourceRegistry.open({ sourceDirectories: [] });
     await OwnedMediaIngestService.open({

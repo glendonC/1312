@@ -21,12 +21,19 @@ import { BoundedReportHost } from "./reportHost.ts";
 import { BoundedRuntimeScheduler } from "./scheduler.ts";
 import { FfmpegCapabilityHost } from "./mediaHost.ts";
 import { BoundedEvidenceReadHost } from "./evidenceHost.ts";
+import { BoundedEvidenceAssessmentHost } from "./evidenceAssessmentHost.ts";
 import {
   BoundedChildEvidenceBridge,
   openChildEvidenceBridge,
   type ChildEvidenceReadHost,
   type OpenChildEvidenceBridge,
 } from "./executor/childEvidenceBridge.ts";
+import {
+  BoundedChildEvidenceAssessmentBridge,
+  openChildEvidenceAssessmentBridge,
+  type ChildEvidenceAssessmentHost,
+  type OpenChildEvidenceAssessmentBridge,
+} from "./executor/childEvidenceAssessmentBridge.ts";
 import {
   BoundedChildMediaBridge,
   openChildMediaBridge,
@@ -69,10 +76,13 @@ export interface CodexWorkerLauncherOptions {
   nextExecutionId?: () => string;
   nextMediaOperationId?: (capability: "media.extract" | "media.seek") => string;
   nextEvidenceOperationId?: () => string;
+  nextAssessmentOperationId?: () => string;
   mediaHost?: ChildMediaCapabilityHost;
   evidenceHost?: ChildEvidenceReadHost;
+  assessmentHost?: ChildEvidenceAssessmentHost;
   mediaMcpServerPath?: string;
   evidenceMcpServerPath?: string;
+  assessmentMcpServerPath?: string;
 }
 
 function tomlString(value: string): string {
@@ -96,11 +106,12 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "mediaMcpServerPath" | "evidenceMcpServerPath"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "mediaMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
   private readonly evidenceHost: ChildEvidenceReadHost;
+  private readonly assessmentHost: ChildEvidenceAssessmentHost;
 
   constructor(
     ledger: RuntimeLedger,
@@ -115,6 +126,7 @@ export class CodexExecWorkerLauncher {
     this.reports = reports;
     this.mediaHost = options.mediaHost ?? new FfmpegCapabilityHost(ledger, artifacts);
     this.evidenceHost = options.evidenceHost ?? new BoundedEvidenceReadHost(ledger, artifacts);
+    this.assessmentHost = options.assessmentHost ?? new BoundedEvidenceAssessmentHost(ledger, artifacts);
     this.options = {
       executable: options.executable ?? "codex",
       executableArgsPrefix: options.executableArgsPrefix,
@@ -128,8 +140,10 @@ export class CodexExecWorkerLauncher {
       nextExecutionId: options.nextExecutionId ?? (() => `execution:${randomUUID()}`),
       nextMediaOperationId: options.nextMediaOperationId,
       nextEvidenceOperationId: options.nextEvidenceOperationId,
+      nextAssessmentOperationId: options.nextAssessmentOperationId,
       mediaMcpServerPath: options.mediaMcpServerPath,
       evidenceMcpServerPath: options.evidenceMcpServerPath,
+      assessmentMcpServerPath: options.assessmentMcpServerPath,
     };
   }
 
@@ -260,9 +274,9 @@ export class CodexExecWorkerLauncher {
     }
     if (
       !scheduled.grants.some((grant) => grant.capability === "report.submit") ||
-      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "evidence.read"].includes(grant.capability))
+      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "evidence.read", "analysis.evidence.assess"].includes(grant.capability))
     ) {
-      throw new Error("Codex executor supports only report.submit plus scheduler-granted media.extract/media.seek/evidence.read");
+      throw new Error("Codex executor supports only report.submit plus scheduler-granted media.extract/media.seek/evidence.read/analysis.evidence.assess");
     }
 
     const version = await this.version();
@@ -290,6 +304,7 @@ export class CodexExecWorkerLauncher {
     let executorFinished = false;
     let mediaBridge: OpenChildMediaBridge | null = null;
     let evidenceBridge: OpenChildEvidenceBridge | null = null;
+    let assessmentBridge: OpenChildEvidenceAssessmentBridge | null = null;
     try {
       const mediaCapabilities = task.grants
         .map((grant) => grant.capability)
@@ -305,6 +320,14 @@ export class CodexExecWorkerLauncher {
         evidenceBridge = await openChildEvidenceBridge(new BoundedChildEvidenceBridge(task, this.evidenceHost, {
           nextOperationId: this.options.nextEvidenceOperationId,
         }));
+      }
+      const assessmentGrant = task.grants.find((grant) => grant.capability === "analysis.evidence.assess");
+      if (assessmentGrant) {
+        assessmentBridge = await openChildEvidenceAssessmentBridge(new BoundedChildEvidenceAssessmentBridge(
+          task,
+          this.assessmentHost,
+          { nextOperationId: this.options.nextAssessmentOperationId },
+        ));
       }
       const args = [
         "exec",
@@ -367,6 +390,30 @@ export class CodexExecWorkerLauncher {
           ])}`,
         );
       }
+      if (assessmentBridge) {
+        const serverPath = this.options.assessmentMcpServerPath ?? fileURLToPath(
+          new URL("./executor/evidenceAssessmentMcpServer.ts", import.meta.url),
+        );
+        args.push(
+          "-c",
+          `mcp_servers.studio_evidence_assessment.command=${tomlString(process.execPath)}`,
+          "-c",
+          `mcp_servers.studio_evidence_assessment.args=${tomlStrings([serverPath])}`,
+          "-c",
+          "mcp_servers.studio_evidence_assessment.required=true",
+          "-c",
+          `mcp_servers.studio_evidence_assessment.enabled_tools=${tomlStrings([assessmentBridge.manifest.tool.name])}`,
+          "-c",
+          "mcp_servers.studio_evidence_assessment.startup_timeout_sec=5",
+          "-c",
+          `mcp_servers.studio_evidence_assessment.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
+          "-c",
+          `mcp_servers.studio_evidence_assessment.env_vars=${tomlStrings([
+            "STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_URL",
+            "STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_TOKEN",
+          ])}`,
+        );
+      }
       args.push("--output-schema", schemaPath);
       if (this.options.model) args.push("--model", this.options.model);
       args.push("-");
@@ -375,7 +422,7 @@ export class CodexExecWorkerLauncher {
         args: this.commandArgs(args),
         cwd: directory,
         stdin: workerPrompt(task),
-        env: mediaBridge || evidenceBridge ? {
+        env: mediaBridge || evidenceBridge || assessmentBridge ? {
           ...process.env,
           ...(mediaBridge ? {
             STUDIO_CHILD_MEDIA_BRIDGE_URL: mediaBridge.endpoint,
@@ -384,6 +431,10 @@ export class CodexExecWorkerLauncher {
           ...(evidenceBridge ? {
             STUDIO_CHILD_EVIDENCE_BRIDGE_URL: evidenceBridge.endpoint,
             STUDIO_CHILD_EVIDENCE_BRIDGE_TOKEN: evidenceBridge.token,
+          } : {}),
+          ...(assessmentBridge ? {
+            STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_URL: assessmentBridge.endpoint,
+            STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_TOKEN: assessmentBridge.token,
           } : {}),
         } : process.env,
         timeoutMs: Math.min(task.budget.wallMs, this.options.maximumWallMs),
@@ -420,6 +471,13 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not read every granted evidence artifact",
           "Codex child did not complete its required receipted evidence read.",
+        );
+      }
+      if (assessmentGrant && !Object.values(this.ledger.state().evidenceAssessments).some((operation) =>
+        operation.taskId === task.id && operation.grantId === assessmentGrant.id && operation.status === "completed")) {
+        throw new LauncherFailure(
+          "Codex child did not complete its granted evidence assessment",
+          "Codex child did not complete its required receipted evidence assessment.",
         );
       }
       let workerValue: unknown;
@@ -527,6 +585,7 @@ export class CodexExecWorkerLauncher {
     } finally {
       if (mediaBridge) await mediaBridge.close();
       if (evidenceBridge) await evidenceBridge.close();
+      if (assessmentBridge) await assessmentBridge.close();
       await rm(directory, { recursive: true, force: true });
     }
   }

@@ -15,7 +15,15 @@ import type {
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
-import { MAX_EVIDENCE_READ_BYTES, MAX_EVIDENCE_READ_ITEMS } from "./validation/scheduling.ts";
+import {
+  MAX_EVIDENCE_ASSESSMENTS,
+  MAX_EVIDENCE_ASSESS_CITATIONS,
+  MAX_EVIDENCE_ASSESS_CLAIMS,
+  MAX_EVIDENCE_ASSESS_READ_RECEIPTS,
+  MAX_EVIDENCE_ASSESS_TOKENS,
+  MAX_EVIDENCE_READ_BYTES,
+  MAX_EVIDENCE_READ_ITEMS,
+} from "./validation/scheduling.ts";
 
 export interface RuntimeIdentityFactory {
   next(kind: "request" | "task" | "agent" | "grant"): string;
@@ -110,6 +118,18 @@ export class BoundedRuntimeScheduler {
               })
               .sort((left, right) => left.artifactId.localeCompare(right.artifactId))
           : [],
+        assessmentScope: capability === "analysis.evidence.assess"
+          ? {
+              evidenceArtifactIds: input.inputArtifactIds
+                .filter((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence")
+                .sort(),
+              maxAssessments: MAX_EVIDENCE_ASSESSMENTS,
+              maxReadReceipts: MAX_EVIDENCE_ASSESS_READ_RECEIPTS,
+              maxClaims: MAX_EVIDENCE_ASSESS_CLAIMS,
+              maxCitations: MAX_EVIDENCE_ASSESS_CITATIONS,
+              maxTokens: MAX_EVIDENCE_ASSESS_TOKENS,
+            }
+          : null,
       }));
   }
 
@@ -131,7 +151,10 @@ export class BoundedRuntimeScheduler {
       input.requiredCapabilities.every((capability) => this.limits.grantableCapabilities.includes(capability)) &&
       (!input.requiredCapabilities.some((capability) => capability.startsWith("media.")) || input.mediaScope.length > 0) &&
       (!input.requiredCapabilities.includes("evidence.read") ||
-        input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence"))
+        input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence")) &&
+      (!input.requiredCapabilities.includes("analysis.evidence.assess") ||
+        (input.requiredCapabilities.includes("evidence.read") &&
+          input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence")))
     );
   }
 

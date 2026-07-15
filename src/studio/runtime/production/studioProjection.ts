@@ -1,6 +1,7 @@
 import { assertRuntimeEvent } from "./assertions.ts";
 import type {
   Capability,
+  EvidenceAssessmentScope,
   EvidenceKind,
   EvidenceReadScope,
   MediaScope,
@@ -71,6 +72,7 @@ export interface ProductionStudioGrantView {
   capability: Capability;
   mediaScope: MediaScope[];
   evidenceScope: EvidenceReadScope[];
+  assessmentScope: EvidenceAssessmentScope | null;
 }
 
 export interface ProductionStudioEvidenceArtifactView {
@@ -103,6 +105,42 @@ export interface ProductionStudioEvidenceReadView {
   returnedFactBytes: number | null;
   truncated: boolean | null;
   failure: string | null;
+}
+
+export interface ProductionStudioEvidenceAssessmentView {
+  operationId: string;
+  capability: "analysis.evidence.assess";
+  status: "started" | "completed" | "failed";
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  readReceiptIds: string[];
+  readReceiptContentIds: string[];
+  maxReadReceipts: number;
+  maxClaims: number;
+  maxCitations: number;
+  maxTokens: number;
+  outputArtifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  claimCount: number | null;
+  citationCount: number | null;
+  tokenCount: number | null;
+  failure: string | null;
+}
+
+export interface ProductionStudioEvidenceAssessmentArtifactView {
+  artifactId: string;
+  kind: "evidence-assessment-receipt";
+  contentId: string;
+  bytes: number;
+  producerTaskId: string;
+  producerAgentId: string;
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  readReceiptIds: string[];
+  readReceiptContentIds: string[];
 }
 
 export interface ProductionStudioReportView {
@@ -208,8 +246,10 @@ export interface ProductionStudioProjection {
   spawnRequests: ProductionStudioSpawnView[];
   operations: ProductionStudioOperationView[];
   evidenceReads: ProductionStudioEvidenceReadView[];
+  evidenceAssessments: ProductionStudioEvidenceAssessmentView[];
   sourceArtifacts: ProductionStudioSourceArtifactView[];
   evidenceArtifacts: ProductionStudioEvidenceArtifactView[];
+  assessmentArtifacts: ProductionStudioEvidenceAssessmentArtifactView[];
   outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
@@ -220,8 +260,10 @@ export interface ProductionStudioProjection {
     spawnRequests: number;
     operations: number;
     evidenceReads: number;
+    evidenceAssessments: number;
     sourceArtifacts: number;
     evidenceArtifacts: number;
+    assessmentArtifacts: number;
     outputArtifacts: number;
   };
 }
@@ -255,6 +297,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       capability: grant.capability,
       mediaScope: structuredClone(grant.mediaScope),
       evidenceScope: structuredClone(grant.evidenceScope),
+      assessmentScope: structuredClone(grant.assessmentScope),
     })))
     .sort((left, right) => left.taskId.localeCompare(right.taskId) || left.grantId.localeCompare(right.grantId));
   if (new Set(grants.map((grant) => grant.grantId)).size !== grants.length) {
@@ -336,6 +379,30 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     }))
     .sort((left, right) => left.operationId.localeCompare(right.operationId));
 
+  const evidenceAssessments = Object.values(state.evidenceAssessments)
+    .map((operation): ProductionStudioEvidenceAssessmentView => ({
+      operationId: operation.id,
+      capability: "analysis.evidence.assess",
+      status: operation.status,
+      taskId: operation.taskId,
+      agentId: operation.agentId,
+      grantId: operation.grantId,
+      readReceiptIds: [...operation.readReceiptIds],
+      readReceiptContentIds: [...operation.readReceiptContentIds],
+      maxReadReceipts: operation.maxReadReceipts,
+      maxClaims: operation.maxClaims,
+      maxCitations: operation.maxCitations,
+      maxTokens: operation.maxTokens,
+      outputArtifactId: operation.artifactId,
+      receiptId: operation.receiptId,
+      receiptContentId: operation.receiptContentId,
+      claimCount: operation.claimCount,
+      citationCount: operation.citationCount,
+      tokenCount: operation.tokenCount,
+      failure: operation.failure,
+    }))
+    .sort((left, right) => left.operationId.localeCompare(right.operationId));
+
   const sourceArtifacts = Object.values(state.artifacts)
     .filter((artifact) => artifact.origin.kind === "ingest")
     .map((artifact): ProductionStudioSourceArtifactView => {
@@ -367,7 +434,11 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       artifact.origin.kind === "media_observation" ||
       artifact.origin.kind === "worker_output")
     .map((artifact): ProductionStudioOutputArtifactView => {
-      if (artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence") {
+      if (
+        artifact.origin.kind === "ingest" ||
+        artifact.origin.kind === "preflight_evidence" ||
+        artifact.origin.kind === "evidence_assessment"
+      ) {
         throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
       }
       if (artifact.producerTaskId === null || artifact.producerAgentId === null) {
@@ -416,6 +487,38 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
         sourceArtifactIds: [...artifact.sourceArtifactIds],
         preflightId: artifact.origin.preflightId,
         preflightContentId: artifact.origin.preflightContentId,
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+
+  const assessmentArtifacts = Object.values(state.artifacts)
+    .filter((artifact) => {
+      if (artifact.origin.kind !== "evidence_assessment") return false;
+      const assessment = state.evidenceAssessments[artifact.origin.operationId];
+      return assessment?.status === "completed" && assessment.artifactId === artifact.id;
+    })
+    .map((artifact): ProductionStudioEvidenceAssessmentArtifactView => {
+      if (artifact.origin.kind !== "evidence_assessment") {
+        throw new Error(`Production Studio projection: assessment artifact ${artifact.id} changed origin`);
+      }
+      if (
+        artifact.kind !== "evidence-assessment-receipt" ||
+        artifact.producerTaskId === null ||
+        artifact.producerAgentId === null ||
+        artifact.mediaClass !== "non_media"
+      ) throw new Error(`Production Studio projection: assessment artifact ${artifact.id} is invalid`);
+      return {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        producerTaskId: artifact.producerTaskId,
+        producerAgentId: artifact.producerAgentId,
+        operationId: artifact.origin.operationId,
+        receiptId: artifact.origin.receiptId,
+        receiptContentId: artifact.origin.receiptContentId,
+        readReceiptIds: [...artifact.origin.readReceiptIds],
+        readReceiptContentIds: [...artifact.origin.readReceiptContentIds],
       };
     })
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
@@ -481,8 +584,10 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     spawnRequests,
     operations,
     evidenceReads,
+    evidenceAssessments,
     sourceArtifacts,
     evidenceArtifacts,
+    assessmentArtifacts,
     outputArtifacts,
     counts: {
       tasks: tasks.length,
@@ -493,8 +598,10 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       spawnRequests: spawnRequests.length,
       operations: operations.length,
       evidenceReads: evidenceReads.length,
+      evidenceAssessments: evidenceAssessments.length,
       sourceArtifacts: sourceArtifacts.length,
       evidenceArtifacts: evidenceArtifacts.length,
+      assessmentArtifacts: assessmentArtifacts.length,
       outputArtifacts: outputArtifacts.length,
     },
   };

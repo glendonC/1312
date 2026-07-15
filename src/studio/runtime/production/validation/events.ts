@@ -1,0 +1,193 @@
+import type { RuntimeEvent } from "../protocol.ts";
+import { validateRuntimeArtifact } from "./artifacts.ts";
+import {
+  validateExecutorSpanReceipt,
+  validateModelUsageReceipt,
+} from "./execution.ts";
+import { validateReportRecord } from "./handoffs.ts";
+import {
+  assertMediaExtractRequest,
+  assertMediaSeekRequest,
+  validateMediaOperationReceipt,
+} from "./media.ts";
+import {
+  boolean,
+  exact,
+  fail,
+  integer,
+  isoTimestamp,
+  literal,
+  nullableString,
+  object,
+  oneOf,
+  string,
+} from "./primitives.ts";
+import {
+  TASK_STATUSES,
+  assertAgentRecord,
+  assertSpawnRequestInput,
+  assertTaskRecord,
+  validateGrants,
+} from "./scheduling.ts";
+
+const REJECTIONS = new Set([
+  "requester_not_authorized",
+  "max_depth",
+  "max_active_workers",
+  "run_budget",
+  "duplicate_owner",
+  "missing_output_contract",
+  "dependency_unavailable",
+  "scope_violation",
+  "capability_not_grantable",
+]);
+
+export function assertRuntimeEvent(
+  value: unknown,
+  context = "Runtime event",
+): asserts value is RuntimeEvent {
+  const item = object(value, context, "event");
+  exact(
+    item,
+    [
+      "schema",
+      "runId",
+      "seq",
+      "eventId",
+      "recordedAt",
+      "producer",
+      "causationId",
+      "correlationId",
+      "type",
+      "data",
+    ],
+    context,
+    "event",
+  );
+  literal(item.schema, "studio.runtime.event.v1", context, "event.schema");
+  string(item.runId, context, "event.runId");
+  integer(item.seq, context, "event.seq", 1);
+  string(item.eventId, context, "event.eventId");
+  isoTimestamp(item.recordedAt, context, "event.recordedAt");
+  const producer = object(item.producer, context, "event.producer");
+  exact(producer, ["kind", "id"], context, "event.producer");
+  oneOf(
+    producer.kind,
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "handoff_host", "launcher"]),
+    context,
+    "event.producer.kind",
+  );
+  string(producer.id, context, "event.producer.id");
+  nullableString(item.causationId, context, "event.causationId");
+  nullableString(item.correlationId, context, "event.correlationId");
+  const type = string(item.type, context, "event.type");
+  const data = object(item.data, context, "event.data");
+
+  if (type === "artifact.recorded") {
+    exact(data, ["artifact"], context, "event.data");
+    validateRuntimeArtifact(data.artifact, context, "event.data.artifact");
+  } else if (type === "task.created") {
+    exact(data, ["task"], context, "event.data");
+    assertTaskRecord(data.task, context, "event.data.task");
+  } else if (type === "spawn.requested") {
+    exact(
+      data,
+      ["requestId", "requestedByTaskId", "requestedByAgentId", "input"],
+      context,
+      "event.data",
+    );
+    string(data.requestId, context, "event.data.requestId");
+    string(data.requestedByTaskId, context, "event.data.requestedByTaskId");
+    string(data.requestedByAgentId, context, "event.data.requestedByAgentId");
+    assertSpawnRequestInput(data.input, context);
+  } else if (type === "spawn.decided") {
+    exact(
+      data,
+      ["requestId", "accepted", "rejection", "taskId", "agentId", "grants"],
+      context,
+      "event.data",
+    );
+    string(data.requestId, context, "event.data.requestId");
+    const accepted = boolean(data.accepted, context, "event.data.accepted");
+    const rejection = data.rejection === null
+      ? null
+      : oneOf<string>(data.rejection, REJECTIONS, context, "event.data.rejection");
+    const taskId = nullableString(data.taskId, context, "event.data.taskId");
+    const agentId = nullableString(data.agentId, context, "event.data.agentId");
+    const acceptedGrants = validateGrants(data.grants, context, "event.data.grants");
+    if (
+      accepted &&
+      (rejection !== null || taskId === null || agentId === null || acceptedGrants.length === 0)
+    ) {
+      fail(
+        context,
+        "event.data",
+        "accepted decisions require identities and grants without rejection",
+      );
+    }
+    if (
+      !accepted &&
+      (rejection === null || taskId !== null || agentId !== null || acceptedGrants.length !== 0)
+    ) {
+      fail(context, "event.data", "rejected decisions require only a rejection");
+    }
+  } else if (type === "agent.registered") {
+    exact(data, ["agent"], context, "event.data");
+    assertAgentRecord(data.agent, context, "event.data.agent");
+  } else if (type === "task.transitioned") {
+    exact(data, ["taskId", "agentId", "status", "reason"], context, "event.data");
+    string(data.taskId, context, "event.data.taskId");
+    string(data.agentId, context, "event.data.agentId");
+    oneOf(data.status, TASK_STATUSES, context, "event.data.status");
+    nullableString(data.reason, context, "event.data.reason");
+  } else if (type === "executor.started") {
+    exact(data, ["executionId", "taskId", "agentId", "startedAt"], context, "event.data");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.taskId, context, "event.data.taskId");
+    string(data.agentId, context, "event.data.agentId");
+    isoTimestamp(data.startedAt, context, "event.data.startedAt");
+  } else if (type === "model.usage_recorded") {
+    exact(data, ["receipt"], context, "event.data");
+    validateModelUsageReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "executor.finished") {
+    exact(data, ["receipt"], context, "event.data");
+    validateExecutorSpanReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "media.operation_started") {
+    exact(data, ["capability", "request", "grantId"], context, "event.data");
+    const capability = oneOf<"media.extract" | "media.seek">(
+      data.capability,
+      new Set(["media.extract", "media.seek"]),
+      context,
+      "event.data.capability",
+    );
+    if (capability === "media.extract") assertMediaExtractRequest(data.request, context);
+    else assertMediaSeekRequest(data.request, context);
+    string(data.grantId, context, "event.data.grantId");
+  } else if (type === "media.operation_completed") {
+    exact(data, ["operationId", "outputArtifactId", "receipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    validateMediaOperationReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "media.operation_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.reason, context, "event.data.reason");
+  } else if (type === "report.submitted") {
+    exact(data, ["report"], context, "event.data");
+    validateReportRecord(data.report, context, "event.data.report");
+  } else if (type === "report.decided") {
+    exact(
+      data,
+      ["reportId", "decidedByTaskId", "decidedByAgentId", "accepted", "reason"],
+      context,
+      "event.data",
+    );
+    string(data.reportId, context, "event.data.reportId");
+    string(data.decidedByTaskId, context, "event.data.decidedByTaskId");
+    string(data.decidedByAgentId, context, "event.data.decidedByAgentId");
+    boolean(data.accepted, context, "event.data.accepted");
+    string(data.reason, context, "event.data.reason");
+  } else {
+    fail(context, "event.type", `has unknown value ${type}`);
+  }
+}

@@ -1,0 +1,272 @@
+import {
+  CAPABILITIES,
+  type AgentRecord,
+  type Capability,
+  type CapabilityGrant,
+  type MediaScope,
+  type RequiredOutput,
+  type RuntimeBudget,
+  type RuntimeLimits,
+  type SpawnRequestInput,
+  type TaskRecord,
+} from "../model.ts";
+import {
+  array,
+  boolean,
+  exact,
+  fail,
+  integer,
+  nullableString,
+  object,
+  oneOf,
+  string,
+  uniqueStrings,
+} from "./primitives.ts";
+
+const CAPABILITY_SET = new Set<string>(CAPABILITIES);
+export const TASK_STATUSES = new Set([
+  "scheduled",
+  "working",
+  "reported",
+  "completed",
+  "failed",
+  "withheld",
+]);
+export const AGENT_STATUSES = new Set(["registered", "working", "reporting", "retired"]);
+export const WORKER_KINDS = new Set([
+  "orchestrator",
+  "media",
+  "analysis",
+  "translation",
+  "quality",
+]);
+const TRACK_KINDS = new Set(["audio", "video", "subtitle", "data", "attachment"]);
+
+function budget(value: unknown, context: string, path: string): asserts value is RuntimeBudget {
+  const item = object(value, context, path);
+  exact(item, ["wallMs", "toolCalls"], context, path);
+  integer(item.wallMs, context, `${path}.wallMs`, 1);
+  integer(item.toolCalls, context, `${path}.toolCalls`, 1);
+}
+
+function scope(value: unknown, context: string, path: string): asserts value is MediaScope {
+  const item = object(value, context, path);
+  exact(item, ["artifactId", "trackId", "startMs", "endMs"], context, path);
+  string(item.artifactId, context, `${path}.artifactId`);
+  string(item.trackId, context, `${path}.trackId`);
+  const start = integer(item.startMs, context, `${path}.startMs`);
+  const end = integer(item.endMs, context, `${path}.endMs`, 1);
+  if (end <= start) fail(context, path, "must be a non-empty half-open range");
+}
+
+function scopes(value: unknown, context: string, path: string): MediaScope[] {
+  const result = array(value, context, path);
+  result.forEach((item, index) => scope(item, context, `${path}[${index}]`));
+  const keys = result.map((item) => {
+    const range = item as MediaScope;
+    return `${range.artifactId}\u0000${range.trackId}\u0000${range.startMs}\u0000${range.endMs}`;
+  });
+  if (new Set(keys).size !== keys.length) fail(context, path, "must not repeat a scope");
+  return result as MediaScope[];
+}
+
+function outputs(value: unknown, context: string, path: string): RequiredOutput[] {
+  const result = array(value, context, path);
+  result.forEach((entry, index) => {
+    const item = object(entry, context, `${path}[${index}]`);
+    exact(item, ["name", "artifactKind", "required"], context, `${path}[${index}]`);
+    string(item.name, context, `${path}[${index}].name`);
+    string(item.artifactKind, context, `${path}[${index}].artifactKind`);
+    boolean(item.required, context, `${path}[${index}].required`);
+  });
+  const names = result.map((entry) => (entry as RequiredOutput).name);
+  if (new Set(names).size !== names.length) fail(context, path, "must not repeat output names");
+  return result as RequiredOutput[];
+}
+
+function capabilities(value: unknown, context: string, path: string): Capability[] {
+  const values = uniqueStrings(value, context, path);
+  values.forEach((entry, index) =>
+    oneOf<Capability>(entry, CAPABILITY_SET, context, `${path}[${index}]`),
+  );
+  return values as Capability[];
+}
+
+function grant(value: unknown, context: string, path: string): asserts value is CapabilityGrant {
+  const item = object(value, context, path);
+  exact(item, ["id", "capability", "taskId", "agentId", "mediaScope"], context, path);
+  string(item.id, context, `${path}.id`);
+  const capability = oneOf<Capability>(
+    item.capability,
+    CAPABILITY_SET,
+    context,
+    `${path}.capability`,
+  );
+  string(item.taskId, context, `${path}.taskId`);
+  string(item.agentId, context, `${path}.agentId`);
+  const mediaScope = scopes(item.mediaScope, context, `${path}.mediaScope`);
+  if (capability.startsWith("media.") && mediaScope.length === 0) {
+    fail(context, path, "media grants require scope");
+  }
+  if (!capability.startsWith("media.") && mediaScope.length !== 0) {
+    fail(context, path, "non-media grants cannot carry scope");
+  }
+}
+
+export function validateGrants(
+  value: unknown,
+  context: string,
+  path: string,
+): CapabilityGrant[] {
+  const result = array(value, context, path);
+  result.forEach((entry, index) => grant(entry, context, `${path}[${index}]`));
+  const ids = result.map((entry) => (entry as CapabilityGrant).id);
+  const names = result.map((entry) => (entry as CapabilityGrant).capability);
+  if (new Set(ids).size !== ids.length) fail(context, path, "must not repeat grant ids");
+  if (new Set(names).size !== names.length) fail(context, path, "must not repeat capabilities");
+  return result as CapabilityGrant[];
+}
+
+function track(value: unknown, context: string, path: string): void {
+  const item = object(value, context, path);
+  exact(item, ["id", "index", "kind", "codec", "durationMs"], context, path);
+  string(item.id, context, `${path}.id`);
+  integer(item.index, context, `${path}.index`);
+  oneOf(item.kind, TRACK_KINDS, context, `${path}.kind`);
+  string(item.codec, context, `${path}.codec`);
+  if (item.durationMs !== null) integer(item.durationMs, context, `${path}.durationMs`, 1);
+}
+
+export function validateTracks(value: unknown, context: string, path: string): void {
+  const result = array(value, context, path);
+  result.forEach((entry, index) => track(entry, context, `${path}[${index}]`));
+  const ids = result.map((entry) => (entry as { id: string }).id);
+  const indexes = result.map((entry) => (entry as { index: number }).index);
+  if (new Set(ids).size !== ids.length || new Set(indexes).size !== indexes.length) {
+    fail(context, path, "must contain unique track ids and indexes");
+  }
+}
+
+export function assertRuntimeLimits(
+  value: unknown,
+  context = "Runtime limits",
+): asserts value is RuntimeLimits {
+  const item = object(value, context, "limits");
+  exact(
+    item,
+    ["maxDepth", "maxActiveWorkers", "runBudget", "grantableCapabilities"],
+    context,
+    "limits",
+  );
+  integer(item.maxDepth, context, "limits.maxDepth");
+  integer(item.maxActiveWorkers, context, "limits.maxActiveWorkers", 1);
+  budget(item.runBudget, context, "limits.runBudget");
+  capabilities(item.grantableCapabilities, context, "limits.grantableCapabilities");
+}
+
+export function assertSpawnRequestInput(
+  value: unknown,
+  context = "Spawn request",
+): asserts value is SpawnRequestInput {
+  const item = object(value, context, "input");
+  exact(
+    item,
+    [
+      "workloadKey",
+      "objective",
+      "workerKind",
+      "workerLabel",
+      "mediaScope",
+      "inputArtifactIds",
+      "requiredOutputs",
+      "requiredCapabilities",
+      "dependencies",
+      "budget",
+    ],
+    context,
+    "input",
+  );
+  string(item.workloadKey, context, "input.workloadKey");
+  string(item.objective, context, "input.objective");
+  oneOf(item.workerKind, WORKER_KINDS, context, "input.workerKind");
+  string(item.workerLabel, context, "input.workerLabel");
+  scopes(item.mediaScope, context, "input.mediaScope");
+  uniqueStrings(item.inputArtifactIds, context, "input.inputArtifactIds");
+  outputs(item.requiredOutputs, context, "input.requiredOutputs");
+  capabilities(item.requiredCapabilities, context, "input.requiredCapabilities");
+  uniqueStrings(item.dependencies, context, "input.dependencies");
+  budget(item.budget, context, "input.budget");
+}
+
+export function assertTaskRecord(
+  value: unknown,
+  context: string,
+  path: string,
+): asserts value is TaskRecord {
+  const item = object(value, context, path);
+  exact(
+    item,
+    [
+      "id",
+      "runId",
+      "workloadKey",
+      "objective",
+      "workerKind",
+      "workerLabel",
+      "parentTaskId",
+      "parentAgentId",
+      "depth",
+      "assignedAgentId",
+      "ownerAgentId",
+      "mediaScope",
+      "inputArtifactIds",
+      "requiredOutputs",
+      "dependencies",
+      "budget",
+      "grants",
+      "status",
+    ],
+    context,
+    path,
+  );
+  string(item.id, context, `${path}.id`);
+  string(item.runId, context, `${path}.runId`);
+  string(item.workloadKey, context, `${path}.workloadKey`);
+  string(item.objective, context, `${path}.objective`);
+  oneOf(item.workerKind, WORKER_KINDS, context, `${path}.workerKind`);
+  string(item.workerLabel, context, `${path}.workerLabel`);
+  nullableString(item.parentTaskId, context, `${path}.parentTaskId`);
+  nullableString(item.parentAgentId, context, `${path}.parentAgentId`);
+  integer(item.depth, context, `${path}.depth`);
+  string(item.assignedAgentId, context, `${path}.assignedAgentId`);
+  nullableString(item.ownerAgentId, context, `${path}.ownerAgentId`);
+  scopes(item.mediaScope, context, `${path}.mediaScope`);
+  uniqueStrings(item.inputArtifactIds, context, `${path}.inputArtifactIds`);
+  outputs(item.requiredOutputs, context, `${path}.requiredOutputs`);
+  uniqueStrings(item.dependencies, context, `${path}.dependencies`);
+  budget(item.budget, context, `${path}.budget`);
+  validateGrants(item.grants, context, `${path}.grants`);
+  oneOf(item.status, TASK_STATUSES, context, `${path}.status`);
+}
+
+export function assertAgentRecord(
+  value: unknown,
+  context: string,
+  path: string,
+): asserts value is AgentRecord {
+  const item = object(value, context, path);
+  exact(
+    item,
+    ["id", "taskId", "parentTaskId", "parentAgentId", "kind", "label", "grants", "status"],
+    context,
+    path,
+  );
+  string(item.id, context, `${path}.id`);
+  string(item.taskId, context, `${path}.taskId`);
+  nullableString(item.parentTaskId, context, `${path}.parentTaskId`);
+  nullableString(item.parentAgentId, context, `${path}.parentAgentId`);
+  oneOf(item.kind, WORKER_KINDS, context, `${path}.kind`);
+  string(item.label, context, `${path}.label`);
+  validateGrants(item.grants, context, `${path}.grants`);
+  oneOf(item.status, AGENT_STATUSES, context, `${path}.status`);
+}

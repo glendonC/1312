@@ -406,12 +406,19 @@ export interface ExecutorSpanReceipt {
   taskId: string;
   agentId: string;
   phase: "active";
-  producer: {
-    id: "codex.exec";
-    version: string;
-    sandbox: "read-only";
-    ephemeral: true;
-  };
+  producer:
+    | {
+        id: "codex.exec";
+        version: string;
+        sandbox: "read-only";
+        ephemeral: true;
+      }
+    | {
+        id: "studio.deterministic-test-executor";
+        version: "1";
+        sandbox: "read-only";
+        ephemeral: true;
+      };
   startedAt: string;
   endedAt: string;
   monotonicDurationMs: number;

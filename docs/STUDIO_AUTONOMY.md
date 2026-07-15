@@ -1,7 +1,7 @@
 # Studio Autonomous Media Runtime
 
 Status: living implementation ledger for the Studio, media runtime, and development lab
-Last updated: 2026-07-14
+Last updated: 2026-07-15
 
 ## Purpose
 
@@ -289,7 +289,7 @@ values distinctly and explain which assumptions dominate the estimate.
 |---|---|---|
 | Event replay | Ordered typed traces, pure reducer, cursor reconstruction, fixture validation, and checkpoints | Keep exact scenario coverage current as producers grow |
 | Transport seam | Replay pause/step/seek/speed, single-trace legacy live validation, and a separate validated production-journal adapter | Acknowledged production live control; never route production events through legacy traces |
-| Source and run start | A development-only owned-source loader revalidates the highest sealed V1/V2/V3 preflight index and every indexed byte, derives a stable source-session revision, binds an explicit language-aware `studio.analysis-request.v1`, and writes an immutable `studio.runtime-start.v1` receipt beside the journal | Idempotent runtime service command, production start event/version, scheduler task propagation of the accepted language context, and main-Studio invocation |
+| Source and run start | A development-only loopback runtime-start host registers operator-selected owned-source directories, revalidates the highest sealed V1/V2/V3 preflight index and every indexed byte, resolves only stable session/revision identities from clients, durably claims `commandId`, writes an immutable adjacent `studio.runtime-start.v1`, and launches one bounded child at most once | Main-Studio invocation, a separately versioned production start event if later required, and scheduler task propagation of the accepted language context |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and production-journal worker projection | Stream the production adapter from a runtime service and add richer production task/lineage views without altering recorded bundles |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, a receipted ffmpeg range extraction host, and a bounded receipted seek observation host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
@@ -320,7 +320,91 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
 | 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
-| 10 — forecasting | Deterministic floor plus local start receipt implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. The development launcher now freezes that forecast into `run-start.json` before scheduling its proof child. The receipt is adjacent to, not an event inside, `events.ndjson`; no runtime service, idempotent start acknowledgement, forecast UI, pricing, calibration, or evaluation producer is claimed. |
+| 10 — forecasting | Deterministic floor plus local start receipt implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. The shared CLI/host application freezes that forecast into `run-start.json` before scheduling its proof child. The receipt is adjacent to, not an event inside, `events.ndjson`; no forecast UI, pricing, calibration, or evaluation producer is claimed. |
+| 11 — local runtime-start host | Development-only host implemented | A transport-independent service plus Node HTTP adapter now accepts only registered source-session/revision identities, durably claims the deterministic command, persists lifecycle state, initializes one immutable receipt/journal/artifact store, and creates one permanent launch claim before asynchronous execution. Authenticated cursor polling validates the complete production-event chain. Restart recovery never relaunches ambiguous work. `/studio/` remains replay-only and `/studio/runtime/` remains a manual journal inspector. |
+
+## Development-only runtime-start host
+
+The implemented host is local control-plane infrastructure, not a hosted service. It binds to
+`127.0.0.1` by default, rejects non-loopback binding unless the operator supplies the explicit
+unsafe-development flag, requires a per-process random bearer token, and returns CORS headers only
+for exact configured Studio origins. Request bodies are bounded and every request/query shape is
+closed. API responses contain stable source, command, runtime, journal, request, forecast, receipt,
+and event identities; they do not contain registered source directories, runtime paths, artifact
+storage keys, subprocess arguments, environment variables, or the bearer token.
+
+Source registration is a host startup operation. The operator supplies one or more owned preflight
+directories (and may constrain them to a configured source root). Each directory is fully loaded by
+the existing owned-source session loader. Browser requests contain only `sourceSessionId` and the
+expected `sourceRevisionId`; any changed indexed byte, symlink escape, unknown session, or stale
+revision fails before command acceptance. The browser cannot submit a source path, output root,
+journal path, artifact-store path, runtime identity, task/agent identity, sequence, scheduler state,
+or executable argument.
+
+`commandId` is the idempotency key. The command record is installed as one complete create-only
+filesystem claim, so concurrent processes select one accepted identity. Runtime id, journal id,
+accepted/start timestamp, analysis-request identity, and request content identity are allocated in
+that same claim. A separate complete create-only launch claim is written before the background
+executor is scheduled. Its durable existence permanently prevents an automatic second child. A
+retry returns the original runtime identity, immutable `run-start.json` content identity, and frozen
+forecast; it does not create another runtime directory, rewrite the receipt, or append another root,
+task, or agent sequence.
+
+The host lifecycle is `accepted`, `initializing`, `running`, `terminal`, `failed`, or `interrupted`.
+Acceptance and creation of a background promise do not imply running. `running` requires a validated
+`executor.started` event. Terminal and failure states are reconciled from the complete journal
+projection. Safe closed reason codes are stored for initialization failure, executor failure,
+interruption, and each ambiguous recovery stage; raw exceptions and subprocess output are not API
+evidence.
+
+On restart the host validates the original start receipt and the entire journal without rewriting
+either. A claim without a receipt, a receipt without a journal, an empty journal before launch, a
+launch claim without execution evidence, or a nonterminal journal becomes an inspectable
+`interrupted` state. The first version does not recreate an in-memory scheduler permit and never
+relaunches such a child. A terminal journal repairs stale lifecycle metadata. Inconsistent command,
+receipt, runtime, or journal identities fail closed.
+
+Cursor polling uses `0` as the initial sentinel. `after` is the last consumed event sequence and is
+exclusive. Every poll validates every line and projects the complete prefix before returning a
+strictly increasing bounded batch. `nextCursor` is the last returned sequence, or the requested
+cursor for an empty batch. A cursor past the current head is an error. Empty journals are valid;
+negative/malformed cursors, excessive limits, non-newline-terminated final bytes, malformed events,
+gaps, duplicates, cross-run events, and projection-invariant failures are rejected. Returned values
+are validated events, never raw log text or legacy traces.
+
+Deterministic execution is the default host script mode. Its receipts identify
+`studio.deterministic-test-executor`, record no model usage, and remain in ignored local runtime
+directories. It can pause before executor evidence or mid-run and can complete, fail, time out, or
+interrupt for tests. Real `codex exec` remains a separate `runtime:host:codex` command guarded by
+`--allow-real-codex`; it preserves the existing read-only sandbox, ephemeral session, bounded
+output, fixed arguments, no-inherited-shell policy, timeout, structured output, and report-up
+contract. Real execution was not run for this host slice.
+
+Implemented HTTP endpoints are:
+
+```text
+GET  /v1/source-sessions
+POST /v1/runtime-starts
+GET  /v1/runtime-starts/:commandId
+GET  /v1/runtimes/:runtimeId
+GET  /v1/runtimes/:runtimeId/events?after=<cursor>&limit=<n>
+```
+
+There is no pause/resume/cancel endpoint. The host does not upload or link-ingest sources. It starts
+only the existing one-child proof objective: no child media tools, media inspection, transcription,
+translation, captions, study output, parent/orchestrator model execution, or multi-worker swarm.
+The main Studio has no host client yet; recorded replay remains a separate protocol.
+
+### Deterministic operator path
+
+Run `npm run runtime:host` and copy the random token plus source-session identities from the startup
+summary. Use the token to list sessions, submit a product-level start request, repeat that exact
+request, and confirm both acknowledgements name the same command/runtime/journal and receipt. Poll
+from `after=0` until `reachedHead` and `terminal` are true. Stop and restart the same command with
+the same ignored `.studio/runtime-host` root, query its command/runtime status, and continue from the
+prior cursor. The emitted `events.ndjson` remains directly loadable through the existing manual
+`/studio/runtime/` file picker. `npm run runtime:host:codex` is the separately guarded real-executor
+path and must be invoked only with explicit authorization.
 
 ## Submission and customization UX
 
@@ -640,6 +724,11 @@ The next production slices, in dependency order:
    discovery and displays, but does not re-read, externally referenced evidence bytes.
 10. Run the authored browser matrix in an environment with an available in-app browser, then add only
    evidence-backed difficult-media scenarios produced by the new detectors.
+11. Implemented 2026-07-15: development-only registered-source runtime-start host, atomic durable
+    command and launch claims, explicit lifecycle records, restart interruption/terminal
+    reconciliation, bounded validated cursor polling, deterministic executor controls, authenticated
+    loopback HTTP adapter, and shared CLI/host application composition. The main Studio remains
+    unwired and no media, caption, or hosted-runtime capability is implied.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow
 the same rule: choose a real deterministic producer first, then add the contract, fixture, policy,

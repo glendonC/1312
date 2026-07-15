@@ -21,6 +21,50 @@ interface StartInput {
   analysisRequest: ProductionAnalysisRequest;
 }
 
+export interface RuntimeStartCommand {
+  commandId: string;
+  workPlan: RuntimeStartRecord["workPlan"];
+}
+
+/** Derive the durable idempotency key before allocating any host-owned runtime paths. */
+export function createRuntimeStartCommand(
+  sourceSession: ProductionSourceSession,
+  analysisRequest: ProductionAnalysisRequest,
+): RuntimeStartCommand {
+  assertProductionSourceSession(sourceSession);
+  assertProductionAnalysisRequest(analysisRequest);
+  if (
+    analysisRequest.sourceSessionId !== sourceSession.sessionId ||
+    analysisRequest.sourceRevisionId !== sourceSession.revisionId ||
+    analysisRequest.sourceContentId !== sourceSession.source.contentId
+  ) {
+    throw new Error("Runtime start command: analysis request does not bind the source-session revision");
+  }
+  const operationId = `operation:contract-proof:${canonicalSha256({
+    requestId: analysisRequest.requestId,
+    range: analysisRequest.range,
+  })}`;
+  const workPlan: RuntimeStartRecord["workPlan"] = {
+    schema: "studio.forecast.work-plan.v1",
+    planId: `plan:contract-proof:${canonicalSha256({ operationId })}`,
+    operations: [
+      {
+        operationId,
+        kind: "runtime.worker-contract-proof",
+        range: { ...analysisRequest.range },
+      },
+    ],
+  };
+  return {
+    commandId: `runtime-start:${canonicalSha256({
+      sourceRevisionId: sourceSession.revisionId,
+      analysisRequestId: analysisRequest.requestId,
+      workPlan,
+    })}`,
+    workPlan,
+  };
+}
+
 /**
  * Build the first honest plan: a bounded worker-contract proof scoped to the selected source
  * range. It does not claim transcription, translation, media inspection, captions, or study work.
@@ -28,21 +72,8 @@ interface StartInput {
 export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
   assertProductionSourceSession(input.sourceSession);
   assertProductionAnalysisRequest(input.analysisRequest);
-  const operationId = `operation:contract-proof:${canonicalSha256({
-    requestId: input.analysisRequest.requestId,
-    range: input.analysisRequest.range,
-  })}`;
-  const workPlan = {
-    schema: "studio.forecast.work-plan.v1" as const,
-    planId: `plan:contract-proof:${canonicalSha256({ operationId })}`,
-    operations: [
-      {
-        operationId,
-        kind: "runtime.worker-contract-proof",
-        range: { ...input.analysisRequest.range },
-      },
-    ],
-  };
+  const command = createRuntimeStartCommand(input.sourceSession, input.analysisRequest);
+  const workPlan = command.workPlan;
   const forecast = createForecastArtifact({
     artifact: {
       artifactId: input.sourceArtifactId,
@@ -65,11 +96,7 @@ export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
   const start: RuntimeStartRecord = {
     schema: "studio.runtime-start.v1",
     producer: { id: "studio.local-runtime-start", version: "1" },
-    commandId: `runtime-start:${canonicalSha256({
-      sourceRevisionId: input.sourceSession.revisionId,
-      analysisRequestId: input.analysisRequest.requestId,
-      workPlan,
-    })}`,
+    commandId: command.commandId,
     runtimeId: input.runId,
     journalId: input.journalId,
     sourceSession: structuredClone(input.sourceSession),

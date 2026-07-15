@@ -1,22 +1,20 @@
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
+import { identifyFile } from "../src/studio/runtime/production/artifactStore.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
-import { CodexExecWorkerLauncher } from "../src/studio/runtime/production/launcher.ts";
 import type {
   RequestedSourceLanguage,
-  RuntimeLimits,
-  SpawnRequestInput,
 } from "../src/studio/runtime/production/model.ts";
-import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
 import {
   createProductionAnalysisRequest,
-  createRuntimeStart,
   loadOwnedSourceSession,
-  writeRuntimeStartReceipt,
 } from "../src/studio/runtime/production/runStart.ts";
-import { BoundedRuntimeScheduler } from "../src/studio/runtime/production/scheduler.ts";
+import {
+  codexWorkerLauncherFactory,
+  initializeRuntimeApplication,
+  runBoundedRuntimeApplication,
+} from "../src/studio/runtime/production/runtimeHost/runtimeApplication.ts";
 
 const REPOSITORY = resolve(import.meta.dirname, "..");
 
@@ -59,13 +57,6 @@ function requestedSourceLanguage(): RequestedSourceLanguage {
   throw new Error("--source-language-mode must be declared, automatic, mixed, unknown, or withheld");
 }
 
-const limits: RuntimeLimits = {
-  maxDepth: 1,
-  maxActiveWorkers: 2,
-  runBudget: { wallMs: 120_000, toolCalls: 4 },
-  grantableCapabilities: ["task.spawn.request", "report.submit"],
-};
-
 const runId = `runtime-local-${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
 const parent = resolve(argument("--output-root") ?? join(REPOSITORY, ".studio/runtime-workers"));
 const runRoot = join(parent, runId);
@@ -86,76 +77,37 @@ const analysisRequest = createProductionAnalysisRequest(loadedSource.session, {
 await mkdir(parent, { recursive: true, mode: 0o700 });
 await mkdir(runRoot, { recursive: false });
 
-const store = new ContentAddressedArtifactStore(join(runRoot, "artifact-store"));
-const source = await store.registerSource(runId, loadedSource.descriptor);
 const journalPath = join(runRoot, "events.ndjson");
 const startedAt = new Date().toISOString();
-const runStart = createRuntimeStart({
-  runId,
+const runStartPath = join(runRoot, "run-start.json");
+const initialized = await initializeRuntimeApplication({
+  runtimeRoot: runRoot,
+  journalPath,
+  artifactStoreRoot: join(runRoot, "artifact-store"),
+  runStartPath,
+  runtimeId: runId,
   journalId: `journal:${runId}`,
   acceptedBy: argument("--accepted-by") ?? "operator:local-cli",
   startedAt,
-  sourceSession: loadedSource.session,
-  sourceArtifactId: source.id,
+  loadedSource,
   analysisRequest,
 });
-const runStartPath = join(runRoot, "run-start.json");
-const runStartContent = await writeRuntimeStartReceipt(runStartPath, runStart);
-const ledger = await RuntimeLedger.open(runId, new FileEventJournal(journalPath));
-await store.record(ledger, source);
-const scheduler = new BoundedRuntimeScheduler(ledger, limits);
-const rootPermit = await scheduler.createRoot({
-  workloadKey: `root:${runId}`,
-  objective: `Coordinate one bounded local worker launch for ${analysisRequest.requestId} without making media-content claims.`,
-  workerKind: "orchestrator",
-  workerLabel: "local-orchestrator",
-  mediaScope: [],
-  inputArtifactIds: [source.id],
-  requiredOutputs: [{ name: "run report", artifactKind: "run-report", required: true }],
-  requiredCapabilities: ["task.spawn.request"],
-  dependencies: [],
-  budget: { wallMs: 60_000, toolCalls: 2 },
-});
-await scheduler.registerAgent(rootPermit);
-await scheduler.transitionTask(rootPermit.taskId, rootPermit.agentId, "working");
-
-const child: SpawnRequestInput = {
-  workloadKey: `bounded-acknowledgement:${runId}`,
-  objective:
-    `Return an honest acknowledgement of ${analysisRequest.requestId}. Do not claim media inspection, transcription, translation, captions, or detector work.`,
-  workerKind: "analysis",
-  workerLabel: "codex-bounded-child",
-  mediaScope: [],
-  inputArtifactIds: [source.id],
-  requiredOutputs: [{ name: "execution report", artifactKind: "worker-execution-report", required: true }],
-  requiredCapabilities: ["report.submit"],
-  dependencies: [],
-  budget: { wallMs: 45_000, toolCalls: 1 },
-};
-const decision = await scheduler.requestSpawn(rootPermit.taskId, rootPermit.agentId, child);
-if (!decision.permit) throw new Error(`Local worker spawn was rejected: ${decision.rejection ?? "unknown"}`);
-
-const reports = new BoundedReportHost(ledger);
-const launcher = new CodexExecWorkerLauncher(ledger, scheduler, store, reports, {
+await runBoundedRuntimeApplication(initialized, codexWorkerLauncherFactory({
   model: argument("--model"),
   maximumWallMs: 45_000,
-});
-const launched = await launcher.launch(decision.permit);
-await reports.decide({
-  reportId: launched.report.id,
-  decidedByTaskId: rootPermit.taskId,
-  decidedByAgentId: rootPermit.agentId,
-  accepted: true,
-  reason: "The bounded child returned its required structured artifact and execution receipts.",
-});
-await scheduler.transitionTask(
-  rootPermit.taskId,
-  rootPermit.agentId,
-  "withheld",
-  "The local launcher smoke ended after the child proof; it produced no run-level media result.",
-);
-
+}));
+const runStart = initialized.runStart;
+const runStartContent = await identifyFile(runStartPath);
+const ledger = await RuntimeLedger.open(runId, new FileEventJournal(journalPath));
 const state = ledger.state();
+const root = Object.values(state.tasks).find((task) => task.parentTaskId === null);
+const child = Object.values(state.tasks).find((task) => task.parentTaskId !== null);
+const execution = Object.values(state.executions)[0];
+const report = Object.values(state.reports)[0];
+const usage = execution?.modelUsageReceiptId ? state.modelUsage[execution.modelUsageReceiptId] : null;
+if (!root || !child || !execution || !report || !usage) {
+  throw new Error("Shared bounded runtime application did not produce its expected Codex proof records");
+}
 process.stdout.write(
   `${JSON.stringify(
     {
@@ -166,7 +118,7 @@ process.stdout.write(
         contentId: runStartContent.contentId,
         commandId: runStart.commandId,
       },
-      artifactStore: join(runRoot, "artifact-store"),
+      artifactStore: initialized.artifactStoreRoot,
       sourceSession: {
         id: loadedSource.session.sessionId,
         revisionId: loadedSource.session.revisionId,
@@ -191,20 +143,20 @@ process.stdout.write(
         frozenForecastId: runStart.frozenForecast.freezeId,
       },
       child: {
-        taskId: decision.permit.taskId,
-        agentId: decision.permit.agentId,
-        status: state.tasks[decision.permit.taskId].status,
-        reportId: launched.report.id,
+        taskId: child.id,
+        agentId: child.assignedAgentId,
+        status: child.status,
+        reportId: report.id,
       },
-      rootStatus: state.tasks[rootPermit.taskId].status,
+      rootStatus: root.status,
       execution: {
-        id: launched.execution.executionId,
-        outcome: launched.execution.outcome,
-        activeDurationMs: launched.execution.monotonicDurationMs,
+        id: execution.id,
+        outcome: execution.status,
+        activeDurationMs: execution.receipt?.monotonicDurationMs ?? null,
       },
-      measuredUsage: launched.usage.measured,
-      model: launched.usage.model,
-      billing: launched.usage.billing,
+      measuredUsage: usage.measured,
+      model: usage.model,
+      billing: usage.billing,
       note:
         "Local production run-start receipt and production journal only; the child did not inspect media or produce captions, and nothing was added to a recorded Studio demo run.",
     },

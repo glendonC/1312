@@ -49,8 +49,17 @@ export function validateExecutorSpanReceipt(
   literal(item.phase, "active", context, `${path}.phase`);
   const producer = object(item.producer, context, `${path}.producer`);
   exact(producer, ["id", "version", "sandbox", "ephemeral"], context, `${path}.producer`);
-  literal(producer.id, "codex.exec", context, `${path}.producer.id`);
-  string(producer.version, context, `${path}.producer.version`);
+  const producerId = oneOf<string>(
+    producer.id,
+    new Set(["codex.exec", "studio.deterministic-test-executor"]),
+    context,
+    `${path}.producer.id`,
+  );
+  if (producerId === "studio.deterministic-test-executor") {
+    literal(producer.version, "1", context, `${path}.producer.version`);
+  } else {
+    string(producer.version, context, `${path}.producer.version`);
+  }
   literal(producer.sandbox, "read-only", context, `${path}.producer.sandbox`);
   if (producer.ephemeral !== true) fail(context, `${path}.producer.ephemeral`, "must be true");
   const startedAt = isoTimestamp(item.startedAt, context, `${path}.startedAt`);
@@ -72,15 +81,18 @@ export function validateExecutorSpanReceipt(
   const outputs = uniqueStrings(item.outputArtifactIds, context, `${path}.outputArtifactIds`);
   const usage = nullableString(item.modelUsageReceiptId, context, `${path}.modelUsageReceiptId`);
   const failure = nullableString(item.failure, context, `${path}.failure`);
-  if (
-    outcome === "completed" &&
-    (exitCode !== 0 || outputs.length === 0 || usage === null || failure !== null)
-  ) {
+  if (outcome === "completed" && (exitCode !== 0 || outputs.length === 0 || failure !== null)) {
     fail(
       context,
       path,
-      "completed spans require exit zero, outputs, measured usage, and no failure",
+      "completed spans require exit zero, outputs, and no failure",
     );
+  }
+  if (outcome === "completed" && producerId === "codex.exec" && usage === null) {
+    fail(context, path, "completed Codex spans require measured usage");
+  }
+  if (producerId === "studio.deterministic-test-executor" && usage !== null) {
+    fail(context, path, "deterministic test spans cannot claim model usage");
   }
   if (outcome !== "completed" && (outputs.length !== 0 || failure === null)) {
     fail(context, path, "unsuccessful spans require a failure and cannot claim outputs");

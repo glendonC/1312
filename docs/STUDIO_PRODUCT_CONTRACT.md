@@ -1,0 +1,520 @@
+# Studio Product Contract
+
+Status: shared UI/runtime contract and implementation inventory
+Last updated: 2026-07-15
+
+## Purpose
+
+This document is the shared boundary between Studio UI/UX work and runtime architecture work.
+It records every product stage, visible datum, control, action, evidence source, and unavailable
+state needed for the complete 1321 loop:
+
+```text
+clip or link
+  -> source facts
+  -> range and output choices
+  -> analysis plan and forecast
+  -> swarm execution
+  -> captions, study, and evidence
+```
+
+The UI/UX chat owns how these contracts are presented. The architecture chat owns the producers
+and runtime wiring that make them true. Neither chat may silently change an action's meaning or
+promote recorded replay into live runtime evidence.
+
+This is not a second architecture ledger. Runtime design and implementation status remain in
+[`docs/STUDIO_AUTONOMY.md`](./STUDIO_AUTONOMY.md), stable boundaries remain in
+[`docs/ARCHITECTURE.md`](./ARCHITECTURE.md), and exact wire contracts remain in
+[`docs/RUNTIME_CONTRACTS.md`](./RUNTIME_CONTRACTS.md).
+
+## Scope and lane boundaries
+
+In scope:
+
+- `/studio/` source entry, preflight, planning, swarm, workspaces, results, and replay controls
+- `/studio/?lab=1` development-only UI states and replay inspection
+- `/studio/runtime/` production-journal inspection
+- `/studio/runtime/memory/` memory-receipt inspection
+- Local ingest, detector, legacy run, scheduler, launcher, journal, media, handoff, forecast, and
+  observability seams that can eventually power the Studio
+- The data and action contracts needed to replace replay sources incrementally
+
+Out of scope:
+
+- Bet G, gold, controls, freezes, scores, and the `bench/` conveyor unless a Studio runtime
+  contract cannot be tested without them
+- More listen-pass work
+- Visual implementation decisions that do not alter product semantics
+- Hosted accounts, sync, private Sori integration, and fine-tuning
+
+## Authority and editing rules
+
+1. The UI/UX chat is the primary editor of this document's surface inventory, interaction
+   requirements, state coverage, and acceptance checklist.
+2. The architecture chat implements against this document. It owns
+   `src/studio/runtime/production/`, local runtime scripts, and the implementation ledger in
+   `STUDIO_AUTONOMY.md`.
+3. Only one chat should edit this document at a time. Architecture discrepancies should first be
+   recorded in its runtime ledger or handed back as a proposed contract change.
+4. A control may be redesigned, renamed, or moved by UI/UX, but its **today behavior**, target
+   action, evidence class, and unavailable behavior must remain explicit.
+5. A real producer does not become a live Studio feature until the Studio invokes it and consumes
+   its validated output through an explicit session/job contract.
+6. Recorded files never become evidence about a newly submitted URL, selected range, or option.
+
+## Status vocabulary
+
+Every row uses one evidence class and one implementation status.
+
+| Class | Meaning |
+|---|---|
+| A — recorded replay / preview | The UI projects recorded artifacts or events. It may be interactive, but it is not executing the submitted job. |
+| B — local real runtime fragment | A producer performs real work and emits receipts, artifacts, or a production journal. It may still be disconnected from `/studio/`. |
+| C — missing / contract only | The desired behavior has no complete producer-to-UI path. A fixture may exercise presentation only. |
+
+| Implementation status | Meaning |
+|---|---|
+| Real and wired | The user action invokes the real producer and the UI consumes its validated result. |
+| Real producer, UI unwired | Real local work exists but `/studio/` does not call or stream it. |
+| Recorded replay | The visible state comes from a recorded run bundle and `ReplayTransport`. |
+| UI contract only | The control or state exists for replay/fixture coverage but cannot produce a matching new run. |
+| Missing | No product surface or adequate producer exists. |
+
+`Unavailable`, `unknown`, `withheld`, and `null` are valid product values. They must not be changed
+to zero, false, empty arrays, guessed ranges, estimated prices, or plausible activity.
+
+## Current system truth
+
+- `/studio/` is hard-wired to `run-006` in `src/pages/studio/index.astro` and boots a
+  `ReplayTransport` in `src/studio/StudioApp.tsx` and `src/studio/store.ts`.
+- `ReplayTransport` reads `public/demo/runs/<id>/` files. The current UI does not create a runtime
+  job, call the local runtime-start host, start `scripts/run-clip.mjs`, start
+  `scripts/run-local-worker.ts`, or load a production journal.
+- A submitted YouTube URL creates a `StudioPreviewSession` with `dataSource: "recorded_run"`.
+  It starts the recorded run and displays: “This interface preview uses a recorded run. Your
+  source was not processed.”
+- `run-005` and `run-006` contain recorded artifacts used by the Studio and lab. `run-005` is also
+  the content-addressed owned-media validator fixture consumed by local runtime tests.
+- A development-only runtime-start host now exists under
+  `src/studio/runtime/production/runtimeHost/`. `npm run runtime:host` starts its deterministic
+  one-child proof on loopback with bearer authentication, registered owned-source sessions,
+  idempotent start acknowledgements, lifecycle lookup, and validated cursor polling. `/studio/`
+  has no host client and does not call it, so the host remains Class B: a real producer with its UI
+  unwired.
+- `/studio/runtime/` validates one operator-selected local NDJSON journal and projects normalized
+  facts. A host journal remains manually loadable there, but the inspector does not start or
+  connect to the host. Its own page states that it “does not start a worker, search raw logs, or
+  insert activity into a recorded demo.”
+- The local scheduler, artifact store, journal, one-child launcher, forecast freeze, and structured
+  report-up are composed only into the host's bounded proof. `media.extract` and `media.seek` are
+  also real fragments, but remain unavailable to the child. None of this is composed into the main
+  Studio loop.
+- `scripts/run-clip.mjs` performs the older real API-backed clip pipeline and writes a recorded run
+  folder. Its emitted legacy traces look like a swarm, but it is not the production scheduler or a
+  live Studio session.
+- UI polish alone cannot change any of these boundaries.
+
+## Product flow contract
+
+| Step | Required user-visible outcome | Today | Class / status | Required runtime boundary |
+|---|---|---|---|---|
+| 1. Add source | User supplies a supported link or owned clip | Link field exists; a valid YouTube link starts a recorded preview | A / recorded replay | `SourceSubmission` creates a session without starting expensive work |
+| 2. Validate and probe | Access, rights, duration, tracks, speech, languages, and known gaps | Recorded receipts can be inspected; local producers exist; submitted links are not probed | A+B / real producers, UI unwired | Session-scoped ingest/probe job with progress and immutable receipts |
+| 3. Choose range | Suggested, detected-language, whole, or custom time window | Recorded and custom controls exist; changed ranges cannot replay; suggested/detected choices are disabled | C / UI contract only | Validated range selection bound to measured source duration and findings |
+| 4. Choose result | Target language, captions/evidence depth, relevant advanced options | Controls exist against recorded configuration; unsupported changes are blocked | A+C / UI contract only | Versioned `AnalysisRequest` accepted by a planner |
+| 5. Review plan | Work operations, agent/task limits, assumptions, workload, elapsed-time range, cost range | No integrated Studio plan/calculator | C / missing | Forecast request over measured preflight and explicit work plan |
+| 6. Start analysis | Accepted plan becomes a run; exact forecast is frozen | In `/studio/`, the replay button starts `ReplayTransport`. Separately, the local host accepts an idempotent runtime-start command, freezes the forecast, and returns durable identities, but Studio has no host client | A+B / recorded replay; real producer, UI unwired | Wire the main Studio to the existing host using product inputs plus stable source-session/revision identities |
+| 7. Spawn agents | Scheduler creates bounded tasks and workers | Recorded manifest/traces animate; the local host can start its bounded one-child proof | A+B / real producer, UI unwired | Streamed production task/agent registry driven by scheduler events |
+| 8. Coordinate | Children inspect scoped inputs and report structured outputs upward | Recorded prose is replayed; local one-child report-up is real but isolated | A+B / partial local fragment | Parent/orchestrator executor, dependencies, handoffs, retries, and child tool bridge |
+| 9. Work through media | Agents seek, loop, mark, extract, inspect frames/tracks, and run detectors | Recorded workspaces are projections; host has only real extract and seek; child can call neither | A+B+C / partial | Capability bridge plus remaining media/detector operations and receipts |
+| 10. Control run | Pause, resume, cancel, reconnect, and show accepted state | Pause/resume/stop control the replay clock only. The local host provides lifecycle lookup and cursor reconnect, unwired from Studio, but no pause/resume/cancel acknowledgement | A+B+C / recorded controls; real polling producer, UI unwired; live controls missing | Reconnect from the last consumed journal sequence; add a separate request/ack protocol for live controls |
+| 11. Publish output | Timed source, translation, withheld lines, captions, study, evidence, exports | Recorded captions, comparison, scores, evidence, glossary, and artifact links render | A / recorded replay | Merge/QC/publish task producing immutable result artifacts |
+| 12. Inspect real run | Operator can audit actual tasks, operations, usage, handoffs, and failures | Local journal can be loaded manually in `/studio/runtime/` | B / real and inspector-wired | Link a Studio run to its production journal without merging protocols |
+
+## Surface and control inventory
+
+### 1. Welcome and source entry — `/studio/`
+
+| ID | Visible datum or control | What it does today | Source today | Target semantics | Class / status |
+|---|---|---|---|---|---|
+| `source.input.open` | **Input Source** | Opens the URL entry control | Client state | Open source selection; no job starts | C / UI contract only |
+| `source.url` | **Paste a link** | Parses presentation details client-side | `presentSource()` | Accept supported URL; upload/owned-file selection remains a separate adapter | C / UI contract only |
+| `source.edit` | Source review/edit button | Returns to URL editing | Client state | Edit before submission; invalidate any stale probe/plan | C / UI contract only |
+| `source.submit` | Arrow, labelled **Launch investigation** | For a valid YouTube URL, creates a UI-only preview and starts `run-006` replay when loaded | `previewSession.ts`, recorded bundle | Rename or redesign so preview and real submission are never the same unlabelled action; real action should create a source session and begin bounded probe only | A / recorded replay |
+| `source.preview.notice` | Submitted-source provenance note | Says the submitted source was not processed | `StudioPreviewSession.dataSource` | Must remain visible anywhere a submitted URL is displayed over recorded evidence | A / recorded replay |
+| `demo.open` | **Run Demo** | Opens recorded-source preflight for the loaded bundle | `run-006` | Explicit entry into recorded demonstration | A / recorded replay |
+| `bundle.retry` | **Retry loading** | Reloads recorded bundle after a fetch/validation failure | `ReplayTransport` | Retry the current source of truth only; never imply runtime retry | A / recorded replay |
+
+Required states: recorded bundle loading, load failure, empty source, invalid URL, unsupported URL,
+submitted-source preview, hosted probe unavailable, and explicit recorded demo.
+
+### 2. Source facts and preflight — `/studio/`
+
+| ID | Visible datum or control | What it does today | Source today | Target semantics | Class / status |
+|---|---|---|---|---|---|
+| `preflight.source` | Source/creator label | Displays recorded receipt facts or an honest absence | Recorded ingest receipt | Normalized ingest fact; do not infer creator from filename or ownership | A+B / producer recorded, UI replay |
+| `preflight.rights` | Rights/licence and attestation | Displays recorded rights basis | Recorded ingest receipt | Gate processing/hosting using adapter-specific receipt | A+B / producer recorded, UI replay |
+| `preflight.selection` | Selected source window and duration | Displays recorded window | Recorded ingest receipt | Measured source duration plus selected analysis range | A+B / producer recorded, UI replay |
+| `preflight.media` | Playable artifact, waveform, SHA-256, bytes | Displays recorded artifact/provenance | Recorded ingest and probe receipts | Session-bound source/artifact identity | A+B / producer recorded, UI replay |
+| `preflight.tracks` | Container, codecs, dimensions, rate, channels | Displays recorded ffprobe data | `media-probe.json` | Real probe projection with source identity | A+B / producer recorded, UI replay |
+| `preflight.speech` | Speech duration/windows/coverage | Displays recorded detector receipt when present | `speech-activity.json` | Measured speech/non-speech ranges with producer identity | A+B / producer recorded, UI replay |
+| `preflight.languages` | Time-ranged classifications, unknowns, withhelds | Displays recorded detector receipt when present | `language-ranges.json` | Measured ranges; never silently set target language or pack | A+B / producer recorded, UI replay |
+| `preflight.acoustics` | Music/noise ranges | Only absence/gap copy exists; empty legacy arrays are not proof | No deterministic producer | Show ranges and uncertainty only after an acoustic receipt exists | C / missing |
+| `preflight.overlap` | Speaker count/overlap ranges | Completed-run diarizer labels may be visible elsewhere, but are not preflight facts | No preflight producer | Show estimates and uncertainty only after a producer exists | C / missing |
+| `preflight.recommendation` | Suggested range/complexity | Disabled: **no recommender output** | No producer | Explain why the range is suggested and link to measured inputs | C / missing |
+| `preflight.coverage` | **Producer coverage** details | Expands recorded producer identities and missing gaps | Recorded receipts and gap registry | Keep as an inspectable honesty surface | A / recorded replay |
+| `preflight.dismiss` | **Try another source** / **Close** | Dismisses a failed/cancelled preflight | Client state | Abandon this preflight without creating a run | C / UI contract only |
+| `preflight.use-recorded` | **Use recorded source** | Opens recorded demo preflight | `run-006` bundle | Remain an explicit demo fallback, never an automatic substitution | A / recorded replay |
+
+Required failure states: inaccessible/disallowed, no target language, mixed language, detector
+uncertainty, excessive duration, cancelled, probe failure, and partial probe success. Development
+fixtures already exercise several of these but contain no measurements.
+
+### 3. Range, output, and analysis choices — `/studio/`
+
+| ID | Visible datum or control | What it does today | Target semantics | Class / status |
+|---|---|---|---|---|
+| `request.range.recorded` | **Recorded selection** | Selects the exact range covered by recorded artifacts | Whole measured/default selection | A / recorded replay |
+| `request.range.suggested` | **Suggested range** | Disabled because no recommender ran | Select a measured recommendation; show rationale/confidence | C / missing |
+| `request.range.detected` | **Measured language ranges** | Disabled because detector evidence does not identify a replayable result subrange | Select one or more measured target-language ranges | C / UI contract only |
+| `request.range.custom` | **Custom start and end** | Reveals numeric fields; any changed range is blocked because no matching recorded run exists | Bind a valid half-open range within measured duration | C / UI contract only |
+| `request.range.start/end` | Start/end seconds | Edits client request only | Prefer scrubber plus exact accessible fields; changing range invalidates plan/forecast | C / UI contract only |
+| `request.long-local` | **Allow this longer local run** | Development-only acceptance for a recorded range; still cannot create a new run | Explicit local policy override with recalculated plan | C / UI contract only |
+| `request.target` | **Translation target** | Only the recorded target is offered | Choose a supported target before planning; unsupported pairs fail closed | A+C / UI contract only |
+| `request.output.captions` | **Captions only** | Replays the same run and hides evidence/comparison surfaces | Plan only required caption outputs | A / recorded replay presentation |
+| `request.output.evidence` | **Captions plus evidence and breakdown** | Replays the same run and shows evidence/comparison | Add evidence/study work to the plan | A / recorded replay presentation |
+| `request.speech-scope` | Foreground/all speech | Visible only in relevant fixtures; changed value cannot replay | Planner input gated by measured relevance | C / UI contract only |
+| `request.lyrics` | Include lyrics | Visible only in relevant fixtures; changed value cannot replay | Planner input gated by measured music finding | C / UI contract only |
+| `request.speaker` | Focus on speaker | Visible only in relevant fixtures; changed value cannot replay | Choose a detector label, not an inferred identity | C / UI contract only |
+| `request.honorifics` | Preserve/naturalize | Changed value cannot replay | Translation-plan input | C / UI contract only |
+| `request.style` | Literal/natural | Changed value cannot replay | Translation-plan input | C / UI contract only |
+| `request.caption-density` | Compact/balanced/relaxed | Changed value cannot replay | Publishing constraint with reading-speed validation | C / UI contract only |
+| `request.slow-analysis` | Longer/slower analysis | Changed value cannot replay | Explicit quality/latency tradeoff in the work plan | C / UI contract only |
+| `request.cancel` | **Cancel** | Enters a cancelled preflight state; no replay starts | Cancel before runtime start | C / UI contract only |
+| `request.confirm-replay` | **Replay recorded analysis** | Validates exact recorded configuration and starts `ReplayTransport` | Must remain explicitly replay-labelled | A / recorded replay |
+
+Policy: default suggested selection is 30–60 seconds; hosted maximum is 120 seconds; longer local
+ranges require an explicit warning. These are policies, not measured cost or elapsed time.
+
+### 4. Plan and time/cost forecast — required Studio surface
+
+No integrated planner or calculator is currently rendered in `/studio/`.
+
+| ID | Required datum or control | Available today | Target semantics | Class / status |
+|---|---|---|---|---|
+| `plan.range` | Draggable selected media range | Numeric custom fields exist; no plan binding | Same content-identified range accepted by runtime | C / missing integration |
+| `plan.operations` | Requested operations/task lanes | Forecast model accepts explicit operation ranges in code | Human-readable work plan; no hidden operations | B / real producer, UI unwired |
+| `plan.agent-limits` | Spawn depth, active workers, concurrency | Scheduler limits exist locally; no Studio selection | Policy-bounded choices, not promises of worker count | B+C / partial |
+| `plan.quality` | Model/quality tier | No complete adapter or UI | Versioned choice mapped to supported executor configuration | C / missing |
+| `forecast.floor` | Deterministic requested workload | `studio.forecast.v1` computes selected duration and summed explicit operation durations | Label **workload floor**, never elapsed time | B / real producer, UI unwired |
+| `forecast.elapsed.baseline` | Baseline elapsed time | `null` | Show unavailable until an elapsed-time estimator has evidence | C / missing |
+| `forecast.elapsed.expected` | Expected elapsed range | `null` | Versioned calibrated estimate with uncertainty | C / missing |
+| `forecast.elapsed.conservative` | Conservative elapsed range | `null` | Versioned calibrated estimate with uncertainty | C / missing |
+| `forecast.model-usage` | Token/provider-unit estimate | `null` | Model-adapter estimate, distinct from budget and actual usage | C / missing |
+| `forecast.api-cost` | Estimated amount and currency | amount and currency are `null` | Versioned price-book snapshot; no hard-coded UI prices | C / missing |
+| `forecast.assumptions` | What dominates estimate | Deterministic-floor warnings exist in the forecast artifact | Always inspectable; name excluded retries/spawns/unknown work | B / real producer, UI unwired |
+| `forecast.accept` | Accept plan and forecast | The local host freezes the accepted forecast into the run-start receipt and durably claims one idempotent command; `/studio/` does not invoke it | Freeze exact accepted forecast and create one idempotent run | B / real producer, UI unwired |
+| `forecast.back` | Edit range/options | No plan surface | Invalidate and regenerate the forecast | C / missing |
+
+UIUX may design every planner state now. Where producers remain absent, it must render unavailable
+values rather than fixture currency or time. A UI-only demonstration fixture may be used only when
+visibly labelled as example data and must never enter recorded or production evidence.
+
+### 5. Swarm and global run controls — `/studio/`
+
+| ID | Visible datum or control | What it does today | Target semantics | Class / status |
+|---|---|---|---|---|
+| `run.topology` | Orchestrator, worker nodes, edges, statuses | Folds recorded legacy traces over a predeclared run manifest | Project production scheduler/registry events | A / recorded replay |
+| `run.layout` | Layout segmented control | Rearranges the local graph only | Presentation-only; may remain independent of runtime | A / real UI over replay data |
+| `run.pan` | Canvas drag | Pans local graph | Presentation-only | A / real UI over replay data |
+| `run.agent.open` | Click agent/orchestrator node | Opens recorded role workspace and history | Inspect the selected production agent/task and its receipts | A / recorded replay |
+| `run.phase` | Phase label and percentage | Derived from replay cursor and trace count | Derive live progress from explicit tasks; never invent a percentage from animation time | A / recorded replay |
+| `run.pause` | **Pause/Resume**, space shortcut | Stops/resumes the replay clock exactly | Send a correlated control request; show paused only after runtime acknowledgement | A / recorded replay |
+| `run.stop` | **Stop** | Stops replay and marks the client session cancelled | Request cancellation; distinguish requested, accepted, draining, cancelled, and failed | A / recorded replay |
+| `run.clear` | **Clear** | Returns to source entry after terminal state | Clear local UI; must not delete runtime evidence | A / client state |
+| `run.again` | **Run again** | Restarts the same recorded replay | Offer replay-again separately from new runtime execution | A / recorded replay |
+
+The words **live**, **working now**, **spawned for your source**, and **paused** are production
+claims. They require corresponding runtime evidence or acknowledgement.
+
+### 6. Agent focus and workspace — `/studio/`
+
+| ID | Visible datum or control | What it does today | Target semantics | Class / status |
+|---|---|---|---|---|
+| `agent.identity` | Display name and recorded status; role and id in panel metadata | Uses a run-scoped manifest label when it is distinct from the machine id, otherwise the recorded role-title fallback | Production registry identity plus task ownership | A / recorded replay |
+| `agent.previous/next` | Previous/next agent | Navigates currently projected recorded agents | Navigate production registry without changing execution | A / client state |
+| `agent.close` | Close/backdrop/Escape | Closes focus surface | Presentation-only | A / client state |
+| `agent.activity` | Recorded action history | Filters emitted legacy traces by agent | Query normalized task, operation, execution, and handoff facts | A / recorded replay |
+| `agent.segment.media` | Play, pause, ±5 seconds, scrubber | Lets the human inspect recorded media; does not move the agent playhead | Preserve separate human inspection cursor and receipted agent operations | A / recorded replay |
+| `agent.segment.marks` | Waveform, playhead, marked ranges | Projects recorded trace effects | Production media-operation receipts and annotations | A / recorded replay |
+| `agent.context` | Resolved terms | Projects recorded glossary effects | Run-scoped evidence with source links; no silent memory promotion | A / recorded replay |
+| `agent.translate` | Draft/translation state | Projects recorded draft effects | Immutable worker artifacts and revisions | A / recorded replay |
+| `agent.qc` | Gates/withholding | Projects recorded gate effects | Structured QC decisions linked to evidence and publish outcome | A / recorded replay |
+| `agent.capabilities` | Granted tools/scope | Not shown in main Studio | Show scheduler-enforced grants and exact media scope | B / producer exists, UI unwired |
+| `agent.spawn-request` | Child request/decision | No production view in main Studio | Show requested/accepted/rejected child and reason | B / producer exists, UI unwired |
+| `agent.handoff` | Structured report-up | No production view in main Studio | Show submitted/accepted/rejected report and artifacts | B / producer exists, UI unwired |
+
+Focus mode keeps the visual mark, one public display name, and the evidence-derived state as its
+identity anchor. Role, machine id, activity, workspace, and provenance remain inside one recorded
+workspace instrument. A presentation-only section rail switches that instrument between the
+role-specific workspace and recorded activity from the panel's outer right edge; previous/next and
+close remain client-state commands below it. While focus is open, the top source chrome recedes but
+the global recorded-replay Dock remains visible and authoritative for pause, progress, and stop. When
+a submitted-source preview is active, its not-processed warning is repeated inside the focus panel.
+Keep the recorded-preview boundary until the main Studio consumes production journal events.
+
+### 7. Results, captions, study, and evidence — `/studio/`
+
+| ID | Visible datum or control | What it does today | Target semantics | Class / status |
+|---|---|---|---|---|
+| `result.player` | Recorded media play/pause and seek | Plays media from the recorded run folder | Play the immutable input/selected output associated with this run | A / recorded replay |
+| `result.caption-view` | **1321 / Cold / Diff** | Switches among recorded caption projections when evidence depth permits | Comparison only when both paths have compatible recorded evidence | A / recorded replay |
+| `result.cue` | Timed source/target/withheld rows | Clicking seeks recorded media to the cue | Published timed result with evidence and withholding reason | A / recorded replay |
+| `result.scores` | Hard lines, fabrications, coverage, timing | Displays recorded values and honest nulls | Keep benchmark accuracy separate from runtime behavior metrics | A / recorded replay |
+| `result.evidence` | Recorded evidence index | Displays post-run index and terminal cue decisions | Link production artifacts/operations without recasting legacy prose as provenance | A / recorded replay |
+| `result.study` | Glossary/corrections/evidence breakdown | Present across recorded worker/results artifacts, but no dedicated study/export workflow is complete | Define a focused study artifact and its export contract | A+C / partial |
+| `result.raw` | **Raw run** disclosure and artifact links | Expands emitted recorded traces and run files | Keep raw recorded and production protocols distinct | A / recorded replay |
+| `result.run-again` | **Run again** | Returns to source entry | Begin a new source session; do not silently rerun or overwrite evidence | A / client state |
+| `result.bench-link` | **See the full bench** | Navigates to `/benchmarks/` | Separate lane; not required for runtime wiring | A / navigation |
+| `result.export-captions` | Caption download/export | Only raw artifact links may expose files | Explicit SRT/VTT/JSON export from published artifacts | C / missing product control |
+| `result.export-study` | Study export | No dedicated control | Export an evidence-linked study artifact; do not rebuild Feather | C / missing |
+
+### 8. Development lab — `/studio/?lab=1`
+
+The lab is development-only and must not be presented as runtime execution.
+
+| Control | Today behavior | Class / status |
+|---|---|---|
+| Collapse/expand | Shows or hides lab controls | A / client state |
+| Recorded scenario | Chooses exact `run-005` or `run-006` anchors | A / recorded replay |
+| Preflight contract | Chooses fixture-only failure/relevance states with no measurements | C / UI contract only |
+| Pause/resume | Controls replay clock | A / recorded replay |
+| Step one | Folds exactly one recorded trace | A / recorded replay |
+| Restart scenario | Reloads and seeks the selected recorded scenario | A / recorded replay |
+| Trace cursor | Reconstructs state through the pure replay reducer | A / recorded replay |
+| Playback speed | Changes recorded replay pace | A / recorded replay |
+| Phase checkpoints | Seeks to exact derived cursor anchors | A / recorded replay |
+| Current trace/support | Inspects the exact recorded trace and references | A / recorded replay |
+
+The lab still needs fixture coverage for a planner/forecast surface, live-control pending/rejected
+states, production-journal reconnect, partial result publication, and export failures. Such fixtures
+exercise UI contracts only and cannot be called run evidence.
+
+### 9. Production Run Explorer — `/studio/runtime/`
+
+| Control or datum | What it does today | Class / status |
+|---|---|---|
+| Select production journal | Reads one local `.ndjson`/`.jsonl` file up to 5 MB in the browser | B / real inspector-wired |
+| Validation/rejection | Builds an immutable observability index or fails closed | B / real inspector-wired |
+| Agent/task/operation filters | Queries normalized indexed facts | B / real inspector-wired |
+| Active duration/tokens/failures | Shows receipted values and coverage; unsupported values are unavailable | B / real inspector-wired |
+| Queue/dependency/reporting/critical path/provider/billing | Explicitly unavailable | C / missing producers |
+| Operations/executions/handoffs/failures | Shows normalized records with source identities | B / real inspector-wired |
+| Worker projection | Shows production task, agent, grants, scope, execution, and report facts | B / real inspector-wired |
+| Source identity registry | Resolves event, receipt, and artifact references inside the selected journal/index | B / real inspector-wired |
+
+The inspector does not discover journals, start a worker, control a run, stream appended events,
+or convert production events into a legacy `RunBundle`.
+
+### 10. Memory review inspector — `/studio/runtime/memory/`
+
+This operator surface validates an explicitly selected set of proposal, decision, revocation,
+materialization, consumption, and legacy receipts. It has no accept/reject/promotion controls and
+does not discover repository receipts. It is a real read-only inspector, not part of the first
+submit-to-result wiring slice.
+
+## Required data inventory
+
+| Data contract | Needed by | Current producer/source | Current truth | Next owner |
+|---|---|---|---|---|
+| Source session id and status | Source/preflight/reconnect | Runtime host startup registration and `GET /v1/source-sessions` | Real local registered owned-preflight session/revision identity; Studio UI missing | Shared Studio-host wiring |
+| Source adapter and rights receipt | Preflight | YouTube and owned/local scripts | Real local/recorded; unwired for submitted Studio URL | Architecture |
+| Raw content id, bytes, preservation | Preflight/provenance | Owned ingest | Real local/recorded | Architecture |
+| Duration, tracks, codecs, dimensions | Preflight/range | `probe-media.mjs` / ffprobe | Real local/recorded | Architecture |
+| Speech/non-speech ranges | Preflight/plan | Pinned Silero producer | Real local/recorded | Architecture |
+| Language ranges and uncertainty | Preflight/range | Pinned Whisper-language producer | Real local/recorded | Architecture |
+| Music/noise ranges | Preflight/plan | None | Withheld | Architecture |
+| Speaker/overlap ranges | Preflight/plan | None | Withheld | Architecture |
+| Suggested range/complexity | Range/plan | None | Withheld | Architecture |
+| Analysis request | Plan/runtime start | `AnalysisRequest` client model | UI contract; recorded replay validation only | Shared contract; UIUX presentation, architecture validation |
+| Explicit work plan | Planner/runtime | Forecast request model | Code contract only | Architecture |
+| Workload floor | Planner | Forecast engine | Real local; UI unwired | Architecture |
+| Expected/conservative elapsed time | Planner | None | Unavailable | Architecture |
+| Model/provider usage estimate | Planner | None | Unavailable | Architecture |
+| Pricing snapshot/currency/API cost | Planner | None | Unavailable | Architecture |
+| Frozen accepted forecast | Runtime start/audit | Runtime host and forecast freeze function | Real local; frozen into the immutable run-start receipt and returned by host status; Studio unwired | Shared Studio-host wiring |
+| Run id/runtime id/journal identity | Run/reconnect/inspector | Runtime-start host acknowledgements, status, and run-start receipt | Real local and durable; Studio unwired | Shared Studio-host wiring |
+| Task definitions/dependencies/budgets | Swarm/agent focus | Production scheduler | Real local; main Studio unwired | Architecture |
+| Dynamic agent registry/grants/scopes | Swarm/agent focus | Production scheduler/registry | Real local; main Studio unwired | Architecture |
+| Live events and cursor | Swarm/reconnect | Authenticated runtime-host polling over the append-only journal | Real local validated cursor service; Studio does not subscribe | Shared Studio-host wiring |
+| Control request/ack | Dock | None | Missing | Architecture |
+| Media-operation receipts | Agent workspace/evidence | `media.extract`, `media.seek` | Real local; child and main Studio unwired | Architecture |
+| Remaining media tools/detectors | Agent workspace | None | Missing | Architecture |
+| Worker execution and measured usage | Agent/observability | Codex launcher | Real for one child | Architecture |
+| Worker output artifact | Agent/result | Codex launcher/artifact store | Real for one child | Architecture |
+| Structured handoff and decision | Coordination/result | Report host | Real for one child/parent fixture | Architecture |
+| Captions and cue decisions | Results | Legacy run pipeline/recorded bundles | Real recorded output; no production runtime publisher | Architecture |
+| Glossary/corrections/study artifact | Results/study | Legacy run pipeline and memory proposal path | Partial recorded artifacts | Shared product definition then architecture |
+| Production observability index | Run Explorer | Post-run indexer | Real local and inspector-wired | Architecture |
+
+## Action contracts for real wiring
+
+The next real Studio slice should wire the existing development host without redesigning the
+scheduler, inventing another runtime-start protocol, or merging legacy and production event shapes.
+The client submits only product inputs plus stable `sourceSessionId` and `sourceRevisionId`; it
+never submits filesystem paths, runtime identities, journal identities, scheduler state, or
+executable arguments.
+
+```text
+operator starts the host with an owned preflight source
+  -> Studio lists registered source-session/revision identities
+  -> Studio submits product inputs and the selected stable identities
+  -> host validates, freezes the forecast, and acknowledges one durable command
+  -> Studio reads lifecycle status without equating accepted/initializing with running
+  -> Studio polls from the last consumed event sequence
+  -> Studio projects terminal, failed, or interrupted state with the host's safe reason
+```
+
+Source upload/link ingest, pause/resume/cancel acknowledgement, hosted execution, child media
+inspection, captions or study publication, and production swarm integration remain separate future
+boundaries; the local host does not provide them.
+
+Minimum action results:
+
+| Action | Required success result | Required failure behavior |
+|---|---|---|
+| List/select registered source | Stable source-session/revision identity and validated owned-preflight summary | Surface unknown, changed, or stale source identity; never ask the browser for a source path |
+| Update request | Validated range and options bound to current source revision | Return field-level reasons; invalidate stale forecast |
+| Create forecast | Content-addressed forecast with explicit available/unavailable fields | Never synthesize missing time, token, or price values |
+| Start run | Command, run, runtime, and journal identities plus the immutable run-start receipt and frozen forecast reference | Retry idempotently; never duplicate a run on double click or label acceptance/initialization as running |
+| Read lifecycle | `accepted`, `initializing`, validated `running`, `terminal`, or `failed`/`interrupted` with a closed safe reason | Surface `failed` and `interrupted` reasons; do not expose raw exceptions or infer running without executor/journal evidence |
+| Subscribe/reconnect | Ordered validated production events after the last consumed sequence | Surface cursor and journal validation errors; never continue animation from a rejected or past-head cursor |
+| Request control | Future correlation id and pending state; no host endpoint exists yet | Do not display accepted state before acknowledgement |
+| Publish result | Immutable artifact ids plus terminal/partial/withheld status | Partial failures remain visible and inspectable |
+
+## UIUX acceptance checklist
+
+The UIUX demo loop is complete only when a human can exercise every state below using clearly
+labelled recorded evidence or contract fixtures:
+
+- [ ] Welcome, source-entry closed/open/edit/review states
+- [ ] Invalid, unsupported, inaccessible, probing, partial-probe, and probe-failed states
+- [ ] Measured source facts with producer identities and missing-finding explanations
+- [ ] Recorded, suggested, detected-language, and custom range presentation
+- [ ] Valid, invalid, short, recommended, long, and over-policy ranges
+- [ ] Captions-only and captions-plus-evidence result choices
+- [ ] Relevant advanced choices without showing irrelevant controls
+- [ ] Plan lanes, assumptions, and agent limits
+- [ ] Workload floor available while elapsed time and cost are unavailable
+- [ ] Forecast loading, stale, failed, accepted, and changed-after-accept states
+- [ ] Explicit **Replay recorded analysis** path
+- [ ] Separate target **Start analysis** path that cannot be mistaken for replay
+- [ ] Swarm empty, starting, running, waiting, partial failure, withheld, cancelled, and complete states
+- [ ] Control requested, acknowledged, rejected, disconnected, and replay-only states
+- [ ] Agent task, scope, grants, operations, outputs, handoffs, and absent-evidence states
+- [ ] Captions, withheld cues, comparison unavailable, unscored, and partial results
+- [ ] Study artifact empty/available and export unavailable/failed/succeeded states
+- [ ] Recorded-demo provenance visible wherever a submitted source is paired with replay data
+- [ ] Production-inspector provenance remains separate from recorded demo provenance
+
+Completing this checklist proves the product interface, not the runtime.
+
+## Runtime readiness milestones
+
+### Testable without new architecture
+
+- Complete `/studio/` replay loop with `run-006`
+- Explicit recorded-source preflight and exact-range replay
+- Submitted-URL preview with the source-not-processed notice
+- Recorded pause/resume/stop/run-again and agent focus/workspaces
+- Recorded captions, comparison, evidence, raw artifacts, and honest nulls
+- Development lab scenarios and contract-only preflight states
+- Local ingest, probe, speech, and language producers
+- Deterministic forecast workload-floor tests
+- One bounded local Codex child with journal, usage, output artifact, and report-up
+- Development-only runtime host with registered owned sources, idempotent start/status, and
+  authenticated validated cursor polling
+- Manual production journal inspection in `/studio/runtime/`
+
+### Small wiring slice
+
+The first slice should connect `/studio/` to the existing host for one registered owned/local
+receipted source and one bounded child. Expected glue areas:
+
+- A development-only host client outside static `ReplayTransport`, configured for the exact local
+  origin and bearer token
+- Registered-source selection that sends only product inputs and stable session/revision ids
+- Mapping the existing `AnalysisRequest` to the host request and consuming the idempotent start
+  acknowledgement, frozen forecast, and durable command/runtime/journal identities
+- Lifecycle projection that keeps `accepted` and `initializing` distinct from `running`, which
+  requires validated journal/executor evidence, and surfaces closed `failed`/`interrupted` reasons
+- Authenticated bounded cursor polling from the last consumed sequence, with visible cursor and
+  journal-validation failures
+- Main-Studio projections for dynamic worker/task/report state, kept separate from legacy traces
+- Explicit UI labels for the production local one-child proof versus recorded demonstration
+
+This does not yet produce autonomous media captions.
+
+### Larger runtime work
+
+- Hosted source ingest and hosted runtime service
+- Parent/orchestrator execution beyond the one-child proof
+- Child-process bridge for scheduler-authorized media and detector tools
+- Remaining media operations, acoustic classification, overlap, separation, and visual context
+- Multi-task dependencies, retries, partial publication, merge, and QC
+- Production caption/study publisher and exports
+- Live control acknowledgements plus hosted reconnect, retention, and access policy
+- Calibrated elapsed-time estimator, usage estimator, and versioned pricing adapter
+
+## Collision and honesty rules
+
+UI/UX changes must not:
+
+- Remove or obscure the submitted-source recorded-preview notice
+- Change `StudioPreviewSession.dataSource` away from `recorded_run` without a real producer path
+- Attach submitted URL metadata to recorded run evidence
+- Rename **Replay recorded analysis** to a live-sounding action
+- Describe `/studio/` **Start analysis** as live merely because the separate host endpoint exists
+- Make a changed range or option appear accepted when no matching artifact can be produced
+- Display fixture values as measurements, expected time, price, usage, worker count, or progress
+- Treat replay pause as runtime acknowledgement
+- Treat a human workspace scrubber as an agent media operation
+- Treat legacy spawn/report prose as production scheduler or handoff evidence
+- Merge production journal events into `run-005`, `run-006`, `RunBundle`, or legacy traces
+- Interpret empty music/speaker arrays as proof that detectors ran
+- Turn null/unavailable scores, usage, prices, or timing into zero
+
+The UIUX chat should avoid editing:
+
+- `src/studio/runtime/production/`
+- `scripts/run-local-worker.ts`
+- Runtime launcher, scheduler, journal, authorization, artifact-store, media-host, report-host,
+  observability, forecast, and memory implementation
+- `bench/`, gold, freeze, scoring, or control-pack files
+
+The architecture chat should avoid redesigning Studio chrome or changing visible interaction
+semantics without updating this contract with the UIUX owner.
+
+## Evidence map
+
+| Claim | Primary evidence |
+|---|---|
+| Main Studio loads `run-006` | `src/pages/studio/index.astro` |
+| Main Studio uses replay transport | `src/studio/StudioApp.tsx`, `src/studio/store.ts`, `src/studio/transport.ts` |
+| Submitted source is recorded-preview-only | `src/studio/previewSession.ts`, `src/studio/StudioApp.tsx` |
+| Range and output controls | `src/studio/preflight/ConfirmationForm.tsx` |
+| Changed ranges/options cannot replay | `src/studio/preflight/model.ts` |
+| Replay and cancellation action semantics | `src/studio/store.ts`, `src/studio/Dock.tsx` |
+| Recorded agent focus/workspaces | `src/studio/AgentPanel.tsx`, `src/studio/Workspace.tsx` |
+| Recorded results/evidence/artifact links | `src/studio/Results.tsx`, `src/studio/evidence/` |
+| Lab replay and contract fixtures | `src/studio/lab/Lab.tsx`, `src/studio/lab/scenarios.ts`, `src/studio/lab/preflightScenarios.ts` |
+| Local real legacy clip pipeline | `scripts/run-clip.mjs` |
+| Local bounded Codex child | `scripts/run-local-worker.ts`, `src/studio/runtime/production/launcher.ts` |
+| Scheduler/journal/media/handoff fragments | `src/studio/runtime/production/` |
+| Workload floor and unavailable estimates | `src/studio/runtime/production/forecast/`, `tests/studio-forecast-production.test.ts` |
+| Local host lifecycle and public identities | `src/studio/runtime/production/runtimeHost/model.ts` |
+| Local host endpoints, bearer authentication, and loopback binding | `src/studio/runtime/production/runtimeHost/httpServer.ts` |
+| Local host implementation and absence boundary | `docs/STUDIO_AUTONOMY.md`, section **Development-only runtime-start host** |
+| Deterministic host and guarded real-Codex commands | `package.json` (`runtime:host`, `runtime:host:codex`), `scripts/run-runtime-host.ts` |
+| Production journal inspector boundary | `src/studio/runtime/production/ProductionRuntimeInspector.tsx` |
+| Runtime/autonomy implementation ledger | `docs/STUDIO_AUTONOMY.md` |

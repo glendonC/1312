@@ -183,6 +183,35 @@ export interface ProductionStudioEvidenceDecisionArtifactView {
   assessmentReceiptContentIds: string[];
 }
 
+export interface ProductionStudioPublishReviewIntakeView {
+  intakeId: string;
+  status: "started" | "completed" | "failed";
+  decisionOperationId: string;
+  decisionArtifactId: string;
+  decisionReceiptId: string;
+  decisionReceiptContentId: string;
+  outputArtifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  outcome: "queued" | "rejected" | null;
+  reasonCodes: EvidenceDecisionReasonCode[];
+  failure: string | null;
+}
+
+export interface ProductionStudioPublishReviewIntakeArtifactView {
+  artifactId: string;
+  kind: "publish-review-intake-receipt";
+  contentId: string;
+  bytes: number;
+  intakeId: string;
+  receiptId: string;
+  receiptContentId: string;
+  decisionOperationId: string;
+  decisionArtifactId: string;
+  decisionReceiptId: string;
+  decisionReceiptContentId: string;
+}
+
 export interface ProductionStudioReportView {
   reportId: string;
   taskId: string;
@@ -288,10 +317,12 @@ export interface ProductionStudioProjection {
   evidenceReads: ProductionStudioEvidenceReadView[];
   evidenceAssessments: ProductionStudioEvidenceAssessmentView[];
   evidenceDecisions: ProductionStudioEvidenceDecisionView[];
+  publishReviewIntakes: ProductionStudioPublishReviewIntakeView[];
   sourceArtifacts: ProductionStudioSourceArtifactView[];
   evidenceArtifacts: ProductionStudioEvidenceArtifactView[];
   assessmentArtifacts: ProductionStudioEvidenceAssessmentArtifactView[];
   decisionArtifacts: ProductionStudioEvidenceDecisionArtifactView[];
+  publishReviewIntakeArtifacts: ProductionStudioPublishReviewIntakeArtifactView[];
   outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
@@ -304,10 +335,12 @@ export interface ProductionStudioProjection {
     evidenceReads: number;
     evidenceAssessments: number;
     evidenceDecisions: number;
+    publishReviewIntakes: number;
     sourceArtifacts: number;
     evidenceArtifacts: number;
     assessmentArtifacts: number;
     decisionArtifacts: number;
+    publishReviewIntakeArtifacts: number;
     outputArtifacts: number;
   };
 }
@@ -471,6 +504,23 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     }))
     .sort((left, right) => left.operationId.localeCompare(right.operationId));
 
+  const publishReviewIntakes = Object.values(state.publishReviewIntakes)
+    .map((intake): ProductionStudioPublishReviewIntakeView => ({
+      intakeId: intake.id,
+      status: intake.status,
+      decisionOperationId: intake.decisionOperationId,
+      decisionArtifactId: intake.decisionArtifactId,
+      decisionReceiptId: intake.decisionReceiptId,
+      decisionReceiptContentId: intake.decisionReceiptContentId,
+      outputArtifactId: intake.artifactId,
+      receiptId: intake.receiptId,
+      receiptContentId: intake.receiptContentId,
+      outcome: intake.outcome,
+      reasonCodes: [...intake.reasonCodes],
+      failure: intake.failure,
+    }))
+    .sort((left, right) => left.intakeId.localeCompare(right.intakeId));
+
   const sourceArtifacts = Object.values(state.artifacts)
     .filter((artifact) => artifact.origin.kind === "ingest")
     .map((artifact): ProductionStudioSourceArtifactView => {
@@ -506,7 +556,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
         artifact.origin.kind === "ingest" ||
         artifact.origin.kind === "preflight_evidence" ||
         artifact.origin.kind === "evidence_assessment" ||
-        artifact.origin.kind === "evidence_decision"
+        artifact.origin.kind === "evidence_decision" ||
+        artifact.origin.kind === "publish_review_intake"
       ) {
         throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
       }
@@ -626,6 +677,39 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     })
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
 
+  const publishReviewIntakeArtifacts = Object.values(state.artifacts)
+    .filter((artifact) => {
+      if (artifact.origin.kind !== "publish_review_intake") return false;
+      const intake = state.publishReviewIntakes[artifact.origin.intakeId];
+      return intake?.status === "completed" && intake.artifactId === artifact.id;
+    })
+    .map((artifact): ProductionStudioPublishReviewIntakeArtifactView => {
+      if (artifact.origin.kind !== "publish_review_intake") {
+        throw new Error(`Production Studio projection: publish-review intake artifact ${artifact.id} changed origin`);
+      }
+      if (
+        artifact.kind !== "publish-review-intake-receipt" ||
+        artifact.producerTaskId !== null ||
+        artifact.producerAgentId !== null ||
+        artifact.mediaClass !== "non_media" ||
+        artifact.publication !== "private"
+      ) throw new Error(`Production Studio projection: publish-review intake artifact ${artifact.id} is invalid`);
+      return {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        intakeId: artifact.origin.intakeId,
+        receiptId: artifact.origin.receiptId,
+        receiptContentId: artifact.origin.receiptContentId,
+        decisionOperationId: artifact.origin.decisionOperationId,
+        decisionArtifactId: artifact.origin.decisionArtifactId,
+        decisionReceiptId: artifact.origin.decisionReceiptId,
+        decisionReceiptContentId: artifact.origin.decisionReceiptContentId,
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+
   const workers = Object.values(state.agents)
     .map((agent): ProductionStudioWorkerView => {
       const task = state.tasks[agent.taskId];
@@ -689,10 +773,12 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     evidenceReads,
     evidenceAssessments,
     evidenceDecisions,
+    publishReviewIntakes,
     sourceArtifacts,
     evidenceArtifacts,
     assessmentArtifacts,
     decisionArtifacts,
+    publishReviewIntakeArtifacts,
     outputArtifacts,
     counts: {
       tasks: tasks.length,
@@ -705,10 +791,12 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       evidenceReads: evidenceReads.length,
       evidenceAssessments: evidenceAssessments.length,
       evidenceDecisions: evidenceDecisions.length,
+      publishReviewIntakes: publishReviewIntakes.length,
       sourceArtifacts: sourceArtifacts.length,
       evidenceArtifacts: evidenceArtifacts.length,
       assessmentArtifacts: assessmentArtifacts.length,
       decisionArtifacts: decisionArtifacts.length,
+      publishReviewIntakeArtifacts: publishReviewIntakeArtifacts.length,
       outputArtifacts: outputArtifacts.length,
     },
   };

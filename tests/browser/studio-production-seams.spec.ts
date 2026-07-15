@@ -113,8 +113,8 @@ test("receipted child media/evidence operations and artifact identity hooks proj
   await expect(assessmentAudit.getByText(/does not certify the assessment meaning|Stored bytes rehashed/).first()).toBeVisible();
   const claims = assessmentAudit.locator('[data-production-assessment-claim-index]');
   await expect(claims).toHaveCount(2);
-  await expect(claims.locator('[data-claim-kind="speech_activity"]')).toHaveCount(1);
-  await expect(claims.locator('[data-claim-kind="language_identity"]')).toHaveCount(1);
+  await expect(assessmentAudit.locator('[data-production-assessment-claim-index][data-claim-kind="speech_activity"]')).toHaveCount(1);
+  await expect(assessmentAudit.locator('[data-production-assessment-claim-index][data-claim-kind="language_identity"]')).toHaveCount(1);
   await expect(claims.getByText(/Exact range/)).toHaveCount(2);
   await expect(claims.getByText(/Preserved states/)).toHaveCount(2);
   const citations = assessmentAudit.locator('[data-production-assessment-citation-receipt-id]');
@@ -163,8 +163,43 @@ test("receipted child media/evidence operations and artifact identity hooks proj
   await expect(decisionReceipt.locator('[data-production-decision-reason-code]')).toHaveCount(1);
   await expect(decisionReceipt.locator('[data-production-decision-reason-code="all_audited_claims_supported"]')).toHaveCount(1);
   await expect(decisionReceipt.locator('[data-production-decision-input-operation-id]')).toHaveCount(1);
-  await expect(decisionReceipts.getByText(/future review producer|does not mean captions exist/)).toBeVisible();
+  await expect(decisionReceipts.getByText(/unreviewed queue|does not mean captions exist/)).toBeVisible();
   for (const link of await decisionReceipt.locator("[data-production-navigation]").all()) {
+    const href = await link.getAttribute("href");
+    expect(href).toMatch(/^#product-production-(operation|artifact)-/);
+    expect(
+      await page.evaluate((target) => Boolean(target && document.getElementById(target.slice(1))), href),
+    ).toBe(true);
+  }
+
+  const reviewIntakes = production.locator('[data-production-region="publish-review-intakes"]');
+  await expect(reviewIntakes.getByRole("heading", { name: "Publish-review intake lineage" })).toBeVisible();
+  await expect(reviewIntakes.locator('[data-production-empty="publish-review-intakes"]')).toHaveCount(0);
+  const reviewIntake = reviewIntakes.locator('[data-production-publish-review-intake-id]');
+  await expect(reviewIntake).toHaveCount(1);
+  await expect(reviewIntake).toHaveAttribute("data-status", "completed");
+  await expect(reviewIntake).toHaveAttribute("data-intake-outcome", "queued");
+  await expect(reviewIntake.locator('[data-production-intake-reason-code="all_audited_claims_supported"]')).toHaveCount(1);
+  await expect(reviewIntakes.getByText(/awaiting review only|does not mean reviewed/)).toBeVisible();
+
+  const reviewIntakeArtifacts = production.locator('[data-production-region="publish-review-intake-artifacts"]');
+  await expect(reviewIntakeArtifacts.getByRole("heading", { name: "Publish-review intake artifacts" })).toBeVisible();
+  await expect(reviewIntakeArtifacts.locator('[data-production-empty="publish-review-intake-artifacts"]')).toHaveCount(0);
+  const reviewIntakeArtifact = reviewIntakeArtifacts.locator('[data-production-publish-review-intake-artifact-id]');
+  await expect(reviewIntakeArtifact).toHaveCount(1);
+  await expect(reviewIntakeArtifact.getByRole("heading", { name: "publish-review-intake-receipt" })).toBeVisible();
+
+  const verifiedReviewIntakes = production.locator('[data-production-region="publish-review-intake-receipts"]');
+  await expect(verifiedReviewIntakes.getByRole("heading", { name: "Verified publish-review intake receipts" })).toBeVisible();
+  await expect(verifiedReviewIntakes.locator('[data-production-empty="publish-review-intake-receipts"]')).toHaveCount(0);
+  const verifiedReviewIntake = verifiedReviewIntakes.locator('[data-production-publish-review-intake-receipt-id]');
+  await expect(verifiedReviewIntake).toHaveCount(1);
+  await expect(verifiedReviewIntake).toHaveAttribute("data-integrity", "stored_intake_and_verified_decision_receipt");
+  await expect(verifiedReviewIntake).toHaveAttribute("data-intake-outcome", "queued");
+  await expect(verifiedReviewIntake).toHaveAttribute("data-intake-producer", "host_publish_review_intake_v1");
+  await expect(verifiedReviewIntake.locator('[data-production-verified-intake-reason-code="all_audited_claims_supported"]')).toHaveCount(1);
+  await expect(verifiedReviewIntakes.getByText(/unreviewed and unpublished/)).toBeVisible();
+  for (const link of await verifiedReviewIntake.locator("[data-production-navigation]").all()) {
     const href = await link.getAttribute("href");
     expect(href).toMatch(/^#product-production-(operation|artifact)-/);
     expect(

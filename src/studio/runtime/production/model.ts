@@ -303,6 +303,17 @@ export interface EvidenceDecisionArtifactOrigin {
   assessmentReceiptContentIds: string[];
 }
 
+export interface PublishReviewIntakeArtifactOrigin {
+  kind: "publish_review_intake";
+  intakeId: string;
+  receiptId: string;
+  receiptContentId: string;
+  decisionOperationId: string;
+  decisionArtifactId: string;
+  decisionReceiptId: string;
+  decisionReceiptContentId: string;
+}
+
 export interface RuntimeArtifact {
   schema: "studio.runtime.artifact.v1";
   id: string;
@@ -324,7 +335,8 @@ export interface RuntimeArtifact {
     | WorkerOutputArtifactOrigin
     | PreflightEvidenceArtifactOrigin
     | EvidenceAssessmentArtifactOrigin
-    | EvidenceDecisionArtifactOrigin;
+    | EvidenceDecisionArtifactOrigin
+    | PublishReviewIntakeArtifactOrigin;
 }
 
 export interface WorkerOutputEnvelope {
@@ -653,6 +665,38 @@ export interface EvidenceDecisionReceipt {
   };
 }
 
+/** The only caller-supplied input accepted by the publish-review intake producer. */
+export interface EvidenceDecisionReceiptIdentity {
+  operationId: string;
+  artifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export type PublishReviewIntakeOutcome = "queued" | "rejected";
+
+export interface PublishReviewIntakeReceipt {
+  schema: "studio.publish-review-intake.receipt.v1";
+  receiptId: string;
+  intakeId: string;
+  input: {
+    decision: EvidenceDecisionReceiptIdentity;
+    verification: {
+      integrity: "stored_decision_and_audited_inputs_verified";
+      producer: "deterministic_audit_state_gate_v1";
+    };
+  };
+  producer: {
+    id: "studio.host-publish-review-intake";
+    version: "1";
+    policy: "queue_verified_proceed_reject_verified_withheld";
+  };
+  result: {
+    outcome: PublishReviewIntakeOutcome;
+    reasonCodes: EvidenceDecisionReasonCode[];
+  };
+}
+
 export interface OperationRecord {
   id: string;
   capability: "media.extract" | "media.seek";
@@ -725,6 +769,21 @@ export interface EvidenceDecisionRecord {
   outcome: EvidenceDecisionOutcome | null;
   reasonCodes: EvidenceDecisionReasonCode[];
   auditedClaimCount: number | null;
+  failure: string | null;
+}
+
+export interface PublishReviewIntakeRecord {
+  id: string;
+  decisionOperationId: string;
+  decisionArtifactId: string;
+  decisionReceiptId: string;
+  decisionReceiptContentId: string;
+  status: "started" | "completed" | "failed";
+  artifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  outcome: PublishReviewIntakeOutcome | null;
+  reasonCodes: EvidenceDecisionReasonCode[];
   failure: string | null;
 }
 
@@ -854,6 +913,7 @@ export interface RuntimeProjection {
   evidenceReads: Record<string, EvidenceReadRecord>;
   evidenceAssessments: Record<string, EvidenceAssessmentRecord>;
   evidenceDecisions: Record<string, EvidenceDecisionRecord>;
+  publishReviewIntakes: Record<string, PublishReviewIntakeRecord>;
   executions: Record<string, ExecutorRecord>;
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;

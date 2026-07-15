@@ -360,6 +360,45 @@ export function validateRuntimeArtifact(
     ) {
       fail(context, path, "evidence decision artifacts must be their content-addressed receipt with audited assessment lineage and a task producer");
     }
+  } else if (kind === "publish_review_intake") {
+    exact(
+      origin,
+      [
+        "kind",
+        "intakeId",
+        "receiptId",
+        "receiptContentId",
+        "decisionOperationId",
+        "decisionArtifactId",
+        "decisionReceiptId",
+        "decisionReceiptContentId",
+      ],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.intakeId, context, `${path}.origin.intakeId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    string(origin.decisionOperationId, context, `${path}.origin.decisionOperationId`);
+    const decisionArtifactId = string(origin.decisionArtifactId, context, `${path}.origin.decisionArtifactId`);
+    string(origin.decisionReceiptId, context, `${path}.origin.decisionReceiptId`);
+    contentId(origin.decisionReceiptContentId, context, `${path}.origin.decisionReceiptContentId`);
+    if (
+      mediaClass !== "non_media" ||
+      item.publication !== "private" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      task !== null ||
+      agent !== null ||
+      JSON.stringify(sources) !== JSON.stringify([decisionArtifactId]) ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) {
+      fail(
+        context,
+        path,
+        "publish-review intake artifacts must be private host-produced receipt lineage over one verified decision artifact",
+      );
+    }
   } else {
     fail(context, `${path}.origin.kind`, `has unknown value ${kind}`);
   }

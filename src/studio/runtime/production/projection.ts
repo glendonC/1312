@@ -41,6 +41,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     evidenceReads: {},
     evidenceAssessments: {},
     evidenceDecisions: {},
+    publishReviewIntakes: {},
     executions: {},
     modelUsage: {},
     reports: {},
@@ -135,6 +136,23 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
           JSON.stringify(artifact.origin.assessmentReceiptContentIds) === JSON.stringify(decision.assessmentReceiptContentIds),
         event,
         `artifact ${artifact.id} changed its audited assessment inputs`,
+      );
+    } else if (artifact.origin.kind === "publish_review_intake") {
+      const intake = next.publishReviewIntakes[artifact.origin.intakeId];
+      invariant(intake?.status === "started", event, `artifact ${artifact.id} has no active publish-review intake`);
+      invariant(
+        artifact.producerTaskId === null && artifact.producerAgentId === null,
+        event,
+        `artifact ${artifact.id} incorrectly claims a task producer`,
+      );
+      invariant(
+        artifact.origin.decisionOperationId === intake.decisionOperationId &&
+          artifact.origin.decisionArtifactId === intake.decisionArtifactId &&
+          artifact.origin.decisionReceiptId === intake.decisionReceiptId &&
+          artifact.origin.decisionReceiptContentId === intake.decisionReceiptContentId &&
+          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([intake.decisionArtifactId]),
+        event,
+        `artifact ${artifact.id} changed its verified decision input`,
       );
     }
     next.artifacts[artifact.id] = artifact;
@@ -834,6 +852,107 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     invariant(operation?.status === "started", event, `evidence decision ${event.data.operationId} is not active`);
     operation.status = "failed";
     operation.failure = event.data.reason;
+    return next;
+  }
+
+  if (event.type === "publish.review.intake_started") {
+    invariant(
+      event.producer.kind === "publish_review_intake_host",
+      event,
+      "publish-review intake must come from the intake host",
+    );
+    const decision = next.evidenceDecisions[event.data.decision.operationId];
+    invariant(
+      decision?.status === "completed" &&
+        decision.artifactId === event.data.decision.artifactId &&
+        decision.receiptId === event.data.decision.receiptId &&
+        decision.receiptContentId === event.data.decision.receiptContentId,
+      event,
+      `publish-review intake ${event.data.intakeId} has no completed exact decision identity`,
+    );
+    invariant(!next.publishReviewIntakes[event.data.intakeId], event, `publish-review intake ${event.data.intakeId} is duplicated`);
+    invariant(
+      !Object.values(next.publishReviewIntakes).some((intake) =>
+        intake.decisionOperationId === event.data.decision.operationId),
+      event,
+      `decision ${event.data.decision.operationId} already has publish-review intake lineage`,
+    );
+    next.publishReviewIntakes[event.data.intakeId] = {
+      id: event.data.intakeId,
+      decisionOperationId: event.data.decision.operationId,
+      decisionArtifactId: event.data.decision.artifactId,
+      decisionReceiptId: event.data.decision.receiptId,
+      decisionReceiptContentId: event.data.decision.receiptContentId,
+      status: "started",
+      artifactId: null,
+      receiptId: null,
+      receiptContentId: null,
+      outcome: null,
+      reasonCodes: [],
+      failure: null,
+    };
+    return next;
+  }
+
+  if (event.type === "publish.review.intake_completed") {
+    invariant(
+      event.producer.kind === "publish_review_intake_host",
+      event,
+      "publish-review intake completion must come from the intake host",
+    );
+    const intake = next.publishReviewIntakes[event.data.intakeId];
+    invariant(intake?.status === "started", event, `publish-review intake ${event.data.intakeId} is not active`);
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    const receipt = event.data.receipt;
+    invariant(
+      artifact?.origin.kind === "publish_review_intake" &&
+        artifact.origin.intakeId === intake.id &&
+        artifact.origin.receiptId === receipt.receiptId &&
+        artifact.origin.receiptContentId === event.data.receiptContentId &&
+        artifact.content.contentId === event.data.receiptContentId,
+      event,
+      `publish-review intake ${intake.id} has no content-addressed receipt artifact`,
+    );
+    invariant(
+      receipt.intakeId === intake.id &&
+        receipt.input.decision.operationId === intake.decisionOperationId &&
+        receipt.input.decision.artifactId === intake.decisionArtifactId &&
+        receipt.input.decision.receiptId === intake.decisionReceiptId &&
+        receipt.input.decision.receiptContentId === intake.decisionReceiptContentId,
+      event,
+      `publish-review intake ${intake.id} receipt changed its verified decision identity`,
+    );
+    const decision = next.evidenceDecisions[intake.decisionOperationId];
+    invariant(
+      (decision.outcome === "proceed_to_publish_review" && receipt.result.outcome === "queued") ||
+        (decision.outcome === "withheld" && receipt.result.outcome === "rejected"),
+      event,
+      `publish-review intake ${intake.id} outcome does not follow the decision outcome`,
+    );
+    invariant(
+      JSON.stringify(receipt.result.reasonCodes) === JSON.stringify(decision.reasonCodes),
+      event,
+      `publish-review intake ${intake.id} changed the decision reason codes`,
+    );
+    intake.status = "completed";
+    intake.artifactId = artifact.id;
+    intake.receiptId = receipt.receiptId;
+    intake.receiptContentId = event.data.receiptContentId;
+    intake.outcome = receipt.result.outcome;
+    intake.reasonCodes = [...receipt.result.reasonCodes];
+    return next;
+  }
+
+  if (event.type === "publish.review.intake_failed") {
+    invariant(
+      event.producer.kind === "publish_review_intake_host",
+      event,
+      "publish-review intake failure must come from the intake host",
+    );
+    const intake = next.publishReviewIntakes[event.data.intakeId];
+    invariant(intake?.status === "started", event, `publish-review intake ${event.data.intakeId} is not active`);
+    intake.status = "failed";
+    intake.failure = event.data.reason;
     return next;
   }
 

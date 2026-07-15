@@ -6,12 +6,14 @@ import type {
   EvidenceAssessmentRequest,
   EvidenceDecisionReceipt,
   EvidenceDecisionRequest,
+  EvidenceDecisionReceiptIdentity,
   ExecutorSpanReceipt,
   EvidenceReadReceipt,
   EvidenceReadRequest,
   MediaOperationRequest,
   MediaOperationReceipt,
   ModelUsageReceipt,
+  PublishReviewIntakeReceipt,
   ReportRecord,
   RuntimeArtifact,
   SpawnRejection,
@@ -28,6 +30,7 @@ export type RuntimeProducerKind =
   | "evidence_host"
   | "assessment_host"
   | "decision_host"
+  | "publish_review_intake_host"
   | "handoff_host"
   | "launcher";
 
@@ -195,6 +198,26 @@ export interface EvidenceDecisionFailedEvent extends RuntimeEventBase {
   data: { operationId: string; reason: string };
 }
 
+export interface PublishReviewIntakeStartedEvent extends RuntimeEventBase {
+  type: "publish.review.intake_started";
+  data: { intakeId: string; decision: EvidenceDecisionReceiptIdentity };
+}
+
+export interface PublishReviewIntakeCompletedEvent extends RuntimeEventBase {
+  type: "publish.review.intake_completed";
+  data: {
+    intakeId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: PublishReviewIntakeReceipt;
+  };
+}
+
+export interface PublishReviewIntakeFailedEvent extends RuntimeEventBase {
+  type: "publish.review.intake_failed";
+  data: { intakeId: string; reason: string };
+}
+
 export interface ReportSubmittedEvent extends RuntimeEventBase {
   type: "report.submitted";
   data: { report: ReportRecord };
@@ -233,6 +256,9 @@ export type RuntimeEvent =
   | EvidenceDecisionStartedEvent
   | EvidenceDecisionCompletedEvent
   | EvidenceDecisionFailedEvent
+  | PublishReviewIntakeStartedEvent
+  | PublishReviewIntakeCompletedEvent
+  | PublishReviewIntakeFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent;
 

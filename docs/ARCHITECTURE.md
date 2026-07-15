@@ -128,7 +128,8 @@ bounded scheduler, dynamic registry, content-addressed artifact store, centraliz
 one real ffmpeg audio-range extraction operation, one bounded ffmpeg seek observation, structured
 child report-up, bounded reads of already-produced pinned speech/language evidence, a bounded
 structured assessment over completed evidence-read receipts, a deterministic bounded decision over
-audited assessment identities, and a bounded local `codex exec` launcher.
+audited assessment identities, a host-only publish-review intake producer over verified decision
+identities, and a bounded local `codex exec` launcher.
 Media scopes use exact track ids and half-open integer-millisecond ranges. The scheduler derives
 task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
 state. The media host re-hashes its source before execution and accepts no caller path or arbitrary
@@ -163,6 +164,15 @@ yields `proceed_to_publish_review`. It emits a private content-addressed
 `studio.evidence-decision.receipt.v1`. A separate authenticated read endpoint re-hashes the stored
 decision, re-runs every input audit, and re-derives the policy before returning it. This does not
 certify media truth or semantic quality and does not create captions, uploads, or publication.
+After a completed decision, the application host invokes a separate publish-review intake producer;
+it is not a child tool and adds no MCP capability. The producer accepts only the exact decision
+operation/artifact/receipt/content identity, repeats the full decision-receipt verification, and
+stores one private content-addressed `studio.publish-review-intake.receipt.v1`. A verified
+`proceed_to_publish_review` decision yields `queued`; a verified `withheld` decision yields
+`rejected` with unchanged reason codes. Raw decision bytes, paths, caller prose/captions/outcomes,
+and publication controls are outside the closed input. Its authenticated read endpoint reopens the
+intake and repeats the complete decision, assessment, and read verification, failing the whole read
+on tamper or policy drift. This lineage is neither human review nor a caption/publication producer.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
@@ -199,10 +209,11 @@ media bridge returns receipt and artifact identities, not media bytes or semanti
 seek does not drive a UI playhead. The evidence bridge may return only the bounded facts that were
 already in a pinned producer receipt; empty, unavailable, unknown, withheld, and truncated are not
 converted into new claims.
-The default deterministic run-005 proof executes one seek, two evidence reads, one assessment, and
-one decision over the audited assessment. Browser-ingested V1 has no evidence-read, assessment, or
-decision grant and projects those regions as unavailable/empty. `proceed_to_publish_review` names
-only eligibility for a future review producer; this runtime has no such consumer or publisher.
+The default deterministic run-005 proof executes one seek, two evidence reads, one assessment, one
+decision over the audited assessment, and one host-produced queued publish-review intake.
+Browser-ingested V1 has no evidence-read, assessment, decision, or intake lineage and projects those
+regions as unavailable/empty. `queued` means awaiting a future human review consumer only; this
+runtime has no reviewer, caption producer, uploader, or publisher.
 
 ### Explicitly deferred
 
@@ -316,7 +327,7 @@ This row shape is future fine-tune data.
 5. ✅ Standalone preflight index with unsupported detector findings withheld
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
-8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
+8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment/decision, host-verified queued/rejected publish-review intake, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
 9. 🔄 Build the immutable observability index from real launcher journals; add further media operations only as separate authorized slices
 10. ⏳ Acoustic/overlap/separation producers and study export
 

@@ -447,6 +447,17 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(decisionGrant.decisionScope.maxAuditedAssessments, 4);
     assert.equal(inspector.projection.decisionArtifacts.length, 1);
     assert.equal(inspector.projection.decisionArtifacts[0].receiptId, decision.receiptId);
+    assert.equal(inspector.projection.publishReviewIntakes.length, 1);
+    assert.equal(inspector.projection.publishReviewIntakes[0].status, "completed");
+    assert.equal(inspector.projection.publishReviewIntakes[0].outcome, "queued");
+    assert.deepEqual(inspector.projection.publishReviewIntakes[0].reasonCodes, [
+      "all_audited_claims_supported",
+    ]);
+    assert.equal(inspector.projection.publishReviewIntakeArtifacts.length, 1);
+    assert.equal(
+      inspector.projection.publishReviewIntakeArtifacts[0].decisionArtifactId,
+      inspector.projection.decisionArtifacts[0].artifactId,
+    );
     assert.equal(inspector.projection.outputArtifacts.length, 2);
     const workerOutput = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "worker_output");
     const seekObservation = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "media_observation");
@@ -509,6 +520,21 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
       receiptId: assessment.receiptId,
       receiptContentId: assessment.receiptContentId,
     }]);
+    const publishReviewIntakes = await runtime.service.publishReviewIntakes(ack.runtimeId);
+    assert.equal(publishReviewIntakes.schema, "studio.local-runtime-publish-review-intakes.v1");
+    assert.equal(publishReviewIntakes.commandId, ack.commandId);
+    assert.equal(publishReviewIntakes.journalHead, cursor);
+    assert.equal(publishReviewIntakes.intakes.length, 1);
+    assert.equal(publishReviewIntakes.intakes[0].integrity, "stored_intake_and_verified_decision_receipt");
+    assert.equal(publishReviewIntakes.intakes[0].producer, "host_publish_review_intake_v1");
+    assert.equal(publishReviewIntakes.intakes[0].outcome, "queued");
+    assert.deepEqual(publishReviewIntakes.intakes[0].reasonCodes, ["all_audited_claims_supported"]);
+    assert.deepEqual(publishReviewIntakes.intakes[0].decision, {
+      operationId: decision.operationId,
+      artifactId: decision.outputArtifactId,
+      receiptId: decision.receiptId,
+      receiptContentId: decision.receiptContentId,
+    });
 
     const reopened = await RuntimeStartService.open({
       store: runtime.store,
@@ -521,6 +547,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(continued.nextCursor, cursor);
     assert.deepEqual(await reopened.assessmentAudits(ack.runtimeId), assessmentAudit);
     assert.deepEqual(await reopened.decisionReceipts(ack.runtimeId), decisionReceipts);
+    assert.deepEqual(await reopened.publishReviewIntakes(ack.runtimeId), publishReviewIntakes);
   } finally {
     await cleanup(runtime);
   }
@@ -537,6 +564,8 @@ test("assessment audit fails closed after restart for stored-byte, content, rece
     assert.equal(healthy.audits.length, 1);
     const healthyDecision = await runtime.service.decisionReceipts(ack.runtimeId);
     assert.equal(healthyDecision.decisions.length, 1);
+    const healthyIntake = await runtime.service.publishReviewIntakes(ack.runtimeId);
+    assert.equal(healthyIntake.intakes.length, 1);
     const receiptContentId = healthy.audits[0].receiptContentId;
     const receiptDigest = receiptContentId.slice("sha256:".length);
     const receiptPath = join(
@@ -563,6 +592,10 @@ test("assessment audit fails closed after restart for stored-byte, content, rece
       reopenedAfterTamper.decisionReceipts(ack.runtimeId),
       (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
     );
+    await assert.rejects(
+      reopenedAfterTamper.publishReviewIntakes(ack.runtimeId),
+      (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
+    );
     await writeFile(receiptPath, originalReceiptBytes);
     assert.equal((await reopenedAfterTamper.assessmentAudits(ack.runtimeId)).audits.length, 1);
 
@@ -581,8 +614,30 @@ test("assessment audit fails closed after restart for stored-byte, content, rece
       reopenedAfterTamper.decisionReceipts(ack.runtimeId),
       (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
     );
+    await assert.rejects(
+      reopenedAfterTamper.publishReviewIntakes(ack.runtimeId),
+      (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
+    );
     await writeFile(decisionPath, originalDecisionBytes);
     assert.equal((await reopenedAfterTamper.decisionReceipts(ack.runtimeId)).decisions.length, 1);
+
+    const intakeContentId = healthyIntake.intakes[0].receiptContentId;
+    const intakeDigest = intakeContentId.slice("sha256:".length);
+    const intakePath = join(
+      paths.artifactStoreRoot,
+      "objects",
+      "sha256",
+      intakeDigest.slice(0, 2),
+      intakeDigest,
+    );
+    const originalIntakeBytes = await readFile(intakePath);
+    await appendFile(intakePath, "tampered");
+    await assert.rejects(
+      reopenedAfterTamper.publishReviewIntakes(ack.runtimeId),
+      (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
+    );
+    await writeFile(intakePath, originalIntakeBytes);
+    assert.equal((await reopenedAfterTamper.publishReviewIntakes(ack.runtimeId)).intakes.length, 1);
 
     const originalJournal = await readFile(paths.journalPath, "utf8");
     const assessmentArtifactEvent = journal.events.find((event) =>
@@ -1024,6 +1079,23 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     assert.equal(decisionBody.decisions[0].outcome, "proceed_to_publish_review");
     assert.equal(JSON.stringify(decisionBody).includes(runtime.directory), false);
     assert.equal(JSON.stringify(decisionBody).includes(FIXTURE), false);
+    const intakes = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-intakes`,
+      { headers: authorized },
+    );
+    assert.equal(intakes.status, 200);
+    const intakeBody = await intakes.json() as {
+      schema: string;
+      intakes: Array<{ integrity: string; outcome: string; producer: string; reasonCodes: string[] }>;
+    };
+    assert.equal(intakeBody.schema, "studio.local-runtime-publish-review-intakes.v1");
+    assert.equal(intakeBody.intakes.length, 1);
+    assert.equal(intakeBody.intakes[0].integrity, "stored_intake_and_verified_decision_receipt");
+    assert.equal(intakeBody.intakes[0].producer, "host_publish_review_intake_v1");
+    assert.equal(intakeBody.intakes[0].outcome, "queued");
+    assert.deepEqual(intakeBody.intakes[0].reasonCodes, ["all_audited_claims_supported"]);
+    assert.equal(JSON.stringify(intakeBody).includes(runtime.directory), false);
+    assert.equal(JSON.stringify(intakeBody).includes(FIXTURE), false);
   } finally {
     await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     await cleanup(runtime);
@@ -1263,6 +1335,9 @@ test("browser-owned ingest fails closed on rights and paths, preserves bytes, ho
     assert.equal(v1Inspector.projection.decisionArtifacts.length, 0);
     assert.deepEqual((await service.assessmentAudits(acknowledgement.runtimeId)).audits, []);
     assert.deepEqual((await service.decisionReceipts(acknowledgement.runtimeId)).decisions, []);
+    assert.equal(v1Inspector.projection.publishReviewIntakes.length, 0);
+    assert.equal(v1Inspector.projection.publishReviewIntakeArtifacts.length, 0);
+    assert.deepEqual((await service.publishReviewIntakes(acknowledgement.runtimeId)).intakes, []);
 
     const reopenedSources = await RuntimeSourceRegistry.open({ sourceDirectories: [] });
     await OwnedMediaIngestService.open({

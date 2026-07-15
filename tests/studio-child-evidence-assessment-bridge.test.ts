@@ -27,6 +27,7 @@ import {
 } from "../src/studio/runtime/production/executor/childEvidenceDecisionBridge.ts";
 import { MemoryEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import { CodexExecWorkerLauncher } from "../src/studio/runtime/production/launcher.ts";
+import { PublishReviewIntakeHost } from "../src/studio/runtime/production/publishReviewIntakeHost.ts";
 import type {
   EvidenceAssessmentClaim,
   SpawnRequestInput,
@@ -339,6 +340,42 @@ test("stdio evidence_decide emits one withheld receipt over a live audited asses
     assert.equal(product.evidenceDecisions[0].outcome, "withheld");
     assert.equal(product.decisionArtifacts.length, 1);
     assert.equal(product.decisionArtifacts[0].receiptId, result.receiptId);
+
+    const intakeHost = new PublishReviewIntakeHost(runtime.ledger, runtime.artifacts);
+    const intakeRequest = {
+      decision: {
+        operationId: result.operationId,
+        artifactId: result.outputArtifactId,
+        receiptId: result.receiptId,
+        receiptContentId: result.receiptContentId,
+      },
+    };
+    await assert.rejects(
+      intakeHost.create({
+        ...intakeRequest,
+        rawDecisionBytes: JSON.stringify(result.receipt),
+        path: "decision.json",
+        caption: "caller-authored caption",
+        prose: "queue this",
+      }),
+      /Publish-review intake request/,
+    );
+    const intake = await intakeHost.create(intakeRequest);
+    assert.equal(intake.receipt.schema, "studio.publish-review-intake.receipt.v1");
+    assert.equal(intake.receipt.result.outcome, "rejected");
+    assert.deepEqual(intake.receipt.result.reasonCodes, result.receipt.decision.reasonCodes);
+    assert.deepEqual(intake.receipt.input.decision, intakeRequest.decision);
+    assert.equal("caption" in intake.receipt, false);
+    assert.equal("publication" in intake.receipt, false);
+    assert.equal("path" in intake.receipt, false);
+    assert.equal("prose" in intake.receipt, false);
+    const intakeEvents = await runtime.ledger.events();
+    assert.equal(intakeEvents.filter((event) => event.type === "publish.review.intake_started").length, 1);
+    assert.equal(intakeEvents.filter((event) => event.type === "publish.review.intake_completed").length, 1);
+    const intakeProduct = projectProductionRuntimeJournal(intakeEvents);
+    assert.equal(intakeProduct.publishReviewIntakes.length, 1);
+    assert.equal(intakeProduct.publishReviewIntakes[0].outcome, "rejected");
+    assert.equal(intakeProduct.publishReviewIntakeArtifacts.length, 1);
   } finally {
     await client.close().catch(() => undefined);
     await opened.close();
@@ -358,6 +395,12 @@ test("decision bridge rejects raw, path-like, caller-authored outcomes and non-a
   );
   try {
     const identity = auditedAssessmentIdentity(assessment);
+    await assert.rejects(
+      new PublishReviewIntakeHost(runtime.ledger, runtime.artifacts).create({
+        decision: identity,
+      }),
+      /requires one exact host-verified decision receipt identity/,
+    );
     await assert.rejects(
       bridge.call({
         auditedAssessments: [identity],
@@ -567,6 +610,21 @@ test("launcher requires completed granted assessment and decision calls before a
           assert.equal(result.execution.outcome, "completed");
           assert.equal(Object.values(runtime.ledger.state().evidenceAssessments)[0].status, "completed");
           assert.equal(Object.values(runtime.ledger.state().evidenceDecisions)[0].status, "completed");
+          const completedDecision = Object.values(runtime.ledger.state().evidenceDecisions)[0];
+          assert.ok(completedDecision.artifactId && completedDecision.receiptId && completedDecision.receiptContentId);
+          const intake = await new PublishReviewIntakeHost(runtime.ledger, runtime.artifacts).create({
+            decision: {
+              operationId: completedDecision.id,
+              artifactId: completedDecision.artifactId,
+              receiptId: completedDecision.receiptId,
+              receiptContentId: completedDecision.receiptContentId,
+            },
+          });
+          assert.equal(
+            intake.receipt.result.outcome,
+            completedDecision.outcome === "proceed_to_publish_review" ? "queued" : "rejected",
+          );
+          assert.equal(Object.values(runtime.ledger.state().publishReviewIntakes)[0].status, "completed");
         } else if (mode === "skip-decision") {
           await assert.rejects(launcher.launch(runtime.permit), /did not complete its granted evidence decision/);
           assert.equal(runtime.ledger.state().tasks[runtime.permit.taskId].status, "failed");

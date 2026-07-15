@@ -42,10 +42,16 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   `withheld` or `proceed_to_publish_review` outcome and canonical reason codes;
 - an authenticated decision-receipt read endpoint that re-hashes the stored decision, re-runs every
   input assessment audit, re-derives policy, and returns no partial verification;
+- a host-only publish-review intake producer that accepts only one exact host-verified decision
+  operation/artifact/receipt/content identity and emits a private content-addressed
+  `studio.publish-review-intake.receipt.v1` with only `queued` or `rejected`;
+- an authenticated publish-review intake read endpoint that re-hashes the intake, re-verifies the
+  decision and every assessment/read audit, and returns no partial lineage;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
 The exact runtime test executes that path against the receipted run-005 media, performs two reads,
-one assessment, and one audited decision, and reopens the event journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
+one assessment, one audited decision, and one host-only publish-review intake, then reopens the event
+journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
 duplicate work, limit violations, scope escalation, invalid registration, source/evidence-byte
 drift, unauthorized media/evidence/assessment/decision calls, unread assessment inputs, non-audited
 decision inputs, out-of-bounds fact
@@ -56,8 +62,9 @@ This does not make the Studio live. A bounded local `codex exec` worker launcher
 production-journal Studio adapter now exist, but `/studio/runtime/` is an inspector and does not
 start workers. The default owned-source path consumes validated poll batches through that adapter
 and renders production-only source-artifact, task, spawn request/decision, worker, grant, operation,
-output-artifact lineage, and report facts without creating a `RunBundle`, legacy trace, or replay
-agent. The source region exposes only validated ingest-origin identity and content facts, and
+output-artifact lineage, decision facts, queued/rejected publish-review intake lineage, and report
+facts without creating a `RunBundle`, legacy trace, or replay agent. The source region exposes only
+validated ingest-origin identity and content facts, and
 artifact references link only when their source/output destination is rendered. The deterministic
 host exercises one real bounded seek plus worker-output receipt/report lineage. No hosted runtime
 service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
@@ -70,7 +77,10 @@ receipts produce none of those grants. `analysis.evidence.decide` adds a separat
 audited-assessment ceiling and lets the host, not the caller, derive outcome/reasons. `media.extract`,
 `media.seek`, `evidence.read`, `analysis.evidence.assess`, and `analysis.evidence.decide` are real
 scheduler/host/child-bridge capabilities; assessment is opinion over completed reads and decision is
-an audit-state gate, not sensing or publication. The other media operations and
+an audit-state gate, not sensing or publication. Publish-review intake is an application-host
+producer rather than a child capability or MCP tool. It accepts only the exact identity of a
+decision that passes the complete decision-receipt verification and records only `queued` or
+`rejected`; it performs no review and creates no captions or publication state. The other media operations and
 detector/model calls in this proposal remain unavailable. The tables below
 continue to document the fixture contract itself and should not be read as the production wire
 schema.
@@ -99,8 +109,27 @@ exact audited assessment identities and grant bounds; completion binds the deter
 private artifact, outcome, reasons, and audited counts. `GET
 /v1/runtimes/:runtimeId/decision-receipts` returns
 `studio.local-runtime-decision-receipts.v1` only after stored decision bytes, every input audit, and
-the re-derived policy agree with the full journal. `proceed_to_publish_review` means only that a
-future review producer may consume the receipt. No caption, upload, or publication follows.
+the re-derived policy agree with the full journal. `proceed_to_publish_review` means only that the
+separate host intake producer may queue the receipt for future human review. No review, caption,
+upload, or publication follows.
+
+The production event union also includes `publish.review.intake_started`,
+`publish.review.intake_completed`, and `publish.review.intake_failed`. These are application-host
+events, not child events: the start binds one exact decision operation/artifact/receipt/content
+identity, and completion binds one private `studio.publish-review-intake.receipt.v1` artifact. The
+producer first runs the complete decision-receipt verification. A verified
+`proceed_to_publish_review` decision yields `queued`; a verified `withheld` decision yields
+`rejected` with the unchanged decision reason codes. The closed request rejects raw decision bytes,
+paths, caller-authored captions or prose, caller-selected outcomes, and publication controls.
+
+`GET /v1/runtimes/:runtimeId/publish-review-intakes` returns
+`studio.local-runtime-publish-review-intakes.v1` only after re-hashing each stored intake receipt,
+checking its artifact and journal lineage, and repeating the full decision, assessment, and read
+verification. Any tamper or policy drift rejects the whole response as
+`stored_content_inconsistent`; no partial intake lineage is returned. V1 and runtimes without a
+completed decision return an honest empty list. `queued` means awaiting human review only, while
+`rejected` means the verified decision did not permit queue entry. Neither outcome means reviewed,
+captioned, uploaded, published, public, media-true, or English-correct.
 
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a

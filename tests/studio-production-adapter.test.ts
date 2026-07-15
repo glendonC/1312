@@ -426,10 +426,12 @@ test("production adapter projects spawn and output lineage with existing facts o
     evidenceReads: 0,
     evidenceAssessments: 0,
     evidenceDecisions: 0,
+    publishReviewIntakes: 0,
     sourceArtifacts: 0,
     evidenceArtifacts: 0,
     assessmentArtifacts: 0,
     decisionArtifacts: 0,
+    publishReviewIntakeArtifacts: 0,
     outputArtifacts: 1,
   });
   assert.deepEqual(

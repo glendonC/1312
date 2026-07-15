@@ -9,6 +9,7 @@ import {
 } from "../artifactStore.ts";
 import { reopenEvidenceAssessmentAudits } from "../assessmentAudit.ts";
 import { reopenEvidenceDecisionReceipts } from "../decisionReceiptAudit.ts";
+import { reopenPublishReviewIntakes } from "../publishReviewIntakeAudit.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
 import {
   createRuntimePlan,
@@ -30,6 +31,7 @@ import type {
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
+  RuntimeHostPublishReviewIntakeResponse,
   RuntimeHostStartAcknowledgement,
   RuntimeHostSourceSummary,
   RuntimeHostStatus,
@@ -641,6 +643,36 @@ export class RuntimeStartService {
       runtimeId,
       journalHead: journal.head,
       decisions,
+    };
+  }
+
+  async publishReviewIntakes(runtimeId: string): Promise<RuntimeHostPublishReviewIntakeResponse> {
+    const record = await this.store.findByRuntimeId(runtimeId);
+    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+    const reconciled = await this.reconcile(record, false);
+    const paths = this.store.paths(runtimeId);
+    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
+    let intakes;
+    try {
+      intakes = await reopenPublishReviewIntakes(
+        journal.state,
+        journal.events,
+        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+      );
+    } catch (error) {
+      throw new RuntimeHostError(
+        "stored_content_inconsistent",
+        "A stored publish-review intake or its verified decision lineage failed closed validation.",
+        409,
+        { cause: error },
+      );
+    }
+    return {
+      schema: "studio.local-runtime-publish-review-intakes.v1",
+      commandId: reconciled.commandId,
+      runtimeId,
+      journalHead: journal.head,
+      intakes,
     };
   }
 

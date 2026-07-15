@@ -6,6 +6,7 @@ import { FfmpegCapabilityHost } from "../mediaHost.ts";
 import { BoundedEvidenceReadHost } from "../evidenceHost.ts";
 import { BoundedEvidenceAssessmentHost } from "../evidenceAssessmentHost.ts";
 import { BoundedEvidenceDecisionHost } from "../evidenceDecisionHost.ts";
+import { PublishReviewIntakeHost } from "../publishReviewIntakeHost.ts";
 import {
   CodexExecWorkerLauncher,
   type CodexWorkerLauncherOptions,
@@ -255,13 +256,36 @@ export async function runBoundedRuntimeApplication(
   });
   try {
     const launched = await launcher.launch(decision.permit);
+    const completedDecisions = Object.values(ledger.state().evidenceDecisions).filter((operation) =>
+      operation.status === "completed");
+    if (completedDecisions.length > 1) {
+      throw new Error("Bounded runtime application produced more than one evidence decision");
+    }
+    const completedDecision = completedDecisions[0];
+    if (completedDecision) {
+      if (
+        !completedDecision.artifactId ||
+        !completedDecision.receiptId ||
+        !completedDecision.receiptContentId
+      ) {
+        throw new Error("Completed evidence decision is missing its exact receipt identity");
+      }
+      await new PublishReviewIntakeHost(ledger, artifacts).create({
+        decision: {
+          operationId: completedDecision.id,
+          artifactId: completedDecision.artifactId,
+          receiptId: completedDecision.receiptId,
+          receiptContentId: completedDecision.receiptContentId,
+        },
+      });
+    }
     await reports.decide({
       reportId: launched.report.id,
       decidedByTaskId: rootPermit.taskId,
       decidedByAgentId: rootPermit.agentId,
       accepted: true,
       reason:
-        "The bounded child returned its structured artifact after its authorized receipted seek, any granted evidence reads, required bounded assessment, and required audited decision.",
+        "The bounded child returned its structured artifact after its authorized receipted seek, any granted evidence reads, required bounded assessment, required audited decision, and separate host-verified publish-review intake when a decision existed.",
     });
     await scheduler.transitionTask(
       rootPermit.taskId,

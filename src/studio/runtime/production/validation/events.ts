@@ -4,6 +4,10 @@ import { assertEvidenceReadRequest, validateEvidenceReadReceipt } from "./eviden
 import { assertEvidenceAssessmentRequest, validateEvidenceAssessmentReceipt } from "./assessment.ts";
 import { assertEvidenceDecisionRequest, validateEvidenceDecisionReceipt } from "./decision.ts";
 import {
+  validateEvidenceDecisionReceiptIdentity,
+  validatePublishReviewIntakeReceipt,
+} from "./publishReview.ts";
+import {
   validateExecutorSpanReceipt,
   validateModelUsageReceipt,
 } from "./execution.ts";
@@ -77,7 +81,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "handoff_host", "launcher"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "handoff_host", "launcher"]),
     context,
     "event.producer.kind",
   );
@@ -224,6 +228,20 @@ export function assertRuntimeEvent(
   } else if (type === "analysis.evidence.decision_failed") {
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
+    string(data.reason, context, "event.data.reason");
+  } else if (type === "publish.review.intake_started") {
+    exact(data, ["intakeId", "decision"], context, "event.data");
+    string(data.intakeId, context, "event.data.intakeId");
+    validateEvidenceDecisionReceiptIdentity(data.decision, context, "event.data.decision");
+  } else if (type === "publish.review.intake_completed") {
+    exact(data, ["intakeId", "outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.intakeId, context, "event.data.intakeId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validatePublishReviewIntakeReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "publish.review.intake_failed") {
+    exact(data, ["intakeId", "reason"], context, "event.data");
+    string(data.intakeId, context, "event.data.intakeId");
     string(data.reason, context, "event.data.reason");
   } else if (type === "report.submitted") {
     exact(data, ["report"], context, "event.data");

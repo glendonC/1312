@@ -16,6 +16,7 @@ import type {
   ExecutorSpanReceipt,
   MediaOperationReceipt,
   MediaTrackDescriptor,
+  PublishReviewIntakeReceipt,
   RuntimeArtifact,
   SourceArtifactDescriptor,
   WorkerOutputEnvelope,
@@ -462,6 +463,46 @@ export class ContentAddressedArtifactStore {
         assessmentArtifactIds: input.receipt.inputs.map((assessment) => assessment.artifactId),
         assessmentReceiptIds: input.receipt.inputs.map((assessment) => assessment.receiptId),
         assessmentReceiptContentIds: input.receipt.inputs.map((assessment) => assessment.receiptContentId),
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildPublishReviewIntakeArtifact(input: {
+    runId: string;
+    receipt: PublishReviewIntakeReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const decision = input.receipt.input.decision;
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({
+        runId: input.runId,
+        intakeId: input.receipt.intakeId,
+        kind: "publish-review-intake-receipt",
+        contentId: input.storedReceipt.content.contentId,
+      })}`,
+      runId: input.runId,
+      kind: "publish-review-intake-receipt",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [decision.artifactId],
+      producerTaskId: null,
+      producerAgentId: null,
+      origin: {
+        kind: "publish_review_intake",
+        intakeId: input.receipt.intakeId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+        decisionOperationId: decision.operationId,
+        decisionArtifactId: decision.artifactId,
+        decisionReceiptId: decision.receiptId,
+        decisionReceiptContentId: decision.receiptContentId,
       },
     };
     assertRuntimeArtifact(artifact);

@@ -20,6 +20,7 @@ export type {
   RuntimeHostAssessmentAuditResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
+  RuntimeHostPublishReviewIntakeResponse,
   RuntimeHostSourceSummary,
   RuntimeHostStartAcknowledgement,
   RuntimeHostStartRequest,

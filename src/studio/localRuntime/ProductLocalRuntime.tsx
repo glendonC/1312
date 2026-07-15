@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { initialRequest, type AnalysisRequest } from "../preflight/model";
 import type { EvidenceAssessmentAudit } from "../runtime/production/assessmentAudit";
 import type { EvidenceDecisionReceiptVerification } from "../runtime/production/decisionReceiptAudit";
+import type { PublishReviewIntakeVerification } from "../runtime/production/publishReviewIntakeAudit";
 import type {
   OwnedMediaIngestStatus,
   RuntimeHostPlanResponse,
@@ -41,6 +42,7 @@ interface RuntimeView {
   production: ProductionStudioProjection;
   assessmentAudits: EvidenceAssessmentAudit[];
   decisionReceipts: EvidenceDecisionReceiptVerification[];
+  publishReviewIntakes: PublishReviewIntakeVerification[];
   cursor: number;
   eventCount: number;
   lastEventType: string | null;
@@ -267,9 +269,10 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         if (poll.commandId !== identity.commandId) {
           throw new Error("Runtime host event polling returned another command identity.");
         }
-        const [assessmentAudit, decisionReceiptResponse] = await Promise.all([
+        const [assessmentAudit, decisionReceiptResponse, publishReviewIntakeResponse] = await Promise.all([
           activeClient.assessmentAudits(identity.runtimeId),
           activeClient.decisionReceipts(identity.runtimeId),
+          activeClient.publishReviewIntakes(identity.runtimeId),
         ]);
         if (
           assessmentAudit.commandId !== identity.commandId ||
@@ -284,6 +287,13 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
           decisionReceiptResponse.journalHead < poll.nextCursor
         ) {
           throw new Error("Runtime host decision receipt identities changed while polling.");
+        }
+        if (
+          publishReviewIntakeResponse.commandId !== identity.commandId ||
+          publishReviewIntakeResponse.runtimeId !== identity.runtimeId ||
+          publishReviewIntakeResponse.journalHead < poll.nextCursor
+        ) {
+          throw new Error("Runtime host publish-review intake identities changed while polling.");
         }
         if (adapter.view().lastSeq !== after) {
           throw new Error("Production adapter cursor changed outside the validated poll path.");
@@ -306,6 +316,13 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         if (visibleDecisionReceipts.length !== completedDecisions.length) {
           throw new Error("A completed evidence decision has no reopened fail-closed receipt verification.");
         }
+        const completedIntakes = production.publishReviewIntakes.filter((intake) =>
+          intake.status === "completed");
+        const visiblePublishReviewIntakes = publishReviewIntakeResponse.intakes.filter((intake) =>
+          completedIntakes.some((projected) => projected.intakeId === intake.intakeId));
+        if (visiblePublishReviewIntakes.length !== completedIntakes.length) {
+          throw new Error("A completed publish-review intake has no reopened fail-closed receipt verification.");
+        }
         after = poll.nextCursor;
         setRuntime((current) => {
           if (!current || current.status.runtimeId !== identity.runtimeId) return current;
@@ -314,6 +331,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
             production,
             assessmentAudits: visibleAssessmentAudits,
             decisionReceipts: visibleDecisionReceipts,
+            publishReviewIntakes: visiblePublishReviewIntakes,
             status: {
               ...statusView(status),
               lifecycle: poll.lifecycle,
@@ -341,6 +359,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
               ...current,
               assessmentAudits: [],
               decisionReceipts: [],
+              publishReviewIntakes: [],
               pollState: "error",
               pollMessage: `Polling stopped after cursor ${current.cursor}: ${errorMessage(pollError)}`,
             }
@@ -376,6 +395,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         production: adapter.view(),
         assessmentAudits: [],
         decisionReceipts: [],
+        publishReviewIntakes: [],
         cursor: 0,
         eventCount: 0,
         lastEventType: null,
@@ -733,6 +753,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
             projection={runtime.production}
             assessmentAudits={runtime.assessmentAudits}
             decisionReceipts={runtime.decisionReceipts}
+            publishReviewIntakes={runtime.publishReviewIntakes}
           />
         </section>
       )}

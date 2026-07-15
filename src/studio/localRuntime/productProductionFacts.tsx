@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { EvidenceAssessmentAudit } from "../runtime/production/assessmentAudit";
 import type { EvidenceDecisionReceiptVerification } from "../runtime/production/decisionReceiptAudit";
+import type { PublishReviewIntakeVerification } from "../runtime/production/publishReviewIntakeAudit";
 import type {
   ProductionStudioGrantView,
   ProductionStudioProjection,
@@ -130,10 +131,12 @@ export function ProductionJournalFacts({
   projection,
   assessmentAudits,
   decisionReceipts,
+  publishReviewIntakes,
 }: {
   projection: ProductionStudioProjection;
   assessmentAudits: readonly EvidenceAssessmentAudit[];
   decisionReceipts: readonly EvidenceDecisionReceiptVerification[];
+  publishReviewIntakes: readonly PublishReviewIntakeVerification[];
 }) {
   const outputArtifactIds = new Set(projection.outputArtifacts.map((artifact) => artifact.artifactId));
   const renderedArtifactIds = new Set([
@@ -141,6 +144,7 @@ export function ProductionJournalFacts({
     ...projection.evidenceArtifacts.map((artifact) => artifact.artifactId),
     ...projection.assessmentArtifacts.map((artifact) => artifact.artifactId),
     ...projection.decisionArtifacts.map((artifact) => artifact.artifactId),
+    ...projection.publishReviewIntakeArtifacts.map((artifact) => artifact.artifactId),
     ...outputArtifactIds,
   ]);
   const operationIds = new Set([
@@ -170,6 +174,19 @@ export function ProductionJournalFacts({
       decision.receiptContentId === receipt.receiptContentId &&
       decision.outcome === receipt.outcome) &&
     renderedArtifactIds.has(receipt.artifactId));
+  const visiblePublishReviewIntakes = publishReviewIntakes.filter((intake) =>
+    projection.publishReviewIntakes.some((projected) =>
+      projected.intakeId === intake.intakeId &&
+      projected.status === "completed" &&
+      projected.outputArtifactId === intake.artifactId &&
+      projected.receiptId === intake.receiptId &&
+      projected.receiptContentId === intake.receiptContentId &&
+      projected.decisionOperationId === intake.decision.operationId &&
+      projected.decisionArtifactId === intake.decision.artifactId &&
+      projected.decisionReceiptId === intake.decision.receiptId &&
+      projected.decisionReceiptContentId === intake.decision.receiptContentId &&
+      projected.outcome === intake.outcome) &&
+    renderedArtifactIds.has(intake.artifactId));
   const executionIds = new Set(
     projection.workers.flatMap((worker) => worker.execution ? [worker.execution.id] : []),
   );
@@ -923,7 +940,7 @@ export function ProductionJournalFacts({
         <p>
           The host reopens the stored decision and every assessment/read receipt, re-runs citation
           closure, and derives the same deterministic outcome. <code>proceed_to_publish_review</code>
-          only allows entry to a future review producer; it does not mean captions exist or anything was published.
+          permits only host intake to an unreviewed queue; it does not mean captions exist or anything was published.
         </p>
         {visibleDecisionReceipts.length === 0 ? (
           <p className="product-runtime-unavailable" data-production-empty="decision-receipts">
@@ -986,6 +1003,189 @@ export function ProductionJournalFacts({
                     </li>
                   ))}
                 </ul>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="publish-review-intakes"
+        aria-labelledby="product-runtime-publish-review-intakes-title"
+      >
+        <h4 id="product-runtime-publish-review-intakes-title">Publish-review intake lineage</h4>
+        <p>
+          Host-produced queue or rejection lineage over one verified decision receipt. Queued means
+          awaiting review only; it does not mean reviewed, captioned, uploaded, published, or public.
+        </p>
+        {projection.publishReviewIntakes.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="publish-review-intakes">
+            Unavailable until the host verifies a completed decision receipt and records a closed
+            publish-review intake. V1 and absent, failed, or tampered decision paths stay unavailable.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.publishReviewIntakes.map((intake) => (
+              <article
+                key={intake.intakeId}
+                id={`product-production-intake-${intake.intakeId}`}
+                data-production-publish-review-intake-id={intake.intakeId}
+                data-status={intake.status}
+                data-intake-outcome={intake.outcome ?? "unavailable"}
+              >
+                <header><h5>studio.publish-review-intake.receipt.v1</h5><span>{intake.outcome ?? intake.status}</span></header>
+                <dl>
+                  <div><dt>Intake</dt><dd>{intake.intakeId}</dd></div>
+                  <div>
+                    <dt>Verified decision operation</dt>
+                    <dd>
+                      {operationIds.has(intake.decisionOperationId)
+                        ? <ProductionIdentityLink kind="operation" identity={intake.decisionOperationId} />
+                        : intake.decisionOperationId}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Verified decision artifact</dt>
+                    <dd><ProductionArtifactReference identity={intake.decisionArtifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
+                  </div>
+                  <div><dt>Verified decision receipt</dt><dd>{intake.decisionReceiptId}</dd></div>
+                  <div><dt>Decision receipt content</dt><dd>{intake.decisionReceiptContentId}</dd></div>
+                  <div><dt>Outcome</dt><dd>{intake.outcome ?? "Unavailable until intake completion"}</dd></div>
+                  <div>
+                    <dt>Decision reason codes</dt>
+                    <dd>
+                      {intake.reasonCodes.length === 0
+                        ? "Unavailable until intake completion"
+                        : intake.reasonCodes.map((reason, index) => (
+                          <span key={reason} data-production-intake-reason-code={reason}>
+                            {index > 0 ? ", " : null}{reason}
+                          </span>
+                        ))}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Intake artifact</dt>
+                    <dd>
+                      {intake.outputArtifactId
+                        ? <ProductionArtifactReference identity={intake.outputArtifactId} renderedArtifactIds={renderedArtifactIds} />
+                        : "Unavailable until intake completion"}
+                    </dd>
+                  </div>
+                  <div><dt>Receipt</dt><dd>{intake.receiptId ?? "Unavailable until intake completion"}</dd></div>
+                  <div><dt>Receipt content</dt><dd>{intake.receiptContentId ?? "Unavailable until intake completion"}</dd></div>
+                  <div><dt>Failure</dt><dd>{intake.failure ?? (intake.status === "failed" ? "Failure reason unavailable" : "Not recorded")}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="publish-review-intake-artifacts"
+        aria-labelledby="product-runtime-publish-review-intake-artifacts-title"
+      >
+        <h4 id="product-runtime-publish-review-intake-artifacts-title">Publish-review intake artifacts</h4>
+        {projection.publishReviewIntakeArtifacts.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="publish-review-intake-artifacts">
+            Unavailable until a completed intake records its private content-addressed receipt artifact.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.publishReviewIntakeArtifacts.map((artifact) => (
+              <article
+                key={artifact.artifactId}
+                id={productionIdentityTarget("artifact", artifact.artifactId)}
+                data-production-publish-review-intake-artifact-id={artifact.artifactId}
+              >
+                <header><h5>{artifact.kind}</h5><span>private intake receipt</span></header>
+                <dl>
+                  <div><dt>Artifact</dt><dd>{artifact.artifactId}</dd></div>
+                  <div><dt>Content</dt><dd>{artifact.contentId} · {artifact.bytes} bytes</dd></div>
+                  <div><dt>Intake</dt><dd>{artifact.intakeId}</dd></div>
+                  <div><dt>Receipt</dt><dd>{artifact.receiptId}</dd></div>
+                  <div><dt>Receipt content</dt><dd>{artifact.receiptContentId}</dd></div>
+                  <div>
+                    <dt>Decision operation</dt>
+                    <dd>
+                      {operationIds.has(artifact.decisionOperationId)
+                        ? <ProductionIdentityLink kind="operation" identity={artifact.decisionOperationId} />
+                        : artifact.decisionOperationId}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Decision artifact</dt>
+                    <dd><ProductionArtifactReference identity={artifact.decisionArtifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
+                  </div>
+                  <div><dt>Decision receipt</dt><dd>{artifact.decisionReceiptId}</dd></div>
+                  <div><dt>Decision receipt content</dt><dd>{artifact.decisionReceiptContentId}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="publish-review-intake-receipts"
+        aria-labelledby="product-runtime-publish-review-intake-receipts-title"
+      >
+        <h4 id="product-runtime-publish-review-intake-receipts-title">Verified publish-review intake receipts</h4>
+        <p>
+          The host reopens the intake, decision, assessment, and read receipts before returning this
+          view. Rejected decision reasons remain visible; queued remains unreviewed and unpublished.
+        </p>
+        {visiblePublishReviewIntakes.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="publish-review-intake-receipts">
+            Unavailable until stored intake bytes and the complete verified decision lineage agree.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {visiblePublishReviewIntakes.map((intake) => (
+              <article
+                key={intake.intakeId}
+                data-production-publish-review-intake-receipt-id={intake.intakeId}
+                data-integrity={intake.integrity}
+                data-intake-outcome={intake.outcome}
+                data-intake-producer={intake.producer}
+              >
+                <header><h5>studio.publish-review-intake.receipt.v1</h5><span>{intake.outcome}</span></header>
+                <dl>
+                  <div><dt>Intake</dt><dd>{intake.intakeId}</dd></div>
+                  <div>
+                    <dt>Intake artifact</dt>
+                    <dd><ProductionArtifactReference identity={intake.artifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
+                  </div>
+                  <div><dt>Receipt</dt><dd>{intake.receiptId}</dd></div>
+                  <div><dt>Stored content</dt><dd>{intake.receiptContentId}</dd></div>
+                  <div><dt>Executor</dt><dd>{intake.producer}</dd></div>
+                  <div><dt>Outcome</dt><dd>{intake.outcome}</dd></div>
+                  <div>
+                    <dt>Reason codes</dt>
+                    <dd>
+                      {intake.reasonCodes.map((reason, index) => (
+                        <span key={reason} data-production-verified-intake-reason-code={reason}>
+                          {index > 0 ? ", " : null}{reason}
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Decision operation</dt>
+                    <dd>
+                      {operationIds.has(intake.decision.operationId)
+                        ? <ProductionIdentityLink kind="operation" identity={intake.decision.operationId} />
+                        : intake.decision.operationId}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Decision artifact</dt>
+                    <dd><ProductionArtifactReference identity={intake.decision.artifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
+                  </div>
+                  <div><dt>Decision receipt</dt><dd>{intake.decision.receiptId}</dd></div>
+                  <div><dt>Decision receipt content</dt><dd>{intake.decision.receiptContentId}</dd></div>
+                  <div><dt>Validation</dt><dd>Intake bytes rehashed; decision and all audited inputs reverified</dd></div>
+                </dl>
               </article>
             ))}
           </div>

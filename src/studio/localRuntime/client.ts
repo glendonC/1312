@@ -7,6 +7,7 @@ import type {
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
+  RuntimeHostPublishReviewIntakeResponse,
   RuntimeHostSourceSummary,
   RuntimeHostStartAcknowledgement,
   RuntimeHostStartRequest,
@@ -913,6 +914,98 @@ function decisionReceiptResponse(
   };
 }
 
+function publishReviewIntakeResponse(
+  value: unknown,
+  expectedRuntimeId: string,
+): RuntimeHostPublishReviewIntakeResponse {
+  const context = "Runtime host publish-review intakes";
+  const item = object(value, context);
+  exact(item, ["schema", "commandId", "runtimeId", "journalHead", "intakes"], context);
+  if (item.schema !== "studio.local-runtime-publish-review-intakes.v1") fail(context, "schema is unsupported.");
+  const runtimeId = identity(item.runtimeId, `${context}.runtimeId`);
+  if (runtimeId !== expectedRuntimeId) fail(context, "runtime identity changed.");
+  if (!Array.isArray(item.intakes)) fail(`${context}.intakes`, "must be an array.");
+  const intakeIds = new Set<string>();
+  const decisionOperationIds = new Set<string>();
+  const intakes = item.intakes.map((candidate, intakeIndex) => {
+    const intakeContext = `${context}.intakes[${intakeIndex}]`;
+    const intake = object(candidate, intakeContext);
+    exact(intake, [
+      "intakeId",
+      "artifactId",
+      "receiptId",
+      "receiptContentId",
+      "integrity",
+      "producer",
+      "decision",
+      "outcome",
+      "reasonCodes",
+    ], intakeContext);
+    const intakeId = identity(intake.intakeId, `${intakeContext}.intakeId`);
+    if (intakeIds.has(intakeId)) fail(`${intakeContext}.intakeId`, "is duplicated.");
+    intakeIds.add(intakeId);
+    if (intake.integrity !== "stored_intake_and_verified_decision_receipt") {
+      fail(`${intakeContext}.integrity`, "does not carry the closed intake verification result.");
+    }
+    if (intake.producer !== "host_publish_review_intake_v1") {
+      fail(`${intakeContext}.producer`, "is unsupported.");
+    }
+    const decision = object(intake.decision, `${intakeContext}.decision`);
+    exact(decision, ["operationId", "artifactId", "receiptId", "receiptContentId"], `${intakeContext}.decision`);
+    const decisionOperationId = identity(decision.operationId, `${intakeContext}.decision.operationId`);
+    if (decisionOperationIds.has(decisionOperationId)) {
+      fail(`${intakeContext}.decision.operationId`, "already has an intake.");
+    }
+    decisionOperationIds.add(decisionOperationId);
+    const outcome = intake.outcome;
+    if (outcome !== "queued" && outcome !== "rejected") fail(`${intakeContext}.outcome`, "is unsupported.");
+    if (!Array.isArray(intake.reasonCodes) || intake.reasonCodes.length === 0) {
+      fail(`${intakeContext}.reasonCodes`, "must contain closed decision reason codes.");
+    }
+    const reasonOrder = [
+      "audited_claim_withheld",
+      "audited_claim_unknown",
+      "audited_claim_truncated",
+      "all_audited_claims_supported",
+    ] as const;
+    const reasonCodes = intake.reasonCodes.map((reason, reasonIndex) => {
+      if (!reasonOrder.includes(reason as (typeof reasonOrder)[number])) {
+        fail(`${intakeContext}.reasonCodes[${reasonIndex}]`, "is unsupported.");
+      }
+      return reason as (typeof reasonOrder)[number];
+    });
+    if (
+      new Set(reasonCodes).size !== reasonCodes.length ||
+      JSON.stringify(reasonCodes) !== JSON.stringify(reasonOrder.filter((reason) => reasonCodes.includes(reason))) ||
+      (outcome === "queued" && (reasonCodes.length !== 1 || reasonCodes[0] !== "all_audited_claims_supported")) ||
+      (outcome === "rejected" && reasonCodes.includes("all_audited_claims_supported"))
+    ) fail(`${intakeContext}.reasonCodes`, "do not agree with the closed intake outcome.");
+    return {
+      intakeId,
+      artifactId: identity(intake.artifactId, `${intakeContext}.artifactId`),
+      receiptId: identity(intake.receiptId, `${intakeContext}.receiptId`),
+      receiptContentId: contentId(intake.receiptContentId, `${intakeContext}.receiptContentId`),
+      integrity: "stored_intake_and_verified_decision_receipt" as const,
+      producer: "host_publish_review_intake_v1" as const,
+      decision: {
+        operationId: decisionOperationId,
+        artifactId: identity(decision.artifactId, `${intakeContext}.decision.artifactId`),
+        receiptId: identity(decision.receiptId, `${intakeContext}.decision.receiptId`),
+        receiptContentId: contentId(decision.receiptContentId, `${intakeContext}.decision.receiptContentId`),
+      },
+      outcome: outcome as "queued" | "rejected",
+      reasonCodes,
+    };
+  });
+  return {
+    schema: "studio.local-runtime-publish-review-intakes.v1",
+    commandId: identity(item.commandId, `${context}.commandId`),
+    runtimeId,
+    journalHead: integer(item.journalHead, `${context}.journalHead`),
+    intakes,
+  };
+}
+
 export function normalizeLocalRuntimeHostBaseUrl(value: string): string {
   let url: URL;
   try {
@@ -1092,6 +1185,13 @@ export class LocalRuntimeHostClient {
   async decisionReceipts(runtimeId: string): Promise<RuntimeHostDecisionReceiptResponse> {
     return decisionReceiptResponse(
       await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/decision-receipts`),
+      runtimeId,
+    );
+  }
+
+  async publishReviewIntakes(runtimeId: string): Promise<RuntimeHostPublishReviewIntakeResponse> {
+    return publishReviewIntakeResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/publish-review-intakes`),
       runtimeId,
     );
   }

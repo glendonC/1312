@@ -21,6 +21,7 @@ import type {
 const CONTENT = `sha256:${"a".repeat(64)}`;
 const RECEIPT_CONTENT = `sha256:${"b".repeat(64)}`;
 const DECISION_CONTENT = `sha256:${"c".repeat(64)}`;
+const INTAKE_CONTENT = `sha256:${"e".repeat(64)}`;
 const SOURCE: RuntimeHostSourceSummary = {
   sourceSessionId: "source-session:fixture",
   sourceRevisionId: "source-revision:fixture",
@@ -311,6 +312,30 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
         }],
       });
     }
+    if (url.endsWith("/v1/runtimes/runtime%3Afixture/publish-review-intakes")) {
+      return json({
+        schema: "studio.local-runtime-publish-review-intakes.v1",
+        commandId: "runtime-start:fixture",
+        runtimeId: "runtime:fixture",
+        journalHead: 7,
+        intakes: [{
+          intakeId: "publish-review-intake:fixture",
+          artifactId: "artifact:publish-review-intake:fixture",
+          receiptId: "publish-review-intake-receipt:fixture",
+          receiptContentId: INTAKE_CONTENT,
+          integrity: "stored_intake_and_verified_decision_receipt",
+          producer: "host_publish_review_intake_v1",
+          decision: {
+            operationId: "operation:decision:fixture",
+            artifactId: "artifact:decision:fixture",
+            receiptId: "evidence-decision:fixture",
+            receiptContentId: DECISION_CONTENT,
+          },
+          outcome: "rejected",
+          reasonCodes: ["audited_claim_unknown", "audited_claim_truncated"],
+        }],
+      });
+    }
     return json({ error: { code: "not_found", message: "Unexpected test URL." } }, 404);
   };
   const client = new LocalRuntimeHostClient({
@@ -331,6 +356,7 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
   const poll = await client.poll(start.runtimeId, 7);
   const assessmentAudit = await client.assessmentAudits(start.runtimeId);
   const decisionReceipts = await client.decisionReceipts(start.runtimeId);
+  const publishReviewIntakes = await client.publishReviewIntakes(start.runtimeId);
 
   assert.equal(client.baseUrl, "http://127.0.0.1:4312");
   assert.equal(plan.forecast.schema, "studio.forecast.v1");
@@ -352,7 +378,14 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
     "audited_claim_unknown",
     "audited_claim_truncated",
   ]);
-  assert.equal(calls.length, 7);
+  assert.equal(publishReviewIntakes.intakes.length, 1);
+  assert.equal(publishReviewIntakes.intakes[0].outcome, "rejected");
+  assert.equal(publishReviewIntakes.intakes[0].decision.operationId, "operation:decision:fixture");
+  assert.deepEqual(publishReviewIntakes.intakes[0].reasonCodes, [
+    "audited_claim_unknown",
+    "audited_claim_truncated",
+  ]);
+  assert.equal(calls.length, 8);
   for (const call of calls) {
     assert.equal(new Headers(call.init?.headers).get("Authorization"), `Bearer ${"t".repeat(64)}`);
   }
@@ -593,6 +626,41 @@ test("browser client rejects an open or incomplete decision receipt instead of e
     (error: unknown) => error instanceof RuntimeHostClientError &&
       error.code === "invalid_host_response" &&
       /closed decision verification result/.test(error.message),
+  );
+});
+
+test("browser client rejects an unverified publish-review intake instead of exposing queue lineage", async () => {
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => json({
+      schema: "studio.local-runtime-publish-review-intakes.v1",
+      commandId: "runtime-start:fixture",
+      runtimeId: "runtime:fixture",
+      journalHead: 7,
+      intakes: [{
+        intakeId: "publish-review-intake:fixture",
+        artifactId: "artifact:publish-review-intake:fixture",
+        receiptId: "publish-review-intake-receipt:fixture",
+        receiptContentId: INTAKE_CONTENT,
+        integrity: "best_effort",
+        producer: "host_publish_review_intake_v1",
+        decision: {
+          operationId: "operation:decision:fixture",
+          artifactId: "artifact:decision:fixture",
+          receiptId: "evidence-decision:fixture",
+          receiptContentId: DECISION_CONTENT,
+        },
+        outcome: "queued",
+        reasonCodes: ["all_audited_claims_supported"],
+      }],
+    }),
+  });
+  await assert.rejects(
+    client.publishReviewIntakes("runtime:fixture"),
+    (error: unknown) => error instanceof RuntimeHostClientError &&
+      error.code === "invalid_host_response" &&
+      /closed intake verification result/.test(error.message),
   );
 });
 

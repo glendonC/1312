@@ -1,29 +1,18 @@
 /**
  * A spatial focus mode for one agent.
  *
- * Selection changes the canvas state rather than opening an inspector beside it: the topology
- * recedes, the chosen identity becomes the left-hand anchor, and its recorded working medium
- * occupies the main glass plane. Recorded activity stays inside that environment as evidence and
- * never calls itself reasoning.
+ * The recorded source remains fixed beside a neutral activity feed. The feed only renders
+ * recorded events and never implies hidden model reasoning.
  */
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import "../styles/studio/focus/index.css";
 import AgentMark from "./AgentMark";
 import { agentIdentityStyle, createAgentIdentityMap } from "./agentIdentity";
-import { agentRoleRemit, agentRoleTitle, agentState, agentTitle } from "./agentPresentation";
-import AgentFocusRail, {
-  FOCUS_SECTIONS,
-  SECTION_DESCRIPTIONS,
-  SECTION_LABELS,
-  type FocusSection,
-} from "./focus/AgentFocusRail";
+import { agentRoleRemit, agentState, agentTitle } from "./agentPresentation";
 import AgentVisualEvidence from "./focus/AgentVisualEvidence";
-import AssignmentPanel from "./focus/AssignmentPanel";
-import HistoryPanel from "./focus/HistoryPanel";
-import ResultsPanel from "./focus/ResultsPanel";
 import WorkbenchPanel from "./focus/WorkbenchPanel";
 import {
   useAgent,
@@ -44,29 +33,6 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
-const ENVIRONMENT_COPY: Record<Role, { title: string; description: string }> = {
-  orchestrator: {
-    title: "Run coordination",
-    description: "Recorded dispatches and the agents currently present in the topology.",
-  },
-  segment: {
-    title: "Recorded media",
-    description: "The source clip, inspection controls, waveform, and the agent's recorded marks.",
-  },
-  context: {
-    title: "Term resolution",
-    description: "Transcript terms resolved into the job context during this run.",
-  },
-  translate: {
-    title: "Translation draft",
-    description: "The assigned clip window and the latest draft recorded for this agent.",
-  },
-  qc: {
-    title: "Gate review",
-    description: "Recorded measurements and dispositions from the verification pass.",
-  },
-};
-
 export default function AgentPanel() {
   const selected = useStudio((state) => state.selected);
   const select = useStudio((state) => state.select);
@@ -78,10 +44,8 @@ export default function AgentPanel() {
   const emitted = useStudio((state) => state.state.emitted);
   const cancelled = useStudio((state) => state.outcome?.kind === "cancelled");
   const paused = useStudio((state) => state.paused);
-  const previewSession = useStudio((state) => state.previewSession);
   const closeButton = useRef<HTMLButtonElement>(null);
   const priorFocus = useRef<HTMLElement | null>(null);
-  const [section, setSection] = useState<FocusSection>("workbench");
   const open = selected !== null;
 
   const identities = useMemo(
@@ -116,10 +80,6 @@ export default function AgentPanel() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [open, select]);
 
-  useEffect(() => {
-    setSection("workbench");
-  }, [selected]);
-
   if (!selected || !bundle) return <AnimatePresence />;
 
   const isOrchestrator = selected === "orchestrator";
@@ -136,9 +96,10 @@ export default function AgentPanel() {
     : history;
   const inspectableIds = ["orchestrator", ...spawnedIds];
   const selectedIndex = inspectableIds.indexOf(selected);
-  const environment = ENVIRONMENT_COPY[role];
-  const environmentTitle = SECTION_LABELS[section];
-  const environmentDescription = SECTION_DESCRIPTIONS[section];
+  const sourceTitle = bundle.run.clip.title
+    || bundle.run.clip.media
+    || bundle.run.clip.source.label
+    || "Recorded source";
 
   const move = (direction: -1 | 1) => {
     if (inspectableIds.length < 2) return;
@@ -163,31 +124,6 @@ export default function AgentPanel() {
     }
   };
 
-  const changeSection = (next: FocusSection, moveFocus = false) => {
-    setSection(next);
-    if (moveFocus) {
-      window.requestAnimationFrame(() => {
-        document.getElementById(`agent-focus-${next}-tab`)?.focus();
-      });
-    }
-  };
-
-  const moveSectionFocus = (event: React.KeyboardEvent<HTMLElement>) => {
-    const currentIndex = FOCUS_SECTIONS.indexOf(section);
-    let next: FocusSection | null = null;
-    if (event.key === "Home") next = FOCUS_SECTIONS[0];
-    if (event.key === "End") next = FOCUS_SECTIONS[FOCUS_SECTIONS.length - 1];
-    if (["ArrowRight", "ArrowDown"].includes(event.key)) {
-      next = FOCUS_SECTIONS[(currentIndex + 1) % FOCUS_SECTIONS.length];
-    }
-    if (["ArrowLeft", "ArrowUp"].includes(event.key)) {
-      next = FOCUS_SECTIONS[(currentIndex - 1 + FOCUS_SECTIONS.length) % FOCUS_SECTIONS.length];
-    }
-    if (!next) return;
-    event.preventDefault();
-    changeSection(next, true);
-  };
-
   return (
     <AnimatePresence>
       <motion.div
@@ -198,7 +134,7 @@ export default function AgentPanel() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.24 }}
+        transition={{ duration: 0.2 }}
       />
 
       <motion.aside
@@ -214,15 +150,15 @@ export default function AgentPanel() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.24 }}
+        transition={{ duration: 0.2 }}
       >
         <div className="agent-focus-spatial" style={agentIdentityStyle(identity)}>
           <motion.section
             className="agent-focus-hero"
             key={`hero-${selected}`}
-            initial={{ opacity: 0, x: -42, scale: 0.88 }}
+            initial={{ opacity: 0, x: -24, scale: 0.94 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 250, damping: 30 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="agent-focus-identity">
               <AgentMark
@@ -245,89 +181,47 @@ export default function AgentPanel() {
                 {agentRoleRemit(role)}
               </p>
             </div>
-
           </motion.section>
 
           <motion.div
-            className="agent-focus-environment-frame"
-            key={`environment-${selected}`}
-            initial={{ opacity: 0, x: 48, scale: 0.94 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 220, damping: 30, delay: 0.03 }}
+            className="agent-focus-shell"
+            key={`focus-${selected}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           >
-            <AgentFocusRail
-              section={section}
-              closeButtonRef={closeButton}
-              onSectionChange={changeSection}
-              onSectionKeyDown={moveSectionFocus}
-              onClose={() => select(null)}
-            />
-
-            <section className="agent-focus-environment" aria-labelledby="agent-environment-title">
-              <header className="agent-focus-environment-head">
-                <div>
-                  <span>Recorded focus</span>
-                  <h3 id="agent-environment-title">{environmentTitle}</h3>
-                  <p>{environmentDescription}</p>
-                </div>
+            <section
+              className="agent-focus-environment"
+              aria-labelledby="agent-focus-source-title"
+            >
+              <header className="agent-focus-source-head">
+                <h3 id="agent-focus-source-title">{sourceTitle}</h3>
               </header>
 
-              <div className="agent-focus-body">
-                <AgentVisualEvidence
-                  title={title}
-                  bundle={bundle}
-                  agent={isOrchestrator ? null : agent!}
-                  log={log}
-                />
+              <span className="agent-focus-stage-rule" data-edge="top" aria-hidden="true" />
 
-                <div className="agent-focus-detail">
-                  {section === "workbench" && (
+              <div className="agent-focus-body">
+                <div
+                  className="agent-focus-media-instrument"
+                >
+                  <AgentVisualEvidence bundle={bundle} />
+                </div>
+
+                <aside
+                  id="agent-focus-narrative"
+                  className="agent-focus-activity-region"
+                  aria-label="Recorded activity"
+                >
+                  <div className="agent-focus-activity-content">
                     <WorkbenchPanel
-                      role={role}
-                      agent={isOrchestrator ? null : agent!}
                       state={state}
                       log={log}
-                      environment={environment}
-                      orchestratorNote={orchestrator.note}
                     />
-                  )}
-                  {section === "assignment" && (
-                    <AssignmentPanel
-                      selected={selected}
-                      role={role}
-                      agent={isOrchestrator ? null : agent!}
-                      bundle={bundle}
-                    />
-                  )}
-                  {section === "history" && <HistoryPanel title={title} log={log} />}
-                  {section === "results" && (
-                    <ResultsPanel
-                      role={role}
-                      agent={isOrchestrator ? null : agent!}
-                      log={log}
-                      orchestratorNote={orchestrator.note}
-                    />
-                  )}
-                </div>
+                  </div>
+                </aside>
               </div>
 
-              <footer className="agent-focus-environment-foot">
-                <p role={previewSession ? "note" : undefined}>
-                  {previewSession
-                    ? "Recorded preview · The submitted source was not processed"
-                    : "Recorded preview · Projected from this run's artifacts and events"}
-                </p>
-                <dl aria-label="Recorded agent identity">
-                  <div>
-                    <dt>Role</dt>
-                    <dd>{agentRoleTitle(role)}</dd>
-                  </div>
-                  <div>
-                    <dt>ID</dt>
-                    <dd><code>{selected}</code></dd>
-                  </div>
-                </dl>
-              </footer>
+              <span className="agent-focus-stage-rule" data-edge="bottom" aria-hidden="true" />
             </section>
 
             <nav className="agent-focus-commands" aria-label="Agent focus commands">
@@ -348,11 +242,13 @@ export default function AgentPanel() {
                   </span>
                 </span>
               </div>
+
               <button
+                ref={closeButton}
                 type="button"
                 className="agent-focus-command-escape"
                 onClick={() => select(null)}
-                aria-label="Close focus"
+                aria-label="Close agent focus"
               >
                 <kbd aria-hidden="true">Esc</kbd>
                 <span>Close</span>

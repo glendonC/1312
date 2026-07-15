@@ -1,124 +1,113 @@
-/* The selected agent becomes a spatial state of the canvas, not a drawer beside it. */
+/* Agent focus is one bounded composition: identity, evidence stage, and command baseline. */
 
 .agent-focus-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 6;
-  width: 100%;
-  height: 100%;
-  padding: 0;
   border: 0;
-  background: rgba(247, 250, 248, 0.38);
+  background: rgba(247, 250, 248, 0.58);
   cursor: zoom-out;
 }
 
-/* Focus owns the canvas while open. The global replay dock stays legible below; only the
- * source/header furniture recedes, and its preview warning is repeated inside the dialog. */
 .studio:has(.agent-focus) .top,
 .studio:has(.agent-focus) .studio-lab {
   opacity: 0.08;
   filter: blur(10px) saturate(0.7);
   pointer-events: none;
-  transition:
-    opacity 220ms ease,
-    filter 260ms ease;
-}
-
-.studio:has(.agent-focus) .top {
-  transform: translateY(-2px) scale(0.985);
-  transform-origin: top center;
-  transition-property: opacity, filter, transform;
+  transition: opacity 200ms ease, filter 240ms ease;
 }
 
 .studio:has(.agent-focus) .top > * {
   pointer-events: none;
 }
 
-.agent-focus {
-  position: absolute;
-  inset: 0;
-  z-index: 7;
-  overflow: hidden;
+.studio:has(.agent-focus) .dock-layout {
+  visibility: hidden;
   pointer-events: none;
 }
 
+.agent-focus {
+  position: fixed;
+  inset: 0;
+  z-index: 16;
+  overflow-x: hidden;
+  overflow-y: auto;
+  pointer-events: none;
+  scrollbar-width: thin;
+}
+
 .agent-focus-spatial {
-  position: relative;
   display: grid;
-  width: min(1360px, 100%);
-  height: 100%;
+  width: min(1900px, 100%);
+  min-height: 100%;
   margin: 0 auto;
-  padding:
-    clamp(78px, 10vh, 104px)
-    clamp(22px, 3.2vw, 54px)
-    clamp(126px, 16vh, 154px);
-  grid-template-columns: clamp(210px, 23vw, 310px) minmax(0, 1fr);
-  gap: clamp(24px, 4vw, 64px);
+  padding: clamp(52px, 6vh, 76px) clamp(34px, 4vw, 76px) clamp(142px, 15vh, 174px);
+  grid-template-columns: clamp(240px, 18vw, 310px) minmax(0, 1fr);
+  gap: clamp(44px, 5vw, 92px);
+  align-items: center;
   pointer-events: none;
 }
 
 .agent-focus-hero,
-.agent-focus-environment-frame {
+.agent-focus-shell {
   pointer-events: auto;
 }
 
-/* The identity stands directly in the softened canvas. It deliberately has no card shell. */
 .agent-focus-hero {
   position: relative;
   z-index: 2;
   display: flex;
   min-width: 0;
-  min-height: 0;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 0 22px;
-  text-align: center;
 }
 
 .agent-focus-identity {
   position: relative;
-  width: clamp(156px, 17vw, 220px);
-  height: clamp(156px, 17vw, 220px);
+  width: clamp(170px, 12vw, 210px);
+  height: clamp(170px, 12vw, 210px);
   flex: none;
 }
 
 .agent-focus[data-role="orchestrator"] .agent-focus-identity {
-  width: clamp(174px, 19vw, 244px);
-  height: clamp(174px, 19vw, 244px);
+  width: clamp(184px, 13vw, 224px);
+  height: clamp(184px, 13vw, 224px);
 }
 
 .agent-focus-identity .agent-mark {
   width: 100%;
   height: 100%;
   box-shadow:
-    0 20px 48px rgba(11, 29, 25, 0.16),
-    0 2px 8px rgba(11, 29, 25, 0.1);
+    0 0 0 1px color-mix(in srgb, var(--agent-current) 28%, transparent),
+    0 24px 58px rgba(18, 32, 28, 0.16),
+    0 0 44px color-mix(in srgb, var(--agent-current) 22%, transparent);
 }
 
 .agent-focus-hero-copy {
-  width: min(278px, 100%);
+  width: min(300px, 100%);
   min-width: 0;
-  margin-top: clamp(26px, 4.4vh, 42px);
+  margin-top: clamp(26px, 3.5vh, 40px);
   text-align: left;
 }
 
 .agent-focus-hero-copy h2 {
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--ink);
-  font-size: clamp(1.75rem, 3vw, 2.55rem);
+  font-size: clamp(2rem, 2.65vw, 2.85rem);
   font-weight: var(--weight-medium);
   letter-spacing: -0.052em;
-  line-height: 0.96;
+  line-height: 0.98;
 }
 
 .agent-focus-state {
   margin: 0;
   color: var(--agent-current, var(--accent));
   font-family: var(--font-mono);
-  font-size: 0.57rem;
+  font-size: 0.58rem;
   font-weight: var(--weight-medium);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -134,28 +123,106 @@
 
 .agent-focus-material-rule {
   height: 3px;
-  margin: 9px 0 12px;
+  margin: 10px 0 14px;
   background: linear-gradient(
     90deg,
     var(--agent-current) 0%,
-    var(--agent-counter) 58%,
-    var(--agent-caustic) 82%,
+    var(--agent-counter) 54%,
+    var(--agent-caustic) 78%,
     transparent 100%
   );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--agent-current) 16%, transparent);
 }
 
 .agent-focus-nameplate-rule {
   height: 1px;
-  margin: 13px 0 11px;
-  background: linear-gradient(90deg, rgba(22, 29, 27, 0.32), transparent 100%);
+  margin: 16px 0 12px;
+  background: linear-gradient(90deg, rgba(22, 29, 27, 0.3), transparent 100%);
 }
 
 .agent-focus-role-remit {
-  max-width: 260px;
+  max-width: 292px;
   margin: 0;
   color: var(--ink-muted);
-  font-size: 0.68rem;
-  line-height: 1.5;
+  font-size: 0.74rem;
+  line-height: 1.58;
+}
+
+.agent-focus-shell {
+  display: grid;
+  width: 100%;
+  height: min(760px, calc(100vh - 218px));
+  min-height: 570px;
+  min-width: 0;
+  grid-template-rows: minmax(0, 1fr) 50px;
+}
+
+.agent-focus-environment {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto 12px minmax(0, 1fr) 12px;
+}
+
+.agent-focus-source-head {
+  min-width: 0;
+  padding: 0 2px 10px;
+}
+
+.agent-focus-source-head h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: clamp(1rem, 1.35vw, 1.28rem);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-focus-stage-rule {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 12px;
+}
+
+.agent-focus-stage-rule::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: rgba(22, 29, 27, 0.2);
+}
+
+.agent-focus-stage-rule::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 38px;
+  height: 2px;
+  background: color-mix(in srgb, var(--agent-current) 72%, var(--ink));
+}
+
+.agent-focus-body {
+  display: grid;
+  width: min(1260px, 100%);
+  min-width: 0;
+  min-height: 0;
+  margin: 0 auto;
+  grid-template-columns: minmax(420px, 1.75fr) minmax(300px, 1fr);
+  gap: clamp(42px, 4.5vw, 74px);
+  align-items: center;
+}
+
+.agent-focus-commands button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--agent-current) 65%, white);
+  outline-offset: 3px;
 }
 
 .agent-focus-visually-hidden {
@@ -170,202 +237,37 @@
   border: 0;
 }
 
-
-/* One compact instrument: section controls outside, glass plane within, commands below. */
-.agent-focus-environment-frame {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  width: 100%;
-  height: min(590px, 100%);
-  min-width: 0;
-  min-height: 0;
-  align-self: center;
-  grid-template-columns: minmax(0, 1fr) 154px;
-  grid-template-rows: minmax(0, 1fr) auto;
-  column-gap: 8px;
-  row-gap: 8px;
-}
-
-
-.agent-focus-environment {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  overflow: hidden;
-  padding: clamp(20px, 2.2vw, 30px);
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.88), transparent 34%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.56), rgba(222, 240, 236, 0.3));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 0 0 1px rgba(22, 29, 27, 0.035),
-    0 22px 58px rgba(18, 32, 28, 0.1);
-  backdrop-filter: blur(30px) saturate(1.45);
-  -webkit-backdrop-filter: blur(30px) saturate(1.45);
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.agent-focus-environment::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 14px;
-  left: 14px;
-  height: 1px;
-  opacity: 0.9;
-  background: linear-gradient(90deg, transparent, #ffffff 18%, #ffffff 82%, transparent);
-  pointer-events: none;
-}
-
-.agent-focus-environment-head {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.agent-focus-environment-head > div {
-  min-width: 0;
-}
-
-.agent-focus-environment-head span,
-.coordination-note span {
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.57rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.agent-focus-environment-head h3 {
-  margin: 7px 0 0;
-  color: var(--ink);
-  font-size: clamp(1.45rem, 2.5vw, 2.1rem);
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.04em;
-  line-height: 1.05;
-}
-
-.agent-focus-environment-head p {
-  max-width: 620px;
-  margin: 8px 0 0;
-  color: var(--ink-muted);
-  font-size: 0.76rem;
-  line-height: 1.5;
-}
-
-
-.agent-focus-environment-foot {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex: none;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 18px;
-  padding-top: 12px;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.53rem;
-  line-height: 1.4;
-}
-
-.agent-focus-environment-foot p {
-  max-width: 430px;
-  margin: 0;
-}
-
-.agent-focus-environment-foot dl {
-  display: flex;
-  flex: none;
-  gap: 14px;
-  margin: 0;
-}
-
-.agent-focus-environment-foot dl > div {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-}
-
-.agent-focus-environment-foot dt {
-  color: var(--ink-faint, var(--ink-muted));
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.agent-focus-environment-foot dd {
-  margin: 0;
-  color: var(--ink-soft);
-}
-
-.agent-focus-environment-foot code {
-  font: inherit;
-}
-
-@media (min-width: 721px) and (max-width: 900px) and (min-height: 561px) {
-  .agent-focus-environment-frame {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 40px minmax(0, 1fr) auto;
-  }
-
-  .agent-focus-environment {
-    grid-column: 1;
-    grid-row: 2;
-  }
-}
-
-@media (max-width: 720px) {
-  .agent-focus {
-    overflow-y: auto;
-  }
-
+@media (max-width: 1100px) {
   .agent-focus-spatial {
-    display: flex;
-    min-height: 100%;
-    height: auto;
-    flex-direction: column;
-    gap: 14px;
-    padding: 68px 10px 96px;
+    padding: 38px 24px 142px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 82px auto;
+    gap: 22px;
+    align-items: start;
   }
 
   .agent-focus-hero {
     display: grid;
-    min-height: 96px;
-    padding: 4px 14px;
-    grid-template-columns: 82px minmax(0, 1fr);
-    grid-template-rows: 1fr;
-    gap: 0 16px;
-    align-items: center;
-    text-align: left;
+    width: min(520px, calc(100% - 70px));
+    height: 82px;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 16px;
+    justify-self: start;
   }
 
   .agent-focus-identity,
   .agent-focus[data-role="orchestrator"] .agent-focus-identity {
-    width: 78px;
-    height: 78px;
-    grid-row: 1 / -1;
+    width: 76px;
+    height: 76px;
   }
 
   .agent-focus-hero-copy {
-    width: 100%;
-    align-self: center;
+    width: min(390px, 100%);
     margin: 0;
   }
 
   .agent-focus-hero-copy h2 {
-    font-size: 1.35rem;
+    font-size: 1.55rem;
   }
 
   .agent-focus-material-rule {
@@ -373,139 +275,96 @@
   }
 
   .agent-focus-nameplate-rule {
-    margin: 8px 0 7px;
+    display: none;
   }
 
   .agent-focus-role-remit {
-    font-size: 0.58rem;
-    line-height: 1.35;
+    overflow: hidden;
+    font-size: 0.61rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .agent-focus-environment-frame {
-    display: grid;
-    width: 100%;
-    height: min(500px, max(286px, calc(100svh - 306px)));
-    flex: none;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 38px minmax(0, 1fr) auto;
-    gap: 7px;
+  .agent-focus-shell {
+    height: max(620px, calc(100vh - 284px));
+    min-height: 620px;
   }
 
-  .agent-focus-environment {
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    flex: none;
-    padding: 18px 16px 16px;
-    border-radius: 11px;
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .agent-focus-environment-head {
-    gap: 12px;
-  }
-
-  .agent-focus-environment-head h3 {
-    font-size: 1.35rem;
-  }
-
-  .agent-focus-environment-head p {
-    font-size: 0.68rem;
-  }
-
-  .agent-focus-environment-foot {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
-    padding-top: 8px;
-  }
-
-  .agent-focus-environment-foot dl {
-    gap: 10px;
+  .agent-focus-body {
+    grid-template-columns: minmax(390px, 1.55fr) minmax(245px, 0.9fr);
+    gap: clamp(26px, 4vw, 42px);
   }
 }
 
-@media (max-width: 720px) and (max-height: 640px) {
-  .agent-focus-environment-frame {
-    height: min(500px, max(276px, calc(100svh - 280px)));
-  }
-
-  .agent-focus-environment-head p {
-    display: none;
-  }
-}
-
-@media (min-width: 721px) and (max-height: 560px) {
+@media (max-width: 720px) {
   .agent-focus-spatial {
-    padding: 58px 16px 124px;
-    grid-template-columns: 142px minmax(0, 1fr);
-    gap: 22px;
+    display: block;
+    padding: 24px 14px 138px;
   }
 
   .agent-focus-hero {
-    justify-content: flex-start;
-    padding-top: 14px;
+    width: min(100%, 470px);
+    height: 70px;
+    margin-bottom: 24px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 13px;
   }
 
   .agent-focus-identity,
   .agent-focus[data-role="orchestrator"] .agent-focus-identity {
-    width: 92px;
-    height: 92px;
-  }
-
-  .agent-focus-hero-copy {
-    margin-top: 18px;
+    width: 64px;
+    height: 64px;
   }
 
   .agent-focus-hero-copy h2 {
-    font-size: 1.18rem;
+    font-size: 1.28rem;
   }
 
   .agent-focus-state {
-    font-size: 0.5rem;
-  }
-
-  .agent-focus-material-rule {
-    margin: 6px 0 8px;
-  }
-
-  .agent-focus-nameplate-rule {
-    margin: 8px 0 7px;
+    font-size: 0.46rem;
   }
 
   .agent-focus-role-remit {
-    font-size: 0.52rem;
-    line-height: 1.35;
-  }
-
-  .agent-focus-environment-frame {
-    grid-template-columns: minmax(0, 1fr) 146px;
-    column-gap: 8px;
-    row-gap: 6px;
-  }
-
-  .agent-focus-environment {
-    padding: 14px 16px;
-    border-radius: 10px;
-  }
-
-  .agent-focus-environment-head h3 {
-    margin-top: 3px;
-    font-size: 1.12rem;
-  }
-
-  .agent-focus-environment-head p {
     display: none;
   }
 
-  .agent-focus-environment-foot {
-    gap: 10px;
-    padding-top: 7px;
-    font-size: 0.48rem;
+  .agent-focus-shell {
+    height: auto;
+    min-height: 0;
+    grid-template-rows: auto auto;
   }
 
-  .agent-focus-environment-foot dl {
-    gap: 9px;
+  .agent-focus-source-head { padding-bottom: 8px; }
+
+  .agent-focus-source-head h3 {
+    font-size: 0.95rem;
+  }
+
+  .agent-focus-body {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 34px;
+    align-items: start;
+  }
+}
+
+@media (max-height: 480px) and (min-width: 721px) {
+  .agent-focus-spatial {
+    padding-top: 24px;
+    padding-bottom: 126px;
+    grid-template-rows: 68px auto;
+    gap: 16px;
+  }
+
+  .agent-focus-hero {
+    height: 68px;
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+
+  .agent-focus-identity,
+  .agent-focus[data-role="orchestrator"] .agent-focus-identity {
+    width: 62px;
+    height: 62px;
   }
 }

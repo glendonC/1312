@@ -11,11 +11,11 @@
  */
 
 import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { clock, pct } from "./format";
 import type { AgentView } from "./replay";
-import { useBundle, useStudio } from "./store";
+import { useBundle } from "./store";
 import type { RunBundle } from "./transport";
 
 /** cell = a compact workspace. focus = the expanded inspection plane. */
@@ -64,7 +64,7 @@ function Segment({
 
   return (
     <>
-      {scale === "focus" && <RecordedMedia bundle={bundle} agentPlayhead={agent.playhead} />}
+      {scale === "focus" && <RecordedMedia bundle={bundle} />}
 
       <div className="env-wave">
         <svg viewBox={`0 0 ${peaks.length * 4} 100`} preserveAspectRatio="none" aria-hidden="true">
@@ -104,95 +104,36 @@ const HAS_PICTURE = /\.(?:mp4|webm|mov|m4v)$/i;
 /**
  * A viewer for the media artifact in this run, not a reconstruction of an agent tool.
  *
- * The inspection cursor belongs to the person opening focus mode. The separate marker below
- * remains the agent's recorded playhead, so scrubbing the clip cannot rewrite what the worker did.
+ * Native media controls belong to the person reviewing the recording. They do not represent or
+ * rewrite autonomous-agent playback.
  */
-export function RecordedMedia({
-  bundle,
-  agentPlayhead,
-}: {
-  bundle: RunBundle;
-  agentPlayhead: number | null;
-}) {
-  const clipT = useStudio((state) => state.clipT);
-  const setClipT = useStudio((state) => state.setClipT);
-  const setGlobalPlaying = useStudio((state) => state.setPlaying);
-  const mediaRef = useRef<HTMLMediaElement | null>(null);
-  const [playing, setPlaying] = useState(false);
+export function RecordedMedia({ bundle }: { bundle: RunBundle }) {
   const [failed, setFailed] = useState(false);
-  const duration = bundle.run.clip.duration;
   const media = bundle.run.clip.media;
   const src = media ? `/demo/runs/${bundle.run.id}/${media}` : null;
   const picture = Boolean(media && HAS_PICTURE.test(media));
-  const cue = bundle.captions.cues.find(
-    (candidate) => clipT >= candidate.t_start && clipT < candidate.t_end,
-  );
-
-  useEffect(() => {
-    const element = mediaRef.current;
-    if (!element || Math.abs(element.currentTime - clipT) <= 0.25) return;
-    element.currentTime = clipT;
-  }, [clipT]);
-
-  useEffect(() => {
-    setGlobalPlaying(false);
-    return () => {
-      mediaRef.current?.pause();
-    };
-  }, [setGlobalPlaying]);
-
-  const seek = (next: number) => {
-    setClipT(Math.max(0, Math.min(duration, next)));
-  };
-
-  const toggle = () => {
-    const element = mediaRef.current;
-    if (!element || failed) return;
-    if (element.paused) {
-      void element.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
-    } else {
-      element.pause();
-      setPlaying(false);
-    }
-  };
 
   return (
-    <section className="env-media" aria-label="Recorded clip inspection">
+    <section className="env-media" aria-label="Recorded source media">
       <div className="env-media-frame">
         {src && picture && (
           <video
-            ref={(element) => {
-              mediaRef.current = element;
-            }}
             src={src}
             preload="metadata"
             playsInline
-            onClick={toggle}
-            onTimeUpdate={(event) => setClipT(event.currentTarget.currentTime)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
-            onError={() => {
-              setFailed(true);
-              setPlaying(false);
-            }}
+            controls
+            onError={() => setFailed(true)}
             aria-label="Recorded source video"
           />
         )}
 
         {src && !picture && (
           <audio
-            ref={(element) => {
-              mediaRef.current = element;
-            }}
             src={src}
             preload="metadata"
-            onTimeUpdate={(event) => setClipT(event.currentTarget.currentTime)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
-            onError={() => {
-              setFailed(true);
-              setPlaying(false);
-            }}
+            controls
+            onError={() => setFailed(true)}
+            aria-label="Recorded source audio"
           />
         )}
 
@@ -201,60 +142,7 @@ export function RecordedMedia({
             {failed ? "The recorded media could not be loaded." : "No playable media was recorded."}
           </p>
         )}
-
-        {cue && (
-          <div className="env-media-caption" aria-live="polite">
-            <span>Recorded transcript</span>
-            <p lang={bundle.run.pair.source}>{cue.source.text}</p>
-          </div>
-        )}
       </div>
-
-      <div className="env-media-transport">
-        <button
-          type="button"
-          onClick={() => seek(clipT - 5)}
-          disabled={!src || failed}
-          aria-label="Back 5 seconds"
-        >
-          −5
-        </button>
-        <button
-          type="button"
-          className="env-media-play"
-          onClick={toggle}
-          disabled={!src || failed}
-          aria-label={playing ? "Pause recorded clip" : "Play recorded clip"}
-        >
-          {playing ? "Pause" : "Play"}
-        </button>
-        <button
-          type="button"
-          onClick={() => seek(clipT + 5)}
-          disabled={!src || failed}
-          aria-label="Forward 5 seconds"
-        >
-          +5
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={duration}
-          step={0.1}
-          value={clipT}
-          onChange={(event) => seek(event.currentTarget.valueAsNumber)}
-          disabled={!src || failed}
-          aria-label="Inspect recorded clip"
-          aria-valuetext={`${clock(clipT)} of ${clock(duration)}`}
-        />
-        <time>{clock(clipT)} / {clock(duration)}</time>
-      </div>
-
-      <p className="env-media-boundary">
-        Inspection cursor {clock(clipT)}
-        <span aria-hidden="true"> / </span>
-        Agent playhead {agentPlayhead === null ? "not recorded yet" : clock(agentPlayhead)}
-      </p>
     </section>
   );
 }

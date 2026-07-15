@@ -1,139 +1,106 @@
-.agent-focus-detail > .agent-focus-activity {
-  min-height: 100%;
-  margin-top: 0;
+/* Real records in document flow; equal timestamps share one timestamp group. */
+
+.agent-focus-activity-feed {
+  min-width: 0;
 }
 
-/* Activity occupies the same plane as the role workspace; the rail chooses between them. */
-.agent-focus-activity {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  min-height: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  margin-top: clamp(18px, 2.5vh, 26px);
-  overflow: hidden;
-}
-
-.agent-focus-activity-head {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 0 2px 10px;
+.agent-focus-activity-state {
+  padding: 0 0 20px;
   border-bottom: 1px solid var(--line);
-  color: var(--ink-soft);
 }
 
-.agent-focus-activity-head span,
-.agent-focus-activity-head strong {
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  font-weight: var(--weight-regular);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.agent-focus-activity-state h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: clamp(1.2rem, 1.6vw, 1.55rem);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.025em;
+  line-height: 1.25;
 }
 
-.agent-focus-activity-head strong {
-  color: var(--ink-muted);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.agent-focus-log {
-  min-height: 0;
-  flex: 1 1 auto;
+.agent-focus-activity-groups,
+.agent-focus-activity-group > ol {
   margin: 0;
   padding: 0;
-  overflow-y: auto;
   list-style: none;
 }
 
-.agent-focus-log-row {
+.agent-focus-activity-group {
   display: grid;
-  grid-template-columns: 2.75rem 3.75rem minmax(0, 1fr);
-  gap: 3px 8px;
-  padding: 9px 11px;
+  min-width: 0;
+  padding: 18px 0;
   border-bottom: 1px solid var(--line);
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.agent-focus-activity-group > time {
+  color: var(--ink-muted);
   font-family: var(--font-mono);
-  font-size: 0.57rem;
+  font-size: 0.58rem;
+  font-variant-numeric: tabular-nums;
   line-height: 1.45;
 }
 
-.agent-focus-log-row:last-child {
-  border-bottom: 0;
+.agent-focus-activity-group > ol,
+.agent-focus-activity-group > ol > li {
+  min-width: 0;
 }
 
-.agent-focus-log-row time {
-  color: var(--ink-muted);
-  font-variant-numeric: tabular-nums;
+.agent-focus-activity-group > ol > li + li {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
 }
 
-.agent-focus-log-action {
-  color: var(--accent);
-}
-
-.agent-focus-log-row strong {
-  overflow: hidden;
-  color: var(--ink);
-  font-weight: var(--weight-regular);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-focus-log-row p {
+.agent-focus-activity-group strong,
+.agent-focus-activity-group code,
+.agent-focus-activity-group p {
+  display: block;
   margin: 0;
-  grid-column: 2 / -1;
+  overflow-wrap: anywhere;
+}
+
+.agent-focus-activity-group strong {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+}
+
+.agent-focus-activity-group code {
+  margin-top: 5px;
+  color: color-mix(in srgb, var(--agent-current) 68%, var(--ink));
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.agent-focus-activity-group p {
+  margin-top: 6px;
   color: var(--ink-muted);
+  font-size: 0.76rem;
   line-height: 1.5;
 }
 
-.agent-focus-log-row[data-level="gate"] .agent-focus-log-action {
-  color: var(--gold-ink);
-}
-
-.agent-focus-log-row[data-level="warn"],
-.agent-focus-log-row[data-level="error"] {
-  background: var(--flag-soft);
-}
-
-.agent-focus-log-row[data-level="warn"] .agent-focus-log-action,
-.agent-focus-log-row[data-level="warn"] p,
-.agent-focus-log-row[data-level="error"] .agent-focus-log-action,
-.agent-focus-log-row[data-level="error"] p {
-  color: var(--flag);
-}
+.agent-focus-activity-group li[data-level="gate"] strong { color: var(--gold-ink); }
+.agent-focus-activity-group li[data-level="warn"] strong,
+.agent-focus-activity-group li[data-level="error"] strong,
+.agent-focus-activity-group li[data-level="warn"] p,
+.agent-focus-activity-group li[data-level="error"] p { color: var(--flag); }
 
 .agent-focus-empty {
   margin: 0;
-  padding: 14px;
-  border-top: 1px solid var(--line);
+  padding: 18px 0;
   color: var(--ink-muted);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
 }
 
 @media (max-width: 720px) {
-  .agent-focus-activity {
-    margin-top: 14px;
-  }
-
-  .agent-focus-activity-head {
-    min-height: 30px;
-  }
-}
-
-@media (min-width: 721px) and (max-height: 560px) {
-  .agent-focus-activity {
-    margin-top: 8px;
-  }
-
-  .agent-focus-activity-head {
-    min-height: 28px;
-  }
-
-  .agent-focus-log-row {
-    padding: 6px 9px;
+  .agent-focus-activity-group {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 11px;
   }
 }

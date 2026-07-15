@@ -1,0 +1,119 @@
+/* Focus has two commands only: cycle the identity or leave the composition. */
+
+.agent-focus-commands {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-top: 4px;
+}
+
+.agent-focus-command-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-focus-commands button {
+  display: inline-flex;
+  min-height: 31px;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  color: var(--ink-muted);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  cursor: pointer;
+  transition: color 150ms ease, transform 150ms ease;
+}
+
+.agent-focus-cycle-buttons {
+  display: inline-flex;
+  flex: none;
+  gap: 3px;
+}
+
+.agent-focus-cycle-buttons button {
+  width: 31px;
+  min-height: 31px;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: color-mix(in srgb, var(--agent-current) 72%, var(--ink));
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 0.8rem;
+}
+
+.agent-focus-cycle-buttons button:hover {
+  border-color: var(--accent-line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.agent-focus-cycle-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.53rem;
+  white-space: nowrap;
+}
+
+.agent-focus-command-position {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.51rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-focus-commands button:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.agent-focus-commands kbd {
+  display: inline-flex;
+  min-width: 29px;
+  height: 27px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 -1px rgba(22, 29, 27, 0.06);
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  .agent-focus-commands {
+    padding-top: 9px;
+  }
+
+  .agent-focus-cycle-label,
+  .agent-focus-commands button {
+    font-size: 0.49rem;
+  }
+}
+
+@media (max-width: 350px) {
+  .agent-focus-cycle-label {
+    font-size: 0;
+  }
+
+  .agent-focus-cycle-label > span,
+  .agent-focus-command-position {
+    font-size: 0.47rem;
+  }
+}

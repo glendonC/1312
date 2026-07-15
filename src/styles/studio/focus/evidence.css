@@ -1,334 +1,118 @@
-/* The visual source stays present while the selected tab changes the evidence/details pane. */
-.agent-focus-body {
+/* The media stays bare; the only adjacent interface is the recorded activity narrative. */
+
+.agent-focus-media-instrument {
   position: relative;
   z-index: 1;
-  display: grid;
+  width: min(100%, 760px);
   min-width: 0;
-  min-height: 0;
-  flex: 1 1 auto;
-  margin-top: clamp(14px, 2vh, 20px);
-  overflow: hidden;
-  grid-template-columns: minmax(0, 1.18fr) minmax(250px, 0.82fr);
-  gap: clamp(12px, 1.5vw, 18px);
+  justify-self: center;
 }
 
-.agent-focus-visual-evidence {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  padding-right: clamp(12px, 1.5vw, 18px);
-  border-right: 1px solid rgba(22, 29, 27, 0.1);
-  overflow-y: auto;
-}
-
-.agent-focus-visual-head {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 2px 9px;
-}
-
-.agent-focus-visual-head > div:first-child {
+.agent-focus-visual-evidence,
+.agent-focus .env-media {
+  width: 100%;
   min-width: 0;
 }
 
-.agent-focus-visual-head span,
-.agent-focus-detail-panel > div > span,
-.agent-focus-now header span,
-.agent-focus-role-projection > header > span,
-.agent-focus-recent header span {
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.52rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.agent-focus-visual-head h4 {
-  margin: 4px 0 0;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 0.78rem;
-  font-weight: var(--weight-medium);
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-focus-visual-badges {
-  display: flex;
-  max-width: 45%;
-  flex: none;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-}
-
-.agent-focus-visual-badges span {
-  max-width: 100%;
-  overflow: hidden;
-  padding: 3px 6px;
-  border: 1px solid rgba(22, 29, 27, 0.1);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.38);
-  font-size: 0.48rem;
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  text-transform: none;
-  white-space: nowrap;
-}
-
-.agent-focus-visual-evidence .env-media {
-  min-height: 238px;
-  flex: 1 1 auto;
-}
-
-.agent-focus-visual-evidence .env-media-frame {
-  min-height: 178px;
-  border-radius: 14px;
-}
-
-.agent-focus-visual-evidence .env-media-transport {
-  grid-template-columns: auto auto auto minmax(72px, 1fr) auto;
-  gap: 5px;
-}
-
-.agent-focus-visual-evidence .env-media-transport button {
-  height: 28px;
-  padding: 0 7px;
-}
-
-.agent-focus-evidence-map {
+.agent-focus .env-media-frame {
   position: relative;
-  height: 34px;
-  flex: none;
-  margin-top: 9px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
-  border: 1px solid rgba(22, 29, 27, 0.1);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.36);
+  border: 0;
+  border-radius: clamp(18px, 1.7vw, 28px);
+  background: #071011;
+  box-shadow: 0 18px 48px rgba(18, 32, 28, 0.15);
+  corner-shape: squircle;
 }
 
-.agent-focus-evidence-wave {
-  position: absolute;
-  inset: 0;
+.agent-focus .env-media-frame video {
+  display: block;
   width: 100%;
   height: 100%;
-  fill: rgba(42, 107, 102, 0.2);
+  object-fit: contain;
+  cursor: default;
 }
 
-.agent-focus-evidence-range {
+.agent-focus .env-media-frame audio {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
-  min-width: 2px;
-  border: 1px solid color-mix(in srgb, var(--agent-current) 44%, white);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--agent-current) 17%, transparent);
+  top: 50%;
+  left: 50%;
+  width: min(88%, 560px);
+  transform: translate(-50%, -50%);
 }
 
-.agent-focus-evidence-marker {
+.agent-focus .env-media-unavailable {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  transform: translateX(-1px);
-}
-
-.agent-focus-evidence-marker[data-marker="human"] {
-  z-index: 3;
-  background: var(--ink);
-}
-
-.agent-focus-evidence-marker[data-marker="agent"] {
-  z-index: 2;
-  background: var(--agent-current, var(--accent));
-}
-
-.agent-focus-evidence-marker[data-marker="reference"] {
-  z-index: 1;
-  width: 5px;
-  border-right: 1px solid var(--gold-ink);
-  border-left: 1px solid var(--gold-ink);
-  opacity: 0.84;
-  background: rgba(196, 152, 49, 0.14);
-}
-
-.agent-focus-evidence-legend {
+  inset: 0;
   display: grid;
-  margin: 7px 0 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
+  margin: 0;
+  place-items: center;
+  padding: 24px;
+  color: rgba(244, 250, 249, 0.72);
+  font-size: 0.78rem;
+  text-align: center;
 }
 
-.agent-focus-evidence-legend > div {
+.agent-focus-activity-region {
   position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: min(570px, 100%);
   min-width: 0;
-  padding-left: 8px;
-}
-
-.agent-focus-evidence-legend > div::before {
-  content: "";
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 0;
-  width: 2px;
-  background: var(--ink);
-}
-
-.agent-focus-evidence-legend > div[data-marker="agent"]::before {
-  background: var(--agent-current, var(--accent));
-}
-
-.agent-focus-evidence-legend > div[data-marker="reference"]::before {
-  background: var(--gold-ink);
-}
-
-.agent-focus-evidence-legend dt,
-.agent-focus-evidence-legend dd {
+  min-height: 430px;
+  flex-direction: column;
+  align-self: center;
   overflow: hidden;
-  font-family: var(--font-mono);
-  font-size: 0.47rem;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--ink);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  clip-path: none;
 }
 
-.agent-focus-evidence-legend dt {
-  color: var(--ink-muted);
-}
-
-.agent-focus-evidence-legend dd {
-  margin: 1px 0 0;
-  color: var(--ink-soft);
-}
-
-.agent-focus-evidence-boundary,
-.agent-focus-truth-note {
-  margin: 7px 0 0;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.48rem;
-  line-height: 1.45;
-}
-
-.agent-focus-detail {
+.agent-focus-activity-content {
   min-width: 0;
   min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
   overflow-y: auto;
+  padding: 0 8px 8px 0;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(22, 29, 27, 0.18) transparent;
 }
 
-
-@media (min-width: 721px) and (max-width: 1100px) and (min-height: 561px) {
-  .agent-focus-body {
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
+@media (max-width: 1100px) {
+  .agent-focus-media-instrument {
+    width: min(100%, 680px);
   }
 
-  .agent-focus-visual-evidence {
-    min-height: 320px;
-    flex: none;
-    padding: 0 0 14px;
-    border-right: 0;
-    border-bottom: 1px solid rgba(22, 29, 27, 0.1);
-    overflow: visible;
+  .agent-focus-activity-region {
+    height: min(470px, 100%);
+    min-height: 390px;
   }
 
-  .agent-focus-detail {
-    min-height: 270px;
-    flex: none;
-    overflow: visible;
-  }
 }
 
 @media (max-width: 720px) {
-  .agent-focus-body {
-    display: flex;
-    margin-top: 12px;
-    flex-direction: column;
-    overflow-y: auto;
+  .agent-focus-media-instrument {
+    width: 100%;
   }
 
-  .agent-focus-visual-evidence {
-    min-height: 300px;
-    flex: none;
-    padding: 0 0 12px;
-    border-right: 0;
-    border-bottom: 1px solid rgba(22, 29, 27, 0.1);
-    overflow: visible;
+  .agent-focus .env-media-frame {
+    border-radius: 19px;
   }
 
-  .agent-focus-visual-head {
-    gap: 8px;
-  }
-
-  .agent-focus-visual-badges {
-    max-width: 42%;
-  }
-
-  .agent-focus-visual-evidence .env-media {
-    min-height: 218px;
-  }
-
-  .agent-focus-visual-evidence .env-media-frame {
-    min-height: 150px;
-  }
-
-  .agent-focus-evidence-legend {
-    gap: 3px;
-  }
-
-  .agent-focus-detail {
+  .agent-focus-activity-region {
+    height: auto;
     min-height: 260px;
-    flex: none;
-    overflow: visible;
-  }
-}
-
-@media (min-width: 721px) and (max-height: 560px) {
-  .agent-focus-body {
-    margin-top: 6px;
-    overflow: hidden;
-    grid-template-columns: minmax(0, 1.05fr) minmax(180px, 0.95fr);
-    gap: 8px;
+    max-height: 430px;
+    align-self: start;
   }
 
-  .agent-focus-visual-evidence {
-    padding-right: 8px;
-    overflow: hidden;
-  }
-
-  .agent-focus-visual-head,
-  .agent-focus-evidence-map,
-  .agent-focus-evidence-legend,
-  .agent-focus-evidence-boundary,
-  .agent-focus-visual-evidence .env-media-boundary {
-    display: none;
-  }
-
-  .agent-focus-visual-evidence .env-media {
-    min-height: 0;
-    gap: 5px;
-  }
-
-  .agent-focus-visual-evidence .env-media-frame {
-    min-height: 82px;
-  }
-
-  .agent-focus-visual-evidence .env-media-transport {
-    grid-template-columns: auto auto auto minmax(46px, 1fr);
-  }
-
-  .agent-focus-visual-evidence .env-media-transport time {
-    display: none;
-  }
-
-  .agent-focus-detail {
-    overflow-y: auto;
+  .agent-focus-activity-content {
+    max-height: 380px;
   }
 }

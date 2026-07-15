@@ -112,6 +112,11 @@
 }
 
 .journey-entry {
+  /* Per-type accent + soft tint. Each entry lights up in its own house color,
+     the same palette Method and Benchmarks use. --entry is read by JS to tint
+     the atmosphere squircle on hover. */
+  --entry: var(--accent);
+  --entry-soft: #cfe9dd;
   min-height: 104px;
   padding: 16px 12px;
   border-radius: 16px;
@@ -121,10 +126,18 @@
   transition: color 160ms ease, background-color 160ms ease, transform 180ms ease;
 }
 
+.journey-entry[data-type="manifesto"] { --entry: #c2503a; --entry-soft: #ffe0d6; }
+.journey-entry[data-type="decision"] { --entry: #3f7098; --entry-soft: #e1edf5; }
+.journey-entry[data-type="experiment"] { --entry: #7f8a1f; --entry-soft: #eef1c8; }
+.journey-entry[data-type="failure"] { --entry: #9e4235; --entry-soft: #f7ded7; }
+.journey-entry[data-type="note"] { --entry: #7c5c94; --entry-soft: #eee2f3; }
+.journey-entry[data-type="score"] { --entry: #2a6b66; --entry-soft: #cde9de; }
+.journey-entry[data-type="ship"] { --entry: #b06a2c; --entry-soft: #f6e1c9; }
+
 .journey-entry:hover,
 .journey-entry:focus-visible {
   color: var(--ink);
-  background: #b9e7cb;
+  background: var(--entry-soft);
   transform: translateY(-1px);
 }
 
@@ -169,10 +182,11 @@
 .journey-entry-type {
   width: fit-content;
   padding: 4px 6px;
-  border: 1px solid var(--accent-line);
+  border: 1px solid color-mix(in srgb, var(--entry) 42%, transparent);
   border-radius: 3px;
-  color: var(--accent);
+  color: var(--entry);
   font-size: 0.58rem;
+  transition: color 160ms ease, border-color 160ms ease;
 }
 
 .journey-entry-end {
@@ -200,8 +214,17 @@
 .journey-entry:hover .journey-entry-arrow,
 .journey-entry:focus-visible .journey-entry-arrow {
   color: var(--paper-elevated);
-  background: var(--ink);
+  background: var(--entry);
+  border-color: var(--entry);
   transform: translate(1px, -1px);
+}
+
+/* Registered so the tint color can cross-fade (plain custom props can't
+   transition) when the pointer moves from one entry to the next. */
+@property --journey-tint {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
 }
 
 .journey-visual {
@@ -215,6 +238,38 @@
   border-radius: var(--squircle-radius);
   background: #e9eee9;
   box-shadow: 0 24px 60px rgba(22, 29, 27, 0.09);
+  --journey-tint: transparent;
+  transition: --journey-tint 460ms ease;
+}
+
+/* The blend of the squircle warms toward the hovered entry's color. Soft-light
+   keeps the living shader underneath readable instead of painting over it. */
+.journey-tint {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 100% at 32% 26%, var(--journey-tint), transparent 68%),
+    radial-gradient(90% 90% at 78% 82%, var(--journey-tint), transparent 72%);
+  mix-blend-mode: soft-light;
+  opacity: 0;
+  transition: opacity 460ms ease;
+  pointer-events: none;
+}
+
+.journey-visual.is-tinted .journey-tint {
+  opacity: 0.9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-visual {
+    transition: none;
+  }
+
+  .journey-tint {
+    transition: opacity 160ms ease;
+  }
 }
 
 .journey-paper-shader {

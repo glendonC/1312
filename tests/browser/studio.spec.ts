@@ -91,6 +91,7 @@ async function renderedDifference(
 test("the lab is opt-in during development", async ({ page }) => {
   await page.goto("/studio/");
   await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Use owned local source" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Studio trace lab" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Local runtime host" })).toHaveCount(0);
 
@@ -98,6 +99,54 @@ test("the lab is opt-in during development", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Local runtime host" })).toBeVisible();
   await expect(page.getByText("development-only · separate from replay")).toBeVisible();
   await expect(page.getByRole("button", { name: "Connect to local host" })).toBeDisabled();
+});
+
+test("the default Studio exposes a separate owned-source operator path", async ({ page }) => {
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Use owned local source" }).click();
+
+  const productRuntime = page.getByRole("region", { name: "Owned local source" });
+  await expect(productRuntime).toBeVisible();
+  await expect(productRuntime.getByText("Local production path · separate from replay")).toBeVisible();
+  await expect(productRuntime.getByText(/does not produce captions, study output, or a multi-agent swarm/)).toBeVisible();
+  await expect(productRuntime.getByText(/Submitted YouTube URLs remain unprocessed recorded previews/)).toBeVisible();
+  await expect(productRuntime.getByText(/preflight-owned-media\.mjs/)).toBeVisible();
+  await expect(productRuntime.getByText(/run-runtime-host\.ts --source-directory/)).toBeVisible();
+  await expect(productRuntime.getByRole("button", { name: "Connect to local host" })).toBeDisabled();
+
+  await productRuntime.getByRole("button", { name: "Back to source choices" }).click();
+  await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run Demo" })).toBeVisible();
+});
+
+test("the product path reviews and freezes an exact local forecast without entering replay", async ({ page }) => {
+  const token = process.env.STUDIO_RUNTIME_HOST_TOKEN;
+  test.skip(!token, "requires an operator-started deterministic runtime host");
+
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Use owned local source" }).click();
+  const productRuntime = page.getByRole("region", { name: "Owned local source" });
+  await productRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
+  await productRuntime.getByRole("button", { name: "Connect to local host" }).click();
+  await expect(productRuntime.getByLabel("Registered owned source")).toBeVisible();
+  await expect(productRuntime.getByText("Owned/local", { exact: false })).toBeVisible();
+
+  await productRuntime.getByLabel("Declared source language").fill("ko");
+  await productRuntime.getByLabel("Language-pack identity (optional)").fill("ko-v3");
+  await productRuntime.getByRole("button", { name: "Review local plan" }).click();
+
+  const plan = productRuntime.getByRole("region", { name: "Local runtime plan" });
+  await expect(plan.getByText("studio.forecast.v1 · not started or frozen")).toBeVisible();
+  await expect(plan.getByText("Workload floor")).toBeVisible();
+  await expect(plan.getByText("Unavailable", { exact: true })).toHaveCount(2);
+  await expect(plan.getByText(/Unavailable · amount and currency are null/)).toBeVisible();
+
+  await plan.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
+  const status = productRuntime.getByRole("region", { name: "Local runtime status" });
+  await expect(status.getByText(/Terminal/)).toBeVisible({ timeout: 10_000 });
+  await expect(status.getByText(/Closed at validated journal head/)).toBeVisible();
+  await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
+  await expect(page.locator(".hub")).toHaveCount(0);
 });
 
 test("the lab starts and polls an explicitly running deterministic host without changing replay state", async ({ page }) => {

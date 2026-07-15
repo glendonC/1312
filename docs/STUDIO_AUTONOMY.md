@@ -289,7 +289,7 @@ values distinctly and explain which assumptions dominate the estimate.
 |---|---|---|
 | Event replay | Ordered typed traces, pure reducer, cursor reconstruction, fixture validation, and checkpoints | Keep exact scenario coverage current as producers grow |
 | Transport seam | Replay pause/step/seek/speed, single-trace legacy live validation, and a separate validated production-journal adapter | Acknowledged production live control; never route production events through legacy traces |
-| Source and run start | A development-only loopback runtime-start host registers operator-selected owned-source directories, revalidates the highest sealed V1/V2/V3 preflight index and every indexed byte, resolves only stable session/revision identities from clients, durably claims `commandId`, writes an immutable adjacent `studio.runtime-start.v1`, and launches one bounded child at most once | Main-Studio invocation, a separately versioned production start event if later required, and scheduler task propagation of the accepted language context |
+| Source and run start | A loopback runtime-start host registers operator-selected owned-source directories, revalidates the highest sealed V1/V2/V3 preflight index and every indexed byte, resolves only stable session/revision identities from clients, exposes a read-only exact plan, durably claims `commandId`, writes an immutable adjacent `studio.runtime-start.v1`, and launches one bounded child at most once. Default Studio can select, plan, start, and poll this path without entering replay state | Browser ingest/probe, a separately versioned production start event if later required, and scheduler task propagation of the accepted language context |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and production-journal worker projection | Stream the production adapter from a runtime service and add richer production task/lineage views without altering recorded bundles |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, a receipted ffmpeg range extraction host, and a bounded receipted seek observation host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
@@ -298,15 +298,17 @@ values distinctly and explain which assumptions dominate the estimate.
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, and terminal cue-decision index | Original live worker lineage and per-operation evidence from future runtime runs |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
 | Observability | Append-only production journal plus a deterministic content-addressed post-run index, normalized task/agent/operation/execution/handoff/failure facts, structured in-memory filters and aggregations, source identity links, and the separate local Run Explorer | Queue/dependency/reporting spans, critical-path semantics, model-adapter identity and provider units where available, persistent multi-run storage, and retention/access policy |
-| Forecasting | Versioned, content-addressed forecast and run-start freeze artifacts now derive a deterministic workload floor from the measured media envelope, selected range, and explicit operation ranges | Price-book adapter, model-usage estimate producer, elapsed-time and historical calibration, interactive comparison, and separate forecast evaluation |
+| Forecasting | Versioned, content-addressed forecast and run-start freeze artifacts derive a deterministic workload floor from the measured media envelope, selected range, and explicit operation ranges. Default Studio validates and shows the exact pre-start floor and assumptions while rendering elapsed, usage, amount, and currency unavailable | Operation/tier selection, price-book adapter, model-usage estimate producer, elapsed-time and historical calibration, interactive comparison, and separate forecast evaluation |
 
-The normal Studio visualizes recorded legacy runs. The separate `/studio/runtime/` inspector can
+The URL/demo branch of normal Studio visualizes recorded legacy runs. Its separate owned-source
+branch can start and poll the bounded production proof, but never inserts those production events
+into the recorded canvas. The separate `/studio/runtime/` inspector can
 validate an operator-selected production NDJSON journal, build its immutable observability index,
 query normalized facts, resolve source event/receipt/artifact identities, and project dynamic
 workers. It does not start the runtime, search raw journal text, insert events into `run-005` or
 `run-006`, or claim that local smoke activity is a recorded demo run.
 
-## Implementation ledger — 2026-07-14
+## Implementation ledger — 2026-07-15
 
 | Phase | Status | Honest boundary |
 |---|---|---|
@@ -320,10 +322,10 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
 | 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
-| 10 — forecasting | Deterministic floor plus local start receipt implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. The shared CLI/host application freezes that forecast into `run-start.json` before scheduling its proof child. The receipt is adjacent to, not an event inside, `events.ndjson`; no forecast UI, pricing, calibration, or evaluation producer is claimed. |
-| 11 — local runtime-start host | Development-only host implemented | A transport-independent service plus Node HTTP adapter now accepts only registered source-session/revision identities, durably claims the deterministic command, persists lifecycle state, initializes one immutable receipt/journal/artifact store, and creates one permanent launch claim before asynchronous execution. Authenticated cursor polling validates the complete production-event chain. Restart recovery never relaunches ambiguous work. `/studio/` remains replay-only and `/studio/runtime/` remains a manual journal inspector. |
+| 10 — forecasting | Deterministic floor plus product forecast surface implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `POST /v1/runtime-plans` returns the exact forecast without creating a command or runtime directory. Default Studio validates it, shows its range/floor/operation/assumptions, and leaves unavailable values unavailable. Start freezes that same content into `run-start.json`; no pricing, calibration, operation-choice, or evaluation producer is claimed. |
+| 11 — local runtime-start host | Local product fragment implemented | A transport-independent service plus Node HTTP adapter accepts only registered source-session/revision identities, derives a deterministic runtime identity for exact pre-start planning, durably claims the command only on start, persists lifecycle state, initializes one immutable receipt/journal/artifact store, and creates one permanent launch claim before asynchronous execution. Default Studio provides the explicit owned-source connect/plan/start/poll path; the lab remains available. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
 
-## Development-only runtime-start host
+## Local runtime-start host
 
 The implemented host is local control-plane infrastructure, not a hosted service. It binds to
 `127.0.0.1` by default, rejects non-loopback binding unless the operator supplies the explicit
@@ -341,10 +343,12 @@ revision fails before command acceptance. The browser cannot submit a source pat
 journal path, artifact-store path, runtime identity, task/agent identity, sequence, scheduler state,
 or executable argument.
 
-`commandId` is the idempotency key. The command record is installed as one complete create-only
-filesystem claim, so concurrent processes select one accepted identity. Runtime id, journal id,
-accepted/start timestamp, analysis-request identity, and request content identity are allocated in
-that same claim. A separate complete create-only launch claim is written before the background
+`commandId` is the idempotency key. A deterministic host allocator derives the runtime identity
+from that command so a read-only plan can name the exact runtime-bound source artifact and forecast
+without creating filesystem state. The command record is installed only on start as one complete
+create-only filesystem claim, so concurrent processes select one accepted identity. Journal id,
+accepted/start timestamp, analysis-request identity, and request content identity are recorded in
+that claim. A separate complete create-only launch claim is written before the background
 executor is scheduled. Its durable existence permanently prevents an automatic second child. A
 retry returns the original runtime identity, immutable `run-start.json` content identity, and frozen
 forecast; it does not create another runtime directory, rewrite the receipt, or append another root,
@@ -384,27 +388,46 @@ Implemented HTTP endpoints are:
 
 ```text
 GET  /v1/source-sessions
+POST /v1/runtime-plans
 POST /v1/runtime-starts
 GET  /v1/runtime-starts/:commandId
 GET  /v1/runtimes/:runtimeId
 GET  /v1/runtimes/:runtimeId/events?after=<cursor>&limit=<n>
 ```
 
+The planning endpoint accepts the same closed product request as start. It revalidates the source,
+derives the exact analysis request, work plan, runtime-bound source-artifact identity, and
+`studio.forecast.v1`, and returns `not_started` with a null frozen-forecast id. It creates no command,
+runtime directory, journal, receipt, or executor. The start endpoint recomputes and freezes that
+exact forecast; the product client fails closed if command, runtime, analysis-request, or forecast
+content identities differ from review.
+
 There is no pause/resume/cancel endpoint. The host does not upload or link-ingest sources. It starts
 only the existing one-child proof objective: no child media tools, media inspection, transcription,
 translation, captions, study output, parent/orchestrator model execution, or multi-worker swarm.
-The main product loop remains recorded replay. An explicit development-only client under
-`/studio/?lab=1` now lists registered sessions, submits mapped product inputs, consumes durable
-start/forecast identities, reads lifecycle, and polls validated events from its last consumed
-cursor. It does not insert those events into `RunBundle`, legacy traces, or the recorded graph.
+Default `/studio/` now offers an explicit **Use owned local source** path that lists registered
+sessions, shows validated source facts, reviews the exact floor, starts, reads lifecycle, and polls
+validated events. The URL/demo path remains recorded replay. `/studio/?lab=1` retains its lower-level
+proof controls. Neither path inserts production events into `RunBundle`, legacy traces, or the
+recorded graph.
 
 ### Deterministic operator path
 
-Run `npm run runtime:host` and copy the random token plus source-session identities from the startup
-summary. Open Studio at the host's allowed origin (default
-`http://127.0.0.1:4321/studio/?lab=1`), expand **Local runtime host**, keep the default host origin,
+For a new owned source, run the full producer and register its sealed directory:
+
+```text
+node scripts/preflight-owned-media.mjs --file /path/to/media.mov --run local-001 --label "Owned clip" --rights-holder "Your name" --rights-scope local --attest-rights
+node scripts/run-runtime-host.ts --source-directory .studio/runs/local-001 --executor deterministic
+```
+
+The first command copies and hashes the exact bytes, records explicit rights, runs ffprobe, and
+seals `preflight.json`. The second command revalidates that directory and prints a random token plus
+source-session identities. Open Studio at the host's allowed origin (default
+`http://127.0.0.1:4321/studio/`), choose **Use owned local source**, keep the default host origin,
 paste the token, connect, select a registered source, enter explicit product language inputs, and
-choose **Start local runtime**. **Repeat identical start** confirms the same
+choose **Review local plan**. Review the range, workload floor, operation, assumptions, and
+unavailable values, then choose **Accept forecast and start local runtime**. The lab's **Repeat
+identical start** still confirms the same
 command/runtime/journal/receipt/forecast identities. The UI polls from `after=0` until
 `reachedHead` and `terminal` are true. Stop and restart the same command with
 the same ignored `.studio/runtime-host` root, query its command/runtime status, and continue from the
@@ -711,16 +734,19 @@ The next production slices, in dependency order:
    floor, not elapsed time or usage; expected and conservative workloads, elapsed time, model
    usage, calibration, price-book snapshot, currency, and API cost stay null/unavailable. A
    separate `studio.forecast-freeze.v1` binds acceptance to a run start by forecast content id and
-   leaves future receipted-actual evaluation separate. UI, pricing, and calibration producers are
-   not claimed.
-8. Implemented 2026-07-14 for the development-only owned-source path: a strict loader revalidates
+   leaves future receipted-actual evaluation separate. Implemented 2026-07-15: default Studio
+   validates and displays the exact read-only plan plus workload floor and keeps unsupported values
+   unavailable. Pricing, calibration, operation-choice, and evaluation producers are not claimed.
+8. Implemented 2026-07-15 for the local owned-source product path: a strict loader revalidates
    the registered rights/source/probe receipts, highest sealed V1/V2/V3 preflight, and every indexed
    byte; derives stable source-session and revision identities; preserves detector receipt content
    ids as evidence; accepts declared, automatic, mixed, unknown, or withheld source-language policy
    separately from one explicit target and optional pack; validates the selected range; creates the
    proof-only work plan and deterministic forecast; and writes a frozen `studio.runtime-start.v1`
-   receipt before the existing one-child launcher. The receipt is not yet a production journal event,
-   scheduler tasks do not yet carry this language context, and `/studio/` remains replay-only.
+   receipt before the existing one-child launcher. Default Studio can now select the registered
+   session, submit those fields, review the exact floor, and start/poll the bounded proof. The receipt
+   is not yet a production journal event, scheduler tasks do not yet carry this language context,
+   and production events do not enter the replay graph.
 9. Implemented 2026-07-14: the dedicated memory review inspector validates an operator-selected
    set of proposal, decision, revocation, legacy, materialization, and consumption receipts; derives
    supersession and rollback from those receipts; and exposes both the accepted snapshot content id
@@ -730,11 +756,11 @@ The next production slices, in dependency order:
    discovery and displays, but does not re-read, externally referenced evidence bytes.
 10. Run the authored browser matrix in an environment with an available in-app browser, then add only
    evidence-backed difficult-media scenarios produced by the new detectors.
-11. Implemented 2026-07-15: development-only registered-source runtime-start host, atomic durable
-    command and launch claims, explicit lifecycle records, restart interruption/terminal
+11. Implemented 2026-07-15: registered-source runtime-start host, read-only exact planning, atomic
+    durable command and launch claims, explicit lifecycle records, restart interruption/terminal
     reconciliation, bounded validated cursor polling, deterministic executor controls, authenticated
-    loopback HTTP adapter, and shared CLI/host application composition. The main Studio remains
-    unwired and no media, caption, or hosted-runtime capability is implied.
+    loopback HTTP adapter, shared CLI/host application composition, and default-Studio owned-source
+    start wiring. No child media, caption, study, swarm, or hosted-runtime capability is implied.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow
 the same rule: choose a real deterministic producer first, then add the contract, fixture, policy,

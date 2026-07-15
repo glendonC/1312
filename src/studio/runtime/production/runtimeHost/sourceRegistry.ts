@@ -60,7 +60,10 @@ export class RuntimeSourceRegistry {
         sourceSessionId: loaded.session.sessionId,
         sourceRevisionId: loaded.session.revisionId,
         sourceContentId: loaded.session.source.contentId,
+        label: loaded.operator.label,
+        rightsScope: loaded.operator.rightsScope,
         durationMs: loaded.session.source.durationMs,
+        trackCount: loaded.descriptor.tracks.length,
         preflightSchema: loaded.session.preflight.schema,
         detectedLanguageEvidenceAvailable:
           loaded.session.detectedLanguageEvidenceContentIds.length > 0,

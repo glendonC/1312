@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 
-import { canonicalSha256, identifyFile } from "../artifactStore.ts";
+import {
+  canonicalSha256,
+  createSourceArtifactId,
+  identifyFile,
+} from "../artifactStore.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
-import { createRuntimeStartCommand } from "../runStart/runtimeStart.ts";
+import {
+  createRuntimePlan,
+  createRuntimeStartCommand,
+} from "../runStart/runtimeStart.ts";
 import { assertRuntimeStartRecord } from "../runStartValidation.ts";
 import type { RuntimeStartRecord } from "../model.ts";
 import { DurableRuntimeCommandStore } from "./commandStore.ts";
@@ -16,6 +23,7 @@ import type {
   InitializedRuntimeApplication,
   RuntimeHostCommandRecord,
   RuntimeHostFailureReason,
+  RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostStartAcknowledgement,
   RuntimeHostSourceSummary,
@@ -36,13 +44,25 @@ export interface RuntimeStartServiceOptions {
   launcherFactory: BoundedWorkerLauncherFactory;
   acceptedBy?: string;
   now?: () => Date;
-  nextRuntimeId?: () => string;
+  runtimeIdForCommand?: (commandId: string) => string;
   hostInstanceId?: string;
   recoverOnOpen?: boolean;
 }
 
 function terminal(lifecycle: RuntimeHostCommandRecord["lifecycle"]): boolean {
   return lifecycle === "terminal" || lifecycle === "failed" || lifecycle === "interrupted";
+}
+
+function deterministicRuntimeId(commandId: string): string {
+  const digest = canonicalSha256({ allocator: "studio.local-runtime-host.v1", commandId });
+  const uuid = [
+    digest.slice(0, 8),
+    digest.slice(8, 12),
+    `4${digest.slice(13, 16)}`,
+    `8${digest.slice(17, 20)}`,
+    digest.slice(20, 32),
+  ].join("-");
+  return `runtime:${uuid}`;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -61,7 +81,7 @@ export class RuntimeStartService {
   private readonly launcherFactory: BoundedWorkerLauncherFactory;
   private readonly acceptedBy: string;
   private readonly now: () => Date;
-  private readonly nextRuntimeId: () => string;
+  private readonly runtimeIdForCommand: (commandId: string) => string;
   private readonly hostInstanceId: string;
   private readonly initializing = new Map<string, Promise<RuntimeHostStartAcknowledgement>>();
   private readonly transitionTails = new Map<string, Promise<RuntimeHostCommandRecord>>();
@@ -72,7 +92,7 @@ export class RuntimeStartService {
     this.launcherFactory = options.launcherFactory;
     this.acceptedBy = options.acceptedBy ?? "operator:local-runtime-host";
     this.now = options.now ?? (() => new Date());
-    this.nextRuntimeId = options.nextRuntimeId ?? (() => `runtime:${randomUUID()}`);
+    this.runtimeIdForCommand = options.runtimeIdForCommand ?? deterministicRuntimeId;
     this.hostInstanceId = options.hostInstanceId ?? `host:${randomUUID()}`;
   }
 
@@ -143,7 +163,11 @@ export class RuntimeStartService {
     }
   }
 
-  async start(value: unknown): Promise<RuntimeHostStartAcknowledgement> {
+  private async prepare(value: unknown): Promise<{
+    loadedSource: Awaited<ReturnType<RuntimeSourceRegistry["resolve"]>>;
+    analysisRequest: ReturnType<typeof createProductionAnalysisRequest>;
+    plan: ReturnType<typeof createRuntimePlan>;
+  }> {
     let request;
     try {
       request = parseRuntimeHostStartRequest(value);
@@ -176,40 +200,73 @@ export class RuntimeStartService {
       );
     }
     const command = createRuntimeStartCommand(loadedSource.session, analysisRequest);
-    const existing = this.initializing.get(command.commandId);
+    const runtimeId = this.runtimeIdForCommand(command.commandId);
+    const sourceArtifactId = createSourceArtifactId(runtimeId, loadedSource.descriptor);
+    const plan = createRuntimePlan({
+      runtimeId,
+      sourceSession: loadedSource.session,
+      sourceArtifactId,
+      analysisRequest,
+    });
+    return { loadedSource, analysisRequest, plan };
+  }
+
+  async plan(value: unknown): Promise<RuntimeHostPlanResponse> {
+    const prepared = await this.prepare(value);
+    return {
+      schema: "studio.local-runtime-plan.v1",
+      commandId: prepared.plan.commandId,
+      runtimeId: prepared.plan.runtimeId,
+      sourceSessionId: prepared.loadedSource.session.sessionId,
+      sourceRevisionId: prepared.loadedSource.session.revisionId,
+      analysisRequestId: prepared.analysisRequest.requestId,
+      forecast: structuredClone(prepared.plan.forecast),
+      acceptance: {
+        status: "not_started",
+        frozenForecastId: null,
+      },
+    };
+  }
+
+  async start(value: unknown): Promise<RuntimeHostStartAcknowledgement> {
+    const prepared = await this.prepare(value);
+    const existing = this.initializing.get(prepared.plan.commandId);
     if (existing) return existing;
-    const acceptance = this.acceptStart(command.commandId, loadedSource, analysisRequest, command.workPlan);
-    this.initializing.set(command.commandId, acceptance);
+    const acceptance = this.acceptStart(
+      prepared.plan,
+      prepared.loadedSource,
+      prepared.analysisRequest,
+    );
+    this.initializing.set(prepared.plan.commandId, acceptance);
     try {
       return await acceptance;
     } finally {
-      this.initializing.delete(command.commandId);
+      this.initializing.delete(prepared.plan.commandId);
     }
   }
 
   private async acceptStart(
-    commandId: string,
+    plan: ReturnType<typeof createRuntimePlan>,
     loadedSource: Awaited<ReturnType<RuntimeSourceRegistry["resolve"]>>,
     analysisRequest: ReturnType<typeof createProductionAnalysisRequest>,
-    workPlan: ReturnType<typeof createRuntimeStartCommand>["workPlan"],
   ): Promise<RuntimeHostStartAcknowledgement> {
     const acceptedAt = this.now().toISOString();
-    const runtimeId = this.nextRuntimeId();
     const requestContentId = `sha256:${canonicalSha256({
       sourceRevisionId: loadedSource.session.revisionId,
       analysisRequest,
-      workPlan,
+      workPlan: plan.workPlan,
+      forecastContentId: plan.forecast.content.contentId,
     })}`;
     const proposed: RuntimeHostCommandRecord = {
       schema: "studio.local-runtime-command.v1",
       producer: { id: "studio.local-runtime-host", version: "1" },
-      commandId,
+      commandId: plan.commandId,
       requestContentId,
       sourceSessionId: loadedSource.session.sessionId,
       sourceRevisionId: loadedSource.session.revisionId,
       analysisRequestId: analysisRequest.requestId,
-      runtimeId,
-      journalId: `journal:${runtimeId}`,
+      runtimeId: plan.runtimeId,
+      journalId: `journal:${plan.runtimeId}`,
       acceptedAt,
       lifecycle: "accepted",
       lastTransitionAt: acceptedAt,
@@ -227,7 +284,7 @@ export class RuntimeStartService {
         const status = await this.statusFromRecord(existingRecord);
         if (status.runStartReceipt !== null || status.terminal) return this.acknowledgement(status);
         await new Promise((resolve) => setTimeout(resolve, 10));
-        existingRecord = (await this.store.read(commandId)) ?? existingRecord;
+        existingRecord = (await this.store.read(plan.commandId)) ?? existingRecord;
       }
       return this.acknowledgement(await this.statusFromRecord(existingRecord));
     }
@@ -245,6 +302,12 @@ export class RuntimeStartService {
         loadedSource,
         analysisRequest,
       });
+      if (
+        initialized.sourceArtifact.id !== plan.sourceArtifactId ||
+        initialized.runStart.forecast.content.contentId !== plan.forecast.content.contentId
+      ) {
+        throw new Error("The initialized runtime does not match its reviewed source artifact and forecast.");
+      }
       const receiptContent = await identifyFile(paths.runStartPath);
       record = await this.replaceLifecycle(
         record,
@@ -262,7 +325,7 @@ export class RuntimeStartService {
       return this.acknowledgement(await this.statusFromRecord(record));
     }
 
-    const launchWon = await this.store.claimLaunch(commandId, {
+    const launchWon = await this.store.claimLaunch(plan.commandId, {
       schema: "studio.local-runtime-launch-claim.v1",
       hostInstanceId: this.hostInstanceId,
       processId: process.pid,

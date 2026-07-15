@@ -21,6 +21,21 @@ interface StartInput {
   analysisRequest: ProductionAnalysisRequest;
 }
 
+export interface RuntimePlanInput {
+  runtimeId: string;
+  sourceSession: ProductionSourceSession;
+  sourceArtifactId: string;
+  analysisRequest: ProductionAnalysisRequest;
+}
+
+export interface RuntimePlan {
+  commandId: string;
+  runtimeId: string;
+  sourceArtifactId: string;
+  workPlan: RuntimeStartRecord["workPlan"];
+  forecast: RuntimeStartRecord["forecast"];
+}
+
 export interface RuntimeStartCommand {
   commandId: string;
   workPlan: RuntimeStartRecord["workPlan"];
@@ -66,14 +81,13 @@ export function createRuntimeStartCommand(
 }
 
 /**
- * Build the first honest plan: a bounded worker-contract proof scoped to the selected source
- * range. It does not claim transcription, translation, media inspection, captions, or study work.
+ * Produce the exact plan and forecast for a host-owned runtime identity without freezing or
+ * starting it. No filesystem state is created by this pure function.
  */
-export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
+export function createRuntimePlan(input: RuntimePlanInput): RuntimePlan {
   assertProductionSourceSession(input.sourceSession);
   assertProductionAnalysisRequest(input.analysisRequest);
   const command = createRuntimeStartCommand(input.sourceSession, input.analysisRequest);
-  const workPlan = command.workPlan;
   const forecast = createForecastArtifact({
     artifact: {
       artifactId: input.sourceArtifactId,
@@ -86,9 +100,31 @@ export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
       },
     },
     range: { ...input.analysisRequest.range },
-    workPlan,
+    workPlan: command.workPlan,
   });
-  const frozenForecast = freezeForecastArtifact(forecast, {
+  return {
+    commandId: command.commandId,
+    runtimeId: input.runtimeId,
+    sourceArtifactId: input.sourceArtifactId,
+    workPlan: command.workPlan,
+    forecast,
+  };
+}
+
+/**
+ * Build the first honest plan: a bounded worker-contract proof scoped to the selected source
+ * range. It does not claim transcription, translation, media inspection, captions, or study work.
+ */
+export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
+  assertProductionSourceSession(input.sourceSession);
+  assertProductionAnalysisRequest(input.analysisRequest);
+  const plan = createRuntimePlan({
+    runtimeId: input.runId,
+    sourceSession: input.sourceSession,
+    sourceArtifactId: input.sourceArtifactId,
+    analysisRequest: input.analysisRequest,
+  });
+  const frozenForecast = freezeForecastArtifact(plan.forecast, {
     runId: input.runId,
     acceptedBy: input.acceptedBy,
     runStartAt: input.startedAt,
@@ -96,14 +132,14 @@ export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
   const start: RuntimeStartRecord = {
     schema: "studio.runtime-start.v1",
     producer: { id: "studio.local-runtime-start", version: "1" },
-    commandId: command.commandId,
+    commandId: plan.commandId,
     runtimeId: input.runId,
     journalId: input.journalId,
     sourceSession: structuredClone(input.sourceSession),
     sourceArtifactId: input.sourceArtifactId,
     analysisRequest: structuredClone(input.analysisRequest),
-    workPlan,
-    forecast,
+    workPlan: plan.workPlan,
+    forecast: plan.forecast,
     frozenForecast,
     startedAt: input.startedAt,
   };

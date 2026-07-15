@@ -27,6 +27,10 @@ const TRACK_KINDS = new Set(["audio", "video", "subtitle", "data", "attachment"]
 export interface LoadedOwnedSourceSession {
   session: ProductionSourceSession;
   descriptor: SourceArtifactDescriptor;
+  operator: {
+    label: string;
+    rightsScope: ProductionSourceSession["sourceReceipt"]["rightsScope"];
+  };
   directory: string;
 }
 
@@ -231,5 +235,13 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
     }),
   };
   assertSourceArtifactDescriptor(descriptor, "Local source session descriptor");
-  return { session, descriptor, directory };
+  return {
+    session,
+    descriptor,
+    operator: {
+      label: source.label,
+      rightsScope: source.rights.scope,
+    },
+    directory,
+  };
 }

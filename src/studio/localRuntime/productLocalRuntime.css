@@ -1,0 +1,137 @@
+.studio-owned-source-control {
+  position: fixed;
+  top: 62px;
+  right: clamp(14px, 2vw, 22px);
+  z-index: 11;
+  min-height: 38px;
+  padding: 7px 10px;
+}
+
+.product-runtime {
+  position: absolute;
+  inset: 72px max(16px, 6vw) 24px;
+  z-index: 4;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(8, 12, 18, 0.96);
+  color: var(--ink, #f4f5f7);
+}
+
+.product-runtime-header,
+.product-runtime-connect,
+.product-runtime-range,
+.product-runtime-language {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.product-runtime-header {
+  justify-content: space-between;
+  align-items: start;
+}
+
+.product-runtime h1,
+.product-runtime h2,
+.product-runtime h3,
+.product-runtime p {
+  margin-block: 6px 12px;
+}
+
+.product-runtime label {
+  display: grid;
+  gap: 5px;
+  min-width: 190px;
+  flex: 1;
+}
+
+.product-runtime input,
+.product-runtime select,
+.product-runtime button {
+  min-height: 38px;
+  padding: 7px 10px;
+}
+
+.product-runtime button {
+  cursor: pointer;
+}
+
+.product-runtime button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.product-runtime-boundary,
+.product-runtime-operator,
+.product-runtime-connect,
+.product-runtime-session,
+.product-runtime-plan,
+.product-runtime-status,
+.product-runtime-error {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.product-runtime-operator code {
+  overflow-wrap: anywhere;
+}
+
+.product-runtime-source-facts,
+.product-runtime-plan dl,
+.product-runtime-status dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.product-runtime-source-facts div,
+.product-runtime-plan dl div,
+.product-runtime-status dl div {
+  min-width: 0;
+}
+
+.product-runtime dt {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.product-runtime dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.product-runtime-request {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.product-runtime-start {
+  margin-top: 12px;
+}
+
+.product-runtime-error {
+  border-color: rgba(255, 100, 100, 0.65);
+}
+
+@media (max-width: 640px) {
+  .product-runtime {
+    inset: 56px 8px 8px;
+    padding: 12px;
+  }
+
+  .product-runtime-connect,
+  .product-runtime-range,
+  .product-runtime-language {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .product-runtime label {
+    width: 100%;
+  }
+}

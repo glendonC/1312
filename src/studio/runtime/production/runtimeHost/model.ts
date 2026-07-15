@@ -4,6 +4,7 @@ import type {
   RuntimeArtifact,
   RuntimeStartRecord,
 } from "../model.ts";
+import type { ForecastArtifact } from "../forecast/model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 
 export const RUNTIME_HOST_LIFECYCLE_STATES = [
@@ -73,9 +74,26 @@ export interface RuntimeHostSourceSummary {
   sourceSessionId: string;
   sourceRevisionId: string;
   sourceContentId: string;
+  label: string;
+  rightsScope: ProductionSourceSession["sourceReceipt"]["rightsScope"];
   durationMs: number;
+  trackCount: number;
   preflightSchema: ProductionSourceSession["preflight"]["schema"];
   detectedLanguageEvidenceAvailable: boolean;
+}
+
+export interface RuntimeHostPlanResponse {
+  schema: "studio.local-runtime-plan.v1";
+  commandId: string;
+  runtimeId: string;
+  sourceSessionId: string;
+  sourceRevisionId: string;
+  analysisRequestId: string;
+  forecast: ForecastArtifact;
+  acceptance: {
+    status: "not_started";
+    frozenForecastId: null;
+  };
 }
 
 export interface RuntimeHostStatus {

@@ -11,6 +11,7 @@ import {
   mapAnalysisRequestToRuntimeStart,
   projectLocalRuntimeLifecycle,
 } from "../src/studio/localRuntime/model.ts";
+import { createForecastArtifact } from "../src/studio/runtime/production/forecast/planner.ts";
 import { parseRuntimeHostStartRequest } from "../src/studio/runtime/production/runtimeHost/validation.ts";
 import type {
   RuntimeHostSourceSummary,
@@ -19,15 +20,40 @@ import type {
 
 const CONTENT = `sha256:${"a".repeat(64)}`;
 const RECEIPT_CONTENT = `sha256:${"b".repeat(64)}`;
-const FORECAST_CONTENT = `sha256:${"c".repeat(64)}`;
 const SOURCE: RuntimeHostSourceSummary = {
   sourceSessionId: "source-session:fixture",
   sourceRevisionId: "source-revision:fixture",
   sourceContentId: CONTENT,
+  label: "Owned fixture clip",
+  rightsScope: "redistribution",
   durationMs: 47_200,
+  trackCount: 2,
   preflightSchema: "studio.preflight-bundle.v3",
   detectedLanguageEvidenceAvailable: true,
 };
+const PLAN_FORECAST = createForecastArtifact({
+  artifact: {
+    artifactId: "artifact:fixture",
+    contentId: CONTENT,
+    measuredDurationMs: SOURCE.durationMs,
+    durationMeasurement: {
+      schema: "studio.media-probe.v1",
+      producer: "scripts/probe-media.mjs",
+      receiptContentId: `sha256:${"d".repeat(64)}`,
+    },
+  },
+  range: { startMs: 0, endMs: SOURCE.durationMs },
+  workPlan: {
+    schema: "studio.forecast.work-plan.v1",
+    planId: "plan:fixture",
+    operations: [{
+      operationId: "operation:fixture",
+      kind: "runtime.worker-contract-proof",
+      range: { startMs: 0, endMs: SOURCE.durationMs },
+    }],
+  },
+});
+const FORECAST_CONTENT = PLAN_FORECAST.content.contentId;
 
 function makeAnalysisRequest(targetLanguage = "en", duration = SOURCE.durationMs / 1_000): AnalysisRequest {
   return {
@@ -194,6 +220,18 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
     if (url.endsWith("/v1/source-sessions")) {
       return json({ schema: "studio.local-source-session-list.v1", sourceSessions: [SOURCE] });
     }
+    if (url.endsWith("/v1/runtime-plans")) {
+      return json({
+        schema: "studio.local-runtime-plan.v1",
+        commandId: "runtime-start:fixture",
+        runtimeId: "runtime:fixture",
+        sourceSessionId: SOURCE.sourceSessionId,
+        sourceRevisionId: SOURCE.sourceRevisionId,
+        analysisRequestId: "analysis-request:fixture",
+        forecast: PLAN_FORECAST,
+        acceptance: { status: "not_started", frozenForecastId: null },
+      });
+    }
     if (url.endsWith("/v1/runtime-starts")) return json(acknowledgement(), 202);
     if (url.endsWith("/v1/runtimes/runtime%3Afixture")) {
       return json(acknowledgement("studio.local-runtime-status.v1"));
@@ -227,22 +265,62 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
     requestedSourceLanguage: { mode: "declared", languages: ["ko"], reason: null },
     selectedLanguagePackId: "ko-v3",
   });
+  const plan = await client.plan(request);
   const start = await client.start(request);
   const status = await client.status(start.runtimeId);
   const poll = await client.poll(start.runtimeId, 7);
 
   assert.equal(client.baseUrl, "http://127.0.0.1:4312");
+  assert.equal(plan.forecast.schema, "studio.forecast.v1");
+  assert.equal(plan.forecast.scenarios.baseline.workload.requestedOperationMediaDurationMs, SOURCE.durationMs);
+  assert.equal(plan.forecast.scenarios.baseline.elapsedDurationMs, null);
+  assert.equal(plan.acceptance.frozenForecastId, null);
   assert.equal(start.commandId, "runtime-start:fixture");
   assert.equal(start.runStartReceipt?.contentId, RECEIPT_CONTENT);
   assert.equal(start.forecast?.frozenForecastId, "forecast-freeze:fixture");
   assert.equal(status.lifecycle, "terminal");
   assert.equal(poll.nextCursor, 7);
   assert.equal(poll.reachedHead, true);
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   for (const call of calls) {
     assert.equal(new Headers(call.init?.headers).get("Authorization"), `Bearer ${"t".repeat(64)}`);
   }
   assert.deepEqual(JSON.parse(String(calls[1].init?.body)), request);
+  assert.deepEqual(JSON.parse(String(calls[2].init?.body)), request);
+});
+
+test("browser client rejects a plan that invents elapsed, usage, or price values", async () => {
+  const request = mapAnalysisRequestToRuntimeStart({
+    source: SOURCE,
+    analysisRequest: makeAnalysisRequest(),
+    requestedSourceLanguage: { mode: "declared", languages: ["ko"], reason: null },
+    selectedLanguagePackId: null,
+  });
+  const invented = structuredClone(PLAN_FORECAST) as unknown as {
+    scenarios: { baseline: { elapsedDurationMs: number | null } };
+  };
+  invented.scenarios.baseline.elapsedDurationMs = 12_345;
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => json({
+      schema: "studio.local-runtime-plan.v1",
+      commandId: "runtime-start:fixture",
+      runtimeId: "runtime:fixture",
+      sourceSessionId: SOURCE.sourceSessionId,
+      sourceRevisionId: SOURCE.sourceRevisionId,
+      analysisRequestId: "analysis-request:fixture",
+      forecast: invented,
+      acceptance: { status: "not_started", frozenForecastId: null },
+    }),
+  });
+
+  await assert.rejects(
+    client.plan(request),
+    (error: unknown) => error instanceof RuntimeHostClientError &&
+      error.code === "invalid_host_response" &&
+      /elapsed duration and model usage must remain unavailable/.test(error.message),
+  );
 });
 
 test("browser client surfaces host cursor errors and rejects inconsistent poll cursors", async () => {

@@ -181,6 +181,22 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
         return;
       }
 
+      if (url.pathname === "/v1/runtime-plans") {
+        if (request.method !== "POST") {
+          throw new RuntimeHostError("method_not_allowed", "Only POST is supported for this endpoint.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+          throw new RuntimeHostError(
+            "unsupported_content_type",
+            "Runtime plans require Content-Type: application/json.",
+            415,
+          );
+        }
+        sendJson(response, 200, await options.service.plan(await readJsonBody(request, maximumBytes)), origin);
+        return;
+      }
+
       const commandId = routeIdentity(url.pathname, /^\/v1\/runtime-starts\/([^/]+)$/);
       if (commandId !== null) {
         if (request.method !== "GET") throw new RuntimeHostError("method_not_allowed", "Only GET is supported for this endpoint.", 405);

@@ -17,7 +17,9 @@ export {
   validatePollCursor,
 } from "./journalPolling.ts";
 export type {
+  RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
+  RuntimeHostSourceSummary,
   RuntimeHostStartAcknowledgement,
   RuntimeHostStartRequest,
   RuntimeHostStatus,

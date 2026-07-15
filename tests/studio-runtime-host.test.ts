@@ -49,11 +49,16 @@ interface HostHarness {
   request: RuntimeHostStartRequest;
 }
 
-function runtimeIds(): () => string {
+function runtimeIds(): (commandId: string) => string {
   let count = 0;
-  return () => {
+  const identities = new Map<string, string>();
+  return (commandId) => {
+    const existing = identities.get(commandId);
+    if (existing) return existing;
     count += 1;
-    return `runtime:00000000-0000-4000-8000-${count.toString().padStart(12, "0")}`;
+    const identity = `runtime:00000000-0000-4000-8000-${count.toString().padStart(12, "0")}`;
+    identities.set(commandId, identity);
+    return identity;
   };
 }
 
@@ -73,7 +78,7 @@ async function hostHarness(options: {
     store,
     sources,
     launcherFactory: executor.factory(),
-    nextRuntimeId: runtimeIds(),
+    runtimeIdForCommand: runtimeIds(),
     recoverOnOpen: options.recoverOnOpen ?? false,
   });
   const source = sources.list()[0];
@@ -96,7 +101,7 @@ async function hostHarness(options: {
 }
 
 async function cleanup(harness: HostHarness): Promise<void> {
-  await rm(harness.directory, { recursive: true, force: true });
+  await rm(harness.directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
 }
 
 async function waitForLifecycle(
@@ -112,6 +117,39 @@ async function waitForLifecycle(
   }
   assert.fail(`runtime did not reach ${expected}`);
 }
+
+test("reviewed plan is read-only and start freezes the exact studio.forecast.v1 content", async () => {
+  const runtime = await hostHarness();
+  try {
+    const plan = await runtime.service.plan(runtime.request);
+    assert.equal(plan.schema, "studio.local-runtime-plan.v1");
+    assert.equal(plan.acceptance.status, "not_started");
+    assert.equal(plan.acceptance.frozenForecastId, null);
+    assert.equal(plan.forecast.schema, "studio.forecast.v1");
+    assert.equal(plan.forecast.scenarios.baseline.status, "floor_only");
+    assert.equal(plan.forecast.scenarios.baseline.workload.selectedMediaDurationMs, 1_000);
+    assert.equal(plan.forecast.scenarios.baseline.workload.requestedOperationMediaDurationMs, 1_000);
+    assert.equal(plan.forecast.scenarios.baseline.elapsedDurationMs, null);
+    assert.equal(plan.forecast.scenarios.baseline.modelUsage, null);
+    assert.deepEqual(plan.forecast.scenarios.baseline.apiCost, { amount: null, currency: null });
+    assert.equal((await runtime.store.list()).length, 0);
+    assert.equal(runtime.executor.launchInvocations, 0);
+
+    const acknowledgement = await runtime.service.start(runtime.request);
+    assert.equal(acknowledgement.commandId, plan.commandId);
+    assert.equal(acknowledgement.runtimeId, plan.runtimeId);
+    assert.equal(acknowledgement.analysisRequestId, plan.analysisRequestId);
+    assert.equal(acknowledgement.forecast?.contentId, plan.forecast.content.contentId);
+    assert.equal(
+      acknowledgement.runStartReceipt?.record.forecast.content.contentId,
+      plan.forecast.content.contentId,
+    );
+    assert.notEqual(acknowledgement.forecast?.frozenForecastId, null);
+    await waitForLifecycle(runtime.service, acknowledgement.commandId, "terminal");
+  } finally {
+    await cleanup(runtime);
+  }
+});
 
 test("ten identical starts durably acknowledge one runtime and invoke one executor", async () => {
   const control = new DeterministicExecutionControl({ pauseBeforeFirstEvent: true });
@@ -180,14 +218,12 @@ test("two service instances sharing one store select one durable command and lau
       store: storeA,
       sources,
       launcherFactory: executorA.factory(),
-      nextRuntimeId: () => "runtime:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       recoverOnOpen: false,
     });
     const serviceB = await RuntimeStartService.open({
       store: storeB,
       sources,
       launcherFactory: executorB.factory(),
-      nextRuntimeId: () => "runtime:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       recoverOnOpen: false,
     });
     const source = sources.list()[0];
@@ -667,18 +703,41 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     });
     assert.equal(oversized.status, 413);
 
+    const planned = await fetch(`${base}/v1/runtime-plans`, {
+      method: "POST",
+      headers: { ...authorized, "Content-Type": "application/json" },
+      body: JSON.stringify(runtime.request),
+    });
+    assert.equal(planned.status, 200);
+    const planBody = await planned.json() as {
+      commandId: string;
+      runtimeId: string;
+      forecast: { content: { contentId: string } };
+      acceptance: { status: string; frozenForecastId: null };
+    };
+    assert.equal(planBody.acceptance.status, "not_started");
+    assert.equal(planBody.acceptance.frozenForecastId, null);
+    assert.equal((await runtime.store.list()).length, 0);
+
     const started = await fetch(`${base}/v1/runtime-starts`, {
       method: "POST",
       headers: { ...authorized, "Content-Type": "application/json" },
       body: JSON.stringify(runtime.request),
     });
     assert.equal(started.status, 202);
-    const ack = await started.json() as { commandId: string; runtimeId: string };
+    const ack = await started.json() as {
+      commandId: string;
+      runtimeId: string;
+      forecast: { contentId: string };
+    };
+    assert.equal(ack.commandId, planBody.commandId);
+    assert.equal(ack.runtimeId, planBody.runtimeId);
+    assert.equal(ack.forecast.contentId, planBody.forecast.content.contentId);
     const status = await fetch(`${base}/v1/runtime-starts/${encodeURIComponent(ack.commandId)}`, { headers: authorized });
     assert.equal(status.status, 200);
     const events = await fetch(`${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/events?after=0&limit=2`, { headers: authorized });
     assert.equal(events.status, 200);
-    const publicBodies = JSON.stringify([ack, await status.json(), await events.json()]);
+    const publicBodies = JSON.stringify([planBody, ack, await status.json(), await events.json()]);
     assert.equal(publicBodies.includes(runtime.directory), false);
     assert.equal(publicBodies.includes(FIXTURE), false);
 

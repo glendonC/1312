@@ -1,8 +1,10 @@
 import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
 
 import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { Play } from "./glyphs";
+import ProductLocalRuntime from "./localRuntime/ProductLocalRuntime";
 import Preflight from "./preflight/Preflight";
 import SourceEntry from "./SourceEntry";
 import { useBundle, useStudio } from "./store";
@@ -106,7 +108,16 @@ function StudioDemoControl() {
   );
 }
 
+function StudioOwnedSourceControl({ open }: { open: () => void }) {
+  return (
+    <button type="button" className="studio-owned-source-control" onClick={open}>
+      Use owned local source
+    </button>
+  );
+}
+
 export default function InputAct() {
+  const [ownedSourceOpen, setOwnedSourceOpen] = useState(false);
   const loadStatus = useStudio((state) => state.loadStatus);
   const error = useStudio((state) => state.error);
   const retry = useStudio((state) => state.retry);
@@ -127,24 +138,29 @@ export default function InputAct() {
     >
       <div className="canvas" aria-hidden="true" />
 
-      {preflightStatus !== "idle" && !clientSourceCheck && <Preflight />}
+      {preflightStatus !== "idle" && !clientSourceCheck && !ownedSourceOpen && <Preflight />}
 
-      {(preflightStatus === "idle" || clientSourceCheck) && loadStatus === "ready" && (
+      {ownedSourceOpen && loadStatus === "ready" && (
+        <ProductLocalRuntime onClose={() => setOwnedSourceOpen(false)} />
+      )}
+
+      {!ownedSourceOpen && (preflightStatus === "idle" || clientSourceCheck) && loadStatus === "ready" && (
         <>
           <StudioWelcome />
           <StudioSourceDock />
           <StudioDemoControl />
+          <StudioOwnedSourceControl open={() => setOwnedSourceOpen(true)} />
         </>
       )}
 
-      {preflightStatus === "idle" && loadStatus === "loading" && (
+      {!ownedSourceOpen && preflightStatus === "idle" && loadStatus === "loading" && (
         <div className="input-status" role="status" aria-live="polite">
           <span className="input-status-kicker">Recorded evidence</span>
           <p>Loading the run bundle…</p>
         </div>
       )}
 
-      {preflightStatus === "idle" && loadStatus === "failed" && (
+      {!ownedSourceOpen && preflightStatus === "idle" && loadStatus === "failed" && (
         <div className="input-status" role="alert">
           <span className="input-status-kicker">Run unavailable</span>
           <p>The recorded evidence could not be loaded. Nothing has been replayed.</p>

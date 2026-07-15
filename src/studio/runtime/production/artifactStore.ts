@@ -14,6 +14,7 @@ import type {
   MediaOperationReceipt,
   MediaTrackDescriptor,
   RuntimeArtifact,
+  SourceArtifactDescriptor,
   WorkerOutputEnvelope,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
@@ -51,6 +52,20 @@ export async function identifyFile(path: string): Promise<ContentIdentity> {
 interface StoredFile {
   content: ContentIdentity;
   storageKey: string;
+}
+
+/**
+ * The runtime source-artifact identity is derivable before bytes are copied into the run store.
+ * This lets the host produce the exact pre-start forecast without creating a runtime directory.
+ */
+export function createSourceArtifactId(runId: string, descriptor: SourceArtifactDescriptor): string {
+  assertSourceArtifactDescriptor(descriptor);
+  return `artifact:${canonicalSha256({
+    runId,
+    contentId: descriptor.content.contentId,
+    adapterId: descriptor.adapterId,
+    sourceReceiptRef: descriptor.sourceReceiptRef,
+  })}`;
 }
 
 export class ContentAddressedArtifactStore {
@@ -111,12 +126,7 @@ export class ContentAddressedArtifactStore {
       throw new Error("Normalized source descriptor does not match the source bytes");
     }
     const stored = await this.storeFile(descriptor.path);
-    const id = `artifact:${canonicalSha256({
-      runId,
-      contentId: stored.content.contentId,
-      adapterId: descriptor.adapterId,
-      sourceReceiptRef: descriptor.sourceReceiptRef,
-    })}`;
+    const id = createSourceArtifactId(runId, descriptor);
     const artifact: RuntimeArtifact = {
       schema: "studio.runtime.artifact.v1",
       id,

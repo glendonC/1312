@@ -1,0 +1,51 @@
+---
+import SectionLede from "./SectionLede.astro";
+import {
+  completedRuns,
+  goldReadyClips,
+  report,
+  reviewedRuns,
+  sourcedClips,
+} from "./model";
+import { sectionCopy } from "./sections";
+
+const clips = report.pack.target_clip_count;
+const conditions = report.systems.length;
+
+const stages = [
+  { n: "01", name: "Draft", desc: "Protocol and data contract written.", color: "coral", meta: "Current", done: true, current: true },
+  { n: "02", name: "Source", desc: "Acquire the five hard Korean clips.", color: "citron", meta: `${sourcedClips} / ${clips}`, done: sourcedClips === clips },
+  { n: "03", name: "Freeze", desc: "Lock captions and the answer key.", color: "blue", meta: `${goldReadyClips} / ${clips}`, done: goldReadyClips === clips },
+  { n: "04", name: "Run", desc: "Score all four conditions.", color: "lilac", meta: `${completedRuns} / ${conditions}`, done: completedRuns === conditions },
+  { n: "05", name: "Review", desc: "Blind human rating, no system labels.", color: "teal", meta: `${reviewedRuns} / ${conditions}`, done: reviewedRuns === conditions },
+  { n: "06", name: "Publish", desc: "Versioned scorecard and receipts.", color: "peach", meta: "Locked", done: false },
+];
+---
+
+<section
+  class="instrument-panel overview-panel"
+  id="panel-overview"
+  role="tabpanel"
+  aria-labelledby="tab-overview"
+  tabindex="0"
+  data-bench-panel="overview"
+>
+  <div class="section-split">
+    <SectionLede copy={sectionCopy.overview} size="hero" />
+
+    <div class="section-body">
+      <ol class="conveyor" aria-label="How a benchmark gets built, stage by stage">
+        {stages.map((stage) => (
+          <li class:list={["stage", `stage-${stage.color}`, stage.current && "is-current"]}>
+            <span class="stage-n">[{stage.n}]</span>
+            <div class="stage-text">
+              <h3>{stage.name}</h3>
+              <p>{stage.desc}</p>
+            </div>
+            <span class="stage-meta">{stage.meta}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
+</section>

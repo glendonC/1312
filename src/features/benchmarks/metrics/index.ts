@@ -7,25 +7,25 @@ export const metricGroups = [
   {
     id: "headline",
     label: "Headline outcomes",
-    note: "The small set that can support product comparisons after gold freezes.",
+    note: "The handful of numbers that can decide a comparison, once the answer key is locked.",
     metrics: headlineMetrics,
   },
   {
     id: "diagnostic",
     label: "Diagnostic metrics",
-    note: "Explain where the pipeline succeeds or fails; do not turn these into the marketing claim.",
+    note: "Standard metrics that locate where it broke. They support the headline; they don’t replace it.",
     metrics: diagnosticMetrics,
   },
   {
     id: "research-only",
     label: "Research-only methods",
-    note: "Valid methods whose annotation or product assumptions are outside the Build Week minimum.",
+    note: "Real methods that need more data than Build Week can gather. Held back, not hidden.",
     metrics: researchMetrics,
   },
   {
     id: "omit",
-    label: "Explicitly omitted",
-    note: "Tempting numbers that would make the page less honest or less interpretable.",
+    label: "Deliberately left out",
+    note: "Tempting numbers we won’t show, because they’d mislead more than inform.",
     metrics: omittedMetrics,
   },
 ] as const;

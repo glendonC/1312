@@ -1,6 +1,7 @@
 ---
-import PanelHeader from "./PanelHeader.astro";
+import SectionLede from "./SectionLede.astro";
 import { difficultyGroups, report, roleLabels } from "./model";
+import { sectionCopy } from "./sections";
 ---
 
 <section
@@ -12,49 +13,46 @@ import { difficultyGroups, report, roleLabels } from "./model";
   data-bench-panel="pack"
   hidden
 >
-  <PanelHeader
-    index="02"
-    label="Test pack"
-    title="Planned media coverage"
-    description="The pack mixes clear controls with real-media failure modes. These are selection targets, not clip evidence."
-  />
+  <div class="section-split">
+    <SectionLede copy={sectionCopy.pack} />
 
-  <div class="panel-split pack-split">
-    <div class="clip-reel" aria-label="Planned Korean media selection slots">
-      {report.pack.clips.map((clip, index) => (
-        <article class:list={["clip-frame", clip.source ? "has-source" : "needs-source"]}>
-          <div class="clip-frame-top">
-            <span class="clip-number">{String(index + 1).padStart(2, "0")}</span>
-            <span class:list={["state-chip", clip.source ? "state-ready" : "state-missing"]}>
-              <span aria-hidden="true">{clip.source ? "✓" : "▨"}</span>
-              {clip.source ? "Source acquired" : "Not sourced"}
-            </span>
-          </div>
-          <div class="clip-frame-body">
-            <span>{roleLabels[clip.role] ?? clip.role}</span>
-            <h3>{clip.domain_target}</h3>
-            <p>{clip.target_duration_s.min}–{clip.target_duration_s.max} seconds</p>
-          </div>
-          <ul class="tag-list" aria-label={`${clip.domain_target} target phenomena`}>
-            {clip.phenomenon_targets.map((phenomenon) => <li>{phenomenon.replaceAll("-", " ")}</li>)}
-          </ul>
-        </article>
-      ))}
-    </div>
-
-    <div class="difficulty-stack" aria-label="Difficulty groups">
-      {difficultyGroups.map((group) => (
-        <article>
-          <span>{group.index}</span>
-          <div>
-            <h3>{group.title}</h3>
-            <p>{group.description}</p>
-            <ul class="tag-list">
-              {group.tags.map((tag) => <li>{tag.replaceAll("-", " ")}</li>)}
+    <div class="section-body">
+      <div class="clip-reel" aria-label="Planned Korean media clip slots">
+        {report.pack.clips.map((clip, index) => (
+          <article class:list={["clip-frame", clip.source ? "has-source" : "needs-source"]}>
+            <div class="clip-frame-top">
+              <span class="clip-number">{String(index + 1).padStart(2, "0")}</span>
+              <span class:list={["state-chip", clip.source ? "state-ready" : "state-missing"]}>
+                <span aria-hidden="true">{clip.source ? "✓" : "▨"}</span>
+                {clip.source ? "Source acquired" : "Not sourced"}
+              </span>
+            </div>
+            <div class="clip-frame-body">
+              <span>{roleLabels[clip.role] ?? clip.role}</span>
+              <h3>{clip.domain_target}</h3>
+              <p>{clip.target_duration_s.min}–{clip.target_duration_s.max} seconds</p>
+            </div>
+            <ul class="tag-list" aria-label={`${clip.domain_target} target phenomena`}>
+              {clip.phenomenon_targets.map((phenomenon) => <li>{phenomenon.replaceAll("-", " ")}</li>)}
             </ul>
-          </div>
-        </article>
-      ))}
+          </article>
+        ))}
+      </div>
+
+      <div class="difficulty-stack" aria-label="What the clips are chosen to stress">
+        {difficultyGroups.map((group) => (
+          <article>
+            <span>{group.index}</span>
+            <div>
+              <h3>{group.title}</h3>
+              <p>{group.description}</p>
+              <ul class="tag-list">
+                {group.tags.map((tag) => <li>{tag.replaceAll("-", " ")}</li>)}
+              </ul>
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
   </div>
 </section>

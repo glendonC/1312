@@ -1,5 +1,5 @@
 ---
-import PanelHeader from "./PanelHeader.astro";
+import SectionLede from "./SectionLede.astro";
 import {
   annotationRequirements,
   artifactContract,
@@ -9,6 +9,7 @@ import {
   supportLabels,
   workItems,
 } from "./model";
+import { sectionCopy } from "./sections";
 ---
 
 <section
@@ -20,66 +21,63 @@ import {
   data-bench-panel="receipts"
   hidden
 >
-  <PanelHeader
-    index="06"
-    label="Receipts"
-    title="Evidence and audit trail"
-    description="The public scorecard stays simple; source, configuration, output, runtime, review, and score files keep it auditable."
-  />
+  <div class="section-split">
+    <SectionLede copy={sectionCopy.receipts} />
 
-  <div class="panel-split receipt-split">
-    <div class="work-ledger">
-      <div class="ledger-heading"><span>Work required</span><span>Current state</span></div>
-      {workItems.map((item) => (
-        <article>
-          <span class={`ledger-marker state-${item.state}`} aria-hidden="true"></span>
-          <div><h3>{item.label}</h3><p>{item.meta}</p></div>
-          <span class={`state-chip state-${item.state}`}>
-            <span aria-hidden="true">{item.state === "ready" ? "✓" : item.state === "measured" ? "●" : item.state === "missing" ? "▨" : "○"}</span>
-            {item.stateLabel}
-          </span>
+    <div class="section-body">
+      <div class="work-ledger">
+        <div class="ledger-heading"><span>Work required</span><span>Current state</span></div>
+        {workItems.map((item) => (
+          <article>
+            <span class={`ledger-marker state-${item.state}`} aria-hidden="true"></span>
+            <div><h3>{item.label}</h3><p>{item.meta}</p></div>
+            <span class={`state-chip state-${item.state}`}>
+              <span aria-hidden="true">{item.state === "ready" ? "✓" : item.state === "measured" ? "●" : item.state === "missing" ? "▨" : "○"}</span>
+              {item.stateLabel}
+            </span>
+          </article>
+        ))}
+      </div>
+
+      <div class="receipt-stack">
+        <article class="receipt-summary">
+          <span>Required files in place</span>
+          <strong>{readyArtifacts}<small> / {artifactContract.length}</small></strong>
+          <p>{missingArtifacts} required files still need real benchmark data.</p>
         </article>
-      ))}
+
+        <details class="receipt-details">
+          <summary>Evidence file paths <span>{artifactContract.length}</span></summary>
+          <ul>
+            {artifactContract.map((artifact) => (
+              <li>
+                <span class={`ledger-marker state-${artifact.state === "ready" ? "ready" : "missing"}`} aria-hidden="true"></span>
+                <div><code>{artifact.path}</code><small>{artifact.role}</small></div>
+                <span>{supportLabels[artifact.state]}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+
+        <details class="receipt-details">
+          <summary>What the answer key needs <span>{annotationRequirements.length}</span></summary>
+          <ul>
+            {annotationRequirements.map((requirement) => (
+              <li>
+                <span class={`ledger-marker state-${requirement.status === "missing" ? "missing" : "planned"}`} aria-hidden="true"></span>
+                <div><strong>{requirement.label}</strong><small>{requirement.purpose}</small></div>
+                <span>{requirement.status === "missing" ? "Missing" : "Planned"}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </div>
+
+      <div class="protocol-strip" aria-label="Protocol decisions">
+        <div><span>Judgment</span><strong>The lines that matter</strong></div>
+        <div><span>Review</span><strong>{report.protocol.minimum_reviewers} blind reviewers + a tiebreaker</strong></div>
+        <div><span>When unsure</span><strong>Held back stays separate</strong></div>
+      </div>
     </div>
-
-    <div class="receipt-stack">
-      <article class="receipt-summary">
-        <span>Repository support</span>
-        <strong>{readyArtifacts}<small> / {artifactContract.length}</small></strong>
-        <p>{missingArtifacts} evidence paths still need real benchmark artifacts.</p>
-      </article>
-
-      <details class="receipt-details">
-        <summary>Artifact paths <span>{artifactContract.length}</span></summary>
-        <ul>
-          {artifactContract.map((artifact) => (
-            <li>
-              <span class={`ledger-marker state-${artifact.state === "ready" ? "ready" : "missing"}`} aria-hidden="true"></span>
-              <div><code>{artifact.path}</code><small>{artifact.role}</small></div>
-              <span>{supportLabels[artifact.state]}</span>
-            </li>
-          ))}
-        </ul>
-      </details>
-
-      <details class="receipt-details">
-        <summary>Gold evidence types <span>{annotationRequirements.length}</span></summary>
-        <ul>
-          {annotationRequirements.map((requirement) => (
-            <li>
-              <span class={`ledger-marker state-${requirement.status === "missing" ? "missing" : "planned"}`} aria-hidden="true"></span>
-              <div><strong>{requirement.label}</strong><small>{requirement.purpose}</small></div>
-              <span>{requirement.status === "missing" ? "Missing" : "Planned"}</span>
-            </li>
-          ))}
-        </ul>
-      </details>
-    </div>
-  </div>
-
-  <div class="protocol-strip" aria-label="Protocol decisions">
-    <div><span>Judgment</span><strong>Critical meaning preserved</strong></div>
-    <div><span>Review</span><strong>{report.protocol.minimum_reviewers} blinded reviewers + adjudication</strong></div>
-    <div><span>Abstention</span><strong>Withheld stays separate</strong></div>
   </div>
 </section>

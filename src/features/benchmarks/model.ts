@@ -42,21 +42,22 @@ export const statusLabels: Record<string, string> = {
 };
 
 export const roleLabels: Record<string, string> = {
-  subject: "1321 subject",
-  internal_control: "Internal control",
-  public_foil: "Public foil",
-  optional_baseline: "Optional baseline",
+  subject: "System under test",
+  internal_control: "Cold control",
+  public_foil: "Public tool",
+  optional_baseline: "Open baseline",
   control: "Control",
   hard: "Hard case",
 };
 
 export const tabs = [
-  { id: "evidence", label: "Evidence", icon: "◎" },
-  { id: "pack", label: "Test pack", icon: "▦" },
-  { id: "compare", label: "Compare", icon: "⇄" },
-  { id: "results", label: "Results", icon: "◫" },
-  { id: "methods", label: "Methods", icon: "⌁" },
-  { id: "receipts", label: "Receipts", icon: "↗" },
+  { id: "overview", label: "Overview", n: "00", color: "ink" },
+  { id: "evidence", label: "Evidence", n: "01", color: "coral" },
+  { id: "pack", label: "Test pack", n: "02", color: "citron" },
+  { id: "compare", label: "Compare", n: "03", color: "blue" },
+  { id: "results", label: "Results", n: "04", color: "lilac" },
+  { id: "methods", label: "Methods", n: "05", color: "teal" },
+  { id: "receipts", label: "Receipts", n: "06", color: "peach" },
 ] as const;
 
 export const sourcedClips = report.pack.clips.filter((clip) => clip.source !== null).length;
@@ -85,7 +86,7 @@ const subjectResult = subjectSystem ? resultBySystem.get(subjectSystem.id) : und
 
 export const heroValue = reportIsScored
   ? displayRate(subjectResult?.headline.critical_meaning.rate ?? null)
-  : "—";
+  : "";
 export const heroValueLabel = reportIsScored ? "Critical meaning preserved" : "Not measured";
 
 export const progressStages = [
@@ -144,7 +145,7 @@ export const workItems = [
     stateLabel: sourcedClips === report.pack.target_clip_count ? "Ready" : "Missing",
   },
   {
-    label: "Freeze gold and critical units",
+    label: "Lock the answer key and the key lines",
     meta: `${completeAnnotationFields} of ${totalAnnotationFields} clip checks complete`,
     state: goldReadyClips === report.pack.target_clip_count ? "ready" : "missing",
     stateLabel: goldReadyClips === report.pack.target_clip_count ? "Ready" : "Missing",

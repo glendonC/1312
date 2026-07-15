@@ -5,17 +5,17 @@ export const benchmarkCopy = {
   hypothesis:
     "On the same frozen Korean media, a prepared 1321 workflow should preserve more critical meaning than the same stack run cold and a dated YouTube auto-translation capture.",
   evidenceBoundary:
-    "This page currently describes the protocol and data contract. It does not contain benchmark results.",
+    "This page lays out the plan and the receipts. It does not contain benchmark results yet.",
   demoBoundary:
-    "The scored Studio replay is a synthetic, planted-error interface fixture. It is not a clip, run, or score in this pack.",
+    "The scored Studio replay is a synthetic, planted-error demo. It is not a clip, run, or score in this pack.",
   publicationRule:
-    "No ranks, deltas, or performance claims until real clips, frozen gold, raw system outputs, and reviewer labels exist.",
+    "No ranks, gaps, or performance claims until real clips, a frozen answer key, raw system outputs, and reviewer labels exist.",
 } as const;
 
 export const supportLabels: Record<SupportState, string> = {
   missing: "Missing",
   planned: "Planned",
-  "sample-only": "Sample shape",
+  "sample-only": "Example only",
   ready: "Ready",
 };
 

@@ -1,5 +1,5 @@
 ---
-import PanelHeader from "./PanelHeader.astro";
+import SectionLede from "./SectionLede.astro";
 import {
   displayNumber,
   displayRate,
@@ -11,6 +11,7 @@ import {
   resultBySystem,
   roleLabels,
 } from "./model";
+import { sectionCopy } from "./sections";
 ---
 
 <section
@@ -22,74 +23,73 @@ import {
   data-bench-panel="results"
   hidden
 >
-  <PanelHeader
-    index="04"
-    label="Results"
-    title="Headline outcome contract"
-    description="Headline outcomes compare systems. The four critical-unit states remain separate so restraint cannot masquerade as correctness."
-  />
+  <div class="section-split">
+    <SectionLede copy={sectionCopy.results} />
 
-  {!reportIsScored ? (
-    <div class="panel-split result-split">
-      <div class="empty-scorecard" role="note" aria-label="No benchmark result is measured">
-        <div class="empty-score-topline"><span>Headline result</span><span>Awaiting frozen evidence</span></div>
-        <strong aria-hidden="true">—</strong>
-        <h3>Not measured</h3>
-        <p>Results will appear here only after real sources, frozen gold, captured outputs, and blinded review exist.</p>
-        <div class="empty-outcome-track" aria-hidden="true"></div>
-        <span class="empty-track-label">No outcome proportions yet</span>
-        <dl>
-          <div><dt>Critical meaning</dt><dd>—</dd></div>
-          <div><dt>Catastrophic errors</dt><dd>—</dd></div>
-          <div><dt>Time to usable</dt><dd>—</dd></div>
-        </dl>
-      </div>
-
-      <div class="outcome-key" aria-label="How to interpret critical-unit outcomes">
-        {outcomeStates.map((outcome, index) => (
-          <article class={outcomeClass[outcome.id]}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <h3>{outcome.label}</h3>
-            <p>{outcome.definition}</p>
-          </article>
-        ))}
-      </div>
-    </div>
-  ) : (
-    <div class="scored-results" aria-label="Scored system results">
-      {report.systems.map((system) => {
-        const result = resultBySystem.get(system.id)!;
-        const outcomes = result.headline.critical_outcomes;
-        return (
-          <article class="result-card">
-            <header>
-              <div><span>{roleLabels[system.role] ?? system.role}</span><h3>{system.label}</h3></div>
-              <span class="state-chip state-measured"><span aria-hidden="true">●</span>Measured</span>
-            </header>
-            <div class="result-headlines">
-              <div><strong>{displayRate(result.headline.critical_meaning.rate)}</strong><span>Critical meaning</span></div>
-              <div><strong>{displayNumber(result.headline.catastrophic.count)}</strong><span>Catastrophic errors</span></div>
-              <div><strong>{displayNumber(result.headline.latency.first_usable_s, { maximumFractionDigits: 1 })}</strong><span>Seconds to usable</span></div>
-            </div>
-            <div
-              class="outcome-bar"
-              role="img"
-              aria-label={`${system.label}: ${displayNumber(outcomes.correct)} correct, ${displayNumber(outcomes.wrong)} wrong, ${displayNumber(outcomes.withheld)} withheld, ${displayNumber(outcomes.missing)} missing`}
-            >
-              <span class="outcome-correct" style={`width:${outcomePercent(outcomes.correct, outcomes.total)}`}></span>
-              <span class="outcome-wrong" style={`width:${outcomePercent(outcomes.wrong, outcomes.total)}`}></span>
-              <span class="outcome-withheld" style={`width:${outcomePercent(outcomes.withheld, outcomes.total)}`}></span>
-              <span class="outcome-missing" style={`width:${outcomePercent(outcomes.missing, outcomes.total)}`}></span>
-            </div>
-            <dl class="outcome-values">
-              <div class="outcome-correct"><dt>Correct</dt><dd>{displayNumber(outcomes.correct)}</dd></div>
-              <div class="outcome-wrong"><dt>Wrong</dt><dd>{displayNumber(outcomes.wrong)}</dd></div>
-              <div class="outcome-withheld"><dt>Withheld</dt><dd>{displayNumber(outcomes.withheld)}</dd></div>
-              <div class="outcome-missing"><dt>Missing</dt><dd>{displayNumber(outcomes.missing)}</dd></div>
+    <div class="section-body">
+      {!reportIsScored ? (
+        <>
+          <div class="empty-scorecard" role="note" aria-label="No benchmark result is measured">
+            <div class="empty-score-topline"><span>Lines that matter, preserved</span><span>Awaiting frozen evidence</span></div>
+            <span class="null-hero" aria-hidden="true"></span>
+            <h3>Not measured yet</h3>
+            <p>A single rate appears here only after real clips, a frozen answer key, captured outputs, and blind review exist.</p>
+            <div class="empty-outcome-track" aria-hidden="true"></div>
+            <span class="empty-track-label">No outcome split yet</span>
+            <dl>
+              <div><dt>Lines that matter</dt><dd><span class="null-mark" aria-hidden="true"></span></dd></div>
+              <div><dt>Serious errors shown</dt><dd><span class="null-mark" aria-hidden="true"></span></dd></div>
+              <div><dt>Time to first caption</dt><dd><span class="null-mark" aria-hidden="true"></span></dd></div>
             </dl>
-          </article>
-        );
-      })}
+          </div>
+
+          <div class="outcome-key" aria-label="How to read the four outcomes">
+            {outcomeStates.map((outcome, index) => (
+              <article class={outcomeClass[outcome.id]}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <h3>{outcome.label}</h3>
+                <p>{outcome.definition}</p>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div class="scored-results" aria-label="Scored system results">
+          {report.systems.map((system) => {
+            const result = resultBySystem.get(system.id)!;
+            const outcomes = result.headline.critical_outcomes;
+            return (
+              <article class="result-card">
+                <header>
+                  <div><span>{roleLabels[system.role] ?? system.role}</span><h3>{system.label}</h3></div>
+                  <span class="state-chip state-measured"><span aria-hidden="true">●</span>Measured</span>
+                </header>
+                <div class="result-headlines">
+                  <div><strong>{displayRate(result.headline.critical_meaning.rate)}</strong><span>Lines that matter</span></div>
+                  <div><strong>{displayNumber(result.headline.catastrophic.count)}</strong><span>Serious errors</span></div>
+                  <div><strong>{displayNumber(result.headline.latency.first_usable_s, { maximumFractionDigits: 1 })}</strong><span>Seconds to first caption</span></div>
+                </div>
+                <div
+                  class="outcome-bar"
+                  role="img"
+                  aria-label={`${system.label}: ${displayNumber(outcomes.correct)} shown & right, ${displayNumber(outcomes.wrong)} shown & wrong, ${displayNumber(outcomes.withheld)} held back, ${displayNumber(outcomes.missing)} missed`}
+                >
+                  <span class="outcome-correct" style={`width:${outcomePercent(outcomes.correct, outcomes.total)}`}></span>
+                  <span class="outcome-wrong" style={`width:${outcomePercent(outcomes.wrong, outcomes.total)}`}></span>
+                  <span class="outcome-withheld" style={`width:${outcomePercent(outcomes.withheld, outcomes.total)}`}></span>
+                  <span class="outcome-missing" style={`width:${outcomePercent(outcomes.missing, outcomes.total)}`}></span>
+                </div>
+                <dl class="outcome-values">
+                  <div class="outcome-correct"><dt>Shown &amp; right</dt><dd>{displayNumber(outcomes.correct)}</dd></div>
+                  <div class="outcome-wrong"><dt>Shown &amp; wrong</dt><dd>{displayNumber(outcomes.wrong)}</dd></div>
+                  <div class="outcome-withheld"><dt>Held back</dt><dd>{displayNumber(outcomes.withheld)}</dd></div>
+                  <div class="outcome-missing"><dt>Missed</dt><dd>{displayNumber(outcomes.missing)}</dd></div>
+                </dl>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
-  )}
+  </div>
 </section>

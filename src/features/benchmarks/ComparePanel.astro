@@ -1,6 +1,7 @@
 ---
-import PanelHeader from "./PanelHeader.astro";
+import SectionLede from "./SectionLede.astro";
 import { comparisonNotes, report, resultBySystem, roleLabels, statusLabels } from "./model";
+import { sectionCopy } from "./sections";
 ---
 
 <section
@@ -12,51 +13,48 @@ import { comparisonNotes, report, resultBySystem, roleLabels, statusLabels } fro
   data-bench-panel="compare"
   hidden
 >
-  <PanelHeader
-    index="03"
-    label="Compare"
-    title="Comparison conditions"
-    description="Versions, inputs, and capture dates stay visible so a comparison never hides what changed."
-  />
+  <div class="section-split">
+    <SectionLede copy={sectionCopy.compare} />
 
-  <div class="same-reel-rule">
-    <span>Same frozen clips</span>
-    <span aria-hidden="true">──────────────────</span>
-    <span>Different allowed inputs</span>
-  </div>
+    <div class="section-body">
+      <div class="same-reel-rule">
+        <span>Same frozen clips</span>
+        <span aria-hidden="true">──────────────────</span>
+        <span>Different allowed inputs</span>
+      </div>
 
-  <div class="panel-split compare-split">
-    <div class="condition-board" aria-label="Planned comparison conditions">
-      {report.systems.map((system, index) => {
-        const result = resultBySystem.get(system.id);
-        const measured = result?.status === "scored";
-        return (
-          <article data-system-role={system.role}>
-            <div class="condition-topline">
-              <span>[{String(index + 1).padStart(2, "0")}]</span>
-              <span class:list={["state-chip", measured ? "state-measured" : "state-planned"]}>
-                <span aria-hidden="true">{measured ? "●" : "○"}</span>
-                {measured ? "Measured" : statusLabels[system.status] ?? system.status}
-              </span>
-            </div>
-            <span class="condition-role">{roleLabels[system.role] ?? system.role}{system.required ? " · required" : " · optional"}</span>
-            <h3>{system.label}</h3>
-            <ul class="tag-list" aria-label={`${system.label} allowed inputs`}>
-              {system.input_modalities.map((input) => <li>{input.replaceAll("-", " ")}</li>)}
-            </ul>
-            <p>{system.version ?? "Version not pinned"}<span>{system.capture_date ?? "No capture date"}</span></p>
+      <div class="condition-board" aria-label="Planned comparison conditions">
+        {report.systems.map((system, index) => {
+          const result = resultBySystem.get(system.id);
+          const measured = result?.status === "scored";
+          return (
+            <article data-system-role={system.role}>
+              <div class="condition-topline">
+                <span>[{String(index + 1).padStart(2, "0")}]</span>
+                <span class:list={["state-chip", measured ? "state-measured" : "state-planned"]}>
+                  <span aria-hidden="true">{measured ? "●" : "○"}</span>
+                  {measured ? "Measured" : statusLabels[system.status] ?? system.status}
+                </span>
+              </div>
+              <span class="condition-role">{roleLabels[system.role] ?? system.role}{system.required ? " · required" : " · optional"}</span>
+              <h3>{system.label}</h3>
+              <ul class="tag-list" aria-label={`${system.label} allowed inputs`}>
+                {system.input_modalities.map((input) => <li>{input.replaceAll("-", " ")}</li>)}
+              </ul>
+              <p>{system.version ?? "Version not pinned"}<span>{system.capture_date ?? "No capture date"}</span></p>
+            </article>
+          );
+        })}
+      </div>
+
+      <div class="comparison-notes" aria-label="Why these conditions are compared">
+        {comparisonNotes.map((note) => (
+          <article>
+            <span>{note.index}</span>
+            <div><h3>{note.title}</h3><p>{note.copy}</p></div>
           </article>
-        );
-      })}
-    </div>
-
-    <div class="comparison-notes" aria-label="Why these conditions are compared">
-      {comparisonNotes.map((note) => (
-        <article>
-          <span>{note.index}</span>
-          <div><h3>{note.title}</h3><p>{note.copy}</p></div>
-        </article>
-      ))}
+        ))}
+      </div>
     </div>
   </div>
 </section>

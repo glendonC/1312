@@ -1,0 +1,19 @@
+---
+import type { SectionCopy } from "./sections";
+
+interface Props {
+  copy: SectionCopy;
+  /** overview uses the largest title treatment */
+  size?: "hero" | "section";
+}
+
+const { copy, size = "section" } = Astro.props;
+---
+
+<div class:list={["section-lede", `is-${size}`]}>
+  <div class="section-head">
+    <h2 class="section-title">{copy.title}</h2>
+    <p class="section-summary">{copy.lede}</p>
+    <p class="section-summary is-secondary">{copy.secondary}</p>
+  </div>
+</div>

@@ -628,7 +628,7 @@ semantics without updating this contract with the UIUX owner.
 | Main Studio loads `run-006` | `src/pages/studio/index.astro` |
 | Main Studio uses replay transport | `src/studio/StudioApp.tsx`, `src/studio/store.ts`, `src/studio/transport.ts` |
 | Submitted source is recorded-preview-only | `src/studio/previewSession.ts`, `src/studio/StudioApp.tsx` |
-| Product owned-source path, forecast/status regions, and production fact selectors | `src/studio/localRuntime/ProductLocalRuntime.tsx` |
+| Product owned-source path, forecast/status regions, and production fact selectors | `src/studio/localRuntime/ProductLocalRuntime.tsx`, `src/studio/localRuntime/productProductionFacts.tsx` |
 | Browser-owned ingest composition and progress protocol | `src/studio/runtime/production/runtimeHost/ownedMediaIngest.ts`, `src/studio/localRuntime/client.ts` |
 | Range and output controls | `src/studio/preflight/ConfirmationForm.tsx` |
 | Changed ranges/options cannot replay | `src/studio/preflight/model.ts` |

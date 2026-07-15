@@ -405,11 +405,48 @@ if (existsSync(reviewsDir)) {
 const packClips = [];
 const freezes = [];
 const packById = new Map();
+let looseGoldCandidates = 0;
 if (existsSync(packsDir)) {
   for (const entry of readdirSync(packsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const packDir = join(packsDir, entry.name);
-    const pack = validatePack(await readJsonFile(join(packDir, "pack.json"), `pack ${entry.name}`), `pack ${entry.name}`);
+    const packPath = join(packDir, "pack.json");
+    if (!existsSync(packPath)) {
+      const jsonEntries = readdirSync(packDir, { withFileTypes: true }).filter(
+        (candidate) => candidate.isFile() && candidate.name.endsWith(".json"),
+      );
+      assert(jsonEntries.length > 0, `candidate-only pack directory ${entry.name} contains no JSON candidates`);
+      assert(
+        jsonEntries.every((candidate) => candidate.name.endsWith(".gold.json")),
+        `candidate-only pack directory ${entry.name} contains non-gold JSON without pack.json`,
+      );
+      const clipIds = new Set();
+      for (const candidate of jsonEntries) {
+        const context = `candidate-only gold ${entry.name}/${candidate.name}`;
+        const gold = await validateGold(await readJsonFile(join(packDir, candidate.name), context), context);
+        assert(gold.pack_id === entry.name, `${context} names pack ${gold.pack_id}`);
+        assert(!clipIds.has(gold.clip_id), `${context} duplicates clip ${gold.clip_id}`);
+        clipIds.add(gold.clip_id);
+        if (gold.mined_from !== null) {
+          await verifiedBinding(gold.mined_from, ROOT, `${context} mined_from`);
+          const source = manifests.find(({ path }) => path === join(ROOT, gold.mined_from.path));
+          assert(source, `${context} names an undiscovered candidates manifest`);
+          assert(source.manifest.routing.route === "gold", `${context} was not mined from a gold-routed manifest`);
+          assert(source.manifest.clip.id === gold.clip_id, `${context} and its candidates manifest name different clips`);
+          const expectedWindows = new Set(
+            source.manifest.candidates.map((unit) => `${unit.t_start}\0${unit.t_end}`),
+          );
+          const heldWindows = new Set(gold.units.map((unit) => `${unit.t_start}\0${unit.t_end}`));
+          assert(
+            heldWindows.size === expectedWindows.size && [...heldWindows].every((window) => expectedWindows.has(window)),
+            `${context} does not contain every mined window exactly once`,
+          );
+        }
+        looseGoldCandidates += 1;
+      }
+      continue;
+    }
+    const pack = validatePack(await readJsonFile(packPath, `pack ${entry.name}`), `pack ${entry.name}`);
     assert(pack.pack_id === entry.name, `pack directory ${entry.name} holds pack ${pack.pack_id}`);
     assert(
       !(pack.freeze_receipt === null && existsSync(join(packDir, "freeze.json"))),
@@ -583,7 +620,7 @@ scoreEverythingCheck({ freezes, captures, scores });
 
 const goldRouted = manifests.filter(({ manifest }) => manifest.routing.route === "gold").length;
 console.log(
-  `conveyor check passed: ${manifests.length} candidates manifest(s) (${goldRouted} routed gold), ${adjudicationCount} adjudication receipt(s), ${packClips.length} pack clip(s), ${freezes.length} frozen pack(s), ${scores.length} score receipt(s), ${ledger.proposals.length} memory proposal(s) clean`,
+  `conveyor check passed: ${manifests.length} candidates manifest(s) (${goldRouted} routed gold), ${looseGoldCandidates} candidate-only gold file(s), ${adjudicationCount} adjudication receipt(s), ${packClips.length} pack clip(s), ${freezes.length} frozen pack(s), ${scores.length} score receipt(s), ${ledger.proposals.length} memory proposal(s) clean`,
 );
 
 /* ------------------------------------------------------- fail-closed drills */

@@ -59,13 +59,6 @@ function seconds(milliseconds: number): string {
   return `${(milliseconds / 1_000).toFixed(3).replace(/\.?(?:0+)$/, "")}s`;
 }
 
-function scopeSummary(scopes: ProductionStudioGrantView["mediaScope"]): string {
-  if (scopes.length === 0) return "No media scope granted";
-  return scopes
-    .map((scope) => `${scope.artifactId} · ${scope.trackId} [${scope.startMs}, ${scope.endMs}) ms`)
-    .join("; ");
-}
-
 type ProductionIdentityKind = "task" | "worker" | "operation" | "execution" | "artifact" | "report";
 
 function productionIdentityTarget(kind: ProductionIdentityKind, identity: string): string {
@@ -92,8 +85,59 @@ function ProductionIdentityLink({
   );
 }
 
+function ProductionArtifactReference({
+  identity,
+  renderedArtifactIds,
+}: {
+  identity: string;
+  renderedArtifactIds: ReadonlySet<string>;
+}) {
+  return renderedArtifactIds.has(identity)
+    ? <ProductionIdentityLink kind="artifact" identity={identity} />
+    : <>{identity}</>;
+}
+
+function ProductionArtifactList({
+  identities,
+  renderedArtifactIds,
+  empty,
+}: {
+  identities: readonly string[];
+  renderedArtifactIds: ReadonlySet<string>;
+  empty: string;
+}) {
+  if (identities.length === 0) return <>{empty}</>;
+  return identities.map((identity, index) => (
+    <span key={identity}>
+      {index > 0 ? ", " : null}
+      <ProductionArtifactReference identity={identity} renderedArtifactIds={renderedArtifactIds} />
+    </span>
+  ));
+}
+
+function ProductionScopeSummary({
+  scopes,
+  renderedArtifactIds,
+}: {
+  scopes: ProductionStudioGrantView["mediaScope"];
+  renderedArtifactIds: ReadonlySet<string>;
+}) {
+  if (scopes.length === 0) return <>No media scope granted</>;
+  return scopes.map((scope, index) => (
+    <span key={`${scope.artifactId}:${scope.trackId}:${scope.startMs}:${scope.endMs}`}>
+      {index > 0 ? "; " : null}
+      <ProductionArtifactReference identity={scope.artifactId} renderedArtifactIds={renderedArtifactIds} />
+      {` · ${scope.trackId} [${scope.startMs}, ${scope.endMs}) ms`}
+    </span>
+  ));
+}
+
 function ProductionJournalFacts({ projection }: { projection: ProductionStudioProjection }) {
   const outputArtifactIds = new Set(projection.outputArtifacts.map((artifact) => artifact.artifactId));
+  const renderedArtifactIds = new Set([
+    ...projection.sourceArtifacts.map((artifact) => artifact.artifactId),
+    ...outputArtifactIds,
+  ]);
   const operationIds = new Set(projection.operations.map((operation) => operation.operationId));
   const executionIds = new Set(
     projection.workers.flatMap((worker) => worker.execution ? [worker.execution.id] : []),
@@ -109,11 +153,45 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
         <span>Validated production adapter · never added to RunBundle</span>
         <h3 id="product-runtime-production-title">Production task and handoff facts</h3>
         <p>
-          Latest validated journal facts, including scheduler decisions and output lineage. They
-          are recorded production evidence, not a presence signal, progress estimate, or replay
-          topology.
+          Latest validated journal facts, including source identity, scheduler decisions, and
+          output lineage. They are recorded production evidence, not a presence signal, progress
+          estimate, or replay topology.
         </p>
       </header>
+
+      <section
+        data-production-region="source-artifacts"
+        aria-labelledby="product-runtime-source-artifacts-title"
+      >
+        <h4 id="product-runtime-source-artifacts-title">Source artifacts</h4>
+        {projection.sourceArtifacts.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="source-artifacts">
+            Unavailable until an ingest-origin <code>artifact.recorded</code> event is validated.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.sourceArtifacts.map((artifact) => (
+              <article
+                key={artifact.artifactId}
+                id={productionIdentityTarget("artifact", artifact.artifactId)}
+                data-production-source-artifact-id={artifact.artifactId}
+              >
+                <header><h5>{artifact.kind}</h5><span>{artifact.mediaClass}</span></header>
+                <dl>
+                  <div><dt>Artifact</dt><dd>{artifact.artifactId}</dd></div>
+                  <div><dt>Content</dt><dd>{artifact.contentId} · {artifact.bytes} bytes</dd></div>
+                  <div>
+                    <dt>Duration</dt>
+                    <dd>{artifact.durationMs === null ? "Unavailable in the validated artifact" : `${artifact.durationMs} ms`}</dd>
+                  </div>
+                  <div><dt>Tracks</dt><dd>{artifact.trackCount}</dd></div>
+                  <div><dt>Publication</dt><dd>{artifact.publication}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section aria-labelledby="product-runtime-tasks-title">
         <h4 id="product-runtime-tasks-title">Production tasks</h4>
@@ -137,6 +215,25 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div><dt>Assigned worker</dt><dd>{task.assignedAgentId}</dd></div>
                   <div><dt>Registered owner</dt><dd>{task.ownerAgentId ?? "Unavailable until agent registration"}</dd></div>
                   <div><dt>Parent task</dt><dd>{task.parentTaskId ?? "Root task"}</dd></div>
+                  <div>
+                    <dt>Input artifacts</dt>
+                    <dd>
+                      <ProductionArtifactList
+                        identities={task.inputArtifactIds}
+                        renderedArtifactIds={renderedArtifactIds}
+                        empty="None in task contract"
+                      />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Media scope</dt>
+                    <dd>
+                      <ProductionScopeSummary
+                        scopes={task.mediaScope}
+                        renderedArtifactIds={renderedArtifactIds}
+                      />
+                    </dd>
+                  </div>
                   <div><dt>Dependencies</dt><dd>{task.dependencies.join(", ") || "None in task contract"}</dd></div>
                   <div>
                     <dt>Required outputs</dt>
@@ -189,8 +286,25 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                     <div><dt>Requested worker kind</dt><dd>{spawn.workerKind}</dd></div>
                     <div><dt>Workload key</dt><dd>{spawn.workloadKey}</dd></div>
                     <div><dt>Requested capabilities</dt><dd>{spawn.requiredCapabilities.join(", ") || "None in request contract"}</dd></div>
-                    <div><dt>Requested media scope</dt><dd>{scopeSummary(spawn.mediaScope)}</dd></div>
-                    <div><dt>Requested input artifacts</dt><dd>{spawn.inputArtifactIds.join(", ") || "None in request contract"}</dd></div>
+                    <div>
+                      <dt>Requested media scope</dt>
+                      <dd>
+                        <ProductionScopeSummary
+                          scopes={spawn.mediaScope}
+                          renderedArtifactIds={renderedArtifactIds}
+                        />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Requested input artifacts</dt>
+                      <dd>
+                        <ProductionArtifactList
+                          identities={spawn.inputArtifactIds}
+                          renderedArtifactIds={renderedArtifactIds}
+                          empty="None in request contract"
+                        />
+                      </dd>
+                    </div>
                     <div>
                       <dt>Required outputs</dt>
                       <dd>
@@ -264,7 +378,15 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                 <dl>
                   <div><dt>Grant</dt><dd>{grant.grantId}</dd></div>
                   <div><dt>Task / worker</dt><dd>{grant.taskId} / {grant.agentId}</dd></div>
-                  <div><dt>Enforced scope</dt><dd>{scopeSummary(grant.mediaScope)}</dd></div>
+                  <div>
+                    <dt>Enforced scope</dt>
+                    <dd>
+                      <ProductionScopeSummary
+                        scopes={grant.mediaScope}
+                        renderedArtifactIds={renderedArtifactIds}
+                      />
+                    </dd>
+                  </div>
                 </dl>
               </article>
             ))}
@@ -299,9 +421,10 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div>
                     <dt>Input artifact</dt>
                     <dd>
-                      {outputArtifactIds.has(operation.inputArtifactId) ? (
-                        <ProductionIdentityLink kind="artifact" identity={operation.inputArtifactId} />
-                      ) : operation.inputArtifactId}
+                      <ProductionArtifactReference
+                        identity={operation.inputArtifactId}
+                        renderedArtifactIds={renderedArtifactIds}
+                      />
                     </dd>
                   </div>
                   <div><dt>Track</dt><dd>{operation.trackId}</dd></div>
@@ -309,9 +432,12 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div>
                     <dt>Output artifact</dt>
                     <dd>
-                      {operation.outputArtifactId && outputArtifactIds.has(operation.outputArtifactId) ? (
-                        <ProductionIdentityLink kind="artifact" identity={operation.outputArtifactId} />
-                      ) : operation.outputArtifactId ?? "Unavailable until media.operation_completed is validated"}
+                      {operation.outputArtifactId ? (
+                        <ProductionArtifactReference
+                          identity={operation.outputArtifactId}
+                          renderedArtifactIds={renderedArtifactIds}
+                        />
+                      ) : "Unavailable until media.operation_completed is validated"}
                     </dd>
                   </div>
                   <div><dt>Receipt</dt><dd>{operation.receiptId ?? "Unavailable until media.operation_completed is validated"}</dd></div>
@@ -372,16 +498,11 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                     <div>
                       <dt>Upstream artifacts</dt>
                       <dd>
-                        {artifact.sourceArtifactIds.length === 0
-                          ? "No upstream artifact ids recorded"
-                          : artifact.sourceArtifactIds.map((sourceId, index) => (
-                            <span key={sourceId}>
-                              {index > 0 ? ", " : null}
-                              {outputArtifactIds.has(sourceId) ? (
-                                <ProductionIdentityLink kind="artifact" identity={sourceId} />
-                              ) : sourceId}
-                            </span>
-                          ))}
+                        <ProductionArtifactList
+                          identities={artifact.sourceArtifactIds}
+                          renderedArtifactIds={renderedArtifactIds}
+                          empty="No upstream artifact ids recorded"
+                        />
                       </dd>
                     </div>
                     <div>
@@ -430,14 +551,11 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div>
                     <dt>Output artifacts</dt>
                     <dd>
-                      {report.outputArtifactIds.map((artifactId, index) => (
-                        <span key={artifactId}>
-                          {index > 0 ? ", " : null}
-                          {outputArtifactIds.has(artifactId) ? (
-                            <ProductionIdentityLink kind="artifact" identity={artifactId} />
-                          ) : artifactId}
-                        </span>
-                      ))}
+                      <ProductionArtifactList
+                        identities={report.outputArtifactIds}
+                        renderedArtifactIds={renderedArtifactIds}
+                        empty="No output artifact ids recorded"
+                      />
                     </dd>
                   </div>
                   <div><dt>Decision reason</dt><dd>{report.decisionReason ?? "Unavailable until report.decided is validated"}</dd></div>

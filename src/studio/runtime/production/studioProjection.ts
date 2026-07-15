@@ -132,6 +132,17 @@ export type ProductionStudioOutputArtifactOrigin =
       receiptContentId: string;
     };
 
+export interface ProductionStudioSourceArtifactView {
+  artifactId: string;
+  kind: string;
+  mediaClass: "raw";
+  publication: "private" | "public";
+  contentId: string;
+  bytes: number;
+  durationMs: number | null;
+  trackCount: number;
+}
+
 export interface ProductionStudioOutputArtifactView {
   artifactId: string;
   kind: string;
@@ -161,6 +172,7 @@ export interface ProductionStudioProjection {
   reports: ProductionStudioReportView[];
   spawnRequests: ProductionStudioSpawnView[];
   operations: ProductionStudioOperationView[];
+  sourceArtifacts: ProductionStudioSourceArtifactView[];
   outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
@@ -170,6 +182,7 @@ export interface ProductionStudioProjection {
     reports: number;
     spawnRequests: number;
     operations: number;
+    sourceArtifacts: number;
     outputArtifacts: number;
   };
 }
@@ -261,6 +274,31 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       failure: operation.failure,
     }))
     .sort((left, right) => left.operationId.localeCompare(right.operationId));
+
+  const sourceArtifacts = Object.values(state.artifacts)
+    .filter((artifact) => artifact.origin.kind === "ingest")
+    .map((artifact): ProductionStudioSourceArtifactView => {
+      if (artifact.origin.kind !== "ingest") {
+        throw new Error(`Production Studio projection: source artifact ${artifact.id} has a non-ingest origin`);
+      }
+      if (artifact.mediaClass !== "raw") {
+        throw new Error(`Production Studio projection: source artifact ${artifact.id} is not raw media`);
+      }
+      if (artifact.producerTaskId !== null || artifact.producerAgentId !== null) {
+        throw new Error(`Production Studio projection: source artifact ${artifact.id} claims a task producer`);
+      }
+      return {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        mediaClass: artifact.mediaClass,
+        publication: artifact.publication,
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        durationMs: artifact.durationMs,
+        trackCount: artifact.tracks.length,
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
 
   const outputArtifacts = Object.values(state.artifacts)
     .filter((artifact) => artifact.origin.kind !== "ingest")
@@ -354,6 +392,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     reports,
     spawnRequests,
     operations,
+    sourceArtifacts,
     outputArtifacts,
     counts: {
       tasks: tasks.length,
@@ -363,6 +402,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       reports: reports.length,
       spawnRequests: spawnRequests.length,
       operations: operations.length,
+      sourceArtifacts: sourceArtifacts.length,
       outputArtifacts: outputArtifacts.length,
     },
   };

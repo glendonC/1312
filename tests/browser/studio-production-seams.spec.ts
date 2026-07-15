@@ -32,6 +32,25 @@ test("production operation absence and artifact identity hooks stay honest", asy
   test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
 
   const production = await openCompletedDeterministicProjection(page);
+  const sourceRegion = production.locator('[data-production-region="source-artifacts"]');
+  await expect(sourceRegion.getByRole("heading", { name: "Source artifacts" })).toBeVisible();
+  await expect(sourceRegion.locator('[data-production-empty="source-artifacts"]')).toHaveCount(0);
+  const sourceArtifact = sourceRegion.locator("[data-production-source-artifact-id]");
+  await expect(sourceArtifact).toHaveCount(1);
+  const sourceArtifactId = await sourceArtifact.getAttribute("data-production-source-artifact-id");
+  expect(sourceArtifactId).toBeTruthy();
+  const sourceLinks = production.locator(
+    `[data-production-navigation="artifact"][data-production-target-id="${sourceArtifactId}"]`,
+  );
+  await expect(sourceLinks).toHaveCount(3);
+  for (const link of await sourceLinks.all()) {
+    const href = await link.getAttribute("href");
+    expect(href).toBe(`#product-production-artifact-${sourceArtifactId}`);
+    expect(
+      await page.evaluate((target) => Boolean(target && document.getElementById(target.slice(1))), href),
+    ).toBe(true);
+  }
+
   await expect(production.locator('[data-production-region="operations"]')).toBeVisible();
   await expect(production.getByRole("heading", { name: "Production operations" })).toBeVisible();
   await expect(production.locator('[data-production-empty="operations"]')).toContainText(
@@ -61,4 +80,8 @@ test("production operation absence and artifact identity hooks stay honest", asy
   const taskHref = await taskLink.getAttribute("href");
   await taskLink.click();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(taskHref);
+
+  const sourceHref = await sourceLinks.first().getAttribute("href");
+  await sourceLinks.first().click();
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(sourceHref);
 });

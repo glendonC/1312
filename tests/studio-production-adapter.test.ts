@@ -414,6 +414,7 @@ test("production adapter projects spawn and output lineage with existing facts o
     reports: 1,
     spawnRequests: 1,
     operations: 0,
+    sourceArtifacts: 0,
     outputArtifacts: 1,
   });
   assert.deepEqual(
@@ -497,6 +498,17 @@ test("production adapter projects only validated media operation identities and 
   const completed = projectProductionRuntimeJournal(operationJournal());
 
   assert.equal(completed.counts.operations, 1);
+  assert.equal(completed.counts.sourceArtifacts, 1);
+  assert.deepEqual(completed.sourceArtifacts, [{
+    artifactId: SOURCE_ARTIFACT_ID,
+    kind: "owned-source",
+    mediaClass: "raw",
+    publication: "private",
+    contentId: `sha256:${"c".repeat(64)}`,
+    bytes: 1_000,
+    durationMs: 5_000,
+    trackCount: 1,
+  }]);
   assert.deepEqual(completed.operations, [{
     operationId: OPERATION_ID,
     capability: "media.extract",
@@ -513,6 +525,13 @@ test("production adapter projects only validated media operation identities and 
     receiptId: "receipt:authorized-extract",
     failure: null,
   }]);
+
+  const unavailableDuration = structuredClone(operationJournal()[0]) as {
+    data: { artifact: { durationMs: number | null } };
+  };
+  unavailableDuration.data.artifact.durationMs = null;
+  const sourceOnly = projectProductionRuntimeJournal([unavailableDuration]);
+  assert.equal(sourceOnly.sourceArtifacts[0].durationMs, null);
 
   const adapter = new ProductionStudioAdapter(RUN_ID);
   const started = adapter.appendBatch(operationJournal().slice(0, 5));
@@ -581,4 +600,18 @@ test("production adapter applies a poll batch atomically and keeps the last vali
     /grant identities must be unique across tasks/,
   );
   assert.deepEqual(adapter.view(), accepted);
+
+  const sourceAdapter = new ProductionStudioAdapter(RUN_ID);
+  const sourceThenGap = structuredClone(operationJournal().slice(0, 2)) as Array<{
+    seq: number;
+    eventId: string;
+  }>;
+  sourceThenGap[1].seq = 99;
+  sourceThenGap[1].eventId = `event:${RUN_ID}:99`;
+  assert.throws(
+    () => sourceAdapter.appendBatch(sourceThenGap),
+    /sequence expected 2, received 99/,
+  );
+  assert.equal(sourceAdapter.view().lastSeq, 0);
+  assert.deepEqual(sourceAdapter.view().sourceArtifacts, []);
 });

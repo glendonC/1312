@@ -101,6 +101,23 @@ export interface ProductionStudioSpawnView {
   agentId: string | null;
 }
 
+export interface ProductionStudioOperationView {
+  operationId: string;
+  capability: "media.extract" | "media.seek";
+  status: "started" | "completed" | "failed";
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  inputArtifactId: string;
+  trackId: string;
+  startMs: number;
+  endMs: number;
+  requestedDurationMs: number;
+  outputArtifactId: string | null;
+  receiptId: string | null;
+  failure: string | null;
+}
+
 export type ProductionStudioOutputArtifactOrigin =
   | {
       kind: "media_operation" | "media_observation";
@@ -143,6 +160,7 @@ export interface ProductionStudioProjection {
   grants: ProductionStudioGrantView[];
   reports: ProductionStudioReportView[];
   spawnRequests: ProductionStudioSpawnView[];
+  operations: ProductionStudioOperationView[];
   outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
@@ -151,6 +169,7 @@ export interface ProductionStudioProjection {
     executions: number;
     reports: number;
     spawnRequests: number;
+    operations: number;
     outputArtifacts: number;
   };
 }
@@ -223,6 +242,25 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       agentId: request.agentId,
     }))
     .sort((left, right) => left.requestId.localeCompare(right.requestId));
+
+  const operations = Object.values(state.operations)
+    .map((operation): ProductionStudioOperationView => ({
+      operationId: operation.id,
+      capability: operation.capability,
+      status: operation.status,
+      taskId: operation.taskId,
+      agentId: operation.agentId,
+      grantId: operation.grantId,
+      inputArtifactId: operation.artifactId,
+      trackId: operation.trackId,
+      startMs: operation.startMs,
+      endMs: operation.endMs,
+      requestedDurationMs: operation.endMs - operation.startMs,
+      outputArtifactId: operation.outputArtifactId,
+      receiptId: operation.receiptId,
+      failure: operation.failure,
+    }))
+    .sort((left, right) => left.operationId.localeCompare(right.operationId));
 
   const outputArtifacts = Object.values(state.artifacts)
     .filter((artifact) => artifact.origin.kind !== "ingest")
@@ -315,6 +353,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     grants,
     reports,
     spawnRequests,
+    operations,
     outputArtifacts,
     counts: {
       tasks: tasks.length,
@@ -323,6 +362,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       executions: Object.keys(state.executions).length,
       reports: reports.length,
       spawnRequests: spawnRequests.length,
+      operations: operations.length,
       outputArtifacts: outputArtifacts.length,
     },
   };

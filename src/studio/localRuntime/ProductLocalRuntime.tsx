@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { initialRequest, type AnalysisRequest } from "../preflight/model";
 import type {
@@ -66,7 +66,39 @@ function scopeSummary(scopes: ProductionStudioGrantView["mediaScope"]): string {
     .join("; ");
 }
 
+type ProductionIdentityKind = "task" | "worker" | "operation" | "execution" | "artifact" | "report";
+
+function productionIdentityTarget(kind: ProductionIdentityKind, identity: string): string {
+  return `product-production-${kind}-${identity}`;
+}
+
+function ProductionIdentityLink({
+  kind,
+  identity,
+  children,
+}: {
+  kind: ProductionIdentityKind;
+  identity: string;
+  children?: ReactNode;
+}) {
+  return (
+    <a
+      href={`#${productionIdentityTarget(kind, identity)}`}
+      data-production-navigation={kind}
+      data-production-target-id={identity}
+    >
+      {children ?? identity}
+    </a>
+  );
+}
+
 function ProductionJournalFacts({ projection }: { projection: ProductionStudioProjection }) {
+  const outputArtifactIds = new Set(projection.outputArtifacts.map((artifact) => artifact.artifactId));
+  const operationIds = new Set(projection.operations.map((operation) => operation.operationId));
+  const executionIds = new Set(
+    projection.workers.flatMap((worker) => worker.execution ? [worker.execution.id] : []),
+  );
+
   return (
     <section
       className="product-runtime-production"
@@ -92,7 +124,12 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
         ) : (
           <div className="product-runtime-fact-list">
             {projection.tasks.map((task) => (
-              <article key={task.taskId} data-production-task-id={task.taskId} data-status={task.status}>
+              <article
+                key={task.taskId}
+                id={productionIdentityTarget("task", task.taskId)}
+                data-production-task-id={task.taskId}
+                data-status={task.status}
+              >
                 <header><h5>{task.label}</h5><span>{task.status}</span></header>
                 <p>{task.objective}</p>
                 <dl>
@@ -182,7 +219,12 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
         ) : (
           <div className="product-runtime-fact-list">
             {projection.workers.map((worker) => (
-              <article key={worker.agentId} data-production-worker-id={worker.agentId} data-status={worker.status}>
+              <article
+                key={worker.agentId}
+                id={productionIdentityTarget("worker", worker.agentId)}
+                data-production-worker-id={worker.agentId}
+                data-status={worker.status}
+              >
                 <header><h5>{worker.label}</h5><span>{worker.status}</span></header>
                 <dl>
                   <div><dt>Worker</dt><dd>{worker.agentId}</dd></div>
@@ -190,6 +232,17 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div><dt>Kind</dt><dd>{worker.kind}</dd></div>
                   <div><dt>Parent worker</dt><dd>{worker.parentAgentId ?? "Root worker"}</dd></div>
                   <div><dt>Journal task status</dt><dd>{worker.taskStatus}</dd></div>
+                  {worker.execution ? (
+                    <div>
+                      <dt>Latest execution</dt>
+                      <dd
+                        id={productionIdentityTarget("execution", worker.execution.id)}
+                        data-production-execution-id={worker.execution.id}
+                      >
+                        {worker.execution.id}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
               </article>
             ))}
@@ -220,6 +273,57 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
       </section>
 
       <section
+        data-production-region="operations"
+        aria-labelledby="product-runtime-operations-title"
+      >
+        <h4 id="product-runtime-operations-title">Production operations</h4>
+        {projection.operations.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="operations">
+            Unavailable until a <code>media.operation_started</code> event is validated. The
+            bounded worker proof does not run a media operation.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.operations.map((operation) => (
+              <article
+                key={operation.operationId}
+                id={productionIdentityTarget("operation", operation.operationId)}
+                data-production-operation-id={operation.operationId}
+                data-status={operation.status}
+              >
+                <header><h5>{operation.capability}</h5><span>{operation.status}</span></header>
+                <dl>
+                  <div><dt>Operation</dt><dd>{operation.operationId}</dd></div>
+                  <div><dt>Task / worker</dt><dd>{operation.taskId} / {operation.agentId}</dd></div>
+                  <div><dt>Grant</dt><dd>{operation.grantId}</dd></div>
+                  <div>
+                    <dt>Input artifact</dt>
+                    <dd>
+                      {outputArtifactIds.has(operation.inputArtifactId) ? (
+                        <ProductionIdentityLink kind="artifact" identity={operation.inputArtifactId} />
+                      ) : operation.inputArtifactId}
+                    </dd>
+                  </div>
+                  <div><dt>Track</dt><dd>{operation.trackId}</dd></div>
+                  <div><dt>Requested range</dt><dd>[{operation.startMs}, {operation.endMs}) ms · {operation.requestedDurationMs} ms</dd></div>
+                  <div>
+                    <dt>Output artifact</dt>
+                    <dd>
+                      {operation.outputArtifactId && outputArtifactIds.has(operation.outputArtifactId) ? (
+                        <ProductionIdentityLink kind="artifact" identity={operation.outputArtifactId} />
+                      ) : operation.outputArtifactId ?? "Unavailable until media.operation_completed is validated"}
+                    </dd>
+                  </div>
+                  <div><dt>Receipt</dt><dd>{operation.receiptId ?? "Unavailable until media.operation_completed is validated"}</dd></div>
+                  <div><dt>Failure</dt><dd>{operation.failure ?? (operation.status === "failed" ? "Failure reason unavailable" : "Not recorded")}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
         data-production-region="output-artifacts"
         aria-labelledby="product-runtime-output-artifacts-title"
       >
@@ -237,19 +341,62 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
               return (
                 <article
                   key={artifact.artifactId}
+                  id={productionIdentityTarget("artifact", artifact.artifactId)}
                   data-production-output-artifact-id={artifact.artifactId}
                   data-origin-kind={artifact.origin.kind}
                 >
                   <header><h5>{artifact.kind}</h5><span>{artifact.mediaClass}</span></header>
                   <dl>
                     <div><dt>Artifact</dt><dd>{artifact.artifactId}</dd></div>
-                    <div><dt>Produced by</dt><dd>{artifact.producerTaskId} / {artifact.producerAgentId}</dd></div>
-                    <div><dt>Origin</dt><dd>{artifact.origin.kind} · {originIdentity}</dd></div>
+                    <div>
+                      <dt>Produced by</dt>
+                      <dd>
+                        <ProductionIdentityLink kind="task" identity={artifact.producerTaskId} />
+                        {" / "}
+                        <ProductionIdentityLink kind="worker" identity={artifact.producerAgentId} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Origin</dt>
+                      <dd>
+                        {artifact.origin.kind} · {artifact.origin.kind === "worker_output" && executionIds.has(artifact.origin.executionId) ? (
+                          <ProductionIdentityLink kind="execution" identity={artifact.origin.executionId}>{originIdentity}</ProductionIdentityLink>
+                        ) : artifact.origin.kind !== "worker_output" && operationIds.has(artifact.origin.operationId) ? (
+                          <ProductionIdentityLink kind="operation" identity={artifact.origin.operationId}>{originIdentity}</ProductionIdentityLink>
+                        ) : originIdentity}
+                      </dd>
+                    </div>
                     <div><dt>Receipt</dt><dd>{artifact.origin.receiptId}</dd></div>
                     <div><dt>Receipt content</dt><dd>{artifact.origin.receiptContentId}</dd></div>
                     <div><dt>Content</dt><dd>{artifact.contentId} · {artifact.bytes} bytes</dd></div>
-                    <div><dt>Upstream artifacts</dt><dd>{artifact.sourceArtifactIds.join(", ") || "No upstream artifact ids recorded"}</dd></div>
-                    <div><dt>Report references</dt><dd>{artifact.reportIds.join(", ") || "No validated report references"}</dd></div>
+                    <div>
+                      <dt>Upstream artifacts</dt>
+                      <dd>
+                        {artifact.sourceArtifactIds.length === 0
+                          ? "No upstream artifact ids recorded"
+                          : artifact.sourceArtifactIds.map((sourceId, index) => (
+                            <span key={sourceId}>
+                              {index > 0 ? ", " : null}
+                              {outputArtifactIds.has(sourceId) ? (
+                                <ProductionIdentityLink kind="artifact" identity={sourceId} />
+                              ) : sourceId}
+                            </span>
+                          ))}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Report references</dt>
+                      <dd>
+                        {artifact.reportIds.length === 0
+                          ? "No validated report references"
+                          : artifact.reportIds.map((reportId, index) => (
+                            <span key={reportId}>
+                              {index > 0 ? ", " : null}
+                              <ProductionIdentityLink kind="report" identity={reportId} />
+                            </span>
+                          ))}
+                      </dd>
+                    </div>
                     <div><dt>Publication</dt><dd>{artifact.publication}</dd></div>
                     <div><dt>Duration</dt><dd>{artifact.durationMs === null ? "Not applicable for this artifact" : `${artifact.durationMs} ms`}</dd></div>
                   </dl>
@@ -269,13 +416,30 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
         ) : (
           <div className="product-runtime-fact-list">
             {projection.reports.map((report) => (
-              <article key={report.reportId} data-production-report-id={report.reportId} data-status={report.status}>
+              <article
+                key={report.reportId}
+                id={productionIdentityTarget("report", report.reportId)}
+                data-production-report-id={report.reportId}
+                data-status={report.status}
+              >
                 <header><h5>{report.reportId}</h5><span>{report.status}</span></header>
                 <p>{report.summary}</p>
                 <dl>
                   <div><dt>Reporter</dt><dd>{report.taskId} / {report.agentId}</dd></div>
                   <div><dt>Reports to</dt><dd>{report.parentTaskId} / {report.parentAgentId}</dd></div>
-                  <div><dt>Output artifacts</dt><dd>{report.outputArtifactIds.join(", ")}</dd></div>
+                  <div>
+                    <dt>Output artifacts</dt>
+                    <dd>
+                      {report.outputArtifactIds.map((artifactId, index) => (
+                        <span key={artifactId}>
+                          {index > 0 ? ", " : null}
+                          {outputArtifactIds.has(artifactId) ? (
+                            <ProductionIdentityLink kind="artifact" identity={artifactId} />
+                          ) : artifactId}
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
                   <div><dt>Decision reason</dt><dd>{report.decisionReason ?? "Unavailable until report.decided is validated"}</dd></div>
                 </dl>
               </article>

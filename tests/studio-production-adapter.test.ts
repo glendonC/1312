@@ -14,6 +14,10 @@ const CHILD_TASK_ID = "task:child";
 const CHILD_AGENT_ID = "agent:child";
 const REPORT_GRANT_ID = "grant:report-child";
 const OUTPUT_ARTIFACT_ID = "artifact:worker-output";
+const SOURCE_ARTIFACT_ID = "artifact:operation-source";
+const OPERATION_ID = "operation:authorized-extract";
+const OPERATION_OUTPUT_ARTIFACT_ID = "artifact:operation-output";
+const OPERATION_GRANT_ID = "grant:extract-root";
 
 function event(
   seq: number,
@@ -243,6 +247,157 @@ function productionJournal(): unknown[] {
   ];
 }
 
+function operationJournal(): unknown[] {
+  const sourceDigest = "c".repeat(64);
+  const outputDigest = "d".repeat(64);
+  const receiptContentDigest = "e".repeat(64);
+  const scope = [{ artifactId: SOURCE_ARTIFACT_ID, trackId: "stream:0", startMs: 1_000, endMs: 2_000 }];
+  const extractGrant = {
+    id: OPERATION_GRANT_ID,
+    capability: "media.extract",
+    taskId: ROOT_TASK_ID,
+    agentId: ROOT_AGENT_ID,
+    mediaScope: scope,
+  };
+  return [
+    event(1, "artifact_store", "artifact.recorded", {
+      artifact: {
+        schema: "studio.runtime.artifact.v1",
+        id: SOURCE_ARTIFACT_ID,
+        runId: RUN_ID,
+        kind: "owned-source",
+        mediaClass: "raw",
+        publication: "private",
+        content: {
+          algorithm: "sha256",
+          digest: sourceDigest,
+          contentId: `sha256:${sourceDigest}`,
+          bytes: 1_000,
+        },
+        storageKey: `objects/sha256/cc/${sourceDigest}`,
+        durationMs: 5_000,
+        tracks: [{ id: "stream:0", index: 0, kind: "audio", codec: "pcm_s16le", durationMs: 5_000 }],
+        sourceArtifactIds: [],
+        producerTaskId: null,
+        producerAgentId: null,
+        origin: {
+          kind: "ingest",
+          adapterId: "owned-local-source-adapter.v1",
+          sourceReceiptRef: "receipt:owned-source",
+        },
+      },
+    }),
+    event(2, "scheduler", "task.created", {
+      task: {
+        id: ROOT_TASK_ID,
+        runId: RUN_ID,
+        workloadKey: "root-operation-proof",
+        objective: "Exercise one already-authorized media operation.",
+        workerKind: "media",
+        workerLabel: "operation proof worker",
+        parentTaskId: null,
+        parentAgentId: null,
+        depth: 0,
+        assignedAgentId: ROOT_AGENT_ID,
+        ownerAgentId: null,
+        mediaScope: scope,
+        inputArtifactIds: [SOURCE_ARTIFACT_ID],
+        requiredOutputs: [{ name: "audio range", artifactKind: "media-range-audio", required: true }],
+        dependencies: [],
+        budget: { wallMs: 2_000, toolCalls: 1 },
+        grants: [extractGrant],
+        status: "scheduled",
+      },
+    }),
+    event(3, "registry", "agent.registered", {
+      agent: {
+        id: ROOT_AGENT_ID,
+        taskId: ROOT_TASK_ID,
+        parentTaskId: null,
+        parentAgentId: null,
+        kind: "media",
+        label: "operation proof worker",
+        grants: [extractGrant],
+        status: "registered",
+      },
+    }),
+    event(4, "scheduler", "task.transitioned", {
+      taskId: ROOT_TASK_ID,
+      agentId: ROOT_AGENT_ID,
+      status: "working",
+      reason: null,
+    }),
+    event(5, "media_host", "media.operation_started", {
+      capability: "media.extract",
+      request: {
+        operationId: OPERATION_ID,
+        taskId: ROOT_TASK_ID,
+        agentId: ROOT_AGENT_ID,
+        artifactId: SOURCE_ARTIFACT_ID,
+        trackId: "stream:0",
+        startMs: 1_000,
+        endMs: 2_000,
+      },
+      grantId: OPERATION_GRANT_ID,
+    }),
+    event(6, "artifact_store", "artifact.recorded", {
+      artifact: {
+        schema: "studio.runtime.artifact.v1",
+        id: OPERATION_OUTPUT_ARTIFACT_ID,
+        runId: RUN_ID,
+        kind: "media-range-audio",
+        mediaClass: "derived",
+        publication: "private",
+        content: {
+          algorithm: "sha256",
+          digest: outputDigest,
+          contentId: `sha256:${outputDigest}`,
+          bytes: 100,
+        },
+        storageKey: `objects/sha256/dd/${outputDigest}`,
+        durationMs: 1_000,
+        tracks: [{ id: "stream:0", index: 0, kind: "audio", codec: "pcm_s16le", durationMs: 1_000 }],
+        sourceArtifactIds: [SOURCE_ARTIFACT_ID],
+        producerTaskId: ROOT_TASK_ID,
+        producerAgentId: ROOT_AGENT_ID,
+        origin: {
+          kind: "media_operation",
+          operationId: OPERATION_ID,
+          receiptId: "receipt:authorized-extract",
+          receiptContentId: `sha256:${receiptContentDigest}`,
+        },
+      },
+    }),
+    event(7, "media_host", "media.operation_completed", {
+      operationId: OPERATION_ID,
+      outputArtifactId: OPERATION_OUTPUT_ARTIFACT_ID,
+      receipt: {
+        schema: "studio.media-operation.receipt.v1",
+        receiptId: "receipt:authorized-extract",
+        operationId: OPERATION_ID,
+        capability: "media.extract",
+        authorization: { grantId: OPERATION_GRANT_ID, taskId: ROOT_TASK_ID, agentId: ROOT_AGENT_ID },
+        request: {
+          artifactId: SOURCE_ARTIFACT_ID,
+          trackId: "stream:0",
+          startMs: 1_000,
+          endMs: 2_000,
+        },
+        producer: { id: "ffmpeg.audio-range-extract", version: "test" },
+        input: { artifactId: SOURCE_ARTIFACT_ID, contentId: `sha256:${sourceDigest}` },
+        output: {
+          artifactId: OPERATION_OUTPUT_ARTIFACT_ID,
+          contentId: `sha256:${outputDigest}`,
+          bytes: 100,
+          durationMs: 1_000,
+          trackId: "stream:0",
+        },
+        sourceArtifactIds: [SOURCE_ARTIFACT_ID],
+      },
+    }),
+  ];
+}
+
 test("production adapter projects spawn and output lineage with existing facts outside legacy topology", () => {
   const projection = projectProductionRuntimeJournal(productionJournal());
 
@@ -258,6 +413,7 @@ test("production adapter projects spawn and output lineage with existing facts o
     executions: 1,
     reports: 1,
     spawnRequests: 1,
+    operations: 0,
     outputArtifacts: 1,
   });
   assert.deepEqual(
@@ -335,6 +491,49 @@ test("production adapter projects spawn and output lineage with existing facts o
   assert.equal("agents" in projection, false);
   assert.equal("traces" in projection, false);
   assert.equal("bundle" in projection, false);
+});
+
+test("production adapter projects only validated media operation identities and honest terminal facts", () => {
+  const completed = projectProductionRuntimeJournal(operationJournal());
+
+  assert.equal(completed.counts.operations, 1);
+  assert.deepEqual(completed.operations, [{
+    operationId: OPERATION_ID,
+    capability: "media.extract",
+    status: "completed",
+    taskId: ROOT_TASK_ID,
+    agentId: ROOT_AGENT_ID,
+    grantId: OPERATION_GRANT_ID,
+    inputArtifactId: SOURCE_ARTIFACT_ID,
+    trackId: "stream:0",
+    startMs: 1_000,
+    endMs: 2_000,
+    requestedDurationMs: 1_000,
+    outputArtifactId: OPERATION_OUTPUT_ARTIFACT_ID,
+    receiptId: "receipt:authorized-extract",
+    failure: null,
+  }]);
+
+  const adapter = new ProductionStudioAdapter(RUN_ID);
+  const started = adapter.appendBatch(operationJournal().slice(0, 5));
+  assert.deepEqual(
+    {
+      status: started.operations[0].status,
+      outputArtifactId: started.operations[0].outputArtifactId,
+      receiptId: started.operations[0].receiptId,
+      failure: started.operations[0].failure,
+    },
+    { status: "started", outputArtifactId: null, receiptId: null, failure: null },
+  );
+
+  const failed = adapter.append(event(6, "media_host", "media.operation_failed", {
+    operationId: OPERATION_ID,
+    reason: "ffmpeg range extraction failed",
+  }));
+  assert.equal(failed.operations[0].status, "failed");
+  assert.equal(failed.operations[0].failure, "ffmpeg range extraction failed");
+  assert.equal(failed.operations[0].outputArtifactId, null);
+  assert.equal(failed.operations[0].receiptId, null);
 });
 
 test("production adapter keeps pending and rejected spawn decisions explicit", () => {

@@ -433,6 +433,47 @@ test("worker focus becomes a role-specific spatial environment", async ({ page }
   await expect(focus).toHaveCount(0);
 });
 
+test("agent focus keeps its spatial stylesheet after client navigation", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "the failure was specific to the routed desktop surface");
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Open Studio" }).click();
+  await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill(
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  );
+  await page.keyboard.press("Enter");
+
+  const orchestrator = page.getByRole("button", { name: /^orchestrator,/ });
+  await expect(orchestrator).toBeVisible();
+  await orchestrator.click();
+
+  const focus = page.getByRole("dialog", { name: "Orchestrator" });
+  await expect(focus).toBeVisible();
+  expect(
+    await focus.evaluate((root) => {
+      const spatial = root.querySelector(".agent-focus-spatial");
+      const environment = root.querySelector(".agent-focus-environment");
+      const close = root.querySelector(".agent-focus-close");
+      if (!spatial || !environment || !close) return null;
+      return {
+        rootPosition: getComputedStyle(root).position,
+        spatialDisplay: getComputedStyle(spatial).display,
+        environmentDisplay: getComputedStyle(environment).display,
+        environmentRadius: getComputedStyle(environment).borderRadius,
+        closeWidth: getComputedStyle(close).width,
+      };
+    }),
+  ).toEqual({
+    rootPosition: "absolute",
+    spatialDisplay: "grid",
+    environmentDisplay: "flex",
+    environmentRadius: "48px",
+    closeWidth: "44px",
+  });
+});
+
 test("agent focus moves the canvas and fits every supported viewport", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive viewport contract");
 

@@ -9,6 +9,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import "../styles/studio/focus.css";
 import AgentMark from "./AgentMark";
 import { agentIdentityStyle, createAgentIdentityMap } from "./agentIdentity";
 import { agentRoleTitle, agentState, agentTitle } from "./agentPresentation";

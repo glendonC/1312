@@ -58,7 +58,7 @@
  *
  * It was a bordered card, which meant the workspaces lived inside a box inside a page, and a
  * box has an edge the swarm can hit. So the frame is gone: the canvas is the stage, it pans,
- * and everything else on it — the layout switch and the opened worker — floats on top
+ * and everything else on it — the layout switch and focused agent — floats on top
  * of it as an overlay rather than taking a slice out of it.
  */
 /* the canvas takes the whole window: the header and the dock float on top of it */
@@ -75,10 +75,16 @@
   background:
     radial-gradient(58% 50% at 50% 42%, rgba(42, 107, 102, 0.07), transparent 72%),
     radial-gradient(38% 42% at 84% 18%, rgba(184, 150, 63, 0.06), transparent 70%);
+  transform-origin: 54% 48%;
+  transition:
+    opacity 420ms ease,
+    filter 520ms ease,
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .graph .grid {
   color: rgba(22, 29, 27, 0.14);
+  transition: opacity 220ms ease;
 }
 
 /*
@@ -148,6 +154,10 @@
   animation: wire-in 460ms ease both;
 }
 
+.wire {
+  transition: opacity 220ms ease;
+}
+
 /* a worker that divided out of another is bound to it, not to the orchestrator */
 .wire-mitosis .react-flow__edge-path {
   stroke: var(--gold-line);
@@ -213,6 +223,15 @@
   outline-offset: 3px;
 }
 
+.agent-node[data-on="true"] .agent-node-identity::after,
+.hub[data-on="true"] .agent-node-identity::after {
+  position: absolute;
+  inset: -7px;
+  border: 1px solid var(--accent-line);
+  border-radius: 50%;
+  content: "";
+}
+
 .agent-node:hover .agent-mark,
 .hub:hover .agent-mark {
   box-shadow:
@@ -248,8 +267,25 @@
   color: var(--ink-muted);
 }
 
-.agent-node[data-on="true"] {
-  opacity: 1;
+.stage[data-agent-focus="true"] .graph {
+  opacity: 0.42;
+  filter: blur(7px) saturate(0.72);
+  transform: translateX(4vw) scale(0.94);
+}
+
+.stage[data-agent-focus="true"] .graph .grid,
+.stage[data-agent-focus="true"] .wire {
+  opacity: 0.24;
+}
+
+.stage[data-agent-focus="true"] .agent-node:not([data-on="true"]),
+.stage[data-agent-focus="true"] .hub:not([data-on="true"]) {
+  opacity: 0.18;
+}
+
+.stage[data-agent-focus="true"] .agent-node[data-on="true"],
+.stage[data-agent-focus="true"] .hub[data-on="true"] {
+  opacity: 0.32;
 }
 
 /* The field resolves while its node travels out from the parent that created it. */
@@ -258,21 +294,23 @@
   transform: scale(0.94);
 }
 
-.agent-node {
+.agent-node,
+.hub {
   transition:
     opacity 320ms ease,
     transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.studio[data-paused="true"] .drawer-dot[data-status] {
+.studio[data-paused="true"] .agent-focus-hero-copy [data-status] {
   animation: none;
-  background: var(--hold);
+  color: var(--hold);
 }
 
 /* ---------- responsive ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-node {
+  .agent-node,
+  .hub {
     transition: none;
   }
 
@@ -285,6 +323,10 @@
   .wire .react-flow__edge-path {
     transition: none;
     animation: none;
+  }
+
+  .graph {
+    transition: none;
   }
 }
 

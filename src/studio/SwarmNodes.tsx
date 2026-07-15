@@ -2,7 +2,7 @@
  * The two kinds of node on the canvas.
  *
  * Every agent gets an identity field on the topology. Detailed tools and evidence belong in
- * the drawer, where they can be read without forcing the entire graph to zoom out.
+ * focus mode, where they can be read without forcing the entire graph to zoom out.
  *
  * Each node subscribes to its own agent and nothing else, so a trace landing on qc-01
  * re-renders qc-01 and leaves every other identity and the layout alone.
@@ -13,51 +13,15 @@ import { memo, useEffect, useState } from "react";
 
 import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
+import { agentState, agentTitle } from "./agentPresentation";
 import { useAgent, useStudio } from "./store";
 import type { SwarmNode } from "./swarm";
-import type { AgentStatus, Role } from "./types";
+import type { Role } from "./types";
 
 /** How long a worker keeps its just-born look before it is simply another worker. */
 const BIRTH_MS = 720;
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
-
-const ROLE_TITLES: Record<Exclude<Role, "orchestrator">, string> = {
-  segment: "Segmenter",
-  context: "Context",
-  translate: "Translator",
-  qc: "Verifier",
-};
-
-const ACTIVE_LABELS: Record<Exclude<Role, "orchestrator">, string> = {
-  segment: "Mapping media",
-  context: "Reading context",
-  translate: "Translating",
-  qc: "Checking evidence",
-};
-
-function workerTitle(id: string, role: Exclude<Role, "orchestrator">): string {
-  const sequence = id.match(/(\d+)$/)?.[1];
-  return sequence ? `${ROLE_TITLES[role]} ${sequence}` : ROLE_TITLES[role];
-}
-
-function workerState(status: AgentStatus, role: Exclude<Role, "orchestrator">): string {
-  if (status === "spawning") return "Joining";
-  if (status === "working") return ACTIVE_LABELS[role];
-  if (status === "reporting") return "Reporting";
-  if (status === "gating") return "Testing a gate";
-  if (status === "retired" || status === "done") return "Complete";
-  return "Waiting";
-}
-
-function orchestratorState(status: AgentStatus): string {
-  if (status === "spawning") return "Starting";
-  if (status === "working") return "Coordinating";
-  if (status === "reporting") return "Gathering reports";
-  if (status === "gating") return "Resolving a gate";
-  if (status === "retired" || status === "done") return "Complete";
-  return "Waiting";
-}
 
 /**
  * A wire can arrive at any face, so every face has a pin.
@@ -123,7 +87,7 @@ function useOpen(id: string): {
   };
 }
 
-/** One worker identity on the canvas. Its readable workspace opens in the drawer. */
+/** One worker identity on the canvas. Its readable workspace opens in focus mode. */
 export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode>) {
   const agent = useAgent(data.agent);
   const on = useStudio((s) => s.selected === data.agent);
@@ -135,8 +99,8 @@ export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode
   if (!agent) return null;
 
   const role = agent.role as Exclude<Role, "orchestrator">;
-  const title = workerTitle(agent.id, role);
-  const state = cancelled ? "Stopped" : workerState(agent.status, role);
+  const title = agentTitle(agent.id, role);
+  const state = agentState(agent.status, role, cancelled);
 
   return (
     <div
@@ -146,10 +110,13 @@ export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode
       data-run-state={cancelled ? "cancelled" : "active"}
       data-on={on}
       data-born={born}
+      data-agent-node={agent.id}
       role="button"
       tabIndex={0}
       onKeyDown={open.onKeyDown}
       aria-label={`${title}, ${state}, ${agent.actions} actions`}
+      aria-haspopup="dialog"
+      aria-expanded={on}
     >
       <span className="agent-node-identity">
         <Pins />
@@ -173,7 +140,7 @@ export const HubNode = memo(function HubNode() {
   const cancelled = useStudio((s) => s.outcome?.kind === "cancelled");
   const paused = useStudio((s) => s.paused);
   const open = useOpen("orchestrator");
-  const state = cancelled ? "Stopped" : orchestratorState(status);
+  const state = agentState(status, "orchestrator", cancelled);
 
   return (
     <div
@@ -181,10 +148,13 @@ export const HubNode = memo(function HubNode() {
       data-status={status}
       data-run-state={cancelled ? "cancelled" : "active"}
       data-on={on}
+      data-agent-node="orchestrator"
       role="button"
       tabIndex={0}
       onKeyDown={open.onKeyDown}
       aria-label={`orchestrator, ${state}. ${note}`}
+      aria-haspopup="dialog"
+      aria-expanded={on}
       title={note}
     >
       <span className="agent-node-identity">

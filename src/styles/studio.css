@@ -3,7 +3,7 @@
  *
  * This file is the shell and the index — the page frame, and the parts it is made of.
  * Each part owns its own component AND its own responsive rules, so there is one place
- * to look for anything about the dock, the canvas, the drawer, the workspace, or the
+ * to look for anything about the dock, the canvas, agent focus, the workspace, or the
  * result, and no single file that has to be read to understand any of them.
  */
 
@@ -11,7 +11,7 @@
 @import "./studio/identity.css";
 @import "./studio/welcome.css";
 @import "./studio/canvas.css";
-@import "./studio/drawer.css";
+@import "./studio/focus.css";
 @import "./studio/workspace.css";
 @import "./studio/results.css";
 

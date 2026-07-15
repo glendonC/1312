@@ -1,0 +1,796 @@
+/* The selected agent becomes a spatial state of the canvas, not a drawer beside it. */
+
+.agent-focus-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: rgba(236, 241, 235, 0.58);
+  backdrop-filter: blur(8px) saturate(0.86);
+  -webkit-backdrop-filter: blur(8px) saturate(0.86);
+  cursor: zoom-out;
+}
+
+.agent-focus {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.agent-focus-spatial {
+  position: relative;
+  display: grid;
+  width: min(1360px, 100%);
+  height: 100%;
+  margin: 0 auto;
+  padding:
+    clamp(78px, 10vh, 104px)
+    clamp(22px, 3.2vw, 54px)
+    clamp(126px, 16vh, 154px);
+  grid-template-columns: clamp(210px, 23vw, 310px) minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 64px);
+  pointer-events: none;
+}
+
+.agent-focus-hero,
+.agent-focus-environment,
+.agent-focus-activity {
+  pointer-events: auto;
+}
+
+/* The identity stands directly in the softened canvas. It deliberately has no card shell. */
+.agent-focus-hero {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0 22px;
+  text-align: center;
+}
+
+.agent-focus-identity {
+  position: relative;
+  width: clamp(156px, 17vw, 220px);
+  height: clamp(156px, 17vw, 220px);
+  flex: none;
+}
+
+.agent-focus[data-role="orchestrator"] .agent-focus-identity {
+  width: clamp(174px, 19vw, 244px);
+  height: clamp(174px, 19vw, 244px);
+}
+
+.agent-focus-identity::before,
+.agent-focus-identity::after {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  content: "";
+}
+
+.agent-focus-identity::before {
+  inset: -22px;
+  border: 1px solid color-mix(in srgb, var(--agent-current) 35%, transparent);
+  box-shadow:
+    0 0 58px color-mix(in srgb, var(--agent-current) 17%, transparent),
+    inset 0 0 34px color-mix(in srgb, var(--agent-body) 9%, transparent);
+}
+
+.agent-focus-identity::after {
+  inset: -42px;
+  border: 1px solid color-mix(in srgb, var(--agent-counter) 14%, transparent);
+}
+
+.agent-focus-identity .agent-mark {
+  width: 100%;
+  height: 100%;
+  box-shadow:
+    0 28px 70px rgba(11, 29, 25, 0.24),
+    0 5px 16px rgba(11, 29, 25, 0.14);
+}
+
+.agent-focus-hero-copy {
+  min-width: 0;
+  margin-top: clamp(30px, 5vh, 48px);
+}
+
+.agent-focus-hero-copy > span,
+.agent-focus-latest > span {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.agent-focus-hero-copy h2 {
+  margin: 7px 0 0;
+  color: var(--ink);
+  font-size: clamp(1.45rem, 2.6vw, 2.15rem);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.agent-focus-hero-copy p {
+  margin: 9px 0 0;
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: var(--weight-medium);
+}
+
+.agent-focus-hero-copy p[data-status="gating"] {
+  color: var(--gold-ink);
+}
+
+.agent-focus-hero-copy code {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+}
+
+.agent-focus-latest {
+  width: min(260px, 100%);
+  margin-top: clamp(20px, 3.4vh, 34px);
+}
+
+.agent-focus-latest strong {
+  display: block;
+  margin-top: 7px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-focus-latest p {
+  display: -webkit-box;
+  margin: 5px 0 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.agent-focus-switcher {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.agent-focus-switcher button,
+.agent-focus-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 9px 24px rgba(22, 29, 27, 0.09);
+  backdrop-filter: blur(18px) saturate(1.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-focus-switcher button {
+  width: 38px;
+  height: 38px;
+}
+
+.agent-focus-switcher span {
+  min-width: 38px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-focus-switcher button:hover,
+.agent-focus-close:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.94);
+  transform: translateY(-1px);
+}
+
+.agent-focus-switcher button:focus-visible,
+.agent-focus-close:focus-visible,
+.agent-focus-activity summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* The squircle is the agent's working medium. It is the dominant object in focus mode. */
+.agent-focus-environment {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(22px, 2.5vw, 34px);
+  padding-bottom: clamp(148px, 18vh, 174px);
+  border: 1px solid color-mix(in srgb, var(--agent-current) 18%, var(--glass-border));
+  border-radius: clamp(30px, 4vw, 48px);
+  corner-shape: squircle;
+  background:
+    radial-gradient(
+      circle at 10% 5%,
+      color-mix(in srgb, var(--agent-current) 10%, transparent),
+      transparent 35%
+    ),
+    rgba(255, 255, 255, 0.79);
+  box-shadow:
+    0 36px 100px rgba(18, 32, 28, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(30px) saturate(1.45);
+  -webkit-backdrop-filter: blur(30px) saturate(1.45);
+}
+
+.agent-focus-environment::before {
+  position: absolute;
+  inset: 10px;
+  border: 1px solid color-mix(in srgb, var(--agent-current) 10%, transparent);
+  border-radius: calc(clamp(30px, 4vw, 48px) - 8px);
+  pointer-events: none;
+  content: "";
+}
+
+.agent-focus-environment-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.agent-focus-environment-head > div {
+  min-width: 0;
+}
+
+.agent-focus-environment-head span,
+.coordination-note span {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.agent-focus-environment-head h3 {
+  margin: 7px 0 0;
+  color: var(--ink);
+  font-size: clamp(1.45rem, 2.5vw, 2.1rem);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.agent-focus-environment-head p {
+  max-width: 620px;
+  margin: 8px 0 0;
+  color: var(--ink-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.agent-focus-close {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-color: color-mix(in srgb, var(--agent-current) 25%, var(--glass-border));
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+
+.agent-focus-workspace {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  margin-top: clamp(18px, 3vh, 28px);
+  overflow: auto;
+}
+
+.agent-focus-workspace > * {
+  width: 100%;
+}
+
+.agent-focus-environment-foot {
+  position: absolute;
+  bottom: 22px;
+  left: clamp(22px, 2.5vw, 34px);
+  z-index: 1;
+  max-width: calc(100% - 390px);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.53rem;
+  line-height: 1.4;
+}
+
+/* Activity floats across the environment edge as secondary evidence, not another main panel. */
+.agent-focus-activity {
+  position: absolute;
+  right: clamp(8px, 2.5vw, 38px);
+  bottom: clamp(104px, 13vh, 126px);
+  z-index: 3;
+  width: min(350px, 30vw);
+  max-height: min(220px, 28vh);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 21px;
+  corner-shape: squircle;
+  background: rgba(252, 253, 250, 0.82);
+  box-shadow: 0 22px 58px rgba(22, 29, 27, 0.16);
+  backdrop-filter: blur(26px) saturate(1.55);
+  -webkit-backdrop-filter: blur(26px) saturate(1.55);
+}
+
+.agent-focus-activity summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 15px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.agent-focus-activity summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-focus-activity summary span,
+.agent-focus-activity summary strong {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: var(--weight-regular);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.agent-focus-activity summary strong {
+  color: var(--ink-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.agent-focus-log {
+  max-height: calc(min(220px, 28vh) - 48px);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.agent-focus-log-row {
+  display: grid;
+  grid-template-columns: 2.75rem 3.75rem minmax(0, 1fr);
+  gap: 3px 8px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  line-height: 1.45;
+}
+
+.agent-focus-log-row:last-child {
+  border-bottom: 0;
+}
+
+.agent-focus-log-row time {
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-focus-log-action {
+  color: var(--accent);
+}
+
+.agent-focus-log-row strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: var(--weight-regular);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-focus-log-row p {
+  margin: 0;
+  grid-column: 2 / -1;
+  color: var(--ink-muted);
+  line-height: 1.5;
+}
+
+.agent-focus-log-row[data-level="gate"] .agent-focus-log-action {
+  color: var(--gold-ink);
+}
+
+.agent-focus-log-row[data-level="warn"],
+.agent-focus-log-row[data-level="error"] {
+  background: var(--flag-soft);
+}
+
+.agent-focus-log-row[data-level="warn"] .agent-focus-log-action,
+.agent-focus-log-row[data-level="warn"] p,
+.agent-focus-log-row[data-level="error"] .agent-focus-log-action,
+.agent-focus-log-row[data-level="error"] p {
+  color: var(--flag);
+}
+
+.agent-focus-empty {
+  margin: 0;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 0.7rem;
+}
+
+/* Orchestration has a topology projection instead of an invented generic workspace. */
+.coordination-env {
+  display: grid;
+  min-height: 100%;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(280px, 1.2fr);
+  gap: clamp(18px, 3vw, 34px);
+  align-content: center;
+}
+
+.coordination-note {
+  align-self: center;
+  padding: 20px;
+  border-left: 2px solid color-mix(in srgb, var(--agent-current) 55%, var(--line));
+}
+
+.coordination-note p {
+  margin: 9px 0 0;
+  color: var(--ink);
+  font-size: clamp(0.92rem, 1.35vw, 1.12rem);
+  line-height: 1.55;
+}
+
+.coordination-workers {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  list-style: none;
+}
+
+.coordination-workers li {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 14px 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  corner-shape: squircle;
+  background: rgba(247, 250, 248, 0.68);
+}
+
+.coordination-workers li::before {
+  position: absolute;
+  top: 17px;
+  bottom: 17px;
+  left: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--line-strong);
+  content: "";
+}
+
+.coordination-workers li[data-status="working"]::before,
+.coordination-workers li[data-status="reporting"]::before,
+.coordination-workers li[data-status="gating"]::before {
+  background: var(--accent);
+}
+
+.coordination-worker-role,
+.coordination-workers li > span:last-child {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.53rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coordination-workers strong {
+  margin: 3px 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .agent-focus {
+    overflow-y: auto;
+  }
+
+  .agent-focus-spatial {
+    display: flex;
+    min-height: 100%;
+    height: auto;
+    flex-direction: column;
+    gap: 14px;
+    padding: 68px 10px 96px;
+  }
+
+  .agent-focus-hero {
+    display: grid;
+    min-height: 112px;
+    padding: 4px 14px;
+    grid-template-columns: 94px minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    gap: 0 18px;
+    align-items: center;
+    text-align: left;
+  }
+
+  .agent-focus-identity,
+  .agent-focus[data-role="orchestrator"] .agent-focus-identity {
+    width: 88px;
+    height: 88px;
+    grid-row: 1 / -1;
+  }
+
+  .agent-focus-identity::before {
+    inset: -11px;
+  }
+
+  .agent-focus-identity::after {
+    inset: -20px;
+  }
+
+  .agent-focus-hero-copy {
+    align-self: end;
+    margin: 0;
+  }
+
+  .agent-focus-hero-copy h2 {
+    font-size: 1.35rem;
+  }
+
+  .agent-focus-hero-copy p {
+    margin-top: 5px;
+  }
+
+  .agent-focus-latest {
+    display: none;
+  }
+
+  .agent-focus-switcher {
+    align-self: start;
+    margin-top: 9px;
+  }
+
+  .agent-focus-switcher button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .agent-focus-environment {
+    width: 100%;
+    height: min(520px, max(250px, calc(100svh - 314px)));
+    min-height: 0;
+    flex: none;
+    padding: 20px 18px 24px;
+    border-radius: 27px;
+  }
+
+  .agent-focus-environment::before {
+    inset: 7px;
+    border-radius: 21px;
+  }
+
+  .agent-focus-environment-head {
+    gap: 12px;
+  }
+
+  .agent-focus-environment-head h3 {
+    font-size: 1.35rem;
+  }
+
+  .agent-focus-environment-head p {
+    font-size: 0.68rem;
+  }
+
+  .agent-focus-close {
+    width: 40px;
+    height: 40px;
+  }
+
+  .agent-focus-workspace {
+    margin-top: 16px;
+    overflow: auto;
+  }
+
+  .agent-focus-environment-foot {
+    display: none;
+  }
+
+  .agent-focus-activity {
+    position: fixed;
+    right: 10px;
+    bottom: 96px;
+    left: 10px;
+    width: auto;
+    max-height: 230px;
+    border-radius: 18px;
+  }
+
+  .agent-focus-log {
+    max-height: 182px;
+  }
+
+  .coordination-env {
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+
+  .coordination-note {
+    padding: 12px 14px;
+  }
+
+  .coordination-workers {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 721px) and (max-height: 560px) {
+  .agent-focus-spatial {
+    padding: 58px 16px 124px;
+    grid-template-columns: 142px minmax(0, 1fr);
+    gap: 22px;
+  }
+
+  .agent-focus-hero {
+    justify-content: flex-start;
+    padding-top: 14px;
+  }
+
+  .agent-focus-identity,
+  .agent-focus[data-role="orchestrator"] .agent-focus-identity {
+    width: 92px;
+    height: 92px;
+  }
+
+  .agent-focus-identity::before {
+    inset: -11px;
+  }
+
+  .agent-focus-identity::after {
+    display: none;
+  }
+
+  .agent-focus-hero-copy {
+    margin-top: 18px;
+  }
+
+  .agent-focus-hero-copy h2 {
+    font-size: 1.18rem;
+  }
+
+  .agent-focus-hero-copy p {
+    margin-top: 5px;
+    font-size: 0.66rem;
+  }
+
+  .agent-focus-latest {
+    display: none;
+  }
+
+  .agent-focus-switcher {
+    margin-top: 12px;
+  }
+
+  .agent-focus-switcher button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .agent-focus-environment {
+    padding: 14px 16px 74px;
+    border-radius: 24px;
+  }
+
+  .agent-focus-environment::before {
+    inset: 6px;
+    border-radius: 18px;
+  }
+
+  .agent-focus-environment-head h3 {
+    margin-top: 3px;
+    font-size: 1.12rem;
+  }
+
+  .agent-focus-environment-head p {
+    display: none;
+  }
+
+  .agent-focus-close {
+    width: 34px;
+    height: 34px;
+  }
+
+  .agent-focus-workspace {
+    margin-top: 9px;
+  }
+
+  .agent-focus-environment-foot {
+    display: none;
+  }
+
+  .agent-focus-activity {
+    right: 20px;
+    bottom: 116px;
+    width: 260px;
+    max-height: 92px;
+    border-radius: 16px;
+  }
+
+  .agent-focus-activity summary {
+    min-height: 38px;
+  }
+
+  .agent-focus-log {
+    max-height: 54px;
+  }
+
+  .agent-focus-log-row {
+    padding: 6px 9px;
+  }
+
+  .coordination-env {
+    grid-template-columns: minmax(150px, 0.7fr) minmax(300px, 1.3fr);
+    gap: 14px;
+  }
+
+  .coordination-note {
+    padding: 10px 14px;
+  }
+
+  .coordination-note p {
+    margin-top: 4px;
+    font-size: 0.78rem;
+  }
+
+  .coordination-workers {
+    gap: 5px;
+  }
+
+  .coordination-workers li {
+    padding: 6px 9px 6px 15px;
+  }
+}

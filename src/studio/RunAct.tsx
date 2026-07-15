@@ -3,10 +3,11 @@ import { motion } from "motion/react";
 import AgentPanel from "./AgentPanel";
 import Results from "./Results";
 import SwarmGraph from "./SwarmGraph";
-import { useComplete } from "./store";
+import { useComplete, useStudio } from "./store";
 
 export default function RunAct() {
   const complete = useComplete();
+  const focused = useStudio((state) => state.selected !== null);
 
   return (
     <motion.section
@@ -15,7 +16,7 @@ export default function RunAct() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="stage">
+      <div className="stage" data-agent-focus={focused ? "true" : undefined}>
         <SwarmGraph />
         <AgentPanel />
       </div>

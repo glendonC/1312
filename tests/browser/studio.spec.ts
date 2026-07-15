@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function openLab(page: Page): Promise<void> {
   await page.goto("/studio/?lab=1");
@@ -12,6 +12,33 @@ function scenario(page: Page) {
 
 function readout(page: Page) {
   return page.locator(".lab-readout b");
+}
+
+async function settledBox(page: Page, locator: Locator) {
+  let previous = await locator.boundingBox();
+  let stableSamples = 0;
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await page.waitForTimeout(180);
+    const current = await locator.boundingBox();
+    if (!previous || !current) {
+      previous = current;
+      stableSamples = 0;
+      continue;
+    }
+
+    const delta = Math.max(
+      Math.abs(previous.x - current.x),
+      Math.abs(previous.y - current.y),
+      Math.abs(previous.width - current.width),
+      Math.abs(previous.height - current.height),
+    );
+    stableSamples = delta <= 0.5 ? stableSamples + 1 : 0;
+    previous = current;
+    if (stableSamples >= 3) return current;
+  }
+
+  throw new Error("Agent node did not settle before focus opened.");
 }
 
 async function renderedDifference(
@@ -374,6 +401,104 @@ test("workers use distinct inherited identity materials", async ({ page }) => {
   await expect(page.locator(".worker-node .env")).toHaveCount(0);
 });
 
+test("worker focus becomes a role-specific spatial environment", async ({ page }) => {
+  await openLab(page);
+  await scenario(page).selectOption("withheld");
+  await page.getByRole("button", { name: "Collapse trace lab" }).click();
+
+  const translator = page.getByRole("button", { name: /^Translator 01,/ });
+  const sourceIdentity = await translator.locator(".agent-mark").getAttribute("data-agent-identity");
+  await translator.focus();
+  await page.keyboard.press("Enter");
+
+  const focus = page.getByRole("dialog");
+  await expect(focus).toBeVisible();
+  await expect(focus).toHaveAccessibleName("Translator 01");
+  await expect(page.locator(".stage")).toHaveAttribute("data-agent-focus", "true");
+  await expect(translator).toHaveAttribute("aria-expanded", "true");
+  await expect(focus.locator(".agent-focus-identity .agent-mark")).toHaveAttribute(
+    "data-agent-identity",
+    sourceIdentity ?? "",
+  );
+  await expect(focus.getByText("Agent environment", { exact: true })).toBeVisible();
+  await expect(focus.getByRole("heading", { name: "Translation draft" })).toBeVisible();
+  await expect(focus.locator('.env[data-role="translate"]')).toBeVisible();
+  await expect(focus.getByText("Recorded activity", { exact: true })).toBeVisible();
+  await expect(focus.locator(".agent-focus-log-row")).not.toHaveCount(0);
+  await expect(focus.getByText("Reasoning", { exact: true })).toHaveCount(0);
+
+  await focus.getByRole("button", { name: "Next agent" }).click();
+  await expect(focus.getByRole("heading", { name: "Translator 01" })).toHaveCount(0);
+  await focus.getByRole("button", { name: "Close agent focus" }).click();
+  await expect(focus).toHaveCount(0);
+});
+
+test("agent focus moves the canvas and fits every supported viewport", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive viewport contract");
+
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await openLab(page);
+    await scenario(page).selectOption("withheld");
+    await page.getByRole("button", { name: "Collapse trace lab" }).click();
+
+    const anchor = page.getByRole("button", { name: /^orchestrator,/ });
+    const before = await settledBox(page, anchor);
+    await anchor.focus();
+    await page.keyboard.press("Enter");
+
+    const focus = page.getByRole("dialog", { name: "Orchestrator" });
+    await expect(focus).toBeVisible();
+    await page.waitForTimeout(450);
+    const environment = focus.locator(".agent-focus-environment");
+    const [focusBox, environmentBox, dockBox, after, graphState] = await Promise.all([
+      focus.boundingBox(),
+      environment.boundingBox(),
+      page.locator(".dock-well").boundingBox(),
+      anchor.boundingBox(),
+      page.locator(".graph").evaluate((element) => ({
+        transform: getComputedStyle(element).transform,
+        filter: getComputedStyle(element).filter,
+      })),
+    ]);
+    expect(focusBox).not.toBeNull();
+    expect(environmentBox).not.toBeNull();
+    expect(dockBox).not.toBeNull();
+    expect(before).not.toBeNull();
+    expect(after).not.toBeNull();
+    expect(focusBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect(focusBox?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect((focusBox?.x ?? 0) + (focusBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
+    expect((focusBox?.y ?? 0) + (focusBox?.height ?? 0)).toBeLessThanOrEqual(viewport.height + 0.5);
+    expect(environmentBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect((environmentBox?.x ?? 0) + (environmentBox?.width ?? 0)).toBeLessThanOrEqual(
+      viewport.width + 0.5,
+    );
+    expect(environmentBox?.y ?? -1).toBeGreaterThanOrEqual(56);
+    expect((environmentBox?.y ?? 0) + (environmentBox?.height ?? 0)).toBeLessThanOrEqual(
+      (dockBox?.y ?? viewport.height) + 0.5,
+    );
+    expect(graphState.transform).not.toBe("none");
+    expect(graphState.filter).toContain("blur");
+    expect(
+      Math.max(
+        Math.abs((before?.x ?? 0) - (after?.x ?? 0)),
+        Math.abs((before?.y ?? 0) - (after?.y ?? 0)),
+      ),
+    ).toBeGreaterThan(1);
+
+    await page.keyboard.press("Escape");
+    await expect(focus).toHaveCount(0);
+  }
+});
+
 test("the submitted preview fits every supported viewport", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive viewport contract");
 
@@ -492,24 +617,34 @@ test("pause freezes the replay cursor and step advances exactly once", async ({ 
   await expect.poll(async () => Number((await readout(page).textContent())?.split("/")[0].trim())).toBe(before + 1);
 });
 
-test("keyboard opens a worker and seeks recorded media", async ({ page }) => {
+test("keyboard opens agent focus and the segment environment scrubs recorded media", async ({ page }) => {
   await openLab(page);
   await scenario(page).selectOption("withheld");
+  await page.getByRole("button", { name: "Collapse trace lab" }).click();
 
   const orchestrator = page.getByRole("button", { name: /^orchestrator,/ });
+  const nodeBoxBefore = await settledBox(page, orchestrator);
   await orchestrator.focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator(".drawer")).toBeVisible();
-  await page.getByRole("button", { name: "Collapse trace lab" }).click();
-  await page.getByRole("button", { name: "Close" }).click({ force: true });
+  const focus = page.getByRole("dialog", { name: "Orchestrator" });
+  await expect(focus).toBeVisible();
+  await expect(focus.getByRole("button", { name: "Close agent focus" })).toBeFocused();
+  expect(nodeBoxBefore).not.toBeNull();
+  await page.keyboard.press("Escape");
+  await expect(focus).toHaveCount(0);
+  await expect(orchestrator).toBeFocused();
 
-  await page.getByRole("button", { name: "Expand trace lab" }).click();
-  await scenario(page).selectOption("unscored-complete");
-  const seek = page.getByRole("slider", { name: "Seek through clip" });
+  const segmenter = page.getByRole("button", { name: /^Segmenter 01,/ });
+  await segmenter.focus();
+  await page.keyboard.press("Enter");
+  const segmentFocus = page.getByRole("dialog", { name: "Segmenter 01" });
+  await expect(segmentFocus.getByRole("heading", { name: "Recorded media" })).toBeVisible();
+  await expect(segmentFocus.getByLabel("Recorded source video")).toBeVisible();
+  const seek = segmentFocus.getByRole("slider", { name: "Inspect recorded clip" });
   await seek.focus();
-  const before = Number(await seek.inputValue());
+  const seekBefore = Number(await seek.inputValue());
   await page.keyboard.press("ArrowRight");
-  await expect.poll(async () => Number(await seek.inputValue())).toBeGreaterThan(before);
+  await expect.poll(async () => Number(await seek.inputValue())).toBeGreaterThan(seekBefore);
 });
 
 test("mobile controls remain in the viewport", async ({ page }, testInfo) => {
@@ -537,6 +672,11 @@ test("reduced motion disables decorative animation", async ({ page }) => {
 
   await openLab(page);
   await scenario(page).selectOption("withheld");
+
+  const orchestrator = page.getByRole("button", { name: /^orchestrator,/ });
+  await orchestrator.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Orchestrator" })).toBeVisible();
 
   const animations = await page.locator(".studio").evaluate((root) =>
     [...root.querySelectorAll("*")].filter((node) => {

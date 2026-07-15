@@ -3,28 +3,28 @@
  *
  * Each role works in a different medium, so each gets a different environment: segment
  * lives in the waveform, context in the glossary, translate in a draft, qc in its gates.
- * This is the one renderer for all four, at two scales — the `cell` on a swarm node and
- * the `panel` in the opened drawer — so the miniature on the graph can never drift from
- * the thing it is a miniature of. Same fold, same fields, two densities.
+ * This is the one renderer for all four, at two scales: `cell` for a compact view and
+ * `focus` for expanded inspection. Same fold, same fields, two densities.
  *
  * Every pixel is projected from that worker's own traces. A worker that has not drafted
  * anything yet says so; it does not show a plausible draft.
  */
 
 import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 
 import { clock, pct } from "./format";
 import type { AgentView } from "./replay";
-import { useBundle } from "./store";
+import { useBundle, useStudio } from "./store";
 import type { RunBundle } from "./transport";
 
-/** cell = the squircle on a swarm node. panel = the drawer. */
-export type Scale = "cell" | "panel";
+/** cell = a compact workspace. focus = the expanded inspection plane. */
+export type Scale = "cell" | "focus";
 
 /** How much of a worker's history each scale has room to hold, newest last. */
 const KEEP: Record<Scale, { marks: number; gloss: number; gates: number; peak: number }> = {
   cell: { marks: 3, gloss: 2, gates: 2, peak: 5 },
-  panel: { marks: 6, gloss: 4, gates: 3, peak: 2 },
+  focus: { marks: 8, gloss: 12, gates: 6, peak: 2 },
 };
 
 export default function Workspace({ agent, scale }: { agent: AgentView; scale: Scale }) {
@@ -35,7 +35,9 @@ export default function Workspace({ agent, scale }: { agent: AgentView; scale: S
 
   return (
     <div className="env" data-scale={scale} data-role={agent.role}>
-      {agent.role === "segment" && <Segment agent={agent} bundle={bundle} keep={keep} />}
+      {agent.role === "segment" && (
+        <Segment agent={agent} bundle={bundle} keep={keep} scale={scale} />
+      )}
       {agent.role === "context" && <Context agent={agent} keep={keep} />}
       {agent.role === "translate" && <Translate agent={agent} />}
       {agent.role === "qc" && <Gates agent={agent} bundle={bundle} keep={keep} />}
@@ -50,16 +52,20 @@ function Segment({
   agent,
   bundle,
   keep,
+  scale,
 }: {
   agent: AgentView;
   bundle: RunBundle;
   keep: Keep;
+  scale: Scale;
 }) {
   const duration = bundle.run.clip.duration;
   const peaks = bundle.wave.peaks.filter((_, i) => i % keep.peak === 0);
 
   return (
     <>
+      {scale === "focus" && <RecordedMedia bundle={bundle} agentPlayhead={agent.playhead} />}
+
       <div className="env-wave">
         <svg viewBox={`0 0 ${peaks.length * 4} 100`} preserveAspectRatio="none" aria-hidden="true">
           {peaks.map((p, i) => {
@@ -93,18 +99,190 @@ function Segment({
   );
 }
 
+const HAS_PICTURE = /\.(?:mp4|webm|mov|m4v)$/i;
+
+/**
+ * A viewer for the media artifact in this run, not a reconstruction of an agent tool.
+ *
+ * The inspection cursor belongs to the person opening focus mode. The separate marker below
+ * remains the agent's recorded playhead, so scrubbing the clip cannot rewrite what the worker did.
+ */
+function RecordedMedia({
+  bundle,
+  agentPlayhead,
+}: {
+  bundle: RunBundle;
+  agentPlayhead: number | null;
+}) {
+  const clipT = useStudio((state) => state.clipT);
+  const setClipT = useStudio((state) => state.setClipT);
+  const setGlobalPlaying = useStudio((state) => state.setPlaying);
+  const mediaRef = useRef<HTMLMediaElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const duration = bundle.run.clip.duration;
+  const media = bundle.run.clip.media;
+  const src = media ? `/demo/runs/${bundle.run.id}/${media}` : null;
+  const picture = Boolean(media && HAS_PICTURE.test(media));
+  const cue = bundle.captions.cues.find(
+    (candidate) => clipT >= candidate.t_start && clipT < candidate.t_end,
+  );
+
+  useEffect(() => {
+    const element = mediaRef.current;
+    if (!element || Math.abs(element.currentTime - clipT) <= 0.25) return;
+    element.currentTime = clipT;
+  }, [clipT]);
+
+  useEffect(() => {
+    setGlobalPlaying(false);
+    return () => {
+      mediaRef.current?.pause();
+    };
+  }, [setGlobalPlaying]);
+
+  const seek = (next: number) => {
+    setClipT(Math.max(0, Math.min(duration, next)));
+  };
+
+  const toggle = () => {
+    const element = mediaRef.current;
+    if (!element || failed) return;
+    if (element.paused) {
+      void element.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    } else {
+      element.pause();
+      setPlaying(false);
+    }
+  };
+
+  return (
+    <section className="env-media" aria-label="Recorded clip inspection">
+      <div className="env-media-frame">
+        {src && picture && (
+          <video
+            ref={(element) => {
+              mediaRef.current = element;
+            }}
+            src={src}
+            preload="metadata"
+            playsInline
+            onClick={toggle}
+            onTimeUpdate={(event) => setClipT(event.currentTarget.currentTime)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            onError={() => {
+              setFailed(true);
+              setPlaying(false);
+            }}
+            aria-label="Recorded source video"
+          />
+        )}
+
+        {src && !picture && (
+          <audio
+            ref={(element) => {
+              mediaRef.current = element;
+            }}
+            src={src}
+            preload="metadata"
+            onTimeUpdate={(event) => setClipT(event.currentTarget.currentTime)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            onError={() => {
+              setFailed(true);
+              setPlaying(false);
+            }}
+          />
+        )}
+
+        {(!src || failed) && (
+          <p className="env-media-unavailable">
+            {failed ? "The recorded media could not be loaded." : "No playable media was recorded."}
+          </p>
+        )}
+
+        {cue && (
+          <div className="env-media-caption" aria-live="polite">
+            <span>Recorded transcript</span>
+            <p lang={bundle.run.pair.source}>{cue.source.text}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="env-media-transport">
+        <button
+          type="button"
+          onClick={() => seek(clipT - 5)}
+          disabled={!src || failed}
+          aria-label="Back 5 seconds"
+        >
+          −5
+        </button>
+        <button
+          type="button"
+          className="env-media-play"
+          onClick={toggle}
+          disabled={!src || failed}
+          aria-label={playing ? "Pause recorded clip" : "Play recorded clip"}
+        >
+          {playing ? "Pause" : "Play"}
+        </button>
+        <button
+          type="button"
+          onClick={() => seek(clipT + 5)}
+          disabled={!src || failed}
+          aria-label="Forward 5 seconds"
+        >
+          +5
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={duration}
+          step={0.1}
+          value={clipT}
+          onChange={(event) => seek(event.currentTarget.valueAsNumber)}
+          disabled={!src || failed}
+          aria-label="Inspect recorded clip"
+          aria-valuetext={`${clock(clipT)} of ${clock(duration)}`}
+        />
+        <time>{clock(clipT)} / {clock(duration)}</time>
+      </div>
+
+      <p className="env-media-boundary">
+        Inspection cursor {clock(clipT)}
+        <span aria-hidden="true"> / </span>
+        Agent playhead {agentPlayhead === null ? "not recorded yet" : clock(agentPlayhead)}
+      </p>
+    </section>
+  );
+}
+
 /** What this worker has looked up. Cross-run memory, arriving one term at a time. */
 function Context({ agent, keep }: { agent: AgentView; keep: Keep }) {
-  if (agent.gloss.length === 0) return <p className="env-empty">nothing looked up yet</p>;
+  if (agent.gloss.length === 0) {
+    return (
+      <div className="env-context-empty">
+        <p className="env-empty">Nothing resolved yet.</p>
+        <p>No browser session was recorded for this run.</p>
+      </div>
+    );
+  }
 
   return (
     <>
-      {agent.gloss.slice(-keep.gloss).map((g, i) => (
-        <div className="env-row" key={`${g.term}-${i}`}>
-          <b>{g.term}</b>
-          <span>{g.gloss}</span>
-        </div>
-      ))}
+      <div className="env-context-list">
+        {agent.gloss.slice(-keep.gloss).map((g, i) => (
+          <div className="env-row" key={`${g.term}-${i}`}>
+            <b>{g.term}</b>
+            <span>{g.gloss}</span>
+          </div>
+        ))}
+      </div>
+      <p className="env-context-boundary">
+        These terms came from transcript resolution. No browser session or visited pages were recorded.
+      </p>
     </>
   );
 }

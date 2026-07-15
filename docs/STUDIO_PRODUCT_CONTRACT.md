@@ -119,9 +119,14 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
   poll, and project its validated source-artifact/task/spawn/worker/grant/operation/output-artifact/
   report facts in a separate production region, but does not project them into the recorded canvas
   or publish results.
-  `media.extract` and `media.seek` are also real fragments. Their validated journal events project as
-  operations when present, but the bounded worker proof does not run them and they remain unavailable
-  to the child. Validated ingest-origin artifacts render as a boring source-artifact region with
+  `media.extract` and `media.seek` are also real fragments. A task-private stdio MCP adapter now
+  exposes either operation to the Codex child only when the scheduler granted it; a loopback bearer
+  bridge injects task/agent identity and the existing media host still enforces live status, exact
+  scope, tool-call budget, source identity, and range. The default bounded proof plans, grants, and
+  executes one real `media.seek`; its validated operation, observation artifact, and receipt project
+  into the production region. `media.extract` is bridge- and host-tested but is not granted by that
+  default proof. Neither tool returns media bytes or semantic findings to the child. Validated
+  ingest-origin artifacts render as a boring source-artifact region with
   identity and content facts only. Artifact references link only to source/output destinations that
   the same production projection actually renders; receipt and other unprojected identities remain
   text.
@@ -141,8 +146,8 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 | 5. Review plan | Work operations, agent/task limits, assumptions, workload, elapsed-time range, cost range | Default Studio calls the read-only host planner and shows exact selected range, explicit proof operation, deterministic workload floor, assumptions, and unavailable elapsed/usage/cost | B+C / real floor wired; estimators and interactive task planner missing | Add producer-backed operation/tier choices and estimators |
 | 6. Start analysis | Accepted plan becomes a run; exact forecast is frozen | **Replay recorded analysis** still starts `ReplayTransport`. Separately, default Studio can **Accept forecast and start local runtime** for a registered owned source; the existing host start freezes the exact reviewed forecast and returns durable identities | A+B / replay plus real and wired local product fragment | Add complete analysis operations and results; do not recast bounded proof as them |
 | 7. Spawn agents | Scheduler creates bounded tasks and workers | Recorded manifest/traces animate only for replay; the owned-source path separately projects validated tasks, spawn requests with pending/accepted/rejected decisions, and registered workers without inserting them into replay topology | A+B / bounded local task, spawn-decision, and worker facts wired separately from replay | Add larger scheduler behavior without creating a swarm-completeness claim |
-| 8. Coordinate | Children inspect scoped inputs and report structured outputs upward | Recorded prose remains replay-only; the local one-child report and parent decision are projected as structured production facts, while the child still cannot inspect media | A+B / bounded report-up wired; larger coordination missing | Parent/orchestrator execution, dependencies, retries, and child tool bridge |
-| 9. Work through media | Agents seek, loop, mark, extract, inspect frames/tracks, and run detectors | Recorded workspaces are projections; host has only real extract and seek; child can call neither | A+B+C / partial | Capability bridge plus remaining media/detector operations and receipts |
+| 8. Coordinate | Children inspect scoped inputs and report structured outputs upward | Recorded prose remains replay-only; the local child can invoke a scheduler-granted media tool through the bounded bridge, retain its real receipt identities in its structured output, and report upward. The parent decision and report remain separately validated | A+B / bounded media-tool plus report-up path wired; larger coordination missing | Parent/orchestrator execution, dependencies, and retries |
+| 9. Work through media | Agents seek, loop, mark, extract, inspect frames/tracks, and run detectors | Recorded workspaces remain projections. The local child bridge exposes only scheduler-granted `media.seek` and/or `media.extract`; the default deterministic proof runs one real bounded seek and projects it. The tools return receipts/artifact identities, not playable bytes or semantic findings | B+C / real seek child path plus bridge-tested extract; remaining tools missing | Add operations/detectors individually with grants, receipts, and honest child-visible results |
 | 10. Control run | Pause, resume, cancel, reconnect, and show accepted state | Pause/resume/stop control replay only. Lab and product local clients project host lifecycle and retry polling from the last consumed journal cursor; product polling atomically updates the separate production fact projection. The host has no pause/resume/cancel endpoint | A+B+C / recorded controls; real local polling/projection wired; runtime controls missing | Add a separate request/ack protocol for live controls without changing replay controls |
 | 11. Publish output | Timed source, translation, withheld lines, captions, study, evidence, exports | Recorded captions, comparison, scores, evidence, glossary, and artifact links render | A / recorded replay | Merge/QC/publish task producing immutable result artifacts |
 | 12. Inspect real run | Operator can audit actual tasks, operations, usage, handoffs, and failures | The owned-source status surface projects polled source-artifact/task/spawn/worker/grant/operation/output-artifact/report facts. Source cards retain only validated identity and content facts; operations retain capability, task, worker, grant, input, range, terminal output/receipt, and failure fields; output lineage retains content, producer, origin, upstream ids, and report references. Artifact references use in-page links only for source/output identities rendered by that projection. The fuller local journal remains manually loadable in `/studio/runtime/` | B / bounded product projection plus full inspector | Expand only with producer-backed facts; do not deep-link into unrelated inspector state |
@@ -229,7 +234,7 @@ numeric measured range. It is a real planner/forecast path, not yet the full tas
 | ID | Required datum or control | Available today | Target semantics | Class / status |
 |---|---|---|---|---|
 | `plan.range` | Draggable selected media range | Owned path shows numeric selected range from the exact host plan; draggable control is absent | Same content-identified range accepted by runtime | B+C / real binding, richer control missing |
-| `plan.operations` | Requested operations/task lanes | Shows the explicit `runtime.worker-contract-proof` operation and range; no operation choices or lanes | Human-readable work plan; no hidden operations | B / real and wired narrow plan |
+| `plan.operations` | Requested operations/task lanes | Shows the explicit `media.seek` operation and exact range that the bounded child proof executes; no operation choices or lanes | Human-readable work plan; no hidden operations | B / real and wired narrow plan |
 | `plan.agent-limits` | Spawn depth, active workers, concurrency | Scheduler limits exist locally; no Studio selection | Policy-bounded choices, not promises of worker count | B+C / partial |
 | `plan.quality` | Model/quality tier | No complete adapter or UI | Versioned choice mapped to supported executor configuration | C / missing |
 | `forecast.floor` | Deterministic requested workload | `studio.forecast.v1` selected and summed explicit-operation media duration is shown as **Workload floor** | Never relabel it elapsed time | B / real and wired |
@@ -259,7 +264,7 @@ visibly labelled as example data and must never enter recorded or production evi
 | `run.production.spawns` | **Spawn requests and decisions** | Shows the requester, bounded requested child contract, and pending/accepted/rejected scheduler decision; accepted decisions name the created task/worker and rejected decisions retain the validated rejection code | Never infer a decision from later worker presence; pending stays unavailable until `spawn.decided` is validated | B / real and wired bounded facts |
 | `run.production.workers` | **Registered workers** | Shows registry identity, kind, task, parent, and journal status from validated production events | Do not treat recorded status as a presence signal or insert the worker into the replay graph | B / real and wired bounded facts |
 | `run.production.grants` | **Capability grants** | Shows scheduler-issued capability, task/worker binding, and exact grant scope | Empty media scope means no media scope was granted; it does not imply a media operation ran | B / real and wired bounded facts |
-| `run.production.operations` | **Production operations** | Shows validated `media.operation_started` identity, capability, task/worker/grant binding, input track and requested range, plus output/receipt or failure only when the corresponding terminal event exists | The deterministic worker proof renders the honest empty state because it runs no media operation; this is not a planned-operation or child-tool claim | B+C / real adapter and UI over existing media-host events; empty in the bounded worker proof |
+| `run.production.operations` | **Production operations** | Shows validated `media.operation_started` identity, capability, task/worker/grant binding, input track and requested range, plus output/receipt or failure only when the corresponding terminal event exists. The default deterministic proof now produces one completed `media.seek` card from real ffmpeg host events | Empty remains empty when no operation event exists; a plan, grant, or worker statement never creates an operation card | B / real child bridge, media host, adapter, and product projection for the bounded seek proof |
 | `run.production.output-lineage` | **Output artifact lineage** | Shows non-ingest artifacts with artifact/content identity, producer task/worker, receipted execution or operation origin, recorded upstream artifact ids, and validated report references | An empty upstream list is displayed as not recorded; it is not replaced with task inputs or guessed media ancestry | B / real and wired for the bounded worker output; media-operation outputs appear only when their validated events exist |
 | `run.production.identity-hooks` | In-page artifact identity links | Links rendered task/spawn/grant/operation inputs and scopes, artifact producer task/worker, rendered operation or latest execution origin, rendered upstream source/output artifacts, and validated report references to stable destinations in the same production region | A receipt id, older unprojected execution, or any other identity without a rendered destination remains plain text; no `/studio/runtime/` deep-link is fabricated | B / real client navigation over validated projected identities |
 | `run.production.reports` | **Structured reports** | Shows the validated report summary, output artifact ids, parent edge, status, and decision reason when present | A submitted report keeps its decision reason unavailable until `report.decided` is validated | B / real and wired bounded facts |
@@ -404,7 +409,7 @@ submit-to-result wiring slice.
 | Dynamic agent registry/grants/scopes | Swarm/agent focus | Production scheduler/registry | Real local; spawn requests/decisions, worker identities, and exact grants/scopes are projected in the default owned-source surface without entering the replay graph | Architecture |
 | Live events and cursor | Swarm/reconnect | Authenticated runtime-host polling over the append-only journal | Product and lab poll from the last consumed cursor and surface validation errors; events do not enter replay topology | Shared Studio-host wiring |
 | Control request/ack | Dock | None | Missing | Architecture |
-| Media-operation receipts | Agent workspace/evidence | `media.extract`, `media.seek` | Real local; validated operation identity/status/receipt fields project in the default production region when their events exist, while the deterministic child path remains empty and the child is unwired | Architecture |
+| Media-operation receipts | Agent workspace/evidence | Child MCP bridge over `media.extract`, `media.seek` and existing media host | Real local; both bridge calls are host-tested, and the default deterministic child executes one planned/granted `media.seek` whose operation, observation artifact, and receipt project in the product region | Architecture |
 | Runtime source artifact | Source/provenance | Production artifact store | Real local; validated ingest-origin identity and content facts project in the default owned-source region without storage paths or a task-producer claim | Architecture |
 | Remaining media tools/detectors | Agent workspace | None | Missing | Architecture |
 | Worker execution and measured usage | Agent/observability | Codex launcher | Real for one child | Architecture |
@@ -441,8 +446,8 @@ operator starts the loopback host and connects Studio with its bearer token
   -> Studio projects terminal, failed, or interrupted state with the host's safe reason
 ```
 
-Hosted/link ingest, pause/resume/cancel acknowledgement, hosted execution, child media
-inspection, captions or study publication, and production swarm integration remain separate future
+Hosted/link ingest, pause/resume/cancel acknowledgement, hosted execution, child-visible media bytes
+or semantic inspection, captions or study publication, and production swarm integration remain separate future
 boundaries; the local host does not provide them.
 
 Minimum action results:
@@ -501,6 +506,8 @@ Completing this checklist proves the product interface, not the runtime.
 - Deterministic forecast workload-floor tests
 - Default-Studio registered owned-source selection, exact planner, accept/start, and journal polling
 - One bounded local Codex child with journal, usage, output artifact, and report-up
+- A bounded child media bridge for scheduler-granted `media.extract`/`media.seek`, with the
+  deterministic host executing one planned real seek and the real Codex path remaining opt-in
 - Development-only runtime host with registered owned sources, idempotent start/status, and
   authenticated validated cursor polling
 - Manual production journal inspection in `/studio/runtime/`
@@ -535,14 +542,14 @@ create a registered V1 source from explicitly attested browser-selected bytes. I
 
 Still open: hosted/link ingest, speech/language detection for browser V1 ingest, operation/tier
 choices, calibrated estimation, and every larger-runtime item below.
-This slice does not produce autonomous media captions or give the child media tools.
+This slice does not produce autonomous media captions or expose media bytes/findings to the child.
 
 ### Larger runtime work
 
 - Hosted source ingest and hosted runtime service
 - Parent/orchestrator execution beyond the one-child proof
-- Child-process bridge for scheduler-authorized media and detector tools
-- Remaining media operations, acoustic classification, overlap, separation, and visual context
+- Remaining child media operations and detector bridges, acoustic classification, overlap,
+  separation, and visual context
 - Multi-task dependencies, retries, partial publication, merge, and QC
 - Production caption/study publisher and exports
 - Live control acknowledgements plus hosted reconnect, retention, and access policy
@@ -595,6 +602,7 @@ semantics without updating this contract with the UIUX owner.
 | Lab replay and contract fixtures | `src/studio/lab/Lab.tsx`, `src/studio/lab/scenarios.ts`, `src/studio/lab/preflightScenarios.ts` |
 | Local real legacy clip pipeline | `scripts/run-clip.mjs` |
 | Local bounded Codex child | `scripts/run-local-worker.ts`, `src/studio/runtime/production/launcher.ts` |
+| Child media-tool bridge and stdio MCP adapter | `src/studio/runtime/production/executor/childMediaBridge.ts`, `src/studio/runtime/production/executor/mediaMcpServer.ts` |
 | Scheduler/journal/media/handoff fragments | `src/studio/runtime/production/` |
 | Dedicated source-artifact/task/spawn/worker/grant/operation/output-artifact/report adapter | `src/studio/runtime/production/studioProjection.ts` |
 | Workload floor and unavailable estimates | `src/studio/runtime/production/forecast/`, `tests/studio-forecast-production.test.ts` |

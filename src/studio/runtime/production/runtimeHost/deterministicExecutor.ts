@@ -1,4 +1,5 @@
 import { canonicalSha256 } from "../artifactStore.ts";
+import { BoundedChildMediaBridge, type ChildMediaToolResult } from "../executor/childMediaBridge.ts";
 import type {
   ExecutorSpanReceipt,
   LaunchPermit,
@@ -154,6 +155,33 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       throw new Error(reason);
     }
 
+    let mediaResult: ChildMediaToolResult;
+    try {
+      const scope = task.mediaScope[0];
+      if (!scope) throw new Error("The deterministic media proof has no scheduler scope");
+      const bridge = new BoundedChildMediaBridge(task, this.context.mediaHost, {
+        nextOperationId: () => this.context.plannedMediaOperationId,
+      });
+      mediaResult = await bridge.call("media_seek", scope);
+    } catch (error) {
+      const reason = "The deterministic child media bridge did not complete its required receipted seek.";
+      const span = this.span(task, executionId, startedAt, {
+        outcome: "failed",
+        outputArtifactIds: [],
+        failure: reason,
+      });
+      await artifacts.storeJson(span);
+      await ledger.transact(
+        { producer: { kind: "launcher", id: "deterministic-test-executor" }, causationId: executionId },
+        () => ({
+          pending: [{ type: "executor.finished", data: { receipt: span } }] satisfies PendingRuntimeEvent[],
+          result: undefined,
+        }),
+      );
+      await scheduler.transitionTask(task.id, task.assignedAgentId, "failed", reason);
+      throw error;
+    }
+
     const envelope: WorkerOutputEnvelope = {
       schema: "studio.worker-output.v1",
       executionId,
@@ -162,7 +190,10 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       output: {
         name: "execution report",
         kind: "worker-execution-report",
-        content: "Deterministic development-only worker acknowledgement; no model or media work ran.",
+        content:
+          `Deterministic child completed ${mediaResult.capability} as ${mediaResult.operationId}; ` +
+          `output ${mediaResult.outputArtifactId}; receipt ${mediaResult.receiptId}; ` +
+          `receipt content ${mediaResult.receiptContentId}. No media-content finding was produced.`,
       },
     };
     const prepared = await artifacts.prepareWorkerOutput(ledger.runId, envelope);
@@ -190,13 +221,15 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       taskId: task.id,
       agentId: task.assignedAgentId,
       outputArtifactIds: [artifact.id],
-      summary: "Deterministic development-only acknowledgement completed without model or media execution.",
+      summary:
+        `Deterministic child completed one authorized ${mediaResult.capability} operation with ` +
+        `receipt ${mediaResult.receiptId}; no model or media-content interpretation ran.`,
     });
     return { report };
   }
 }
 
-/** Deterministic, controllable test executor. It never records model usage or media evidence. */
+/** Deterministic, controllable child executor. It records no model usage and runs one real receipted seek. */
 export class DeterministicRuntimeExecutor {
   readonly mode: DeterministicExecutionMode;
   readonly control: DeterministicExecutionControl;

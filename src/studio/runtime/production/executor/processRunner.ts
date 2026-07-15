@@ -14,6 +14,7 @@ export interface BoundedProcessInput {
   args: string[];
   cwd: string;
   stdin: string;
+  env?: NodeJS.ProcessEnv;
   timeoutMs: number;
   maxStdoutBytes: number;
   maxStderrBytes: number;
@@ -23,7 +24,7 @@ export function runBoundedProcess(input: BoundedProcessInput): Promise<ProcessRe
   return new Promise((resolve, reject) => {
     const child = spawn(input.executable, input.args, {
       cwd: input.cwd,
-      env: process.env,
+      env: input.env ?? process.env,
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });

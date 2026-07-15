@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 
 import { canonicalSha256, ContentAddressedArtifactStore } from "./artifactStore.ts";
 import type { RuntimeLedger } from "./journal.ts";
@@ -18,6 +19,13 @@ import type {
 import type { PendingRuntimeEvent } from "./protocol.ts";
 import { BoundedReportHost } from "./reportHost.ts";
 import { BoundedRuntimeScheduler } from "./scheduler.ts";
+import { FfmpegCapabilityHost } from "./mediaHost.ts";
+import {
+  BoundedChildMediaBridge,
+  openChildMediaBridge,
+  type ChildMediaCapabilityHost,
+  type OpenChildMediaBridge,
+} from "./executor/childMediaBridge.ts";
 import {
   parseCodexEvents,
   type CodexUsageEvent,
@@ -52,6 +60,17 @@ export interface CodexWorkerLauncherOptions {
   now?: () => Date;
   monotonicNow?: () => number;
   nextExecutionId?: () => string;
+  nextMediaOperationId?: (capability: "media.extract" | "media.seek") => string;
+  mediaHost?: ChildMediaCapabilityHost;
+  mediaMcpServerPath?: string;
+}
+
+function tomlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function tomlStrings(values: readonly string[]): string {
+  return `[${values.map(tomlString).join(",")}]`;
 }
 
 export class CodexExecWorkerLauncher {
@@ -65,8 +84,12 @@ export class CodexExecWorkerLauncher {
       "executable" | "maxStdoutBytes" | "maxStderrBytes" | "maximumWallMs" | "now" | "monotonicNow" | "nextExecutionId"
     >
   > &
-    Pick<CodexWorkerLauncherOptions, "executableArgsPrefix" | "model" | "temporaryRoot">;
+    Pick<
+      CodexWorkerLauncherOptions,
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "mediaMcpServerPath"
+    >;
   private versionPromise: Promise<string> | null = null;
+  private readonly mediaHost: ChildMediaCapabilityHost;
 
   constructor(
     ledger: RuntimeLedger,
@@ -79,6 +102,7 @@ export class CodexExecWorkerLauncher {
     this.scheduler = scheduler;
     this.artifacts = artifacts;
     this.reports = reports;
+    this.mediaHost = options.mediaHost ?? new FfmpegCapabilityHost(ledger, artifacts);
     this.options = {
       executable: options.executable ?? "codex",
       executableArgsPrefix: options.executableArgsPrefix,
@@ -90,6 +114,8 @@ export class CodexExecWorkerLauncher {
       now: options.now ?? (() => new Date()),
       monotonicNow: options.monotonicNow ?? (() => performance.now()),
       nextExecutionId: options.nextExecutionId ?? (() => `execution:${randomUUID()}`),
+      nextMediaOperationId: options.nextMediaOperationId,
+      mediaMcpServerPath: options.mediaMcpServerPath,
     };
   }
 
@@ -220,9 +246,9 @@ export class CodexExecWorkerLauncher {
     }
     if (
       !scheduled.grants.some((grant) => grant.capability === "report.submit") ||
-      scheduled.grants.some((grant) => grant.capability !== "report.submit")
+      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek"].includes(grant.capability))
     ) {
-      throw new Error("Codex executor currently supports only the structured report.submit capability");
+      throw new Error("Codex executor supports only report.submit plus scheduler-granted media.extract/media.seek");
     }
 
     const version = await this.version();
@@ -248,7 +274,17 @@ export class CodexExecWorkerLauncher {
     let processResult: ProcessResult | null = null;
     let usage: ModelUsageReceipt | null = null;
     let executorFinished = false;
+    let mediaBridge: OpenChildMediaBridge | null = null;
     try {
+      const mediaCapabilities = task.grants
+        .map((grant) => grant.capability)
+        .filter((capability): capability is "media.extract" | "media.seek" =>
+          capability === "media.extract" || capability === "media.seek");
+      if (mediaCapabilities.length > 0) {
+        mediaBridge = await openChildMediaBridge(new BoundedChildMediaBridge(task, this.mediaHost, {
+          nextOperationId: this.options.nextMediaOperationId,
+        }));
+      }
       const args = [
         "exec",
         "--json",
@@ -260,9 +296,33 @@ export class CodexExecWorkerLauncher {
         "--skip-git-repo-check",
         "-c",
         "shell_environment_policy.inherit=none",
-        "--output-schema",
-        schemaPath,
       ];
+      if (mediaBridge) {
+        const toolNames = mediaBridge.manifest.tools.map((tool) => tool.name);
+        const serverPath = this.options.mediaMcpServerPath ?? fileURLToPath(
+          new URL("./executor/mediaMcpServer.ts", import.meta.url),
+        );
+        args.push(
+          "-c",
+          `mcp_servers.studio_media.command=${tomlString(process.execPath)}`,
+          "-c",
+          `mcp_servers.studio_media.args=${tomlStrings([serverPath])}`,
+          "-c",
+          "mcp_servers.studio_media.required=true",
+          "-c",
+          `mcp_servers.studio_media.enabled_tools=${tomlStrings(toolNames)}`,
+          "-c",
+          "mcp_servers.studio_media.startup_timeout_sec=5",
+          "-c",
+          `mcp_servers.studio_media.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
+          "-c",
+          `mcp_servers.studio_media.env_vars=${tomlStrings([
+            "STUDIO_CHILD_MEDIA_BRIDGE_URL",
+            "STUDIO_CHILD_MEDIA_BRIDGE_TOKEN",
+          ])}`,
+        );
+      }
+      args.push("--output-schema", schemaPath);
       if (this.options.model) args.push("--model", this.options.model);
       args.push("-");
       processResult = await runProcess({
@@ -270,6 +330,11 @@ export class CodexExecWorkerLauncher {
         args: this.commandArgs(args),
         cwd: directory,
         stdin: workerPrompt(task),
+        env: mediaBridge ? {
+          ...process.env,
+          STUDIO_CHILD_MEDIA_BRIDGE_URL: mediaBridge.endpoint,
+          STUDIO_CHILD_MEDIA_BRIDGE_TOKEN: mediaBridge.token,
+        } : process.env,
         timeoutMs: Math.min(task.budget.wallMs, this.options.maximumWallMs),
         maxStdoutBytes: this.options.maxStdoutBytes,
         maxStderrBytes: this.options.maxStderrBytes,
@@ -288,6 +353,14 @@ export class CodexExecWorkerLauncher {
       }
       const parsed = parseCodexEvents(processResult.stdout);
       usage = await this.recordUsage(executionId, task, version, parsed.usageEvent, parsed.rawUsageEvent);
+      if (mediaCapabilities.some((capability) =>
+        !Object.values(this.ledger.state().operations).some((operation) =>
+          operation.taskId === task.id && operation.capability === capability && operation.status === "completed"))) {
+        throw new LauncherFailure(
+          "Codex child did not complete every granted media capability",
+          "Codex child did not complete its required receipted media operation.",
+        );
+      }
       let workerValue: unknown;
       try {
         workerValue = JSON.parse(parsed.finalMessage);
@@ -391,6 +464,7 @@ export class CodexExecWorkerLauncher {
       }
       throw error;
     } finally {
+      if (mediaBridge) await mediaBridge.close();
       await rm(directory, { recursive: true, force: true });
     }
   }

@@ -137,10 +137,13 @@ content-addressed non-media observation artifact with raw-source lineage.
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
 read-only sandbox, no host environment inherited by model-generated shell commands, JSONL events,
-and a closed output schema. The
-child currently receives only the structured task contract and can use only `report.submit`; media
-capabilities are rejected because no child-process tool bridge exists. Validated output becomes a
-private content-addressed worker artifact and is submitted through the existing handoff host.
+and a closed output schema. For tasks with `media.extract` and/or `media.seek` grants, it also starts
+a task-private authenticated loopback bridge plus a required stdio MCP adapter. The adapter publishes
+only the scheduler-granted tool names and exact scopes. Child requests cannot choose paths, process
+arguments, task/agent identity, or operation ids; the existing ffmpeg capability host remains the
+authority for live ownership, budget, source hash, range, journal events, artifacts, and receipts.
+Validated output becomes a private content-addressed worker artifact and is submitted through the
+existing handoff host. A missing completed operation for any granted media capability fails closed.
 
 Executor events receipt monotonic active duration and the CLI version. The launcher consumes the
 documented `turn.completed.usage` object rather than logs or budgets, stores the exact raw usage event
@@ -153,8 +156,9 @@ This remains a local runtime and exact smoke-tested path, not a hosted service. 
 production adapter folds `studio.runtime.event.v1` directly and `/studio/runtime/` projects an
 operator-selected local journal; neither creates a `RunBundle` nor inserts local activity into a
 recorded demo. Step, loop, mark, track selection, frames, live control acknowledgement, and
-detector/model tool calls remain unavailable capabilities rather than UI claims. The bounded seek
-host operation does not drive a UI playhead and is not bridged into the Codex child.
+detector/model tool calls remain unavailable capabilities rather than UI claims. The bounded child
+bridge returns receipt and artifact identities, not media bytes or semantic findings, and a seek does
+not drive a UI playhead.
 
 ### Explicitly deferred
 

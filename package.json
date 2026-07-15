@@ -11,7 +11,7 @@
     "memory:check": "node --test tests/studio-memory-producer.test.mjs && node scripts/check-memory.mjs",
     "speech:check": "node --test tests/studio-speech-production.test.ts",
     "language:check": "node --test tests/studio-language-production.test.ts",
-    "runtime:check": "node --test tests/studio-runtime-production.test.ts tests/studio-production-adapter.test.ts tests/studio-runtime-validation.test.ts tests/studio-executor-contract.test.ts tests/studio-runtime-inspector.test.ts tests/studio-run-start-production.test.ts tests/studio-runtime-host.test.ts tests/studio-local-runtime-client.test.ts tests/studio-forecast-production.test.ts tests/studio-memory-inspection.test.ts",
+    "runtime:check": "node --test tests/studio-runtime-production.test.ts tests/studio-child-media-bridge.test.ts tests/studio-production-adapter.test.ts tests/studio-runtime-validation.test.ts tests/studio-executor-contract.test.ts tests/studio-runtime-inspector.test.ts tests/studio-run-start-production.test.ts tests/studio-runtime-host.test.ts tests/studio-local-runtime-client.test.ts tests/studio-forecast-production.test.ts tests/studio-memory-inspection.test.ts",
     "runtime:index": "node scripts/index-runtime-observability.ts",
     "runtime:host": "node scripts/run-runtime-host.ts --source-directory public/demo/runs/run-005 --executor deterministic",
     "runtime:host:codex": "node scripts/run-runtime-host.ts --source-directory public/demo/runs/run-005 --executor codex --allow-real-codex",
@@ -33,6 +33,7 @@
     "@astrojs/react": "^6.0.1",
     "@huggingface/transformers": "4.2.0",
     "@iconify-json/ph": "^1.2.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -43,6 +44,7 @@
     "onnxruntime-node": "1.27.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "zod": "^4.4.3",
     "zustand": "^5.0.14"
   }
 }

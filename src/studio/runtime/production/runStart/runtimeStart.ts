@@ -55,17 +55,17 @@ export function createRuntimeStartCommand(
   ) {
     throw new Error("Runtime start command: analysis request does not bind the source-session revision");
   }
-  const operationId = `operation:contract-proof:${canonicalSha256({
+  const operationId = `operation:bounded-media-seek:${canonicalSha256({
     requestId: analysisRequest.requestId,
     range: analysisRequest.range,
   })}`;
   const workPlan: RuntimeStartRecord["workPlan"] = {
     schema: "studio.forecast.work-plan.v1",
-    planId: `plan:contract-proof:${canonicalSha256({ operationId })}`,
+    planId: `plan:bounded-media-seek:${canonicalSha256({ operationId })}`,
     operations: [
       {
         operationId,
-        kind: "runtime.worker-contract-proof",
+        kind: "media.seek",
         range: { ...analysisRequest.range },
       },
     ],
@@ -112,8 +112,8 @@ export function createRuntimePlan(input: RuntimePlanInput): RuntimePlan {
 }
 
 /**
- * Build the first honest plan: a bounded worker-contract proof scoped to the selected source
- * range. It does not claim transcription, translation, media inspection, captions, or study work.
+ * Build the first honest plan: one bounded, receipted media.seek child proof scoped to the selected
+ * source range. It does not claim semantic inspection, transcription, translation, captions, or study work.
  */
 export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
   assertProductionSourceSession(input.sourceSession);

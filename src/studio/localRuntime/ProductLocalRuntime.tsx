@@ -401,8 +401,8 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
         <h4 id="product-runtime-operations-title">Production operations</h4>
         {projection.operations.length === 0 ? (
           <p className="product-runtime-unavailable" data-production-empty="operations">
-            Unavailable until a <code>media.operation_started</code> event is validated. The
-            bounded worker proof does not run a media operation.
+            Unavailable until a <code>media.operation_started</code> event is validated. No
+            operation is inferred from a plan, grant, or worker claim.
           </p>
         ) : (
           <div className="product-runtime-fact-list">

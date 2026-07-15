@@ -292,7 +292,7 @@ values distinctly and explain which assumptions dominate the estimate.
 | Source and run start | A loopback runtime-start host accepts explicitly attested bounded owned bytes or operator-selected preflight directories, invokes the existing ingest/ffprobe/V1-seal chain for browser media, revalidates every indexed byte, hot-registers and resolves stable session/revision identities, exposes a read-only exact plan, durably claims `commandId`, writes an immutable adjacent `studio.runtime-start.v1`, and launches one bounded child at most once. Default Studio can ingest, select, plan, start, and poll without entering replay state | Hosted/link ingest, speech/language detection for browser V1 ingest, a separately versioned production start event if later required, and scheduler task propagation of the accepted language context |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and an atomic production-only source-artifact/task/spawn-decision/worker/grant/operation/output-artifact/report projection streamed by the owned-source host poll | Add larger scheduler behavior without altering recorded bundles or claiming a complete swarm |
 | Workspaces | Role-specific legacy trace projections plus boring production-only source-artifact, task, spawn-decision, grant, operation, output-lineage, and report regions with in-page links only to identities rendered in that projection | A production agent workspace remains separate work |
-| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, a receipted ffmpeg range extraction host, and a bounded receipted seek observation host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
+| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, receipted ffmpeg extract/seek hosts, and a task-private child bridge that exposes only scheduler-granted `media_extract`/`media_seek`. The default proof plans and executes one bounded seek | Additional individually implemented media operations, child-visible media evidence where justified, and detector-backed acoustic/overlap tracks or stems |
 | Coordination | Legacy trace prose plus real bounded Codex child execution, worker-output artifacts, structured report-up, and a separate validated report projection in the owned-source product path | Parent/orchestrator execution beyond the one-child launcher proof; never retrofit legacy prose into handoffs |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Captions, comparison, scores, raw receipts, hashed artifacts, terminal cue-decision index, and a separate owned-source projection of validated source identity/content facts plus operation and worker-output identity/receipt/report lineage with honest in-page identity hooks | Production caption/study publication |
@@ -314,18 +314,18 @@ workers. It does not start the runtime, search raw journal text, insert events i
 
 | Phase | Status | Honest boundary |
 |---|---|---|
-| 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. One targeted desktop Playwright case exercised the host-backed production projection on 2026-07-15; the in-app browser surface and full desktop/mobile matrix were unavailable for this slice. |
+| 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. A targeted desktop Playwright case now asserts the host-backed non-empty operation and output lineage, but it was not browser-executed in this slice because the in-app browser exposed no target. |
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
 | 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Default Studio now sends explicitly attested owned bytes to the development host, which composes the existing ingest and V1 seal producers and hot-registers the validated source. This browser path does not run speech or language detection, so those findings remain honestly unavailable. Pinned Silero VAD and Whisper language producers remain available to the CLI preflight chain. Hosted/link submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
-| 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` no longer reads a fixed `run-005` path internally: it requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the existing bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, journals its lifecycle, stores its structured output, and reports through the handoff host. `run-005` remains only the explicit npm smoke/test input. The static Studio is not a runtime service and no live socket/control path is claimed. |
-| 4 — scoped media | Two operations implemented | `media.extract` emits a derived audio artifact and `media.seek` decodes a granted audio interval to a null sink, storing the receipt itself as a content-addressed observation artifact with source lineage. Both re-hash the source and enforce exact grants. The Codex child cannot invoke either operation; step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools are not claimed. |
+| 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, installs only its granted media MCP tools, requires each granted media capability to produce a completed journal operation, stores its structured output, and reports through the handoff host. `run-005` remains only the explicit npm smoke/test input. The static Studio is not a runtime service and no live socket/control path is claimed. |
+| 4 — scoped media | Two host operations plus child bridge implemented | `media.extract` emits a derived audio artifact and `media.seek` decodes a granted audio interval to a null sink, storing the receipt itself as a content-addressed observation artifact with source lineage. Both re-hash the source and enforce exact grants. A task-private loopback/bearer bridge and required stdio MCP server expose only granted `media_extract`/`media_seek`; they inject task/agent and host-derived operation identity, accept no paths, and return only receipt/artifact facts. The default deterministic proof grants and executes one real seek. Step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools and semantic media findings are not claimed. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
-| 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real derived-media lineage, worker-output content, executor identity, and structured handoff. The owned-source product region projects validated ingest-origin identity/content facts plus operation identity/status/request/terminal facts and non-ingest output identity, producer, origin, recorded upstream ids, and report references. Artifact references link only to source/output identities rendered by that same projection; receipts and other absent identities have no fabricated destination. The deterministic host exercises worker-output lineage only and therefore shows the operation empty state; the child still cannot produce media-operation lineage. Legacy report/merge prose is not recast as provenance. |
+| 6 — provenance | Partially implemented | Recorded artifacts and terminal cue decisions have a deterministic post-run index; the production runtime receipts real media-operation lineage, worker-output content, executor identity, and structured handoff. The owned-source product region projects validated ingest-origin facts plus operation request/terminal facts and non-ingest output identity, producer, origin, recorded upstream ids, and report references. The deterministic child now produces one `media.seek` observation artifact with raw-source lineage alongside its separate worker output/report. Artifact references link only to identities rendered by that projection; receipts and other absent identities have no fabricated destination. Legacy report/merge prose is not recast as provenance. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
-| 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. A prior targeted desktop host-backed task/worker/grant/report case passed. Source-artifact region, conditional source-link, spawn-decision, and output-lineage assertions are now authored in that deterministic-host case, and desktop/mobile discovery passes, but the case was not browser-executed in this slice because the in-app browser had no available target. The full desktop/mobile browser matrix was not run, and no live control producer exists. |
+| 8 — verification | Partially implemented | Build, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Task/worker/grant/report, source-artifact, spawn-decision, non-empty operation, receipt, and output-lineage assertions are authored in the deterministic-host case, but the updated case was not browser-executed in this slice because the in-app browser exposed no target. The full desktop/mobile browser matrix was not run, and no live control producer exists. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
 | 10 — forecasting | Deterministic floor plus product forecast surface implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `POST /v1/runtime-plans` returns the exact forecast without creating a command or runtime directory. Default Studio validates it, shows its range/floor/operation/assumptions, and leaves unavailable values unavailable. Start freezes that same content into `run-start.json`; no pricing, calibration, operation-choice, or evaluation producer is claimed. |
-| 11 — local runtime-start host | Local product fragment implemented | A transport-independent service plus Node HTTP adapter accepts bounded owned bytes through authenticated create/upload/status endpoints, uses only host-chosen ignored paths and fixed producer arguments, hot-registers the sealed V1 source, then preserves the stable-identity plan/start/poll path. Default Studio provides explicit file/rights/progress/select/plan/start/poll controls and atomically projects validated source-artifact/task/spawn-decision/worker/grant/operation/output-artifact/report facts through a dedicated production adapter; the deterministic proof has no operation events and renders that absence. Artifact references link only to identities present in the same projection. The lab remains available. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
+| 11 — local runtime-start host | Local product fragment implemented | A transport-independent service plus Node HTTP adapter accepts bounded owned bytes through authenticated create/upload/status endpoints, uses only host-chosen ignored paths and fixed producer arguments, hot-registers the sealed V1 source, then preserves the stable-identity plan/start/poll path. Default Studio provides explicit file/rights/progress/select/plan/start/poll controls and atomically projects validated source-artifact/task/spawn-decision/worker/grant/operation/output-artifact/report facts through a dedicated production adapter. The reviewed plan, scheduler grant, child bridge call, media-host operation, and projected operation share the planned `media.seek` identity in the default deterministic proof. Artifact references link only to identities present in the same projection. The lab remains available. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
 
 ## Local runtime-start host
 
@@ -419,14 +419,16 @@ exact forecast; the product client fails closed if command, runtime, analysis-re
 content identities differ from review.
 
 There is no pause/resume/cancel endpoint. The host does not link-ingest or host remote sources. It starts
-only the existing one-child proof objective: no child media tools, media inspection, transcription,
-translation, captions, study output, parent/orchestrator model execution, or multi-worker swarm.
+only the existing one-child proof objective with one exact scheduler-granted `media.seek`: the child
+receives no media path or bytes, and no transcription, translation, captions, study output,
+parent/orchestrator model execution, or multi-worker swarm is implied.
 Default `/studio/` now offers an explicit **Use owned local source** path that lists registered
 sessions, shows validated source facts, reviews the exact floor, starts, reads lifecycle, and polls
 validated events. The product poll sends complete validated batches through the production-only
 adapter and renders separate source-artifact, task, spawn request/decision, registered-worker,
 capability-grant, operation, output-artifact lineage, and structured-report facts. The deterministic
-proof emits no media-operation events, so that region stays explicitly unavailable. Raw ingest
+proof invokes the same task-private bridge and real ffmpeg seek host, so that region contains one
+completed receipted operation. It remains empty whenever no validated operation events exist. Raw ingest
 artifacts are not relabelled as outputs: their region exposes identity and content facts only, and
 their storage paths remain absent. Artifact references navigate only to rendered source/output
 identities in this same region; receipt identities remain text. A rejected batch leaves the last
@@ -455,8 +457,8 @@ identical start** still confirms the same
 command/runtime/journal/receipt/forecast identities. The UI polls from `after=0` until
 `reachedHead` and `terminal` are true and shows the validated production task, spawn decision,
 worker, grant, source-artifact, output-artifact lineage, and report facts below the runtime identities. The
-production-operations region explicitly remains unavailable on this deterministic path because no
-media host operation ran. Stop and restart the same command with
+production-operations region shows the completed `media.seek`, input and observation-artifact lineage,
+and receipt identity produced by the real host operation. Stop and restart the same command with
 the same ignored `.studio/runtime-host` root, query its command/runtime status, and continue from the
 prior cursor. The emitted `events.ndjson` remains directly loadable through the existing manual
 `/studio/runtime/` file picker. `npm run runtime:host:codex` is the separately guarded real-executor
@@ -749,11 +751,13 @@ The next production slices, in dependency order:
 4. Implemented 2026-07-14 for the available producer: the launcher receipts monotonic active spans
    and exact `turn.completed` token usage with a content-addressed raw receipt. Model identity when
    the CLI default is used, provider units, billing, and non-active span phases stay null/unavailable.
-5. Implemented 2026-07-14: bounded `media.seek` observation re-hashes the source, invokes ffmpeg with
+5. Implemented 2026-07-14, extended 2026-07-15: bounded `media.seek` observation re-hashes the source, invokes ffmpeg with
    fixed host arguments to seek and decode only the exact granted audio interval to a null sink,
    stores its receipt as a content-addressed non-media artifact with raw-source lineage, and journals
-   it through the production projection. It is scheduler/host-only: the Codex child still exposes
-   only `report.submit`, and no UI playhead, step/loop/mark, frame, or other media operation is claimed.
+   it through the production projection. A task-private loopback bridge now exposes `media_seek` and/or
+   `media_extract` only when the scheduler task owns the matching grant and exact scope; the media host
+   remains authoritative for live ownership, budget, source hash, range, event, artifact, and receipt
+   checks. No UI playhead, step/loop/mark, frame, or other media operation is claimed.
 6. Implemented 2026-07-14: deterministic immutable observability index over validated real
    production journals, exact journal and canonical source hashes, stored-receipt cross-checks,
    normalized task/agent/media-operation/handoff/active-span/measured-token/failure facts, typed
@@ -796,10 +800,18 @@ The next production slices, in dependency order:
     start wiring. The default owned-source path now folds polled events atomically into dedicated
     source-artifact/task/spawn-decision/worker/grant/operation/output-artifact/report view-models and
     renders them outside legacy replay state. Operation cards consume only existing validated
-    media-host events and remain empty for the deterministic worker proof. The source-artifact region
+    media-host events; the deterministic worker proof now produces one real completed seek, while
+    any execution with no operation events still projects an empty operations region. The source-artifact region
     exposes only validated identity and content facts. Artifact references have in-page hooks only to
-    rendered source/output, task, worker, operation/execution, and report identities. No child
-    media, caption, study, swarm completeness, or hosted-runtime capability is implied.
+    rendered source/output, task, worker, operation/execution, and report identities. No child-visible
+    media bytes, caption, study, swarm completeness, or hosted-runtime capability is implied.
+12. Implemented 2026-07-15: the bounded child media bridge publishes only the task's granted
+    `media_extract`/`media_seek` MCP tools, strips caller control over paths and operation identity,
+    forwards exact range calls to the existing ffmpeg capability host, and returns closed receipt and
+    artifact identities. The deterministic executor and a real stdio MCP child-process test exercise
+    grant -> call -> journal -> projection. The launcher is configured and host-tested with a fake
+    Codex JSONL process; a real model-backed `codex exec` invocation remains operator-only and was not
+    required to establish the bridge or media-host evidence.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow
 the same rule: choose a real deterministic producer first, then add the contract, fixture, policy,

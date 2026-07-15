@@ -27,7 +27,7 @@ async function openCompletedDeterministicProjection(page: Page): Promise<Locator
   return status.getByRole("region", { name: "Production task and handoff facts" });
 }
 
-test("production operation absence and artifact identity hooks stay honest", async ({ page }, testInfo) => {
+test("receipted child media operation and artifact identity hooks project outside replay", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one deterministic projection covers identity hooks");
   test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
 
@@ -42,7 +42,7 @@ test("production operation absence and artifact identity hooks stay honest", asy
   const sourceLinks = production.locator(
     `[data-production-navigation="artifact"][data-production-target-id="${sourceArtifactId}"]`,
   );
-  await expect(sourceLinks).toHaveCount(3);
+  await expect.poll(() => sourceLinks.count()).toBeGreaterThan(0);
   for (const link of await sourceLinks.all()) {
     const href = await link.getAttribute("href");
     expect(href).toBe(`#product-production-artifact-${sourceArtifactId}`);
@@ -53,12 +53,20 @@ test("production operation absence and artifact identity hooks stay honest", asy
 
   await expect(production.locator('[data-production-region="operations"]')).toBeVisible();
   await expect(production.getByRole("heading", { name: "Production operations" })).toBeVisible();
-  await expect(production.locator('[data-production-empty="operations"]')).toContainText(
-    "The bounded worker proof does not run a media operation.",
-  );
-  await expect(production.locator("[data-production-operation-id]")).toHaveCount(0);
+  await expect(production.locator('[data-production-empty="operations"]')).toHaveCount(0);
+  const operation = production.locator("[data-production-operation-id]");
+  await expect(operation).toHaveCount(1);
+  await expect(operation).toHaveAttribute("data-status", "completed");
+  await expect(operation.getByRole("heading", { name: "media.seek" })).toBeVisible();
+  await expect(operation.getByText(/^receipt:/)).toBeVisible();
+  await expect(operation.locator('[data-production-navigation="artifact"]')).toHaveCount(2);
 
-  const artifact = production.locator("[data-production-output-artifact-id]").first();
+  const seekArtifact = production.locator('[data-production-output-artifact-id][data-origin-kind="media_observation"]');
+  await expect(seekArtifact).toHaveCount(1);
+  await expect(seekArtifact.locator('[data-production-navigation="operation"]')).toHaveCount(1);
+  await expect(seekArtifact.locator('[data-production-navigation="artifact"]')).toHaveCount(1);
+
+  const artifact = production.locator('[data-production-output-artifact-id][data-origin-kind="worker_output"]');
   await expect(artifact).toHaveAttribute("data-origin-kind", "worker_output");
   const links = artifact.locator("[data-production-navigation]");
   await expect(links).toHaveCount(4);

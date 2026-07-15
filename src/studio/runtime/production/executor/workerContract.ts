@@ -108,6 +108,12 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
 }
 
 export function workerPrompt(task: TaskRecord): string {
+  const mediaTools = task.grants.flatMap((grant) =>
+    grant.capability === "media.extract"
+      ? ["media_extract"]
+      : grant.capability === "media.seek"
+        ? ["media_seek"]
+        : []);
   const contract = {
     taskId: task.id,
     objective: task.objective,
@@ -116,11 +122,21 @@ export function workerPrompt(task: TaskRecord): string {
     inputArtifactIds: task.inputArtifactIds,
     mediaScope: task.mediaScope,
     budget: task.budget,
+    grantedMediaTools: mediaTools,
   };
+  const mediaBoundary = mediaTools.length === 0
+    ? "This executor exposes no media bytes and no media tools. Do not claim that you inspected, heard, translated, or measured media."
+    : [
+        `This executor exposes only these scheduler-granted media tools: ${mediaTools.join(", ")}.`,
+        "Invoke only the tool and exact artifact, track, and half-open millisecond range named by the contract.",
+        "A media operation occurred only when the tool returns a studio.child-media-tool-result.v1 receipt.",
+        "The tools return receipt and artifact identities, not media bytes or semantic findings; do not claim what the media contains, sounds like, says, or means.",
+        "Include the returned operation, artifact, receipt, and receipt-content identities in the required worker output.",
+      ].join(" ");
   return [
     "You are one isolated child in the 1321 Studio production runtime.",
     "Complete only the bounded task contract below and return the JSON required by the supplied output schema.",
-    "This executor exposes no media bytes and no Studio tools. Do not claim that you inspected, heard, translated, or measured media.",
+    mediaBoundary,
     "Output content is a worker-authored artifact proposal; the parent decides whether to accept it.",
     JSON.stringify(contract),
   ].join("\n\n");

@@ -223,8 +223,40 @@ for (const value of required) {
 if (args.at(-1) !== "-") throw new Error("worker prompt must arrive on stdin");
 let prompt = "";
 for await (const chunk of process.stdin) prompt += chunk;
-if (!prompt.includes("exposes no media bytes") || !prompt.includes("bounded child contract")) {
+const mediaTask = prompt.includes("scheduler-granted media tools: media_seek");
+if ((!mediaTask && !prompt.includes("exposes no media bytes")) || !prompt.includes("bounded task contract")) {
   throw new Error("bounded prompt was not supplied");
+}
+let mediaResult = null;
+if (mediaTask) {
+  const configs = args.flatMap((value, index) => value === "-c" ? [args[index + 1]] : []);
+  const requiredMediaConfig = [
+    "mcp_servers.studio_media.command=",
+    "mcp_servers.studio_media.args=",
+    "mcp_servers.studio_media.required=true",
+    "mcp_servers.studio_media.enabled_tools=[\\\"media_seek\\\"]",
+    "mcp_servers.studio_media.env_vars=",
+  ];
+  for (const value of requiredMediaConfig) {
+    if (!configs.some((config) => config.startsWith(value))) throw new Error("missing media bridge config " + value);
+  }
+  if (!process.env.STUDIO_CHILD_MEDIA_BRIDGE_URL || !process.env.STUDIO_CHILD_MEDIA_BRIDGE_TOKEN) {
+    throw new Error("missing media bridge environment");
+  }
+  if (mode === "media-seek") {
+    const contract = JSON.parse(prompt.split("\\n\\n").at(-1));
+    const response = await fetch(process.env.STUDIO_CHILD_MEDIA_BRIDGE_URL + "/v1/call", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + process.env.STUDIO_CHILD_MEDIA_BRIDGE_TOKEN,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: "media_seek", arguments: contract.mediaScope[0] }),
+    });
+    const body = await response.json();
+    if (!response.ok || body.ok !== true) throw new Error("media bridge call failed");
+    mediaResult = body.result;
+  }
 }
 if (mode === "hang") await new Promise((resolve) => setTimeout(resolve, 60_000));
 const schemaPath = args[args.indexOf("--output-schema") + 1];
@@ -232,8 +264,16 @@ const schema = JSON.parse(await readFile(schemaPath, "utf8"));
 const name = schema.properties.outputs.items.properties.name.enum[0];
 const kind = schema.properties.outputs.items.properties.kind.enum[0];
 const output = {
-  summary: "The isolated child completed its bounded acknowledgement and made no media claim.",
-  outputs: [{ name, kind, content: "Bounded worker execution acknowledged; media inspection was unavailable." }],
+  summary: mediaResult
+    ? "The isolated child completed one receipted seek without a media-content claim."
+    : "The isolated child completed its bounded acknowledgement and made no media claim.",
+  outputs: [{
+    name,
+    kind,
+    content: mediaResult
+      ? "Completed " + mediaResult.operationId + "; artifact " + mediaResult.outputArtifactId + "; receipt " + mediaResult.receiptId + "; receipt content " + mediaResult.receiptContentId + "."
+      : "Bounded worker execution acknowledged; no media-content finding was made.",
+  }],
 };
 if (mode === "open-output") output.unreceipted = true;
 const events = [
@@ -583,14 +623,91 @@ test("Codex launcher registers a bounded child, receipts active time and measure
   }
 });
 
+test("Codex launcher binds a scheduler-granted media.seek child to the real receipted bridge", async () => {
+  const runtime = await harness(BASE_LIMITS, "file");
+  try {
+    const decision = await runtime.scheduler.requestSpawn(
+      runtime.rootTaskId,
+      runtime.rootAgentId,
+      seekChildInput(runtime),
+    );
+    assert.ok(decision.permit);
+    const fake = await fakeCodex(runtime, "media-seek");
+    const launcher = new CodexExecWorkerLauncher(
+      runtime.ledger,
+      runtime.scheduler,
+      runtime.store,
+      new BoundedReportHost(runtime.ledger, () => "report:codex-media-seek"),
+      {
+        executable: fake.executable,
+        executableArgsPrefix: fake.prefix,
+        nextExecutionId: () => "execution:codex-media-seek",
+        nextMediaOperationId: () => "operation:codex-child-media-seek",
+        maximumWallMs: 5_000,
+      },
+    );
+
+    const result = await launcher.launch(decision.permit);
+    assert.equal(result.execution.outcome, "completed");
+    assert.equal(result.report.status, "submitted");
+    const state = runtime.ledger.state();
+    assert.equal(state.operations["operation:codex-child-media-seek"].status, "completed");
+    assert.equal(state.operations["operation:codex-child-media-seek"].capability, "media.seek");
+    const operationArtifact = state.artifacts[state.operations["operation:codex-child-media-seek"].outputArtifactId!];
+    assert.equal(operationArtifact.origin.kind, "media_observation");
+    const workerBytes = await runtime.store.receiptBytes(result.artifacts[0].content.contentId);
+    const workerEnvelope = JSON.parse(workerBytes.toString("utf8")) as { output: { content: string } };
+    assert.match(workerEnvelope.output.content, /operation:codex-child-media-seek/);
+    assert.match(workerEnvelope.output.content, /receipt:/);
+    const studio = projectProductionRuntimeJournal(await runtime.ledger.events());
+    assert.equal(studio.operations.length, 1);
+    assert.equal(studio.operations[0].status, "completed");
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("Codex media grant fails closed when the child returns without invoking its required tool", async () => {
+  const runtime = await harness();
+  try {
+    const decision = await runtime.scheduler.requestSpawn(
+      runtime.rootTaskId,
+      runtime.rootAgentId,
+      seekChildInput(runtime),
+    );
+    assert.ok(decision.permit);
+    const fake = await fakeCodex(runtime, "media-skip");
+    const launcher = new CodexExecWorkerLauncher(
+      runtime.ledger,
+      runtime.scheduler,
+      runtime.store,
+      new BoundedReportHost(runtime.ledger),
+      {
+        executable: fake.executable,
+        executableArgsPrefix: fake.prefix,
+        nextExecutionId: () => "execution:codex-media-skip",
+      },
+    );
+    await assert.rejects(launcher.launch(decision.permit), /did not complete every granted media capability/);
+    const state = runtime.ledger.state();
+    assert.equal(state.tasks[decision.permit.taskId].status, "failed");
+    assert.equal(state.executions["execution:codex-media-skip"].status, "failed");
+    assert.equal(Object.keys(state.operations).length, 0);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
 test("Codex launcher fails closed on unsupported capabilities and invalid child output", async (suite) => {
   await suite.test("unsupported capability is rejected before registration", async () => {
     const runtime = await harness();
     try {
+      const unsupported = codexChildInput(runtime);
+      unsupported.requiredCapabilities = ["task.spawn.request", "report.submit"];
       const decision = await runtime.scheduler.requestSpawn(
         runtime.rootTaskId,
         runtime.rootAgentId,
-        childInput(runtime),
+        unsupported,
       );
       const fake = await fakeCodex(runtime);
       const launcher = new CodexExecWorkerLauncher(
@@ -601,7 +718,10 @@ test("Codex launcher fails closed on unsupported capabilities and invalid child 
         { executable: fake.executable, executableArgsPrefix: fake.prefix },
       );
       const before = (await runtime.ledger.events()).length;
-      await assert.rejects(launcher.launch(decision.permit!), /supports only the structured report.submit capability/);
+      await assert.rejects(
+        launcher.launch(decision.permit!),
+        /supports only report.submit plus scheduler-granted media.extract\/media.seek/,
+      );
       assert.equal((await runtime.ledger.events()).length, before);
       assert.equal(runtime.ledger.state().tasks[decision.permit!.taskId].ownerAgentId, null);
     } finally {

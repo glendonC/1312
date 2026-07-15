@@ -388,22 +388,33 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.workers.length, 2);
     assert.deepEqual(
       inspector.projection.grants.map((grant) => grant.capability).sort(),
-      ["report.submit", "task.spawn.request"],
+      ["media.seek", "report.submit", "task.spawn.request"],
     );
     assert.equal(inspector.projection.reports.length, 1);
     assert.equal(inspector.projection.reports[0].status, "accepted");
     assert.equal(inspector.projection.spawnRequests.length, 1);
     assert.equal(inspector.projection.spawnRequests[0].decision, "accepted");
     assert.equal(inspector.projection.spawnRequests[0].requestedByTaskId, inspector.projection.tasks[0].taskId);
-    assert.equal(inspector.projection.spawnRequests[0].requiredCapabilities[0], "report.submit");
-    assert.equal(inspector.projection.outputArtifacts.length, 1);
-    assert.equal(inspector.projection.outputArtifacts[0].kind, "worker-execution-report");
-    assert.equal(inspector.projection.outputArtifacts[0].origin.kind, "worker_output");
-    assert.deepEqual(inspector.projection.outputArtifacts[0].sourceArtifactIds, []);
     assert.deepEqual(
-      inspector.projection.outputArtifacts[0].reportIds,
+      inspector.projection.spawnRequests[0].requiredCapabilities,
+      ["media.seek", "report.submit"],
+    );
+    assert.equal(inspector.projection.operations.length, 1);
+    assert.equal(inspector.projection.operations[0].capability, "media.seek");
+    assert.equal(inspector.projection.operations[0].status, "completed");
+    assert.equal(inspector.projection.outputArtifacts.length, 2);
+    const workerOutput = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "worker_output");
+    const seekObservation = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "media_observation");
+    assert.ok(workerOutput);
+    assert.ok(seekObservation);
+    assert.equal(workerOutput.kind, "worker-execution-report");
+    assert.deepEqual(workerOutput.sourceArtifactIds, []);
+    assert.deepEqual(seekObservation.sourceArtifactIds, [inspector.projection.sourceArtifacts[0].artifactId]);
+    assert.deepEqual(
+      workerOutput.reportIds,
       [inspector.projection.reports[0].reportId],
     );
+    assert.deepEqual(seekObservation.reportIds, []);
 
     const reopened = await RuntimeStartService.open({
       store: runtime.store,

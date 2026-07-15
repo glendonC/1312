@@ -23,6 +23,9 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
 - a content-addressed artifact store with closed ingest and media-operation origins;
 - a capability host that performs real, scoped ffmpeg audio-range extraction and bounded audio seek
   observation, with content-addressed receipts and source lineage;
+- a task-private child bridge that publishes only scheduler-granted `media_extract`/`media_seek`,
+  accepts no caller paths or operation ids, and delegates authorization, budget, source, range,
+  journal, artifact, and receipt authority to that capability host;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
 The exact runtime test executes that path against the receipted run-005 media and reopens the event
@@ -38,10 +41,10 @@ and renders production-only source-artifact, task, spawn request/decision, worke
 output-artifact lineage, and report facts without creating a `RunBundle`, legacy trace, or replay
 agent. The source region exposes only validated ingest-origin identity and content facts, and
 artifact references link only when their source/output destination is rendered. The deterministic
-host exercises worker-output receipt/report lineage and no media operation. No hosted runtime
-service or live control acknowledgement producer
-exists. The launcher still exposes only `report.submit` to its child because no child-process media
-tool bridge exists. `media.extract` and `media.seek` are real scheduler/host capabilities; the other
+host exercises one real bounded seek plus worker-output receipt/report lineage. No hosted runtime
+service or live control acknowledgement producer exists. The launcher can expose `media_extract`
+and/or `media_seek` only for matching live task grants, in addition to the closed structured report
+output. `media.extract` and `media.seek` are real scheduler/host/child-bridge capabilities; the other
 media operations and detector/model calls in this proposal remain unavailable. The tables below
 continue to document the fixture contract itself and should not be read as the production wire
 schema.

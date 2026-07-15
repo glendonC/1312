@@ -105,8 +105,21 @@ test("worker contract uses one closed schema, validator, and no-media prompt", (
   assert.equal(schema.additionalProperties, false);
   assert.equal(schema.properties.outputs.minItems, 1);
   assert.equal(schema.properties.outputs.maxItems, 1);
-  assert.match(workerPrompt(contract), /exposes no media bytes and no Studio tools/);
+  assert.match(workerPrompt(contract), /exposes no media bytes and no media tools/);
   assert.match(workerPrompt(contract), /Return one bounded acknowledgement/);
+
+  const mediaContract = structuredClone(contract);
+  mediaContract.mediaScope = [{ artifactId: "artifact:source", trackId: "stream:0", startMs: 0, endMs: 1_000 }];
+  mediaContract.grants.unshift({
+    id: "grant:seek",
+    capability: "media.seek",
+    taskId: mediaContract.id,
+    agentId: mediaContract.assignedAgentId,
+    mediaScope: structuredClone(mediaContract.mediaScope),
+  });
+  assert.match(workerPrompt(mediaContract), /scheduler-granted media tools: media_seek/);
+  assert.match(workerPrompt(mediaContract), /operation occurred only when the tool returns/);
+  assert.match(workerPrompt(mediaContract), /not media bytes or semantic findings/);
 });
 
 test("bounded process runner reports output overflow without accepting excess bytes", async () => {

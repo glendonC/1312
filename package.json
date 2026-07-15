@@ -11,7 +11,7 @@
     "memory:check": "node --test tests/studio-memory-producer.test.mjs && node scripts/check-memory.mjs",
     "speech:check": "node --test tests/studio-speech-production.test.ts",
     "language:check": "node --test tests/studio-language-production.test.ts",
-    "runtime:check": "node --test tests/studio-runtime-production.test.ts tests/studio-runtime-validation.test.ts tests/studio-executor-contract.test.ts tests/studio-runtime-inspector.test.ts tests/studio-run-start-production.test.ts tests/studio-runtime-host.test.ts tests/studio-forecast-production.test.ts tests/studio-memory-inspection.test.ts",
+    "runtime:check": "node --test tests/studio-runtime-production.test.ts tests/studio-runtime-validation.test.ts tests/studio-executor-contract.test.ts tests/studio-runtime-inspector.test.ts tests/studio-run-start-production.test.ts tests/studio-runtime-host.test.ts tests/studio-local-runtime-client.test.ts tests/studio-forecast-production.test.ts tests/studio-memory-inspection.test.ts",
     "runtime:index": "node scripts/index-runtime-observability.ts",
     "runtime:host": "node scripts/run-runtime-host.ts --source-directory public/demo/runs/run-005 --executor deterministic",
     "runtime:host:codex": "node scripts/run-runtime-host.ts --source-directory public/demo/runs/run-005 --executor codex --allow-real-codex",

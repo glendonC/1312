@@ -625,6 +625,19 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     assert.equal(badOrigin.status, 403);
     assert.equal(badOrigin.headers.get("access-control-allow-origin"), null);
 
+    const preflight = await fetch(`${base}/v1/source-sessions`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: origin,
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization",
+      },
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("content-length"), null);
+    assert.equal(await preflight.text(), "");
+    assert.equal(preflight.headers.get("access-control-allow-origin"), origin);
+
     const listed = await fetch(`${base}/v1/source-sessions`, { headers: authorized });
     assert.equal(listed.status, 200);
     assert.equal(listed.headers.get("access-control-allow-origin"), origin);

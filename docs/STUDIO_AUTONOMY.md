@@ -393,14 +393,20 @@ GET  /v1/runtimes/:runtimeId/events?after=<cursor>&limit=<n>
 There is no pause/resume/cancel endpoint. The host does not upload or link-ingest sources. It starts
 only the existing one-child proof objective: no child media tools, media inspection, transcription,
 translation, captions, study output, parent/orchestrator model execution, or multi-worker swarm.
-The main Studio has no host client yet; recorded replay remains a separate protocol.
+The main product loop remains recorded replay. An explicit development-only client under
+`/studio/?lab=1` now lists registered sessions, submits mapped product inputs, consumes durable
+start/forecast identities, reads lifecycle, and polls validated events from its last consumed
+cursor. It does not insert those events into `RunBundle`, legacy traces, or the recorded graph.
 
 ### Deterministic operator path
 
 Run `npm run runtime:host` and copy the random token plus source-session identities from the startup
-summary. Use the token to list sessions, submit a product-level start request, repeat that exact
-request, and confirm both acknowledgements name the same command/runtime/journal and receipt. Poll
-from `after=0` until `reachedHead` and `terminal` are true. Stop and restart the same command with
+summary. Open Studio at the host's allowed origin (default
+`http://127.0.0.1:4321/studio/?lab=1`), expand **Local runtime host**, keep the default host origin,
+paste the token, connect, select a registered source, enter explicit product language inputs, and
+choose **Start local runtime**. **Repeat identical start** confirms the same
+command/runtime/journal/receipt/forecast identities. The UI polls from `after=0` until
+`reachedHead` and `terminal` are true. Stop and restart the same command with
 the same ignored `.studio/runtime-host` root, query its command/runtime status, and continue from the
 prior cursor. The emitted `events.ndjson` remains directly loadable through the existing manual
 `/studio/runtime/` file picker. `npm run runtime:host:codex` is the separately guarded real-executor

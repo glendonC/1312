@@ -64,6 +64,21 @@ function sendJson(
   response.end(body);
 }
 
+function sendNoContent(
+  response: ServerResponse,
+  origin: string,
+  extraHeaders: Record<string, string>,
+): void {
+  response.writeHead(204, {
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Access-Control-Allow-Origin": origin,
+    Vary: "Origin",
+    ...extraHeaders,
+  });
+  response.end();
+}
+
 async function readJsonBody(request: IncomingMessage, maximumBytes: number): Promise<unknown> {
   const declared = request.headers["content-length"];
   if (declared !== undefined) {
@@ -125,7 +140,7 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
       }
       if (request.method === "OPTIONS") {
         if (!origin) throw new RuntimeHostError("origin_required", "CORS preflight requires an allowed origin.", 403);
-        sendJson(response, 204, null, origin, {
+        sendNoContent(response, origin, {
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Authorization, Content-Type",
           "Access-Control-Max-Age": "600",

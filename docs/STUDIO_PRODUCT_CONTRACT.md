@@ -85,11 +85,12 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 
 ## Current system truth
 
-- `/studio/` is hard-wired to `run-006` in `src/pages/studio/index.astro` and boots a
+- Default `/studio/` is hard-wired to `run-006` in `src/pages/studio/index.astro` and boots a
   `ReplayTransport` in `src/studio/StudioApp.tsx` and `src/studio/store.ts`.
-- `ReplayTransport` reads `public/demo/runs/<id>/` files. The current UI does not create a runtime
-  job, call the local runtime-start host, start `scripts/run-clip.mjs`, start
-  `scripts/run-local-worker.ts`, or load a production journal.
+- `ReplayTransport` reads `public/demo/runs/<id>/` files. The default product loop does not create
+  a runtime job, start `scripts/run-clip.mjs`, start `scripts/run-local-worker.ts`, or load a
+  production journal. An explicit development-only `/studio/?lab=1` surface now calls the separate
+  local runtime-start host without changing replay state.
 - A submitted YouTube URL creates a `StudioPreviewSession` with `dataSource: "recorded_run"`.
   It starts the recorded run and displays: “This interface preview uses a recorded run. Your
   source was not processed.”
@@ -98,9 +99,11 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 - A development-only runtime-start host now exists under
   `src/studio/runtime/production/runtimeHost/`. `npm run runtime:host` starts its deterministic
   one-child proof on loopback with bearer authentication, registered owned-source sessions,
-  idempotent start acknowledgements, lifecycle lookup, and validated cursor polling. `/studio/`
-  has no host client and does not call it, so the host remains Class B: a real producer with its UI
-  unwired.
+  idempotent start acknowledgements, lifecycle lookup, and validated cursor polling. The lab-only
+  browser client lists its registered sources, sends product inputs plus stable session/revision
+  identities, consumes the acknowledgement and frozen identities, and polls validated events from
+  the last consumed cursor. This is a real and wired development fragment, not the complete Studio
+  product loop.
 - `/studio/runtime/` validates one operator-selected local NDJSON journal and projects normalized
   facts. A host journal remains manually loadable there, but the inspector does not start or
   connect to the host. Its own page states that it “does not start a worker, search raw logs, or
@@ -123,11 +126,11 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 | 3. Choose range | Suggested, detected-language, whole, or custom time window | Recorded and custom controls exist; changed ranges cannot replay; suggested/detected choices are disabled | C / UI contract only | Validated range selection bound to measured source duration and findings |
 | 4. Choose result | Target language, captions/evidence depth, relevant advanced options | Controls exist against recorded configuration; unsupported changes are blocked | A+C / UI contract only | Versioned `AnalysisRequest` accepted by a planner |
 | 5. Review plan | Work operations, agent/task limits, assumptions, workload, elapsed-time range, cost range | No integrated Studio plan/calculator | C / missing | Forecast request over measured preflight and explicit work plan |
-| 6. Start analysis | Accepted plan becomes a run; exact forecast is frozen | In `/studio/`, the replay button starts `ReplayTransport`. Separately, the local host accepts an idempotent runtime-start command, freezes the forecast, and returns durable identities, but Studio has no host client | A+B / recorded replay; real producer, UI unwired | Wire the main Studio to the existing host using product inputs plus stable source-session/revision identities |
-| 7. Spawn agents | Scheduler creates bounded tasks and workers | Recorded manifest/traces animate; the local host can start its bounded one-child proof | A+B / real producer, UI unwired | Streamed production task/agent registry driven by scheduler events |
+| 6. Start analysis | Accepted plan becomes a run; exact forecast is frozen | **Replay recorded analysis** still starts `ReplayTransport`. Separately, `/studio/?lab=1` can select a registered local source and **Start local runtime**, consuming one idempotent acknowledgement and frozen identities | A+B / recorded replay plus real and wired development fragment; full product loop missing | Integrate source ingest and planning before promoting the lab proof into the product loop |
+| 7. Spawn agents | Scheduler creates bounded tasks and workers | Recorded manifest/traces animate; the lab can start the host's bounded one-child proof, but does not project its worker as replay topology | A+B / local start wired; production topology UI unwired | Streamed production task/agent registry driven by scheduler events |
 | 8. Coordinate | Children inspect scoped inputs and report structured outputs upward | Recorded prose is replayed; local one-child report-up is real but isolated | A+B / partial local fragment | Parent/orchestrator executor, dependencies, handoffs, retries, and child tool bridge |
 | 9. Work through media | Agents seek, loop, mark, extract, inspect frames/tracks, and run detectors | Recorded workspaces are projections; host has only real extract and seek; child can call neither | A+B+C / partial | Capability bridge plus remaining media/detector operations and receipts |
-| 10. Control run | Pause, resume, cancel, reconnect, and show accepted state | Pause/resume/stop control the replay clock only. The local host provides lifecycle lookup and cursor reconnect, unwired from Studio, but no pause/resume/cancel acknowledgement | A+B+C / recorded controls; real polling producer, UI unwired; live controls missing | Reconnect from the last consumed journal sequence; add a separate request/ack protocol for live controls |
+| 10. Control run | Pause, resume, cancel, reconnect, and show accepted state | Pause/resume/stop control the replay clock only. The lab client separately projects host lifecycle and reconnects polling from its last consumed journal cursor; the host has no pause/resume/cancel endpoint | A+B+C / recorded controls; real polling wired in development lab; runtime controls missing | Add a separate request/ack protocol for live controls without changing replay controls |
 | 11. Publish output | Timed source, translation, withheld lines, captions, study, evidence, exports | Recorded captions, comparison, scores, evidence, glossary, and artifact links render | A / recorded replay | Merge/QC/publish task producing immutable result artifacts |
 | 12. Inspect real run | Operator can audit actual tasks, operations, usage, handoffs, and failures | Local journal can be loaded manually in `/studio/runtime/` | B / real and inspector-wired | Link a Studio run to its production journal without merging protocols |
 
@@ -192,6 +195,7 @@ fixtures already exercise several of these but contain no measurements.
 | `request.slow-analysis` | Longer/slower analysis | Changed value cannot replay | Explicit quality/latency tradeoff in the work plan | C / UI contract only |
 | `request.cancel` | **Cancel** | Enters a cancelled preflight state; no replay starts | Cancel before runtime start | C / UI contract only |
 | `request.confirm-replay` | **Replay recorded analysis** | Validates exact recorded configuration and starts `ReplayTransport` | Must remain explicitly replay-labelled | A / recorded replay |
+| `request.start-local` | **Start local runtime** in `/studio/?lab=1` | Sends mapped product inputs and host-listed source-session/revision identities to the deterministic local one-child proof | Remain development-only until source ingest and planning are product-wired; never imply captions or a swarm | B / real and wired development fragment |
 
 Policy: default suggested selection is 30–60 seconds; hosted maximum is 120 seconds; longer local
 ranges require an explicit warning. These are policies, not measured cost or elapsed time.
@@ -213,7 +217,7 @@ No integrated planner or calculator is currently rendered in `/studio/`.
 | `forecast.model-usage` | Token/provider-unit estimate | `null` | Model-adapter estimate, distinct from budget and actual usage | C / missing |
 | `forecast.api-cost` | Estimated amount and currency | amount and currency are `null` | Versioned price-book snapshot; no hard-coded UI prices | C / missing |
 | `forecast.assumptions` | What dominates estimate | Deterministic-floor warnings exist in the forecast artifact | Always inspectable; name excluded retries/spawns/unknown work | B / real producer, UI unwired |
-| `forecast.accept` | Accept plan and forecast | The local host freezes the accepted forecast into the run-start receipt and durably claims one idempotent command; `/studio/` does not invoke it | Freeze exact accepted forecast and create one idempotent run | B / real producer, UI unwired |
+| `forecast.accept` | Accept plan and forecast | The lab start action invokes the host, which freezes the accepted forecast into the run-start receipt and durably claims one idempotent command; the UI consumes its forecast/freeze/receipt identities, but no integrated planner is rendered | Freeze exact accepted forecast and create one idempotent run | B / partially wired development fragment; planner missing |
 | `forecast.back` | Edit range/options | No plan surface | Invalidate and regenerate the forecast | C / missing |
 
 UIUX may design every planner state now. Where producers remain absent, it must render unavailable
@@ -256,9 +260,14 @@ claims. They require corresponding runtime evidence or acknowledgement.
 
 Focus mode keeps the visual mark, one public display name, and the evidence-derived state as its
 identity anchor. Role, machine id, activity, workspace, and provenance remain inside one recorded
-workspace instrument. A presentation-only section rail switches that instrument between the
-role-specific workspace and recorded activity from the panel's outer right edge; previous/next and
-close remain client-state commands below it. While focus is open, the top source chrome recedes but
+workspace instrument. The concise role remit beneath the name is compatibility presentation copy,
+not a recorded task objective; a future production projection must replace it with scheduler-owned
+objective data. A presentation-only section rail switches that instrument between the
+role-specific workspace and recorded activity from the panel's outer right edge. Its active label is
+persistent and inactive labels appear on hover or keyboard focus. Previous/next and Esc Close use one
+keycap-style command language below the panel, while a spatial X occupies the same right-side rail
+as the section controls; there is no competing close control in the panel header. While focus is
+open, the top source chrome recedes but
 the global recorded-replay Dock remains visible and authoritative for pause, progress, and stop. When
 a submitted-source preview is active, its not-processed warning is repeated inside the focus panel.
 Keep the recorded-preview boundary until the main Studio consumes production journal events.
@@ -281,7 +290,8 @@ Keep the recorded-preview boundary until the main Studio consumes production jou
 
 ### 8. Development lab — `/studio/?lab=1`
 
-The lab is development-only and must not be presented as runtime execution.
+The lab is development-only. Replay controls remain explicitly recorded; the separate local-host
+section is real bounded runtime execution and must retain its no-captions/no-swarm boundary.
 
 | Control | Today behavior | Class / status |
 |---|---|---|
@@ -295,10 +305,14 @@ The lab is development-only and must not be presented as runtime execution.
 | Playback speed | Changes recorded replay pace | A / recorded replay |
 | Phase checkpoints | Seeks to exact derived cursor anchors | A / recorded replay |
 | Current trace/support | Inspects the exact recorded trace and references | A / recorded replay |
+| Connect to local host | Uses an exact loopback origin plus a paste-once bearer token to list registered source sessions | B / real and wired development fragment |
+| Start local runtime | Maps product inputs plus the selected stable source-session/revision identities to one host start | B / real and wired development fragment |
+| Repeat identical start | Repeats the retained exact request and compares command/runtime/journal/receipt/forecast identities | B / real idempotency proof |
+| Runtime lifecycle/journal poll | Keeps accepted/initializing distinct from running, shows closed reasons, and advances only to a validated returned cursor | B / real and wired development fragment |
 
 The lab still needs fixture coverage for a planner/forecast surface, live-control pending/rejected
-states, production-journal reconnect, partial result publication, and export failures. Such fixtures
-exercise UI contracts only and cannot be called run evidence.
+states, page-reload/host-restart reconnect, partial result publication, and export failures. Such
+fixtures exercise UI contracts only and cannot be called run evidence.
 
 ### 9. Production Run Explorer — `/studio/runtime/`
 
@@ -327,7 +341,7 @@ submit-to-result wiring slice.
 
 | Data contract | Needed by | Current producer/source | Current truth | Next owner |
 |---|---|---|---|---|
-| Source session id and status | Source/preflight/reconnect | Runtime host startup registration and `GET /v1/source-sessions` | Real local registered owned-preflight session/revision identity; Studio UI missing | Shared Studio-host wiring |
+| Source session id and status | Source/preflight/reconnect | Runtime host startup registration and `GET /v1/source-sessions` | Real local registered owned-preflight session/revision identity; selectable in development lab only | Shared Studio-host wiring |
 | Source adapter and rights receipt | Preflight | YouTube and owned/local scripts | Real local/recorded; unwired for submitted Studio URL | Architecture |
 | Raw content id, bytes, preservation | Preflight/provenance | Owned ingest | Real local/recorded | Architecture |
 | Duration, tracks, codecs, dimensions | Preflight/range | `probe-media.mjs` / ffprobe | Real local/recorded | Architecture |
@@ -336,17 +350,17 @@ submit-to-result wiring slice.
 | Music/noise ranges | Preflight/plan | None | Withheld | Architecture |
 | Speaker/overlap ranges | Preflight/plan | None | Withheld | Architecture |
 | Suggested range/complexity | Range/plan | None | Withheld | Architecture |
-| Analysis request | Plan/runtime start | `AnalysisRequest` client model | UI contract; recorded replay validation only | Shared contract; UIUX presentation, architecture validation |
+| Analysis request | Plan/runtime start | `AnalysisRequest` client model and local-host mapper | Product fields map to the host in the development lab; product planner integration missing | Shared contract; UIUX presentation, architecture validation |
 | Explicit work plan | Planner/runtime | Forecast request model | Code contract only | Architecture |
 | Workload floor | Planner | Forecast engine | Real local; UI unwired | Architecture |
 | Expected/conservative elapsed time | Planner | None | Unavailable | Architecture |
 | Model/provider usage estimate | Planner | None | Unavailable | Architecture |
 | Pricing snapshot/currency/API cost | Planner | None | Unavailable | Architecture |
-| Frozen accepted forecast | Runtime start/audit | Runtime host and forecast freeze function | Real local; frozen into the immutable run-start receipt and returned by host status; Studio unwired | Shared Studio-host wiring |
-| Run id/runtime id/journal identity | Run/reconnect/inspector | Runtime-start host acknowledgements, status, and run-start receipt | Real local and durable; Studio unwired | Shared Studio-host wiring |
+| Frozen accepted forecast | Runtime start/audit | Runtime host and forecast freeze function | Real local; development lab consumes forecast, freeze, and immutable run-start receipt identities | Shared Studio-host wiring |
+| Run id/runtime id/journal identity | Run/reconnect/inspector | Runtime-start host acknowledgements, status, and run-start receipt | Real local, durable, and projected in the development lab | Shared Studio-host wiring |
 | Task definitions/dependencies/budgets | Swarm/agent focus | Production scheduler | Real local; main Studio unwired | Architecture |
 | Dynamic agent registry/grants/scopes | Swarm/agent focus | Production scheduler/registry | Real local; main Studio unwired | Architecture |
-| Live events and cursor | Swarm/reconnect | Authenticated runtime-host polling over the append-only journal | Real local validated cursor service; Studio does not subscribe | Shared Studio-host wiring |
+| Live events and cursor | Swarm/reconnect | Authenticated runtime-host polling over the append-only journal | Development lab polls from the last consumed cursor and surfaces validation errors; events do not enter replay topology | Shared Studio-host wiring |
 | Control request/ack | Dock | None | Missing | Architecture |
 | Media-operation receipts | Agent workspace/evidence | `media.extract`, `media.seek` | Real local; child and main Studio unwired | Architecture |
 | Remaining media tools/detectors | Agent workspace | None | Missing | Architecture |
@@ -359,11 +373,11 @@ submit-to-result wiring slice.
 
 ## Action contracts for real wiring
 
-The next real Studio slice should wire the existing development host without redesigning the
+The first real Studio wiring slice now calls the existing development host without redesigning the
 scheduler, inventing another runtime-start protocol, or merging legacy and production event shapes.
-The client submits only product inputs plus stable `sourceSessionId` and `sourceRevisionId`; it
+The lab client submits only product inputs plus stable `sourceSessionId` and `sourceRevisionId`; it
 never submits filesystem paths, runtime identities, journal identities, scheduler state, or
-executable arguments.
+executable arguments. Product source-ingest and planner integration remain future slices.
 
 ```text
 operator starts the host with an owned preflight source
@@ -438,8 +452,8 @@ Completing this checklist proves the product interface, not the runtime.
 
 ### Small wiring slice
 
-The first slice should connect `/studio/` to the existing host for one registered owned/local
-receipted source and one bounded child. Expected glue areas:
+The first thin slice connects `/studio/?lab=1` to the existing host for one registered owned/local
+receipted source and one bounded child. Implemented glue:
 
 - A development-only host client outside static `ReplayTransport`, configured for the exact local
   origin and bearer token
@@ -450,10 +464,11 @@ receipted source and one bounded child. Expected glue areas:
   requires validated journal/executor evidence, and surfaces closed `failed`/`interrupted` reasons
 - Authenticated bounded cursor polling from the last consumed sequence, with visible cursor and
   journal-validation failures
-- Main-Studio projections for dynamic worker/task/report state, kept separate from legacy traces
 - Explicit UI labels for the production local one-child proof versus recorded demonstration
 
-This does not yet produce autonomous media captions.
+Still open: dynamic production worker/task/report projection in the main Studio, product source
+ingest and planning, and every larger-runtime item below. This slice does not produce autonomous
+media captions.
 
 ### Larger runtime work
 
@@ -514,6 +529,7 @@ semantics without updating this contract with the UIUX owner.
 | Workload floor and unavailable estimates | `src/studio/runtime/production/forecast/`, `tests/studio-forecast-production.test.ts` |
 | Local host lifecycle and public identities | `src/studio/runtime/production/runtimeHost/model.ts` |
 | Local host endpoints, bearer authentication, and loopback binding | `src/studio/runtime/production/runtimeHost/httpServer.ts` |
+| Lab-only host client, lifecycle projection, and cursor validation | `src/studio/localRuntime/`, `tests/studio-local-runtime-client.test.ts` |
 | Local host implementation and absence boundary | `docs/STUDIO_AUTONOMY.md`, section **Development-only runtime-start host** |
 | Deterministic host and guarded real-Codex commands | `package.json` (`runtime:host`, `runtime:host:codex`), `scripts/run-runtime-host.ts` |
 | Production journal inspector boundary | `src/studio/runtime/production/ProductionRuntimeInspector.tsx` |

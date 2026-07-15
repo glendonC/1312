@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { clock } from "../format";
+import LocalRuntimeLab from "../localRuntime/LocalRuntimeLab";
 import { phaseOf } from "../replay";
 import { replayTransport, useStudio } from "../store";
 import { deriveCheckpoints } from "./checkpoints";
@@ -91,6 +92,10 @@ export default function Lab({ defaultRunId }: { defaultRunId: string }) {
 
       {!collapsed && (
         <div className="lab-body">
+          <p className="lab-note">
+            Recorded replay controls below use <code>ReplayTransport</code>. They do not control the separate local runtime host.
+          </p>
+
           <label className="lab-field">
             <span>Exact scenario</span>
             <select
@@ -218,6 +223,8 @@ export default function Lab({ defaultRunId }: { defaultRunId: string }) {
               <p>No trace has been folded yet.</p>
             )}
           </details>
+
+          <LocalRuntimeLab />
         </div>
       )}
     </aside>

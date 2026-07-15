@@ -6,6 +6,7 @@ import type {
 } from "../model.ts";
 import type { ForecastArtifact } from "../forecast/model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
+import type { EvidenceAssessmentAudit } from "../assessmentAudit.ts";
 
 export const RUNTIME_HOST_LIFECYCLE_STATES = [
   "accepted",
@@ -171,6 +172,14 @@ export interface RuntimeHostPollResponse {
   reachedHead: boolean;
   terminal: boolean;
   reason: RuntimeHostFailureReason | null;
+}
+
+export interface RuntimeHostAssessmentAuditResponse {
+  schema: "studio.local-runtime-assessment-audits.v1";
+  commandId: string;
+  runtimeId: string;
+  journalHead: number;
+  audits: EvidenceAssessmentAudit[];
 }
 
 export interface InitializedRuntimeApplication {

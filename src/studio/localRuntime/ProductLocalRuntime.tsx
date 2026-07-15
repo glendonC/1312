@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { initialRequest, type AnalysisRequest } from "../preflight/model";
+import type { EvidenceAssessmentAudit } from "../runtime/production/assessmentAudit";
 import type {
   OwnedMediaIngestStatus,
   RuntimeHostPlanResponse,
@@ -34,6 +35,7 @@ interface ReviewedPlan {
 interface RuntimeView {
   status: RuntimeStatusView;
   production: ProductionStudioProjection;
+  assessmentAudits: EvidenceAssessmentAudit[];
   cursor: number;
   eventCount: number;
   lastEventType: string | null;
@@ -59,7 +61,7 @@ function seconds(milliseconds: number): string {
   return `${(milliseconds / 1_000).toFixed(3).replace(/\.?(?:0+)$/, "")}s`;
 }
 
-type ProductionIdentityKind = "task" | "worker" | "operation" | "execution" | "artifact" | "report";
+type ProductionIdentityKind = "task" | "worker" | "operation" | "execution" | "artifact" | "receipt" | "report";
 
 function productionIdentityTarget(kind: ProductionIdentityKind, identity: string): string {
   return `product-production-${kind}-${identity}`;
@@ -169,7 +171,13 @@ function ProductionAssessmentScopeSummary({
   );
 }
 
-function ProductionJournalFacts({ projection }: { projection: ProductionStudioProjection }) {
+function ProductionJournalFacts({
+  projection,
+  assessmentAudits,
+}: {
+  projection: ProductionStudioProjection;
+  assessmentAudits: readonly EvidenceAssessmentAudit[];
+}) {
   const outputArtifactIds = new Set(projection.outputArtifacts.map((artifact) => artifact.artifactId));
   const renderedArtifactIds = new Set([
     ...projection.sourceArtifacts.map((artifact) => artifact.artifactId),
@@ -179,8 +187,21 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
   ]);
   const operationIds = new Set([
     ...projection.operations.map((operation) => operation.operationId),
+    ...projection.evidenceReads.map((operation) => operation.operationId),
     ...projection.evidenceAssessments.map((operation) => operation.operationId),
   ]);
+  const taskIds = new Set(projection.tasks.map((task) => task.taskId));
+  const workerIds = new Set(projection.workers.map((worker) => worker.agentId));
+  const readReceiptIds = new Set(projection.evidenceReads.flatMap((read) =>
+    read.receiptId && read.status === "completed" ? [read.receiptId] : []));
+  const visibleAssessmentAudits = assessmentAudits.filter((audit) =>
+    projection.evidenceAssessments.some((assessment) =>
+      assessment.operationId === audit.operationId &&
+      assessment.status === "completed" &&
+      assessment.outputArtifactId === audit.artifactId &&
+      assessment.receiptId === audit.receiptId &&
+      assessment.receiptContentId === audit.receiptContentId) &&
+    renderedArtifactIds.has(audit.artifactId));
   const executionIds = new Set(
     projection.workers.flatMap((worker) => worker.execution ? [worker.execution.id] : []),
   );
@@ -535,7 +556,19 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div><dt>Hard bounds</dt><dd>{read.maxItems} items / {read.maxBytes} bytes</dd></div>
                   <div><dt>Returned</dt><dd>{read.returnedItems === null || read.returnedFactBytes === null ? "Unavailable until evidence.read_completed is validated" : `${read.returnedItems} items / ${read.returnedFactBytes} bytes`}</dd></div>
                   <div><dt>Truncated</dt><dd>{read.truncated === null ? "Unavailable until completion" : read.truncated ? "Yes" : "No"}</dd></div>
-                  <div><dt>Receipt</dt><dd>{read.receiptId ?? "Unavailable until completion"}</dd></div>
+                  <div>
+                    <dt>Receipt</dt>
+                    <dd>
+                      {read.receiptId ? (
+                        <span
+                          id={productionIdentityTarget("receipt", read.receiptId)}
+                          data-production-read-receipt-id={read.receiptId}
+                        >
+                          {read.receiptId}
+                        </span>
+                      ) : "Unavailable until completion"}
+                    </dd>
+                  </div>
                   <div><dt>Receipt content</dt><dd>{read.receiptContentId ?? "Unavailable until completion"}</dd></div>
                   <div><dt>Failure</dt><dd>{read.failure ?? (read.status === "failed" ? "Failure reason unavailable" : "Not recorded")}</dd></div>
                 </dl>
@@ -636,6 +669,135 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div><dt>Input read receipts</dt><dd>{artifact.readReceiptIds.join(", ")}</dd></div>
                   <div><dt>Input receipt content</dt><dd>{artifact.readReceiptContentIds.join(", ")}</dd></div>
                 </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="assessment-receipt-audits"
+        aria-labelledby="product-runtime-assessment-audits-title"
+      >
+        <h4 id="product-runtime-assessment-audits-title">Assessment receipt audit</h4>
+        <p>
+          This reopens stored assessment and cited read receipts, verifies their content identities
+          and journal lineage, and preserves structured evidence states. It does not certify the
+          assessment meaning or the truth of the media.
+        </p>
+        {visibleAssessmentAudits.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="assessment-receipt-audits">
+            Unavailable until a completed assessment receipt is reopened and validated. Failed,
+            absent, V1, or stored-content/lineage-mismatch paths remain unavailable.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {visibleAssessmentAudits.map((audit) => (
+              <article
+                key={audit.operationId}
+                data-production-assessment-audit-id={audit.operationId}
+                data-integrity={audit.integrity}
+              >
+                <header>
+                  <h5>studio.evidence-assessment.receipt.v1</h5>
+                  <span>integrity and citation closure verified</span>
+                </header>
+                <dl>
+                  <div>
+                    <dt>Assessment operation</dt>
+                    <dd>
+                      {operationIds.has(audit.operationId)
+                        ? <ProductionIdentityLink kind="operation" identity={audit.operationId} />
+                        : audit.operationId}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Assessment artifact</dt>
+                    <dd>
+                      <ProductionArtifactReference
+                        identity={audit.artifactId}
+                        renderedArtifactIds={renderedArtifactIds}
+                      />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Task / worker</dt>
+                    <dd>
+                      {taskIds.has(audit.taskId)
+                        ? <ProductionIdentityLink kind="task" identity={audit.taskId} />
+                        : audit.taskId}
+                      {" / "}
+                      {workerIds.has(audit.agentId)
+                        ? <ProductionIdentityLink kind="worker" identity={audit.agentId} />
+                        : audit.agentId}
+                    </dd>
+                  </div>
+                  <div><dt>Receipt</dt><dd>{audit.receiptId}</dd></div>
+                  <div><dt>Stored content</dt><dd>{audit.receiptContentId}</dd></div>
+                  <div><dt>Validation</dt><dd>Stored bytes rehashed; assessment, read-receipt, citation, and journal lineage closed</dd></div>
+                </dl>
+                <div className="product-runtime-fact-list" data-production-assessment-claims={audit.claims.length}>
+                  {audit.claims.map((claim) => (
+                    <article
+                      key={claim.claimIndex}
+                      data-production-assessment-claim-index={claim.claimIndex}
+                      data-claim-kind={claim.kind}
+                      data-claim-states={claim.states.join(" ")}
+                    >
+                      <header>
+                        <h5>Claim {claim.claimIndex + 1} · {claim.kind}</h5>
+                        <span>{claim.states.join(" + ")}</span>
+                      </header>
+                      <dl>
+                        <div><dt>Kind</dt><dd>{claim.kind}</dd></div>
+                        <div><dt>Value</dt><dd>{claim.value ?? "Unavailable (null)"}</dd></div>
+                        <div><dt>Exact range</dt><dd>[{claim.range.startMs}, {claim.range.endMs}) ms</dd></div>
+                        <div><dt>Preserved states</dt><dd>{claim.states.join(", ")}</dd></div>
+                      </dl>
+                      <div data-production-assessment-citations={claim.citations.length}>
+                        <h6>Cited returned facts</h6>
+                        <ul>
+                          {claim.citations.map((citation) => (
+                            <li
+                              key={`${citation.receiptId}:${citation.receiptContentId}`}
+                              data-production-assessment-citation-receipt-id={citation.receiptId}
+                            >
+                              <dl>
+                                <div>
+                                  <dt>Read receipt</dt>
+                                  <dd>
+                                    {readReceiptIds.has(citation.receiptId)
+                                      ? <ProductionIdentityLink kind="receipt" identity={citation.receiptId} />
+                                      : citation.receiptId}
+                                  </dd>
+                                </div>
+                                <div><dt>Receipt content</dt><dd>{citation.receiptContentId}</dd></div>
+                                <div>
+                                  <dt>Read operation</dt>
+                                  <dd>
+                                    {operationIds.has(citation.readOperationId)
+                                      ? <ProductionIdentityLink kind="operation" identity={citation.readOperationId} />
+                                      : citation.readOperationId}
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt>Evidence artifact</dt>
+                                  <dd>
+                                    <ProductionArtifactReference
+                                      identity={citation.evidenceArtifactId}
+                                      renderedArtifactIds={renderedArtifactIds}
+                                    />
+                                  </dd>
+                                </div>
+                                <div><dt>Fact indexes</dt><dd>{citation.factIndexes.join(", ")}</dd></div>
+                              </dl>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               </article>
             ))}
           </div>
@@ -1036,6 +1198,14 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         if (poll.commandId !== identity.commandId) {
           throw new Error("Runtime host event polling returned another command identity.");
         }
+        const assessmentAudit = await activeClient.assessmentAudits(identity.runtimeId);
+        if (
+          assessmentAudit.commandId !== identity.commandId ||
+          assessmentAudit.runtimeId !== identity.runtimeId ||
+          assessmentAudit.journalHead < poll.nextCursor
+        ) {
+          throw new Error("Runtime host assessment audit identities changed while polling.");
+        }
         if (adapter.view().lastSeq !== after) {
           throw new Error("Production adapter cursor changed outside the validated poll path.");
         }
@@ -1043,12 +1213,20 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         if (production.lastSeq !== poll.nextCursor) {
           throw new Error("Production adapter cursor does not match the validated host cursor.");
         }
+        const completedAssessments = production.evidenceAssessments.filter((assessment) =>
+          assessment.status === "completed");
+        const visibleAssessmentAudits = assessmentAudit.audits.filter((audit) =>
+          completedAssessments.some((assessment) => assessment.operationId === audit.operationId));
+        if (visibleAssessmentAudits.length !== completedAssessments.length) {
+          throw new Error("A completed assessment has no reopened fail-closed receipt audit.");
+        }
         after = poll.nextCursor;
         setRuntime((current) => {
           if (!current || current.status.runtimeId !== identity.runtimeId) return current;
           return {
             ...current,
             production,
+            assessmentAudits: visibleAssessmentAudits,
             status: {
               ...statusView(status),
               lifecycle: poll.lifecycle,
@@ -1074,6 +1252,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         setRuntime((current) => current && current.status.runtimeId === identity.runtimeId
           ? {
               ...current,
+              assessmentAudits: [],
               pollState: "error",
               pollMessage: `Polling stopped after cursor ${current.cursor}: ${errorMessage(pollError)}`,
             }
@@ -1107,6 +1286,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
       const nextRuntime: RuntimeView = {
         status: statusView(acknowledgement),
         production: adapter.view(),
+        assessmentAudits: [],
         cursor: 0,
         eventCount: 0,
         lastEventType: null,
@@ -1460,7 +1640,10 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
           <p>
             Audit the host journal separately in <a href="/studio/runtime/">Production Run Explorer</a>. These events are not inserted into the recorded RunBundle or agent graph.
           </p>
-          <ProductionJournalFacts projection={runtime.production} />
+          <ProductionJournalFacts
+            projection={runtime.production}
+            assessmentAudits={runtime.assessmentAudits}
+          />
         </section>
       )}
     </section>

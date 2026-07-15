@@ -3,9 +3,11 @@ import { readFile, stat } from "node:fs/promises";
 
 import {
   canonicalSha256,
+  ContentAddressedArtifactStore,
   createSourceArtifactId,
   identifyFile,
 } from "../artifactStore.ts";
+import { reopenEvidenceAssessmentAudits } from "../assessmentAudit.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
 import {
   createRuntimePlan,
@@ -22,6 +24,7 @@ import {
 import type {
   InitializedRuntimeApplication,
   RuntimeHostCommandRecord,
+  RuntimeHostAssessmentAuditResponse,
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
@@ -576,6 +579,36 @@ export class RuntimeStartService {
       reachedHead: nextCursor === journal.head,
       terminal: terminal(reconciled.lifecycle),
       reason: structuredClone(reconciled.reason),
+    };
+  }
+
+  async assessmentAudits(runtimeId: string): Promise<RuntimeHostAssessmentAuditResponse> {
+    const record = await this.store.findByRuntimeId(runtimeId);
+    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+    const reconciled = await this.reconcile(record, false);
+    const paths = this.store.paths(runtimeId);
+    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
+    let audits;
+    try {
+      audits = await reopenEvidenceAssessmentAudits(
+        journal.state,
+        journal.events,
+        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+      );
+    } catch (error) {
+      throw new RuntimeHostError(
+        "stored_content_inconsistent",
+        "A stored assessment receipt or its cited read lineage failed closed audit validation.",
+        409,
+        { cause: error },
+      );
+    }
+    return {
+      schema: "studio.local-runtime-assessment-audits.v1",
+      commandId: reconciled.commandId,
+      runtimeId,
+      journalHead: journal.head,
+      audits,
     };
   }
 

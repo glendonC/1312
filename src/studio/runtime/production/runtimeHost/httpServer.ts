@@ -278,6 +278,14 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
         return;
       }
 
+      const auditRuntimeId = routeIdentity(url.pathname, /^\/v1\/runtimes\/([^/]+)\/assessment-audits$/);
+      if (auditRuntimeId !== null) {
+        if (request.method !== "GET") throw new RuntimeHostError("method_not_allowed", "Only GET is supported for this endpoint.", 405);
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        sendJson(response, 200, await options.service.assessmentAudits(auditRuntimeId), origin);
+        return;
+      }
+
       const runtimeId = routeIdentity(url.pathname, /^\/v1\/runtimes\/([^/]+)$/);
       if (runtimeId !== null) {
         if (request.method !== "GET") throw new RuntimeHostError("method_not_allowed", "Only GET is supported for this endpoint.", 405);

@@ -449,6 +449,40 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     );
     assert.deepEqual(seekObservation.reportIds, []);
 
+    const assessmentAudit = await runtime.service.assessmentAudits(ack.runtimeId);
+    assert.equal(assessmentAudit.schema, "studio.local-runtime-assessment-audits.v1");
+    assert.equal(assessmentAudit.commandId, ack.commandId);
+    assert.equal(assessmentAudit.journalHead, cursor);
+    assert.equal(assessmentAudit.audits.length, 1);
+    assert.equal(assessmentAudit.audits[0].integrity, "stored_receipt_and_citations_verified");
+    assert.equal(assessmentAudit.audits[0].claims.length, 2);
+    assert.ok(assessmentAudit.audits[0].claims.every((claim) =>
+      claim.range.endMs > claim.range.startMs &&
+      claim.states.length > 0 &&
+      claim.citations.length > 0 &&
+      claim.citations.every((citation) =>
+        citation.receiptId.startsWith("evidence-read:") &&
+        citation.receiptContentId.startsWith("sha256:") &&
+        citation.factIndexes.length > 0)));
+    const completedAssessmentEvent = direct.events.find((event) =>
+      event.type === "analysis.evidence.assessment_completed");
+    assert.ok(completedAssessmentEvent?.type === "analysis.evidence.assessment_completed");
+    assert.deepEqual(
+      assessmentAudit.audits[0].claims.map((claim) => ({
+        claimIndex: claim.claimIndex,
+        kind: claim.kind,
+        value: claim.value,
+        range: claim.range,
+        states: claim.states,
+        citations: claim.citations.map(({ receiptId, receiptContentId, factIndexes }) => ({
+          receiptId,
+          receiptContentId,
+          factIndexes,
+        })),
+      })),
+      completedAssessmentEvent.data.receipt.claims,
+    );
+
     const reopened = await RuntimeStartService.open({
       store: runtime.store,
       sources: runtime.sources,
@@ -458,6 +492,104 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     const continued = await reopened.poll(ack.runtimeId, cursor, 3);
     assert.deepEqual(continued.events, []);
     assert.equal(continued.nextCursor, cursor);
+    assert.deepEqual(await reopened.assessmentAudits(ack.runtimeId), assessmentAudit);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("assessment audit fails closed after restart for stored-byte, content, receipt-lineage, or journal drift", async () => {
+  const runtime = await hostHarness();
+  try {
+    const ack = await runtime.service.start(runtime.request);
+    await waitForLifecycle(runtime.service, ack.commandId, "terminal");
+    const paths = runtime.store.paths(ack.runtimeId);
+    const journal = await readValidatedRuntimeJournal(paths.journalPath, ack.runtimeId);
+    const healthy = await runtime.service.assessmentAudits(ack.runtimeId);
+    assert.equal(healthy.audits.length, 1);
+    const receiptContentId = healthy.audits[0].receiptContentId;
+    const receiptDigest = receiptContentId.slice("sha256:".length);
+    const receiptPath = join(
+      paths.artifactStoreRoot,
+      "objects",
+      "sha256",
+      receiptDigest.slice(0, 2),
+      receiptDigest,
+    );
+    const originalReceiptBytes = await readFile(receiptPath);
+
+    await appendFile(receiptPath, "tampered");
+    const reopenedAfterTamper = await RuntimeStartService.open({
+      store: runtime.store,
+      sources: runtime.sources,
+      launcherFactory: new DeterministicRuntimeExecutor().factory(),
+      recoverOnOpen: true,
+    });
+    await assert.rejects(
+      reopenedAfterTamper.assessmentAudits(ack.runtimeId),
+      (error: unknown) => (error as { code?: string }).code === "stored_content_inconsistent",
+    );
+    await writeFile(receiptPath, originalReceiptBytes);
+    assert.equal((await reopenedAfterTamper.assessmentAudits(ack.runtimeId)).audits.length, 1);
+
+    const originalJournal = await readFile(paths.journalPath, "utf8");
+    const assessmentArtifactEvent = journal.events.find((event) =>
+      event.type === "artifact.recorded" && event.data.artifact.origin.kind === "evidence_assessment");
+    const assessmentCompletion = journal.events.find((event) =>
+      event.type === "analysis.evidence.assessment_completed");
+    const readCompletion = journal.events.find((event) => event.type === "evidence.read_completed");
+    assert.ok(assessmentArtifactEvent?.type === "artifact.recorded");
+    assert.ok(assessmentCompletion?.type === "analysis.evidence.assessment_completed");
+    assert.ok(readCompletion?.type === "evidence.read_completed");
+
+    const expectJournalAuditFailure = async (
+      mutate: (events: Array<Record<string, unknown>>) => void,
+    ): Promise<void> => {
+      const events = structuredClone(journal.events) as unknown as Array<Record<string, unknown>>;
+      mutate(events);
+      await writeFile(paths.journalPath, `${events.map((event) => JSON.stringify(event)).join("\n")}\n`);
+      await assert.rejects(
+        runtime.service.assessmentAudits(ack.runtimeId),
+        (error: unknown) => ["stored_content_inconsistent", "invalid_journal_chain"].includes(
+          (error as { code?: string }).code ?? "",
+        ),
+      );
+      await writeFile(paths.journalPath, originalJournal);
+      assert.equal((await runtime.service.assessmentAudits(ack.runtimeId)).audits.length, 1);
+    };
+
+    await expectJournalAuditFailure((events) => {
+      const artifactEvent = events.find((event) => event.type === "artifact.recorded" &&
+        (event.data as { artifact?: { origin?: { kind?: string } } }).artifact?.origin?.kind === "evidence_assessment") as {
+          data: { artifact: { content: { digest: string; contentId: string; bytes: number }; storageKey: string; origin: { receiptContentId: string } } };
+        };
+      const completion = events.find((event) => event.type === "analysis.evidence.assessment_completed") as {
+        data: { receiptContentId: string };
+      };
+      const read = readCompletion.data.receiptContentId;
+      const digest = read.slice("sha256:".length);
+      artifactEvent.data.artifact.content.digest = digest;
+      artifactEvent.data.artifact.content.contentId = read;
+      artifactEvent.data.artifact.content.bytes = Buffer.byteLength(JSON.stringify(readCompletion.data.receipt));
+      artifactEvent.data.artifact.storageKey = `objects/sha256/${digest.slice(0, 2)}/${digest}`;
+      artifactEvent.data.artifact.origin.receiptContentId = read;
+      completion.data.receiptContentId = read;
+    });
+
+    await expectJournalAuditFailure((events) => {
+      const artifactEvent = events.find((event) => event.type === "artifact.recorded" &&
+        (event.data as { artifact?: { origin?: { kind?: string } } }).artifact?.origin?.kind === "evidence_assessment") as {
+          data: { artifact: { origin: { readReceiptIds: string[] } } };
+        };
+      artifactEvent.data.artifact.origin.readReceiptIds[0] = "evidence-read:out-of-lineage";
+    });
+
+    await expectJournalAuditFailure((events) => {
+      const completion = events.find((event) => event.type === "analysis.evidence.assessment_completed") as {
+        data: { receipt: { claims: Array<{ range: { startMs: number } }> } };
+      };
+      completion.data.receipt.claims[0].range.startMs += 1;
+    });
   } finally {
     await cleanup(runtime);
   }
@@ -814,6 +946,16 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     const method = await fetch(`${base}/v1/source-sessions`, { method: "POST", headers: authorized });
     assert.equal(method.status, 405);
     await waitForLifecycle(runtime.service, ack.commandId, "terminal");
+    const audits = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/assessment-audits`,
+      { headers: authorized },
+    );
+    assert.equal(audits.status, 200);
+    const auditBody = await audits.json() as { schema: string; audits: unknown[] };
+    assert.equal(auditBody.schema, "studio.local-runtime-assessment-audits.v1");
+    assert.equal(auditBody.audits.length, 1);
+    assert.equal(JSON.stringify(auditBody).includes(runtime.directory), false);
+    assert.equal(JSON.stringify(auditBody).includes(FIXTURE), false);
   } finally {
     await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     await cleanup(runtime);
@@ -1048,6 +1190,7 @@ test("browser-owned ingest fails closed on rights and paths, preserves bytes, ho
     assert.equal(v1Inspector.projection.evidenceReads.length, 0);
     assert.equal(v1Inspector.projection.evidenceAssessments.length, 0);
     assert.equal(v1Inspector.projection.assessmentArtifacts.length, 0);
+    assert.deepEqual((await service.assessmentAudits(acknowledgement.runtimeId)).audits, []);
 
     const reopenedSources = await RuntimeSourceRegistry.open({ sourceDirectories: [] });
     await OwnedMediaIngestService.open({

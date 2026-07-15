@@ -251,6 +251,37 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
         reason: null,
       });
     }
+    if (url.endsWith("/v1/runtimes/runtime%3Afixture/assessment-audits")) {
+      return json({
+        schema: "studio.local-runtime-assessment-audits.v1",
+        commandId: "runtime-start:fixture",
+        runtimeId: "runtime:fixture",
+        journalHead: 7,
+        audits: [{
+          operationId: "operation:assessment:fixture",
+          artifactId: "artifact:assessment:fixture",
+          receiptId: "evidence-assessment:fixture",
+          receiptContentId: RECEIPT_CONTENT,
+          taskId: "task:fixture",
+          agentId: "agent:fixture",
+          integrity: "stored_receipt_and_citations_verified",
+          claims: [{
+            claimIndex: 0,
+            kind: "language_identity",
+            value: null,
+            range: { startMs: 0, endMs: 1_000 },
+            states: ["unknown", "truncated"],
+            citations: [{
+              readOperationId: "operation:read:fixture",
+              receiptId: "evidence-read:fixture",
+              receiptContentId: CONTENT,
+              evidenceArtifactId: "artifact:evidence:fixture",
+              factIndexes: [0],
+            }],
+          }],
+        }],
+      });
+    }
     return json({ error: { code: "not_found", message: "Unexpected test URL." } }, 404);
   };
   const client = new LocalRuntimeHostClient({
@@ -269,6 +300,7 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
   const start = await client.start(request);
   const status = await client.status(start.runtimeId);
   const poll = await client.poll(start.runtimeId, 7);
+  const assessmentAudit = await client.assessmentAudits(start.runtimeId);
 
   assert.equal(client.baseUrl, "http://127.0.0.1:4312");
   assert.equal(plan.forecast.schema, "studio.forecast.v1");
@@ -281,7 +313,10 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
   assert.equal(status.lifecycle, "terminal");
   assert.equal(poll.nextCursor, 7);
   assert.equal(poll.reachedHead, true);
-  assert.equal(calls.length, 5);
+  assert.equal(assessmentAudit.audits.length, 1);
+  assert.equal(assessmentAudit.audits[0].claims[0].states.join(","), "unknown,truncated");
+  assert.deepEqual(assessmentAudit.audits[0].claims[0].citations[0].factIndexes, [0]);
+  assert.equal(calls.length, 6);
   for (const call of calls) {
     assert.equal(new Headers(call.init?.headers).get("Authorization"), `Bearer ${"t".repeat(64)}`);
   }
@@ -459,6 +494,35 @@ test("browser client surfaces host cursor errors and rejects inconsistent poll c
   await assert.rejects(
     invalidClient.poll("runtime:fixture", 4),
     (error: unknown) => error instanceof RuntimeHostClientError && error.code === "invalid_host_response",
+  );
+});
+
+test("browser client rejects an open or incomplete assessment audit instead of exposing it", async () => {
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => json({
+      schema: "studio.local-runtime-assessment-audits.v1",
+      commandId: "runtime-start:fixture",
+      runtimeId: "runtime:fixture",
+      journalHead: 7,
+      audits: [{
+        operationId: "operation:assessment:fixture",
+        artifactId: "artifact:assessment:fixture",
+        receiptId: "evidence-assessment:fixture",
+        receiptContentId: RECEIPT_CONTENT,
+        taskId: "task:fixture",
+        agentId: "agent:fixture",
+        integrity: "best_effort",
+        claims: [],
+      }],
+    }),
+  });
+  await assert.rejects(
+    client.assessmentAudits("runtime:fixture"),
+    (error: unknown) => error instanceof RuntimeHostClientError &&
+      error.code === "invalid_host_response" &&
+      /closed audit result/.test(error.message),
   );
 });
 

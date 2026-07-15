@@ -97,6 +97,35 @@ test("receipted child media/evidence operations and artifact identity hooks proj
   await expect(assessmentArtifact.locator('[data-production-navigation="worker"]')).toHaveCount(1);
   await expect(assessmentArtifact.locator('[data-production-navigation="operation"]')).toHaveCount(1);
 
+  const assessmentAudits = production.locator('[data-production-region="assessment-receipt-audits"]');
+  await expect(assessmentAudits.getByRole("heading", { name: "Assessment receipt audit" })).toBeVisible();
+  await expect(assessmentAudits.locator('[data-production-empty="assessment-receipt-audits"]')).toHaveCount(0);
+  const assessmentAudit = assessmentAudits.locator('[data-production-assessment-audit-id]');
+  await expect(assessmentAudit).toHaveCount(1);
+  await expect(assessmentAudit).toHaveAttribute(
+    "data-integrity",
+    "stored_receipt_and_citations_verified",
+  );
+  await expect(assessmentAudit.getByText(/does not certify the assessment meaning|Stored bytes rehashed/).first()).toBeVisible();
+  const claims = assessmentAudit.locator('[data-production-assessment-claim-index]');
+  await expect(claims).toHaveCount(2);
+  await expect(claims.locator('[data-claim-kind="speech_activity"]')).toHaveCount(1);
+  await expect(claims.locator('[data-claim-kind="language_identity"]')).toHaveCount(1);
+  await expect(claims.getByText(/Exact range/)).toHaveCount(2);
+  await expect(claims.getByText(/Preserved states/)).toHaveCount(2);
+  const citations = assessmentAudit.locator('[data-production-assessment-citation-receipt-id]');
+  await expect(citations).toHaveCount(2);
+  await expect(citations.getByText(/Fact indexes/)).toHaveCount(2);
+  await expect(citations.locator('[data-production-navigation="receipt"]')).toHaveCount(2);
+  for (const link of await assessmentAudit.locator("[data-production-navigation]").all()) {
+    const href = await link.getAttribute("href");
+    expect(href).toMatch(/^#product-production-(task|worker|operation|artifact|receipt)-/);
+    expect(href).not.toContain("/studio/runtime");
+    expect(
+      await page.evaluate((target) => Boolean(target && document.getElementById(target.slice(1))), href),
+    ).toBe(true);
+  }
+
   await expect(production.locator('[data-production-region="operations"]')).toBeVisible();
   await expect(production.getByRole("heading", { name: "Production operations" })).toBeVisible();
   await expect(production.locator('[data-production-empty="operations"]')).toHaveCount(0);

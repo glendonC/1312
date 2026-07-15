@@ -33,6 +33,9 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   `evidence_assess`, accepts completed same-task evidence-read receipt/content identities and closed
   range/citation claims, injects task/agent/operation identity, and emits a content-addressed
   `studio.evidence-assessment.receipt.v1` without reading producer files;
+- an authenticated read-only assessment-audit endpoint that reopens the stored assessment and every
+  cited evidence-read receipt by content identity, re-hashes canonical bytes, closes exact ranges,
+  states, fact indexes, and task/artifact/journal lineage, and returns no partial audit;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
 The exact runtime test executes that path against the receipted run-005 media, performs two reads
@@ -69,6 +72,17 @@ The production event union now includes
 assessment artifact and `studio.evidence-assessment.receipt.v1` content identity; failed events
 carry only the closed runtime failure shape. These events stay in the production journal and never
 enter legacy replay.
+
+`GET /v1/runtimes/:runtimeId/assessment-audits` is a separate path-free read contract rather than a
+new runtime event. Its `studio.local-runtime-assessment-audits.v1` response names the command,
+runtime, validated journal head, and zero or more fully reopened audits. Each audit contains only
+the assessment operation/artifact/receipt/task/agent identities and structured claims with exact
+range, value, preserved states, cited read operation/receipt/content/evidence-artifact identities,
+and returned-fact indexes. Any missing object, changed byte, non-canonical content, swapped identity,
+out-of-lineage read, invalid index/range/state, or disagreement between stored receipt, artifact,
+completion event, and full projection rejects the whole response as `stored_content_inconsistent`.
+An empty response is valid when no completed assessment exists, including V1. The audit certifies
+receipt integrity and citation closure only; it does not certify media truth or semantic quality.
 
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a

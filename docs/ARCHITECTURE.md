@@ -1,7 +1,7 @@
 # Architecture (verified direction — UI-first week)
 
 Status: **decided for Build Week**; implement agents after UI scaffold is solid.  
-Last updated: 2026-07-14
+Last updated: 2026-07-15
 
 ## Goals
 
@@ -150,6 +150,11 @@ enforces hard ceilings of one assessment, four read receipts, eight claims, 32 c
 512 deterministic structured tokens. It emits a private content-addressed
 `studio.evidence-assessment.receipt.v1`; it never opens producer paths, reruns a detector, or
 produces captions, translations, or study output.
+The local runtime host also exposes a distinct authenticated read-only assessment-audit boundary.
+It reopens the stored assessment and cited read receipts by content identity, verifies canonical
+hashes and exact claim/citation derivation against the complete runtime projection, and returns an
+honest empty list when no completed assessment exists. This is not another runtime event or finding,
+and passing the audit proves integrity and citation closure rather than truth or semantic quality.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,

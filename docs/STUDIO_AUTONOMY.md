@@ -33,6 +33,9 @@ artifacts.
 13. Assess only completed evidence-read receipts. Every structured conclusion must remain range-
     bound, cite exact receipt/content identities and returned-fact indexes, and preserve upstream
     unknown, withheld, and truncated states.
+14. Treat a journal-carried assessment receipt as unaudited until a read-only host path reopens the
+    stored assessment and cited read receipts by content identity and closes them against the full
+    journal projection. This proves integrity and citation closure, not truth or semantic quality.
 
 ## Optimize the media before spawning the full swarm
 
@@ -323,12 +326,12 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, installs only granted media/evidence/assessment MCP tools, and requires every granted media capability, evidence artifact scope, and assessment grant to produce a completed journal operation before accepting output. `run-005` remains only the explicit npm smoke/test input. The real model path was not executed for this tranche. |
 | 4 — scoped media/evidence | Two media operations, bounded evidence read, and bounded assessment implemented | `media.extract`/`media.seek` retain their existing exact ffmpeg authority. `evidence.read` accepts only registered preflight evidence and remains capped at 32 KiB/64 facts per artifact. `analysis.evidence.assess` accepts only completed same-task read-receipt identity/content pairs and closed range/citation claims. The host reopens and hashes each receipt, checks returned fact indexes and exact bounding ranges, derives supported/unknown/withheld/truncated states, and enforces 1 assessment/4 receipts/8 claims/32 cited indexes/512 deterministic structured tokens. Separate bridges inject task/agent/operation identity and accept no paths or open controls. Run-005 executes one seek, two reads, and one assessment; V1 runs only the seek. No detector runs during either operation. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
-| 6 — provenance | Partially implemented | In addition to media/output lineage, validated V2/V3 receipts project as private preflight-evidence artifacts with source, pinned producer, content, receipt schema, and sealed-preflight lineage. Evidence-read cards show exact bounds and returned state. Assessment start/completion/failure cards and the private `studio.evidence-assessment.receipt.v1` artifact retain completed read-receipt inputs, claim/cited-index/token usage, and producer identities. Reading is not an artifact producer; assessment is an opinion over reads, not sensing. Legacy report/merge prose is not recast as provenance. |
+| 6 — provenance | Partially implemented | In addition to media/output lineage, validated V2/V3 receipts project as private preflight-evidence artifacts with source, pinned producer, content, receipt schema, and sealed-preflight lineage. Evidence-read cards show exact bounds and returned state. Assessment start/completion/failure cards and the private `studio.evidence-assessment.receipt.v1` artifact retain completed read-receipt inputs, claim/cited-index/token usage, and producer identities. A separate read-only audit reopens the stored assessment and cited reads, verifies canonical content identities, exact ranges/states/indexes, and journal/artifact/task lineage, then exposes the closed claims in the product. Reading is not an artifact producer; assessment is an opinion over reads, not sensing, and audit does not certify truth. Legacy report/merge prose is not recast as provenance. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
-| 8 — verification | Partially implemented | Runtime tests execute real run-005 VAD/language fixtures through grant → stdio MCP → host → read receipts → assessment host → journal/artifact → product projection; reject unread/raw/open inputs, out-of-bounds indexes, content drift, skipped grants, and count/claim/cited-index/token overflow; and prove V1 absence. Browser selectors/assertions cover evidence and assessment regions; browser execution status must be reported separately. Real Codex remains unverified, the full desktop/mobile matrix was not run, and no live control producer exists. |
+| 8 — verification | Partially implemented | Runtime tests execute real run-005 VAD/language fixtures through grant → stdio MCP → host → read receipts → assessment host → journal/artifact → stored-receipt audit → product projection; reject unread/raw/open inputs, out-of-bounds indexes, content drift, skipped grants, count/claim/cited-index/token overflow, mutated stored bytes, swapped content identities, out-of-lineage receipts, and journal/stored-receipt mismatch; and prove V1 audit absence. Browser selectors/assertions cover the audit claims, citations, preserved states, and honest empty region; browser execution status must be reported separately. Real Codex remains unverified, the full desktop/mobile matrix was not run, and no live control producer exists. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
 | 10 — forecasting | Deterministic floor plus product forecast surface implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `POST /v1/runtime-plans` returns the exact forecast without creating a command or runtime directory. Default Studio validates it, shows its range/floor/operation/assumptions, and leaves unavailable values unavailable. Start freezes that same content into `run-start.json`; no pricing, calibration, operation-choice, or evaluation producer is claimed. |
-| 11 — local runtime-start host | Local product fragment implemented | The existing plan/start/poll path registers V2/V3 evidence, derives paired optional `evidence.read` and `analysis.evidence.assess` grants, executes required reads then one assessment, and projects evidence/assessment artifacts and operations outside replay. Browser-ingested V1 remains evidence/assessment-unavailable. The forecast remains the exact one-seek media workload floor; read/assessment budgets are post-start scheduler facts, not mislabelled workload. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
+| 11 — local runtime-start host | Local product fragment implemented | The existing plan/start/poll path registers V2/V3 evidence, derives paired optional `evidence.read` and `analysis.evidence.assess` grants, executes required reads then one assessment, and projects evidence/assessment artifacts and operations outside replay. `GET /v1/runtimes/:runtimeId/assessment-audits` separately reopens content-addressed assessment/read receipts and returns only fully closed claims/citations. Browser-ingested V1 remains evidence/assessment/audit-unavailable. The forecast remains the exact one-seek media workload floor; read/assessment budgets are post-start scheduler facts, not mislabelled workload. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
 
 ## Local runtime-start host
 
@@ -406,6 +409,7 @@ POST /v1/runtime-starts
 GET  /v1/runtime-starts/:commandId
 GET  /v1/runtimes/:runtimeId
 GET  /v1/runtimes/:runtimeId/events?after=<cursor>&limit=<n>
+GET  /v1/runtimes/:runtimeId/assessment-audits
 ```
 
 Owned ingest state is `queued`, `probing`, `sealing`, `registered`, or `failed`. These are host
@@ -439,10 +443,12 @@ sessions, shows validated source facts, reviews the exact floor, starts, reads l
 validated events. The product poll sends complete validated batches through the production-only
 adapter and renders separate source/evidence artifacts, tasks, spawn request/decision, registered
 workers, capability grants, media operations, evidence reads/assessments, assessment artifacts,
-output lineage, and structured reports.
+assessment receipt audits, output lineage, and structured reports. The audit endpoint carries no
+paths or receipt bytes; it returns an empty list until a completed assessment exists and fails the
+whole response closed when stored content or lineage does not agree with the validated journal.
 The deterministic run-005 proof invokes the real ffmpeg seek host, reads both pre-existing pinned
-receipts, and emits one `studio.evidence-assessment.receipt.v1`; a V1 proof projects empty evidence
-and assessment regions. These regions remain empty whenever no
+receipts, emits one `studio.evidence-assessment.receipt.v1`, and reopens it for the product audit; a
+V1 proof projects empty evidence, assessment, and assessment-audit regions. These regions remain empty whenever no
 validated events exist. Raw ingest
 artifacts are not relabelled as outputs: their region exposes identity and content facts only, and
 their storage paths remain absent. Artifact references navigate only to rendered source/output
@@ -850,6 +856,14 @@ The next production slices, in dependency order:
     Deterministic run-005 performs one assessment after two reads; browser V1 receives no grant.
     Deterministic, stdio MCP, and fake-Codex seams are tested; real Codex and browser assertions were
     not executed for this tranche.
+15. Implemented 2026-07-15: the authenticated assessment-audit endpoint reopens the private
+    `studio.evidence-assessment.receipt.v1` object and every cited `studio.evidence-read.receipt.v1`
+    object by content identity, verifies canonical hashes/receipt ids, exact claim range/value/state
+    derivation, returned-fact indexes, and journal/artifact/task lineage, and returns only the closed
+    claim/citation view. Product navigation targets only already-rendered read receipts, artifacts,
+    tasks, workers, and operations. Restart, mutated-byte, swapped-content, out-of-lineage, journal-
+    mismatch, and V1-empty cases are runtime-tested. Playwright assertions are authored but were not
+    executed; real Codex remains optional and was not run.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow
 the same rule: choose a real deterministic producer first, then add the contract, fixture, policy,

@@ -1,116 +1,48 @@
-import { useMemo, useState } from "react";
-
-import type { TaskStatus } from "./model";
-import { buildRuntimeObservabilityIndex } from "./observability/indexer";
-import type {
-  IndexedOperationCapability,
-  ObservabilitySourceReferences,
-  RuntimeObservabilityIndex,
-} from "./observability/model";
-import { ImmutableObservabilityQueryStore } from "./observability/query";
+import type { ObservabilitySourceReferences } from "./observability/model";
 import {
-  projectProductionRuntimeJournal,
-  type ProductionStudioProjection,
-} from "./studioProjection";
-
-const MAX_JOURNAL_BYTES = 5 * 1024 * 1024;
-
-function integer(value: number): string {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
-function duration(milliseconds: number | null): string {
-  return milliseconds === null ? "unavailable" : `${(milliseconds / 1_000).toFixed(2)} s active`;
-}
-
-function measuredInteger(value: number | null): string {
-  return value === null ? "unavailable" : integer(value);
-}
-
-function domId(kind: "event" | "receipt" | "artifact", id: string): string {
-  return `runtime-source-${kind}-${id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
-}
-
-function compactIdentity(value: string): string {
-  if (value.length <= 28) return value;
-  return `${value.slice(0, 14)}…${value.slice(-10)}`;
-}
+  compactRuntimeIdentity,
+  formatDuration,
+  formatInteger,
+  formatMeasuredInteger,
+  runtimeSourceDomId,
+} from "./runtimeInspector/format";
+import { useRuntimeInspector } from "./runtimeInspector/useRuntimeInspector";
 
 function SourceLinks({ sources }: { sources: ObservabilitySourceReferences }) {
   return (
     <div className="runtime-source-links" aria-label="Source identities">
       <span>sources</span>
       {sources.eventIds.map((id) => (
-        <a href={`#${domId("event", id)}`} key={`event:${id}`}>{id.split(":").at(-1)}</a>
+        <a href={`#${runtimeSourceDomId("event", id)}`} key={`event:${id}`}>{id.split(":").at(-1)}</a>
       ))}
       {sources.receiptIds.map((id) => (
-        <a href={`#${domId("receipt", id)}`} key={`receipt:${id}`}>{compactIdentity(id)}</a>
+        <a href={`#${runtimeSourceDomId("receipt", id)}`} key={`receipt:${id}`}>{compactRuntimeIdentity(id)}</a>
       ))}
       {sources.artifactIds.map((id) => (
-        <a href={`#${domId("artifact", id)}`} key={`artifact:${id}`}>{compactIdentity(id)}</a>
+        <a href={`#${runtimeSourceDomId("artifact", id)}`} key={`artifact:${id}`}>{compactRuntimeIdentity(id)}</a>
       ))}
     </div>
   );
 }
 
 export default function ProductionRuntimeInspector() {
-  const [projection, setProjection] = useState<ProductionStudioProjection | null>(null);
-  const [index, setIndex] = useState<RuntimeObservabilityIndex | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [filename, setFilename] = useState<string | null>(null);
-  const [agentFilter, setAgentFilter] = useState("all");
-  const [taskStatusFilter, setTaskStatusFilter] = useState("all");
-  const [operationFilter, setOperationFilter] = useState("all");
-
-  const store = useMemo(
-    () => (index ? new ImmutableObservabilityQueryStore([index]) : null),
-    [index],
-  );
-  const query = useMemo(() => {
-    if (!store) return null;
-    return store.query({
-      agentIds: agentFilter === "all" ? undefined : [agentFilter],
-      taskStatuses:
-        taskStatusFilter === "all" ? undefined : [taskStatusFilter as TaskStatus],
-      operationCapabilities:
-        operationFilter === "all"
-          ? undefined
-          : [operationFilter as IndexedOperationCapability],
-    });
-  }, [agentFilter, operationFilter, store, taskStatusFilter]);
-
-  const load = async (file: File | undefined): Promise<void> => {
-    setProjection(null);
-    setIndex(null);
-    setError(null);
-    setFilename(file?.name ?? null);
-    setAgentFilter("all");
-    setTaskStatusFilter("all");
-    setOperationFilter("all");
-    if (!file) return;
-    if (file.size <= 0 || file.size > MAX_JOURNAL_BYTES) {
-      setError("The journal must be non-empty and no larger than 5 MB.");
-      return;
-    }
-    try {
-      const raw = await file.text();
-      const built = await buildRuntimeObservabilityIndex(raw);
-      const events = raw
-        .trimEnd()
-        .split("\n")
-        .map((line) => JSON.parse(line) as unknown);
-      setProjection(projectProductionRuntimeJournal(events));
-      setIndex(built);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The production journal could not be validated.");
-    }
-  };
-
-  const agentOptions = index?.records.agents.map((agent) => agent.agentId) ?? [];
-  const taskStatusOptions = [...new Set(index?.records.tasks.map((task) => task.status) ?? [])].sort();
-  const operationOptions = [
-    ...new Set(index?.records.operations.map((operation) => operation.capability) ?? []),
-  ].sort();
+  const {
+    projection,
+    index,
+    error,
+    filename,
+    agentFilter,
+    setAgentFilter,
+    taskStatusFilter,
+    setTaskStatusFilter,
+    operationFilter,
+    setOperationFilter,
+    query,
+    agentOptions,
+    taskStatusOptions,
+    operationOptions,
+    load,
+  } = useRuntimeInspector();
 
   return (
     <main className="runtime-inspector">
@@ -158,7 +90,7 @@ export default function ProductionRuntimeInspector() {
             <div>
               <span className="runtime-proof">Validated immutable index · not a recorded demo</span>
               <h2>{projection.runId}</h2>
-              <code title={index.indexId}>{compactIdentity(index.indexId)}</code>
+              <code title={index.indexId}>{compactRuntimeIdentity(index.indexId)}</code>
             </div>
             <dl>
               <div><dt>events</dt><dd>{index.sourceJournal.eventCount}</dd></div>
@@ -200,9 +132,9 @@ export default function ProductionRuntimeInspector() {
             </header>
 
             <div className="runtime-metrics">
-              <div><span>active duration</span><b>{duration(query.aggregate.measured.activeDurationMs)}</b><small>{query.aggregate.coverage.activeExecutionsMeasured}/{query.aggregate.coverage.totalExecutions} executions measured</small></div>
-              <div><span>input tokens</span><b>{measuredInteger(query.aggregate.measured.inputTokens)}</b><small>{query.aggregate.coverage.usageExecutionsMeasured}/{query.aggregate.coverage.totalExecutions} executions measured</small></div>
-              <div><span>output tokens</span><b>{measuredInteger(query.aggregate.measured.outputTokens)}</b><small>turn.completed only</small></div>
+              <div><span>active duration</span><b>{formatDuration(query.aggregate.measured.activeDurationMs)}</b><small>{query.aggregate.coverage.activeExecutionsMeasured}/{query.aggregate.coverage.totalExecutions} executions measured</small></div>
+              <div><span>input tokens</span><b>{formatMeasuredInteger(query.aggregate.measured.inputTokens)}</b><small>{query.aggregate.coverage.usageExecutionsMeasured}/{query.aggregate.coverage.totalExecutions} executions measured</small></div>
+              <div><span>output tokens</span><b>{formatMeasuredInteger(query.aggregate.measured.outputTokens)}</b><small>turn.completed only</small></div>
               <div><span>failures</span><b>{query.aggregate.counts.failures}</b><small>structured failure events</small></div>
             </div>
 
@@ -252,10 +184,10 @@ export default function ProductionRuntimeInspector() {
                         <tr key={execution.executionId}>
                           <td><code>{execution.executionId}</code><small>model {execution.model ?? "unavailable"}</small></td>
                           <td>{execution.status}</td>
-                          <td>{duration(execution.activeDurationMs)}</td>
+                          <td>{formatDuration(execution.activeDurationMs)}</td>
                           <td>
                             {execution.tokens
-                              ? `${integer(execution.tokens.inputTokens)} in · ${integer(execution.tokens.outputTokens)} out`
+                              ? `${formatInteger(execution.tokens.inputTokens)} in · ${formatInteger(execution.tokens.outputTokens)} out`
                               : "unavailable"}
                           </td>
                           <td><SourceLinks sources={execution.sources} /></td>
@@ -311,9 +243,9 @@ export default function ProductionRuntimeInspector() {
                   </dl>
                   {worker.execution ? (
                     <div className="runtime-receipt">
-                      <div><span>executor</span><b>{worker.execution.status} · {duration(worker.execution.activeDurationMs)}</b></div>
+                      <div><span>executor</span><b>{worker.execution.status} · {formatDuration(worker.execution.activeDurationMs)}</b></div>
                       {worker.execution.usage ? (
-                        <div><span>measured model usage</span><b>{integer(worker.execution.usage.inputTokens)} in · {integer(worker.execution.usage.outputTokens)} out</b><small>model {worker.execution.usage.model ?? "unavailable"} · billing unavailable</small></div>
+                        <div><span>measured model usage</span><b>{formatInteger(worker.execution.usage.inputTokens)} in · {formatInteger(worker.execution.usage.outputTokens)} out</b><small>model {worker.execution.usage.model ?? "unavailable"} · billing unavailable</small></div>
                       ) : <div><span>measured model usage</span><b>unavailable</b></div>}
                     </div>
                   ) : <p className="runtime-unavailable">No executor span was recorded.</p>}
@@ -334,7 +266,7 @@ export default function ProductionRuntimeInspector() {
               <section>
                 <h3>Events</h3>
                 {query.sources.events.map((source) => (
-                  <article id={domId("event", source.eventId)} key={source.eventId}>
+                  <article id={runtimeSourceDomId("event", source.eventId)} key={source.eventId}>
                     <b>{source.eventId} · {source.type}</b><code>{source.contentId}</code>
                   </article>
                 ))}
@@ -342,7 +274,7 @@ export default function ProductionRuntimeInspector() {
               <section>
                 <h3>Receipts</h3>
                 {query.sources.receipts.map((source) => (
-                  <article id={domId("receipt", source.receiptId)} key={source.receiptId}>
+                  <article id={runtimeSourceDomId("receipt", source.receiptId)} key={source.receiptId}>
                     <b>{source.receiptId} · {source.kind}</b><code>{source.contentId}</code>
                     {source.rawReceiptContentId && <small>raw {source.rawReceiptContentId}</small>}
                   </article>
@@ -351,7 +283,7 @@ export default function ProductionRuntimeInspector() {
               <section>
                 <h3>Artifacts</h3>
                 {query.sources.artifacts.map((source) => (
-                  <article id={domId("artifact", source.artifactId)} key={source.artifactId}>
+                  <article id={runtimeSourceDomId("artifact", source.artifactId)} key={source.artifactId}>
                     <b>{source.artifactId} · {source.kind}</b><code>{source.contentId}</code>
                   </article>
                 ))}

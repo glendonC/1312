@@ -16,6 +16,14 @@ const ACTIVE_LABELS: Record<Role, string> = {
   qc: "Checking evidence",
 };
 
+const ROLE_REMITS: Record<Role, string> = {
+  orchestrator: "Coordinates the recorded run and its projected workers.",
+  segment: "Maps the recorded source into inspectable ranges and marks.",
+  context: "Resolves transcript terms against the recorded job context.",
+  translate: "Drafts the assigned clip window in the target language.",
+  qc: "Checks recorded measurements and publication gates.",
+};
+
 /**
  * The manifest label is the run-scoped public name when it differs from the machine id.
  * Older recorded runs used the id as their label, so they retain the role-title fallback.
@@ -30,6 +38,11 @@ export function agentTitle(id: string, role: Role, label?: string): string {
 
 export function agentRoleTitle(role: Role): string {
   return ROLE_TITLES[role];
+}
+
+/** Compatibility presentation copy for recorded roles; never a runtime task objective. */
+export function agentRoleRemit(role: Role): string {
+  return ROLE_REMITS[role];
 }
 
 /** Status copy is role-aware, but never implies work the event stream has not recorded. */

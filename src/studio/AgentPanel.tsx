@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "../styles/studio/focus.css";
 import AgentMark from "./AgentMark";
 import { agentIdentityStyle, createAgentIdentityMap } from "./agentIdentity";
-import { agentRoleTitle, agentState, agentTitle } from "./agentPresentation";
+import { agentRoleRemit, agentRoleTitle, agentState, agentTitle } from "./agentPresentation";
 import { clock } from "./format";
 import {
   useAgent,
@@ -346,10 +346,16 @@ export default function AgentPanel() {
             </div>
 
             <div className="agent-focus-hero-copy">
-              <h2 id="agent-focus-title">{title}</h2>
-              <p id="agent-focus-state" data-status={status}>
+              <p id="agent-focus-state" className="agent-focus-state" data-status={status}>
                 <span className="agent-focus-visually-hidden">Recorded state: </span>
                 {state}
+              </p>
+              <span className="agent-focus-material-rule" aria-hidden="true" />
+              <h2 id="agent-focus-title">{title}</h2>
+              <span className="agent-focus-nameplate-rule" aria-hidden="true" />
+              <p className="agent-focus-role-remit">
+                <span className="agent-focus-visually-hidden">Recorded role remit: </span>
+                {agentRoleRemit(role)}
               </p>
             </div>
 
@@ -362,39 +368,57 @@ export default function AgentPanel() {
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 220, damping: 30, delay: 0.03 }}
           >
-            <nav
-              className="agent-focus-section-rail"
-              role="tablist"
-              aria-label="Focused worker sections"
-              onKeyDown={moveSectionFocus}
-            >
-              <button
-                id="agent-focus-workspace-tab"
-                type="button"
-                role="tab"
-                aria-selected={section === "workspace"}
-                aria-controls="agent-focus-workspace-panel"
-                tabIndex={section === "workspace" ? 0 : -1}
-                onClick={() => changeSection("workspace")}
-                title="Workspace"
+            <div className="agent-focus-side-rail">
+              <nav
+                className="agent-focus-section-rail"
+                role="tablist"
+                aria-label="Focused worker sections"
+                onKeyDown={moveSectionFocus}
               >
-                <FocusSectionIcon section="workspace" />
-                <span className="agent-focus-visually-hidden">Workspace</span>
-              </button>
+                <button
+                  id="agent-focus-workspace-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={section === "workspace"}
+                  aria-controls="agent-focus-workspace-panel"
+                  tabIndex={section === "workspace" ? 0 : -1}
+                  onClick={() => changeSection("workspace")}
+                >
+                  <span className="agent-focus-section-icon" aria-hidden="true">
+                    <FocusSectionIcon section="workspace" />
+                  </span>
+                  <span className="agent-focus-section-label" aria-hidden="true">Workspace</span>
+                  <span className="agent-focus-visually-hidden">Workspace</span>
+                </button>
+                <button
+                  id="agent-focus-activity-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={section === "activity"}
+                  aria-controls="agent-focus-activity-panel"
+                  tabIndex={section === "activity" ? 0 : -1}
+                  onClick={() => changeSection("activity")}
+                >
+                  <span className="agent-focus-section-icon" aria-hidden="true">
+                    <FocusSectionIcon section="activity" />
+                  </span>
+                  <span className="agent-focus-section-label" aria-hidden="true">
+                    Recorded activity
+                  </span>
+                  <span className="agent-focus-visually-hidden">Recorded activity</span>
+                </button>
+              </nav>
               <button
-                id="agent-focus-activity-tab"
+                ref={closeButton}
                 type="button"
-                role="tab"
-                aria-selected={section === "activity"}
-                aria-controls="agent-focus-activity-panel"
-                tabIndex={section === "activity" ? 0 : -1}
-                onClick={() => changeSection("activity")}
-                title="Recorded activity"
+                className="agent-focus-rail-close"
+                onClick={() => select(null)}
+                aria-label="Close agent focus"
               >
-                <FocusSectionIcon section="activity" />
-                <span className="agent-focus-visually-hidden">Recorded activity</span>
+                <span className="agent-focus-section-icon" aria-hidden="true">×</span>
+                <span className="agent-focus-section-label" aria-hidden="true">Close focus</span>
               </button>
-            </nav>
+            </div>
 
             <section className="agent-focus-environment" aria-labelledby="agent-environment-title">
               <header className="agent-focus-environment-head">
@@ -403,15 +427,6 @@ export default function AgentPanel() {
                   <h3 id="agent-environment-title">{environmentTitle}</h3>
                   <p>{environmentDescription}</p>
                 </div>
-                <button
-                  ref={closeButton}
-                  type="button"
-                  className="agent-focus-close"
-                  onClick={() => select(null)}
-                  aria-label="Close agent focus"
-                >
-                  ×
-                </button>
               </header>
 
               {section === "workspace" ? (
@@ -451,22 +466,27 @@ export default function AgentPanel() {
             </section>
 
             <nav className="agent-focus-commands" aria-label="Agent focus commands">
-              <div>
+              <div className="agent-focus-command-group">
                 <button type="button" onClick={() => move(-1)} aria-label="Previous agent">
-                  <span aria-hidden="true">←</span>
-                  Previous worker
+                  <span className="agent-focus-command-key" aria-hidden="true">←</span>
+                  <span>Previous <span className="agent-focus-command-noun">worker</span></span>
                 </button>
                 <span className="agent-focus-command-position">
                   {selectedIndex + 1} / {inspectableIds.length}
                 </span>
                 <button type="button" onClick={() => move(1)} aria-label="Next agent">
-                  Next worker
-                  <span aria-hidden="true">→</span>
+                  <span className="agent-focus-command-key" aria-hidden="true">→</span>
+                  <span>Next <span className="agent-focus-command-noun">worker</span></span>
                 </button>
               </div>
-              <button type="button" onClick={() => select(null)} aria-label="Close focus">
-                <kbd>Esc</kbd>
-                Close
+              <button
+                type="button"
+                className="agent-focus-command-escape"
+                onClick={() => select(null)}
+                aria-label="Close focus"
+              >
+                <kbd aria-hidden="true">Esc</kbd>
+                <span>Close</span>
               </button>
             </nav>
           </motion.div>

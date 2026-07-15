@@ -82,6 +82,39 @@ export interface RuntimeHostSourceSummary {
   detectedLanguageEvidenceAvailable: boolean;
 }
 
+export const OWNED_MEDIA_INGEST_STATES = [
+  "queued",
+  "probing",
+  "sealing",
+  "registered",
+  "failed",
+] as const;
+
+export type OwnedMediaIngestState = (typeof OWNED_MEDIA_INGEST_STATES)[number];
+
+export interface OwnedMediaIngestRequest {
+  filename: string;
+  declaredBytes: number;
+  label: string;
+  rightsHolder: string;
+  rightsScope: "local_processing";
+  ownershipAttested: true;
+}
+
+export interface OwnedMediaIngestFailure {
+  code: "upload_failed" | "probe_failed" | "seal_failed" | "registration_failed";
+  message: string;
+}
+
+export interface OwnedMediaIngestStatus {
+  schema: "studio.owned-media-ingest.v1";
+  ingestId: string;
+  status: OwnedMediaIngestState;
+  updatedAt: string;
+  source: RuntimeHostSourceSummary | null;
+  failure: OwnedMediaIngestFailure | null;
+}
+
 export interface RuntimeHostPlanResponse {
   schema: "studio.local-runtime-plan.v1";
   commandId: string;

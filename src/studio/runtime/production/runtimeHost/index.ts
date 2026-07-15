@@ -32,4 +32,8 @@ export {
 } from "./runtimeApplication.ts";
 export { RuntimeStartService } from "./service.ts";
 export { RuntimeSourceRegistry } from "./sourceRegistry.ts";
+export {
+  DEFAULT_OWNED_MEDIA_INGEST_BYTES,
+  OwnedMediaIngestService,
+} from "./ownedMediaIngest.ts";
 export { parseRuntimeHostStartRequest } from "./validation.ts";

@@ -28,46 +28,56 @@ export class RuntimeSourceRegistry {
   private readonly entries = new Map<string, RegisteredEntry>();
 
   static async open(options: RuntimeSourceRegistryOptions): Promise<RuntimeSourceRegistry> {
-    if (options.sourceDirectories.length === 0) {
-      throw new RuntimeHostError("no_registered_sources", "At least one owned source directory must be registered.");
-    }
     const registry = new RuntimeSourceRegistry();
     const sourceRoot = options.sourceRoot ? await realpath(resolve(options.sourceRoot)) : null;
     for (const input of options.sourceDirectories) {
-      const directory = await realpath(resolve(input));
-      if (sourceRoot && !contained(sourceRoot, directory)) {
-        throw new RuntimeHostError(
-          "source_outside_root",
-          "A registered source directory is outside the configured source root.",
-        );
-      }
-      const loaded = await loadOwnedSourceSession(directory);
-      const existing = registry.entries.get(loaded.session.sessionId);
-      if (existing && existing.loaded.session.revisionId !== loaded.session.revisionId) {
-        throw new RuntimeHostError(
-          "ambiguous_source_session",
-          "Two registered directories resolve to one source session with different revisions.",
-        );
-      }
-      registry.entries.set(loaded.session.sessionId, { directory, loaded });
+      await registry.registerDirectory(input, sourceRoot ? { sourceRoot } : {});
     }
     return registry;
   }
 
+  async registerDirectory(
+    input: string,
+    options: { sourceRoot?: string } = {},
+  ): Promise<RuntimeHostSourceSummary> {
+    const directory = await realpath(resolve(input));
+    const sourceRoot = options.sourceRoot ? await realpath(resolve(options.sourceRoot)) : null;
+    if (sourceRoot && !contained(sourceRoot, directory)) {
+      throw new RuntimeHostError(
+        "source_outside_root",
+        "A registered source directory is outside the configured source root.",
+      );
+    }
+    const loaded = await loadOwnedSourceSession(directory);
+    const existing = this.entries.get(loaded.session.sessionId);
+    if (existing && existing.loaded.session.revisionId !== loaded.session.revisionId) {
+      throw new RuntimeHostError(
+        "ambiguous_source_session",
+        "Two registered directories resolve to one source session with different revisions.",
+      );
+    }
+    this.entries.set(loaded.session.sessionId, { directory, loaded });
+    return this.summary(loaded);
+  }
+
+  private summary(loaded: LoadedOwnedSourceSession): RuntimeHostSourceSummary {
+    return {
+      sourceSessionId: loaded.session.sessionId,
+      sourceRevisionId: loaded.session.revisionId,
+      sourceContentId: loaded.session.source.contentId,
+      label: loaded.operator.label,
+      rightsScope: loaded.operator.rightsScope,
+      durationMs: loaded.session.source.durationMs,
+      trackCount: loaded.descriptor.tracks.length,
+      preflightSchema: loaded.session.preflight.schema,
+      detectedLanguageEvidenceAvailable:
+        loaded.session.detectedLanguageEvidenceContentIds.length > 0,
+    };
+  }
+
   list(): RuntimeHostSourceSummary[] {
     return [...this.entries.values()]
-      .map(({ loaded }) => ({
-        sourceSessionId: loaded.session.sessionId,
-        sourceRevisionId: loaded.session.revisionId,
-        sourceContentId: loaded.session.source.contentId,
-        label: loaded.operator.label,
-        rightsScope: loaded.operator.rightsScope,
-        durationMs: loaded.session.source.durationMs,
-        trackCount: loaded.descriptor.tracks.length,
-        preflightSchema: loaded.session.preflight.schema,
-        detectedLanguageEvidenceAvailable:
-          loaded.session.detectedLanguageEvidenceContentIds.length > 0,
-      }))
+      .map(({ loaded }) => this.summary(loaded))
       .sort((left, right) => left.sourceSessionId.localeCompare(right.sourceSessionId));
   }
 

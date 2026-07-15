@@ -289,7 +289,7 @@ values distinctly and explain which assumptions dominate the estimate.
 |---|---|---|
 | Event replay | Ordered typed traces, pure reducer, cursor reconstruction, fixture validation, and checkpoints | Keep exact scenario coverage current as producers grow |
 | Transport seam | Replay pause/step/seek/speed, single-trace legacy live validation, and a separate validated production-journal adapter | Acknowledged production live control; never route production events through legacy traces |
-| Source and run start | A loopback runtime-start host registers operator-selected owned-source directories, revalidates the highest sealed V1/V2/V3 preflight index and every indexed byte, resolves only stable session/revision identities from clients, exposes a read-only exact plan, durably claims `commandId`, writes an immutable adjacent `studio.runtime-start.v1`, and launches one bounded child at most once. Default Studio can select, plan, start, and poll this path without entering replay state | Browser ingest/probe, a separately versioned production start event if later required, and scheduler task propagation of the accepted language context |
+| Source and run start | A loopback runtime-start host accepts explicitly attested bounded owned bytes or operator-selected preflight directories, invokes the existing ingest/ffprobe/V1-seal chain for browser media, revalidates every indexed byte, hot-registers and resolves stable session/revision identities, exposes a read-only exact plan, durably claims `commandId`, writes an immutable adjacent `studio.runtime-start.v1`, and launches one bounded child at most once. Default Studio can ingest, select, plan, start, and poll without entering replay state | Hosted/link ingest, speech/language detection for browser V1 ingest, a separately versioned production start event if later required, and scheduler task propagation of the accepted language context |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and production-journal worker projection | Stream the production adapter from a runtime service and add richer production task/lineage views without altering recorded bundles |
 | Workspaces | Role-specific legacy trace projections | Production task, capability, media scope, artifact, and operation views |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD speech/non-speech receipts, pinned speech-window language receipts, post-run evidence index, a receipted ffmpeg range extraction host, and a bounded receipted seek observation host | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
@@ -314,7 +314,7 @@ workers. It does not start the runtime, search raw journal text, insert events i
 |---|---|---|
 | 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. Browser automation is authored but interactive execution is unavailable in the current in-app browser environment. |
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
-| 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Pinned Silero VAD receipts preserve normalized PCM, raw frame scores, and exact speech windows. The pinned Whisper language producer consumes only those validated windows and receipts per-range scores plus classified, unknown, or withheld decisions. The development source-session loader now re-hashes every artifact in the highest available sealed index and preserves language-receipt content ids as evidence without changing the requested source, target, pack, or range. Hosted submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
+| 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Default Studio now sends explicitly attested owned bytes to the development host, which composes the existing ingest and V1 seal producers and hot-registers the validated source. This browser path does not run speech or language detection, so those findings remain honestly unavailable. Pinned Silero VAD and Whisper language producers remain available to the CLI preflight chain. Hosted/link submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
 | 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` no longer reads a fixed `run-005` path internally: it requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the existing bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, journals its lifecycle, stores its structured output, and reports through the handoff host. `run-005` remains only the explicit npm smoke/test input. The static Studio is not a runtime service and no live socket/control path is claimed. |
 | 4 — scoped media | Two operations implemented | `media.extract` emits a derived audio artifact and `media.seek` decodes a granted audio interval to a null sink, storing the receipt itself as a content-addressed observation artifact with source lineage. Both re-hash the source and enforce exact grants. The Codex child cannot invoke either operation; step, loop, mark, track selection, frames, waveform/spectrogram/OCR tools are not claimed. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
@@ -323,7 +323,7 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 8 — verification | Partially implemented | Build, bench, receipt policy, deterministic launcher/runtime tests, opt-in real Codex smoke, memory policy, and browser-test discovery are automated. Interactive desktop/mobile browser execution remains unavailable and no live control producer exists. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
 | 10 — forecasting | Deterministic floor plus product forecast surface implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `POST /v1/runtime-plans` returns the exact forecast without creating a command or runtime directory. Default Studio validates it, shows its range/floor/operation/assumptions, and leaves unavailable values unavailable. Start freezes that same content into `run-start.json`; no pricing, calibration, operation-choice, or evaluation producer is claimed. |
-| 11 — local runtime-start host | Local product fragment implemented | A transport-independent service plus Node HTTP adapter accepts only registered source-session/revision identities, derives a deterministic runtime identity for exact pre-start planning, durably claims the command only on start, persists lifecycle state, initializes one immutable receipt/journal/artifact store, and creates one permanent launch claim before asynchronous execution. Default Studio provides the explicit owned-source connect/plan/start/poll path; the lab remains available. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
+| 11 — local runtime-start host | Local product fragment implemented | A transport-independent service plus Node HTTP adapter now also accepts bounded owned bytes through authenticated create/upload/status endpoints, uses only host-chosen ignored paths and fixed producer arguments, hot-registers the sealed V1 source, then preserves the existing stable-identity plan/start/poll path. Default Studio provides explicit file/rights/progress/select/plan/start/poll controls; the lab remains available. Restart recovery never relaunches ambiguous work. `/studio/runtime/` remains a manual journal inspector and production events never enter replay topology. |
 
 ## Local runtime-start host
 
@@ -335,11 +335,16 @@ closed. API responses contain stable source, command, runtime, journal, request,
 and event identities; they do not contain registered source directories, runtime paths, artifact
 storage keys, subprocess arguments, environment variables, or the bearer token.
 
-Source registration is a host startup operation. The operator supplies one or more owned preflight
-directories (and may constrain them to a configured source root). Each directory is fully loaded by
-the existing owned-source session loader. Browser requests contain only `sourceSessionId` and the
-expected `sourceRevisionId`; any changed indexed byte, symlink escape, unknown session, or stale
-revision fails before command acceptance. The browser cannot submit a source path, output root,
+Source registration can occur at host startup or after a browser-owned ingest. Startup directories
+remain an operator escape hatch and are fully loaded by the existing owned-source session loader.
+For browser ingest, the client creates metadata with an original basename, byte count, explicit
+label, explicit rights holder, fixed `local_processing` scope, and a required ownership/control
+attestation. It then PUTs the exact bounded bytes. The host chooses a private path beneath
+`.studio/owned-sources`, invokes the existing owned ingest/ffprobe producer, seals V1 with the
+existing preflight producer, revalidates every indexed byte, and hot-registers the resulting
+session/revision. Sealed directories are rediscovered and revalidated when the host restarts.
+Browser status responses contain only job state, safe failure detail, and the path-free validated
+source summary. The browser cannot submit a source path, output root, public/redistribution flag,
 journal path, artifact-store path, runtime identity, task/agent identity, sequence, scheduler state,
 or executable argument.
 
@@ -387,6 +392,9 @@ contract. Real execution was not run for this host slice.
 Implemented HTTP endpoints are:
 
 ```text
+POST /v1/owned-media-ingests
+PUT  /v1/owned-media-ingests/:ingestId/media
+GET  /v1/owned-media-ingests/:ingestId
 GET  /v1/source-sessions
 POST /v1/runtime-plans
 POST /v1/runtime-starts
@@ -395,6 +403,12 @@ GET  /v1/runtimes/:runtimeId
 GET  /v1/runtimes/:runtimeId/events?after=<cursor>&limit=<n>
 ```
 
+Owned ingest state is `queued`, `probing`, `sealing`, `registered`, or `failed`. These are host
+transitions around actual upload acceptance, the existing ingest/ffprobe process, immutable V1
+sealing, and registry validation; there is no animated percentage. Upload length must match the
+declared byte count and the configured `--maximum-owned-media-bytes` bound. Redistribution and
+publication are not available through this endpoint.
+
 The planning endpoint accepts the same closed product request as start. It revalidates the source,
 derives the exact analysis request, work plan, runtime-bound source-artifact identity, and
 `studio.forecast.v1`, and returns `not_started` with a null frozen-forecast id. It creates no command,
@@ -402,7 +416,7 @@ runtime directory, journal, receipt, or executor. The start endpoint recomputes 
 exact forecast; the product client fails closed if command, runtime, analysis-request, or forecast
 content identities differ from review.
 
-There is no pause/resume/cancel endpoint. The host does not upload or link-ingest sources. It starts
+There is no pause/resume/cancel endpoint. The host does not link-ingest or host remote sources. It starts
 only the existing one-child proof objective: no child media tools, media inspection, transcription,
 translation, captions, study output, parent/orchestrator model execution, or multi-worker swarm.
 Default `/studio/` now offers an explicit **Use owned local source** path that lists registered
@@ -413,20 +427,20 @@ recorded graph.
 
 ### Deterministic operator path
 
-For a new owned source, run the full producer and register its sealed directory:
+For a new owned source, start the host with browser ingest enabled by default:
 
 ```text
-node scripts/preflight-owned-media.mjs --file /path/to/media.mov --run local-001 --label "Owned clip" --rights-holder "Your name" --rights-scope local --attest-rights
-node scripts/run-runtime-host.ts --source-directory .studio/runs/local-001 --executor deterministic
+node scripts/run-runtime-host.ts --executor deterministic
 ```
 
-The first command copies and hashes the exact bytes, records explicit rights, runs ffprobe, and
-seals `preflight.json`. The second command revalidates that directory and prints a random token plus
-source-session identities. Open Studio at the host's allowed origin (default
-`http://127.0.0.1:4321/studio/`), choose **Use owned local source**, keep the default host origin,
-paste the token, connect, select a registered source, enter explicit product language inputs, and
-choose **Review local plan**. Review the range, workload floor, operation, assumptions, and
-unavailable values, then choose **Accept forecast and start local runtime**. The lab's **Repeat
+The host prints a random token and accepts only the exact default development origins
+`http://127.0.0.1:4321` and `http://localhost:4321`. Open Studio at either origin, choose **Use owned
+local source**, keep the default host origin, paste the token, and connect. Choose **Owned media
+file**, enter **Source label** and **Rights holder**, check the ownership/control attestation, then
+choose **Confirm ownership and ingest**. Studio shows real producer state and auto-selects the
+registered V1 session. Enter explicit product language inputs and choose **Review local plan**.
+Review the range, workload floor, operation, assumptions, and unavailable values, then choose
+**Accept forecast and start local runtime**. The lab's **Repeat
 identical start** still confirms the same
 command/runtime/journal/receipt/forecast identities. The UI polls from `after=0` until
 `reachedHead` and `terminal` are true. Stop and restart the same command with
@@ -434,6 +448,12 @@ the same ignored `.studio/runtime-host` root, query its command/runtime status, 
 prior cursor. The emitted `events.ndjson` remains directly loadable through the existing manual
 `/studio/runtime/` file picker. `npm run runtime:host:codex` is the separately guarded real-executor
 path and must be invoked only with explicit authorization.
+
+The prior CLI remains valid as an escape hatch: run `scripts/preflight-owned-media.mjs` with all
+explicit rights fields and `--attest-rights`, then add its sealed directory with
+`--source-directory`. `--owned-ingest-root` changes only the host-owned private ingest root;
+`--maximum-owned-media-bytes` changes the exact upload bound. Neither flag is accepted from the
+browser.
 
 ## Submission and customization UX
 

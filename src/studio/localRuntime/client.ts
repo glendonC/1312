@@ -1,5 +1,7 @@
 import { assertRuntimeEvent } from "../runtime/production/validation/events.ts";
 import type {
+  OwnedMediaIngestRequest,
+  OwnedMediaIngestStatus,
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
@@ -162,6 +164,48 @@ function sourceSummary(value: unknown, index: number): RuntimeHostSourceSummary 
       item.detectedLanguageEvidenceAvailable,
       `${context}.detectedLanguageEvidenceAvailable`,
     ),
+  };
+}
+
+const INGEST_FAILURE_CODES = new Set([
+  "upload_failed",
+  "probe_failed",
+  "seal_failed",
+  "registration_failed",
+]);
+
+function ingestStatus(value: unknown): OwnedMediaIngestStatus {
+  const context = "Owned media ingest";
+  const item = object(value, context);
+  exact(item, ["schema", "ingestId", "status", "updatedAt", "source", "failure"], context);
+  if (item.schema !== "studio.owned-media-ingest.v1") fail(context, "schema is unsupported.");
+  if (!["queued", "probing", "sealing", "registered", "failed"].includes(item.status as string)) {
+    fail(`${context}.status`, "is unsupported.");
+  }
+  const status = item.status as OwnedMediaIngestStatus["status"];
+  const source = item.source === null ? null : sourceSummary(item.source, 0);
+  let failure: OwnedMediaIngestStatus["failure"] = null;
+  if (item.failure !== null) {
+    const detail = object(item.failure, `${context}.failure`);
+    exact(detail, ["code", "message"], `${context}.failure`);
+    if (!INGEST_FAILURE_CODES.has(detail.code as string)) fail(`${context}.failure.code`, "is unsupported.");
+    const message = string(detail.message, `${context}.failure.message`);
+    if (message.length > 256) fail(`${context}.failure.message`, "is too long.");
+    failure = {
+      code: detail.code as NonNullable<OwnedMediaIngestStatus["failure"]>["code"],
+      message,
+    };
+  }
+  if ((status === "registered") !== (source !== null) || (status === "failed") !== (failure !== null)) {
+    fail(context, "source or failure detail does not match the terminal state.");
+  }
+  return {
+    schema: "studio.owned-media-ingest.v1",
+    ingestId: identity(item.ingestId, `${context}.ingestId`),
+    status,
+    updatedAt: timestamp(item.updatedAt, `${context}.updatedAt`),
+    source,
+    failure,
   };
 }
 
@@ -705,6 +749,31 @@ export class LocalRuntimeHostClient {
     }
     if (!Array.isArray(value.sourceSessions)) fail("Runtime host source list", "sourceSessions must be an array.");
     return value.sourceSessions.map(sourceSummary);
+  }
+
+  async createOwnedMediaIngest(request: OwnedMediaIngestRequest): Promise<OwnedMediaIngestStatus> {
+    return ingestStatus(await this.request("/v1/owned-media-ingests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    }));
+  }
+
+  async uploadOwnedMedia(ingestId: string, bytes: Blob): Promise<OwnedMediaIngestStatus> {
+    const stableId = identity(ingestId, "Owned media ingest id");
+    return ingestStatus(await this.request(
+      `/v1/owned-media-ingests/${encodeURIComponent(stableId)}/media`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: bytes,
+      },
+    ));
+  }
+
+  async ownedMediaIngestStatus(ingestId: string): Promise<OwnedMediaIngestStatus> {
+    const stableId = identity(ingestId, "Owned media ingest id");
+    return ingestStatus(await this.request(`/v1/owned-media-ingests/${encodeURIComponent(stableId)}`));
   }
 
   async plan(request: RuntimeHostStartRequest): Promise<RuntimeHostPlanResponse> {

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   DurableRuntimeCommandStore,
   DeterministicRuntimeExecutor,
+  OwnedMediaIngestService,
   RuntimeSourceRegistry,
   RuntimeStartService,
   codexWorkerLauncherFactory,
@@ -43,9 +44,6 @@ function integer(name: string, fallback: number): number {
 }
 
 const sourceDirectories = values("--source-directory");
-if (sourceDirectories.length === 0) {
-  throw new Error("At least one --source-directory must explicitly register an owned preflight source");
-}
 const executorMode = value("--executor") ?? "deterministic";
 if (executorMode !== "deterministic" && executorMode !== "codex") {
   throw new Error("--executor must be deterministic or codex");
@@ -55,12 +53,22 @@ if (executorMode === "codex" && !flag("--allow-real-codex")) {
 }
 
 const runtimeRoot = resolve(value("--runtime-root") ?? resolve(REPOSITORY, ".studio/runtime-host"));
+const ownedIngestRoot = resolve(value("--owned-ingest-root") ?? resolve(REPOSITORY, ".studio/owned-sources"));
+const maximumOwnedMediaBytes = integer("--maximum-owned-media-bytes", 512 * 1024 * 1024);
 const sourceRoot = value("--source-root");
 const origins = values("--allowed-origin");
-const allowedOrigins = origins.length > 0 ? origins : ["http://127.0.0.1:4321"];
+const allowedOrigins = origins.length > 0
+  ? origins
+  : ["http://127.0.0.1:4321", "http://localhost:4321"];
 const sources = await RuntimeSourceRegistry.open({
   sourceDirectories: sourceDirectories.map((directory) => resolve(directory)),
   ...(sourceRoot ? { sourceRoot: resolve(sourceRoot) } : {}),
+});
+const ownedMediaIngest = await OwnedMediaIngestService.open({
+  root: ownedIngestRoot,
+  repositoryRoot: REPOSITORY,
+  sources,
+  maximumBytes: maximumOwnedMediaBytes,
 });
 const store = await DurableRuntimeCommandStore.open(runtimeRoot);
 const deterministic = executorMode === "deterministic" ? new DeterministicRuntimeExecutor() : null;
@@ -72,7 +80,7 @@ const service = await RuntimeStartService.open({
     : codexWorkerLauncherFactory({ model: value("--model"), maximumWallMs: 45_000 }),
 });
 const token = randomBytes(32).toString("hex");
-const server = createRuntimeHostHttpServer({ service, token, allowedOrigins });
+const server = createRuntimeHostHttpServer({ service, ownedMediaIngest, token, allowedOrigins });
 const listening = await listenRuntimeHost(server, {
   host: value("--host") ?? "127.0.0.1",
   port: integer("--port", 4312),
@@ -84,6 +92,10 @@ process.stdout.write(`${JSON.stringify({
   listening: `http://${listening.host}:${listening.port}`,
   allowedOrigins,
   sourceSessionIds: service.listSources().map((source) => source.sourceSessionId),
+  ownedMediaIngest: {
+    enabled: true,
+    maximumBytes: maximumOwnedMediaBytes,
+  },
   runtimeRoot,
   executor: executorMode === "codex" ? "real-codex-opt-in" : "deterministic-no-model",
   authorizationToken: token,

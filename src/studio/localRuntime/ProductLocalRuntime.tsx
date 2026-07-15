@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { initialRequest, type AnalysisRequest } from "../preflight/model";
 import type {
+  OwnedMediaIngestStatus,
   RuntimeHostPlanResponse,
   RuntimeHostSourceSummary,
   RuntimeHostStartAcknowledgement,
@@ -17,7 +18,7 @@ import {
 
 import "./productLocalRuntime.css";
 
-type Busy = "connect" | "plan" | "start" | null;
+type Busy = "connect" | "ingest" | "plan" | "start" | null;
 type RuntimeStatusView = Omit<RuntimeHostStatus, "schema">;
 
 interface ReviewedPlan {
@@ -58,6 +59,11 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
   const [client, setClient] = useState<LocalRuntimeHostClient | null>(null);
   const [sources, setSources] = useState<RuntimeHostSourceSummary[]>([]);
   const [sourceId, setSourceId] = useState("");
+  const [ownedFile, setOwnedFile] = useState<File | null>(null);
+  const [sourceLabel, setSourceLabel] = useState("");
+  const [rightsHolder, setRightsHolder] = useState("");
+  const [ownershipAttested, setOwnershipAttested] = useState(false);
+  const [ingest, setIngest] = useState<OwnedMediaIngestStatus | null>(null);
   const [analysisRequest, setAnalysisRequest] = useState<AnalysisRequest>(() => initialRequest("en", 0));
   const [sourceLanguage, setSourceLanguage] = useState("");
   const [languagePackId, setLanguagePackId] = useState("");
@@ -66,6 +72,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
   const [reviewed, setReviewed] = useState<ReviewedPlan | null>(null);
   const [runtime, setRuntime] = useState<RuntimeView | null>(null);
   const pollGeneration = useRef(0);
+  const ingestGeneration = useRef(0);
 
   const selectedSource = sources.find((source) => source.sourceSessionId === sourceId) ?? null;
   const lifecycle = runtime
@@ -80,9 +87,17 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
     analysisRequest.start >= 0 &&
     analysisRequest.end > analysisRequest.start &&
     Math.round(analysisRequest.end * 1_000) <= selectedSource.durationMs;
+  const ingestValid = client !== null &&
+    ownedFile !== null &&
+    sourceLabel.trim().length > 0 &&
+    rightsHolder.trim().length > 0 &&
+    ownershipAttested &&
+    (ingest === null || ingest.status === "failed") &&
+    busy === null;
 
   useEffect(() => () => {
     pollGeneration.current += 1;
+    ingestGeneration.current += 1;
   }, []);
 
   function stopPolling(): void {
@@ -98,9 +113,12 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
 
   function disconnect(): void {
     clearReviewedState();
+    ingestGeneration.current += 1;
     setClient(null);
     setSources([]);
     setSourceId("");
+    setIngest(null);
+    setBusy(null);
   }
 
   async function connect(): Promise<void> {
@@ -112,13 +130,12 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
     try {
       const nextClient = new LocalRuntimeHostClient({ baseUrl, token });
       const nextSources = await nextClient.listSourceSessions();
-      if (nextSources.length === 0) throw new Error("The local runtime host has no registered owned-source sessions.");
-      const first = nextSources[0];
       setBaseUrl(nextClient.baseUrl);
       setClient(nextClient);
       setSources(nextSources);
-      setSourceId(first.sourceSessionId);
-      setAnalysisRequest(initialRequest("en", first.durationMs / 1_000));
+      const first = nextSources[0] ?? null;
+      setSourceId(first?.sourceSessionId ?? "");
+      setAnalysisRequest(initialRequest("en", (first?.durationMs ?? 0) / 1_000));
     } catch (nextError) {
       setClient(null);
       setSources([]);
@@ -137,6 +154,57 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
     setSourceLanguage("");
     setLanguagePackId("");
     setAnalysisRequest(initialRequest("en", next.durationMs / 1_000));
+  }
+
+  async function ingestOwnedMedia(): Promise<void> {
+    if (!client || !ownedFile || !ingestValid) return;
+    stopPolling();
+    const generation = ++ingestGeneration.current;
+    setBusy("ingest");
+    setError(null);
+    setReviewed(null);
+    setRuntime(null);
+    setIngest(null);
+    try {
+      let status = await client.createOwnedMediaIngest({
+        filename: ownedFile.name,
+        declaredBytes: ownedFile.size,
+        label: sourceLabel.trim(),
+        rightsHolder: rightsHolder.trim(),
+        rightsScope: "local_processing",
+        ownershipAttested: true,
+      });
+      if (generation !== ingestGeneration.current) return;
+      setIngest(status);
+      status = await client.uploadOwnedMedia(status.ingestId, ownedFile);
+      if (generation !== ingestGeneration.current) return;
+      setIngest(status);
+
+      while (status.status !== "registered" && status.status !== "failed") {
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+        status = await client.ownedMediaIngestStatus(status.ingestId);
+        if (generation !== ingestGeneration.current) return;
+        setIngest(status);
+      }
+      if (status.status === "failed" || !status.source) return;
+
+      const nextSources = await client.listSourceSessions();
+      if (generation !== ingestGeneration.current) return;
+      const registered = nextSources.find((source) =>
+        source.sourceSessionId === status.source?.sourceSessionId &&
+        source.sourceRevisionId === status.source?.sourceRevisionId
+      );
+      if (!registered) throw new Error("The registered ingest is absent from the host source list.");
+      setSources(nextSources);
+      setSourceId(registered.sourceSessionId);
+      setSourceLanguage("");
+      setLanguagePackId("");
+      setAnalysisRequest(initialRequest("en", registered.durationMs / 1_000));
+    } catch (nextError) {
+      if (generation === ingestGeneration.current) setError(errorMessage(nextError));
+    } finally {
+      if (generation === ingestGeneration.current) setBusy(null);
+    }
   }
 
   function updateRequest(update: Partial<AnalysisRequest>): void {
@@ -296,18 +364,15 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         Submitted YouTube URLs remain unprocessed recorded previews.
       </p>
 
-      <details className="product-runtime-operator" open>
-        <summary>Prepare and register an owned source</summary>
+      <details className="product-runtime-operator">
+        <summary>Local host setup and CLI escape hatch</summary>
         <ol>
           <li>
-            Seal owned bytes, rights, and the real media probe:<br />
-            <code>node scripts/preflight-owned-media.mjs --file /path/to/media.mov --run local-001 --label "Owned clip" --rights-holder "Your name" --rights-scope local --attest-rights</code>
+            Start the deterministic host (browser ingest is enabled under ignored <code>.studio/</code> storage):<br />
+            <code>node scripts/run-runtime-host.ts --executor deterministic</code>
           </li>
-          <li>
-            Start the deterministic host with that sealed directory:<br />
-            <code>node scripts/run-runtime-host.ts --source-directory .studio/runs/local-001 --executor deterministic</code>
-          </li>
-          <li>Open Studio from the allowed origin, then paste the host token below.</li>
+          <li>Paste the printed bearer token, connect, then use the owned-media form below.</li>
+          <li>Operator preflight directories remain supported with <code>--source-directory</code> as a CLI escape hatch.</li>
         </ol>
       </details>
 
@@ -346,6 +411,83 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
           </button>
         )}
       </div>
+
+      {client && (
+        <fieldset className="product-runtime-ingest">
+          <legend>Ingest media you own or control</legend>
+          <p>
+            The host preserves the selected bytes privately, runs the real media probe, seals a V1 preflight,
+            and registers the resulting source. This path does not authorize redistribution.
+          </p>
+          <label>
+            <span>Owned media file</span>
+            <input
+              type="file"
+              accept="audio/*,video/*"
+              disabled={busy === "ingest"}
+              onChange={(event) => {
+                setOwnedFile(event.currentTarget.files?.[0] ?? null);
+                setIngest(null);
+                setError(null);
+              }}
+            />
+          </label>
+          <label>
+            <span>Source label</span>
+            <input
+              type="text"
+              value={sourceLabel}
+              maxLength={160}
+              disabled={busy === "ingest"}
+              onChange={(event) => setSourceLabel(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            <span>Rights holder</span>
+            <input
+              type="text"
+              value={rightsHolder}
+              maxLength={160}
+              disabled={busy === "ingest"}
+              onChange={(event) => setRightsHolder(event.currentTarget.value)}
+            />
+          </label>
+          <label className="product-runtime-attestation">
+            <input
+              type="checkbox"
+              checked={ownershipAttested}
+              disabled={busy === "ingest"}
+              onChange={(event) => setOwnershipAttested(event.currentTarget.checked)}
+            />
+            <span>I attest that I own or control this media and authorize local processing of this copy.</span>
+          </label>
+          <button type="button" disabled={!ingestValid} onClick={() => void ingestOwnedMedia()}>
+            {busy === "ingest" ? "Ingesting owned media…" : "Confirm ownership and ingest"}
+          </button>
+          {ingest && (
+            <div
+              className="product-runtime-ingest-status"
+              data-state={ingest.status}
+              role="status"
+              aria-live="polite"
+              aria-label="Owned media ingest progress"
+            >
+              <b>{ingest.status}</b>
+              {ingest.status === "queued" && <span> · The job is queued for bounded local upload and probe work.</span>}
+              {ingest.status === "probing" && <span> · ffprobe is measuring the preserved media.</span>}
+              {ingest.status === "sealing" && <span> · The host is sealing the immutable V1 preflight.</span>}
+              {ingest.status === "registered" && <span> · The source is registered and selected below.</span>}
+              {ingest.failure && <span> · {ingest.failure.code}: {ingest.failure.message}</span>}
+            </div>
+          )}
+        </fieldset>
+      )}
+
+      {client && sources.length === 0 && !ingest && (
+        <p className="product-runtime-empty-source" role="status">
+          No owned source is registered yet. Choose a file and complete the ownership attestation above.
+        </p>
+      )}
 
       {client && selectedSource && (
         <div className="product-runtime-session">

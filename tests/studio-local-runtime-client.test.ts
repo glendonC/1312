@@ -289,6 +289,106 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
   assert.deepEqual(JSON.parse(String(calls[2].init?.body)), request);
 });
 
+test("browser client creates, uploads, and validates a path-free owned-media ingest", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const ingestId = "owned-ingest:00000000-0000-4000-8000-000000000001";
+  const updatedAt = "2026-07-15T12:00:00.000Z";
+  let statusReads = 0;
+  const fetcher = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = String(input);
+    calls.push({ url, init });
+    if (url.endsWith("/v1/owned-media-ingests") && init?.method === "POST") {
+      return json({
+        schema: "studio.owned-media-ingest.v1",
+        ingestId,
+        status: "queued",
+        updatedAt,
+        source: null,
+        failure: null,
+      }, 202);
+    }
+    if (url.endsWith(`/v1/owned-media-ingests/${encodeURIComponent(ingestId)}/media`)) {
+      return json({
+        schema: "studio.owned-media-ingest.v1",
+        ingestId,
+        status: "queued",
+        updatedAt,
+        source: null,
+        failure: null,
+      }, 202);
+    }
+    statusReads += 1;
+    return json({
+      schema: "studio.owned-media-ingest.v1",
+      ingestId,
+      status: "registered",
+      updatedAt,
+      source: SOURCE,
+      failure: null,
+    });
+  };
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: fetcher,
+  });
+  const media = new Blob([new Uint8Array([1, 2, 3, 4])], { type: "audio/mp4" });
+  const created = await client.createOwnedMediaIngest({
+    filename: "owned.m4a",
+    declaredBytes: media.size,
+    label: "Owned clip",
+    rightsHolder: "Fixture Studio",
+    rightsScope: "local_processing",
+    ownershipAttested: true,
+  });
+  const uploaded = await client.uploadOwnedMedia(created.ingestId, media);
+  const registered = await client.ownedMediaIngestStatus(uploaded.ingestId);
+
+  assert.equal(registered.status, "registered");
+  assert.equal(registered.source?.sourceSessionId, SOURCE.sourceSessionId);
+  assert.equal(statusReads, 1);
+  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
+    filename: "owned.m4a",
+    declaredBytes: 4,
+    label: "Owned clip",
+    rightsHolder: "Fixture Studio",
+    rightsScope: "local_processing",
+    ownershipAttested: true,
+  });
+  assert.equal(calls[1].init?.body, media);
+  assert.equal(new Headers(calls[1].init?.headers).get("Content-Type"), "application/octet-stream");
+  for (const call of calls) {
+    assert.equal(new Headers(call.init?.headers).get("Authorization"), `Bearer ${"t".repeat(64)}`);
+  }
+});
+
+test("browser client rejects ingest responses containing path-like extra fields", async () => {
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => json({
+      schema: "studio.owned-media-ingest.v1",
+      ingestId: "owned-ingest:00000000-0000-4000-8000-000000000001",
+      status: "queued",
+      updatedAt: "2026-07-15T12:00:00.000Z",
+      source: null,
+      failure: null,
+      sourcePath: "/tmp/host-owned.m4a",
+    }, 202),
+  });
+  await assert.rejects(
+    client.createOwnedMediaIngest({
+      filename: "owned.m4a",
+      declaredBytes: 4,
+      label: "Owned clip",
+      rightsHolder: "Fixture Studio",
+      rightsScope: "local_processing",
+      ownershipAttested: true,
+    }),
+    (error: unknown) => error instanceof RuntimeHostClientError && error.code === "invalid_host_response",
+  );
+});
+
 test("browser client rejects a plan that invents elapsed, usage, or price values", async () => {
   const request = mapAnalysisRequestToRuntimeStart({
     source: SOURCE,

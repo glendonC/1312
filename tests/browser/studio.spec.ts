@@ -14,6 +14,31 @@ function readout(page: Page) {
   return page.locator(".lab-readout b");
 }
 
+function ownedWav(seed: number): Buffer {
+  const sampleRate = 8_000;
+  const samples = sampleRate;
+  const dataBytes = samples * 2;
+  const output = Buffer.alloc(44 + dataBytes);
+  output.write("RIFF", 0);
+  output.writeUInt32LE(36 + dataBytes, 4);
+  output.write("WAVE", 8);
+  output.write("fmt ", 12);
+  output.writeUInt32LE(16, 16);
+  output.writeUInt16LE(1, 20);
+  output.writeUInt16LE(1, 22);
+  output.writeUInt32LE(sampleRate, 24);
+  output.writeUInt32LE(sampleRate * 2, 28);
+  output.writeUInt16LE(2, 32);
+  output.writeUInt16LE(16, 34);
+  output.write("data", 36);
+  output.writeUInt32LE(dataBytes, 40);
+  for (let index = 0; index < samples; index += 1) {
+    const sample = Math.round(Math.sin((index + seed) * 2 * Math.PI * 220 / sampleRate) * 2_000);
+    output.writeInt16LE(sample, 44 + index * 2);
+  }
+  return output;
+}
+
 async function settledBox(page: Page, locator: Locator) {
   let previous = await locator.boundingBox();
   let stableSamples = 0;
@@ -110,13 +135,55 @@ test("the default Studio exposes a separate owned-source operator path", async (
   await expect(productRuntime.getByText("Local production path · separate from replay")).toBeVisible();
   await expect(productRuntime.getByText(/does not produce captions, study output, or a multi-agent swarm/)).toBeVisible();
   await expect(productRuntime.getByText(/Submitted YouTube URLs remain unprocessed recorded previews/)).toBeVisible();
-  await expect(productRuntime.getByText(/preflight-owned-media\.mjs/)).toBeVisible();
-  await expect(productRuntime.getByText(/run-runtime-host\.ts --source-directory/)).toBeVisible();
+  await productRuntime.getByText("Local host setup and CLI escape hatch").click();
+  await expect(productRuntime.getByText(/run-runtime-host\.ts --executor deterministic/)).toBeVisible();
+  await expect(productRuntime.getByText(/--source-directory/)).toBeVisible();
   await expect(productRuntime.getByRole("button", { name: "Connect to local host" })).toBeDisabled();
 
   await productRuntime.getByRole("button", { name: "Back to source choices" }).click();
   await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run Demo" })).toBeVisible();
+});
+
+test("owned browser media requires rights, registers, and continues through the existing plan/start flow", async ({ page }, testInfo) => {
+  const token = process.env.STUDIO_RUNTIME_HOST_TOKEN;
+  test.skip(testInfo.project.name !== "desktop", "one ingest is sufficient across browser projects");
+  test.skip(!token, "requires an operator-started deterministic runtime host");
+
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Use owned local source" }).click();
+  const productRuntime = page.getByRole("region", { name: "Owned local source" });
+  await productRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
+  await productRuntime.getByRole("button", { name: "Connect to local host" }).click();
+
+  await productRuntime.getByLabel("Owned media file").setInputFiles({
+    name: "browser-owned.wav",
+    mimeType: "audio/wav",
+    buffer: ownedWav(Date.now() % 8_000),
+  });
+  await productRuntime.getByLabel("Source label").fill("Browser-owned WAV");
+  await productRuntime.getByLabel("Rights holder").fill("Browser Test Studio");
+  const confirm = productRuntime.getByRole("button", { name: "Confirm ownership and ingest" });
+  await expect(confirm).toBeDisabled();
+  await productRuntime.getByLabel(/I attest that I own or control this media/).check();
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+
+  const progress = productRuntime.getByRole("status", { name: "Owned media ingest progress" });
+  await expect(progress).toHaveAttribute("data-state", "registered", { timeout: 15_000 });
+  await expect(progress).toContainText("source is registered and selected");
+  await expect(productRuntime.getByLabel("Registered owned source")).toContainText("Browser-owned WAV");
+  await expect(productRuntime.locator(".product-runtime-source-facts").getByText("Unavailable", { exact: true })).toBeVisible();
+
+  await productRuntime.getByLabel("Declared source language").fill("ko");
+  await productRuntime.getByRole("button", { name: "Review local plan" }).click();
+  const plan = productRuntime.getByRole("region", { name: "Local runtime plan" });
+  await expect(plan).toBeVisible();
+  await plan.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
+  const status = productRuntime.getByRole("region", { name: "Local runtime status" });
+  await expect(status.getByText(/Terminal/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
+  await expect(page.locator(".hub")).toHaveCount(0);
 });
 
 test("the product path reviews and freezes an exact local forecast without entering replay", async ({ page }) => {

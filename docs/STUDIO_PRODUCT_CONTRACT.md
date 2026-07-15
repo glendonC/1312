@@ -101,6 +101,7 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 - A local runtime-start host now exists under
   `src/studio/runtime/production/runtimeHost/`. `npm run runtime:host` starts its deterministic
   one-child proof on loopback with bearer authentication, registered owned-source sessions,
+  development-only owned-byte ingest/probe/seal/status endpoints,
   an exact read-only plan/forecast endpoint, idempotent start acknowledgements, lifecycle lookup,
   and validated cursor polling. The shared browser client lists registered sources, validates the
   returned `studio.forecast.v1`, sends product inputs plus stable session/revision identities,
@@ -123,8 +124,8 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 
 | Step | Required user-visible outcome | Today | Class / status | Required runtime boundary |
 |---|---|---|---|---|
-| 1. Add source | User supplies a supported link or owned clip | A valid YouTube link starts an explicit recorded preview; **Use owned local source** opens an operator-registered host source path | A+B / recorded preview plus real owned-source path | Browser upload/ingest remains missing; operator preflight registration is real |
-| 2. Validate and probe | Access, rights, duration, tracks, speech, languages, and known gaps | Owned preflight producer seals bytes/rights/ffprobe receipts; the host revalidates the highest sealed V1/V2/V3 directory and Studio shows its source/session facts. Submitted links are not probed | B / real and wired for operator-owned source; hosted links missing | Add browser ingest/probe job with progress; keep host registration path |
+| 1. Add source | User supplies a supported link or owned clip | A valid YouTube link starts an explicit recorded preview; **Use owned local source** connects to the loopback host, accepts browser-selected owned bytes only after explicit ownership/control attestation, and keeps CLI preflight registration as an escape hatch | A+B / recorded preview plus real browser-owned source path | Hosted/link ingest remains missing; local browser ingest is development-only |
+| 2. Validate and probe | Access, rights, duration, tracks, speech, languages, and known gaps | Browser-owned ingest preserves bytes under ignored `.studio/`, runs the existing ffprobe producer, seals V1 preflight, hot-registers the session, and exposes real queued/probing/sealing/registered/failed state. Speech/language findings remain unavailable for this V1 path. Submitted links are not probed | B / real and wired for browser-owned source; detector and hosted-link gaps remain | Add detectors only through their sealed producer chain; do not infer findings from media or filename |
 | 3. Choose range | Suggested, detected-language, whole, or custom time window | Owned-source numeric range is bounded by host-reported measured duration; replay custom changes remain blocked; recommendation is absent | A+B+C / real local custom range; replay and missing recommendation boundaries retained | Add measured selection affordance/recommender without inventing findings |
 | 4. Choose result | Target language, captions/evidence depth, relevant advanced options | Owned-source path maps explicit declared/target language, optional pack, range, and output contract into `studio.analysis-request.v1`; this does not imply a corresponding output producer | B / real and wired request mapping | Extend only when producers support more options |
 | 5. Review plan | Work operations, agent/task limits, assumptions, workload, elapsed-time range, cost range | Default Studio calls the read-only host planner and shows exact selected range, explicit proof operation, deterministic workload floor, assumptions, and unavailable elapsed/usage/cost | B+C / real floor wired; estimators and interactive task planner missing | Add producer-backed operation/tier choices and estimators |
@@ -147,7 +148,7 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 | `source.edit` | Source review/edit button | Returns to URL editing | Client state | Edit before submission; invalidate any stale probe/plan | C / UI contract only |
 | `source.submit` | Arrow, labelled **Launch investigation** | For a valid YouTube URL, creates a UI-only preview and starts `run-006` replay when loaded | `previewSession.ts`, recorded bundle | Rename or redesign so preview and real submission are never the same unlabelled action; real action should create a source session and begin bounded probe only | A / recorded replay |
 | `source.preview.notice` | Submitted-source provenance note | Says the submitted source was not processed | `StudioPreviewSession.dataSource` | Must remain visible anywhere a submitted URL is displayed over recorded evidence | A / recorded replay |
-| `source.owned.open` | **Use owned local source** | Opens the separate product-facing loopback-host path; it does not submit the URL field or start replay | Client state | Add browser upload/ingest later without weakening explicit rights | B / real local path entry |
+| `source.owned.open` | **Use owned local source** | Opens the separate product-facing loopback-host path; it does not submit the URL field or start replay | Client state | Preserve the explicit replay/production boundary | B / real local path entry |
 | `demo.open` | **Run Demo** | Opens recorded-source preflight for the loaded bundle | `run-006` | Explicit entry into recorded demonstration | A / recorded replay |
 | `bundle.retry` | **Retry loading** | Reloads recorded bundle after a fetch/validation failure | `ReplayTransport` | Retry the current source of truth only; never imply runtime retry | A / recorded replay |
 
@@ -172,7 +173,9 @@ submitted-source preview, hosted probe unavailable, and explicit recorded demo.
 | `preflight.dismiss` | **Try another source** / **Close** | Dismisses a failed/cancelled preflight | Client state | Abandon this preflight without creating a run | C / UI contract only |
 | `preflight.use-recorded` | **Use recorded source** | Opens recorded demo preflight | `run-006` bundle | Remain an explicit demo fallback, never an automatic substitution | A / recorded replay |
 | `local.source.connect` | **Connect to local host** | Uses an exact loopback origin and paste-once bearer token to list only host-registered sessions | `LocalRuntimeHostClient` | Keep paths and tokens out of response bodies | B / real and wired |
-| `local.source.select` | **Registered owned source** | Selects a host-returned stable source-session/revision | `RuntimeSourceRegistry` | Browser upload may later create a session through a separate endpoint | B / real and wired |
+| `local.source.ingest` | **Owned media file**, **Source label**, **Rights holder**, explicit ownership/control checkbox, and **Confirm ownership and ingest** | Creates an authenticated local-processing-only job, uploads bounded bytes, invokes the existing ingest/probe/seal producers with host-chosen paths/arguments, and hot-registers the validated result | Runtime host owned-media ingest composition | Never treat filename as rights; never accept client destination paths, public publication, or redistribution through this endpoint | B / real and wired development path |
+| `local.source.ingest-progress` | **queued**, **probing**, **sealing**, **registered**, or **failed** | Polls producer-backed job state; terminal registration carries only the validated source summary and stable identities | `GET /v1/owned-media-ingests/:ingestId` | No animated percentage or invented detector progress | B / real and wired |
+| `local.source.select` | **Registered owned source** | Selects a host-returned stable source-session/revision; a newly ingested source is cross-checked against the list and auto-selected | `RuntimeSourceRegistry` | Preserve stale-revision checks | B / real and wired |
 | `local.source.facts` | Receipt scope, measured duration/tracks, sealed preflight, language-evidence availability, content/session/revision ids | Projects the validated registered source summary; no filename/path is returned | Host source registry over owned preflight receipts | Expand only with validated source-adapter facts | B / real and wired |
 
 Required failure states: inaccessible/disallowed, no target language, mixed language, detector
@@ -351,12 +354,12 @@ submit-to-result wiring slice.
 
 | Data contract | Needed by | Current producer/source | Current truth | Next owner |
 |---|---|---|---|---|
-| Source session id and status | Source/preflight/reconnect | Runtime host startup registration and `GET /v1/source-sessions` | Real registered owned-preflight session/revision identity; selectable in default Studio and development lab | Shared Studio-host wiring |
-| Source adapter and rights receipt | Preflight | YouTube and owned/local scripts | Real local/recorded; unwired for submitted Studio URL | Architecture |
-| Raw content id, bytes, preservation | Preflight/provenance | Owned ingest | Real local/recorded | Architecture |
-| Duration, tracks, codecs, dimensions | Preflight/range | `probe-media.mjs` / ffprobe | Real local/recorded | Architecture |
-| Speech/non-speech ranges | Preflight/plan | Pinned Silero producer | Real local/recorded | Architecture |
-| Language ranges and uncertainty | Preflight/range | Pinned Whisper-language producer | Real local/recorded | Architecture |
+| Source session id and status | Source/preflight/reconnect | Runtime host startup or hot registration and `GET /v1/source-sessions` | Real browser-owned preflight session/revision identity; auto-selectable in default Studio and selectable in the lab | Shared Studio-host wiring |
+| Source adapter and rights receipt | Preflight | YouTube and owned/local scripts | Real for browser-owned local ingest and recorded sources; submitted URL remains preview-only | Architecture |
+| Raw content id, bytes, preservation | Preflight/provenance | Owned ingest | Real and wired for browser-owned local ingest; real recorded | Architecture |
+| Duration, tracks, codecs, dimensions | Preflight/range | `probe-media.mjs` / ffprobe | Real and wired as validated browser-owned source summary; real recorded | Architecture |
+| Speech/non-speech ranges | Preflight/plan | Pinned Silero producer | Real for CLI/local and recorded preflights; unavailable for browser-ingested V1 | Architecture |
+| Language ranges and uncertainty | Preflight/range | Pinned Whisper-language producer | Real for CLI/local and recorded preflights; unavailable for browser-ingested V1 | Architecture |
 | Music/noise ranges | Preflight/plan | None | Withheld | Architecture |
 | Speaker/overlap ranges | Preflight/plan | None | Withheld | Architecture |
 | Suggested range/complexity | Range/plan | None | Withheld | Architecture |
@@ -385,13 +388,19 @@ submit-to-result wiring slice.
 
 The first real Studio wiring slice now calls the existing local host without redesigning the
 scheduler, inventing another runtime-start protocol, or merging legacy and production event shapes.
-The shared client submits only product inputs plus stable `sourceSessionId` and `sourceRevisionId`; it
-never submits filesystem paths, runtime identities, journal identities, scheduler state, or
-executable arguments. Browser source upload/ingest and the full analysis planner remain future slices.
+For ingest, the shared client submits an original basename, declared byte count, explicit label,
+rights holder, fixed local-processing scope, and a true ownership/control attestation, followed by
+the exact browser bytes. It never submits a destination path, public flag, executable argument, or
+detector fact. After registration, plan/start still submit only product inputs plus stable
+`sourceSessionId` and `sourceRevisionId`; they never submit filesystem paths, runtime identities,
+journal identities, scheduler state, or executable arguments. The full analysis planner remains a
+future slice.
 
 ```text
-operator starts the host with an owned preflight source
-  -> Studio lists registered source-session/revision identities
+operator starts the loopback host and connects Studio with its bearer token
+  -> Studio may list existing registered sources or accept an explicitly attested owned file
+  -> host preserves bytes, probes, seals V1, and hot-registers stable source identities
+  -> Studio cross-checks and selects the registered source-session/revision
   -> Studio submits product inputs to the read-only exact planner
   -> Studio shows the selected range, explicit work, floor, assumptions, and unavailable estimates
   -> human accepts; Studio sends the same request to the existing start endpoint
@@ -401,7 +410,7 @@ operator starts the host with an owned preflight source
   -> Studio projects terminal, failed, or interrupted state with the host's safe reason
 ```
 
-Source upload/link ingest, pause/resume/cancel acknowledgement, hosted execution, child media
+Hosted/link ingest, pause/resume/cancel acknowledgement, hosted execution, child media
 inspection, captions or study publication, and production swarm integration remain separate future
 boundaries; the local host does not provide them.
 
@@ -409,6 +418,7 @@ Minimum action results:
 
 | Action | Required success result | Required failure behavior |
 |---|---|---|
+| Ingest owned local media | Real terminal registration with a validated summary and stable session/revision identities | Require explicit ownership/control; reject redistribution, arbitrary paths/fields, mismatched or oversized bytes, probe/seal errors, and path-bearing responses |
 | List/select registered source | Stable source-session/revision identity and validated owned-preflight summary | Surface unknown, changed, or stale source identity; never ask the browser for a source path |
 | Update request | Validated range and options bound to current source revision | Return field-level reasons; invalidate stale forecast |
 | Create forecast | Read-only content-addressed `studio.forecast.v1` plus `not_started`/unfrozen status | Never create runtime state or synthesize missing time, token, or price values |
@@ -456,6 +466,7 @@ Completing this checklist proves the product interface, not the runtime.
 - Recorded captions, comparison, evidence, raw artifacts, and honest nulls
 - Development lab scenarios and contract-only preflight states
 - Local ingest, probe, speech, and language producers
+- Development-only browser-owned upload through the existing ingest/probe/V1-seal producers, with hot registration
 - Deterministic forecast workload-floor tests
 - Default-Studio registered owned-source selection, exact planner, accept/start, and journal polling
 - One bounded local Codex child with journal, usage, output artifact, and report-up
@@ -466,12 +477,16 @@ Completing this checklist proves the product interface, not the runtime.
 ### Small wiring slice
 
 The thin slice now connects default `/studio/` as well as `/studio/?lab=1` to the existing host for
-registered owned/local receipted sources and one bounded child. Implemented glue:
+registered owned/local receipted sources and one bounded child. The default product path can also
+create a registered V1 source from explicitly attested browser-selected bytes. Implemented glue:
 
 - A host client outside static `ReplayTransport`, configured for the exact local
   origin and bearer token
-- A default-Studio operator path from `preflight-owned-media.mjs` directory to host registration,
-  registered-source selection, and source facts without browser-submitted paths
+- Authenticated create/upload/status endpoints that write only beneath the host-owned ignored root,
+  call `ingest-owned-media.mjs` then `preflight-owned-media.mjs --index-existing`, and hot-register
+  without browser-submitted paths or executable arguments
+- A default-Studio owned-file, rights-attestation, real-progress, auto-selection, and source-facts path;
+  operator `--source-directory` registration remains an escape hatch
 - Mapping the existing `AnalysisRequest` to the host request and consuming the idempotent start
   acknowledgement, frozen forecast, and durable command/runtime/journal identities
 - A read-only exact planner that creates no command/runtime directory, plus a functional forecast
@@ -482,9 +497,9 @@ registered owned/local receipted sources and one bounded child. Implemented glue
   journal-validation failures
 - Explicit UI labels for the production local one-child proof versus recorded demonstration
 
-Still open: browser source ingest/probe, dynamic production worker/task/report projection in the
-main Studio, operation/tier choices, calibrated estimation, and every larger-runtime item below.
-This slice does not produce autonomous media captions.
+Still open: hosted/link ingest, speech/language detection for browser V1 ingest, dynamic production
+worker/task/report projection in the main Studio, operation/tier choices, calibrated estimation,
+and every larger-runtime item below. This slice does not produce autonomous media captions.
 
 ### Larger runtime work
 
@@ -535,6 +550,7 @@ semantics without updating this contract with the UIUX owner.
 | Main Studio uses replay transport | `src/studio/StudioApp.tsx`, `src/studio/store.ts`, `src/studio/transport.ts` |
 | Submitted source is recorded-preview-only | `src/studio/previewSession.ts`, `src/studio/StudioApp.tsx` |
 | Product owned-source path and forecast/status regions | `src/studio/localRuntime/ProductLocalRuntime.tsx` |
+| Browser-owned ingest composition and progress protocol | `src/studio/runtime/production/runtimeHost/ownedMediaIngest.ts`, `src/studio/localRuntime/client.ts` |
 | Range and output controls | `src/studio/preflight/ConfirmationForm.tsx` |
 | Changed ranges/options cannot replay | `src/studio/preflight/model.ts` |
 | Replay and cancellation action semantics | `src/studio/store.ts`, `src/studio/Dock.tsx` |

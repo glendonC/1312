@@ -2,12 +2,14 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import { RuntimeHostError, safeRuntimeHostError } from "./errors.ts";
 import { validatePollCursor } from "./journalPolling.ts";
+import { OwnedMediaIngestService } from "./ownedMediaIngest.ts";
 import { RuntimeStartService } from "./service.ts";
 
 export const DEFAULT_RUNTIME_HOST_BODY_BYTES = 64 * 1024;
 
 export interface RuntimeHostHttpOptions {
   service: RuntimeStartService;
+  ownedMediaIngest?: OwnedMediaIngestService;
   token: string;
   allowedOrigins: string[];
   maximumBodyBytes?: number;
@@ -141,7 +143,7 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
       if (request.method === "OPTIONS") {
         if (!origin) throw new RuntimeHostError("origin_required", "CORS preflight requires an allowed origin.", 403);
         sendNoContent(response, origin, {
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
           "Access-Control-Allow-Headers": "Authorization, Content-Type",
           "Access-Control-Max-Age": "600",
         });
@@ -151,6 +153,63 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
         throw new RuntimeHostError("unauthorized", "A valid local runtime-host token is required.", 401);
       }
       const url = new URL(request.url ?? "/", "http://runtime-host.local");
+
+      if (url.pathname === "/v1/owned-media-ingests") {
+        if (!options.ownedMediaIngest) {
+          throw new RuntimeHostError("owned_ingest_unavailable", "Browser owned-media ingest is not enabled.", 404);
+        }
+        if (request.method !== "POST") {
+          throw new RuntimeHostError("method_not_allowed", "Only POST is supported for this endpoint.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+          throw new RuntimeHostError(
+            "unsupported_content_type",
+            "Owned-media ingest metadata requires Content-Type: application/json.",
+            415,
+          );
+        }
+        sendJson(
+          response,
+          202,
+          options.ownedMediaIngest.create(await readJsonBody(request, maximumBytes)),
+          origin,
+        );
+        return;
+      }
+
+      const ingestMediaId = routeIdentity(url.pathname, /^\/v1\/owned-media-ingests\/([^/]+)\/media$/);
+      if (ingestMediaId !== null) {
+        if (!options.ownedMediaIngest) {
+          throw new RuntimeHostError("owned_ingest_unavailable", "Browser owned-media ingest is not enabled.", 404);
+        }
+        if (request.method !== "PUT") {
+          throw new RuntimeHostError("method_not_allowed", "Only PUT is supported for this endpoint.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/octet-stream") {
+          throw new RuntimeHostError(
+            "unsupported_content_type",
+            "Owned-media bytes require Content-Type: application/octet-stream.",
+            415,
+          );
+        }
+        sendJson(response, 202, await options.ownedMediaIngest.upload(ingestMediaId, request), origin);
+        return;
+      }
+
+      const ingestId = routeIdentity(url.pathname, /^\/v1\/owned-media-ingests\/([^/]+)$/);
+      if (ingestId !== null) {
+        if (!options.ownedMediaIngest) {
+          throw new RuntimeHostError("owned_ingest_unavailable", "Browser owned-media ingest is not enabled.", 404);
+        }
+        if (request.method !== "GET") {
+          throw new RuntimeHostError("method_not_allowed", "Only GET is supported for this endpoint.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        sendJson(response, 200, options.ownedMediaIngest.status(ingestId), origin);
+        return;
+      }
 
       if (url.pathname === "/v1/source-sessions") {
         if (request.method !== "GET") {

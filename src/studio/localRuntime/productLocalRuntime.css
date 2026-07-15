@@ -66,12 +66,33 @@
 .product-runtime-boundary,
 .product-runtime-operator,
 .product-runtime-connect,
+.product-runtime-ingest,
+.product-runtime-empty-source,
 .product-runtime-session,
 .product-runtime-plan,
 .product-runtime-status,
 .product-runtime-error {
   margin-top: 16px;
   padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.product-runtime-ingest {
+  display: grid;
+  gap: 12px;
+}
+
+.product-runtime .product-runtime-attestation {
+  display: flex;
+  align-items: start;
+}
+
+.product-runtime-attestation input {
+  min-height: auto;
+}
+
+.product-runtime-ingest-status {
+  padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
 

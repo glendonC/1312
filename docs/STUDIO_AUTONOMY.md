@@ -45,6 +45,11 @@ artifacts.
     stored decision identity and emits one private content-addressed `queued` or `rejected` receipt.
     `queued` is unreviewed intake; `rejected` preserves the decision reasons. Neither outcome creates
     captions, review completion, upload, publication, public bytes, or media/language truth.
+17. Review only a host-verified `queued` intake through one host-configured, explicitly attested local
+    operator identity. Record exactly one immutable `approve_for_caption_production` or
+    `reject_with_reasons` receipt with closed reasons and an optional bounded note. Approval authorizes
+    only a future bounded caption producer to consume that verified receipt. If approval must be
+    withdrawn, append one immutable revocation receipt; never delete or silently replace review history.
 
 ## Optimize the media before spawning the full swarm
 
@@ -308,9 +313,9 @@ values distinctly and explain which assumptions dominate the estimate.
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and an atomic production-only source-artifact/task/spawn-decision/worker/grant/operation/output-artifact/report projection streamed by the owned-source host poll | Add larger scheduler behavior without altering recorded bundles or claiming a complete swarm |
 | Workspaces | Role-specific legacy trace projections plus boring production-only source-artifact, task, spawn-decision, grant, operation, output-lineage, and report regions with in-page links only to identities rendered in that projection | A production agent workspace remains separate work |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD/language receipts, post-run evidence index, receipted ffmpeg extract/seek hosts, and task-private bridges for granted `media_extract`/`media_seek`, `evidence_read`, `evidence_assess`, and `evidence_decide`. The default run-005 proof executes one seek, two reads, one bounded assessment, then one deterministic decision over the audited assessment; V1 gets none of the evidence/assessment/decision grants | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
-| Coordination | Legacy trace prose plus real bounded Codex child execution, a receipted structured opinion over completed read receipts, a separate deterministic decision over audited assessment identities, a host-only queued/rejected publish-review intake producer, worker-output artifacts, structured report-up, and separate validated assessment/decision/intake/report projections in the owned-source product path | Parent/orchestrator execution and human review over queued intake; never retrofit legacy prose into handoffs or publication authority |
+| Coordination | Legacy trace prose plus real bounded Codex child execution, a receipted structured opinion over completed read receipts, a separate deterministic decision over audited assessment identities, a host-only queued/rejected publish-review intake producer, one host-authoritative attested human review/revocation producer, worker-output artifacts, structured report-up, and separate validated assessment/decision/intake/review/report projections in the owned-source product path | Parent/orchestrator execution and a caption producer consuming verified unrevoked approval; never retrofit legacy prose into handoffs or publication authority |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
-| Results | Recorded captions/comparison/scores remain separate. The owned-source path projects validated decision receipts and private queued/rejected publish-review intake, including visible withheld reasons, but has no human review, caption, upload, or publication consumer | Human review over queued intake, then a separately authorized production caption/study publication boundary |
+| Results | Recorded captions/comparison/scores remain separate. The owned-source path projects validated decision, private queued/rejected intake, immutable human approve/reject, and optional approval-revocation receipts with visible reasons, but has no caption, upload, or publication producer | A bounded caption/translation producer consuming only verified unrevoked approval, with upload/publication still separate |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
 | Observability | Append-only production journal plus a deterministic content-addressed post-run index, normalized task/agent/operation/execution/handoff/failure facts, structured in-memory filters and aggregations, source identity links, and the separate local Run Explorer | Queue/dependency/reporting spans, critical-path semantics, model-adapter identity and provider units where available, persistent multi-run storage, and retention/access policy |
 | Forecasting | Versioned, content-addressed forecast and run-start freeze artifacts derive a deterministic workload floor from the measured media envelope, selected range, and explicit operation ranges. Default Studio validates and shows the exact pre-start floor and assumptions while rendering elapsed, usage, amount, and currency unavailable | Operation/tier selection, price-book adapter, model-usage estimate producer, elapsed-time and historical calibration, interactive comparison, and separate forecast evaluation |
@@ -335,12 +340,12 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, installs only granted media/evidence/assessment/decision MCP tools, and requires every granted media capability, evidence artifact scope, assessment grant, and decision grant to complete before accepting output. `run-005` remains only the explicit npm smoke/test input. One guarded real-Codex attempt on 2026-07-15 completed seek plus both reads but hit the 45-second wall limit before assess/decide; it is not a passed closed-chain verification. |
 | 4 — scoped media/evidence | Two media operations plus bounded read, assessment, and audited decision implemented | `media.extract`/`media.seek` retain their exact ffmpeg authority. `evidence.read` and `analysis.evidence.assess` retain their existing bounds. `analysis.evidence.decide` accepts only exact same-task assessment operation/artifact/receipt/content identities, re-runs the full live assessment audit, and enforces 1 decision/4 audited assessments. Its closed deterministic policy withholds any preserved withheld/unknown/truncated state; otherwise it emits `proceed_to_publish_review`. Separate bridges inject task/agent/operation identity and accept no paths, bytes, prose, caller outcome, or publication controls. Run-005 executes one seek, two reads, one assessment, and one decision; V1 runs only the seek. No detector, caption, or publisher runs. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
-| 6 — provenance | Partially implemented | Assessment, decision, and publish-review intake started/completed/failed events retain exact inputs, private content-addressed artifacts, and terminal facts. The assessment audit reopens assessment/read bytes; the decision read additionally reopens the decision, re-runs every input audit, and re-derives the closed policy; the intake read then reopens intake bytes and repeats the complete decision verification. Product regions expose receipts and stable queued/rejected reasons. Reading is not an artifact producer; assessment is an opinion; audit verifies integrity/citation closure; decision is an audit-state gate; intake is unreviewed queue lineage. None certifies truth, caption quality, review completion, or publication. |
+| 6 — provenance | Partially implemented | Assessment, decision, intake, human review, and review-revocation started/completed/failed events retain exact inputs, private content-addressed artifacts, and terminal facts. Each authenticated read reopens its own bytes and recursively verifies the complete prior chain. Product regions expose queued/rejected intake, immutable approve/reject/revoke receipts, reviewer identity/attestation, and stable reasons. Reading is not an artifact producer; assessment is an opinion; decision is an audit-state gate; intake is unreviewed queue lineage; approval is eligibility only for a future caption producer. None certifies truth, caption quality, English correctness, upload, or publication. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
-| 8 — verification | Partially implemented | Runtime tests carry run-005 through grant → read → assessment → audit → deterministic decision → stored decision/input re-verification → queued intake → stored intake/decision re-verification → product projection; a withheld fixture proves rejected intake with preserved reasons. Tests reject raw/path/caption/prose/caller-outcome and non-audited inputs, byte or lineage tamper, skipped decision grants, and prove V1 absence. Stdio MCP and fake-Codex seams execute the gate; the one real-Codex attempt stopped at its 45-second wall before assess/decide. Browser assertions cover non-empty decision and intake operation/artifact/verified-receipt selectors; product selectors also name the empty states. Browser execution status is reported separately. |
+| 8 — verification | Partially implemented | Runtime tests carry run-005 through grant → read → assessment → audit → deterministic decision → queued intake → attested approve or reject → optional approval revocation → full stored-lineage re-verification → product projection. A withheld fixture proves rejected intake cannot enter human review; tests reject raw/path/caption/open-output/caller-outcome, forged reviewer identity, illegal duplicate transitions, and byte or lineage tamper, and prove V1 absence. Stdio MCP and fake-Codex seams execute the earlier gate; the one real-Codex attempt stopped at its 45-second wall before assess/decide and was not rerun. Browser assertions cover approve and reject happy paths on a deterministic host; execution status is reported separately. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
 | 10 — forecasting | Deterministic floor plus product forecast surface implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `POST /v1/runtime-plans` returns the exact forecast without creating a command or runtime directory. Default Studio validates it, shows its range/floor/operation/assumptions, and leaves unavailable values unavailable. Start freezes that same content into `run-start.json`; no pricing, calibration, operation-choice, or evaluation producer is claimed. |
-| 11 — local runtime-start host | Local product fragment implemented | The plan/start/poll path registers V2/V3 evidence, derives paired optional read/assess/decide grants, requires one decision after the verified assessment, then invokes a separate host-only intake producer over the reverified decision identity. Separate assessment-audit, decision-receipt, and publish-review-intake GETs reopen all stored content and lineage. Browser-ingested V1 remains evidence/assessment/audit/decision/intake-unavailable. The forecast remains the exact one-seek media workload floor; post-start gate and intake work are not forecast work. Restart recovery never relaunches ambiguous work, and production events never enter replay topology. |
+| 11 — local runtime-start host | Local product fragment implemented | The plan/start/poll path registers V2/V3 evidence, derives paired optional read/assess/decide grants, requires one decision after verified assessment, then invokes host-only intake. Separate authenticated reads reopen assessment, decision, intake, and immutable human decision/revocation content and full lineage. Closed review mutations bind the host-configured reviewer and exact attestation. Browser-ingested V1 remains empty through review. The forecast remains the exact one-seek media workload floor; post-start gate, intake, and human review are not forecast work. Restart recovery never relaunches ambiguous work, and production events never enter replay topology. |
 
 ## Local runtime-start host
 
@@ -421,6 +426,9 @@ GET  /v1/runtimes/:runtimeId/events?after=<cursor>&limit=<n>
 GET  /v1/runtimes/:runtimeId/assessment-audits
 GET  /v1/runtimes/:runtimeId/decision-receipts
 GET  /v1/runtimes/:runtimeId/publish-review-intakes
+GET  /v1/runtimes/:runtimeId/publish-review-decisions
+POST /v1/runtimes/:runtimeId/publish-review-decisions
+POST /v1/runtimes/:runtimeId/publish-review-revocations
 ```
 
 Owned ingest state is `queued`, `probing`, `sealing`, `registered`, or `failed`. These are host
@@ -461,13 +469,25 @@ the read path, and journals a private content-addressed `queued` or `rejected` r
 decision bytes, paths, caller outcomes, captions, and prose are outside the closed request. The GET
 reopens the intake and repeats the full decision/assessment/read verification, failing the whole read
 on tamper or drift.
+The human-review mutation is application-host authority, not a child tool. The host exposes one
+configured reviewer id/label suitable for local development; the client can submit only the id and
+the exact required attestation, while the host supplies and receipts the label. It accepts only one
+exact verified queued intake and appends one private content-addressed
+`studio.publish-review-decision.receipt.v1` with closed `approve_for_caption_production` or
+`reject_with_reasons` semantics, ordered closed reason codes, and a null or single-line 280-character
+note. A rejected decision is final for that intake. An unrevoked approval may receive one separate
+private `studio.publish-review-revocation.receipt.v1`; the approval remains immutable and visible.
+The authenticated review GET re-hashes decision and revocation objects and recursively repeats the
+intake/decision/assessment/read verification. Raw bytes, paths, captions, output prose, caller reviewer
+labels, mismatched ids, rejected intake, tamper/drift, and duplicate or illegal transitions fail closed.
 Default `/studio/` now offers an explicit **Use owned local source** path that lists registered
 sessions, shows validated source facts, reviews the exact floor, starts, reads lifecycle, and polls
 validated events. The product poll sends complete validated batches through the production-only
 adapter and renders separate source/evidence artifacts, tasks, spawn request/decision, registered
 workers, capability grants, media operations, evidence reads/assessments, assessment artifacts,
 assessment receipt audits, evidence decisions, decision artifacts, verified decision receipts,
-publish-review intake lineage/artifacts/verified receipts, output lineage, and structured reports.
+publish-review intake lineage/artifacts/verified receipts, human review controls and immutable
+decision/revocation lineage/artifacts/verified receipts, output lineage, and structured reports.
 The read endpoints carry no paths or receipt bytes; they
 return empty lists until their completed operation exists and fail the whole response closed when
 stored content or lineage does not agree with the validated journal.
@@ -475,7 +495,7 @@ The deterministic run-005 proof invokes the real ffmpeg seek host, reads both pr
 receipts, emits one `studio.evidence-assessment.receipt.v1`, reopens it for audit, and emits then
 reopens one `studio.evidence-decision.receipt.v1`, then queues one verified publish-review intake;
 a withheld fixture emits rejected intake with preserved reasons. A V1 proof projects empty evidence,
-assessment, assessment-audit, decision, and intake regions. These regions remain empty whenever no
+assessment, assessment-audit, decision, intake, and human-review regions. These regions remain empty whenever no
 validated events exist. Raw ingest
 artifacts are not relabelled as outputs: their region exposes identity and content facts only, and
 their storage paths remain absent. Artifact references navigate only to rendered source/output
@@ -510,6 +530,12 @@ the runtime identities. The production-operations region shows the completed `me
 remain explicitly unavailable for that browser-created V1 source. To see original receipt
 identities/lineage, bounded completed reads, and one range/citation-bound assessment, restart the host with the sealed run-005
 directory registered through `--source-directory`, connect to that session, and repeat review/start.
+After deterministic run-005 reaches terminal, **Human review** lists the verified queued intake.
+Confirm the named reviewer attestation, choose **Approve for caption production** or select a closed
+reason and choose **Reject with reasons**, and optionally enter the bounded note. Approval creates no
+captions; it may be superseded with **Revoke approval** after selecting a closed revocation reason and
+confirming the separate revocation attestation. To exercise approve and reject independently, start
+two fresh runtime commands because every intake accepts exactly one immutable decision.
 Stop and restart the same command with
 the same ignored `.studio/runtime-host` root, query its command/runtime status, and continue from the
 prior cursor. The emitted `events.ndjson` remains directly loadable through the existing manual
@@ -939,8 +965,21 @@ The next production slices, in dependency order:
     Raw decision bytes, paths, captions, prose, caller outcomes, proceed-without-audit, tamper, and
     drift fail closed. The focused desktop Playwright assertion executed against a fresh
     deterministic/no-model run-005 host and passed; this does not upgrade the partial real-Codex
-    result. No review, caption, upload, publication, public artifact, or media/language-truth
-    producer exists.
+    result. Intake itself is not human review and creates no caption, upload, publication, public
+    artifact, or media/language-truth claim.
+18. Implemented 2026-07-15: the host-authoritative human review producer accepts only one exact
+    recursively verified `queued` intake identity and the host-configured local reviewer id plus
+    required attestation. It appends a private content-addressed
+    `studio.publish-review-decision.receipt.v1` with closed `approve_for_caption_production` or
+    `reject_with_reasons`, ordered reasons, and an optional bounded note. Rejection is immutable for
+    that intake; an unrevoked approval may be superseded only by one separate content-addressed
+    `studio.publish-review-revocation.receipt.v1`. Authenticated GET verification reopens every review,
+    revocation, intake, decision, assessment, and read receipt. The product exposes boring approve,
+    reject, and revoke controls plus honest V1/absent/rejected-intake/unverified empty states. Focused
+    tests cover approve, reject, illegal replacement, revoke, forged reviewer/open input, tamper,
+    rejected intake, and V1 empty. No real-Codex rerun was needed or performed; browser execution is
+    reported with this tranche. Approval creates no captions, translation, study, upload, publication,
+    public artifact, correctness claim, or media/language-truth claim.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow
 the same rule: choose a real deterministic producer first, then add the contract, fixture, policy,

@@ -4,9 +4,13 @@ import { initialRequest, type AnalysisRequest } from "../preflight/model";
 import type { EvidenceAssessmentAudit } from "../runtime/production/assessmentAudit";
 import type { EvidenceDecisionReceiptVerification } from "../runtime/production/decisionReceiptAudit";
 import type { PublishReviewIntakeVerification } from "../runtime/production/publishReviewIntakeAudit";
+import type { PublishReviewDecisionVerification } from "../runtime/production/publishReviewDecisionAudit";
 import type {
   OwnedMediaIngestStatus,
   RuntimeHostPlanResponse,
+  RuntimeHostPublishReviewDecisionRequest,
+  RuntimeHostPublishReviewOperator,
+  RuntimeHostPublishReviewRevocationRequest,
   RuntimeHostSourceSummary,
   RuntimeHostStartRequest,
 } from "../runtime/production/runtimeHost/model";
@@ -43,6 +47,8 @@ interface RuntimeView {
   assessmentAudits: EvidenceAssessmentAudit[];
   decisionReceipts: EvidenceDecisionReceiptVerification[];
   publishReviewIntakes: PublishReviewIntakeVerification[];
+  publishReviewDecisions: PublishReviewDecisionVerification[];
+  reviewOperator: RuntimeHostPublishReviewOperator | null;
   cursor: number;
   eventCount: number;
   lastEventType: string | null;
@@ -68,6 +74,8 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
   const [error, setError] = useState<string | null>(null);
   const [reviewed, setReviewed] = useState<ReviewedPlan | null>(null);
   const [runtime, setRuntime] = useState<RuntimeView | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const pollGeneration = useRef(0);
   const ingestGeneration = useRef(0);
   const productionAdapter = useRef<ProductionStudioAdapter | null>(null);
@@ -108,6 +116,8 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
     setReviewed(null);
     setRuntime(null);
     setError(null);
+    setReviewBusy(false);
+    setReviewError(null);
   }
 
   function disconnect(): void {
@@ -269,10 +279,11 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         if (poll.commandId !== identity.commandId) {
           throw new Error("Runtime host event polling returned another command identity.");
         }
-        const [assessmentAudit, decisionReceiptResponse, publishReviewIntakeResponse] = await Promise.all([
+        const [assessmentAudit, decisionReceiptResponse, publishReviewIntakeResponse, publishReviewDecisionResponse] = await Promise.all([
           activeClient.assessmentAudits(identity.runtimeId),
           activeClient.decisionReceipts(identity.runtimeId),
           activeClient.publishReviewIntakes(identity.runtimeId),
+          activeClient.publishReviewDecisions(identity.runtimeId),
         ]);
         if (
           assessmentAudit.commandId !== identity.commandId ||
@@ -294,6 +305,13 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
           publishReviewIntakeResponse.journalHead < poll.nextCursor
         ) {
           throw new Error("Runtime host publish-review intake identities changed while polling.");
+        }
+        if (
+          publishReviewDecisionResponse.commandId !== identity.commandId ||
+          publishReviewDecisionResponse.runtimeId !== identity.runtimeId ||
+          publishReviewDecisionResponse.journalHead < poll.nextCursor
+        ) {
+          throw new Error("Runtime host publish-review decision identities changed while polling.");
         }
         if (adapter.view().lastSeq !== after) {
           throw new Error("Production adapter cursor changed outside the validated poll path.");
@@ -323,6 +341,24 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         if (visiblePublishReviewIntakes.length !== completedIntakes.length) {
           throw new Error("A completed publish-review intake has no reopened fail-closed receipt verification.");
         }
+        const completedReviews = production.publishReviewDecisions.filter((review) =>
+          review.status === "completed");
+        const visiblePublishReviewDecisions = publishReviewDecisionResponse.reviews.filter((review) =>
+          completedReviews.some((projected) => projected.reviewId === review.reviewId));
+        if (visiblePublishReviewDecisions.length !== completedReviews.length) {
+          throw new Error("A completed publish-review decision has no reopened fail-closed receipt verification.");
+        }
+        const completedRevocations = production.publishReviewRevocations.filter((revocation) =>
+          revocation.status === "completed");
+        const visibleRevocations = visiblePublishReviewDecisions.flatMap((review) =>
+          review.revocation ? [review.revocation] : []);
+        if (
+          visibleRevocations.length !== completedRevocations.length ||
+          completedRevocations.some((projected) =>
+            !visibleRevocations.some((revocation) => revocation.revocationId === projected.revocationId))
+        ) {
+          throw new Error("A completed publish-review revocation has no reopened fail-closed receipt verification.");
+        }
         after = poll.nextCursor;
         setRuntime((current) => {
           if (!current || current.status.runtimeId !== identity.runtimeId) return current;
@@ -332,6 +368,8 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
             assessmentAudits: visibleAssessmentAudits,
             decisionReceipts: visibleDecisionReceipts,
             publishReviewIntakes: visiblePublishReviewIntakes,
+            publishReviewDecisions: visiblePublishReviewDecisions,
+            reviewOperator: publishReviewDecisionResponse.reviewer,
             status: {
               ...statusView(status),
               lifecycle: poll.lifecycle,
@@ -360,6 +398,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
               assessmentAudits: [],
               decisionReceipts: [],
               publishReviewIntakes: [],
+              publishReviewDecisions: [],
               pollState: "error",
               pollMessage: `Polling stopped after cursor ${current.cursor}: ${errorMessage(pollError)}`,
             }
@@ -396,6 +435,8 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         assessmentAudits: [],
         decisionReceipts: [],
         publishReviewIntakes: [],
+        publishReviewDecisions: [],
+        reviewOperator: null,
         cursor: 0,
         eventCount: 0,
         lastEventType: null,
@@ -413,6 +454,58 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
       setError(errorMessage(nextError));
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function submitPublishReviewDecision(
+    request: RuntimeHostPublishReviewDecisionRequest,
+  ): Promise<void> {
+    const current = runtime;
+    const adapter = productionAdapter.current;
+    if (!client || !current || !adapter || reviewBusy) return;
+    setReviewBusy(true);
+    setReviewError(null);
+    try {
+      const response = await client.createPublishReviewDecision(current.status.runtimeId, request);
+      if (
+        response.commandId !== current.status.commandId ||
+        response.runtimeId !== current.status.runtimeId ||
+        response.journalHead < current.cursor
+      ) throw new Error("Runtime host review decision identities changed after submission.");
+      setRuntime((value) => value && value.status.runtimeId === current.status.runtimeId
+        ? { ...value, publishReviewDecisions: response.reviews, reviewOperator: response.reviewer }
+        : value);
+      await beginPolling(client, current.status, current.cursor, adapter);
+    } catch (nextError) {
+      setReviewError(errorMessage(nextError));
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  async function submitPublishReviewRevocation(
+    request: RuntimeHostPublishReviewRevocationRequest,
+  ): Promise<void> {
+    const current = runtime;
+    const adapter = productionAdapter.current;
+    if (!client || !current || !adapter || reviewBusy) return;
+    setReviewBusy(true);
+    setReviewError(null);
+    try {
+      const response = await client.createPublishReviewRevocation(current.status.runtimeId, request);
+      if (
+        response.commandId !== current.status.commandId ||
+        response.runtimeId !== current.status.runtimeId ||
+        response.journalHead < current.cursor
+      ) throw new Error("Runtime host review revocation identities changed after submission.");
+      setRuntime((value) => value && value.status.runtimeId === current.status.runtimeId
+        ? { ...value, publishReviewDecisions: response.reviews, reviewOperator: response.reviewer }
+        : value);
+      await beginPolling(client, current.status, current.cursor, adapter);
+    } catch (nextError) {
+      setReviewError(errorMessage(nextError));
+    } finally {
+      setReviewBusy(false);
     }
   }
 
@@ -754,6 +847,12 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
             assessmentAudits={runtime.assessmentAudits}
             decisionReceipts={runtime.decisionReceipts}
             publishReviewIntakes={runtime.publishReviewIntakes}
+            publishReviewDecisions={runtime.publishReviewDecisions}
+            reviewOperator={runtime.reviewOperator}
+            reviewBusy={reviewBusy}
+            reviewError={reviewError}
+            onPublishReviewDecision={submitPublishReviewDecision}
+            onPublishReviewRevocation={submitPublishReviewRevocation}
           />
         </section>
       )}

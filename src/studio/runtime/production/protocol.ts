@@ -13,7 +13,11 @@ import type {
   MediaOperationRequest,
   MediaOperationReceipt,
   ModelUsageReceipt,
+  PublishReviewDecisionReceipt,
+  PublishReviewDecisionRequest,
   PublishReviewIntakeReceipt,
+  PublishReviewRevocationReceipt,
+  PublishReviewRevocationRequest,
   ReportRecord,
   RuntimeArtifact,
   SpawnRejection,
@@ -31,6 +35,7 @@ export type RuntimeProducerKind =
   | "assessment_host"
   | "decision_host"
   | "publish_review_intake_host"
+  | "publish_review_host"
   | "handoff_host"
   | "launcher";
 
@@ -218,6 +223,54 @@ export interface PublishReviewIntakeFailedEvent extends RuntimeEventBase {
   data: { intakeId: string; reason: string };
 }
 
+export interface PublishReviewDecisionStartedEvent extends RuntimeEventBase {
+  type: "publish.review.decision_started";
+  data: {
+    reviewId: string;
+    request: PublishReviewDecisionRequest;
+    reviewerLabel: string;
+  };
+}
+
+export interface PublishReviewDecisionCompletedEvent extends RuntimeEventBase {
+  type: "publish.review.decision_completed";
+  data: {
+    reviewId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: PublishReviewDecisionReceipt;
+  };
+}
+
+export interface PublishReviewDecisionFailedEvent extends RuntimeEventBase {
+  type: "publish.review.decision_failed";
+  data: { reviewId: string; reason: string };
+}
+
+export interface PublishReviewRevocationStartedEvent extends RuntimeEventBase {
+  type: "publish.review.revocation_started";
+  data: {
+    revocationId: string;
+    request: PublishReviewRevocationRequest;
+    reviewerLabel: string;
+  };
+}
+
+export interface PublishReviewRevocationCompletedEvent extends RuntimeEventBase {
+  type: "publish.review.revocation_completed";
+  data: {
+    revocationId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: PublishReviewRevocationReceipt;
+  };
+}
+
+export interface PublishReviewRevocationFailedEvent extends RuntimeEventBase {
+  type: "publish.review.revocation_failed";
+  data: { revocationId: string; reason: string };
+}
+
 export interface ReportSubmittedEvent extends RuntimeEventBase {
   type: "report.submitted";
   data: { report: ReportRecord };
@@ -259,6 +312,12 @@ export type RuntimeEvent =
   | PublishReviewIntakeStartedEvent
   | PublishReviewIntakeCompletedEvent
   | PublishReviewIntakeFailedEvent
+  | PublishReviewDecisionStartedEvent
+  | PublishReviewDecisionCompletedEvent
+  | PublishReviewDecisionFailedEvent
+  | PublishReviewRevocationStartedEvent
+  | PublishReviewRevocationCompletedEvent
+  | PublishReviewRevocationFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent;
 

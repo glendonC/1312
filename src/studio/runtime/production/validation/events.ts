@@ -8,6 +8,12 @@ import {
   validatePublishReviewIntakeReceipt,
 } from "./publishReview.ts";
 import {
+  assertPublishReviewDecisionRequest,
+  assertPublishReviewRevocationRequest,
+  validatePublishReviewDecisionReceipt,
+  validatePublishReviewRevocationReceipt,
+} from "./publishReviewDecision.ts";
+import {
   validateExecutorSpanReceipt,
   validateModelUsageReceipt,
 } from "./execution.ts";
@@ -81,7 +87,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "handoff_host", "launcher"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "handoff_host", "launcher"]),
     context,
     "event.producer.kind",
   );
@@ -242,6 +248,36 @@ export function assertRuntimeEvent(
   } else if (type === "publish.review.intake_failed") {
     exact(data, ["intakeId", "reason"], context, "event.data");
     string(data.intakeId, context, "event.data.intakeId");
+    string(data.reason, context, "event.data.reason");
+  } else if (type === "publish.review.decision_started") {
+    exact(data, ["reviewId", "request", "reviewerLabel"], context, "event.data");
+    string(data.reviewId, context, "event.data.reviewId");
+    assertPublishReviewDecisionRequest(data.request);
+    string(data.reviewerLabel, context, "event.data.reviewerLabel");
+  } else if (type === "publish.review.decision_completed") {
+    exact(data, ["reviewId", "outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.reviewId, context, "event.data.reviewId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validatePublishReviewDecisionReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "publish.review.decision_failed") {
+    exact(data, ["reviewId", "reason"], context, "event.data");
+    string(data.reviewId, context, "event.data.reviewId");
+    string(data.reason, context, "event.data.reason");
+  } else if (type === "publish.review.revocation_started") {
+    exact(data, ["revocationId", "request", "reviewerLabel"], context, "event.data");
+    string(data.revocationId, context, "event.data.revocationId");
+    assertPublishReviewRevocationRequest(data.request);
+    string(data.reviewerLabel, context, "event.data.reviewerLabel");
+  } else if (type === "publish.review.revocation_completed") {
+    exact(data, ["revocationId", "outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.revocationId, context, "event.data.revocationId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validatePublishReviewRevocationReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "publish.review.revocation_failed") {
+    exact(data, ["revocationId", "reason"], context, "event.data");
+    string(data.revocationId, context, "event.data.revocationId");
     string(data.reason, context, "event.data.reason");
   } else if (type === "report.submitted") {
     exact(data, ["report"], context, "event.data");

@@ -16,6 +16,7 @@ import test from "node:test";
 
 import { canonicalSha256, identifyFile } from "../src/studio/runtime/production/artifactStore.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
+import { adaptProductionRuntime } from "../src/studio/runtime/production/studioProjection.ts";
 import { loadRuntimeInspectorJournal } from "../src/studio/runtime/production/runtimeInspector/journalLoader.ts";
 import { createProductionAnalysisRequest } from "../src/studio/runtime/production/runStart/analysisRequest.ts";
 import { createRuntimeStartCommand } from "../src/studio/runtime/production/runStart/runtimeStart.ts";
@@ -548,6 +549,196 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.deepEqual(await reopened.assessmentAudits(ack.runtimeId), assessmentAudit);
     assert.deepEqual(await reopened.decisionReceipts(ack.runtimeId), decisionReceipts);
     assert.deepEqual(await reopened.publishReviewIntakes(ack.runtimeId), publishReviewIntakes);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("verified queued intake can be approved once and revoked only by a separate immutable receipt", async () => {
+  const runtime = await hostHarness();
+  try {
+    const acknowledgement = await runtime.service.start(runtime.request);
+    await waitForLifecycle(runtime.service, acknowledgement.commandId, "terminal");
+    const intakeResponse = await runtime.service.publishReviewIntakes(acknowledgement.runtimeId);
+    const intake = intakeResponse.intakes[0];
+    assert.ok(intake);
+    const empty = await runtime.service.publishReviewDecisions(acknowledgement.runtimeId);
+    assert.deepEqual(empty.reviews, []);
+    assert.deepEqual(empty.reviewer, {
+      id: "reviewer:local-operator",
+      label: "Local review operator",
+      decisionAttestation: "I attest that I am the named reviewer and made this review decision.",
+      revocationAttestation: "I attest that I am the named reviewer and made this revocation decision.",
+    });
+
+    const approved = await runtime.service.createPublishReviewDecision(acknowledgement.runtimeId, {
+      intake: {
+        intakeId: intake.intakeId,
+        artifactId: intake.artifactId,
+        receiptId: intake.receiptId,
+        receiptContentId: intake.receiptContentId,
+      },
+      reviewer: {
+        id: empty.reviewer.id,
+        attestation: empty.reviewer.decisionAttestation,
+      },
+      decision: {
+        outcome: "approve_for_caption_production",
+        reasonCodes: ["reviewer_attested_caption_production_may_proceed"],
+        note: "Ready for a future bounded caption producer.",
+      },
+    });
+    assert.equal(approved.reviews.length, 1);
+    assert.equal(approved.reviews[0].state, "approved_for_caption_production");
+    assert.equal(approved.reviews[0].outcome, "approve_for_caption_production");
+    assert.equal(approved.reviews[0].reviewer.id, empty.reviewer.id);
+    assert.equal(approved.reviews[0].revocation, null);
+
+    const approval = approved.reviews[0];
+    const revoked = await runtime.service.createPublishReviewRevocation(acknowledgement.runtimeId, {
+      approval: {
+        reviewId: approval.reviewId,
+        artifactId: approval.artifactId,
+        receiptId: approval.receiptId,
+        receiptContentId: approval.receiptContentId,
+      },
+      reviewer: {
+        id: approved.reviewer.id,
+        attestation: approved.reviewer.revocationAttestation,
+      },
+      revocation: {
+        reasonCodes: ["new_review_required"],
+        note: "New review is required before any caption producer may consume approval.",
+      },
+    });
+    assert.equal(revoked.reviews[0].state, "approval_revoked");
+    assert.equal(revoked.reviews[0].revocation?.integrity, "stored_revocation_and_verified_approval");
+    assert.deepEqual(revoked.reviews[0].revocation?.reasonCodes, ["new_review_required"]);
+
+    const journal = await readValidatedRuntimeJournal(
+      runtime.store.paths(acknowledgement.runtimeId).journalPath,
+      acknowledgement.runtimeId,
+    );
+    assert.equal(Object.keys(journal.state.publishReviewDecisions).length, 1);
+    assert.equal(Object.keys(journal.state.publishReviewRevocations).length, 1);
+    assert.equal(Object.values(journal.state.publishReviewDecisions)[0].status, "completed");
+    assert.equal(Object.values(journal.state.publishReviewRevocations)[0].status, "completed");
+    assert.equal(journal.events.filter((event) => event.type === "publish.review.decision_started").length, 1);
+    assert.equal(journal.events.filter((event) => event.type === "publish.review.decision_completed").length, 1);
+    assert.equal(journal.events.filter((event) => event.type === "publish.review.revocation_started").length, 1);
+    assert.equal(journal.events.filter((event) => event.type === "publish.review.revocation_completed").length, 1);
+    const productProjection = adaptProductionRuntime(journal.state);
+    assert.equal(productProjection.publishReviewDecisions[0].outcome, "approve_for_caption_production");
+    assert.equal(productProjection.publishReviewRevocations[0].status, "completed");
+    assert.equal(productProjection.publishReviewDecisionArtifacts.length, 1);
+    assert.equal(productProjection.publishReviewRevocationArtifacts.length, 1);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("rejected review cannot be replaced by approval and forged reviewer or open input is rejected", async () => {
+  const runtime = await hostHarness();
+  try {
+    const acknowledgement = await runtime.service.start(runtime.request);
+    await waitForLifecycle(runtime.service, acknowledgement.commandId, "terminal");
+    const intake = (await runtime.service.publishReviewIntakes(acknowledgement.runtimeId)).intakes[0];
+    const authority = (await runtime.service.publishReviewDecisions(acknowledgement.runtimeId)).reviewer;
+    const identity = {
+      intakeId: intake.intakeId,
+      artifactId: intake.artifactId,
+      receiptId: intake.receiptId,
+      receiptContentId: intake.receiptContentId,
+    };
+
+    await assert.rejects(
+      runtime.service.createPublishReviewDecision(acknowledgement.runtimeId, {
+        intake: identity,
+        reviewer: { id: "reviewer:forged", attestation: authority.decisionAttestation },
+        decision: {
+          outcome: "reject_with_reasons",
+          reasonCodes: ["evidence_requires_additional_review"],
+          note: null,
+        },
+      }),
+      /does not match this host's configured review operator/,
+    );
+    await assert.rejects(
+      runtime.service.createPublishReviewDecision(acknowledgement.runtimeId, {
+        intake: identity,
+        reviewer: { id: authority.id, attestation: authority.decisionAttestation },
+        decision: {
+          outcome: "reject_with_reasons",
+          reasonCodes: ["evidence_requires_additional_review"],
+          note: null,
+        },
+        captions: "caller-authored output is forbidden",
+      }),
+      /invalid or contains open fields/,
+    );
+
+    const rejected = await runtime.service.createPublishReviewDecision(acknowledgement.runtimeId, {
+      intake: identity,
+      reviewer: { id: authority.id, attestation: authority.decisionAttestation },
+      decision: {
+        outcome: "reject_with_reasons",
+        reasonCodes: ["evidence_requires_additional_review"],
+        note: "The rejection remains visible.",
+      },
+    });
+    assert.equal(rejected.reviews[0].state, "rejected");
+    await assert.rejects(
+      runtime.service.createPublishReviewDecision(acknowledgement.runtimeId, {
+        intake: identity,
+        reviewer: { id: authority.id, attestation: authority.decisionAttestation },
+        decision: {
+          outcome: "approve_for_caption_production",
+          reasonCodes: ["reviewer_attested_caption_production_may_proceed"],
+          note: null,
+        },
+      }),
+      /already has immutable review decision lineage/,
+    );
+    assert.equal((await runtime.service.publishReviewDecisions(acknowledgement.runtimeId)).reviews[0].state, "rejected");
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("publish-review read fails closed when stored human decision bytes are tampered", async () => {
+  const runtime = await hostHarness();
+  try {
+    const acknowledgement = await runtime.service.start(runtime.request);
+    await waitForLifecycle(runtime.service, acknowledgement.commandId, "terminal");
+    const intake = (await runtime.service.publishReviewIntakes(acknowledgement.runtimeId)).intakes[0];
+    const authority = (await runtime.service.publishReviewDecisions(acknowledgement.runtimeId)).reviewer;
+    const reviewed = await runtime.service.createPublishReviewDecision(acknowledgement.runtimeId, {
+      intake: {
+        intakeId: intake.intakeId,
+        artifactId: intake.artifactId,
+        receiptId: intake.receiptId,
+        receiptContentId: intake.receiptContentId,
+      },
+      reviewer: { id: authority.id, attestation: authority.decisionAttestation },
+      decision: {
+        outcome: "approve_for_caption_production",
+        reasonCodes: ["reviewer_attested_caption_production_may_proceed"],
+        note: null,
+      },
+    });
+    const digest = reviewed.reviews[0].receiptContentId.replace("sha256:", "");
+    const objectPath = join(
+      runtime.store.paths(acknowledgement.runtimeId).artifactStoreRoot,
+      "objects",
+      "sha256",
+      digest.slice(0, 2),
+      digest,
+    );
+    await writeFile(objectPath, "{}\n", "utf8");
+    await assert.rejects(
+      runtime.service.publishReviewDecisions(acknowledgement.runtimeId),
+      /failed closed validation/,
+    );
   } finally {
     await cleanup(runtime);
   }
@@ -1086,7 +1277,16 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     assert.equal(intakes.status, 200);
     const intakeBody = await intakes.json() as {
       schema: string;
-      intakes: Array<{ integrity: string; outcome: string; producer: string; reasonCodes: string[] }>;
+      intakes: Array<{
+        intakeId: string;
+        artifactId: string;
+        receiptId: string;
+        receiptContentId: string;
+        integrity: string;
+        outcome: string;
+        producer: string;
+        reasonCodes: string[];
+      }>;
     };
     assert.equal(intakeBody.schema, "studio.local-runtime-publish-review-intakes.v1");
     assert.equal(intakeBody.intakes.length, 1);
@@ -1096,6 +1296,73 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     assert.deepEqual(intakeBody.intakes[0].reasonCodes, ["all_audited_claims_supported"]);
     assert.equal(JSON.stringify(intakeBody).includes(runtime.directory), false);
     assert.equal(JSON.stringify(intakeBody).includes(FIXTURE), false);
+    const reviewAuthorityResponse = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-decisions`,
+      { headers: authorized },
+    );
+    assert.equal(reviewAuthorityResponse.status, 200);
+    const reviewAuthority = await reviewAuthorityResponse.json() as {
+      reviewer: { id: string; decisionAttestation: string; revocationAttestation: string };
+      reviews: unknown[];
+    };
+    assert.deepEqual(reviewAuthority.reviews, []);
+    const createReview = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-decisions`,
+      {
+        method: "POST",
+        headers: { ...authorized, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          intake: {
+            intakeId: intakeBody.intakes[0].intakeId,
+            artifactId: intakeBody.intakes[0].artifactId,
+            receiptId: intakeBody.intakes[0].receiptId,
+            receiptContentId: intakeBody.intakes[0].receiptContentId,
+          },
+          reviewer: {
+            id: reviewAuthority.reviewer.id,
+            attestation: reviewAuthority.reviewer.decisionAttestation,
+          },
+          decision: {
+            outcome: "approve_for_caption_production",
+            reasonCodes: ["reviewer_attested_caption_production_may_proceed"],
+            note: null,
+          },
+        }),
+      },
+    );
+    assert.equal(createReview.status, 201);
+    const reviewBody = await createReview.json() as {
+      reviews: Array<{
+        reviewId: string;
+        artifactId: string;
+        receiptId: string;
+        receiptContentId: string;
+        state: string;
+      }>;
+    };
+    assert.equal(reviewBody.reviews[0].state, "approved_for_caption_production");
+    const revokeReview = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-revocations`,
+      {
+        method: "POST",
+        headers: { ...authorized, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          approval: {
+            reviewId: reviewBody.reviews[0].reviewId,
+            artifactId: reviewBody.reviews[0].artifactId,
+            receiptId: reviewBody.reviews[0].receiptId,
+            receiptContentId: reviewBody.reviews[0].receiptContentId,
+          },
+          reviewer: {
+            id: reviewAuthority.reviewer.id,
+            attestation: reviewAuthority.reviewer.revocationAttestation,
+          },
+          revocation: { reasonCodes: ["new_review_required"], note: null },
+        }),
+      },
+    );
+    assert.equal(revokeReview.status, 201);
+    assert.equal((await revokeReview.json() as { reviews: Array<{ state: string }> }).reviews[0].state, "approval_revoked");
   } finally {
     await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     await cleanup(runtime);
@@ -1338,6 +1605,7 @@ test("browser-owned ingest fails closed on rights and paths, preserves bytes, ho
     assert.equal(v1Inspector.projection.publishReviewIntakes.length, 0);
     assert.equal(v1Inspector.projection.publishReviewIntakeArtifacts.length, 0);
     assert.deepEqual((await service.publishReviewIntakes(acknowledgement.runtimeId)).intakes, []);
+    assert.deepEqual((await service.publishReviewDecisions(acknowledgement.runtimeId)).reviews, []);
 
     const reopenedSources = await RuntimeSourceRegistry.open({ sourceDirectories: [] });
     await OwnedMediaIngestService.open({

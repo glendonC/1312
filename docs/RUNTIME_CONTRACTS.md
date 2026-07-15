@@ -47,11 +47,18 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   `studio.publish-review-intake.receipt.v1` with only `queued` or `rejected`;
 - an authenticated publish-review intake read endpoint that re-hashes the intake, re-verifies the
   decision and every assessment/read audit, and returns no partial lineage;
+- a host-authoritative human review producer that accepts only a verified queued intake plus the
+  exact host-configured reviewer id and required attestation, then appends one private immutable
+  `approve_for_caption_production` or `reject_with_reasons` receipt with closed reasons;
+- a separate immutable approval-revocation producer and an authenticated review read endpoint that
+  re-hash decision/revocation bytes and recursively verify intake, decision, assessment, and read
+  lineage without creating caption or publication state;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
 The exact runtime test executes that path against the receipted run-005 media, performs two reads,
-one assessment, one audited decision, and one host-only publish-review intake, then reopens the event
-journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
+one assessment, one audited decision, one host-only publish-review intake, and independent approve,
+reject, and revoke review paths, then reopens the event journal to prove replay equivalence. It also
+rejects fixture-only input, provider-field leakage,
 duplicate work, limit violations, scope escalation, invalid registration, source/evidence-byte
 drift, unauthorized media/evidence/assessment/decision calls, unread assessment inputs, non-audited
 decision inputs, out-of-bounds fact
@@ -62,7 +69,8 @@ This does not make the Studio live. A bounded local `codex exec` worker launcher
 production-journal Studio adapter now exist, but `/studio/runtime/` is an inspector and does not
 start workers. The default owned-source path consumes validated poll batches through that adapter
 and renders production-only source-artifact, task, spawn request/decision, worker, grant, operation,
-output-artifact lineage, decision facts, queued/rejected publish-review intake lineage, and report
+output-artifact lineage, decision facts, queued/rejected publish-review intake lineage, immutable
+human review/revocation facts, and report
 facts without creating a `RunBundle`, legacy trace, or replay agent. The source region exposes only
 validated ingest-origin identity and content facts, and
 artifact references link only when their source/output destination is rendered. The deterministic
@@ -80,7 +88,11 @@ scheduler/host/child-bridge capabilities; assessment is opinion over completed r
 an audit-state gate, not sensing or publication. Publish-review intake is an application-host
 producer rather than a child capability or MCP tool. It accepts only the exact identity of a
 decision that passes the complete decision-receipt verification and records only `queued` or
-`rejected`; it performs no review and creates no captions or publication state. The other media operations and
+`rejected`; it performs no review and creates no captions or publication state. Human review is a
+second application-host authority over verified queued intake. It binds the configured local reviewer
+and explicit attestation to one immutable approve/reject receipt; only an approval may receive one
+separate immutable revocation. Approval means eligibility for a future bounded caption producer,
+not caption, correctness, upload, or publication state. The other media operations and
 detector/model calls in this proposal remain unavailable. The tables below
 continue to document the fixture contract itself and should not be read as the production wire
 schema.
@@ -130,6 +142,27 @@ verification. Any tamper or policy drift rejects the whole response as
 completed decision return an honest empty list. `queued` means awaiting human review only, while
 `rejected` means the verified decision did not permit queue entry. Neither outcome means reviewed,
 captioned, uploaded, published, public, media-true, or English-correct.
+
+The production event union also includes `publish.review.decision_started`,
+`publish.review.decision_completed`, `publish.review.decision_failed`,
+`publish.review.revocation_started`, `publish.review.revocation_completed`, and
+`publish.review.revocation_failed`. These are host events, not child events. A decision start binds
+one exact queued intake identity, reviewer id, required attestation, closed outcome/reasons, and
+bounded optional note; completion binds the host-supplied reviewer label and private
+`studio.publish-review-decision.receipt.v1` artifact. Revocation similarly binds one exact verified
+unrevoked approval and a private `studio.publish-review-revocation.receipt.v1`. There is one decision
+per intake, rejection cannot become approval without new intake, and there is at most one revocation.
+
+`GET /v1/runtimes/:runtimeId/publish-review-decisions` returns
+`studio.local-runtime-publish-review-decisions.v1` only after every stored review and revocation is
+re-hashed and its complete intake/decision/assessment/read lineage agrees with the journal. The same
+resource accepts closed decision POSTs; `POST
+/v1/runtimes/:runtimeId/publish-review-revocations` accepts closed revocations. The host exposes its
+single local reviewer id/label and exact attestations in the GET response; the caller cannot supply
+the label. Raw receipt bytes, paths, captions, prose-as-output, open fields, rejected intake, forged
+reviewer identity, tamper/drift, and illegal transitions fail closed. V1 and absent review lineage
+return an honest empty list. No endpoint generates captions, translation, study output, upload, or
+publication.
 
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a

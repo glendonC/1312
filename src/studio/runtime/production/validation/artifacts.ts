@@ -399,6 +399,76 @@ export function validateRuntimeArtifact(
         "publish-review intake artifacts must be private host-produced receipt lineage over one verified decision artifact",
       );
     }
+  } else if (kind === "publish_review_decision") {
+    exact(
+      origin,
+      [
+        "kind",
+        "reviewId",
+        "receiptId",
+        "receiptContentId",
+        "intakeId",
+        "intakeArtifactId",
+        "intakeReceiptId",
+        "intakeReceiptContentId",
+      ],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.reviewId, context, `${path}.origin.reviewId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    string(origin.intakeId, context, `${path}.origin.intakeId`);
+    const intakeArtifactId = string(origin.intakeArtifactId, context, `${path}.origin.intakeArtifactId`);
+    string(origin.intakeReceiptId, context, `${path}.origin.intakeReceiptId`);
+    contentId(origin.intakeReceiptContentId, context, `${path}.origin.intakeReceiptContentId`);
+    if (
+      mediaClass !== "non_media" ||
+      item.publication !== "private" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      task !== null ||
+      agent !== null ||
+      JSON.stringify(sources) !== JSON.stringify([intakeArtifactId]) ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) {
+      fail(context, path, "publish-review decisions must be private host-produced receipts over one verified intake artifact");
+    }
+  } else if (kind === "publish_review_revocation") {
+    exact(
+      origin,
+      [
+        "kind",
+        "revocationId",
+        "receiptId",
+        "receiptContentId",
+        "reviewId",
+        "approvalArtifactId",
+        "approvalReceiptId",
+        "approvalReceiptContentId",
+      ],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.revocationId, context, `${path}.origin.revocationId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    string(origin.reviewId, context, `${path}.origin.reviewId`);
+    const approvalArtifactId = string(origin.approvalArtifactId, context, `${path}.origin.approvalArtifactId`);
+    string(origin.approvalReceiptId, context, `${path}.origin.approvalReceiptId`);
+    contentId(origin.approvalReceiptContentId, context, `${path}.origin.approvalReceiptContentId`);
+    if (
+      mediaClass !== "non_media" ||
+      item.publication !== "private" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      task !== null ||
+      agent !== null ||
+      JSON.stringify(sources) !== JSON.stringify([approvalArtifactId]) ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) {
+      fail(context, path, "publish-review revocations must be private host-produced receipts over one verified approval artifact");
+    }
   } else {
     fail(context, `${path}.origin.kind`, `has unknown value ${kind}`);
   }

@@ -129,7 +129,8 @@ one real ffmpeg audio-range extraction operation, one bounded ffmpeg seek observ
 child report-up, bounded reads of already-produced pinned speech/language evidence, a bounded
 structured assessment over completed evidence-read receipts, a deterministic bounded decision over
 audited assessment identities, a host-only publish-review intake producer over verified decision
-identities, and a bounded local `codex exec` launcher.
+identities, a host-authoritative attested review/revocation producer over verified queued intake,
+and a bounded local `codex exec` launcher.
 Media scopes use exact track ids and half-open integer-millisecond ranges. The scheduler derives
 task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
 state. The media host re-hashes its source before execution and accepts no caller path or arbitrary
@@ -173,6 +174,17 @@ stores one private content-addressed `studio.publish-review-intake.receipt.v1`. 
 and publication controls are outside the closed input. Its authenticated read endpoint reopens the
 intake and repeats the complete decision, assessment, and read verification, failing the whole read
 on tamper or policy drift. This lineage is neither human review nor a caption/publication producer.
+Human review is a separate application-host boundary with no child capability or MCP tool. The host
+configures one local reviewer id/label and exposes exact decision/revocation attestations; callers
+submit only the matching id, attestation, closed reason codes, and optional bounded note. It
+recursively verifies one queued intake before appending an immutable private
+`studio.publish-review-decision.receipt.v1` with `approve_for_caption_production` or
+`reject_with_reasons`. Approval only permits a future bounded caption producer to consume that
+verified receipt. An approval may be superseded by one immutable
+`studio.publish-review-revocation.receipt.v1`; rejection and revocation remain visible. The
+authenticated review read re-hashes both receipt kinds and the entire intake/decision/assessment/read
+chain. Rejected intake, forged reviewer identity, raw/open/path/caption input, illegal duplicate
+transitions, tamper, and drift fail closed.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
@@ -211,9 +223,10 @@ already in a pinned producer receipt; empty, unavailable, unknown, withheld, and
 converted into new claims.
 The default deterministic run-005 proof executes one seek, two evidence reads, one assessment, one
 decision over the audited assessment, and one host-produced queued publish-review intake.
-Browser-ingested V1 has no evidence-read, assessment, decision, or intake lineage and projects those
-regions as unavailable/empty. `queued` means awaiting a future human review consumer only; this
-runtime has no reviewer, caption producer, uploader, or publisher.
+The queued intake can then receive one explicit local human approve/reject receipt and an approval
+can receive one revocation receipt. Browser-ingested V1 has no evidence-read, assessment, decision,
+intake, or review lineage and projects those regions as unavailable/empty. `queued` remains
+unreviewed until its receipt exists; this runtime has no caption producer, uploader, or publisher.
 
 ### Explicitly deferred
 
@@ -327,7 +340,7 @@ This row shape is future fine-tune data.
 5. ✅ Standalone preflight index with unsupported detector findings withheld
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
-8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment/decision, host-verified queued/rejected publish-review intake, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
+8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment/decision, host-verified queued/rejected publish-review intake, immutable attested human review/revocation receipts, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
 9. 🔄 Build the immutable observability index from real launcher journals; add further media operations only as separate authorized slices
 10. ⏳ Acoustic/overlap/separation producers and study export
 

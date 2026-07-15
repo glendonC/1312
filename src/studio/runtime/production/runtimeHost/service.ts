@@ -10,6 +10,12 @@ import {
 import { reopenEvidenceAssessmentAudits } from "../assessmentAudit.ts";
 import { reopenEvidenceDecisionReceipts } from "../decisionReceiptAudit.ts";
 import { reopenPublishReviewIntakes } from "../publishReviewIntakeAudit.ts";
+import { reopenPublishReviewDecisions } from "../publishReviewDecisionAudit.ts";
+import {
+  PublishReviewHost,
+  PublishReviewHostError,
+} from "../publishReviewHost.ts";
+import { FileEventJournal, RuntimeLedger } from "../journal.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
 import {
   createRuntimePlan,
@@ -32,6 +38,7 @@ import type {
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewIntakeResponse,
+  RuntimeHostPublishReviewDecisionResponse,
   RuntimeHostStartAcknowledgement,
   RuntimeHostSourceSummary,
   RuntimeHostStatus,
@@ -44,6 +51,14 @@ import {
 } from "./runtimeApplication.ts";
 import { RuntimeSourceRegistry } from "./sourceRegistry.ts";
 import { parseRuntimeHostStartRequest } from "./validation.ts";
+import {
+  assertPublishReviewDecisionRequest,
+  assertPublishReviewRevocationRequest,
+  PUBLISH_REVIEW_DECISION_ATTESTATION,
+  PUBLISH_REVIEW_REVOCATION_ATTESTATION,
+  validatePublishReviewOperator,
+} from "../validation/publishReviewDecision.ts";
+import type { PublishReviewOperator } from "../model.ts";
 
 export interface RuntimeStartServiceOptions {
   store: DurableRuntimeCommandStore;
@@ -54,6 +69,7 @@ export interface RuntimeStartServiceOptions {
   runtimeIdForCommand?: (commandId: string) => string;
   hostInstanceId?: string;
   recoverOnOpen?: boolean;
+  reviewer?: PublishReviewOperator;
 }
 
 function terminal(lifecycle: RuntimeHostCommandRecord["lifecycle"]): boolean {
@@ -90,8 +106,10 @@ export class RuntimeStartService {
   private readonly now: () => Date;
   private readonly runtimeIdForCommand: (commandId: string) => string;
   private readonly hostInstanceId: string;
+  private readonly reviewer: PublishReviewOperator;
   private readonly initializing = new Map<string, Promise<RuntimeHostStartAcknowledgement>>();
   private readonly transitionTails = new Map<string, Promise<RuntimeHostCommandRecord>>();
+  private readonly reviewMutationTails = new Map<string, Promise<unknown>>();
 
   private constructor(options: RuntimeStartServiceOptions) {
     this.store = options.store;
@@ -101,6 +119,9 @@ export class RuntimeStartService {
     this.now = options.now ?? (() => new Date());
     this.runtimeIdForCommand = options.runtimeIdForCommand ?? deterministicRuntimeId;
     this.hostInstanceId = options.hostInstanceId ?? `host:${randomUUID()}`;
+    this.reviewer = validatePublishReviewOperator(
+      options.reviewer ?? { id: "reviewer:local-operator", label: "Local review operator" },
+    );
   }
 
   static async open(options: RuntimeStartServiceOptions): Promise<RuntimeStartService> {
@@ -674,6 +695,153 @@ export class RuntimeStartService {
       journalHead: journal.head,
       intakes,
     };
+  }
+
+  private async withReviewMutation<T>(runtimeId: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.reviewMutationTails.get(runtimeId) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(operation);
+    this.reviewMutationTails.set(runtimeId, next);
+    try {
+      return await next;
+    } finally {
+      if (this.reviewMutationTails.get(runtimeId) === next) this.reviewMutationTails.delete(runtimeId);
+    }
+  }
+
+  private rethrowReviewHostError(error: unknown): never {
+    if (error instanceof PublishReviewHostError) {
+      if (error.code === "reviewer_identity_mismatch") {
+        throw new RuntimeHostError(
+          "reviewer_identity_mismatch",
+          "The attested reviewer identity does not match this host's configured review operator.",
+          403,
+          { cause: error },
+        );
+      }
+      if (error.code === "stored_lineage_invalid") {
+        throw new RuntimeHostError(
+          "stored_content_inconsistent",
+          "Stored publish-review lineage failed closed verification.",
+          409,
+          { cause: error },
+        );
+      }
+      throw new RuntimeHostError(
+        "illegal_review_transition",
+        error.message,
+        409,
+        { cause: error },
+      );
+    }
+    throw new RuntimeHostError(
+      "stored_content_inconsistent",
+      "The publish-review receipt could not be recorded against verified stored lineage.",
+      409,
+      { cause: error },
+    );
+  }
+
+  async publishReviewDecisions(runtimeId: string): Promise<RuntimeHostPublishReviewDecisionResponse> {
+    const record = await this.store.findByRuntimeId(runtimeId);
+    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+    const reconciled = await this.reconcile(record, false);
+    const paths = this.store.paths(runtimeId);
+    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
+    let reviews;
+    try {
+      reviews = await reopenPublishReviewDecisions(
+        journal.state,
+        journal.events,
+        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+      );
+    } catch (error) {
+      throw new RuntimeHostError(
+        "stored_content_inconsistent",
+        "A stored publish-review decision, revocation, or verified intake lineage failed closed validation.",
+        409,
+        { cause: error },
+      );
+    }
+    return {
+      schema: "studio.local-runtime-publish-review-decisions.v1",
+      commandId: reconciled.commandId,
+      runtimeId,
+      journalHead: journal.head,
+      reviewer: {
+        ...structuredClone(this.reviewer),
+        decisionAttestation: PUBLISH_REVIEW_DECISION_ATTESTATION,
+        revocationAttestation: PUBLISH_REVIEW_REVOCATION_ATTESTATION,
+      },
+      reviews,
+    };
+  }
+
+  async createPublishReviewDecision(
+    runtimeId: string,
+    value: unknown,
+  ): Promise<RuntimeHostPublishReviewDecisionResponse> {
+    let request;
+    try {
+      request = assertPublishReviewDecisionRequest(value);
+    } catch (error) {
+      throw new RuntimeHostError(
+        "invalid_review_request",
+        "The publish-review decision request is invalid or contains open fields.",
+        400,
+        { cause: error },
+      );
+    }
+    return this.withReviewMutation(runtimeId, async () => {
+      const record = await this.store.findByRuntimeId(runtimeId);
+      if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+      await this.reconcile(record, false);
+      const paths = this.store.paths(runtimeId);
+      try {
+        const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
+        await new PublishReviewHost(
+          ledger,
+          new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+          this.reviewer,
+        ).decide(request);
+      } catch (error) {
+        this.rethrowReviewHostError(error);
+      }
+      return this.publishReviewDecisions(runtimeId);
+    });
+  }
+
+  async createPublishReviewRevocation(
+    runtimeId: string,
+    value: unknown,
+  ): Promise<RuntimeHostPublishReviewDecisionResponse> {
+    let request;
+    try {
+      request = assertPublishReviewRevocationRequest(value);
+    } catch (error) {
+      throw new RuntimeHostError(
+        "invalid_review_request",
+        "The publish-review revocation request is invalid or contains open fields.",
+        400,
+        { cause: error },
+      );
+    }
+    return this.withReviewMutation(runtimeId, async () => {
+      const record = await this.store.findByRuntimeId(runtimeId);
+      if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+      await this.reconcile(record, false);
+      const paths = this.store.paths(runtimeId);
+      try {
+        const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
+        await new PublishReviewHost(
+          ledger,
+          new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+          this.reviewer,
+        ).revoke(request);
+      } catch (error) {
+        this.rethrowReviewHostError(error);
+      }
+      return this.publishReviewDecisions(runtimeId);
+    });
   }
 
   async recover(): Promise<void> {

@@ -336,6 +336,21 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
         }],
       });
     }
+    if (url.endsWith("/v1/runtimes/runtime%3Afixture/publish-review-decisions")) {
+      return json({
+        schema: "studio.local-runtime-publish-review-decisions.v1",
+        commandId: "runtime-start:fixture",
+        runtimeId: "runtime:fixture",
+        journalHead: 7,
+        reviewer: {
+          id: "reviewer:local-fixture",
+          label: "Local fixture reviewer",
+          decisionAttestation: "I attest that I am the named reviewer and made this review decision.",
+          revocationAttestation: "I attest that I am the named reviewer and made this revocation decision.",
+        },
+        reviews: [],
+      });
+    }
     return json({ error: { code: "not_found", message: "Unexpected test URL." } }, 404);
   };
   const client = new LocalRuntimeHostClient({
@@ -357,6 +372,7 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
   const assessmentAudit = await client.assessmentAudits(start.runtimeId);
   const decisionReceipts = await client.decisionReceipts(start.runtimeId);
   const publishReviewIntakes = await client.publishReviewIntakes(start.runtimeId);
+  const publishReviewDecisions = await client.publishReviewDecisions(start.runtimeId);
 
   assert.equal(client.baseUrl, "http://127.0.0.1:4312");
   assert.equal(plan.forecast.schema, "studio.forecast.v1");
@@ -385,7 +401,9 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
     "audited_claim_unknown",
     "audited_claim_truncated",
   ]);
-  assert.equal(calls.length, 8);
+  assert.equal(publishReviewDecisions.reviewer.id, "reviewer:local-fixture");
+  assert.deepEqual(publishReviewDecisions.reviews, []);
+  assert.equal(calls.length, 9);
   for (const call of calls) {
     assert.equal(new Headers(call.init?.headers).get("Authorization"), `Bearer ${"t".repeat(64)}`);
   }
@@ -661,6 +679,116 @@ test("browser client rejects an unverified publish-review intake instead of expo
     (error: unknown) => error instanceof RuntimeHostClientError &&
       error.code === "invalid_host_response" &&
       /closed intake verification result/.test(error.message),
+  );
+});
+
+test("browser client validates the host reviewer, immutable review receipt, and revocation state", async () => {
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => json({
+      schema: "studio.local-runtime-publish-review-decisions.v1",
+      commandId: "runtime-start:fixture",
+      runtimeId: "runtime:fixture",
+      journalHead: 13,
+      reviewer: {
+        id: "reviewer:local-fixture",
+        label: "Local fixture reviewer",
+        decisionAttestation: "I attest that I am the named reviewer and made this review decision.",
+        revocationAttestation: "I attest that I am the named reviewer and made this revocation decision.",
+      },
+      reviews: [{
+        reviewId: "publish-review:fixture",
+        artifactId: "artifact:publish-review:fixture",
+        receiptId: "publish-review-decision-receipt:fixture",
+        receiptContentId: RECEIPT_CONTENT,
+        integrity: "stored_review_and_verified_queued_intake",
+        producer: "host_publish_review_v1",
+        intake: {
+          intakeId: "publish-review-intake:fixture",
+          artifactId: "artifact:publish-review-intake:fixture",
+          receiptId: "publish-review-intake-receipt:fixture",
+          receiptContentId: INTAKE_CONTENT,
+        },
+        reviewer: {
+          id: "reviewer:local-fixture",
+          label: "Local fixture reviewer",
+          attestation: "I attest that I am the named reviewer and made this review decision.",
+        },
+        outcome: "approve_for_caption_production",
+        reasonCodes: ["reviewer_attested_caption_production_may_proceed"],
+        note: "Bounded note.",
+        state: "approval_revoked",
+        revocation: {
+          revocationId: "publish-review-revocation:fixture",
+          artifactId: "artifact:publish-review-revocation:fixture",
+          receiptId: "publish-review-revocation-receipt:fixture",
+          receiptContentId: DECISION_CONTENT,
+          integrity: "stored_revocation_and_verified_approval",
+          producer: "host_publish_review_v1",
+          reviewer: {
+            id: "reviewer:local-fixture",
+            label: "Local fixture reviewer",
+            attestation: "I attest that I am the named reviewer and made this revocation decision.",
+          },
+          reasonCodes: ["new_review_required"],
+          note: null,
+        },
+      }],
+    }),
+  });
+  const response = await client.publishReviewDecisions("runtime:fixture");
+  assert.equal(response.reviews[0].state, "approval_revoked");
+  assert.equal(response.reviews[0].revocation?.reasonCodes[0], "new_review_required");
+  assert.equal(response.reviews[0].reviewer.id, response.reviewer.id);
+});
+
+test("browser client rejects caller-forged reviewer identity in a purported verified review response", async () => {
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => json({
+      schema: "studio.local-runtime-publish-review-decisions.v1",
+      commandId: "runtime-start:fixture",
+      runtimeId: "runtime:fixture",
+      journalHead: 10,
+      reviewer: {
+        id: "reviewer:host",
+        label: "Host reviewer",
+        decisionAttestation: "I attest that I am the named reviewer and made this review decision.",
+        revocationAttestation: "I attest that I am the named reviewer and made this revocation decision.",
+      },
+      reviews: [{
+        reviewId: "publish-review:fixture",
+        artifactId: "artifact:publish-review:fixture",
+        receiptId: "publish-review-decision-receipt:fixture",
+        receiptContentId: RECEIPT_CONTENT,
+        integrity: "stored_review_and_verified_queued_intake",
+        producer: "host_publish_review_v1",
+        intake: {
+          intakeId: "publish-review-intake:fixture",
+          artifactId: "artifact:publish-review-intake:fixture",
+          receiptId: "publish-review-intake-receipt:fixture",
+          receiptContentId: INTAKE_CONTENT,
+        },
+        reviewer: {
+          id: "reviewer:forged",
+          label: "Forged reviewer",
+          attestation: "I attest that I am the named reviewer and made this review decision.",
+        },
+        outcome: "reject_with_reasons",
+        reasonCodes: ["evidence_requires_additional_review"],
+        note: null,
+        state: "rejected",
+        revocation: null,
+      }],
+    }),
+  });
+  await assert.rejects(
+    client.publishReviewDecisions("runtime:fixture"),
+    (error: unknown) => error instanceof RuntimeHostClientError &&
+      error.code === "invalid_host_response" &&
+      /host review authority/.test(error.message),
   );
 });
 

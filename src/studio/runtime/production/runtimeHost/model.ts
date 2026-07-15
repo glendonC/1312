@@ -9,6 +9,12 @@ import type { RuntimeEvent } from "../protocol.ts";
 import type { EvidenceAssessmentAudit } from "../assessmentAudit.ts";
 import type { EvidenceDecisionReceiptVerification } from "../decisionReceiptAudit.ts";
 import type { PublishReviewIntakeVerification } from "../publishReviewIntakeAudit.ts";
+import type {
+  PublishReviewDecisionRequest,
+  PublishReviewOperator,
+  PublishReviewRevocationRequest,
+} from "../model.ts";
+import type { PublishReviewDecisionVerification } from "../publishReviewDecisionAudit.ts";
 
 export const RUNTIME_HOST_LIFECYCLE_STATES = [
   "accepted",
@@ -199,6 +205,23 @@ export interface RuntimeHostPublishReviewIntakeResponse {
   journalHead: number;
   intakes: PublishReviewIntakeVerification[];
 }
+
+export interface RuntimeHostPublishReviewOperator extends PublishReviewOperator {
+  decisionAttestation: "I attest that I am the named reviewer and made this review decision.";
+  revocationAttestation: "I attest that I am the named reviewer and made this revocation decision.";
+}
+
+export interface RuntimeHostPublishReviewDecisionResponse {
+  schema: "studio.local-runtime-publish-review-decisions.v1";
+  commandId: string;
+  runtimeId: string;
+  journalHead: number;
+  reviewer: RuntimeHostPublishReviewOperator;
+  reviews: PublishReviewDecisionVerification[];
+}
+
+export type RuntimeHostPublishReviewDecisionRequest = PublishReviewDecisionRequest;
+export type RuntimeHostPublishReviewRevocationRequest = PublishReviewRevocationRequest;
 
 export interface InitializedRuntimeApplication {
   runtimeRoot: string;

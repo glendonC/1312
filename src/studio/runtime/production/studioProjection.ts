@@ -7,6 +7,8 @@ import type {
   EvidenceKind,
   EvidenceReadScope,
   MediaScope,
+  PublishReviewDecisionReasonCode,
+  PublishReviewRevocationReasonCode,
   RequiredOutput,
   RuntimeProjection,
   SpawnRejection,
@@ -212,6 +214,69 @@ export interface ProductionStudioPublishReviewIntakeArtifactView {
   decisionReceiptContentId: string;
 }
 
+export interface ProductionStudioPublishReviewDecisionView {
+  reviewId: string;
+  status: "started" | "completed" | "failed";
+  intakeId: string;
+  intakeArtifactId: string;
+  intakeReceiptId: string;
+  intakeReceiptContentId: string;
+  reviewerId: string;
+  reviewerLabel: string;
+  outputArtifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  outcome: "approve_for_caption_production" | "reject_with_reasons" | null;
+  reasonCodes: PublishReviewDecisionReasonCode[];
+  note: string | null;
+  failure: string | null;
+}
+
+export interface ProductionStudioPublishReviewRevocationView {
+  revocationId: string;
+  status: "started" | "completed" | "failed";
+  reviewId: string;
+  approvalArtifactId: string;
+  approvalReceiptId: string;
+  approvalReceiptContentId: string;
+  reviewerId: string;
+  reviewerLabel: string;
+  outputArtifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  reasonCodes: PublishReviewRevocationReasonCode[];
+  note: string | null;
+  failure: string | null;
+}
+
+export interface ProductionStudioPublishReviewDecisionArtifactView {
+  artifactId: string;
+  kind: "publish-review-decision-receipt";
+  contentId: string;
+  bytes: number;
+  reviewId: string;
+  receiptId: string;
+  receiptContentId: string;
+  intakeId: string;
+  intakeArtifactId: string;
+  intakeReceiptId: string;
+  intakeReceiptContentId: string;
+}
+
+export interface ProductionStudioPublishReviewRevocationArtifactView {
+  artifactId: string;
+  kind: "publish-review-revocation-receipt";
+  contentId: string;
+  bytes: number;
+  revocationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  reviewId: string;
+  approvalArtifactId: string;
+  approvalReceiptId: string;
+  approvalReceiptContentId: string;
+}
+
 export interface ProductionStudioReportView {
   reportId: string;
   taskId: string;
@@ -318,11 +383,15 @@ export interface ProductionStudioProjection {
   evidenceAssessments: ProductionStudioEvidenceAssessmentView[];
   evidenceDecisions: ProductionStudioEvidenceDecisionView[];
   publishReviewIntakes: ProductionStudioPublishReviewIntakeView[];
+  publishReviewDecisions: ProductionStudioPublishReviewDecisionView[];
+  publishReviewRevocations: ProductionStudioPublishReviewRevocationView[];
   sourceArtifacts: ProductionStudioSourceArtifactView[];
   evidenceArtifacts: ProductionStudioEvidenceArtifactView[];
   assessmentArtifacts: ProductionStudioEvidenceAssessmentArtifactView[];
   decisionArtifacts: ProductionStudioEvidenceDecisionArtifactView[];
   publishReviewIntakeArtifacts: ProductionStudioPublishReviewIntakeArtifactView[];
+  publishReviewDecisionArtifacts: ProductionStudioPublishReviewDecisionArtifactView[];
+  publishReviewRevocationArtifacts: ProductionStudioPublishReviewRevocationArtifactView[];
   outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
@@ -336,11 +405,15 @@ export interface ProductionStudioProjection {
     evidenceAssessments: number;
     evidenceDecisions: number;
     publishReviewIntakes: number;
+    publishReviewDecisions: number;
+    publishReviewRevocations: number;
     sourceArtifacts: number;
     evidenceArtifacts: number;
     assessmentArtifacts: number;
     decisionArtifacts: number;
     publishReviewIntakeArtifacts: number;
+    publishReviewDecisionArtifacts: number;
+    publishReviewRevocationArtifacts: number;
     outputArtifacts: number;
   };
 }
@@ -521,6 +594,45 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     }))
     .sort((left, right) => left.intakeId.localeCompare(right.intakeId));
 
+  const publishReviewDecisions = Object.values(state.publishReviewDecisions)
+    .map((review): ProductionStudioPublishReviewDecisionView => ({
+      reviewId: review.id,
+      status: review.status,
+      intakeId: review.intakeId,
+      intakeArtifactId: review.intakeArtifactId,
+      intakeReceiptId: review.intakeReceiptId,
+      intakeReceiptContentId: review.intakeReceiptContentId,
+      reviewerId: review.reviewerId,
+      reviewerLabel: review.reviewerLabel,
+      outputArtifactId: review.artifactId,
+      receiptId: review.receiptId,
+      receiptContentId: review.receiptContentId,
+      outcome: review.outcome,
+      reasonCodes: [...review.reasonCodes],
+      note: review.note,
+      failure: review.failure,
+    }))
+    .sort((left, right) => left.reviewId.localeCompare(right.reviewId));
+
+  const publishReviewRevocations = Object.values(state.publishReviewRevocations)
+    .map((revocation): ProductionStudioPublishReviewRevocationView => ({
+      revocationId: revocation.id,
+      status: revocation.status,
+      reviewId: revocation.reviewId,
+      approvalArtifactId: revocation.approvalArtifactId,
+      approvalReceiptId: revocation.approvalReceiptId,
+      approvalReceiptContentId: revocation.approvalReceiptContentId,
+      reviewerId: revocation.reviewerId,
+      reviewerLabel: revocation.reviewerLabel,
+      outputArtifactId: revocation.artifactId,
+      receiptId: revocation.receiptId,
+      receiptContentId: revocation.receiptContentId,
+      reasonCodes: [...revocation.reasonCodes],
+      note: revocation.note,
+      failure: revocation.failure,
+    }))
+    .sort((left, right) => left.revocationId.localeCompare(right.revocationId));
+
   const sourceArtifacts = Object.values(state.artifacts)
     .filter((artifact) => artifact.origin.kind === "ingest")
     .map((artifact): ProductionStudioSourceArtifactView => {
@@ -557,7 +669,9 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
         artifact.origin.kind === "preflight_evidence" ||
         artifact.origin.kind === "evidence_assessment" ||
         artifact.origin.kind === "evidence_decision" ||
-        artifact.origin.kind === "publish_review_intake"
+        artifact.origin.kind === "publish_review_intake" ||
+        artifact.origin.kind === "publish_review_decision" ||
+        artifact.origin.kind === "publish_review_revocation"
       ) {
         throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
       }
@@ -710,6 +824,72 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     })
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
 
+  const publishReviewDecisionArtifacts = Object.values(state.artifacts)
+    .filter((artifact) => {
+      if (artifact.origin.kind !== "publish_review_decision") return false;
+      const review = state.publishReviewDecisions[artifact.origin.reviewId];
+      return review?.status === "completed" && review.artifactId === artifact.id;
+    })
+    .map((artifact): ProductionStudioPublishReviewDecisionArtifactView => {
+      if (artifact.origin.kind !== "publish_review_decision") {
+        throw new Error(`Production Studio projection: publish-review decision artifact ${artifact.id} changed origin`);
+      }
+      if (
+        artifact.kind !== "publish-review-decision-receipt" ||
+        artifact.producerTaskId !== null ||
+        artifact.producerAgentId !== null ||
+        artifact.mediaClass !== "non_media" ||
+        artifact.publication !== "private"
+      ) throw new Error(`Production Studio projection: publish-review decision artifact ${artifact.id} is invalid`);
+      return {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        reviewId: artifact.origin.reviewId,
+        receiptId: artifact.origin.receiptId,
+        receiptContentId: artifact.origin.receiptContentId,
+        intakeId: artifact.origin.intakeId,
+        intakeArtifactId: artifact.origin.intakeArtifactId,
+        intakeReceiptId: artifact.origin.intakeReceiptId,
+        intakeReceiptContentId: artifact.origin.intakeReceiptContentId,
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+
+  const publishReviewRevocationArtifacts = Object.values(state.artifacts)
+    .filter((artifact) => {
+      if (artifact.origin.kind !== "publish_review_revocation") return false;
+      const revocation = state.publishReviewRevocations[artifact.origin.revocationId];
+      return revocation?.status === "completed" && revocation.artifactId === artifact.id;
+    })
+    .map((artifact): ProductionStudioPublishReviewRevocationArtifactView => {
+      if (artifact.origin.kind !== "publish_review_revocation") {
+        throw new Error(`Production Studio projection: publish-review revocation artifact ${artifact.id} changed origin`);
+      }
+      if (
+        artifact.kind !== "publish-review-revocation-receipt" ||
+        artifact.producerTaskId !== null ||
+        artifact.producerAgentId !== null ||
+        artifact.mediaClass !== "non_media" ||
+        artifact.publication !== "private"
+      ) throw new Error(`Production Studio projection: publish-review revocation artifact ${artifact.id} is invalid`);
+      return {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        revocationId: artifact.origin.revocationId,
+        receiptId: artifact.origin.receiptId,
+        receiptContentId: artifact.origin.receiptContentId,
+        reviewId: artifact.origin.reviewId,
+        approvalArtifactId: artifact.origin.approvalArtifactId,
+        approvalReceiptId: artifact.origin.approvalReceiptId,
+        approvalReceiptContentId: artifact.origin.approvalReceiptContentId,
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+
   const workers = Object.values(state.agents)
     .map((agent): ProductionStudioWorkerView => {
       const task = state.tasks[agent.taskId];
@@ -774,11 +954,15 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     evidenceAssessments,
     evidenceDecisions,
     publishReviewIntakes,
+    publishReviewDecisions,
+    publishReviewRevocations,
     sourceArtifacts,
     evidenceArtifacts,
     assessmentArtifacts,
     decisionArtifacts,
     publishReviewIntakeArtifacts,
+    publishReviewDecisionArtifacts,
+    publishReviewRevocationArtifacts,
     outputArtifacts,
     counts: {
       tasks: tasks.length,
@@ -792,11 +976,15 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       evidenceAssessments: evidenceAssessments.length,
       evidenceDecisions: evidenceDecisions.length,
       publishReviewIntakes: publishReviewIntakes.length,
+      publishReviewDecisions: publishReviewDecisions.length,
+      publishReviewRevocations: publishReviewRevocations.length,
       sourceArtifacts: sourceArtifacts.length,
       evidenceArtifacts: evidenceArtifacts.length,
       assessmentArtifacts: assessmentArtifacts.length,
       decisionArtifacts: decisionArtifacts.length,
       publishReviewIntakeArtifacts: publishReviewIntakeArtifacts.length,
+      publishReviewDecisionArtifacts: publishReviewDecisionArtifacts.length,
+      publishReviewRevocationArtifacts: publishReviewRevocationArtifacts.length,
       outputArtifacts: outputArtifacts.length,
     },
   };

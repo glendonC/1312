@@ -56,6 +56,8 @@ const runtimeRoot = resolve(value("--runtime-root") ?? resolve(REPOSITORY, ".stu
 const ownedIngestRoot = resolve(value("--owned-ingest-root") ?? resolve(REPOSITORY, ".studio/owned-sources"));
 const maximumOwnedMediaBytes = integer("--maximum-owned-media-bytes", 512 * 1024 * 1024);
 const sourceRoot = value("--source-root");
+const reviewerId = value("--reviewer-id") ?? "reviewer:local-operator";
+const reviewerLabel = value("--reviewer-label") ?? "Local review operator";
 const origins = values("--allowed-origin");
 const allowedOrigins = origins.length > 0
   ? origins
@@ -78,6 +80,7 @@ const service = await RuntimeStartService.open({
   launcherFactory: deterministic
     ? deterministic.factory()
     : codexWorkerLauncherFactory({ model: value("--model"), maximumWallMs: 45_000 }),
+  reviewer: { id: reviewerId, label: reviewerLabel },
 });
 const token = randomBytes(32).toString("hex");
 const server = createRuntimeHostHttpServer({ service, ownedMediaIngest, token, allowedOrigins });
@@ -96,6 +99,7 @@ process.stdout.write(`${JSON.stringify({
     enabled: true,
     maximumBytes: maximumOwnedMediaBytes,
   },
+  reviewer: { id: reviewerId, label: reviewerLabel },
   runtimeRoot,
   executor: executorMode === "codex" ? "real-codex-opt-in" : "deterministic-no-model",
   authorizationToken: token,

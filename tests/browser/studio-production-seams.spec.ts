@@ -5,7 +5,7 @@ function productStudioUrl(): string {
   return runtimeHost ? `/studio/?runtimeHost=${encodeURIComponent(runtimeHost)}` : "/studio/";
 }
 
-async function openCompletedDeterministicProjection(page: Page): Promise<Locator> {
+async function openCompletedDeterministicProjection(page: Page, endSeconds?: number): Promise<Locator> {
   const token = process.env.STUDIO_RUNTIME_HOST_TOKEN ?? "";
   await page.goto(productStudioUrl());
   await page.getByRole("button", { name: "Use owned local source" }).click();
@@ -14,6 +14,9 @@ async function openCompletedDeterministicProjection(page: Page): Promise<Locator
   await productRuntime.getByLabel("Paste-once bearer token").fill(token);
   await productRuntime.getByRole("button", { name: "Connect to local host" }).click();
   await expect(productRuntime.getByLabel("Registered owned source")).toBeVisible();
+  if (endSeconds !== undefined) {
+    await productRuntime.getByLabel("End, seconds").fill(String(endSeconds));
+  }
   await productRuntime.getByLabel("Declared source language").fill("ko");
   await productRuntime.getByLabel("Language-pack identity (optional)").fill("ko-v3");
   await productRuntime.getByRole("button", { name: "Review local plan" }).click();
@@ -26,6 +29,53 @@ async function openCompletedDeterministicProjection(page: Page): Promise<Locator
   await expect(status.getByText(/Terminal/)).toBeVisible({ timeout: 10_000 });
   return status.getByRole("region", { name: "Production task and handoff facts" });
 }
+
+test("attested reviewer approves one verified queued intake for future caption production only", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one deterministic desktop review path is sufficient");
+  test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
+
+  const production = await openCompletedDeterministicProjection(page, 0.9);
+  const review = production.locator('[data-production-region="publish-review-human-review"]');
+  await expect(review.getByRole("heading", { name: "Queued intake human review" })).toBeVisible();
+  const control = review.locator("[data-production-review-control-intake-id]");
+  await expect(control).toHaveCount(1);
+  await control.locator("[data-production-review-attestation]").check();
+  await control.locator('[data-production-review-action="approve_for_caption_production"]').click();
+
+  const receipts = production.locator('[data-production-region="publish-review-decision-receipts"]');
+  const receipt = receipts.locator("[data-production-publish-review-decision-receipt-id]");
+  await expect(receipt).toHaveCount(1, { timeout: 10_000 });
+  await expect(receipt).toHaveAttribute("data-integrity", "stored_review_and_verified_queued_intake");
+  await expect(receipt).toHaveAttribute("data-review-outcome", "approve_for_caption_production");
+  await expect(receipt).toHaveAttribute("data-review-state", "approved_for_caption_production");
+  await expect(receipt.locator('[data-production-review-reason-code="reviewer_attested_caption_production_may_proceed"]')).toHaveCount(1);
+  await expect(receipts.getByText(/future caption producer may consume this review receipt/)).toBeVisible();
+  await expect(production.getByText(/creates no captions, upload, publication/)).toBeVisible();
+  await expect(production.locator('[data-production-publish-review-revocation-receipt-id]')).toHaveCount(0);
+});
+
+test("attested reviewer rejects one verified queued intake with a visible closed reason", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one deterministic desktop review path is sufficient");
+  test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
+
+  const production = await openCompletedDeterministicProjection(page, 0.8);
+  const review = production.locator('[data-production-region="publish-review-human-review"]');
+  const control = review.locator("[data-production-review-control-intake-id]");
+  await expect(control).toHaveCount(1);
+  await control.locator("[data-production-review-rejection-reason]").selectOption("evidence_requires_additional_review");
+  await control.locator("[data-production-review-note]").fill("A new review is required before caption production.");
+  await control.locator("[data-production-review-attestation]").check();
+  await control.locator('[data-production-review-action="reject_with_reasons"]').click();
+
+  const receipts = production.locator('[data-production-region="publish-review-decision-receipts"]');
+  const receipt = receipts.locator("[data-production-publish-review-decision-receipt-id]");
+  await expect(receipt).toHaveCount(1, { timeout: 10_000 });
+  await expect(receipt).toHaveAttribute("data-review-outcome", "reject_with_reasons");
+  await expect(receipt).toHaveAttribute("data-review-state", "rejected");
+  await expect(receipt.locator('[data-production-review-reason-code="evidence_requires_additional_review"]')).toHaveCount(1);
+  await expect(receipt.getByText("A new review is required before caption production.")).toBeVisible();
+  await expect(receipt.locator('[data-production-review-revocation-control]')).toHaveCount(0);
+});
 
 test("receipted child media/evidence operations and artifact identity hooks project outside replay", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one deterministic projection covers identity hooks");

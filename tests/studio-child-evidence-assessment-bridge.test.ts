@@ -28,6 +28,7 @@ import {
 import { MemoryEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import { CodexExecWorkerLauncher } from "../src/studio/runtime/production/launcher.ts";
 import { PublishReviewIntakeHost } from "../src/studio/runtime/production/publishReviewIntakeHost.ts";
+import { PublishReviewHost } from "../src/studio/runtime/production/publishReviewHost.ts";
 import type {
   EvidenceAssessmentClaim,
   SpawnRequestInput,
@@ -376,6 +377,34 @@ test("stdio evidence_decide emits one withheld receipt over a live audited asses
     assert.equal(intakeProduct.publishReviewIntakes.length, 1);
     assert.equal(intakeProduct.publishReviewIntakes[0].outcome, "rejected");
     assert.equal(intakeProduct.publishReviewIntakeArtifacts.length, 1);
+    await assert.rejects(
+      new PublishReviewHost(
+        runtime.ledger,
+        runtime.artifacts,
+        { id: "reviewer:test-operator", label: "Test review operator" },
+      ).decide({
+        intake: {
+          intakeId: intake.receipt.intakeId,
+          artifactId: intake.outputArtifactId,
+          receiptId: intake.receipt.receiptId,
+          receiptContentId: intake.receiptContentId,
+        },
+        reviewer: {
+          id: "reviewer:test-operator",
+          attestation: "I attest that I am the named reviewer and made this review decision.",
+        },
+        decision: {
+          outcome: "reject_with_reasons",
+          reasonCodes: ["evidence_requires_additional_review"],
+          note: null,
+        },
+      }),
+      /host-verified queued intake identity/,
+    );
+    assert.equal(
+      (await runtime.ledger.events()).some((event) => event.type === "publish.review.decision_started"),
+      false,
+    );
   } finally {
     await client.close().catch(() => undefined);
     await opened.close();

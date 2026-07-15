@@ -42,6 +42,8 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     evidenceAssessments: {},
     evidenceDecisions: {},
     publishReviewIntakes: {},
+    publishReviewDecisions: {},
+    publishReviewRevocations: {},
     executions: {},
     modelUsage: {},
     reports: {},
@@ -153,6 +155,40 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
           JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([intake.decisionArtifactId]),
         event,
         `artifact ${artifact.id} changed its verified decision input`,
+      );
+    } else if (artifact.origin.kind === "publish_review_decision") {
+      const review = next.publishReviewDecisions[artifact.origin.reviewId];
+      invariant(review?.status === "started", event, `artifact ${artifact.id} has no active publish-review decision`);
+      invariant(
+        artifact.producerTaskId === null && artifact.producerAgentId === null,
+        event,
+        `artifact ${artifact.id} incorrectly claims a task producer`,
+      );
+      invariant(
+        artifact.origin.intakeId === review.intakeId &&
+          artifact.origin.intakeArtifactId === review.intakeArtifactId &&
+          artifact.origin.intakeReceiptId === review.intakeReceiptId &&
+          artifact.origin.intakeReceiptContentId === review.intakeReceiptContentId &&
+          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([review.intakeArtifactId]),
+        event,
+        `artifact ${artifact.id} changed its verified intake input`,
+      );
+    } else if (artifact.origin.kind === "publish_review_revocation") {
+      const revocation = next.publishReviewRevocations[artifact.origin.revocationId];
+      invariant(revocation?.status === "started", event, `artifact ${artifact.id} has no active publish-review revocation`);
+      invariant(
+        artifact.producerTaskId === null && artifact.producerAgentId === null,
+        event,
+        `artifact ${artifact.id} incorrectly claims a task producer`,
+      );
+      invariant(
+        artifact.origin.reviewId === revocation.reviewId &&
+          artifact.origin.approvalArtifactId === revocation.approvalArtifactId &&
+          artifact.origin.approvalReceiptId === revocation.approvalReceiptId &&
+          artifact.origin.approvalReceiptContentId === revocation.approvalReceiptContentId &&
+          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([revocation.approvalArtifactId]),
+        event,
+        `artifact ${artifact.id} changed its verified approval input`,
       );
     }
     next.artifacts[artifact.id] = artifact;
@@ -953,6 +989,173 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     invariant(intake?.status === "started", event, `publish-review intake ${event.data.intakeId} is not active`);
     intake.status = "failed";
     intake.failure = event.data.reason;
+    return next;
+  }
+
+  if (event.type === "publish.review.decision_started") {
+    invariant(event.producer.kind === "publish_review_host", event, "publish-review decisions must come from the review host");
+    const request = event.data.request;
+    const intake = next.publishReviewIntakes[request.intake.intakeId];
+    invariant(
+      intake?.status === "completed" &&
+        intake.outcome === "queued" &&
+        intake.artifactId === request.intake.artifactId &&
+        intake.receiptId === request.intake.receiptId &&
+        intake.receiptContentId === request.intake.receiptContentId,
+      event,
+      `publish-review decision ${event.data.reviewId} has no completed exact queued intake identity`,
+    );
+    invariant(!next.publishReviewDecisions[event.data.reviewId], event, `publish-review decision ${event.data.reviewId} is duplicated`);
+    invariant(
+      !Object.values(next.publishReviewDecisions).some((review) => review.intakeId === intake.id),
+      event,
+      `queued intake ${intake.id} already has immutable review lineage`,
+    );
+    next.publishReviewDecisions[event.data.reviewId] = {
+      id: event.data.reviewId,
+      intakeId: intake.id,
+      intakeArtifactId: request.intake.artifactId,
+      intakeReceiptId: request.intake.receiptId,
+      intakeReceiptContentId: request.intake.receiptContentId,
+      reviewerId: request.reviewer.id,
+      reviewerLabel: event.data.reviewerLabel,
+      status: "started",
+      artifactId: null,
+      receiptId: null,
+      receiptContentId: null,
+      outcome: null,
+      reasonCodes: [],
+      note: null,
+      failure: null,
+    };
+    return next;
+  }
+
+  if (event.type === "publish.review.decision_completed") {
+    invariant(event.producer.kind === "publish_review_host", event, "publish-review completion must come from the review host");
+    const review = next.publishReviewDecisions[event.data.reviewId];
+    invariant(review?.status === "started", event, `publish-review decision ${event.data.reviewId} is not active`);
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    const receipt = event.data.receipt;
+    invariant(
+      artifact?.origin.kind === "publish_review_decision" &&
+        artifact.origin.reviewId === review.id &&
+        artifact.origin.receiptId === receipt.receiptId &&
+        artifact.origin.receiptContentId === event.data.receiptContentId &&
+        artifact.content.contentId === event.data.receiptContentId,
+      event,
+      `publish-review decision ${review.id} has no content-addressed receipt artifact`,
+    );
+    invariant(
+      receipt.reviewId === review.id &&
+        receipt.input.intake.intakeId === review.intakeId &&
+        receipt.input.intake.artifactId === review.intakeArtifactId &&
+        receipt.input.intake.receiptId === review.intakeReceiptId &&
+        receipt.input.intake.receiptContentId === review.intakeReceiptContentId &&
+        receipt.reviewer.id === review.reviewerId &&
+        receipt.reviewer.label === review.reviewerLabel,
+      event,
+      `publish-review decision ${review.id} receipt changed its intake or reviewer identity`,
+    );
+    review.status = "completed";
+    review.artifactId = artifact.id;
+    review.receiptId = receipt.receiptId;
+    review.receiptContentId = event.data.receiptContentId;
+    review.outcome = receipt.decision.outcome;
+    review.reasonCodes = [...receipt.decision.reasonCodes];
+    review.note = receipt.decision.note;
+    return next;
+  }
+
+  if (event.type === "publish.review.decision_failed") {
+    invariant(event.producer.kind === "publish_review_host", event, "publish-review failure must come from the review host");
+    const review = next.publishReviewDecisions[event.data.reviewId];
+    invariant(review?.status === "started", event, `publish-review decision ${event.data.reviewId} is not active`);
+    review.status = "failed";
+    review.failure = event.data.reason;
+    return next;
+  }
+
+  if (event.type === "publish.review.revocation_started") {
+    invariant(event.producer.kind === "publish_review_host", event, "publish-review revocations must come from the review host");
+    const request = event.data.request;
+    const approval = next.publishReviewDecisions[request.approval.reviewId];
+    invariant(
+      approval?.status === "completed" &&
+        approval.outcome === "approve_for_caption_production" &&
+        approval.artifactId === request.approval.artifactId &&
+        approval.receiptId === request.approval.receiptId &&
+        approval.receiptContentId === request.approval.receiptContentId,
+      event,
+      `publish-review revocation ${event.data.revocationId} has no completed exact approval identity`,
+    );
+    invariant(!next.publishReviewRevocations[event.data.revocationId], event, `publish-review revocation ${event.data.revocationId} is duplicated`);
+    invariant(
+      !Object.values(next.publishReviewRevocations).some((revocation) => revocation.reviewId === approval.id),
+      event,
+      `approval ${approval.id} already has immutable revocation lineage`,
+    );
+    next.publishReviewRevocations[event.data.revocationId] = {
+      id: event.data.revocationId,
+      reviewId: approval.id,
+      approvalArtifactId: request.approval.artifactId,
+      approvalReceiptId: request.approval.receiptId,
+      approvalReceiptContentId: request.approval.receiptContentId,
+      reviewerId: request.reviewer.id,
+      reviewerLabel: event.data.reviewerLabel,
+      status: "started",
+      artifactId: null,
+      receiptId: null,
+      receiptContentId: null,
+      reasonCodes: [],
+      note: null,
+      failure: null,
+    };
+    return next;
+  }
+
+  if (event.type === "publish.review.revocation_completed") {
+    invariant(event.producer.kind === "publish_review_host", event, "publish-review revocation completion must come from the review host");
+    const revocation = next.publishReviewRevocations[event.data.revocationId];
+    invariant(revocation?.status === "started", event, `publish-review revocation ${event.data.revocationId} is not active`);
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    const receipt = event.data.receipt;
+    invariant(
+      artifact?.origin.kind === "publish_review_revocation" &&
+        artifact.origin.revocationId === revocation.id &&
+        artifact.origin.receiptId === receipt.receiptId &&
+        artifact.origin.receiptContentId === event.data.receiptContentId &&
+        artifact.content.contentId === event.data.receiptContentId,
+      event,
+      `publish-review revocation ${revocation.id} has no content-addressed receipt artifact`,
+    );
+    invariant(
+      receipt.revocationId === revocation.id &&
+        receipt.input.approval.reviewId === revocation.reviewId &&
+        receipt.input.approval.artifactId === revocation.approvalArtifactId &&
+        receipt.input.approval.receiptId === revocation.approvalReceiptId &&
+        receipt.input.approval.receiptContentId === revocation.approvalReceiptContentId &&
+        receipt.reviewer.id === revocation.reviewerId &&
+        receipt.reviewer.label === revocation.reviewerLabel &&
+        receipt.result.state === "approval_revoked",
+      event,
+      `publish-review revocation ${revocation.id} receipt changed its approval or reviewer identity`,
+    );
+    revocation.status = "completed";
+    revocation.artifactId = artifact.id;
+    revocation.receiptId = receipt.receiptId;
+    revocation.receiptContentId = event.data.receiptContentId;
+    revocation.reasonCodes = [...receipt.revocation.reasonCodes];
+    revocation.note = receipt.revocation.note;
+    return next;
+  }
+
+  if (event.type === "publish.review.revocation_failed") {
+    invariant(event.producer.kind === "publish_review_host", event, "publish-review revocation failure must come from the review host");
+    const revocation = next.publishReviewRevocations[event.data.revocationId];
+    invariant(revocation?.status === "started", event, `publish-review revocation ${event.data.revocationId} is not active`);
+    revocation.status = "failed";
+    revocation.failure = event.data.reason;
     return next;
   }
 

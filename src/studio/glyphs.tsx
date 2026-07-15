@@ -45,6 +45,39 @@ export function Arrow() {
   );
 }
 
+export function Replay() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M12.8 5.2V2.6m0 0h-2.6m2.6 0-2 1.9a5.3 5.3 0 1 0 2.3 5.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function Overview() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path
+        d="M5.4 2.5H2.5v2.9M10.6 2.5h2.9v2.9M13.5 10.6v2.9h-2.9M5.4 13.5H2.5v-2.9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="6" cy="7" r="1" fill="currentColor" />
+      <circle cx="10.2" cy="6" r="0.85" fill="currentColor" />
+      <circle cx="9" cy="10.2" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function YouTube() {
   return (
     <svg viewBox="0 0 24 17" width="24" height="17" aria-hidden="true">

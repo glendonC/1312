@@ -74,6 +74,36 @@
   pointer-events: none;
 }
 
+/* Canvas hover/focus can activate this identity-coloured perimeter sweep. */
+.agent-mark::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  opacity: 0;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 270deg,
+    color-mix(in srgb, var(--agent-current) 38%, transparent) 294deg,
+    var(--agent-current) 326deg,
+    color-mix(in srgb, var(--agent-caustic) 72%, white) 342deg,
+    transparent 360deg
+  );
+  content: "";
+  pointer-events: none;
+  transform: rotate(-120deg);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
 .agent-mark[data-status="gating"]::before {
   box-shadow:
     inset 0 0 0 2px var(--gold-line),

@@ -4,7 +4,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import DockTrace from "./DockTrace";
-import { Hold } from "./glyphs";
+import { Hold, Replay } from "./glyphs";
+import LayoutControl from "./LayoutControl";
 import { useComplete, usePaused, useProgress, useStudio } from "./store";
 
 const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as const;
@@ -47,28 +48,38 @@ export default function Dock() {
   return (
     <div className="dock-well">
       <AnimatePresence initial={false}>
-        {running && (
+        {(running || terminal) && (
           <motion.div
             className="rail"
-            data-paused={paused}
-            data-pending={pausePending}
+            data-paused={running ? paused : undefined}
+            data-pending={running ? pausePending : undefined}
+            data-terminal={terminal ? "true" : undefined}
             initial={{ opacity: 0, y: 7, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 7, scale: 0.96 }}
             transition={SPRING}
           >
-            <button
-              type="button"
-              className="rail-btn"
-              onClick={togglePause}
-              aria-label={paused ? "Resume" : "Pause"}
-              aria-pressed={paused}
-              disabled={pausePending}
-            >
-              <Hold paused={paused} />
-              <span>{pausePending ? "Pausing" : paused ? "Resume" : "Pause"}</span>
-              <kbd aria-hidden="true">space</kbd>
-            </button>
+            {running ? (
+              <button
+                type="button"
+                className="rail-btn"
+                onClick={togglePause}
+                aria-label={paused ? "Resume" : "Pause"}
+                aria-pressed={paused}
+                disabled={pausePending}
+              >
+                <span className="rail-glyph">
+                  <Hold paused={paused} />
+                </span>
+                <span>{pausePending ? "Pausing" : paused ? "Resume" : "Pause"}</span>
+                <kbd aria-hidden="true">space</kbd>
+              </button>
+            ) : (
+              <button type="button" className="rail-btn" onClick={start}>
+                <Replay />
+                <span>Run again</span>
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -85,53 +96,55 @@ export default function Dock() {
         <DockTrace box={box} done={done} />
 
         <div className="dock-bar dock-bar-run">
-          {running && (
-            <button
-              type="button"
-              className="dock-hold"
-              onClick={togglePause}
-              aria-label={paused ? "Resume" : "Pause"}
-              aria-pressed={paused}
-              disabled={pausePending}
-            >
-              <Hold paused={paused} />
-            </button>
-          )}
-
-          <span className="dock-status" aria-live="polite">
-            {cancelled ? (
-              <span className="dock-cancelled">Cancelled</span>
-            ) : running ? (
-              pausePending ? (
-                <span className="dock-held">Pausing…</span>
-              ) : paused ? (
-                <span className="dock-held">Paused</span>
-              ) : (
-                <span className="text-shimmer">{phase}…</span>
-              )
-            ) : (
-              <span className="dock-done">Done</span>
+          <div className="dock-state">
+            {running && (
+              <button
+                type="button"
+                className="dock-hold"
+                onClick={togglePause}
+                aria-label={paused ? "Resume" : "Pause"}
+                aria-pressed={paused}
+                disabled={pausePending}
+              >
+                <span className="dock-hold-glyph">
+                  <Hold paused={paused} />
+                </span>
+              </button>
             )}
-          </span>
+
+            <span className="dock-status" aria-live="polite">
+              {cancelled ? (
+                <span className="dock-cancelled">Cancelled</span>
+              ) : running ? (
+                pausePending ? (
+                  <span className="dock-held">Pausing…</span>
+                ) : paused ? (
+                  <span className="dock-held">Paused</span>
+                ) : (
+                  <span className="text-shimmer">{phase}…</span>
+                )
+              ) : (
+                <span className="dock-done">Done</span>
+              )}
+            </span>
+          </div>
 
           <span className="dock-pct">{percent}%</span>
 
-          {terminal && (
-            <button type="button" className="dock-again" onClick={start}>
-              Run again
+          <div className="dock-actions">
+            <button
+              type="button"
+              className="dock-stop"
+              data-running={running}
+              onClick={clear}
+            >
+              {running ? "Stop" : "Clear"}
             </button>
-          )}
-
-          <button
-            type="button"
-            className="dock-stop"
-            data-running={running}
-            onClick={clear}
-          >
-            {running ? "Stop" : "Clear"}
-          </button>
+          </div>
         </div>
       </motion.div>
+
+      <LayoutControl />
     </div>
   );
 }

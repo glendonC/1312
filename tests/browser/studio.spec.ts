@@ -503,17 +503,24 @@ test("the public Dock pauses and resumes without stopping the run", async ({ pag
   ))).toBeGreaterThan(0.95);
   const pauseField = await page.locator(".studio").evaluate((studio) => {
     const style = getComputedStyle(studio, "::after");
+    const top = studio.querySelector<HTMLElement>(".top");
+    const dockWell = studio.querySelector<HTMLElement>(".dock-well");
     return {
       background: style.backgroundImage,
       blur: style.backdropFilter || style.getPropertyValue("-webkit-backdrop-filter"),
       mask: style.maskImage || style.getPropertyValue("-webkit-mask-image"),
       shadow: style.boxShadow,
+      layer: parseFloat(style.zIndex),
+      topLayer: top ? parseFloat(getComputedStyle(top).zIndex) : Number.NaN,
+      dockLayer: dockWell ? parseFloat(getComputedStyle(dockWell).zIndex) : Number.NaN,
     };
   });
   expect(pauseField.background.match(/linear-gradient/g)?.length).toBe(4);
   expect(pauseField.blur).toContain("blur(14px)");
   expect(pauseField.mask).toContain("radial-gradient");
   expect(pauseField.shadow).not.toBe("none");
+  expect(pauseField.layer).toBeGreaterThan(pauseField.topLayer);
+  expect(pauseField.layer).toBeLessThan(pauseField.dockLayer);
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
 
   await page.getByRole("button", { name: "Resume", exact: true }).click();

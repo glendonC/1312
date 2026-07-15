@@ -107,7 +107,7 @@ const HAS_PICTURE = /\.(?:mp4|webm|mov|m4v)$/i;
  * The inspection cursor belongs to the person opening focus mode. The separate marker below
  * remains the agent's recorded playhead, so scrubbing the clip cannot rewrite what the worker did.
  */
-function RecordedMedia({
+export function RecordedMedia({
   bundle,
   agentPlayhead,
 }: {

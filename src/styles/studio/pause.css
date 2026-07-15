@@ -1,0 +1,65 @@
+/* A global replay hold gathers the canvas into a broad, cool edge haze without covering its
+ * evidence. The mask keeps the optical blur at the perimeter so the held frame stays readable. */
+.studio::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  opacity: 0;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(222, 232, 227, 0.9),
+      rgba(236, 242, 239, 0.54) clamp(58px, 8vh, 92px),
+      transparent clamp(176px, 24vh, 250px)
+    ),
+    linear-gradient(
+      to top,
+      rgba(222, 232, 227, 0.88),
+      rgba(236, 242, 239, 0.5) clamp(58px, 8vh, 92px),
+      transparent clamp(176px, 24vh, 250px)
+    ),
+    linear-gradient(
+      to right,
+      rgba(218, 229, 224, 0.82),
+      rgba(238, 243, 241, 0.46) clamp(48px, 6vw, 76px),
+      transparent clamp(128px, 16vw, 190px)
+    ),
+    linear-gradient(
+      to left,
+      rgba(218, 229, 224, 0.82),
+      rgba(238, 243, 241, 0.46) clamp(48px, 6vw, 76px),
+      transparent clamp(128px, 16vw, 190px)
+    );
+  box-shadow:
+    inset 0 0 clamp(84px, 11vw, 150px) rgba(236, 242, 239, 0.58),
+    inset 0 0 34px rgba(75, 96, 90, 0.14);
+  backdrop-filter: blur(14px) saturate(0.78);
+  -webkit-backdrop-filter: blur(14px) saturate(0.78);
+  mask-image: radial-gradient(
+    ellipse 72% 66% at 50% 48%,
+    transparent 0,
+    transparent 43%,
+    rgba(0, 0, 0, 0.2) 61%,
+    #000 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 72% 66% at 50% 48%,
+    transparent 0,
+    transparent 43%,
+    rgba(0, 0, 0, 0.2) 61%,
+    #000 100%
+  );
+  pointer-events: none;
+  transition: opacity 300ms ease;
+}
+
+.studio[data-stage="run"][data-paused="true"]::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio::after {
+    transition: none;
+  }
+}

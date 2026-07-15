@@ -1,0 +1,529 @@
+/* The section rail and focus commands form one compact navigation instrument. */
+
+.agent-focus-section-rail button:focus-visible,
+.agent-focus-rail-close:focus-visible,
+.agent-focus-commands button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.agent-focus-side-rail {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.agent-focus-section-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-focus-section-rail button,
+.agent-focus-rail-close {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--ink-muted);
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-focus-section-rail button::before,
+.agent-focus-rail-close::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(22, 29, 27, 0.12);
+  border-radius: inherit;
+  pointer-events: none;
+  transition: border-color 160ms ease;
+}
+
+.agent-focus-section-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 9px;
+  color: inherit;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(230, 242, 239, 0.44));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.92),
+    0 2px 6px rgba(18, 32, 28, 0.06);
+  backdrop-filter: blur(14px) saturate(1.25);
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.agent-focus-rail-close .agent-focus-section-icon {
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.agent-focus-section-label {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 7px);
+  z-index: 4;
+  width: max-content;
+  max-width: 106px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 9px;
+  opacity: 0;
+  color: var(--ink-soft);
+  background: rgba(247, 252, 250, 0.76);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.92),
+    0 3px 9px rgba(18, 32, 28, 0.06);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-3px, -50%);
+  transition:
+    opacity 150ms ease,
+    transform 180ms ease;
+}
+
+.agent-focus-section-rail button:hover,
+.agent-focus-rail-close:hover,
+.agent-focus-section-rail button[aria-selected="true"] {
+  color: var(--accent);
+  background: transparent;
+  transform: translateX(1px);
+}
+
+.agent-focus-section-rail button:hover::before,
+.agent-focus-rail-close:hover::before,
+.agent-focus-section-rail button[aria-selected="true"]::before {
+  border-color: rgba(42, 107, 102, 0.3);
+}
+
+.agent-focus-section-rail button:hover .agent-focus-section-label,
+.agent-focus-section-rail button:focus-visible .agent-focus-section-label,
+.agent-focus-rail-close:hover .agent-focus-section-label,
+.agent-focus-rail-close:focus-visible .agent-focus-section-label,
+.agent-focus-section-rail button[aria-selected="true"] .agent-focus-section-label {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.agent-focus-section-rail button[aria-selected="true"] .agent-focus-section-icon {
+  border-color: color-mix(in srgb, var(--agent-current) 38%, white);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.86),
+      color-mix(in srgb, var(--agent-current) 22%, white)
+    );
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.94),
+    0 2px 7px color-mix(in srgb, var(--agent-current) 16%, transparent);
+}
+
+.agent-focus-section-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+
+.agent-focus-commands {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 4px;
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.agent-focus-command-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.agent-focus-commands button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  color: var(--ink-muted);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-focus-cycle-buttons {
+  display: inline-flex;
+  flex: none;
+  gap: 3px;
+}
+
+.agent-focus-cycle-buttons button {
+  width: 30px;
+  min-height: 30px;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(22, 29, 27, 0.12);
+  border-radius: 9px;
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.agent-focus-cycle-buttons button:hover {
+  border-color: var(--accent-line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.agent-focus-cycle-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  white-space: nowrap;
+}
+
+.agent-focus-commands button:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.agent-focus-command-position {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.53rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-focus-commands kbd {
+  display: inline-flex;
+  min-width: 28px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  border: 1px solid rgba(22, 29, 27, 0.12);
+  border-radius: 9px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 -1px rgba(22, 29, 27, 0.06);
+  font: inherit;
+  text-align: center;
+}
+
+@media (min-width: 721px) and (max-width: 900px) and (min-height: 561px) {
+  .agent-focus-side-rail {
+    justify-content: flex-end;
+    flex-direction: row;
+    gap: 4px;
+    padding: 0 8px 0 0;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .agent-focus-section-rail {
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .agent-focus-section-rail button,
+  .agent-focus-rail-close {
+    width: 38px;
+    height: 38px;
+  }
+
+  .agent-focus-section-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .agent-focus-section-label {
+    display: none;
+  }
+
+  .agent-focus-section-rail button[aria-selected="true"],
+  .agent-focus-section-rail button:hover,
+  .agent-focus-section-rail button:focus-visible,
+  .agent-focus-rail-close:hover,
+  .agent-focus-rail-close:focus-visible {
+    width: auto;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .agent-focus-section-rail button[aria-selected="true"]::before,
+  .agent-focus-section-rail button:hover::before,
+  .agent-focus-section-rail button:focus-visible::before,
+  .agent-focus-rail-close:hover::before,
+  .agent-focus-rail-close:focus-visible::before {
+    width: 38px;
+    right: auto;
+  }
+
+  .agent-focus-section-rail button[aria-selected="true"] .agent-focus-section-label,
+  .agent-focus-section-rail button:hover .agent-focus-section-label,
+  .agent-focus-section-rail button:focus-visible .agent-focus-section-label,
+  .agent-focus-rail-close:hover .agent-focus-section-label,
+  .agent-focus-rail-close:focus-visible .agent-focus-section-label {
+    position: static;
+    display: inline-flex;
+    max-width: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .agent-focus-section-rail:has(button:not([aria-selected="true"]):hover)
+    button[aria-selected="true"],
+  .agent-focus-section-rail:has(button:not([aria-selected="true"]):focus-visible)
+    button[aria-selected="true"] {
+    width: 38px;
+    gap: 0;
+  }
+
+  .agent-focus-section-rail:has(button:not([aria-selected="true"]):hover)
+    button[aria-selected="true"] .agent-focus-section-label,
+  .agent-focus-section-rail:has(button:not([aria-selected="true"]):focus-visible)
+    button[aria-selected="true"] .agent-focus-section-label {
+    display: none;
+  }
+
+  .agent-focus-commands {
+    grid-column: 1;
+    grid-row: 3;
+  }
+}
+
+@media (max-width: 720px) {
+  .agent-focus-side-rail {
+    justify-content: flex-end;
+    flex-direction: row;
+    gap: 3px;
+    padding: 0 5px 0 0;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .agent-focus-section-rail {
+    flex-direction: row;
+    gap: 3px;
+  }
+
+  .agent-focus-section-rail button,
+  .agent-focus-rail-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .agent-focus-section-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+  }
+
+  .agent-focus-section-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .agent-focus-section-label {
+    display: none;
+    padding: 6px 8px;
+    font-size: 0.52rem;
+  }
+
+  .agent-focus-rail-close,
+  .agent-focus-rail-close:hover,
+  .agent-focus-rail-close:focus-visible {
+    width: 36px;
+    gap: 0;
+  }
+
+  .agent-focus-rail-close::before,
+  .agent-focus-rail-close:hover::before,
+  .agent-focus-rail-close:focus-visible::before {
+    width: 36px;
+  }
+
+  .agent-focus-rail-close .agent-focus-section-label,
+  .agent-focus-rail-close:hover .agent-focus-section-label,
+  .agent-focus-rail-close:focus-visible .agent-focus-section-label {
+    display: none;
+  }
+
+  .agent-focus-section-rail button[aria-selected="true"],
+  .agent-focus-section-rail button:hover,
+  .agent-focus-section-rail button:focus-visible,
+  .agent-focus-rail-close:hover,
+  .agent-focus-rail-close:focus-visible {
+    width: auto;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .agent-focus-section-rail button[aria-selected="true"]::before,
+  .agent-focus-section-rail button:hover::before,
+  .agent-focus-section-rail button:focus-visible::before,
+  .agent-focus-rail-close:hover::before,
+  .agent-focus-rail-close:focus-visible::before {
+    width: 36px;
+    right: auto;
+  }
+
+  .agent-focus-section-rail button[aria-selected="true"] .agent-focus-section-label,
+  .agent-focus-section-rail button:hover .agent-focus-section-label,
+  .agent-focus-section-rail button:focus-visible .agent-focus-section-label,
+  .agent-focus-rail-close:hover .agent-focus-section-label,
+  .agent-focus-rail-close:focus-visible .agent-focus-section-label {
+    position: static;
+    display: inline-flex;
+    max-width: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .agent-focus-section-rail:has(button:not([aria-selected="true"]):hover)
+    button[aria-selected="true"],
+  .agent-focus-section-rail:has(button:not([aria-selected="true"]):focus-visible)
+    button[aria-selected="true"] {
+    width: 36px;
+    gap: 0;
+  }
+
+  .agent-focus-section-rail:has(button:not([aria-selected="true"]):hover)
+    button[aria-selected="true"] .agent-focus-section-label,
+  .agent-focus-section-rail:has(button:not([aria-selected="true"]):focus-visible)
+    button[aria-selected="true"] .agent-focus-section-label {
+    display: none;
+  }
+
+  .agent-focus-section-rail button:hover,
+  .agent-focus-rail-close:hover,
+  .agent-focus-section-rail button[aria-selected="true"] {
+    transform: translateY(1px);
+  }
+
+  .agent-focus-commands {
+    padding: 0 3px;
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .agent-focus-command-group {
+    gap: 7px;
+  }
+
+  .agent-focus-commands button {
+    font-size: 0.52rem;
+  }
+
+  .agent-focus-cycle-buttons {
+    gap: 2px;
+  }
+
+  .agent-focus-cycle-buttons button {
+    width: 28px;
+    min-height: 28px;
+    border-radius: 8px;
+  }
+
+  .agent-focus-cycle-label {
+    gap: 4px;
+    font-size: 0.52rem;
+  }
+}
+
+@media (min-width: 721px) and (max-height: 560px) {
+  .agent-focus-side-rail {
+    gap: 6px;
+    padding-top: 8px;
+  }
+
+  .agent-focus-section-rail button,
+  .agent-focus-rail-close {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+  }
+
+  .agent-focus-section-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .agent-focus-commands {
+    gap: 8px;
+    padding: 0 2px;
+  }
+
+  .agent-focus-command-group {
+    gap: 7px;
+  }
+
+  .agent-focus-commands button {
+    min-height: 26px;
+    gap: 4px;
+    font-size: 0.49rem;
+  }
+
+  .agent-focus-cycle-buttons button,
+  .agent-focus-commands kbd {
+    min-width: 24px;
+    height: 22px;
+    min-height: 22px;
+  }
+}

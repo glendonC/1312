@@ -487,12 +487,33 @@ test("the public Dock pauses and resumes without stopping the run", async ({ pag
   await expect(page.locator(".dock-status")).toHaveText("Paused");
   const hubMesh = page.locator(".hub .agent-mark-mesh");
   await expect(hubMesh).toHaveAttribute("data-mesh-motion", "still");
-  await page.waitForTimeout(350);
-  const heldFrame = await hubMesh.evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL());
-  await page.waitForTimeout(400);
+  let heldFrame = "";
   await expect
-    .poll(() => hubMesh.evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL()))
-    .toBe(heldFrame);
+    .poll(async () => {
+      const currentFrame = await hubMesh.evaluate(
+        (canvas) => (canvas as HTMLCanvasElement).toDataURL(),
+      );
+      const stable = currentFrame === heldFrame;
+      heldFrame = currentFrame;
+      return stable;
+    }, { intervals: [200, 200, 300], timeout: 5_000 })
+    .toBe(true);
+  await expect.poll(() => page.locator(".studio").evaluate((studio) => (
+    parseFloat(getComputedStyle(studio, "::after").opacity)
+  ))).toBeGreaterThan(0.95);
+  const pauseField = await page.locator(".studio").evaluate((studio) => {
+    const style = getComputedStyle(studio, "::after");
+    return {
+      background: style.backgroundImage,
+      blur: style.backdropFilter || style.getPropertyValue("-webkit-backdrop-filter"),
+      mask: style.maskImage || style.getPropertyValue("-webkit-mask-image"),
+      shadow: style.boxShadow,
+    };
+  });
+  expect(pauseField.background.match(/linear-gradient/g)?.length).toBe(4);
+  expect(pauseField.blur).toContain("blur(14px)");
+  expect(pauseField.mask).toContain("radial-gradient");
+  expect(pauseField.shadow).not.toBe("none");
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
 
   await page.getByRole("button", { name: "Resume", exact: true }).click();
@@ -574,7 +595,7 @@ test("workers use distinct inherited identity materials", async ({ page }) => {
   await expect(page.locator(".worker-node .env")).toHaveCount(0);
 });
 
-test("worker focus becomes a role-specific spatial environment", async ({ page }) => {
+test("agent focus keeps visual evidence present across human-readable sections", async ({ page }) => {
   await openLab(page);
   await scenario(page).selectOption("withheld");
   await page.getByRole("button", { name: "Collapse trace lab" }).click();
@@ -618,45 +639,81 @@ test("worker focus becomes a role-specific spatial environment", async ({ page }
     ),
   ).toContain("linear-gradient");
   const environment = focus.locator(".agent-focus-environment");
-  const activity = environment.locator(":scope > .agent-focus-activity");
+  const visualEvidence = environment.locator(".agent-focus-visual-evidence");
+  const activity = environment.locator(".agent-focus-detail > .agent-focus-activity");
   const sideRail = focus.locator(".agent-focus-side-rail");
-  const sectionTabs = focus.getByRole("tablist", { name: "Focused worker sections" });
-  const workspaceTab = sectionTabs.getByRole("tab", { name: "Workspace" });
-  const activityTab = sectionTabs.getByRole("tab", { name: "Recorded activity" });
-  const workspaceLabel = workspaceTab.locator(".agent-focus-section-label");
-  const activityLabel = activityTab.locator(".agent-focus-section-label");
-  await expect(workspaceLabel).toHaveCSS("opacity", "1");
+  const sectionTabs = focus.getByRole("tablist", { name: "Focused agent sections" });
+  const workbenchTab = sectionTabs.getByRole("tab", { name: "Workbench" });
+  const assignmentTab = sectionTabs.getByRole("tab", { name: "Assignment" });
+  const historyTab = sectionTabs.getByRole("tab", { name: "History" });
+  const resultsTab = sectionTabs.getByRole("tab", { name: "Results" });
+  const workbenchLabel = workbenchTab.locator(".agent-focus-section-label");
+  const historyLabel = historyTab.locator(".agent-focus-section-label");
+  await expect(sectionTabs.getByRole("tab")).toHaveCount(4);
+  await expect(workbenchLabel).toHaveCSS("opacity", "1");
+  await expect(visualEvidence).toBeVisible();
+  await expect(visualEvidence.getByLabel("Recorded source video")).toBeVisible();
+  await expect(visualEvidence.getByRole("img", { name: /Translator 01 media evidence/ })).toBeVisible();
+  await expect(visualEvidence.getByText(/Playback is your inspection cursor/)).toBeVisible();
+  await expect(visualEvidence.getByText(/Assigned 0:00–0:18/)).toBeVisible();
   await expect(sideRail).toHaveCSS("z-index", "2");
-  const sectionControlShape = await workspaceTab.evaluate((button) => {
+  const sectionControlMaterial = await workbenchTab.evaluate((button) => {
     const icon = button.querySelector(".agent-focus-section-icon");
     return {
       frameRadius: getComputedStyle(button).borderRadius,
+      frameBackground: getComputedStyle(button).backgroundColor,
+      frameShadow: getComputedStyle(button).boxShadow,
+      frameHeight: getComputedStyle(button).height,
+      frameOutline: getComputedStyle(button, "::before").borderTopStyle,
       iconRadius: icon ? getComputedStyle(icon).borderRadius : "0px",
+      iconBackground: icon ? getComputedStyle(icon).backgroundImage : "none",
     };
   });
-  expect(sectionControlShape.frameRadius).toBe("4px");
-  expect(parseFloat(sectionControlShape.iconRadius)).toBeGreaterThan(
-    parseFloat(sectionControlShape.frameRadius),
+  expect(sectionControlMaterial.frameBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(sectionControlMaterial.frameShadow).toBe("none");
+  expect(sectionControlMaterial.frameOutline).toBe("solid");
+  expect(parseFloat(sectionControlMaterial.frameHeight)).toBeLessThanOrEqual(40);
+  expect(parseFloat(sectionControlMaterial.iconRadius)).toBeGreaterThan(
+    parseFloat(sectionControlMaterial.frameRadius),
   );
-  if ((page.viewportSize()?.width ?? 0) > 720) {
-    await activityTab.hover();
-    await expect(activityLabel).toHaveCSS("opacity", "1");
+  expect(sectionControlMaterial.iconBackground).toContain("linear-gradient");
+  const railGap = await sectionTabs.evaluate((rail) => parseFloat(getComputedStyle(rail).gap));
+  expect(railGap).toBeLessThanOrEqual(4);
+  if ((page.viewportSize()?.width ?? 0) > 900) {
+    await historyTab.hover();
+    await expect(historyLabel).toHaveCSS("opacity", "1");
     await page.mouse.move(0, 0);
+    await historyTab.focus();
+    await expect(historyLabel).toHaveCSS("opacity", "1");
   } else {
-    await expect(activityLabel).toHaveCSS("display", "none");
+    await expect(historyLabel).toHaveCSS("display", "none");
+    await historyTab.focus();
+    expect(await historyLabel.evaluate((label) => getComputedStyle(label).display)).not.toBe("none");
   }
-  const [environmentBox, sideRailBox, workspaceTabBox, activityTabBox] = await Promise.all([
+  await workbenchTab.focus();
+  const [environmentBox, sideRailBox, workbenchTabBox, workbenchIconBox, workbenchLabelBox,
+    historyTabBox] = await Promise.all([
     environment.boundingBox(),
     sideRail.boundingBox(),
-    workspaceTab.boundingBox(),
-    activityTab.boundingBox(),
+    workbenchTab.boundingBox(),
+    workbenchTab.locator(".agent-focus-section-icon").boundingBox(),
+    workbenchLabel.boundingBox(),
+    historyTab.boundingBox(),
   ]);
   expect(environmentBox).not.toBeNull();
   expect(sideRailBox).not.toBeNull();
-  expect(workspaceTabBox).not.toBeNull();
-  expect(activityTabBox).not.toBeNull();
-  if ((page.viewportSize()?.width ?? 0) > 720) {
+  expect(workbenchTabBox).not.toBeNull();
+  expect(workbenchIconBox).not.toBeNull();
+  expect(workbenchLabelBox).not.toBeNull();
+  expect(historyTabBox).not.toBeNull();
+  expect(workbenchLabelBox?.x ?? 0).toBeGreaterThanOrEqual(
+    (workbenchIconBox?.x ?? 0) + (workbenchIconBox?.width ?? 0) + 4,
+  );
+  if ((page.viewportSize()?.width ?? 0) > 900) {
     expect(sideRailBox?.x ?? 0).toBeGreaterThanOrEqual(
+      (environmentBox?.x ?? 0) + (environmentBox?.width ?? 0),
+    );
+    expect(workbenchLabelBox?.x ?? 0).toBeGreaterThanOrEqual(
       (environmentBox?.x ?? 0) + (environmentBox?.width ?? 0),
     );
   } else {
@@ -670,27 +727,48 @@ test("worker focus becomes a role-specific spatial environment", async ({ page }
     expect((sideRailBox?.y ?? 0) + (sideRailBox?.height ?? 0)).toBeLessThanOrEqual(
       environmentBox?.y ?? 0,
     );
+    expect((workbenchLabelBox?.y ?? 0) + (workbenchLabelBox?.height ?? 0)).toBeLessThanOrEqual(
+      environmentBox?.y ?? 0,
+    );
   }
-  await expect(workspaceTab).toHaveAttribute(
+  await expect(workbenchTab).toHaveAttribute(
     "aria-selected",
     "true",
   );
   await expect(activity).toHaveCount(0);
-  await activityTab.click();
-  await expect(focus.getByRole("heading", { name: "Recorded activity" })).toBeVisible();
+
+  await assignmentTab.click();
+  await expect(focus.getByRole("heading", { name: "Assignment" })).toBeVisible();
+  await expect(focus.getByText("Production task objective", { exact: true })).toBeVisible();
+  await expect(visualEvidence.getByLabel("Recorded source video")).toBeVisible();
+
+  await resultsTab.click();
+  await expect(focus.getByRole("heading", { name: "Results" })).toBeVisible();
+  await expect(focus.getByText("Recorded result projection", { exact: true })).toBeVisible();
+  await expect(focus.getByText("Production result fields unavailable", { exact: true })).toBeVisible();
+  await expect(visualEvidence.getByLabel("Recorded source video")).toBeVisible();
+
+  await historyTab.click();
+  await expect(focus.getByRole("heading", { name: "History" })).toBeVisible();
   await expect(activity).toBeVisible();
-  await expect(activityLabel).toHaveCSS("opacity", "1");
+  await expect(historyLabel).toHaveCSS("opacity", "1");
   await expect(focus.locator(".agent-focus-log-row")).not.toHaveCount(0);
-  await expect(activityTab).toHaveAttribute(
+  expect(await activity.evaluate((element) => getComputedStyle(element).position)).toBe("relative");
+  await expect(historyTab).toHaveAttribute(
     "aria-selected",
     "true",
   );
   await page.keyboard.press("Home");
-  await expect(sectionTabs.getByRole("tab", { name: "Workspace" })).toBeFocused();
-  await expect(focus.getByRole("heading", { name: "Translation draft" })).toBeVisible();
+  await expect(workbenchTab).toBeFocused();
+  await expect(focus.getByRole("heading", { name: "Workbench" })).toBeVisible();
   await page.keyboard.press("End");
-  await expect(sectionTabs.getByRole("tab", { name: "Recorded activity" })).toBeFocused();
-  await expect(focus.getByRole("heading", { name: "Recorded activity" })).toBeVisible();
+  await expect(resultsTab).toBeFocused();
+  await expect(focus.getByRole("heading", { name: "Results" })).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(historyTab).toBeFocused();
+  await expect(focus.getByRole("heading", { name: "History" })).toBeVisible();
+  await page.keyboard.press("Home");
+  await expect(workbenchTab).toBeFocused();
   await expect(
     focus.locator(".agent-focus-hero-copy").getByText("Translator", { exact: true }),
   ).toHaveCount(0);
@@ -698,28 +776,40 @@ test("worker focus becomes a role-specific spatial environment", async ({ page }
   await expect(
     environment.locator(".agent-focus-environment-foot").getByText("translate-01", { exact: true }),
   ).toBeVisible();
-  expect(await activity.evaluate((element) => getComputedStyle(element).position)).toBe("relative");
   const focusCommands = focus.getByRole("navigation", { name: "Agent focus commands" });
   await expect(focusCommands).toBeVisible();
   await expect(environment.locator(".agent-focus-close")).toHaveCount(0);
   await expect(sideRail.getByRole("button", { name: "Close agent focus" })).toBeVisible();
   await expect(focusCommands.getByRole("button", { name: "Close focus" })).toBeVisible();
-  await expect(focusCommands.locator(".agent-focus-command-key, kbd")).toHaveCount(3);
-  expect(
-    new Set(
-      await focusCommands.locator(".agent-focus-command-key, kbd").evaluateAll((keys) =>
-        keys.map((key) => getComputedStyle(key).borderRadius),
-      ),
-    ).size,
-  ).toBe(1);
+  const cycleButtons = focusCommands.locator(".agent-focus-cycle-buttons > button");
+  const cycleLabel = focusCommands.locator(".agent-focus-cycle-label");
+  await expect(cycleButtons).toHaveCount(2);
+  await expect(cycleLabel).toHaveText(/Cycle agents\s*·\s*\d+\/\d+/);
+  await expect(focusCommands.getByRole("button", { name: "Previous agent" })).toBeVisible();
+  await expect(focusCommands.getByRole("button", { name: "Next agent" })).toBeVisible();
+  await expect(focus.getByText(/^Previous(?:\s|$)/)).toHaveCount(0);
+  await expect(focus.getByText(/^Next(?:\s|$)/)).toHaveCount(0);
+  const [previousBox, nextBox] = await Promise.all([
+    cycleButtons.nth(0).boundingBox(),
+    cycleButtons.nth(1).boundingBox(),
+  ]);
+  expect(previousBox).not.toBeNull();
+  expect(nextBox).not.toBeNull();
+  expect(Math.abs((previousBox?.y ?? 0) - (nextBox?.y ?? 0))).toBeLessThanOrEqual(0.5);
+  expect((nextBox?.x ?? 0) - ((previousBox?.x ?? 0) + (previousBox?.width ?? 0)))
+    .toBeLessThanOrEqual(3.5);
   await expect(focus.getByText("Reasoning", { exact: true })).toHaveCount(0);
   await expectFocusSettled(focus);
 
+  const cyclePosition = cycleLabel.locator(".agent-focus-command-position");
+  const cyclePositionBefore = await cyclePosition.textContent();
   await focus.getByRole("button", { name: "Next agent" }).click();
+  await expect(cyclePosition).not.toHaveText(cyclePositionBefore ?? "");
   await expect(focus.getByRole("heading", { name: "Translator 01" })).toHaveCount(0);
   await expect(focus).toHaveAccessibleName("Verifier 01");
   await expect(focus.getByRole("heading", { name: "Gate review" })).toBeVisible();
   await expect(focus.locator('.env[data-role="qc"]')).toBeVisible();
+  await expect(focus.getByLabel("Recorded source video")).toBeVisible();
   await expect(focus.locator(".agent-focus-role-remit")).toContainText(
     "Checks recorded measurements and publication gates.",
   );
@@ -731,6 +821,7 @@ test("worker focus becomes a role-specific spatial environment", async ({ page }
   await expect(focus).toHaveAccessibleName("Orchestrator");
   await expect(focus.getByRole("heading", { name: "Run coordination" })).toBeVisible();
   await expect(focus.locator(".coordination-env")).toBeVisible();
+  await expect(focus.getByLabel("Recorded source video")).toBeVisible();
   await expect(focus.locator(".agent-focus-role-remit")).toContainText(
     "Coordinates the recorded run and its projected workers.",
   );
@@ -739,9 +830,15 @@ test("worker focus becomes a role-specific spatial environment", async ({ page }
   await expect(focus).toHaveAccessibleName("Segmenter 01");
   await expect(focus.getByRole("heading", { name: "Recorded media" })).toBeVisible();
   await expect(focus.locator('.env[data-role="segment"]')).toBeVisible();
+  await expect(focus.getByLabel("Recorded source video")).toBeVisible();
   await expect(focus.locator(".agent-focus-role-remit")).toContainText(
     "Maps the recorded source into inspectable ranges and marks.",
   );
+  await expectFocusSettled(focus);
+  await focus.getByRole("button", { name: "Next agent" }).click();
+  await expect(focus).toHaveAccessibleName("Context 01");
+  await expect(focus.getByRole("heading", { name: "Term resolution" })).toBeVisible();
+  await expect(focus.getByLabel("Recorded source video")).toBeVisible();
   await expectFocusSettled(focus);
   await focus.getByRole("button", { name: "Close agent focus" }).click();
   await expect(focus).toHaveCount(0);
@@ -766,6 +863,9 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
   const focus = page.getByRole("dialog", { name: "Orchestrator" });
   await expect(focus).toBeVisible();
   await expectFocusSettled(focus);
+  await expect(focus.getByRole("tab", { name: "Workbench" })).toHaveAttribute("aria-selected", "true");
+  await expect(focus.getByLabel("Recorded source video")).toBeVisible();
+  await expect(focus.locator(".agent-focus-body")).toHaveCSS("display", "grid");
   await expect(page.locator(".top")).toHaveCSS("opacity", "0.08");
   await expect(focus.getByRole("note")).toHaveText(
     "Recorded preview · The submitted source was not processed",
@@ -774,15 +874,20 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
     const spatial = root.querySelector(".agent-focus-spatial");
     const environment = root.querySelector(".agent-focus-environment");
     const sectionRail = root.querySelector(".agent-focus-section-rail");
+    const activeSection = sectionRail?.querySelector('[aria-selected="true"]');
+    const activeLabel = activeSection?.querySelector(".agent-focus-section-label");
     const closeKey = root.querySelector(".agent-focus-rail-close .agent-focus-section-icon");
     const top = document.querySelector(".top");
     const topMark = document.querySelector(".top-mark");
     const dock = document.querySelector(".dock");
-    if (!spatial || !environment || !sectionRail || !closeKey || !top || !topMark || !dock) {
+    if (!spatial || !environment || !sectionRail || !activeSection || !activeLabel
+      || !closeKey || !top || !topMark || !dock) {
       return null;
     }
     const environmentBox = environment.getBoundingClientRect();
     const sectionRailBox = sectionRail.getBoundingClientRect();
+    const activeSectionBox = activeSection.getBoundingClientRect();
+    const activeLabelBox = activeLabel.getBoundingClientRect();
     return {
       rootPosition: getComputedStyle(root).position,
       spatialDisplay: getComputedStyle(spatial).display,
@@ -790,6 +895,10 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
       environmentBackground: getComputedStyle(environment).backgroundImage,
       environmentRadius: getComputedStyle(environment).borderRadius,
       sectionRailIsRight: sectionRailBox.left >= environmentBox.right,
+      activeLabelIsOutward: activeLabelBox.left >= activeSectionBox.right,
+      activeLabelClearsEnvironment: activeLabelBox.left >= environmentBox.right,
+      activeFrameBackground: getComputedStyle(activeSection).backgroundColor,
+      activeFrameShadow: getComputedStyle(activeSection).boxShadow,
       closeKeyWidth: getComputedStyle(closeKey).width,
       topFilter: getComputedStyle(top).filter,
       topOpacity: getComputedStyle(top).opacity,
@@ -812,7 +921,11 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
     environmentDisplay: "flex",
     environmentRadius: "14px",
     sectionRailIsRight: true,
-    closeKeyWidth: "34px",
+    activeLabelIsOutward: true,
+    activeLabelClearsEnvironment: true,
+    activeFrameBackground: "rgba(0, 0, 0, 0)",
+    activeFrameShadow: "none",
+    closeKeyWidth: "30px",
     topOpacity: "0.08",
     topMarkPointerEvents: "none",
     dockFilter: "none",
@@ -826,6 +939,7 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
 
 test("agent focus moves the canvas and fits every supported viewport", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive viewport contract");
+  test.setTimeout(60_000);
 
   for (const viewport of [
     { width: 320, height: 568 },
@@ -849,21 +963,47 @@ test("agent focus moves the canvas and fits every supported viewport", async ({ 
     await expect(focus).toBeVisible();
     await page.waitForTimeout(450);
     const environment = focus.locator(".agent-focus-environment");
-    const [focusBox, environmentBox, dockBox, after, graphState] = await Promise.all([
+    const focusBody = focus.locator(".agent-focus-body");
+    const sideRail = focus.locator(".agent-focus-side-rail");
+    const cycleButtons = focus.locator(".agent-focus-cycle-buttons > button");
+    const cycleLabel = focus.locator(".agent-focus-cycle-label");
+    await expect(focus.getByRole("tablist", { name: "Focused agent sections" }).getByRole("tab"))
+      .toHaveCount(4);
+    await expect(focus.getByLabel("Recorded source video")).toBeVisible();
+    await expect(focus.locator(".agent-focus-visual-evidence")).toBeVisible();
+    const [focusBox, environmentBox, focusBodyBox, sideRailBox, dockBox, after, graphState,
+      visibleRailLabels, previousBox, nextBox, cycleLabelBox] = await Promise.all([
       focus.boundingBox(),
       environment.boundingBox(),
+      focusBody.boundingBox(),
+      sideRail.boundingBox(),
       page.locator(".dock-well").boundingBox(),
       anchor.boundingBox(),
       page.locator(".graph").evaluate((element) => ({
         transform: getComputedStyle(element).transform,
         filter: getComputedStyle(element).filter,
       })),
+      sideRail.locator(".agent-focus-section-label").evaluateAll((labels) =>
+        labels.flatMap((label) => {
+          const style = getComputedStyle(label);
+          if (style.display === "none" || style.opacity === "0") return [];
+          const box = label.getBoundingClientRect();
+          return [{ x: box.x, y: box.y, width: box.width, height: box.height }];
+        })),
+      cycleButtons.nth(0).boundingBox(),
+      cycleButtons.nth(1).boundingBox(),
+      cycleLabel.boundingBox(),
     ]);
     expect(focusBox).not.toBeNull();
     expect(environmentBox).not.toBeNull();
+    expect(focusBodyBox).not.toBeNull();
+    expect(sideRailBox).not.toBeNull();
     expect(dockBox).not.toBeNull();
     expect(before).not.toBeNull();
     expect(after).not.toBeNull();
+    expect(previousBox).not.toBeNull();
+    expect(nextBox).not.toBeNull();
+    expect(cycleLabelBox).not.toBeNull();
     expect(focusBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
     expect(focusBox?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
     expect((focusBox?.x ?? 0) + (focusBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
@@ -875,6 +1015,34 @@ test("agent focus moves the canvas and fits every supported viewport", async ({ 
     expect(environmentBox?.y ?? -1).toBeGreaterThanOrEqual(56);
     expect((environmentBox?.y ?? 0) + (environmentBox?.height ?? 0)).toBeLessThanOrEqual(
       (dockBox?.y ?? viewport.height) + 0.5,
+    );
+    expect(focusBodyBox?.x ?? -1).toBeGreaterThanOrEqual((environmentBox?.x ?? 0) - 0.5);
+    expect((focusBodyBox?.x ?? 0) + (focusBodyBox?.width ?? 0)).toBeLessThanOrEqual(
+      (environmentBox?.x ?? 0) + (environmentBox?.width ?? 0) + 0.5,
+    );
+    expect((focusBodyBox?.y ?? 0) + (focusBodyBox?.height ?? 0)).toBeLessThanOrEqual(
+      (environmentBox?.y ?? 0) + (environmentBox?.height ?? 0) + 0.5,
+    );
+    expect((sideRailBox?.x ?? 0) + (sideRailBox?.width ?? 0)).toBeLessThanOrEqual(
+      viewport.width + 0.5,
+    );
+    expect(visibleRailLabels.length).toBeGreaterThan(0);
+    for (const labelBox of visibleRailLabels) {
+      expect(labelBox.x).toBeGreaterThanOrEqual(-0.5);
+      expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(viewport.width + 0.5);
+      expect(
+        labelBox.x >= (environmentBox?.x ?? 0) + (environmentBox?.width ?? 0) - 0.5
+        || labelBox.y + labelBox.height <= (environmentBox?.y ?? 0) + 0.5,
+      ).toBe(true);
+    }
+    expect((previousBox?.x ?? 0) + (previousBox?.width ?? 0)).toBeLessThanOrEqual(
+      nextBox?.x ?? 0,
+    );
+    expect((nextBox?.x ?? 0) + (nextBox?.width ?? 0)).toBeLessThanOrEqual(
+      viewport.width + 0.5,
+    );
+    expect((cycleLabelBox?.x ?? 0) + (cycleLabelBox?.width ?? 0)).toBeLessThanOrEqual(
+      viewport.width + 0.5,
     );
     expect(graphState.transform).not.toBe("none");
     expect(graphState.filter).toContain("blur");

@@ -13,6 +13,7 @@
 @import "./studio/canvas.css";
 @import "./studio/workspace.css";
 @import "./studio/results.css";
+@import "./studio/pause.css";
 
 .studio {
   position: relative;

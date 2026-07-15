@@ -11,6 +11,11 @@ export function normalizeSourceReceipt(receipt) {
     const videoId = requiredText(receipt.video_id, "youtube.video_id");
     const url = requiredText(receipt.url, "youtube.url");
     const licence = requiredText(receipt.licence, "youtube.licence");
+    if (!/creative commons/i.test(licence)) {
+      throw new Error(
+        "youtube.licence is not redistributable; Standard YouTube media must use the bench-only local_eval_youtube adapter",
+      );
+    }
     const attribution = requiredText(receipt.attribution, "youtube.attribution");
     const duration = positive(receipt.duration, "youtube.duration");
     return {
@@ -92,6 +97,72 @@ export function normalizeSourceReceipt(receipt) {
   throw new Error(`source receipt kind ${String(receipt.kind)} has no registered adapter`);
 }
 
+/**
+ * Bench-only provenance adapter for Standard YouTube Licence media that is held as a local
+ * evaluation copy. It is intentionally separate from normalizeSourceReceipt: runtime and demo
+ * producers must never interpret this receipt as authority to copy media into a public path.
+ */
+export function normalizeBenchSourceReceipt(receipt) {
+  if (receipt?.kind !== "local_eval_youtube") return normalizeSourceReceipt(receipt);
+
+  exact(receipt.schema, "studio.bench.source.local-eval-youtube.v1", "local_eval_youtube.schema");
+  const label = requiredText(receipt.label, "local_eval_youtube.label");
+  const channel = requiredText(receipt.channel, "local_eval_youtube.channel");
+  const videoId = requiredText(receipt.video_id, "local_eval_youtube.video_id");
+  const url = requiredText(receipt.url, "local_eval_youtube.url");
+  const parsedUrl = youtubeUrl(url, "local_eval_youtube.url");
+  if (youtubeVideoId(parsedUrl) !== videoId) {
+    throw new Error("local_eval_youtube.video_id does not match local_eval_youtube.url");
+  }
+  exact(
+    receipt.licence,
+    "Standard YouTube licence — local evaluation copy only; NOT redistributable",
+    "local_eval_youtube.licence",
+  );
+  const attribution = requiredText(receipt.attribution, "local_eval_youtube.attribution");
+  if (!attribution.includes(channel)) {
+    throw new Error("local_eval_youtube.attribution must name local_eval_youtube.channel");
+  }
+  const duration = positive(receipt.duration, "local_eval_youtube.duration");
+  const localPath = scratchPath(receipt.local_copy?.path, "local_eval_youtube.local_copy.path");
+  const contentId = requiredText(receipt.local_copy?.content_id, "local_eval_youtube.local_copy.content_id");
+  if (!/^sha256:[a-f0-9]{64}$/.test(contentId)) {
+    throw new Error("local_eval_youtube.local_copy.content_id must be a SHA-256 content id");
+  }
+  if (!Number.isSafeInteger(receipt.local_copy?.bytes) || receipt.local_copy.bytes <= 0) {
+    throw new Error("local_eval_youtube.local_copy.bytes must be a positive integer");
+  }
+  exact(receipt.redistribution?.allowed, false, "local_eval_youtube.redistribution.allowed");
+  exact(receipt.redistribution?.public_path, null, "local_eval_youtube.redistribution.public_path");
+  const note = requiredText(receipt.note, "local_eval_youtube.note");
+  if (!/not published with the repo/i.test(note)) {
+    throw new Error("local_eval_youtube.note must state that the screen-capture is not published with the repo");
+  }
+
+  return {
+    kind: "local_eval_youtube",
+    title: label,
+    creator: channel,
+    sourceId: videoId,
+    locator: { url },
+    rights: {
+      basis: "standard_youtube_local_evaluation",
+      label: receipt.licence,
+      attribution,
+      scope: "local_processing",
+    },
+    selection: {
+      start: requiredText(receipt.window?.start, "local_eval_youtube.window.start"),
+      end: requiredText(receipt.window?.end, "local_eval_youtube.window.end"),
+      duration,
+    },
+    contentId,
+    localPath,
+    redistribution: { allowed: false, publicPath: null },
+    note,
+  };
+}
+
 function requiredText(value, path) {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${path} must be a non-empty string`);
   return value;
@@ -106,4 +177,32 @@ function positive(value, path) {
 
 function exact(value, expected, path) {
   if (value !== expected) throw new Error(`${path} must equal ${expected}`);
+}
+
+function youtubeUrl(value, path) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${path} must be a valid URL`);
+  }
+  if (
+    parsed.protocol !== "https:" ||
+    !new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]).has(parsed.hostname)
+  ) {
+    throw new Error(`${path} must be an HTTPS YouTube URL`);
+  }
+  return parsed;
+}
+
+function youtubeVideoId(url) {
+  return url.hostname === "youtu.be" ? url.pathname.slice(1).split("/")[0] : url.searchParams.get("v");
+}
+
+function scratchPath(value, path) {
+  const text = requiredText(value, path).replaceAll("\\", "/");
+  if (!text.startsWith(".studio/scratch/") || text.split("/").includes("..")) {
+    throw new Error(`${path} must stay under .studio/scratch/`);
+  }
+  return text;
 }

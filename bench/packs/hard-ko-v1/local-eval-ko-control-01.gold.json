@@ -1,0 +1,87 @@
+{
+  "schema": "studio.bench.gold.v1",
+  "pack_id": "hard-ko-v1",
+  "clip_id": "local-eval-ko-control-01",
+  "status": "candidate",
+  "drafter": "agent:gold-drafter-v1",
+  "source": {
+    "kind": "local_eval_youtube",
+    "url": "https://www.youtube.com/watch?v=-OloSwDTomI",
+    "channel": "쿠팡플레이 Coupang Play",
+    "licence": "Standard YouTube licence — local evaluation copy only; NOT redistributable",
+    "window": {
+      "start": "00:02:46.560",
+      "end": "00:03:15.189",
+      "duration": 28.629,
+      "alignment": "approximate source alignment of the local screen capture"
+    },
+    "attribution": "\"대학전쟁 시즌 2 | 스페셜 티저 | 서고연카포 프로필 공개ㅣ 쿠팡플레이 | 쿠팡 | EN Subbed\" by 쿠팡플레이 Coupang Play; source credited for local evaluation only.",
+    "redistributable": false,
+    "note": "Screen-capture held locally for bench; not published with the repo. The operator does not own or control the copyright."
+  },
+  "mined_from": null,
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 10,
+      "korean_gold": "안녕하세요. 저는 일반 중학교 조기 졸업하고 서울과학고 입학, 한국 수학올림피아드 금상, 사전테스트 전체 1위를 한 서울대학교 수리과학부-",
+      "english_guidance": "Hello. The speaker says they graduated early from a regular middle school, entered Seoul Science High School, won gold in the Korean Mathematical Olympiad, ranked first overall on a pretest, and begins identifying their Seoul National University Mathematical Sciences affiliation before the window cuts off.",
+      "critical_units": [
+        {
+          "id": "local-eval-ko-control-01-0000-1000-meaning-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker says they graduated early from a regular middle school and entered Seoul Science High School.",
+            "The speaker says they won gold in the Korean Mathematical Olympiad.",
+            "The speaker says they ranked first overall on a pretest.",
+            "The speaker begins identifying an affiliation with Seoul National University's Department of Mathematical Sciences, and the phrase is incomplete at the window boundary."
+          ],
+          "catastrophic_if": [
+            "Reverses or materially changes the schools, award, first-place result, or incomplete university affiliation."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 10,
+      "t_end": 20,
+      "korean_gold": "-24학번 김규민이라고 합니다. 본인만의 어떤 암기 비법 같은 게 있나요? 저는 비법을 만들어내는 데 오히려 더 많은 시간을 소요하곤 해서-",
+      "english_guidance": "The cut-in completes the introduction as Kim Gyumin, class of 2024. A question asks about a personal memorization trick. The answer says inventing such tricks tends to take even more time, and the thought is cut off at the window end.",
+      "critical_units": [
+        {
+          "id": "local-eval-ko-control-01-1000-2000-meaning-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker identifies themself as Kim Gyumin, class of 2024.",
+            "A question asks whether the speaker has a personal memorization trick.",
+            "The speaker says creating a trick tends to consume even more time, and the explanation remains incomplete."
+          ],
+          "catastrophic_if": [
+            "Changes the identity or class year, or claims the speaker says a trick saves time rather than takes more time."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 20,
+      "t_end": 28.629,
+      "korean_gold": "-그냥 외우는 편입니다. 매력 포인트가 지능이라고 했어요? 그건 다른 게 생각나는 게 잘 없어서.",
+      "english_guidance": "The cut-in completes the answer: the speaker tends simply to memorize. Asked whether they named intelligence as their charm point, the speaker says that was because they could not readily think of anything else.",
+      "critical_units": [
+        {
+          "id": "local-eval-ko-control-01-2000-28629-meaning-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker says they tend simply to memorize.",
+            "A question asks whether the speaker named intelligence as their charm point.",
+            "The speaker says they did so because they could not readily think of anything else."
+          ],
+          "catastrophic_if": [
+            "Claims the speaker uses an elaborate memorization method or gives a different reason for naming intelligence."
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": "Audio-grounded Korean copied window-for-window from .studio/scratch/control-01/LISTEN_PASS.md. Boundary hyphens are preserved and no text is merged across windows. Independently selected control with mined_from null. Standard YouTube Licence screen-capture is retained only under gitignored .studio/scratch/ and is not redistributable or published with the repository."
+}

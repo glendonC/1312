@@ -25,6 +25,7 @@ import {
 } from "./lib/bench-gold.mjs";
 import { fileReceipt, writeImmutableJson } from "./lib/immutable-receipts.mjs";
 import { loadLedger } from "./lib/memory-review.mjs";
+import { normalizeBenchSourceReceipt } from "./lib/source-receipts.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const schemaUrl = new URL("../bench/schemas/report.schema.json", import.meta.url);
@@ -455,6 +456,7 @@ if (existsSync(packsDir)) {
     const goldByClip = new Map();
     for (const clip of pack.clips) {
       if (clip.clip_id !== null) packClips.push({ pack_id: pack.pack_id, clip_id: clip.clip_id, status: clip.status });
+      if (clip.source !== null) normalizeBenchSourceReceipt(clip.source);
       if (clip.gold_path !== null) {
         const gold = await validateGold(await readJsonFile(join(packDir, clip.gold_path)), `pack ${pack.pack_id} gold ${clip.gold_path}`);
         assert(gold.pack_id === pack.pack_id && gold.clip_id === clip.clip_id, `pack ${pack.pack_id} gold ${clip.gold_path} names a different pack or clip`);
@@ -647,6 +649,59 @@ const temp = await mkdtemp(join(tmpdir(), "studio-bench-check-"));
 try {
   const packDir = join(temp, "packs", "drill-pack");
   const drillReviews = join(temp, "reviews");
+
+  const localEvalSource = {
+    schema: "studio.bench.source.local-eval-youtube.v1",
+    kind: "local_eval_youtube",
+    label: "Local-evaluation drill",
+    channel: "Drill channel",
+    url: "https://www.youtube.com/watch?v=drill-video",
+    video_id: "drill-video",
+    licence: "Standard YouTube licence — local evaluation copy only; NOT redistributable",
+    window: { start: "00:00:00", end: "00:00:02" },
+    duration: 2,
+    attribution: "Local-evaluation drill by Drill channel.",
+    local_copy: {
+      path: ".studio/scratch/drill/clip.mp4",
+      content_id: `sha256:${"0".repeat(64)}`,
+      bytes: 1,
+    },
+    redistribution: { allowed: false, public_path: null },
+    note: "Screen-capture held locally for bench; not published with the repo.",
+  };
+  normalizeBenchSourceReceipt(localEvalSource);
+  await rejects(
+    async () => normalizeBenchSourceReceipt({
+      ...localEvalSource,
+      local_copy: { ...localEvalSource.local_copy, path: "public/demo/clip.mp4" },
+    }),
+    /must stay under \.studio\/scratch/,
+    "a local-evaluation source admitted a public media path",
+  );
+  await rejects(
+    async () => normalizeBenchSourceReceipt({
+      ...localEvalSource,
+      redistribution: { allowed: true, public_path: "public/demo/clip.mp4" },
+    }),
+    /allowed must equal false/,
+    "a local-evaluation source admitted redistribution",
+  );
+  await rejects(
+    async () => normalizeBenchSourceReceipt({
+      kind: "youtube",
+      label: "Non-CC drill",
+      channel: "Drill channel",
+      video_id: "drill-video",
+      url: "https://www.youtube.com/watch?v=drill-video",
+      licence: "Standard YouTube licence",
+      window: { start: "00:00:00", end: "00:00:02" },
+      duration: 2,
+      attribution: "Drill attribution.",
+      note: "Drill note.",
+    }),
+    /not redistributable/,
+    "a Standard YouTube source entered the redistributable adapter",
+  );
 
   const goldFor = (clipId, drafter = "drafter-agent-01") => ({
     schema: "studio.bench.gold.v1",
@@ -1150,7 +1205,7 @@ try {
   }
 
   console.log(
-    "fail-closed drills passed: single-reviewer freeze, same-identity freeze, drafter self-review, mined control, backdated freeze, pre-registration, unlabelled line, label-for-nothing, unfrozen gold, split-window aggregation, withheld-shadowed emission, route conflict, training-clip-in-pack, contaminated proposal, masked unresolvable run, unresolvable run, unattributable evidence, unscored post-freeze capture, manifest gold",
+    "fail-closed drills passed: local-eval public-path, local-eval redistribution, non-CC redistribution, single-reviewer freeze, same-identity freeze, drafter self-review, mined control, backdated freeze, pre-registration, unlabelled line, label-for-nothing, unfrozen gold, split-window aggregation, withheld-shadowed emission, route conflict, training-clip-in-pack, contaminated proposal, masked unresolvable run, unresolvable run, unattributable evidence, unscored post-freeze capture, manifest gold",
   );
 } finally {
   await rm(temp, { recursive: true, force: true });

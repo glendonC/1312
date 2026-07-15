@@ -1,0 +1,262 @@
+{
+  "schema": "studio.bench.gold.v1",
+  "pack_id": "hard-ko-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "status": "candidate",
+  "drafter": "agent:gold-drafter-v1",
+  "source": {
+    "kind": "youtube",
+    "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+    "channel": "Didi's Korean Culture Podcast",
+    "licence": "Creative Commons Attribution license (reuse allowed)",
+    "window": {
+      "start": "00:05:10",
+      "end": "00:05:50",
+      "duration": 40
+    },
+    "attribution": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed)."
+  },
+  "mined_from": {
+    "path": "bench/candidates/run-006/candidates.json",
+    "content_id": "sha256:c4e6fa69698ece83ed3a75943f159286462f1bea60614b247a7cef2221124dce",
+    "bytes": 12970
+  },
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "korean_gold": "분들이 몇 분 계신데",
+      "english_guidance": "There are a few people, and/but… Preserve the unfinished continuation and the respectful people/counter reading of 분.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0000-0155-meaning-01",
+          "phenomenon": "ko.counter_homophone",
+          "facts": [
+            "The phrase refers to multiple people.",
+            "The utterance is incomplete and continues beyond this window."
+          ],
+          "catastrophic_if": [
+            "Treats 분 as minutes rather than people."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "korean_gold": "네",
+      "english_guidance": "A brief affirmative or attentive backchannel such as ‘yes,’ ‘right,’ or ‘okay.’",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0155-0195-backchannel-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker gives a brief affirmative or attentive acknowledgment."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "korean_gold": "어떤 분은 태국 갔다 오셨다고 했거든요. 근데 태국이 진짜 좋았다고 그러시더라구요.",
+      "english_guidance": "One person said they had been to Thailand, and said that Thailand was really good. Natural variants may render the honorific and reported-speech framing differently.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0195-0770-meaning-01",
+          "phenomenon": "none",
+          "facts": [
+            "A person is reported to have visited Thailand.",
+            "That person is reported to have found Thailand very good."
+          ],
+          "catastrophic_if": [
+            "Reverses the report into not visiting Thailand or disliking Thailand."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "korean_gold": "네",
+      "english_guidance": "A brief affirmative or attentive backchannel such as ‘yes,’ ‘right,’ or ‘okay.’",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1190-1235-backchannel-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker gives a brief affirmative or attentive acknowledgment."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 12.7,
+      "t_end": 13.6,
+      "korean_gold": "왜요 왜요?",
+      "english_guidance": "‘Why? Why?’ Preserve that the question is repeated.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1270-1360-question-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker asks why twice in immediate repetition."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 14,
+      "t_end": 18.8,
+      "korean_gold": "아니 그 예전에 코로나 사태 이전에 누나랑",
+      "english_guidance": "‘No/well, back before the COVID crisis, with my older sister…’ The next window confirms that 누나 is the male speaker’s biological older sister; this phrase remains unfinished.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1400-1880-kinship-01",
+          "phenomenon": "ko.kinship_address",
+          "facts": [
+            "The time is before the COVID crisis.",
+            "The speaker refers to being with his older sister.",
+            "The phrase is incomplete at the window boundary."
+          ],
+          "catastrophic_if": [
+            "Changes the older-sister relationship to a spouse, younger sibling, or unrelated person.",
+            "Places the event after COVID rather than before it."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 18.8,
+      "t_end": 19,
+      "korean_gold": "네",
+      "english_guidance": "A brief affirmative or attentive backchannel such as ‘yes,’ ‘right,’ or ‘okay.’",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1880-1900-backchannel-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker gives a brief affirmative or attentive acknowledgment."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 19,
+      "t_end": 19.15,
+      "korean_gold": "친누나가",
+      "english_guidance": "‘My biological older sister…’ The subject-marked fragment continues into the following speech.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1900-1915-kinship-01",
+          "phenomenon": "ko.kinship_address",
+          "facts": [
+            "The referent is the male speaker’s biological older sister.",
+            "The subject-marked phrase is incomplete."
+          ],
+          "catastrophic_if": [
+            "Changes 친누나 to a younger sister, spouse, or unrelated woman."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 19.15,
+      "t_end": 20.2,
+      "korean_gold": "네",
+      "english_guidance": "A brief affirmative or attentive backchannel such as ‘yes,’ ‘right,’ or ‘okay.’",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1915-2020-backchannel-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker gives a brief affirmative or attentive acknowledgment."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 20.2,
+      "t_end": 25.2,
+      "korean_gold": "그 막 그 매형이랑 태국에 한 달 살기를 하려고 했는데",
+      "english_guidance": "With her husband—the speaker’s brother-in-law—his older sister had planned to live in Thailand for a month, but… Preserve that this was an intention and that the clause is unfinished.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2020-2520-kinship-01",
+          "phenomenon": "ko.kinship_address",
+          "facts": [
+            "매형 refers to the male speaker’s older sister’s husband.",
+            "The plan was to live in Thailand for one month.",
+            "The construction expresses an intention and ends with an unfinished contrast or explanation."
+          ],
+          "catastrophic_if": [
+            "Misidentifies 매형 as the speaker’s own husband or as a different family relationship.",
+            "Turns the one-month Thailand plan into a completed stay in another place or for another duration."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 25.52,
+      "t_end": 28.12,
+      "korean_gold": "그 내용이 너무 바쁘셔가지고 남는 사람이",
+      "english_guidance": "The audio-grounded wording is transcribed as 그 내용이; it says the referent was very busy and leads into ‘the person left/available…’. Keep the referent unresolved and the phrase incomplete.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2552-2812-meaning-01",
+          "phenomenon": "none",
+          "facts": [
+            "A referent is described as very busy.",
+            "The phrase leads into identifying the person remaining or available and is incomplete."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 28.12,
+      "t_end": 28.32,
+      "korean_gold": "네.",
+      "english_guidance": "A brief affirmative or attentive backchannel such as ‘yes,’ ‘right,’ or ‘okay.’",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2812-2832-backchannel-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker gives a brief affirmative or attentive acknowledgment."
+          ],
+          "catastrophic_if": []
+        }
+      ]
+    },
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "korean_gold": "저밖에 없어서 그 공짜로 태국 한 달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한 달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어",
+      "english_guidance": "Because I was the only one available, I once got to live in Thailand for a month for free. I lived in Chiang Mai for a month; the neighborhood was very pretty and the people were very kind, and then the clip cuts off on ‘Korean…’. Preserve both one-month references and the unfinished ending.",
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2832-3987-meaning-01",
+          "phenomenon": "ko.numeral_boundary",
+          "facts": [
+            "The speaker was the only person remaining or available.",
+            "The speaker once lived in Thailand for one month for free.",
+            "The speaker lived in Chiang Mai for one month.",
+            "The neighborhood was very pretty and the people were very kind.",
+            "The utterance cuts off after beginning a phrase with 한국어."
+          ],
+          "catastrophic_if": [
+            "Changes the month-long Thailand and Chiang Mai stay to a different country, city, or duration.",
+            "Reverses the free stay into a paid stay or the kind people into hostile people."
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": "Audio-grounded via bench/MOM_LISTEN_PASS.md; informal unblinded listen (saw ‘Computer heard’); candidate only; NOT frozen; NOT dual-reviewed; NOT adjudicated; NOT scoreable."
+}

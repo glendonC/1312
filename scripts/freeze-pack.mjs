@@ -41,6 +41,7 @@ import {
   validatePack,
 } from "./lib/bench-gold.mjs";
 import { writeImmutableJson } from "./lib/immutable-receipts.mjs";
+import { normalizeBenchSourceReceipt } from "./lib/source-receipts.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const REVIEWS = join(ROOT, "bench/reviews");
@@ -121,6 +122,7 @@ try {
     const sourcePath = arg("source-json");
     if (!sourcePath) die("--source-json is required: a bench clip without recorded provenance is not evidence");
     const source = await readJsonFile(join(ROOT, sourcePath), "clip source provenance");
+    normalizeBenchSourceReceipt(source);
     if (pack.clips.some((other) => other.clip_id === clipId)) die(`clip ${clipId} is already in this pack`);
     clip.status = "sourced";
     clip.clip_id = clipId;

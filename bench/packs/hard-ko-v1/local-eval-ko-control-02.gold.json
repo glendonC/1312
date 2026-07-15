@@ -1,0 +1,86 @@
+{
+  "schema": "studio.bench.gold.v1",
+  "pack_id": "hard-ko-v1",
+  "clip_id": "local-eval-ko-control-02",
+  "status": "candidate",
+  "drafter": "agent:gold-drafter-v1",
+  "source": {
+    "kind": "local_eval_youtube",
+    "url": "https://www.youtube.com/watch?v=-OloSwDTomI",
+    "channel": "쿠팡플레이 Coupang Play",
+    "licence": "Standard YouTube licence — local evaluation copy only; NOT redistributable",
+    "window": {
+      "start": "00:04:19.799",
+      "end": "00:04:52.183",
+      "duration": 32.384,
+      "alignment": "approximate source alignment of the local screen capture"
+    },
+    "attribution": "\"대학전쟁 시즌 2 | 스페셜 티저 | 서고연카포 프로필 공개ㅣ 쿠팡플레이 | 쿠팡 | EN Subbed\" by 쿠팡플레이 Coupang Play; source credited for local evaluation only.",
+    "redistributable": false,
+    "note": "Screen-capture held locally for bench; not published with the repo. The operator does not own or control the copyright."
+  },
+  "mined_from": null,
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 11,
+      "korean_gold": "안녕하세요. 의대 대신 카이스트, 수시 정시 모두 섭렵. 카이스트 전산학부 23학번 오형석입니다. 수능을 못 보지는 않았는데 평소보다는 조금 못 봤거든요. 총 5개 틀렸었고요.",
+      "english_guidance": "Hello. The introduction contrasts medical school with KAIST and says both early and regular admissions were mastered. The speaker identifies themself as Oh Hyungseok, class of 2023 in KAIST's School of Computing, and says the CSAT result was not bad but slightly worse than usual, with five wrong in total.",
+      "critical_units": [
+        {
+          "id": "local-eval-ko-control-02-0000-1100-meaning-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker identifies themself as Oh Hyungseok, class of 2023 in KAIST's School of Computing.",
+            "The introduction contrasts medical school with KAIST and mentions both early and regular admissions.",
+            "The speaker says the CSAT result was slightly worse than usual but not bad, with five answers wrong in total."
+          ],
+          "catastrophic_if": [
+            "Changes the institution, department, class year, or total of five wrong answers, or says the result was better than usual."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 11,
+      "t_end": 22,
+      "korean_gold": "주변에서 의대를 진학하라는 어른들의 조언이 많긴 했는데 대학을 선택하는 게 사회에서의 제 첫 선택이잖아요. 이 정답이라고 말하는 길을 선택하게 되면 앞으로도 내가 주체적으로 무언가를 선택하기-",
+      "english_guidance": "The speaker says many adults around them advised attending medical school, but choosing a university was their first choice in society. They worried that choosing the path presented as the correct answer would make it difficult to choose things independently in the future; the sentence cuts off.",
+      "critical_units": [
+        {
+          "id": "local-eval-ko-control-02-1100-2200-meaning-01",
+          "phenomenon": "none",
+          "facts": [
+            "Many adults around the speaker advised them to attend medical school.",
+            "The speaker describes choosing a university as their first choice in society.",
+            "The speaker worries that taking the path others call the correct answer could make future independent choices difficult, and the thought is incomplete."
+          ],
+          "catastrophic_if": [
+            "Says the speaker was advised against medical school or preferred letting others make future choices."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 22,
+      "t_end": 32.384,
+      "korean_gold": "-힘들겠다는 생각이 들어서 열정이 이끄는 선택을 했습니다. 그래도 공대 공부를 할 때 가장 즐거운 것 같아서 후회는 없습니다",
+      "english_guidance": "The cut-in completes the concern that independent choice would be difficult, so the speaker made a choice led by passion. They say they seem happiest while studying engineering and therefore have no regrets.",
+      "critical_units": [
+        {
+          "id": "local-eval-ko-control-02-2200-32384-meaning-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker says the concern about future independent choice led them to make a choice guided by passion.",
+            "The speaker says they seem happiest when studying engineering.",
+            "The speaker says they have no regrets."
+          ],
+          "catastrophic_if": [
+            "Claims the choice was made without passion, that engineering makes the speaker unhappy, or that the speaker regrets the choice."
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": "Audio-grounded Korean copied window-for-window from .studio/scratch/control-02/LISTEN_PASS.md. Boundary hyphens are preserved and no text is merged across windows. Independently selected control with mined_from null. Standard YouTube Licence screen-capture is retained only under gitignored .studio/scratch/ and is not redistributable or published with the repository."
+}

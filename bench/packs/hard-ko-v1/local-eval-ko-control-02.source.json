@@ -1,0 +1,27 @@
+{
+  "schema": "studio.bench.source.local-eval-youtube.v1",
+  "kind": "local_eval_youtube",
+  "label": "대학전쟁 시즌 2 | 스페셜 티저 | 서고연카포 프로필 공개ㅣ 쿠팡플레이 | 쿠팡 | EN Subbed",
+  "channel": "쿠팡플레이 Coupang Play",
+  "url": "https://www.youtube.com/watch?v=-OloSwDTomI",
+  "video_id": "-OloSwDTomI",
+  "licence": "Standard YouTube licence — local evaluation copy only; NOT redistributable",
+  "provider_licence_reported": "NA",
+  "window": {
+    "start": "00:04:19.799",
+    "end": "00:04:52.183",
+    "alignment": "approximate source alignment of the local screen capture"
+  },
+  "duration": 32.384,
+  "attribution": "\"대학전쟁 시즌 2 | 스페셜 티저 | 서고연카포 프로필 공개ㅣ 쿠팡플레이 | 쿠팡 | EN Subbed\" by 쿠팡플레이 Coupang Play; source credited for local evaluation only.",
+  "local_copy": {
+    "path": ".studio/scratch/control-02/hyunseokInterviewTest.mp4",
+    "content_id": "sha256:48607e221bf5b12409e453171414667c9917c6eae7bdafa0497e2ffee76e4fc1",
+    "bytes": 9374608
+  },
+  "redistribution": {
+    "allowed": false,
+    "public_path": null
+  },
+  "note": "Screen-capture held locally for bench; not published with the repo. The operator does not own or control the copyright. This receipt is provenance, not permission to redistribute."
+}

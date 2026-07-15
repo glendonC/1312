@@ -1,0 +1,41 @@
+{
+  "review_id": "bench-review:sha256:08f3cbc91e6650140cd1a964a775eb12a790cd7e8edd646603f32b14b4339989",
+  "schema": "studio.bench.review.v1",
+  "pack_id": "hard-ko-v1",
+  "clip_id": "local-eval-ko-control-01",
+  "candidate": {
+    "path": "bench/packs/hard-ko-v1/local-eval-ko-control-01.gold.json",
+    "content_id": "sha256:0f9d513946ef219e917f1407547b0b81162c3d1ca0f284513434fd6862afca96",
+    "bytes": 5046
+  },
+  "reviewer": {
+    "name": "Bench Reviewer B",
+    "git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+  },
+  "drafter": "agent:gold-drafter-v1",
+  "blinded": true,
+  "action": "accept",
+  "reason": "Reviewer B accepts all three audio-grounded listen-sheet windows and the direct guidance and critical conditions. No system output exists for this control, so none was available or viewed.",
+  "unit_decisions": [
+    {
+      "t_start": 0,
+      "t_end": 10,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 10,
+      "t_end": 20,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 20,
+      "t_end": 28.629,
+      "action": "accept",
+      "note": null
+    }
+  ],
+  "minutes_spent": null,
+  "created_at": "2026-07-15T12:19:13.000Z"
+}

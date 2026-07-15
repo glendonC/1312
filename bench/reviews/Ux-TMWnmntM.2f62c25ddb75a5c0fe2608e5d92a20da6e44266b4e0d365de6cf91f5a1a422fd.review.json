@@ -1,0 +1,101 @@
+{
+  "review_id": "bench-review:sha256:2f62c25ddb75a5c0fe2608e5d92a20da6e44266b4e0d365de6cf91f5a1a422fd",
+  "schema": "studio.bench.review.v1",
+  "pack_id": "hard-ko-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "candidate": {
+    "path": "bench/packs/hard-ko-v1/Ux-TMWnmntM.gold.json",
+    "content_id": "sha256:c96513b7b0e5b4c644fdf4e2f8598677a9a783861b4dd7ecedcc530cbb10f605",
+    "bytes": 10313
+  },
+  "reviewer": {
+    "name": "Bench Reviewer A",
+    "git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+  },
+  "drafter": "agent:gold-drafter-v1",
+  "blinded": true,
+  "action": "accept",
+  "reason": "Reviewer A confirms a clean source-media-and-candidate-only listen of every exact window and accepts the Korean transcription, non-canonical English guidance, critical-unit facts, phenomena, and catastrophic conditions for all 13 units.",
+  "unit_decisions": [
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 12.7,
+      "t_end": 13.6,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 14,
+      "t_end": 18.8,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 18.8,
+      "t_end": 19,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 19,
+      "t_end": 19.15,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 19.15,
+      "t_end": 20.2,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 20.2,
+      "t_end": 25.2,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 25.52,
+      "t_end": 28.12,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 28.12,
+      "t_end": 28.32,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "action": "accept",
+      "note": null
+    }
+  ],
+  "minutes_spent": null,
+  "created_at": "2026-07-15T00:07:37.000Z"
+}

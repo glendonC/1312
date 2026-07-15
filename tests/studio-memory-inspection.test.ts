@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import * as memoryInspection from "../src/studio/runtime/production/memory/inspection.ts";
 import {
   consumeAcceptedMemorySnapshotForRun,
   inspectMemoryReviewArtifacts,
   memoryContentId,
 } from "../src/studio/runtime/production/memory/inspection.ts";
+import { evaluateMemoryLedger } from "../src/studio/runtime/production/memory/ledgerEvaluation.ts";
+import { validateMemoryMaterializationLinks } from "../src/studio/runtime/production/memory/materialization.ts";
 import {
   MEMORY_REVIEW_SCHEMAS,
   type MemoryConsumptionReceipt,
@@ -235,6 +238,14 @@ async function lifecycle() {
   };
 }
 
+test("memory inspection preserves its exact public export surface", () => {
+  assert.deepEqual(Object.keys(memoryInspection).sort(), [
+    "consumeAcceptedMemorySnapshotForRun",
+    "inspectMemoryReviewArtifacts",
+    "memoryContentId",
+  ]);
+});
+
 test("memory inspection projects proposal, supersession, rollback, and materialization receipts", async () => {
   const fixture = await lifecycle();
   const inspection = await inspectMemoryReviewArtifacts(fixture.artifacts);
@@ -405,5 +416,80 @@ test("consumption receipts cannot substitute a different snapshot identity", asy
   await assert.rejects(
     () => inspectMemoryReviewArtifacts([...fixture.artifacts, receipt]),
     /snapshot_content_id does not match the accepted snapshot/,
+  );
+});
+
+test("memory receipt parsing remains closed before ledger evaluation", async () => {
+  const fixture = await lifecycle();
+  await assert.rejects(
+    () => inspectMemoryReviewArtifacts([{ ...fixture.first, approved: true }]),
+    { message: /^memory inspection: artifacts\[0\]\.approved is not allowed$/ },
+  );
+});
+
+test("memory ledger decisions remain independent from their proposer", async () => {
+  const proposal = await makeProposal({
+    key: "독립 검토",
+    gloss: "independent review",
+    proposedBy: "reviewer:same-person",
+    createdAt: "2026-07-14T12:00:00.000Z",
+  });
+  const decision = await makeDecision({
+    proposal,
+    action: "accept",
+    reviewer: proposal.proposed_by,
+    reason: "A proposer cannot approve their own cross-run memory.",
+    createdAt: "2026-07-14T12:01:00.000Z",
+  });
+
+  await assert.rejects(
+    () => inspectMemoryReviewArtifacts([proposal, decision]),
+    {
+      message:
+        /^memory inspection: decision memory-decision:sha256:[a-f0-9]{64}\.decided_by must differ from the proposer$/,
+    },
+  );
+});
+
+test("materializations cannot misstate evaluated proposal status", async () => {
+  const fixture = await lifecycle();
+  const { materialization_id: _materializationId, ...body } = structuredClone(fixture.firstSnapshot);
+  body.proposal_receipts[0].status = "rejected";
+  const misstated = await identified("memory-materialization", "materialization_id", body);
+
+  await assert.rejects(
+    () => inspectMemoryReviewArtifacts([fixture.legacy, fixture.first, fixture.firstAcceptance, misstated]),
+    {
+      message:
+        /^memory inspection: materialization memory-materialization:sha256:[a-f0-9]{64} misstates review status for memory-proposal:sha256:[a-f0-9]{64}$/,
+    },
+  );
+});
+
+test("ledger evaluation independently derives rollback heads", async () => {
+  const fixture = await lifecycle();
+  const evaluated = await evaluateMemoryLedger(
+    [fixture.first, fixture.replacement],
+    [fixture.firstAcceptance, fixture.replacementAcceptance, fixture.revocation],
+  );
+
+  assert.equal(evaluated.states.get(fixture.replacement.proposal_id)?.status, "revoked");
+  assert.equal([...evaluated.heads.values()][0]?.proposal_id, fixture.first.proposal_id);
+});
+
+test("materialization verification independently validates receipt closure", async () => {
+  const fixture = await lifecycle();
+  await validateMemoryMaterializationLinks(
+    fixture.rollbackSnapshot,
+    new Map([
+      [fixture.first.proposal_id, fixture.first],
+      [fixture.replacement.proposal_id, fixture.replacement],
+    ]),
+    new Map([
+      [fixture.firstAcceptance.decision_id, fixture.firstAcceptance],
+      [fixture.replacementAcceptance.decision_id, fixture.replacementAcceptance],
+      [fixture.revocation.decision_id, fixture.revocation],
+    ]),
+    new Map([[fixture.legacy.snapshot_id, fixture.legacy]]),
   );
 });

@@ -1,10 +1,15 @@
 /** Compatibility facade for the independently testable production validation domains. */
 export {
   assertRuntimeArtifact,
+  assertPreflightEvidenceArtifactDescriptor,
   assertSourceArtifactDescriptor,
   assertWorkerOutputEnvelope,
 } from "./validation/artifacts.ts";
 export { assertRuntimeEvent } from "./validation/events.ts";
+export {
+  assertEvidenceReadRequest,
+  validateEvidenceReadReceipt,
+} from "./validation/evidence.ts";
 export {
   assertReportDecisionRequest,
   assertReportSubmitRequest,

@@ -1,5 +1,6 @@
 import type { RuntimeEvent } from "../protocol.ts";
 import { validateRuntimeArtifact } from "./artifacts.ts";
+import { assertEvidenceReadRequest, validateEvidenceReadReceipt } from "./evidence.ts";
 import {
   validateExecutorSpanReceipt,
   validateModelUsageReceipt,
@@ -12,6 +13,7 @@ import {
 } from "./media.ts";
 import {
   boolean,
+  contentId,
   exact,
   fail,
   integer,
@@ -73,7 +75,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "handoff_host", "launcher"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "handoff_host", "launcher"]),
     context,
     "event.producer.kind",
   );
@@ -169,6 +171,22 @@ export function assertRuntimeEvent(
     string(data.outputArtifactId, context, "event.data.outputArtifactId");
     validateMediaOperationReceipt(data.receipt, context, "event.data.receipt");
   } else if (type === "media.operation_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.reason, context, "event.data.reason");
+  } else if (type === "evidence.read_started") {
+    exact(data, ["request", "grantId", "evidenceKind", "maxBytes", "maxItems"], context, "event.data");
+    assertEvidenceReadRequest(data.request, context);
+    string(data.grantId, context, "event.data.grantId");
+    oneOf(data.evidenceKind, new Set(["speech_activity", "language_ranges"]), context, "event.data.evidenceKind");
+    integer(data.maxBytes, context, "event.data.maxBytes", 1);
+    integer(data.maxItems, context, "event.data.maxItems", 1);
+  } else if (type === "evidence.read_completed") {
+    exact(data, ["operationId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateEvidenceReadReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "evidence.read_failed") {
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     string(data.reason, context, "event.data.reason");

@@ -27,7 +27,7 @@ async function openCompletedDeterministicProjection(page: Page): Promise<Locator
   return status.getByRole("region", { name: "Production task and handoff facts" });
 }
 
-test("receipted child media operation and artifact identity hooks project outside replay", async ({ page }, testInfo) => {
+test("receipted child media/evidence operations and artifact identity hooks project outside replay", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one deterministic projection covers identity hooks");
   test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
 
@@ -50,6 +50,28 @@ test("receipted child media operation and artifact identity hooks project outsid
       await page.evaluate((target) => Boolean(target && document.getElementById(target.slice(1))), href),
     ).toBe(true);
   }
+
+  const evidenceArtifacts = production.locator('[data-production-region="evidence-artifacts"]');
+  await expect(evidenceArtifacts.getByRole("heading", { name: "Evidence artifacts" })).toBeVisible();
+  await expect(evidenceArtifacts.locator('[data-production-empty="evidence-artifacts"]')).toHaveCount(0);
+  await expect(evidenceArtifacts.locator('[data-production-evidence-artifact-id]')).toHaveCount(2);
+  await expect(evidenceArtifacts.locator('[data-evidence-kind="speech_activity"]')).toHaveCount(1);
+  await expect(evidenceArtifacts.locator('[data-evidence-kind="language_ranges"]')).toHaveCount(1);
+
+  const evidenceReads = production.locator('[data-production-region="evidence-reads"]');
+  await expect(evidenceReads.getByRole("heading", { name: "Evidence reads" })).toBeVisible();
+  await expect(evidenceReads.locator('[data-production-empty="evidence-reads"]')).toHaveCount(0);
+  const reads = evidenceReads.locator('[data-production-evidence-read-id]');
+  await expect(reads).toHaveCount(2);
+  await expect(evidenceReads.locator('[data-production-evidence-read-id][data-status="completed"]')).toHaveCount(2);
+  await expect(evidenceReads.getByText("64 items / 32768 bytes")).toHaveCount(2);
+  await expect(evidenceReads.getByText(/^evidence-read:/)).toHaveCount(2);
+  await expect(evidenceReads.locator('[data-production-navigation="artifact"]')).toHaveCount(2);
+
+  const evidenceGrant = production.locator('[data-production-grant-id]').filter({ hasText: "evidence.read" });
+  await expect(evidenceGrant).toHaveCount(1);
+  await expect(evidenceGrant.getByText(/speech_activity/)).toBeVisible();
+  await expect(evidenceGrant.getByText(/language_ranges/)).toBeVisible();
 
   await expect(production.locator('[data-production-region="operations"]')).toBeVisible();
   await expect(production.getByRole("heading", { name: "Production operations" })).toBeVisible();

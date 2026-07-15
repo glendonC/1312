@@ -15,6 +15,7 @@ import type {
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
+import { MAX_EVIDENCE_READ_BYTES, MAX_EVIDENCE_READ_ITEMS } from "./validation/scheduling.ts";
 
 export interface RuntimeIdentityFactory {
   next(kind: "request" | "task" | "agent" | "grant"): string;
@@ -78,7 +79,12 @@ export class BoundedRuntimeScheduler {
     assertRuntimeLimits(limits);
   }
 
-  private grants(taskId: string, agentId: string, input: SpawnRequestInput): CapabilityGrant[] {
+  private grants(
+    state: RuntimeProjection,
+    taskId: string,
+    agentId: string,
+    input: SpawnRequestInput,
+  ): CapabilityGrant[] {
     return [...input.requiredCapabilities]
       .sort()
       .map((capability) => ({
@@ -87,6 +93,23 @@ export class BoundedRuntimeScheduler {
         taskId,
         agentId,
         mediaScope: capability.startsWith("media.") ? structuredClone(input.mediaScope) : [],
+        evidenceScope: capability === "evidence.read"
+          ? input.inputArtifactIds
+              .map((artifactId) => state.artifacts[artifactId])
+              .filter((artifact) => artifact?.origin.kind === "preflight_evidence")
+              .map((artifact) => {
+                if (artifact.origin.kind !== "preflight_evidence") {
+                  throw new Error("Scheduler evidence scope changed during grant construction");
+                }
+                return {
+                  artifactId: artifact.id,
+                  evidenceKind: artifact.origin.evidenceKind,
+                  maxBytes: MAX_EVIDENCE_READ_BYTES,
+                  maxItems: MAX_EVIDENCE_READ_ITEMS,
+                };
+              })
+              .sort((left, right) => left.artifactId.localeCompare(right.artifactId))
+          : [],
       }));
   }
 
@@ -102,11 +125,13 @@ export class BoundedRuntimeScheduler {
     });
   }
 
-  private capabilityValid(input: SpawnRequestInput): boolean {
+  private capabilityValid(state: RuntimeProjection, input: SpawnRequestInput): boolean {
     return (
       input.requiredCapabilities.length > 0 &&
       input.requiredCapabilities.every((capability) => this.limits.grantableCapabilities.includes(capability)) &&
-      (!input.requiredCapabilities.some((capability) => capability.startsWith("media.")) || input.mediaScope.length > 0)
+      (!input.requiredCapabilities.some((capability) => capability.startsWith("media.")) || input.mediaScope.length > 0) &&
+      (!input.requiredCapabilities.includes("evidence.read") ||
+        input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence"))
     );
   }
 
@@ -123,7 +148,7 @@ export class BoundedRuntimeScheduler {
           throw new Error("Root task requires at least one required output");
         }
         if (!this.scopeValid(state, input)) throw new Error("Root task media scope is not backed by registered artifacts");
-        if (!this.capabilityValid(input)) throw new Error("Root task requests an unavailable capability");
+        if (!this.capabilityValid(state, input)) throw new Error("Root task requests an unavailable capability");
         if (input.dependencies.length !== 0) throw new Error("Root task cannot have dependencies");
         if (
           input.budget.wallMs > this.limits.runBudget.wallMs ||
@@ -156,7 +181,7 @@ export class BoundedRuntimeScheduler {
           requiredOutputs: structuredClone(input.requiredOutputs),
           dependencies: [],
           budget: { ...input.budget },
-          grants: this.grants(taskId, agentId, input),
+          grants: this.grants(state, taskId, agentId, input),
           status: "scheduled",
         };
         return {
@@ -205,7 +230,7 @@ export class BoundedRuntimeScheduler {
     ) {
       return "scope_violation";
     }
-    if (!this.capabilityValid(input)) return "capability_not_grantable";
+    if (!this.capabilityValid(state, input)) return "capability_not_grantable";
     const total = allocated(state);
     if (
       total.wallMs + input.budget.wallMs > this.limits.runBudget.wallMs ||
@@ -252,7 +277,7 @@ export class BoundedRuntimeScheduler {
         const parent = state.tasks[requestedByTaskId];
         const taskId = this.identities.next("task");
         const agentId = this.identities.next("agent");
-        const grants = this.grants(taskId, agentId, input);
+        const grants = this.grants(state, taskId, agentId, input);
         const permit: LaunchPermit = {
           requestId,
           taskId,

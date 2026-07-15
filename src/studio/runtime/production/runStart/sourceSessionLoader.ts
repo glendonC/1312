@@ -17,6 +17,7 @@ import {
 import { canonicalSha256, identifyFile } from "../artifactStore.ts";
 import type {
   ContentIdentity,
+  PreflightEvidenceArtifactDescriptor,
   ProductionSourceSession,
   SourceArtifactDescriptor,
 } from "../model.ts";
@@ -32,6 +33,7 @@ export interface LoadedOwnedSourceSession {
     rightsScope: ProductionSourceSession["sourceReceipt"]["rightsScope"];
   };
   directory: string;
+  evidenceDescriptors: PreflightEvidenceArtifactDescriptor[];
 }
 
 function contained(root: string, candidate: string, label: string): string {
@@ -169,6 +171,39 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
   }
   const preflightContent = await identifyFile(await containedFile(directory, preflightName, preflightName));
 
+  const evidenceDescriptors: PreflightEvidenceArtifactDescriptor[] = [];
+  const appendEvidence = async (
+    artifactId: string | null,
+    evidenceKind: PreflightEvidenceArtifactDescriptor["evidenceKind"],
+  ): Promise<void> => {
+    if (artifactId === null) return;
+    const artifact = preflight.artifacts.find((candidate) => candidate.artifact_id === artifactId);
+    const measured = measuredArtifacts.get(artifactId);
+    if (!artifact || !measured) {
+      throw new Error(`Local source session: ${evidenceKind} finding has no indexed receipt`);
+    }
+    const expectedKind = evidenceKind === "speech_activity"
+      ? "speech_activity_receipt"
+      : "language_ranges_receipt";
+    if (artifact.kind !== expectedKind || artifact.class !== "receipt") {
+      throw new Error(`Local source session: ${evidenceKind} finding is not its producer receipt`);
+    }
+    evidenceDescriptors.push({
+      schema: "studio.preflight-evidence-artifact.v1",
+      evidenceKind,
+      receiptSchema: evidenceKind === "speech_activity"
+        ? "studio.speech-activity.v1"
+        : "studio.language-ranges.v1",
+      producerId: evidenceKind === "speech_activity" ? "silero-vad" : "whisper-language-id",
+      path: await containedFile(directory, artifact.path, `${evidenceKind} evidence`),
+      content: measured,
+      preflightId: preflight.preflight_id,
+      preflightContentId: preflightContent.contentId,
+    });
+  };
+  await appendEvidence(preflight.findings.speech_activity, "speech_activity");
+  await appendEvidence(preflight.findings.language_ranges, "language_ranges");
+
   const languageEvidence = preflight.findings.language_ranges === null
     ? []
     : [
@@ -243,5 +278,6 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
       rightsScope: source.rights.scope,
     },
     directory,
+    evidenceDescriptors,
   };
 }

@@ -388,7 +388,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.workers.length, 2);
     assert.deepEqual(
       inspector.projection.grants.map((grant) => grant.capability).sort(),
-      ["media.seek", "report.submit", "task.spawn.request"],
+      ["evidence.read", "media.seek", "report.submit", "task.spawn.request"],
     );
     assert.equal(inspector.projection.reports.length, 1);
     assert.equal(inspector.projection.reports[0].status, "accepted");
@@ -397,11 +397,29 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.spawnRequests[0].requestedByTaskId, inspector.projection.tasks[0].taskId);
     assert.deepEqual(
       inspector.projection.spawnRequests[0].requiredCapabilities,
-      ["media.seek", "report.submit"],
+      ["evidence.read", "media.seek", "report.submit"],
     );
     assert.equal(inspector.projection.operations.length, 1);
     assert.equal(inspector.projection.operations[0].capability, "media.seek");
     assert.equal(inspector.projection.operations[0].status, "completed");
+    assert.equal(inspector.projection.evidenceArtifacts.length, 2);
+    assert.deepEqual(
+      inspector.projection.evidenceArtifacts.map((artifact) => artifact.evidenceKind).sort(),
+      ["language_ranges", "speech_activity"],
+    );
+    assert.equal(inspector.projection.evidenceReads.length, 2);
+    assert.ok(inspector.projection.evidenceReads.every((read) =>
+      read.status === "completed" &&
+      read.returnedItems !== null &&
+      read.returnedFactBytes !== null &&
+      read.returnedFactBytes <= read.maxBytes &&
+      read.returnedItems <= read.maxItems &&
+      read.receiptId !== null &&
+      read.receiptContentId !== null));
+    const evidenceGrant = inspector.projection.grants.find((grant) => grant.capability === "evidence.read");
+    assert.ok(evidenceGrant);
+    assert.equal(evidenceGrant.evidenceScope.length, 2);
+    assert.ok(evidenceGrant.evidenceScope.every((scope) => scope.maxBytes === 32 * 1024 && scope.maxItems === 64));
     assert.equal(inspector.projection.outputArtifacts.length, 2);
     const workerOutput = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "worker_output");
     const seekObservation = inspector.projection.outputArtifacts.find((artifact) => artifact.origin.kind === "media_observation");

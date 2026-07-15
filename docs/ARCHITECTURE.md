@@ -126,24 +126,35 @@ Production work lives under `src/studio/runtime/production/` and does not import
 The production runtime provides a versioned event protocol, append-only journal, pure projection,
 bounded scheduler, dynamic registry, content-addressed artifact store, centralized authorization,
 one real ffmpeg audio-range extraction operation, one bounded ffmpeg seek observation, structured
-child report-up, and a bounded local `codex exec` launcher.
+child report-up, bounded reads of already-produced pinned speech/language evidence, and a bounded
+local `codex exec` launcher.
 Media scopes use exact track ids and half-open integer-millisecond ranges. The scheduler derives
 task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
 state. The media host re-hashes its source before execution and accepts no caller path or arbitrary
 executable arguments. Extraction records tool, input/output, grant, range, receipt, and derived
 lineage; bounded seek decodes the granted audio interval to a null sink and stores its receipt as a
 content-addressed non-media observation artifact with raw-source lineage.
+The owned-source adapter registers only producer-validated V2/V3 speech-activity and language-range
+receipts as private content-addressed runtime artifacts. `evidence.read` grants name exact artifact
+identities with hard byte and fact-count limits. The evidence host rechecks live ownership, the
+exact grant, combined task tool-call budget, stored content identity, receipt schema/producer, and
+preflight/source lineage before returning bounded structured windows or decisions in another
+content-addressed receipt. It accepts no path, range, query, or caller-selected output bound, exposes
+no raw media bytes, and creates no detector finding.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
 read-only sandbox, no host environment inherited by model-generated shell commands, JSONL events,
 and a closed output schema. For tasks with `media.extract` and/or `media.seek` grants, it also starts
-a task-private authenticated loopback bridge plus a required stdio MCP adapter. The adapter publishes
-only the scheduler-granted tool names and exact scopes. Child requests cannot choose paths, process
-arguments, task/agent identity, or operation ids; the existing ffmpeg capability host remains the
-authority for live ownership, budget, source hash, range, journal events, artifacts, and receipts.
+a task-private authenticated loopback bridge plus a required stdio MCP adapter. A separate required
+bridge/MCP pair exposes `evidence_read` only when an `evidence.read` grant is present. The adapters
+publish only scheduler-granted tool names and exact scopes. Child requests cannot choose paths,
+process arguments, task/agent identity, operation ids, or evidence excerpt controls; the ffmpeg and
+evidence hosts remain the authorities for live ownership, budgets, stored content identity, journal
+events, artifacts, and receipts.
 Validated output becomes a private content-addressed worker artifact and is submitted through the
-existing handoff host. A missing completed operation for any granted media capability fails closed.
+existing handoff host. A missing completed operation for any granted media capability, or a missing
+completed read for any evidence artifact in a grant, fails closed.
 
 Executor events receipt monotonic active duration and the CLI version. The launcher consumes the
 documented `turn.completed.usage` object rather than logs or budgets, stores the exact raw usage event
@@ -157,8 +168,10 @@ production adapter folds `studio.runtime.event.v1` directly and `/studio/runtime
 operator-selected local journal; neither creates a `RunBundle` nor inserts local activity into a
 recorded demo. Step, loop, mark, track selection, frames, live control acknowledgement, and
 detector/model tool calls remain unavailable capabilities rather than UI claims. The bounded child
-bridge returns receipt and artifact identities, not media bytes or semantic findings, and a seek does
-not drive a UI playhead.
+media bridge returns receipt and artifact identities, not media bytes or semantic findings, and a
+seek does not drive a UI playhead. The evidence bridge may return only the bounded facts that were
+already in a pinned producer receipt; empty, unavailable, unknown, withheld, and truncated are not
+converted into new claims.
 
 ### Explicitly deferred
 

@@ -20,19 +20,22 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
 - an append-only NDJSON event journal and pure replay projection;
 - a bounded scheduler that derives task ids, depth, parentage, ownership, grants, and reservations;
 - a dynamic registry that registers only a scheduler-issued launch permit;
-- a content-addressed artifact store with closed ingest and media-operation origins;
+- a content-addressed artifact store with closed ingest, preflight-evidence, and media-operation origins;
 - a capability host that performs real, scoped ffmpeg audio-range extraction and bounded audio seek
   observation, with content-addressed receipts and source lineage;
 - a task-private child bridge that publishes only scheduler-granted `media_extract`/`media_seek`,
   accepts no caller paths or operation ids, and delegates authorization, budget, source, range,
   journal, artifact, and receipt authority to that capability host;
+- an `evidence.read` host plus separate task-private bridge that publishes only `evidence_read`,
+  accepts only an exact scheduler-granted artifact id, injects task/agent/operation identity, and
+  returns bounded facts from already-validated pinned VAD/language receipts with original lineage;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
 The exact runtime test executes that path against the receipted run-005 media and reopens the event
 journal to prove replay equivalence. It also rejects fixture-only input, provider-field leakage,
-duplicate work, limit violations, scope escalation, invalid registration, source-byte drift,
-unauthorized media calls, caller-controlled paths, malformed requests, changed receipt lineage, and
-invalid handoffs.
+duplicate work, limit violations, scope escalation, invalid registration, source/evidence-byte
+drift, unauthorized media/evidence calls, caller-controlled paths, malformed requests, changed
+receipt lineage, and invalid handoffs.
 
 This does not make the Studio live. A bounded local `codex exec` worker launcher and a separate
 production-journal Studio adapter now exist, but `/studio/runtime/` is an inspector and does not
@@ -42,10 +45,13 @@ output-artifact lineage, and report facts without creating a `RunBundle`, legacy
 agent. The source region exposes only validated ingest-origin identity and content facts, and
 artifact references link only when their source/output destination is rendered. The deterministic
 host exercises one real bounded seek plus worker-output receipt/report lineage. No hosted runtime
-service or live control acknowledgement producer exists. The launcher can expose `media_extract`
-and/or `media_seek` only for matching live task grants, in addition to the closed structured report
-output. `media.extract` and `media.seek` are real scheduler/host/child-bridge capabilities; the other
-media operations and detector/model calls in this proposal remain unavailable. The tables below
+service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
+`media_seek`, and/or `evidence_read` only for matching live task grants, in addition to the closed
+structured report output. `evidence.read` is not a detector call: it reads registered, immutable
+V2/V3 receipt artifacts under per-artifact 32 KiB/64-fact ceilings and the shared task tool-call
+budget. V1 and absent receipts produce no grant and no finding. `media.extract`, `media.seek`, and
+`evidence.read` are real scheduler/host/child-bridge capabilities; the other media operations and
+detector/model calls in this proposal remain unavailable. The tables below
 continue to document the fixture contract itself and should not be read as the production wire
 schema.
 

@@ -9,6 +9,7 @@ export const CAPABILITIES = [
   "report.submit",
   "media.extract",
   "media.seek",
+  "evidence.read",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -33,6 +34,16 @@ export interface MediaScope {
   trackId: string;
   startMs: number;
   endMs: number;
+}
+
+export type EvidenceKind = "speech_activity" | "language_ranges";
+
+/** Scheduler-issued, artifact-exact response budget for one existing evidence receipt. */
+export interface EvidenceReadScope {
+  artifactId: string;
+  evidenceKind: EvidenceKind;
+  maxBytes: number;
+  maxItems: number;
 }
 
 export interface RequiredOutput {
@@ -94,6 +105,7 @@ export interface CapabilityGrant {
   taskId: string;
   agentId: string;
   mediaScope: MediaScope[];
+  evidenceScope: EvidenceReadScope[];
 }
 
 export interface AgentRecord {
@@ -135,6 +147,18 @@ export interface SourceArtifactDescriptor {
   content: ContentIdentity;
   durationMs: number;
   tracks: MediaTrackDescriptor[];
+}
+
+/** Host-only descriptor for producer-validated evidence that existed before runtime start. */
+export interface PreflightEvidenceArtifactDescriptor {
+  schema: "studio.preflight-evidence-artifact.v1";
+  evidenceKind: EvidenceKind;
+  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
+  producerId: "silero-vad" | "whisper-language-id";
+  path: string;
+  content: ContentIdentity;
+  preflightId: string;
+  preflightContentId: string;
 }
 
 export interface ProductionSourceSession {
@@ -228,6 +252,15 @@ export interface WorkerOutputArtifactOrigin {
   receiptContentId: string;
 }
 
+export interface PreflightEvidenceArtifactOrigin {
+  kind: "preflight_evidence";
+  evidenceKind: EvidenceKind;
+  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
+  producerId: "silero-vad" | "whisper-language-id";
+  preflightId: string;
+  preflightContentId: string;
+}
+
 export interface RuntimeArtifact {
   schema: "studio.runtime.artifact.v1";
   id: string;
@@ -246,7 +279,8 @@ export interface RuntimeArtifact {
     | SourceArtifactOrigin
     | MediaOperationArtifactOrigin
     | MediaObservationArtifactOrigin
-    | WorkerOutputArtifactOrigin;
+    | WorkerOutputArtifactOrigin
+    | PreflightEvidenceArtifactOrigin;
 }
 
 export interface WorkerOutputEnvelope {
@@ -381,6 +415,75 @@ export interface MediaSeekObservationReceipt {
 
 export type MediaOperationReceipt = MediaExtractReceipt | MediaSeekObservationReceipt;
 
+export interface SpeechWindowEvidenceFact {
+  kind: "speech_window" | "non_speech_window";
+  index: number;
+  startSample: number;
+  endSample: number;
+  startMs: number;
+  endMs: number;
+}
+
+export interface LanguageRangeEvidenceFact {
+  kind: "language_range";
+  speechWindowIndex: number;
+  chunkIndex: number;
+  startSample: number;
+  endSample: number;
+  startMs: number;
+  endMs: number;
+  decision: {
+    status: "classified" | "unknown" | "withheld";
+    code: string | null;
+    probability: number | null;
+    margin: number | null;
+    reason: string | null;
+  };
+}
+
+export type EvidenceFact = SpeechWindowEvidenceFact | LanguageRangeEvidenceFact;
+
+export interface EvidenceReadRequest {
+  operationId: string;
+  taskId: string;
+  agentId: string;
+  artifactId: string;
+}
+
+export interface EvidenceReadReceipt {
+  schema: "studio.evidence-read.receipt.v1";
+  receiptId: string;
+  operationId: string;
+  capability: "evidence.read";
+  authorization: {
+    grantId: string;
+    taskId: string;
+    agentId: string;
+    maxBytes: number;
+    maxItems: number;
+  };
+  input: {
+    artifactId: string;
+    contentId: string;
+    bytes: number;
+    evidenceKind: EvidenceKind;
+    receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
+  };
+  producer: { id: "studio.bounded-evidence-read"; version: "1" };
+  facts: EvidenceFact[];
+  result: {
+    availableItems: number;
+    returnedItems: number;
+    returnedFactBytes: number;
+    truncated: boolean;
+  };
+  lineage: {
+    preflightId: string;
+    preflightContentId: string;
+    sourceArtifactIds: string[];
+  };
+}
+
 export interface OperationRecord {
   id: string;
   capability: "media.extract" | "media.seek";
@@ -394,6 +497,24 @@ export interface OperationRecord {
   status: "started" | "completed" | "failed";
   outputArtifactId: string | null;
   receiptId: string | null;
+  failure: string | null;
+}
+
+export interface EvidenceReadRecord {
+  id: string;
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  artifactId: string;
+  evidenceKind: EvidenceKind;
+  maxBytes: number;
+  maxItems: number;
+  status: "started" | "completed" | "failed";
+  receiptId: string | null;
+  receiptContentId: string | null;
+  returnedItems: number | null;
+  returnedFactBytes: number | null;
+  truncated: boolean | null;
   failure: string | null;
 }
 
@@ -520,6 +641,7 @@ export interface RuntimeProjection {
   artifacts: Record<string, RuntimeArtifact>;
   spawnRequests: Record<string, SpawnRequestRecord>;
   operations: Record<string, OperationRecord>;
+  evidenceReads: Record<string, EvidenceReadRecord>;
   executions: Record<string, ExecutorRecord>;
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;

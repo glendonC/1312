@@ -3,6 +3,7 @@ import { open } from "node:fs/promises";
 import { ContentAddressedArtifactStore } from "../artifactStore.ts";
 import { FileEventJournal, RuntimeLedger } from "../journal.ts";
 import { FfmpegCapabilityHost } from "../mediaHost.ts";
+import { BoundedEvidenceReadHost } from "../evidenceHost.ts";
 import {
   CodexExecWorkerLauncher,
   type CodexWorkerLauncherOptions,
@@ -24,8 +25,8 @@ import type { InitializedRuntimeApplication } from "./model.ts";
 export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 1,
   maxActiveWorkers: 2,
-  runBudget: { wallMs: 120_000, toolCalls: 4 },
-  grantableCapabilities: ["task.spawn.request", "report.submit", "media.extract", "media.seek"],
+  runBudget: { wallMs: 120_000, toolCalls: 8 },
+  grantableCapabilities: ["task.spawn.request", "report.submit", "media.extract", "media.seek", "evidence.read"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {
@@ -45,6 +46,7 @@ export interface BoundedWorkerLauncherContext {
   artifacts: ContentAddressedArtifactStore;
   reports: BoundedReportHost;
   mediaHost: FfmpegCapabilityHost;
+  evidenceHost: BoundedEvidenceReadHost;
   plannedMediaOperationId: string;
 }
 
@@ -55,10 +57,11 @@ export type BoundedWorkerLauncherFactory = (
 export function codexWorkerLauncherFactory(
   options: CodexWorkerLauncherOptions = {},
 ): BoundedWorkerLauncherFactory {
-  return ({ ledger, scheduler, artifacts, reports, mediaHost, plannedMediaOperationId }) =>
+  return ({ ledger, scheduler, artifacts, reports, mediaHost, evidenceHost, plannedMediaOperationId }) =>
     new CodexExecWorkerLauncher(ledger, scheduler, artifacts, reports, {
       ...options,
       mediaHost: options.mediaHost ?? mediaHost,
+      evidenceHost: options.evidenceHost ?? evidenceHost,
       nextMediaOperationId: options.nextMediaOperationId ?? (() => plannedMediaOperationId),
     });
 }
@@ -85,6 +88,10 @@ export async function initializeRuntimeApplication(
 ): Promise<InitializedRuntimeApplication> {
   const artifacts = new ContentAddressedArtifactStore(input.artifactStoreRoot);
   const sourceArtifact = await artifacts.registerSource(input.runtimeId, input.loadedSource.descriptor);
+  const evidenceArtifacts = await Promise.all(
+    input.loadedSource.evidenceDescriptors.map((descriptor) =>
+      artifacts.registerPreflightEvidence(input.runtimeId, sourceArtifact.id, descriptor)),
+  );
   const runStart = createRuntimeStart({
     runId: input.runtimeId,
     journalId: input.journalId,
@@ -108,6 +115,7 @@ export async function initializeRuntimeApplication(
     runStartPath: input.runStartPath,
     runStart,
     sourceArtifact,
+    evidenceArtifacts,
     sourceSession: structuredClone(input.loadedSource.session),
   };
 }
@@ -116,24 +124,32 @@ function childInput(
   runtimeId: string,
   request: ProductionAnalysisRequest,
   sourceArtifactId: string,
+  evidenceArtifactIds: string[],
   mediaScope: SpawnRequestInput["mediaScope"],
 ): SpawnRequestInput {
   return {
     workloadKey: `bounded-media-seek:${runtimeId}`,
     objective:
       `Invoke media_seek exactly once for the granted source range for ${request.requestId}, ` +
-      "retain the returned operation/artifact/receipt identities, and report them without making " +
+      (evidenceArtifactIds.length > 0
+        ? `read each of the ${evidenceArtifactIds.length} explicitly granted preflight evidence artifacts, `
+        : "retain the honest absence of granted detector evidence, ") +
+      "retain the returned operation/artifact/receipt identities and bounded evidence facts, and report them without making " +
       "media-content, transcription, translation, caption, or detector claims.",
     workerKind: "media",
     workerLabel: "bounded-media-child",
     mediaScope,
-    inputArtifactIds: [sourceArtifactId],
+    inputArtifactIds: [sourceArtifactId, ...evidenceArtifactIds],
     requiredOutputs: [
       { name: "execution report", artifactKind: "worker-execution-report", required: true },
     ],
-    requiredCapabilities: ["media.seek", "report.submit"],
+    requiredCapabilities: [
+      "media.seek",
+      ...(evidenceArtifactIds.length > 0 ? ["evidence.read" as const] : []),
+      "report.submit",
+    ],
     dependencies: [],
-    budget: { wallMs: 45_000, toolCalls: 1 },
+    budget: { wallMs: 45_000, toolCalls: 1 + evidenceArtifactIds.length },
   };
 }
 
@@ -154,6 +170,9 @@ export async function runBoundedRuntimeApplication(
   }
   const artifacts = new ContentAddressedArtifactStore(initialized.artifactStoreRoot);
   await artifacts.record(ledger, initialized.sourceArtifact);
+  for (const evidenceArtifact of initialized.evidenceArtifacts) {
+    await artifacts.record(ledger, evidenceArtifact);
+  }
   const audioTrack = initialized.sourceArtifact.tracks.find((track) => track.kind === "audio");
   if (!audioTrack) throw new Error("Bounded runtime application requires one registered audio track");
   const mediaScope = [{
@@ -167,11 +186,11 @@ export async function runBoundedRuntimeApplication(
     workloadKey: `root:${initialized.runStart.runtimeId}`,
     objective:
       `Coordinate one bounded local worker launch for ${initialized.runStart.analysisRequest.requestId} ` +
-      "with one receipted bounded seek and without making media-content claims.",
+      "with one receipted bounded seek, any explicitly pinned evidence reads, and no invented media-content claims.",
     workerKind: "orchestrator",
     workerLabel: "local-orchestrator",
     mediaScope,
-    inputArtifactIds: [initialized.sourceArtifact.id],
+    inputArtifactIds: [initialized.sourceArtifact.id, ...initialized.evidenceArtifacts.map((artifact) => artifact.id)],
     requiredOutputs: [{ name: "run report", artifactKind: "run-report", required: true }],
     requiredCapabilities: ["task.spawn.request"],
     dependencies: [],
@@ -187,6 +206,7 @@ export async function runBoundedRuntimeApplication(
       initialized.runStart.runtimeId,
       initialized.runStart.analysisRequest,
       initialized.sourceArtifact.id,
+      initialized.evidenceArtifacts.map((artifact) => artifact.id),
       mediaScope,
     ),
   );
@@ -202,6 +222,7 @@ export async function runBoundedRuntimeApplication(
 
   const reports = new BoundedReportHost(ledger);
   const mediaHost = new FfmpegCapabilityHost(ledger, artifacts);
+  const evidenceHost = new BoundedEvidenceReadHost(ledger, artifacts);
   const plannedOperation = initialized.runStart.workPlan.operations[0];
   if (
     initialized.runStart.workPlan.operations.length !== 1 ||
@@ -217,6 +238,7 @@ export async function runBoundedRuntimeApplication(
     artifacts,
     reports,
     mediaHost,
+    evidenceHost,
     plannedMediaOperationId: plannedOperation.operationId,
   });
   try {
@@ -226,13 +248,14 @@ export async function runBoundedRuntimeApplication(
       decidedByTaskId: rootPermit.taskId,
       decidedByAgentId: rootPermit.agentId,
       accepted: true,
-      reason: "The bounded child returned its structured artifact after one authorized receipted seek.",
+      reason:
+        "The bounded child returned its structured artifact after its authorized receipted seek and any granted evidence reads.",
     });
     await scheduler.transitionTask(
       rootPermit.taskId,
       rootPermit.agentId,
       "withheld",
-      "The local launcher proof ended after one receipted seek observation and child report; it produced no captions or study result.",
+      "The local launcher proof ended after one receipted seek observation, any available pinned evidence reads, and child report; it produced no captions or study result.",
     );
   } catch (error) {
     if (error instanceof RuntimeApplicationInterrupted) throw error;

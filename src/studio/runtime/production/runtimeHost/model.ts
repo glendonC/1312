@@ -180,5 +180,6 @@ export interface InitializedRuntimeApplication {
   runStartPath: string;
   runStart: RuntimeStartRecord;
   sourceArtifact: RuntimeArtifact;
+  evidenceArtifacts: RuntimeArtifact[];
   sourceSession: ProductionSourceSession;
 }

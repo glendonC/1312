@@ -1,5 +1,9 @@
 import { canonicalSha256 } from "../artifactStore.ts";
 import { BoundedChildMediaBridge, type ChildMediaToolResult } from "../executor/childMediaBridge.ts";
+import {
+  BoundedChildEvidenceBridge,
+  type ChildEvidenceToolResult,
+} from "../executor/childEvidenceBridge.ts";
 import type {
   ExecutorSpanReceipt,
   LaunchPermit,
@@ -156,6 +160,7 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
     }
 
     let mediaResult: ChildMediaToolResult;
+    const evidenceResults: ChildEvidenceToolResult[] = [];
     try {
       const scope = task.mediaScope[0];
       if (!scope) throw new Error("The deterministic media proof has no scheduler scope");
@@ -163,8 +168,19 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
         nextOperationId: () => this.context.plannedMediaOperationId,
       });
       mediaResult = await bridge.call("media_seek", scope);
+      const evidenceGrant = task.grants.find((grant) => grant.capability === "evidence.read");
+      for (const evidenceScope of evidenceGrant?.evidenceScope ?? []) {
+        const evidenceBridge = new BoundedChildEvidenceBridge(task, this.context.evidenceHost, {
+          nextOperationId: () => `operation:evidence-read:${canonicalSha256({
+            runId: ledger.runId,
+            taskId: task.id,
+            artifactId: evidenceScope.artifactId,
+          })}`,
+        });
+        evidenceResults.push(await evidenceBridge.call({ artifactId: evidenceScope.artifactId }));
+      }
     } catch (error) {
-      const reason = "The deterministic child media bridge did not complete its required receipted seek.";
+      const reason = "The deterministic child bridge did not complete every required receipted media/evidence operation.";
       const span = this.span(task, executionId, startedAt, {
         outcome: "failed",
         outputArtifactIds: [],
@@ -193,7 +209,12 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
         content:
           `Deterministic child completed ${mediaResult.capability} as ${mediaResult.operationId}; ` +
           `output ${mediaResult.outputArtifactId}; receipt ${mediaResult.receiptId}; ` +
-          `receipt content ${mediaResult.receiptContentId}. No media-content finding was produced.`,
+          `receipt content ${mediaResult.receiptContentId}. ` +
+          (evidenceResults.length > 0
+            ? `It read ${evidenceResults.length} pre-existing evidence artifacts under their receipted bounds: ${evidenceResults.map((result) =>
+                `${result.inputArtifactId} (${result.receipt.result.returnedItems} facts, ${result.receiptId}, ${result.receiptContentId})`).join("; ")}. `
+            : "No detector evidence was granted or read. ") +
+          "No new detector or media-content finding was produced.",
       },
     };
     const prepared = await artifacts.prepareWorkerOutput(ledger.runId, envelope);
@@ -223,13 +244,14 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       outputArtifactIds: [artifact.id],
       summary:
         `Deterministic child completed one authorized ${mediaResult.capability} operation with ` +
-        `receipt ${mediaResult.receiptId}; no model or media-content interpretation ran.`,
+        `receipt ${mediaResult.receiptId} and ${evidenceResults.length} authorized evidence reads; ` +
+        "no model, detector, or media-content interpretation ran.",
     });
     return { report };
   }
 }
 
-/** Deterministic, controllable child executor. It records no model usage and runs one real receipted seek. */
+/** Deterministic executor: one real seek plus every available, explicitly granted evidence read. */
 export class DeterministicRuntimeExecutor {
   readonly mode: DeterministicExecutionMode;
   readonly control: DeterministicExecutionControl;

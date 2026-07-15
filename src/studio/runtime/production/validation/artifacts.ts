@@ -1,4 +1,5 @@
 import type {
+  PreflightEvidenceArtifactDescriptor,
   RuntimeArtifact,
   SourceArtifactDescriptor,
   WorkerOutputEnvelope,
@@ -51,6 +52,59 @@ export function assertSourceArtifactDescriptor(
       fail(context, "source.tracks", "contains a duration beyond the source duration");
     }
   }
+}
+
+export function assertPreflightEvidenceArtifactDescriptor(
+  value: unknown,
+  context = "Preflight evidence artifact descriptor",
+): asserts value is PreflightEvidenceArtifactDescriptor {
+  const item = object(value, context, "evidence");
+  exact(
+    item,
+    [
+      "schema",
+      "evidenceKind",
+      "receiptSchema",
+      "producerId",
+      "path",
+      "content",
+      "preflightId",
+      "preflightContentId",
+    ],
+    context,
+    "evidence",
+  );
+  literal(item.schema, "studio.preflight-evidence-artifact.v1", context, "evidence.schema");
+  const evidenceKind = oneOf(
+    item.evidenceKind,
+    new Set(["speech_activity", "language_ranges"]),
+    context,
+    "evidence.evidenceKind",
+  );
+  const receiptSchema = oneOf(
+    item.receiptSchema,
+    new Set(["studio.speech-activity.v1", "studio.language-ranges.v1"]),
+    context,
+    "evidence.receiptSchema",
+  );
+  const producerId = oneOf(
+    item.producerId,
+    new Set(["silero-vad", "whisper-language-id"]),
+    context,
+    "evidence.producerId",
+  );
+  if (
+    (evidenceKind === "speech_activity" &&
+      (receiptSchema !== "studio.speech-activity.v1" || producerId !== "silero-vad")) ||
+    (evidenceKind === "language_ranges" &&
+      (receiptSchema !== "studio.language-ranges.v1" || producerId !== "whisper-language-id"))
+  ) {
+    fail(context, "evidence", "kind, receipt schema, and pinned producer must agree");
+  }
+  string(item.path, context, "evidence.path");
+  hash(item.content, context, "evidence.content");
+  string(item.preflightId, context, "evidence.preflightId");
+  contentId(item.preflightContentId, context, "evidence.preflightContentId");
 }
 
 export function validateRuntimeArtifact(
@@ -182,6 +236,58 @@ export function validateRuntimeArtifact(
         context,
         path,
         "worker output artifacts require a task producer and cannot claim media lineage",
+      );
+    }
+  } else if (kind === "preflight_evidence") {
+    exact(
+      origin,
+      [
+        "kind",
+        "evidenceKind",
+        "receiptSchema",
+        "producerId",
+        "preflightId",
+        "preflightContentId",
+      ],
+      context,
+      `${path}.origin`,
+    );
+    const evidenceKind = oneOf(
+      origin.evidenceKind,
+      new Set(["speech_activity", "language_ranges"]),
+      context,
+      `${path}.origin.evidenceKind`,
+    );
+    const receiptSchema = oneOf(
+      origin.receiptSchema,
+      new Set(["studio.speech-activity.v1", "studio.language-ranges.v1"]),
+      context,
+      `${path}.origin.receiptSchema`,
+    );
+    const producerId = oneOf(
+      origin.producerId,
+      new Set(["silero-vad", "whisper-language-id"]),
+      context,
+      `${path}.origin.producerId`,
+    );
+    string(origin.preflightId, context, `${path}.origin.preflightId`);
+    contentId(origin.preflightContentId, context, `${path}.origin.preflightContentId`);
+    if (
+      mediaClass !== "non_media" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      sources.length !== 1 ||
+      task !== null ||
+      agent !== null ||
+      (evidenceKind === "speech_activity" &&
+        (receiptSchema !== "studio.speech-activity.v1" || producerId !== "silero-vad")) ||
+      (evidenceKind === "language_ranges" &&
+        (receiptSchema !== "studio.language-ranges.v1" || producerId !== "whisper-language-id"))
+    ) {
+      fail(
+        context,
+        path,
+        "preflight evidence must be one validated non-media receipt with source lineage and no task producer",
       );
     }
   } else {

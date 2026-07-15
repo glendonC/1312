@@ -50,7 +50,7 @@ function receiptValue(event: RuntimeEvent): {
 function receiptArtifactLinks(state: RuntimeProjection, receiptId: string): RuntimeArtifact[] {
   return Object.values(state.artifacts).filter((artifact) => {
     const origin = artifact.origin;
-    return origin.kind !== "ingest" && origin.receiptId === receiptId;
+    return origin.kind !== "ingest" && origin.kind !== "preflight_evidence" && origin.receiptId === receiptId;
   });
 }
 
@@ -125,7 +125,11 @@ export async function buildRuntimeObservabilityIndex(
     const linkedArtifacts = receiptArtifactLinks(state, candidate.receipt.receiptId);
     for (const artifact of linkedArtifacts) {
       const origin = artifact.origin;
-      if (origin.kind === "ingest" || origin.receiptContentId !== content.contentId) {
+      if (
+        origin.kind === "ingest" ||
+        origin.kind === "preflight_evidence" ||
+        origin.receiptContentId !== content.contentId
+      ) {
         throw new Error(
           `Observability receipt ${candidate.receipt.receiptId} does not match its artifact-store content link`,
         );
@@ -150,7 +154,10 @@ export async function buildRuntimeObservabilityIndex(
         kind: artifact.kind,
         eventId: event.eventId,
         contentId: artifact.content.contentId,
-        receiptId: artifact.origin.kind === "ingest" ? null : artifact.origin.receiptId,
+        receiptId:
+          artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence"
+            ? null
+            : artifact.origin.receiptId,
       },
     ];
   });

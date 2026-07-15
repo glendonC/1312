@@ -14,8 +14,10 @@ import {
 
 test("production validation facade preserves its exact public export surface", () => {
   assert.deepEqual(Object.keys(productionValidation).sort(), [
+    "assertEvidenceReadRequest",
     "assertMediaExtractRequest",
     "assertMediaSeekRequest",
+    "assertPreflightEvidenceArtifactDescriptor",
     "assertProductionAnalysisRequest",
     "assertProductionSourceSession",
     "assertReportDecisionRequest",
@@ -26,6 +28,7 @@ test("production validation facade preserves its exact public export surface", (
     "assertSourceArtifactDescriptor",
     "assertSpawnRequestInput",
     "assertWorkerOutputEnvelope",
+    "validateEvidenceReadReceipt",
   ]);
 });
 

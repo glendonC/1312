@@ -20,6 +20,13 @@ import type { PendingRuntimeEvent } from "./protocol.ts";
 import { BoundedReportHost } from "./reportHost.ts";
 import { BoundedRuntimeScheduler } from "./scheduler.ts";
 import { FfmpegCapabilityHost } from "./mediaHost.ts";
+import { BoundedEvidenceReadHost } from "./evidenceHost.ts";
+import {
+  BoundedChildEvidenceBridge,
+  openChildEvidenceBridge,
+  type ChildEvidenceReadHost,
+  type OpenChildEvidenceBridge,
+} from "./executor/childEvidenceBridge.ts";
 import {
   BoundedChildMediaBridge,
   openChildMediaBridge,
@@ -61,8 +68,11 @@ export interface CodexWorkerLauncherOptions {
   monotonicNow?: () => number;
   nextExecutionId?: () => string;
   nextMediaOperationId?: (capability: "media.extract" | "media.seek") => string;
+  nextEvidenceOperationId?: () => string;
   mediaHost?: ChildMediaCapabilityHost;
+  evidenceHost?: ChildEvidenceReadHost;
   mediaMcpServerPath?: string;
+  evidenceMcpServerPath?: string;
 }
 
 function tomlString(value: string): string {
@@ -86,10 +96,11 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "mediaMcpServerPath"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "mediaMcpServerPath" | "evidenceMcpServerPath"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
+  private readonly evidenceHost: ChildEvidenceReadHost;
 
   constructor(
     ledger: RuntimeLedger,
@@ -103,6 +114,7 @@ export class CodexExecWorkerLauncher {
     this.artifacts = artifacts;
     this.reports = reports;
     this.mediaHost = options.mediaHost ?? new FfmpegCapabilityHost(ledger, artifacts);
+    this.evidenceHost = options.evidenceHost ?? new BoundedEvidenceReadHost(ledger, artifacts);
     this.options = {
       executable: options.executable ?? "codex",
       executableArgsPrefix: options.executableArgsPrefix,
@@ -115,7 +127,9 @@ export class CodexExecWorkerLauncher {
       monotonicNow: options.monotonicNow ?? (() => performance.now()),
       nextExecutionId: options.nextExecutionId ?? (() => `execution:${randomUUID()}`),
       nextMediaOperationId: options.nextMediaOperationId,
+      nextEvidenceOperationId: options.nextEvidenceOperationId,
       mediaMcpServerPath: options.mediaMcpServerPath,
+      evidenceMcpServerPath: options.evidenceMcpServerPath,
     };
   }
 
@@ -246,9 +260,9 @@ export class CodexExecWorkerLauncher {
     }
     if (
       !scheduled.grants.some((grant) => grant.capability === "report.submit") ||
-      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek"].includes(grant.capability))
+      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "evidence.read"].includes(grant.capability))
     ) {
-      throw new Error("Codex executor supports only report.submit plus scheduler-granted media.extract/media.seek");
+      throw new Error("Codex executor supports only report.submit plus scheduler-granted media.extract/media.seek/evidence.read");
     }
 
     const version = await this.version();
@@ -275,6 +289,7 @@ export class CodexExecWorkerLauncher {
     let usage: ModelUsageReceipt | null = null;
     let executorFinished = false;
     let mediaBridge: OpenChildMediaBridge | null = null;
+    let evidenceBridge: OpenChildEvidenceBridge | null = null;
     try {
       const mediaCapabilities = task.grants
         .map((grant) => grant.capability)
@@ -283,6 +298,12 @@ export class CodexExecWorkerLauncher {
       if (mediaCapabilities.length > 0) {
         mediaBridge = await openChildMediaBridge(new BoundedChildMediaBridge(task, this.mediaHost, {
           nextOperationId: this.options.nextMediaOperationId,
+        }));
+      }
+      const evidenceGrant = task.grants.find((grant) => grant.capability === "evidence.read");
+      if (evidenceGrant) {
+        evidenceBridge = await openChildEvidenceBridge(new BoundedChildEvidenceBridge(task, this.evidenceHost, {
+          nextOperationId: this.options.nextEvidenceOperationId,
         }));
       }
       const args = [
@@ -322,6 +343,30 @@ export class CodexExecWorkerLauncher {
           ])}`,
         );
       }
+      if (evidenceBridge) {
+        const serverPath = this.options.evidenceMcpServerPath ?? fileURLToPath(
+          new URL("./executor/evidenceMcpServer.ts", import.meta.url),
+        );
+        args.push(
+          "-c",
+          `mcp_servers.studio_evidence.command=${tomlString(process.execPath)}`,
+          "-c",
+          `mcp_servers.studio_evidence.args=${tomlStrings([serverPath])}`,
+          "-c",
+          "mcp_servers.studio_evidence.required=true",
+          "-c",
+          `mcp_servers.studio_evidence.enabled_tools=${tomlStrings([evidenceBridge.manifest.tool.name])}`,
+          "-c",
+          "mcp_servers.studio_evidence.startup_timeout_sec=5",
+          "-c",
+          `mcp_servers.studio_evidence.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
+          "-c",
+          `mcp_servers.studio_evidence.env_vars=${tomlStrings([
+            "STUDIO_CHILD_EVIDENCE_BRIDGE_URL",
+            "STUDIO_CHILD_EVIDENCE_BRIDGE_TOKEN",
+          ])}`,
+        );
+      }
       args.push("--output-schema", schemaPath);
       if (this.options.model) args.push("--model", this.options.model);
       args.push("-");
@@ -330,10 +375,16 @@ export class CodexExecWorkerLauncher {
         args: this.commandArgs(args),
         cwd: directory,
         stdin: workerPrompt(task),
-        env: mediaBridge ? {
+        env: mediaBridge || evidenceBridge ? {
           ...process.env,
-          STUDIO_CHILD_MEDIA_BRIDGE_URL: mediaBridge.endpoint,
-          STUDIO_CHILD_MEDIA_BRIDGE_TOKEN: mediaBridge.token,
+          ...(mediaBridge ? {
+            STUDIO_CHILD_MEDIA_BRIDGE_URL: mediaBridge.endpoint,
+            STUDIO_CHILD_MEDIA_BRIDGE_TOKEN: mediaBridge.token,
+          } : {}),
+          ...(evidenceBridge ? {
+            STUDIO_CHILD_EVIDENCE_BRIDGE_URL: evidenceBridge.endpoint,
+            STUDIO_CHILD_EVIDENCE_BRIDGE_TOKEN: evidenceBridge.token,
+          } : {}),
         } : process.env,
         timeoutMs: Math.min(task.budget.wallMs, this.options.maximumWallMs),
         maxStdoutBytes: this.options.maxStdoutBytes,
@@ -359,6 +410,16 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete every granted media capability",
           "Codex child did not complete its required receipted media operation.",
+        );
+      }
+      if (evidenceGrant?.evidenceScope.some((scope) =>
+        !Object.values(this.ledger.state().evidenceReads).some((operation) =>
+          operation.taskId === task.id &&
+          operation.artifactId === scope.artifactId &&
+          operation.status === "completed"))) {
+        throw new LauncherFailure(
+          "Codex child did not read every granted evidence artifact",
+          "Codex child did not complete its required receipted evidence read.",
         );
       }
       let workerValue: unknown;
@@ -465,6 +526,7 @@ export class CodexExecWorkerLauncher {
       throw error;
     } finally {
       if (mediaBridge) await mediaBridge.close();
+      if (evidenceBridge) await evidenceBridge.close();
       await rm(directory, { recursive: true, force: true });
     }
   }

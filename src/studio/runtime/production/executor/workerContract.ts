@@ -123,6 +123,9 @@ export function workerPrompt(task: TaskRecord): string {
     mediaScope: task.mediaScope,
     budget: task.budget,
     grantedMediaTools: mediaTools,
+    grantedEvidence: task.grants
+      .filter((grant) => grant.capability === "evidence.read")
+      .flatMap((grant) => grant.evidenceScope),
   };
   const mediaBoundary = mediaTools.length === 0
     ? "This executor exposes no media bytes and no media tools. Do not claim that you inspected, heard, translated, or measured media."
@@ -133,10 +136,23 @@ export function workerPrompt(task: TaskRecord): string {
         "The tools return receipt and artifact identities, not media bytes or semantic findings; do not claim what the media contains, sounds like, says, or means.",
         "Include the returned operation, artifact, receipt, and receipt-content identities in the required worker output.",
       ].join(" ");
+  const evidenceScope = task.grants
+    .filter((grant) => grant.capability === "evidence.read")
+    .flatMap((grant) => grant.evidenceScope);
+  const evidenceBoundary = evidenceScope.length === 0
+    ? "This executor exposes no evidence-read tool. Existing detector findings are unavailable to this child."
+    : [
+        "This executor exposes evidence_read for each scheduler-granted evidence artifact in the contract.",
+        "Invoke it exactly once for every granted artifactId and use only the bounded facts returned in studio.child-evidence-tool-result.v1.",
+        "The evidence existed before this read; the read creates no new detector finding and does not expose paths or raw media bytes.",
+        "Preserve operation, input-artifact, receipt, receipt-content, producer, decision, and preflight-lineage identities in the required worker output.",
+        "Do not infer claims beyond the returned facts; unknown, withheld, empty, and truncated remain explicit.",
+      ].join(" ");
   return [
     "You are one isolated child in the 1321 Studio production runtime.",
     "Complete only the bounded task contract below and return the JSON required by the supplied output schema.",
     mediaBoundary,
+    evidenceBoundary,
     "Output content is a worker-authored artifact proposal; the parent decides whether to accept it.",
     JSON.stringify(contract),
   ].join("\n\n");

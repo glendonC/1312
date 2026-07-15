@@ -5,6 +5,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import {
   assertRuntimeArtifact,
+  assertPreflightEvidenceArtifactDescriptor,
   assertSourceArtifactDescriptor,
   assertWorkerOutputEnvelope,
 } from "./assertions.ts";
@@ -32,6 +33,12 @@ function canonical(value: unknown): string {
 
 export function canonicalSha256(value: unknown): string {
   return createHash("sha256").update(canonical(value)).digest("hex");
+}
+
+/** Content identity produced by storeJson's canonical JSON plus its terminal newline. */
+export function canonicalJsonContentId(value: unknown): string {
+  const digest = createHash("sha256").update(`${canonical(value)}\n`).digest("hex");
+  return `sha256:${digest}`;
 }
 
 export async function identifyFile(path: string): Promise<ContentIdentity> {
@@ -151,6 +158,50 @@ export class ContentAddressedArtifactStore {
     return artifact;
   }
 
+  async registerPreflightEvidence(
+    runId: string,
+    sourceArtifactId: string,
+    descriptorValue: unknown,
+  ): Promise<RuntimeArtifact> {
+    assertPreflightEvidenceArtifactDescriptor(descriptorValue);
+    const descriptor = descriptorValue;
+    const measured = await identifyFile(descriptor.path);
+    if (measured.contentId !== descriptor.content.contentId || measured.bytes !== descriptor.content.bytes) {
+      throw new Error("Validated preflight evidence no longer matches its content identity");
+    }
+    const stored = await this.storeFile(descriptor.path);
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({
+        runId,
+        evidenceKind: descriptor.evidenceKind,
+        contentId: stored.content.contentId,
+        preflightContentId: descriptor.preflightContentId,
+      })}`,
+      runId,
+      kind: `${descriptor.evidenceKind.replaceAll("_", "-")}-receipt`,
+      mediaClass: "non_media",
+      publication: "private",
+      content: stored.content,
+      storageKey: stored.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [sourceArtifactId],
+      producerTaskId: null,
+      producerAgentId: null,
+      origin: {
+        kind: "preflight_evidence",
+        evidenceKind: descriptor.evidenceKind,
+        receiptSchema: descriptor.receiptSchema,
+        producerId: descriptor.producerId,
+        preflightId: descriptor.preflightId,
+        preflightContentId: descriptor.preflightContentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
   async prepareDerived(
     path: string,
     input: {
@@ -184,7 +235,11 @@ export class ContentAddressedArtifactStore {
     const path = join(directory, "receipt.json");
     try {
       await writeFile(path, `${canonical(value)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
-      return await this.storeFile(path);
+      const stored = await this.storeFile(path);
+      if (stored.content.contentId !== canonicalJsonContentId(value)) {
+        throw new Error("Canonical JSON storage content identity changed unexpectedly");
+      }
+      return stored;
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

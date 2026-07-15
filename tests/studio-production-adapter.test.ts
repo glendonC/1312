@@ -45,6 +45,7 @@ const ROOT_GRANT = {
   taskId: ROOT_TASK_ID,
   agentId: ROOT_AGENT_ID,
   mediaScope: [],
+  evidenceScope: [],
 };
 
 const REPORT_GRANT = {
@@ -53,6 +54,7 @@ const REPORT_GRANT = {
   taskId: CHILD_TASK_ID,
   agentId: CHILD_AGENT_ID,
   mediaScope: [],
+  evidenceScope: [],
 };
 
 const CHILD_INPUT = {
@@ -258,6 +260,7 @@ function operationJournal(): unknown[] {
     taskId: ROOT_TASK_ID,
     agentId: ROOT_AGENT_ID,
     mediaScope: scope,
+    evidenceScope: [],
   };
   return [
     event(1, "artifact_store", "artifact.recorded", {
@@ -414,7 +417,9 @@ test("production adapter projects spawn and output lineage with existing facts o
     reports: 1,
     spawnRequests: 1,
     operations: 0,
+    evidenceReads: 0,
     sourceArtifacts: 0,
+    evidenceArtifacts: 0,
     outputArtifacts: 1,
   });
   assert.deepEqual(
@@ -439,6 +444,7 @@ test("production adapter projects spawn and output lineage with existing facts o
       agentId: CHILD_AGENT_ID,
       capability: "report.submit",
       mediaScope: [],
+      evidenceScope: [],
     },
   );
   assert.deepEqual(projection.reports, [{

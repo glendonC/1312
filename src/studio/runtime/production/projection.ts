@@ -10,7 +10,11 @@ function sameGrants(left: CapabilityGrant[], right: CapabilityGrant[]): boolean 
   const canonical = (grants: CapabilityGrant[]) =>
     [...grants]
       .sort((a, b) => a.id.localeCompare(b.id))
-      .map((grant) => ({ ...grant, mediaScope: [...grant.mediaScope] }));
+      .map((grant) => ({
+        ...grant,
+        mediaScope: [...grant.mediaScope],
+        evidenceScope: [...grant.evidenceScope],
+      }));
   return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 }
 
@@ -33,6 +37,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     artifacts: {},
     spawnRequests: {},
     operations: {},
+    evidenceReads: {},
     executions: {},
     modelUsage: {},
     reports: {},
@@ -166,7 +171,14 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     const activeOperation = Object.values(next.operations).some(
       (operation) => operation.taskId === task.id && operation.status === "started",
     );
-    invariant(!activeOperation || event.data.status === "working", event, `task ${task.id} has an active media operation`);
+    const activeEvidenceRead = Object.values(next.evidenceReads).some(
+      (operation) => operation.taskId === task.id && operation.status === "started",
+    );
+    invariant(
+      (!activeOperation && !activeEvidenceRead) || event.data.status === "working",
+      event,
+      `task ${task.id} has an active capability operation`,
+    );
     const activeExecution = Object.values(next.executions).some(
       (execution) => execution.taskId === task.id && execution.status === "active",
     );
@@ -294,7 +306,10 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
       event,
       `operation ${request.operationId} exceeds its grant scope`,
     );
-    const calls = Object.values(next.operations).filter((operation) => operation.taskId === task.id).length;
+    const calls = [
+      ...Object.values(next.operations),
+      ...Object.values(next.evidenceReads),
+    ].filter((operation) => operation.taskId === task.id).length;
     invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.operations[request.operationId] = {
       id: request.operationId,
@@ -373,6 +388,112 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     operation.status = "completed";
     operation.outputArtifactId = artifact.id;
     operation.receiptId = event.data.receipt.receiptId;
+    return next;
+  }
+
+  if (event.type === "evidence.read_started") {
+    invariant(event.producer.kind === "evidence_host", event, "evidence read must come from the evidence host");
+    const request = event.data.request;
+    const task = next.tasks[request.taskId];
+    invariant(
+      task?.status === "working" && task.ownerAgentId === request.agentId,
+      event,
+      `evidence read ${request.operationId} has no working owner`,
+    );
+    invariant(!next.evidenceReads[request.operationId] && !next.operations[request.operationId], event, `operation ${request.operationId} is duplicated`);
+    const grant = task.grants.find((candidate) => candidate.id === event.data.grantId);
+    const scope = grant?.evidenceScope.find((candidate) =>
+      candidate.artifactId === request.artifactId && candidate.evidenceKind === event.data.evidenceKind);
+    invariant(grant?.capability === "evidence.read" && scope, event, `evidence read ${request.operationId} lacks its grant`);
+    const artifact = next.artifacts[request.artifactId];
+    invariant(
+      artifact?.origin.kind === "preflight_evidence" && artifact.origin.evidenceKind === event.data.evidenceKind,
+      event,
+      `evidence read ${request.operationId} input is unavailable`,
+    );
+    invariant(
+      event.data.maxBytes > 0 && event.data.maxBytes <= scope.maxBytes &&
+        event.data.maxItems > 0 && event.data.maxItems <= scope.maxItems,
+      event,
+      `evidence read ${request.operationId} exceeds its grant budget`,
+    );
+    const calls = [
+      ...Object.values(next.operations),
+      ...Object.values(next.evidenceReads),
+    ].filter((operation) => operation.taskId === task.id).length;
+    invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
+    next.evidenceReads[request.operationId] = {
+      id: request.operationId,
+      taskId: request.taskId,
+      agentId: request.agentId,
+      grantId: event.data.grantId,
+      artifactId: request.artifactId,
+      evidenceKind: event.data.evidenceKind,
+      maxBytes: event.data.maxBytes,
+      maxItems: event.data.maxItems,
+      status: "started",
+      receiptId: null,
+      receiptContentId: null,
+      returnedItems: null,
+      returnedFactBytes: null,
+      truncated: null,
+      failure: null,
+    };
+    return next;
+  }
+
+  if (event.type === "evidence.read_completed") {
+    invariant(event.producer.kind === "evidence_host", event, "evidence completion must come from the evidence host");
+    const operation = next.evidenceReads[event.data.operationId];
+    invariant(operation?.status === "started", event, `evidence read ${event.data.operationId} is not active`);
+    const receipt = event.data.receipt;
+    const artifact = next.artifacts[operation.artifactId];
+    invariant(
+      artifact?.origin.kind === "preflight_evidence",
+      event,
+      `evidence read ${operation.id} input artifact is unavailable`,
+    );
+    invariant(
+      receipt.operationId === operation.id &&
+        receipt.authorization.grantId === operation.grantId &&
+        receipt.authorization.taskId === operation.taskId &&
+        receipt.authorization.agentId === operation.agentId &&
+        receipt.authorization.maxBytes === operation.maxBytes &&
+        receipt.authorization.maxItems === operation.maxItems,
+      event,
+      `evidence read ${operation.id} receipt changed authorization`,
+    );
+    invariant(
+      receipt.input.artifactId === artifact.id &&
+        receipt.input.contentId === artifact.content.contentId &&
+        receipt.input.bytes === artifact.content.bytes &&
+        receipt.input.evidenceKind === artifact.origin.evidenceKind &&
+        receipt.input.receiptSchema === artifact.origin.receiptSchema,
+      event,
+      `evidence read ${operation.id} receipt changed input identity`,
+    );
+    invariant(
+      receipt.lineage.preflightId === artifact.origin.preflightId &&
+        receipt.lineage.preflightContentId === artifact.origin.preflightContentId &&
+        JSON.stringify(receipt.lineage.sourceArtifactIds) === JSON.stringify(artifact.sourceArtifactIds),
+      event,
+      `evidence read ${operation.id} receipt changed lineage`,
+    );
+    operation.status = "completed";
+    operation.receiptId = receipt.receiptId;
+    operation.receiptContentId = event.data.receiptContentId;
+    operation.returnedItems = receipt.result.returnedItems;
+    operation.returnedFactBytes = receipt.result.returnedFactBytes;
+    operation.truncated = receipt.result.truncated;
+    return next;
+  }
+
+  if (event.type === "evidence.read_failed") {
+    invariant(event.producer.kind === "evidence_host", event, "evidence failure must come from the evidence host");
+    const operation = next.evidenceReads[event.data.operationId];
+    invariant(operation?.status === "started", event, `evidence read ${event.data.operationId} is not active`);
+    operation.status = "failed";
+    operation.failure = event.data.reason;
     return next;
   }
 

@@ -3,6 +3,8 @@ import type {
   Capability,
   CapabilityGrant,
   ExecutorSpanReceipt,
+  EvidenceReadReceipt,
+  EvidenceReadRequest,
   MediaOperationRequest,
   MediaOperationReceipt,
   ModelUsageReceipt,
@@ -19,6 +21,7 @@ export type RuntimeProducerKind =
   | "registry"
   | "artifact_store"
   | "media_host"
+  | "evidence_host"
   | "handoff_host"
   | "launcher";
 
@@ -118,6 +121,27 @@ export interface MediaOperationFailedEvent extends RuntimeEventBase {
   data: { operationId: string; reason: string };
 }
 
+export interface EvidenceReadStartedEvent extends RuntimeEventBase {
+  type: "evidence.read_started";
+  data: {
+    request: EvidenceReadRequest;
+    grantId: string;
+    evidenceKind: EvidenceReadReceipt["input"]["evidenceKind"];
+    maxBytes: number;
+    maxItems: number;
+  };
+}
+
+export interface EvidenceReadCompletedEvent extends RuntimeEventBase {
+  type: "evidence.read_completed";
+  data: { operationId: string; receiptContentId: string; receipt: EvidenceReadReceipt };
+}
+
+export interface EvidenceReadFailedEvent extends RuntimeEventBase {
+  type: "evidence.read_failed";
+  data: { operationId: string; reason: string };
+}
+
 export interface ReportSubmittedEvent extends RuntimeEventBase {
   type: "report.submitted";
   data: { report: ReportRecord };
@@ -147,6 +171,9 @@ export type RuntimeEvent =
   | MediaOperationStartedEvent
   | MediaOperationCompletedEvent
   | MediaOperationFailedEvent
+  | EvidenceReadStartedEvent
+  | EvidenceReadCompletedEvent
+  | EvidenceReadFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent;
 

@@ -3,6 +3,7 @@ import {
   type AgentRecord,
   type Capability,
   type CapabilityGrant,
+  type EvidenceReadScope,
   type MediaScope,
   type RequiredOutput,
   type RuntimeBudget,
@@ -41,6 +42,9 @@ export const WORKER_KINDS = new Set([
   "quality",
 ]);
 const TRACK_KINDS = new Set(["audio", "video", "subtitle", "data", "attachment"]);
+const EVIDENCE_KINDS = new Set(["speech_activity", "language_ranges"]);
+export const MAX_EVIDENCE_READ_BYTES = 32 * 1024;
+export const MAX_EVIDENCE_READ_ITEMS = 64;
 
 function budget(value: unknown, context: string, path: string): asserts value is RuntimeBudget {
   const item = object(value, context, path);
@@ -70,6 +74,29 @@ function scopes(value: unknown, context: string, path: string): MediaScope[] {
   return result as MediaScope[];
 }
 
+function evidenceScope(value: unknown, context: string, path: string): asserts value is EvidenceReadScope {
+  const item = object(value, context, path);
+  exact(item, ["artifactId", "evidenceKind", "maxBytes", "maxItems"], context, path);
+  string(item.artifactId, context, `${path}.artifactId`);
+  oneOf(item.evidenceKind, EVIDENCE_KINDS, context, `${path}.evidenceKind`);
+  const maxBytes = integer(item.maxBytes, context, `${path}.maxBytes`, 1);
+  const maxItems = integer(item.maxItems, context, `${path}.maxItems`, 1);
+  if (maxBytes > MAX_EVIDENCE_READ_BYTES) {
+    fail(context, `${path}.maxBytes`, `must not exceed ${MAX_EVIDENCE_READ_BYTES}`);
+  }
+  if (maxItems > MAX_EVIDENCE_READ_ITEMS) {
+    fail(context, `${path}.maxItems`, `must not exceed ${MAX_EVIDENCE_READ_ITEMS}`);
+  }
+}
+
+function evidenceScopes(value: unknown, context: string, path: string): EvidenceReadScope[] {
+  const result = array(value, context, path);
+  result.forEach((item, index) => evidenceScope(item, context, `${path}[${index}]`));
+  const ids = result.map((item) => (item as EvidenceReadScope).artifactId);
+  if (new Set(ids).size !== ids.length) fail(context, path, "must not repeat an evidence artifact");
+  return result as EvidenceReadScope[];
+}
+
 function outputs(value: unknown, context: string, path: string): RequiredOutput[] {
   const result = array(value, context, path);
   result.forEach((entry, index) => {
@@ -94,7 +121,7 @@ function capabilities(value: unknown, context: string, path: string): Capability
 
 function grant(value: unknown, context: string, path: string): asserts value is CapabilityGrant {
   const item = object(value, context, path);
-  exact(item, ["id", "capability", "taskId", "agentId", "mediaScope"], context, path);
+  exact(item, ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope"], context, path);
   string(item.id, context, `${path}.id`);
   const capability = oneOf<Capability>(
     item.capability,
@@ -105,11 +132,18 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   string(item.taskId, context, `${path}.taskId`);
   string(item.agentId, context, `${path}.agentId`);
   const mediaScope = scopes(item.mediaScope, context, `${path}.mediaScope`);
+  const readScope = evidenceScopes(item.evidenceScope, context, `${path}.evidenceScope`);
   if (capability.startsWith("media.") && mediaScope.length === 0) {
     fail(context, path, "media grants require scope");
   }
   if (!capability.startsWith("media.") && mediaScope.length !== 0) {
     fail(context, path, "non-media grants cannot carry scope");
+  }
+  if (capability === "evidence.read" && readScope.length === 0) {
+    fail(context, path, "evidence.read grants require evidence scope");
+  }
+  if (capability !== "evidence.read" && readScope.length !== 0) {
+    fail(context, path, "non-evidence grants cannot carry evidence scope");
   }
 }
 

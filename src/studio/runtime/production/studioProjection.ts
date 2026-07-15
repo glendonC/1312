@@ -1,6 +1,8 @@
 import { assertRuntimeEvent } from "./assertions.ts";
 import type {
   Capability,
+  EvidenceKind,
+  EvidenceReadScope,
   MediaScope,
   RequiredOutput,
   RuntimeProjection,
@@ -68,6 +70,39 @@ export interface ProductionStudioGrantView {
   agentId: string;
   capability: Capability;
   mediaScope: MediaScope[];
+  evidenceScope: EvidenceReadScope[];
+}
+
+export interface ProductionStudioEvidenceArtifactView {
+  artifactId: string;
+  kind: string;
+  evidenceKind: EvidenceKind;
+  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
+  producerId: "silero-vad" | "whisper-language-id";
+  contentId: string;
+  bytes: number;
+  sourceArtifactIds: string[];
+  preflightId: string;
+  preflightContentId: string;
+}
+
+export interface ProductionStudioEvidenceReadView {
+  operationId: string;
+  capability: "evidence.read";
+  status: "started" | "completed" | "failed";
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  inputArtifactId: string;
+  evidenceKind: EvidenceKind;
+  maxBytes: number;
+  maxItems: number;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  returnedItems: number | null;
+  returnedFactBytes: number | null;
+  truncated: boolean | null;
+  failure: string | null;
 }
 
 export interface ProductionStudioReportView {
@@ -172,7 +207,9 @@ export interface ProductionStudioProjection {
   reports: ProductionStudioReportView[];
   spawnRequests: ProductionStudioSpawnView[];
   operations: ProductionStudioOperationView[];
+  evidenceReads: ProductionStudioEvidenceReadView[];
   sourceArtifacts: ProductionStudioSourceArtifactView[];
+  evidenceArtifacts: ProductionStudioEvidenceArtifactView[];
   outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
@@ -182,7 +219,9 @@ export interface ProductionStudioProjection {
     reports: number;
     spawnRequests: number;
     operations: number;
+    evidenceReads: number;
     sourceArtifacts: number;
+    evidenceArtifacts: number;
     outputArtifacts: number;
   };
 }
@@ -215,6 +254,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       agentId: grant.agentId,
       capability: grant.capability,
       mediaScope: structuredClone(grant.mediaScope),
+      evidenceScope: structuredClone(grant.evidenceScope),
     })))
     .sort((left, right) => left.taskId.localeCompare(right.taskId) || left.grantId.localeCompare(right.grantId));
   if (new Set(grants.map((grant) => grant.grantId)).size !== grants.length) {
@@ -275,6 +315,27 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     }))
     .sort((left, right) => left.operationId.localeCompare(right.operationId));
 
+  const evidenceReads = Object.values(state.evidenceReads)
+    .map((operation): ProductionStudioEvidenceReadView => ({
+      operationId: operation.id,
+      capability: "evidence.read",
+      status: operation.status,
+      taskId: operation.taskId,
+      agentId: operation.agentId,
+      grantId: operation.grantId,
+      inputArtifactId: operation.artifactId,
+      evidenceKind: operation.evidenceKind,
+      maxBytes: operation.maxBytes,
+      maxItems: operation.maxItems,
+      receiptId: operation.receiptId,
+      receiptContentId: operation.receiptContentId,
+      returnedItems: operation.returnedItems,
+      returnedFactBytes: operation.returnedFactBytes,
+      truncated: operation.truncated,
+      failure: operation.failure,
+    }))
+    .sort((left, right) => left.operationId.localeCompare(right.operationId));
+
   const sourceArtifacts = Object.values(state.artifacts)
     .filter((artifact) => artifact.origin.kind === "ingest")
     .map((artifact): ProductionStudioSourceArtifactView => {
@@ -301,9 +362,12 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
 
   const outputArtifacts = Object.values(state.artifacts)
-    .filter((artifact) => artifact.origin.kind !== "ingest")
+    .filter((artifact) =>
+      artifact.origin.kind === "media_operation" ||
+      artifact.origin.kind === "media_observation" ||
+      artifact.origin.kind === "worker_output")
     .map((artifact): ProductionStudioOutputArtifactView => {
-      if (artifact.origin.kind === "ingest") {
+      if (artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence") {
         throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
       }
       if (artifact.producerTaskId === null || artifact.producerAgentId === null) {
@@ -328,6 +392,30 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
         sourceArtifactIds: [...artifact.sourceArtifactIds],
         origin: structuredClone(artifact.origin),
         reportIds,
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+
+  const evidenceArtifacts = Object.values(state.artifacts)
+    .filter((artifact) => artifact.origin.kind === "preflight_evidence")
+    .map((artifact): ProductionStudioEvidenceArtifactView => {
+      if (artifact.origin.kind !== "preflight_evidence") {
+        throw new Error(`Production Studio projection: evidence artifact ${artifact.id} changed origin`);
+      }
+      if (artifact.producerTaskId !== null || artifact.producerAgentId !== null || artifact.mediaClass !== "non_media") {
+        throw new Error(`Production Studio projection: evidence artifact ${artifact.id} claims a runtime producer`);
+      }
+      return {
+        artifactId: artifact.id,
+        kind: artifact.kind,
+        evidenceKind: artifact.origin.evidenceKind,
+        receiptSchema: artifact.origin.receiptSchema,
+        producerId: artifact.origin.producerId,
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        sourceArtifactIds: [...artifact.sourceArtifactIds],
+        preflightId: artifact.origin.preflightId,
+        preflightContentId: artifact.origin.preflightContentId,
       };
     })
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
@@ -392,7 +480,9 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     reports,
     spawnRequests,
     operations,
+    evidenceReads,
     sourceArtifacts,
+    evidenceArtifacts,
     outputArtifacts,
     counts: {
       tasks: tasks.length,
@@ -402,7 +492,9 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       reports: reports.length,
       spawnRequests: spawnRequests.length,
       operations: operations.length,
+      evidenceReads: evidenceReads.length,
       sourceArtifacts: sourceArtifacts.length,
+      evidenceArtifacts: evidenceArtifacts.length,
       outputArtifacts: outputArtifacts.length,
     },
   };

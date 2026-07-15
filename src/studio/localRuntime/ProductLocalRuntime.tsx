@@ -132,10 +132,28 @@ function ProductionScopeSummary({
   ));
 }
 
+function ProductionEvidenceScopeSummary({
+  scopes,
+  renderedArtifactIds,
+}: {
+  scopes: ProductionStudioGrantView["evidenceScope"];
+  renderedArtifactIds: ReadonlySet<string>;
+}) {
+  if (scopes.length === 0) return <>No evidence scope granted</>;
+  return scopes.map((scope, index) => (
+    <span key={`${scope.artifactId}:${scope.evidenceKind}`}>
+      {index > 0 ? "; " : null}
+      <ProductionArtifactReference identity={scope.artifactId} renderedArtifactIds={renderedArtifactIds} />
+      {` · ${scope.evidenceKind} · ${scope.maxItems} items / ${scope.maxBytes} bytes`}
+    </span>
+  ));
+}
+
 function ProductionJournalFacts({ projection }: { projection: ProductionStudioProjection }) {
   const outputArtifactIds = new Set(projection.outputArtifacts.map((artifact) => artifact.artifactId));
   const renderedArtifactIds = new Set([
     ...projection.sourceArtifacts.map((artifact) => artifact.artifactId),
+    ...projection.evidenceArtifacts.map((artifact) => artifact.artifactId),
     ...outputArtifactIds,
   ]);
   const operationIds = new Set(projection.operations.map((operation) => operation.operationId));
@@ -186,6 +204,49 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   </div>
                   <div><dt>Tracks</dt><dd>{artifact.trackCount}</dd></div>
                   <div><dt>Publication</dt><dd>{artifact.publication}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="evidence-artifacts"
+        aria-labelledby="product-runtime-evidence-artifacts-title"
+      >
+        <h4 id="product-runtime-evidence-artifacts-title">Evidence artifacts</h4>
+        {projection.evidenceArtifacts.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="evidence-artifacts">
+            Unavailable when the owned preflight has no pinned speech or language evidence receipt.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.evidenceArtifacts.map((artifact) => (
+              <article
+                key={artifact.artifactId}
+                id={productionIdentityTarget("artifact", artifact.artifactId)}
+                data-production-evidence-artifact-id={artifact.artifactId}
+                data-evidence-kind={artifact.evidenceKind}
+              >
+                <header><h5>{artifact.kind}</h5><span>{artifact.evidenceKind}</span></header>
+                <dl>
+                  <div><dt>Artifact</dt><dd>{artifact.artifactId}</dd></div>
+                  <div><dt>Receipt schema</dt><dd>{artifact.receiptSchema}</dd></div>
+                  <div><dt>Existing producer</dt><dd>{artifact.producerId}</dd></div>
+                  <div><dt>Content</dt><dd>{artifact.contentId} · {artifact.bytes} bytes</dd></div>
+                  <div><dt>Preflight</dt><dd>{artifact.preflightId}</dd></div>
+                  <div><dt>Preflight content</dt><dd>{artifact.preflightContentId}</dd></div>
+                  <div>
+                    <dt>Source lineage</dt>
+                    <dd>
+                      <ProductionArtifactList
+                        identities={artifact.sourceArtifactIds}
+                        renderedArtifactIds={renderedArtifactIds}
+                        empty="Unavailable"
+                      />
+                    </dd>
+                  </div>
                 </dl>
               </article>
             ))}
@@ -379,7 +440,7 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                   <div><dt>Grant</dt><dd>{grant.grantId}</dd></div>
                   <div><dt>Task / worker</dt><dd>{grant.taskId} / {grant.agentId}</dd></div>
                   <div>
-                    <dt>Enforced scope</dt>
+                    <dt>Enforced media scope</dt>
                     <dd>
                       <ProductionScopeSummary
                         scopes={grant.mediaScope}
@@ -387,6 +448,63 @@ function ProductionJournalFacts({ projection }: { projection: ProductionStudioPr
                       />
                     </dd>
                   </div>
+                  <div>
+                    <dt>Enforced evidence scope</dt>
+                    <dd>
+                      <ProductionEvidenceScopeSummary
+                        scopes={grant.evidenceScope}
+                        renderedArtifactIds={renderedArtifactIds}
+                      />
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section
+        data-production-region="evidence-reads"
+        aria-labelledby="product-runtime-evidence-reads-title"
+      >
+        <h4 id="product-runtime-evidence-reads-title">Evidence reads</h4>
+        {projection.evidenceReads.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-empty="evidence-reads">
+            Unavailable until an <code>evidence.read_started</code> event is validated. No read is
+            inferred from an evidence artifact or grant.
+          </p>
+        ) : (
+          <div className="product-runtime-fact-list">
+            {projection.evidenceReads.map((read) => (
+              <article
+                key={read.operationId}
+                id={productionIdentityTarget("operation", read.operationId)}
+                data-production-evidence-read-id={read.operationId}
+                data-evidence-kind={read.evidenceKind}
+                data-status={read.status}
+              >
+                <header><h5>{read.capability}</h5><span>{read.status}</span></header>
+                <dl>
+                  <div><dt>Operation</dt><dd>{read.operationId}</dd></div>
+                  <div><dt>Task / worker</dt><dd>{read.taskId} / {read.agentId}</dd></div>
+                  <div><dt>Grant</dt><dd>{read.grantId}</dd></div>
+                  <div>
+                    <dt>Existing evidence artifact</dt>
+                    <dd>
+                      <ProductionArtifactReference
+                        identity={read.inputArtifactId}
+                        renderedArtifactIds={renderedArtifactIds}
+                      />
+                    </dd>
+                  </div>
+                  <div><dt>Evidence kind</dt><dd>{read.evidenceKind}</dd></div>
+                  <div><dt>Hard bounds</dt><dd>{read.maxItems} items / {read.maxBytes} bytes</dd></div>
+                  <div><dt>Returned</dt><dd>{read.returnedItems === null || read.returnedFactBytes === null ? "Unavailable until evidence.read_completed is validated" : `${read.returnedItems} items / ${read.returnedFactBytes} bytes`}</dd></div>
+                  <div><dt>Truncated</dt><dd>{read.truncated === null ? "Unavailable until completion" : read.truncated ? "Yes" : "No"}</dd></div>
+                  <div><dt>Receipt</dt><dd>{read.receiptId ?? "Unavailable until completion"}</dd></div>
+                  <div><dt>Receipt content</dt><dd>{read.receiptContentId ?? "Unavailable until completion"}</dd></div>
+                  <div><dt>Failure</dt><dd>{read.failure ?? (read.status === "failed" ? "Failure reason unavailable" : "Not recorded")}</dd></div>
                 </dl>
               </article>
             ))}

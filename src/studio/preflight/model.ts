@@ -159,14 +159,15 @@ export function resolvingSubmittedSourcePreflight(): PreflightSession {
 }
 
 export function resolvedSubmittedSourcePreflight(durationSeconds: number): PreflightSession {
+  const boundedDuration = Math.min(durationSeconds, HOSTED_MAX_RANGE_S);
   return {
     ...idlePreflight(),
     status: "ready",
     title: "Submitted source metadata resolved",
     message: "Provider metadata is ready for request setup. Media download and content processing have not started.",
     request: {
-      ...initialRequest("en", durationSeconds),
-      rangeMode: "entire",
+      ...initialRequest("en", boundedDuration),
+      rangeMode: durationSeconds > HOSTED_MAX_RANGE_S ? "custom" : "entire",
     },
     missing: [...PRODUCER_GAPS],
     provenance: {

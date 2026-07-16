@@ -1,33 +1,39 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 
-import { Arrow, Edit } from "./glyphs";
-import { presentSource } from "./previewSession";
-import SourceDisplay from "./SourceDisplay";
+import { Arrow } from "./glyphs";
 import { useStudio } from "./store";
 
 const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as const;
+
+interface SourceEntryProps {
+  open: boolean;
+  url: string;
+  focusRequest: number;
+  setOpen: (open: boolean) => void;
+  setUrl: (url: string) => void;
+}
 
 /**
  * Source entry belongs to the welcome sequence, not the run dock. It deliberately reuses
  * the dock's field, review, and action atoms so the source keeps one visual language while
  * the two surfaces remain free to evolve around different jobs.
  */
-export default function SourceEntry() {
+export default function SourceEntry({
+  open,
+  url,
+  focusRequest,
+  setOpen,
+  setUrl,
+}: SourceEntryProps) {
   const submitSource = useStudio((state) => state.submitSource);
   const dismissPreflight = useStudio((state) => state.dismissPreflight);
 
-  const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState("");
-  const [editingSource, setEditingSource] = useState(true);
   const [fieldOverflow, setFieldOverflow] = useState({ left: false, right: false });
   const field = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const control = useRef<HTMLDivElement>(null);
   const [controlWidth, setControlWidth] = useState(0);
-
-  const sourcePresentation = presentSource(url);
-  const reviewingSource = sourcePresentation !== null && !editingSource;
 
   useLayoutEffect(() => {
     const element = control.current;
@@ -54,15 +60,21 @@ export default function SourceEntry() {
   }
 
   useEffect(() => {
-    if (!open || !editingSource) return;
-    field.current?.focus();
-  }, [editingSource, open]);
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => {
+      const input = field.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusRequest, open]);
 
   useLayoutEffect(() => {
-    if (!open || !editingSource) return;
+    if (!open) return;
     const frame = window.requestAnimationFrame(syncFieldOverflow);
     return () => window.cancelAnimationFrame(frame);
-  }, [controlWidth, editingSource, open, url]);
+  }, [controlWidth, open, url]);
 
   function close(): void {
     setOpen(false);
@@ -93,7 +105,6 @@ export default function SourceEntry() {
             className="dock-fab"
             onClick={() => {
               dismissPreflight();
-              setEditingSource(true);
               setOpen(true);
             }}
             initial={{ opacity: 0 }}
@@ -107,7 +118,7 @@ export default function SourceEntry() {
         ) : (
           <motion.form
             key="open"
-            className={`dock-bar${reviewingSource ? " dock-bar-source" : ""}`}
+            className="dock-bar"
             onSubmit={submit}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -115,54 +126,33 @@ export default function SourceEntry() {
             transition={{ duration: 0.18, delay: 0.06 }}
             layout
           >
-            {reviewingSource ? (
-              <>
-                <button
-                  type="button"
-                  className="dock-source-review"
-                  aria-label={`Edit source: ${sourcePresentation.accessibleName}`}
-                  onClick={() => setEditingSource(true)}
-                >
-                  <span className="dock-source-edit-mark" aria-hidden="true">
-                    <Edit />
-                  </span>
-                  <SourceDisplay source={sourcePresentation} title={url} />
-                </button>
-              </>
-            ) : (
-              <span
-                className="dock-field-shell"
-                data-overflow-left={fieldOverflow.left}
-                data-overflow-right={fieldOverflow.right}
-              >
-                <input
-                  ref={field}
-                  className="dock-field"
-                  type="text"
-                  inputMode="url"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="Paste a link"
-                  aria-label="Clip link"
-                  value={url}
-                  onBlur={() => {
-                    if (sourcePresentation) {
-                      window.requestAnimationFrame(() => setEditingSource(false));
-                    }
-                  }}
-                  onChange={(event) => {
-                    dismissPreflight();
-                    setUrl(event.target.value);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") close();
-                    window.requestAnimationFrame(syncFieldOverflow);
-                  }}
-                  onScroll={syncFieldOverflow}
-                  onSelect={syncFieldOverflow}
-                />
-              </span>
-            )}
+            <span
+              className="dock-field-shell"
+              data-overflow-left={fieldOverflow.left}
+              data-overflow-right={fieldOverflow.right}
+            >
+              <input
+                ref={field}
+                className="dock-field"
+                type="text"
+                inputMode="url"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Paste a link"
+                aria-label="Clip link"
+                value={url}
+                onChange={(event) => {
+                  dismissPreflight();
+                  setUrl(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") close();
+                  window.requestAnimationFrame(syncFieldOverflow);
+                }}
+                onScroll={syncFieldOverflow}
+                onSelect={syncFieldOverflow}
+              />
+            </span>
 
             <motion.span
               className="dock-go-reveal"
@@ -174,7 +164,7 @@ export default function SourceEntry() {
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <button type="submit" className="dock-go" aria-label="Launch investigation">
+              <button type="submit" className="dock-go" aria-label="Resolve source metadata">
                 <Arrow />
               </button>
             </motion.span>

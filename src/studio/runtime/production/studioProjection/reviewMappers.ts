@@ -2,6 +2,7 @@ import type { RuntimeProjection } from "../model.ts";
 import type {
   ProductionStudioCaptionArtifactView,
   ProductionStudioCaptionProductionView,
+  ProductionStudioCaptionQualityControlView,
   ProductionStudioPublishReviewDecisionArtifactView,
   ProductionStudioPublishReviewDecisionView,
   ProductionStudioPublishReviewIntakeArtifactView,
@@ -85,9 +86,14 @@ export function projectCaptionProductions(state: RuntimeProjection) {
       status: job.status,
       approvalReviewId: job.approvalReviewId,
       approvalArtifactId: job.approvalArtifactId,
+      approvalReceiptId: job.approvalReceiptId,
+      approvalReceiptContentId: job.approvalReceiptContentId,
       sourceArtifactId: job.sourceArtifactId,
+      sourceContentId: job.sourceContentId,
       analysisRequestId: job.analysisRequestId,
       range: structuredClone(job.range),
+      acceptedChildOutput: structuredClone(job.acceptedChildOutput),
+      rootPromotion: structuredClone(job.rootPromotion),
       executorClassification: job.executor.classification,
       executorExecutionScope: job.executor.executionScope,
       cognitionClaim: job.executor.cognitionClaim,
@@ -106,6 +112,26 @@ export function projectCaptionProductions(state: RuntimeProjection) {
     }))
     .sort((left, right) => left.jobId.localeCompare(right.jobId));
   return captionProductions;
+}
+
+
+export function projectCaptionQualityControls(state: RuntimeProjection) {
+  const qualityControls = Object.values(state.captionQualityControls)
+    .map((qc): ProductionStudioCaptionQualityControlView => ({
+      qcId: qc.id,
+      jobId: qc.jobId,
+      captionArtifactId: qc.captionArtifactId,
+      captionContentId: qc.captionContentId,
+      captionReceiptId: qc.captionReceiptId,
+      captionReceiptContentId: qc.captionReceiptContentId,
+      outputArtifactId: qc.outputArtifactId,
+      receiptId: qc.receiptId,
+      receiptContentId: qc.receiptContentId,
+      outcome: qc.outcome,
+      reasonCodes: [...qc.reasonCodes],
+    }))
+    .sort((left, right) => left.qcId.localeCompare(right.qcId));
+  return qualityControls;
 }
 
 

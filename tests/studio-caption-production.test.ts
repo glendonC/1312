@@ -272,9 +272,29 @@ test("exact approval produces immutable timed KO+EN artifacts with honest withhe
     assert.equal(Object.values(journal.state.captionProductions)[0].status, "completed");
     assert.equal(Object.values(journal.state.captionQualityControls)[0].outcome, "withheld");
     const projection = adaptProductionRuntime(journal.state);
+    assert.equal(projection.rootOutputDispositions.length, 1);
+    assert.equal(projection.rootOutputDispositions[0].outcome, "promoted_to_root");
+    assert.equal(
+      projection.rootOutputDispositions[0].inputArtifactId,
+      projection.captionProductions[0].acceptedChildOutput.artifactId,
+    );
     assert.equal(projection.captionProductions.length, 1);
     assert.equal(projection.captionProductions[0].lineCount, 16);
     assert.equal(projection.captionProductions[0].withheldCount, 2);
+    assert.equal(projection.captionProductions[0].executorExecutionScope, "test_demo_only");
+    assert.equal(projection.captionProductions[0].executorClassification, "recorded_real_pipeline_fixture");
+    assert.equal(projection.captionProductions[0].cognitionClaim, "none");
+    assert.equal(
+      projection.captionProductions[0].rootPromotion.dispositionId,
+      projection.rootOutputDispositions[0].dispositionId,
+    );
+    assert.equal(projection.captionQualityControls.length, 1);
+    assert.equal(projection.captionQualityControls[0].outcome, "withheld");
+    assert.deepEqual(projection.captionQualityControls[0].reasonCodes, ["recorded_fixture_test_demo_only"]);
+    assert.equal(
+      projection.captionQualityControls[0].captionArtifactId,
+      projection.captionProductions[0].captionArtifactId,
+    );
     assert.equal(projection.captionArtifacts.length, 2);
     const observability = await buildRuntimeObservabilityIndex(await readFile(
       runtime.store.paths(approval.runtimeId).journalPath,
@@ -429,6 +449,17 @@ test("a current-run complete candidate receives an independent accept receipt", 
     assert.deepEqual(response.qualityControls[0].acceptedLineIds, ["line-current-run-001"]);
     assert.deepEqual(response.qualityControls[0].withheldLineIds, []);
     assert.equal(response.qualityControls[0].policy, "structural_current_run_gate_without_semantic_quality_score");
+    const journal = await readValidatedRuntimeJournal(
+      runtime.store.paths(approval.runtimeId).journalPath,
+      approval.runtimeId,
+    );
+    const projection = adaptProductionRuntime(journal.state);
+    assert.equal(projection.captionProductions[0].executorExecutionScope, "current_run");
+    assert.equal(projection.captionProductions[0].cognitionClaim, "none");
+    assert.equal(projection.captionQualityControls[0].outcome, "accepted");
+    assert.deepEqual(projection.captionQualityControls[0].reasonCodes, [
+      "current_run_candidate_structurally_complete",
+    ]);
   } finally {
     await rm(runtime.directory, { recursive: true, force: true });
   }

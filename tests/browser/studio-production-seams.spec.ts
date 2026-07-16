@@ -30,6 +30,25 @@ async function openCompletedDeterministicProjection(page: Page, endSeconds?: num
   return status.getByRole("region", { name: "Production task and handoff facts" });
 }
 
+test("owned processing canvas exposes projection facts and explicit missing receipt states", async ({ page }) => {
+  await page.goto("/studio/?processingMock=running");
+
+  const canvas = page.getByRole("region", { name: "Processing canvas" });
+  const coordination = canvas.getByRole("region", { name: "Receipt-backed coordination" });
+  await expect(coordination).toBeVisible();
+  await expect(coordination).toContainText("deterministic host composition");
+  await expect(coordination.locator("[data-production-live-task-id]")).toHaveCount(2);
+  await expect(coordination.locator("[data-production-live-grant-id]")).toHaveCount(0);
+  await expect(coordination.getByText("No scheduler grant recorded")).toHaveCount(2);
+  await expect(coordination.locator('[data-production-live-empty="handoffs"]')).toBeVisible();
+  const operation = coordination.locator("[data-production-live-operation-id]");
+  await expect(operation).toHaveCount(1);
+  await expect(operation).toHaveAttribute("data-operation-status", "started");
+  await expect(operation.getByText("No perception observation recorded for this operation")).toBeVisible();
+  await expect(coordination.locator('[data-production-live-empty="caption-lineage"]')).toBeVisible();
+  await expect(coordination.getByText(/No caption-production start receipt/)).toBeVisible();
+});
+
 test("attested approval explicitly produces private bounded captions without publication", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one deterministic desktop review path is sufficient");
   test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
@@ -44,6 +63,17 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(processingCanvas.getByRole("button", { name: "Cancel" })).toHaveCount(0);
   await expect(processingCanvas.getByRole("button", { name: "Stop" })).toHaveCount(0);
   await expect(processingCanvas.getByText(/no pause or cancellation command/)).toBeVisible();
+  const coordination = processingCanvas.getByRole("region", { name: "Receipt-backed coordination" });
+  await expect(coordination).toBeVisible();
+  await expect(coordination.locator("[data-production-live-task-id]")).toHaveCount(2);
+  await expect(coordination.locator("[data-production-live-grant-id]")).toHaveCount(6);
+  const handoff = coordination.locator("[data-production-live-spawn-id]");
+  await expect(handoff).toHaveCount(1);
+  await expect(handoff).toHaveAttribute("data-spawn-decision", "accepted");
+  await expect(handoff.getByText("Promoted to root", { exact: true })).toBeVisible();
+  await expect(coordination.locator("[data-production-live-operation-id]")).toHaveCount(1);
+  await expect(coordination.locator("[data-production-live-evidence-read-id]")).toHaveCount(2);
+  await expect(coordination.locator('[data-production-live-empty="caption-lineage"]')).toBeVisible();
   const worker = processingCanvas.getByRole("button", { name: "Inspect bounded-media-child, Complete" });
   await expect(worker).toBeVisible();
   await worker.click();
@@ -97,8 +127,14 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(productionResults.locator('[data-production-results-line-id]')).toHaveCount(16);
   await expect(productionResults).toContainText("not replay Results identity");
   await expect(productionResults).toContainText("does not claim transcription accuracy, English quality, or a Bet G score");
-  await expect(processingCanvas.getByRole("heading", { name: "Private artifact available" })).toBeVisible();
-  await expect(processingCanvas.getByText(/16 timed lines/)).toBeVisible();
+  await expect(processingCanvas.getByRole("heading", { name: "Caption candidate withheld" })).toBeVisible();
+  await expect(processingCanvas.getByText(/Recorded fixture test demo only/)).toBeVisible();
+  const liveCaption = coordination.locator("[data-production-live-caption-job-id]");
+  await expect(liveCaption).toHaveCount(1);
+  await expect(liveCaption).toHaveAttribute("data-caption-execution-scope", "test_demo_only");
+  await expect(liveCaption).toHaveAttribute("data-caption-qc-outcome", "withheld");
+  await expect(liveCaption).toContainText("recorded_fixture_test_demo_only");
+  await expect(liveCaption).toContainText("cognition claim none");
 });
 
 test("attested reviewer rejects one verified queued intake with a visible closed reason", async ({ page }, testInfo) => {

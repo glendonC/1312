@@ -20,7 +20,7 @@ Working order: finish and verify each slice before starting the next.
 
 ## 3. Current-run captions and QC
 
-- Status: implemented and verified; awaiting commit approval.
+- Status: committed and complete in `85e4ea3`.
 - Real: caption production now fails closed unless it can recursively reopen one same-run `promoted_to_root` child output whose granted media scope covers the immutable owned source/window. The candidate input and every timed line retain exact source/content/window, accepted-child, and root-promotion artifact/receipt lineage. A separate host then emits one content-addressed QC receipt: structurally complete `current_run` executor output can be accepted, while incomplete/empty output and every `recorded_real_pipeline_fixture` candidate are withheld. The executor contract pins `cognitionClaim: none`; fixture reuse is pinned `test_demo_only` and cannot take the accept path.
 - Missing: semantic caption/translation quality judgment, an LLM judge, a score, public Results/publish wiring, and any larger swarm. Automated acceptance exercises the current-run branch with a bounded test executor seam; this slice records no new live external recognizer/translator result and makes no translation-quality claim.
 - Done when: captions are produced for the current run, every line retains source/window lineage, QC can accept or withhold with receipts, and fixture output is never labeled live cognition.
@@ -28,11 +28,16 @@ Working order: finish and verify each slice before starting the next.
 
 ## 4. Richer live swarm UI
 
-- Status: pending.
-- Real: production journal projections expose tasks, workers, grants, operations, artifacts, and reports.
-- Missing: richer receipt-backed live coordination views.
-- Done when: every visible worker, transition, finding, handoff, and promotion is reconstructable from production receipts and absent facts remain absent.
-- Fake-claim risk: thought bubbles, inferred activity, or animated coordination without producer evidence.
+- Status: implemented and verified by the production build and focused projection/runtime tests; awaiting commit approval. Browser assertions cover the development missing-state fixture and the operator-started real-journal path, but could not be executed in this workspace because no supported in-app browser backend was registered.
+- Real: the owned/local canvas consumes only `studio.production-projection.v1`. It now exposes every projected task, registered worker, scheduler grant, media operation, bounded evidence read, spawn request/decision, child report, and root promote/reject disposition with their recorded identities and scope. Exact caption candidate lineage now projects source/content, accepted child output, root-promotion receipt, approval receipt, private candidate, and independent caption-QC receipt. A recorded fixture remains labeled `test_demo_only` and its projected QC disposition is `withheld`; a structurally complete `current_run` candidate can project `accepted` while retaining `cognitionClaim: none`. Missing task, grant, handoff, operation, finding, caption, and QC receipts render explicit absent states. Generic topology wires and the six-worker display cap were removed.
+- Missing: model-driven root planning/synthesis, more than one child/output, recursion, peer chat, semantic caption or translation-quality judgment, a live external recognizer/translator result in the default fixture path, speech/word/music/speaker perception beyond the existing bounded receipts, publication authority, and executed visual/browser QA in this workspace.
+- Done when: every visible worker, transition, finding, handoff, promotion, caption lineage step, and QC disposition is reconstructable from the validated production projection; focused tests prove fixture-withheld and current-run-accepted branches; absent facts remain absent; no UI copy claims replay-agent state, autonomy, semantic quality, or publication.
+- Fake-claim risk: treating deterministic host composition as model-driven swarm cognition, treating audio activity or evidence-read counts as media understanding, or treating structural QC acceptance as transcription/translation quality.
+
+## Build Week depth v1 assessment
+
+- All four depth-v1 slices are implemented locally. The checklist becomes complete for Build Week depth v1 only after slice 4 is approved and committed.
+- Remaining beyond depth v1: model-driven planning and synthesis, broader bounded perception, multiple children/outputs and recursive coordination, semantic caption/translation evaluation, a default live recognizer/translator producer, public Results/publish authority, and Bet G/public benchmark work.
 
 ## Explicit non-goals
 

@@ -16,6 +16,7 @@ import type { RuntimeHostSourceSummary } from "../runtime/production/runtimeHost
 import type { LocalRuntimeLifecycleProjection } from "./model";
 import type { RuntimeStatusView } from "./productLocalRuntimeShared";
 import { seconds } from "./productLocalRuntimeShared";
+import ProductionCoordinationLedger from "./ProductionCoordinationLedger";
 
 interface ProductionProcessingCanvasProps {
   source: RuntimeHostSourceSummary;
@@ -105,12 +106,20 @@ function buildWorkerIdentities(
 function currentFacts(production: ProductionStudioProjection): RecordedFact[] {
   const facts: RecordedFact[] = [];
   const caption = production.captionProductions.at(-1);
+  const captionQc = production.captionQualityControls.at(-1);
   const review = production.publishReviewDecisions.at(-1);
   const intake = production.publishReviewIntakes.at(-1);
   const decision = production.evidenceDecisions.at(-1);
   const assessment = production.evidenceAssessments.at(-1);
   const operation = production.operations.at(-1);
 
+  if (captionQc) {
+    facts.push({
+      key: captionQc.qcId,
+      label: "Caption QC",
+      state: sentence(captionQc.outcome),
+    });
+  }
   if (caption) {
     facts.push({
       key: caption.jobId,
@@ -181,9 +190,24 @@ function artifactState(production: ProductionStudioProjection, captionResultCoun
   }
   if (job?.status === "completed") {
     const lineCount = job.lineCount === null ? "line count unavailable" : `${job.lineCount} timed lines`;
+    const qualityControl = production.captionQualityControls.find((qc) => qc.jobId === job.jobId) ?? null;
+    if (!qualityControl) {
+      return {
+        label: "Caption candidate awaiting QC",
+        detail: `${sentence(job.resultStatus ?? "completed")} · ${lineCount}. No independent QC receipt is recorded.`,
+        tone: "quiet",
+      };
+    }
+    if (qualityControl.outcome === "withheld") {
+      return {
+        label: "Caption candidate withheld",
+        detail: `${qualityControl.reasonCodes.map(sentence).join(" · ")}. The private candidate is not QC-accepted or published.`,
+        tone: "quiet",
+      };
+    }
     return {
-      label: captionResultCount > 0 ? "Private artifact available" : "Caption receipt recorded",
-      detail: `${sentence(job.resultStatus ?? "completed")} · ${lineCount}. No upload or publication authority is present.`,
+      label: captionResultCount > 0 ? "Structurally accepted private candidate" : "QC acceptance receipt recorded",
+      detail: `${lineCount}. Structural current-run acceptance only; no semantic-quality or publication authority is present.`,
       tone: captionResultCount > 0 ? "available" : "quiet",
     };
   }
@@ -438,11 +462,7 @@ export default function ProductionProcessingCanvas({
 
           {workers.length > 0 ? (
             <div className="processing-worker-field" data-worker-count={Math.min(workers.length, 6)}>
-              <svg className="processing-worker-wire" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
-                <path d="M8 16 C30 16 32 8 50 8 S70 16 92 16" />
-                {workers.length > 1 && <path d="M8 16 C30 16 32 24 50 24 S70 16 92 16" />}
-              </svg>
-              {workers.slice(0, 6).map((worker, index) => {
+              {workers.map((worker, index) => {
                 const identity = identities.get(worker.agentId) ?? ORCHESTRATOR_IDENTITY;
                 return (
                   <button
@@ -465,6 +485,9 @@ export default function ProductionProcessingCanvas({
                     <b>{worker.label}</b>
                     <small className={activeWorkers.includes(worker) ? "text-shimmer" : undefined}>
                       {workerStatusLabel(worker)}
+                    </small>
+                    <small className="processing-worker-parent">
+                      {worker.parentAgentId ? `Child of ${compactIdentity(worker.parentAgentId)}` : "Root worker"}
                     </small>
                   </button>
                 );
@@ -495,9 +518,11 @@ export default function ProductionProcessingCanvas({
         </aside>
       </div>
 
+      <ProductionCoordinationLedger production={production} />
+
       <div className="processing-artifact" data-tone={artifact.tone}>
         <div>
-          <span className="processing-kicker">Usable artifact</span>
+          <span className="processing-kicker">Caption disposition</span>
           <h3>{artifact.label}</h3>
           <p>{artifact.detail}</p>
         </div>

@@ -2,6 +2,7 @@ import type {
   Capability,
   CaptionExecutorClassification,
   CaptionProductionStatus,
+  CaptionQualityControlReasonCode,
   EvidenceAssessmentScope,
   EvidenceDecisionReasonCode,
   EvidenceDecisionScope,
@@ -283,9 +284,23 @@ export interface ProductionStudioCaptionProductionView {
   status: "started" | "completed" | "failed";
   approvalReviewId: string;
   approvalArtifactId: string;
+  approvalReceiptId: string;
+  approvalReceiptContentId: string;
   sourceArtifactId: string;
+  sourceContentId: string;
   analysisRequestId: string;
   range: { startMs: number; endMs: number };
+  acceptedChildOutput: {
+    artifactId: string;
+    contentId: string;
+  };
+  rootPromotion: {
+    dispositionId: string;
+    artifactId: string;
+    contentId: string;
+    receiptId: string;
+    receiptContentId: string;
+  };
   executorClassification: CaptionExecutorClassification;
   executorExecutionScope: "test_demo_only" | "current_run";
   cognitionClaim: "none";
@@ -301,6 +316,20 @@ export interface ProductionStudioCaptionProductionView {
   withheldCount: number | null;
   unavailableCount: number | null;
   failure: string | null;
+}
+
+export interface ProductionStudioCaptionQualityControlView {
+  qcId: string;
+  jobId: string;
+  captionArtifactId: string;
+  captionContentId: string;
+  captionReceiptId: string;
+  captionReceiptContentId: string;
+  outputArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+  outcome: "accepted" | "withheld";
+  reasonCodes: CaptionQualityControlReasonCode[];
 }
 
 export interface ProductionStudioCaptionArtifactView {
@@ -343,6 +372,22 @@ export interface ProductionStudioSpawnView {
   rejection: SpawnRejection | null;
   taskId: string | null;
   agentId: string | null;
+}
+
+export interface ProductionStudioRootOutputDispositionView {
+  dispositionId: string;
+  reportId: string;
+  spawnRequestId: string;
+  rootTaskId: string;
+  rootAgentId: string;
+  childTaskId: string;
+  childAgentId: string;
+  inputArtifactId: string;
+  outputArtifactId: string;
+  outcome: "promoted_to_root" | "rejected_by_root";
+  reason: string;
+  receiptId: string;
+  receiptContentId: string;
 }
 
 export interface ProductionStudioOperationView {
@@ -427,6 +472,7 @@ export interface ProductionStudioProjection {
   grants: ProductionStudioGrantView[];
   reports: ProductionStudioReportView[];
   spawnRequests: ProductionStudioSpawnView[];
+  rootOutputDispositions: ProductionStudioRootOutputDispositionView[];
   operations: ProductionStudioOperationView[];
   evidenceReads: ProductionStudioEvidenceReadView[];
   evidenceAssessments: ProductionStudioEvidenceAssessmentView[];
@@ -435,6 +481,7 @@ export interface ProductionStudioProjection {
   publishReviewDecisions: ProductionStudioPublishReviewDecisionView[];
   publishReviewRevocations: ProductionStudioPublishReviewRevocationView[];
   captionProductions: ProductionStudioCaptionProductionView[];
+  captionQualityControls: ProductionStudioCaptionQualityControlView[];
   sourceArtifacts: ProductionStudioSourceArtifactView[];
   evidenceArtifacts: ProductionStudioEvidenceArtifactView[];
   assessmentArtifacts: ProductionStudioEvidenceAssessmentArtifactView[];
@@ -451,6 +498,7 @@ export interface ProductionStudioProjection {
     executions: number;
     reports: number;
     spawnRequests: number;
+    rootOutputDispositions: number;
     operations: number;
     evidenceReads: number;
     evidenceAssessments: number;
@@ -459,6 +507,7 @@ export interface ProductionStudioProjection {
     publishReviewDecisions: number;
     publishReviewRevocations: number;
     captionProductions: number;
+    captionQualityControls: number;
     sourceArtifacts: number;
     evidenceArtifacts: number;
     assessmentArtifacts: number;

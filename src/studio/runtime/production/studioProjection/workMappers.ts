@@ -3,6 +3,7 @@ import type {
   ProductionStudioGrantView,
   ProductionStudioOperationView,
   ProductionStudioReportView,
+  ProductionStudioRootOutputDispositionView,
   ProductionStudioSpawnView,
   ProductionStudioTaskView,
   ProductionStudioWorkerView,
@@ -92,6 +93,36 @@ export function projectSpawnRequests(state: RuntimeProjection) {
     }))
     .sort((left, right) => left.requestId.localeCompare(right.requestId));
   return spawnRequests;
+}
+
+
+export function projectRootOutputDispositions(state: RuntimeProjection) {
+  const dispositions = Object.values(state.rootOutputDispositions)
+    .map((disposition): ProductionStudioRootOutputDispositionView => {
+      const report = state.reports[disposition.reportId];
+      if (!report?.decisionReason) {
+        throw new Error(
+          `Production Studio projection: root disposition ${disposition.id} has no decided report reason`,
+        );
+      }
+      return {
+        dispositionId: disposition.id,
+        reportId: disposition.reportId,
+        spawnRequestId: disposition.spawnRequestId,
+        rootTaskId: disposition.rootTaskId,
+        rootAgentId: disposition.rootAgentId,
+        childTaskId: disposition.childTaskId,
+        childAgentId: disposition.childAgentId,
+        inputArtifactId: disposition.inputArtifactId,
+        outputArtifactId: disposition.outputArtifactId,
+        outcome: disposition.outcome,
+        reason: report.decisionReason,
+        receiptId: disposition.receiptId,
+        receiptContentId: disposition.receiptContentId,
+      };
+    })
+    .sort((left, right) => left.dispositionId.localeCompare(right.dispositionId));
+  return dispositions;
 }
 
 

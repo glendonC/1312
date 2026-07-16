@@ -18,6 +18,7 @@ import type { ProductionStudioProjection } from "./studioProjection/model.ts";
 import {
   projectCaptionArtifacts,
   projectCaptionProductions,
+  projectCaptionQualityControls,
   projectPublishReviewDecisionArtifacts,
   projectPublishReviewDecisions,
   projectPublishReviewIntakeArtifacts,
@@ -29,6 +30,7 @@ import {
   projectGrants,
   projectOperations,
   projectReports,
+  projectRootOutputDispositions,
   projectSpawnRequests,
   projectTasks,
   projectWorkers,
@@ -41,6 +43,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
   const grants = projectGrants(state);
   const reports = projectReports(state);
   const spawnRequests = projectSpawnRequests(state);
+  const rootOutputDispositions = projectRootOutputDispositions(state);
   const operations = projectOperations(state);
   const evidenceReads = projectEvidenceReads(state);
   const evidenceAssessments = projectEvidenceAssessments(state);
@@ -49,6 +52,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
   const publishReviewDecisions = projectPublishReviewDecisions(state);
   const publishReviewRevocations = projectPublishReviewRevocations(state);
   const captionProductions = projectCaptionProductions(state);
+  const captionQualityControls = projectCaptionQualityControls(state);
   const sourceArtifacts = projectSourceArtifacts(state);
   const outputArtifacts = projectOutputArtifacts(state, reports);
   const evidenceArtifacts = projectEvidenceArtifacts(state);
@@ -70,6 +74,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     grants,
     reports,
     spawnRequests,
+    rootOutputDispositions,
     operations,
     evidenceReads,
     evidenceAssessments,
@@ -78,6 +83,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     publishReviewDecisions,
     publishReviewRevocations,
     captionProductions,
+    captionQualityControls,
     sourceArtifacts,
     evidenceArtifacts,
     assessmentArtifacts,
@@ -94,6 +100,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       executions: Object.keys(state.executions).length,
       reports: reports.length,
       spawnRequests: spawnRequests.length,
+      rootOutputDispositions: rootOutputDispositions.length,
       operations: operations.length,
       evidenceReads: evidenceReads.length,
       evidenceAssessments: evidenceAssessments.length,
@@ -102,6 +109,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       publishReviewDecisions: publishReviewDecisions.length,
       publishReviewRevocations: publishReviewRevocations.length,
       captionProductions: captionProductions.length,
+      captionQualityControls: captionQualityControls.length,
       sourceArtifacts: sourceArtifacts.length,
       evidenceArtifacts: evidenceArtifacts.length,
       assessmentArtifacts: assessmentArtifacts.length,

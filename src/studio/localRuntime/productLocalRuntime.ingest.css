@@ -1,0 +1,103 @@
+
+.product-runtime-connect,
+.product-runtime-range,
+.product-runtime-language {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+
+.product-runtime label {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  min-width: 190px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.product-runtime label > span,
+.product-runtime legend {
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-ingest,
+.product-runtime-request {
+  display: grid;
+  gap: 14px;
+}
+
+.product-runtime-ingest > p,
+.product-runtime-request > p,
+.product-runtime-empty-source {
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.product-runtime .product-runtime-attestation {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.product-runtime-attestation input {
+  width: 17px;
+  min-height: 17px;
+  flex: 0 0 17px;
+  margin-top: 2px;
+  padding: 0;
+}
+
+.product-runtime-ingest-status {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink-soft);
+  background: var(--paper-soft);
+  font-size: 0.72rem;
+}
+
+.product-runtime-ingest-status[data-state="failed"] {
+  border-color: var(--flag-line);
+  color: var(--flag);
+  background: var(--flag-soft);
+}
+
+.product-runtime-source-facts,
+.product-runtime-plan dl,
+.product-runtime-evidence-boundary dl,
+.product-runtime-caption-result-identities {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.product-runtime-source-facts {
+  margin-block: 16px 0;
+}
+
+.product-runtime-source-facts div,
+.product-runtime-plan dl div,
+.product-runtime-evidence-boundary dl div,
+.product-runtime-caption-result-identities div {
+  min-width: 0;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.product-runtime dt {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+}
+
+.product-runtime dd {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}

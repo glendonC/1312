@@ -1,0 +1,171 @@
+/* Source entry before a run, and the single global control while a run is active. */
+
+.act-input {
+  position: relative;
+  height: 100svh;
+  min-height: 100svh;
+  flex: 1;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(58% 46% at 50% 74%, rgba(42, 107, 102, 0.17), transparent 72%),
+    radial-gradient(40% 40% at 20% 28%, rgba(184, 150, 63, 0.1), transparent 70%),
+    radial-gradient(44% 44% at 82% 24%, rgba(42, 107, 102, 0.09), transparent 72%);
+}
+
+.input-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  width: min(430px, calc(100vw - 32px));
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  transform: translate(-50%, -50%);
+}
+
+.input-status-kicker {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.input-status p,
+.input-status code {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.input-status code {
+  overflow-wrap: anywhere;
+  color: var(--flag);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+}
+
+.dock-well {
+  position: fixed;
+  bottom: clamp(20px, 4vh, 34px);
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transform: translateX(-50%);
+}
+
+/* Pause is reversible, so it sits on a separate quiet plane above the destructive Stop. */
+.rail {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.72),
+    0 9px 24px rgba(26, 70, 66, 0.09);
+  backdrop-filter: blur(20px) saturate(1.55);
+  -webkit-backdrop-filter: blur(20px) saturate(1.55);
+}
+
+.rail[data-paused="true"] {
+  border-color: var(--hold-line);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.rail[data-terminal="true"] {
+  border-color: var(--accent-line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.rail-btn {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 0;
+  color: var(--ink-soft);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.rail-glyph,
+.dock-hold-glyph {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+.rail-glyph svg,
+.dock-hold-glyph svg {
+  display: block;
+  overflow: visible;
+}
+
+.rail-btn:hover {
+  color: var(--ink);
+  background: rgba(22, 29, 27, 0.05);
+}
+
+.rail[data-paused="true"] .rail-btn {
+  color: var(--accent);
+}
+
+.rail[data-paused="true"] .rail-btn:hover {
+  background: var(--accent-soft);
+}
+
+.rail[data-terminal="true"] .rail-btn {
+  color: var(--accent);
+}
+
+.rail[data-terminal="true"] .rail-btn:hover {
+  background: var(--accent-soft);
+}
+
+.rail-btn:disabled,
+.dock-hold:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.rail-btn kbd {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink-muted);
+  background: rgba(22, 29, 27, 0.04);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  line-height: 1;
+}

@@ -1,0 +1,400 @@
+/* The worker's environment at compact and expanded-focus scales. */
+
+/* ---------- the worker's environment ---------- */
+
+/*
+ * One renderer, two densities. `focus` is the readable inspection view and `cell` is the
+ * same workspace at compact scale. The cell is a glance and focus is a read, so the cell
+ * clamps lines and drops rows, but it never shows a field focus would not show.
+ */
+.env {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  corner-shape: squircle;
+  background: var(--paper);
+}
+
+.env[data-scale="cell"] {
+  min-height: 0;
+  flex: 1;
+  gap: 4px;
+  padding: 6px 7px;
+  overflow: hidden;
+  border-radius: 13px;
+}
+
+.env[data-scale="focus"] {
+  min-height: 100%;
+  flex: 1;
+  gap: 14px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* nothing has landed yet, and the workspace says so instead of showing a plausible guess */
+.env-empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  line-height: 1.5;
+}
+
+.env[data-scale="cell"] .env-empty {
+  font-size: 0.54rem;
+}
+
+/* which half of the clip this worker owns: the only thing separating translate-01 from -02 */
+.env-win {
+  align-self: flex-start;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.env[data-scale="cell"] .env-win {
+  padding: 0 4px;
+  font-size: 0.5rem;
+}
+
+.env-wave {
+  position: relative;
+  height: 46px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--paper-soft);
+}
+
+.env[data-scale="focus"] .env-wave {
+  height: 70px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(247, 250, 248, 0.72);
+}
+
+.env[data-scale="cell"] .env-wave {
+  height: 34px;
+  border-radius: 4px;
+}
+
+.env-wave svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.env-wave svg rect {
+  fill: rgba(22, 29, 27, 0.26);
+}
+
+.env-head {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--accent);
+}
+
+.env-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.env[data-scale="focus"] .env-marks {
+  gap: 6px;
+}
+
+.env[data-scale="focus"] .mark {
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 0.58rem;
+}
+
+.mark {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+}
+
+.mark[data-hard="true"] {
+  border-color: var(--flag-line);
+  color: var(--flag);
+  background: var(--flag-soft);
+}
+
+.env-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  line-height: 1.5;
+}
+
+.env-context-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.env[data-scale="focus"] .env-row {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  corner-shape: squircle;
+  background: rgba(247, 250, 248, 0.68);
+}
+
+.env[data-scale="focus"] .env-row b {
+  font-size: 0.75rem;
+}
+
+.env[data-scale="focus"] .env-row span {
+  font-size: 0.65rem;
+}
+
+.env-context-boundary,
+.env-context-empty > p:last-child {
+  margin: auto 0 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  line-height: 1.55;
+}
+
+.env-context-empty {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 18px;
+  text-align: center;
+}
+
+.env-context-empty > p:last-child {
+  margin-top: 7px;
+}
+
+.env-row b {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.env-row span {
+  overflow: hidden;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-src {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.env[data-scale="focus"] .env-win {
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 0.6rem;
+}
+
+.env[data-scale="focus"] .env-src,
+.env[data-scale="focus"] .env-tgt {
+  padding: clamp(14px, 2vw, 22px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  corner-shape: squircle;
+  background: rgba(247, 250, 248, 0.68);
+}
+
+.env[data-scale="focus"] .env-src {
+  color: var(--ink);
+  font-size: clamp(1.08rem, 2vw, 1.45rem);
+  line-height: 1.55;
+}
+
+.env[data-scale="focus"] .env-tgt {
+  color: var(--ink-soft);
+  font-size: clamp(0.96rem, 1.5vw, 1.2rem);
+  line-height: 1.55;
+}
+
+.env-tgt {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.env-conf {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.env[data-scale="focus"] .env-conf {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/*
+ * It says "agreement", and it has to.
+ *
+ * An unlabelled bar next to a translation is read as the model's confidence in it, which is the
+ * one number nobody here is allowed to print: these models return no logprobs, and a model's
+ * opinion of its own correctness is the wrong-fluent failure this instrument exists to catch,
+ * dressed up as evidence. What the bar actually shows is how far a SECOND recogniser backs up
+ * the Korean — a measurement, between two systems, about the audio.
+ */
+.env-conf-key {
+  color: var(--ink-faint, var(--ink-muted));
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* No bar at all when there is nothing to measure: an empty track reads as a zero, and a zero is
+   a finding. The absence of one gets words instead. */
+.env-conf-none {
+  flex: 1;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-align: right;
+}
+
+.env-conf-track {
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.env-conf-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.env-conf-val {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.env-gate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
+}
+
+.env[data-scale="focus"] .env-gate {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(247, 250, 248, 0.68);
+}
+
+.env[data-scale="focus"] .env-gate-name,
+.env[data-scale="focus"] .env-gate-val {
+  font-size: 0.66rem;
+}
+
+.env-gate-name {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* gate provenance: universal rules survive a language swap, pack rules do not */
+.env-gate-name i {
+  padding: 0 3px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--ink-muted);
+  font-size: 0.52rem;
+  font-style: normal;
+}
+
+.env-gate-name i[data-scope="universal"] {
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.env-gate-val {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.env-gate[data-fail="true"] .env-gate-val {
+  color: var(--flag);
+}
+
+.env-gate-track {
+  height: 3px;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.env-gate-fill {
+  display: block;
+  height: 100%;
+  background: var(--ink-muted);
+}
+
+.env-gate[data-fail="true"] .env-gate-fill {
+  background: var(--flag);
+}
+
+.stamp {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border: 1px solid var(--flag-line);
+  border-radius: 6px;
+  color: var(--flag);
+  background: var(--flag-soft);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stamp[data-kind="corrected"] {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-soft);
+}

@@ -1,0 +1,205 @@
+
+/* Detailed evidence remains available below the primary canvas. */
+
+.product-runtime-evidence {
+  width: min(1120px, 100%);
+  margin: 24px auto 0;
+  padding: 0 clamp(14px, 2vw, 22px) 22px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.product-runtime-evidence > summary {
+  padding: 16px 0;
+  border-bottom: 1px solid transparent;
+}
+
+.product-runtime-evidence[open] > summary {
+  border-bottom-color: var(--line);
+}
+
+.product-runtime-evidence > summary > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.product-runtime-evidence > summary b {
+  font-size: 0.76rem;
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-evidence > summary small {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+}
+
+.product-runtime-evidence-boundary {
+  padding-block: 18px;
+}
+
+.product-runtime-evidence-boundary > p,
+.product-runtime-production > p,
+.product-runtime-production section > p,
+.product-runtime-caption-results > p {
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+
+.product-runtime-evidence-boundary > p a {
+  color: var(--accent);
+}
+
+.product-runtime-production {
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.product-runtime-production > header h3,
+.product-runtime-caption-results > header h3 {
+  margin-top: 4px;
+  font-size: 1rem;
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-production > section {
+  margin-top: 26px;
+}
+
+.product-runtime-production section h4 {
+  font-size: 0.82rem;
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-fact-list {
+  display: grid;
+  gap: 0;
+  margin-top: 12px;
+}
+
+.product-runtime-fact-list article,
+.product-runtime-unavailable {
+  margin: 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.product-runtime-fact-list article > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-runtime-fact-list h5 {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-fact-list article > header > span,
+.product-runtime-fact-list article > header > small {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+}
+
+.product-runtime-fact-list dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.product-runtime-fact-list article > p {
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+
+.product-runtime-fact-list button,
+.product-runtime-fact-list input,
+.product-runtime-fact-list select,
+.product-runtime-fact-list textarea {
+  font-size: 0.68rem;
+}
+
+.product-runtime-caption-results {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.product-runtime-caption-results-boundary,
+.product-runtime-caption-results-nonclaim {
+  margin-top: 12px !important;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.product-runtime-caption-result-list {
+  display: grid;
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.product-runtime-caption-result-list > article {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.product-runtime-caption-result-list > article > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-runtime-caption-result-list h4 {
+  margin-top: 4px;
+  font-size: 0.86rem;
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-caption-result-identities {
+  margin-top: 14px;
+}
+
+.product-runtime-caption-lines {
+  display: grid;
+  gap: 0;
+  margin-top: 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.product-runtime-caption-lines li {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.3fr) minmax(200px, 1fr) minmax(200px, 1fr);
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.product-runtime-caption-lines p {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.product-runtime-caption-time {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-variant-numeric: tabular-nums;
+}

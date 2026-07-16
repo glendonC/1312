@@ -1,0 +1,115 @@
+
+.preflight-binding {
+  margin: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+}
+
+.preflight-forecast-ledger {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.65fr);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.preflight-forecast-ledger > section,
+.preflight-forecast-ledger > aside {
+  padding: 16px 0;
+}
+
+.preflight-forecast-ledger > aside {
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+
+.preflight-forecast-ledger > section > span,
+.preflight-forecast-ledger > aside > span,
+.preflight-request-identity > span {
+  display: block;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.preflight-forecast-ledger h3 {
+  margin: 6px 0 12px;
+  font-size: 0.9rem;
+  font-weight: var(--weight-medium);
+}
+
+.preflight-forecast-ledger dl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.preflight-forecast-ledger dl div {
+  display: grid;
+  grid-template-columns: 7.4rem minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.preflight-forecast-ledger dt,
+.preflight-forecast-ledger dd {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.preflight-forecast-ledger dt {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
+.preflight-forecast-ledger dd {
+  color: var(--ink-soft);
+}
+
+.preflight-request-identity {
+  margin: 0;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.preflight-request-identity summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.preflight-request-identity summary::-webkit-details-marker {
+  display: none;
+}
+
+.preflight-request-identity summary code {
+  flex: none;
+  margin: 0;
+}
+
+.preflight-request-identity code,
+.preflight-request-identity small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.preflight-request-identity code {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 0.62rem;
+}
+
+.preflight-request-identity small {
+  margin-top: 5px;
+  color: var(--ink-muted);
+  font-size: 0.62rem;
+  line-height: 1.4;
+}

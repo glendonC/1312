@@ -1,0 +1,87 @@
+
+/* ---------- the same environment, shrunk onto the node ---------- */
+
+.env[data-scale="cell"] .mark {
+  padding: 0 4px;
+  font-size: 0.5rem;
+}
+
+.env[data-scale="cell"] .env-marks {
+  gap: 3px;
+}
+
+.env[data-scale="cell"] .env-row {
+  gap: 5px;
+  font-size: 0.56rem;
+  line-height: 1.4;
+}
+
+/*
+ * The card is a glance, not a transcript. Korean wraps to two lines and the English to
+ * one, and both ellipsize — an unclamped draft would push the confidence bar off the card
+ * and turn the swarm into soup. The full line is one click away in focus mode.
+ */
+.env[data-scale="cell"] .env-src,
+.env[data-scale="cell"] .env-tgt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.env[data-scale="cell"] .env-src {
+  font-size: 0.62rem;
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+}
+
+.env[data-scale="cell"] .env-tgt {
+  font-size: 0.58rem;
+  line-height: 1.35;
+  -webkit-line-clamp: 1;
+}
+
+.env[data-scale="cell"] .env-conf {
+  margin-top: auto;
+  gap: 5px;
+}
+
+.env[data-scale="cell"] .env-conf-val {
+  font-size: 0.52rem;
+}
+
+/* The label survives the shrink to card size. It is the difference between a measurement and a
+   model's opinion of itself, and that does not stop mattering because the card got smaller. */
+.env[data-scale="cell"] .env-conf-key {
+  font-size: 0.46rem;
+  letter-spacing: 0.02em;
+}
+
+.env[data-scale="cell"] .env-conf-none {
+  overflow: hidden;
+  font-size: 0.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env[data-scale="cell"] .env-gate {
+  gap: 2px 6px;
+}
+
+.env[data-scale="cell"] .env-gate-name {
+  font-size: 0.54rem;
+}
+
+.env[data-scale="cell"] .env-gate-name i {
+  font-size: 0.46rem;
+}
+
+.env[data-scale="cell"] .env-gate-val {
+  font-size: 0.54rem;
+}
+
+.env[data-scale="cell"] .stamp {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.48rem;
+  letter-spacing: 0.06em;
+}

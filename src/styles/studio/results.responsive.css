@@ -1,0 +1,17 @@
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 720px) {
+  .submitted-results-boundary dl {
+    grid-template-columns: 1fr;
+  }
+
+  .submitted-results-boundary dl div:nth-child(odd) {
+    padding-right: 0;
+  }
+
+  .scores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 16px;
+  }
+}

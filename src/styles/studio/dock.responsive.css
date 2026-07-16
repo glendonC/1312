@@ -1,0 +1,48 @@
+
+@media (max-width: 720px) {
+  .rail:not([data-terminal="true"]) {
+    display: none;
+  }
+
+  .dock-hold {
+    display: inline-flex;
+  }
+
+  .dock-bar {
+    width: min(440px, 92vw);
+    gap: 6px;
+    padding-inline: 7px;
+  }
+
+  .dock-bar-run {
+    width: min(440px, 92vw);
+    min-width: 0;
+    padding-left: 7px;
+  }
+
+  .dock-bar-source {
+    width: fit-content;
+    max-width: 92vw;
+  }
+
+  .dock-state .dock-status {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .dock-layout {
+    right: 0;
+    bottom: calc(100% + 10px);
+    left: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .source-display-url-full.has-compact {
+    display: none;
+  }
+
+  .source-display-url-compact {
+    display: inline;
+  }
+}

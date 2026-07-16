@@ -1,0 +1,131 @@
+
+/* ---------- recorded media inside the segmenter's focus environment ---------- */
+
+.env-media {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.env-media-frame {
+  position: relative;
+  min-height: 160px;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid rgba(22, 29, 27, 0.16);
+  border-radius: 20px;
+  corner-shape: squircle;
+  background: #17201e;
+}
+
+.env-media-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.env-media-frame audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.env-media-caption {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.94);
+  background: rgba(14, 21, 20, 0.62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.env-media-caption span {
+  display: block;
+  color: rgba(255, 255, 255, 0.62);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.env-media-caption p {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.env-media-unavailable {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  left: 20px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  text-align: center;
+  transform: translateY(-50%);
+}
+
+.env-media-transport {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(100px, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.env-media-transport button {
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  cursor: pointer;
+}
+
+.env-media-transport .env-media-play {
+  min-width: 58px;
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.env-media-transport button:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.env-media-transport button:disabled,
+.env-media-transport input:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.env-media-transport input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.env-media-transport time,
+.env-media-boundary {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.env-media-boundary {
+  margin: 0;
+}

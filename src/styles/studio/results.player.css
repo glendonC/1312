@@ -1,0 +1,296 @@
+
+/* ---------- the screen ---------- */
+
+/*
+ * The clip, playing, with the captions on it.
+ *
+ * The list below is for reading; this is for WATCHING, and it is the only place the two paths
+ * meet an audience the way an audience actually meets a caption — one line at a time, over a
+ * face, at speed, with no chance to cross-check. Which is the whole argument: a withheld line
+ * looks like less right up until you notice that the alternative was never a blank, it was a
+ * fluent sentence nobody in the room could verify.
+ */
+.screen {
+  position: relative;
+  overflow: hidden;
+  margin: 0;
+  border-radius: 12px;
+  corner-shape: squircle;
+  background: #10201d;
+  line-height: 0;
+}
+
+.screen-video {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  cursor: pointer;
+}
+
+.burn {
+  position: absolute;
+  right: 4%;
+  bottom: 5%;
+  left: 4%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.35;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.burn[data-path="prepped"],
+.burn[data-path="cold"] {
+  color: #fff;
+  font-size: clamp(0.9rem, 1.7vw, 1.06rem);
+  /* a caption sits on whatever the frame happens to be, so it carries its own contrast */
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.85),
+    0 0 14px rgba(0, 0, 0, 0.55);
+}
+
+.burn[data-path="cold"] {
+  color: var(--stop-soft, #ffd9d3);
+}
+
+.results[data-accuracy="unscored"] .burn[data-path="cold"],
+.results[data-accuracy="unscored"] .burn-cold {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+/* Not a caption: a refusal, and the reason for it. It must not look like speech. */
+.burn[data-path="withheld"] {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  corner-shape: squircle;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(16, 32, 29, 0.72);
+  font-size: 0.78rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.burn-mark {
+  color: var(--hold, #5f6f6b);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.burn-cold {
+  color: var(--stop-soft, #ffb4a8);
+  font-size: 0.74rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* ---------- the credit: a term of the licence, not a courtesy ---------- */
+
+.credit {
+  margin: 0;
+  padding: 0 6px 2px;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.credit-title {
+  color: var(--ink);
+}
+
+.credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 4px 2px;
+}
+
+.play {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--paper-elevated);
+  background: var(--ink);
+  font-size: 0.6rem;
+  cursor: pointer;
+  transition: transform 160ms ease;
+}
+
+.play:hover {
+  transform: scale(1.06);
+}
+
+.play:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.media-empty,
+.wave-empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.media-empty {
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--paper-soft);
+  text-align: center;
+}
+
+.wave-empty {
+  min-width: 0;
+  flex: 1;
+}
+
+.wave {
+  position: relative;
+  height: 40px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--paper-soft);
+}
+
+.wave-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.wave-svg rect {
+  fill: rgba(22, 29, 27, 0.3);
+}
+
+.wave-regions,
+.wave-head,
+.wave-hit {
+  position: absolute;
+  inset: 0;
+}
+
+.wave-region {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.wave-region[data-kind="music"] {
+  background: var(--gold-soft);
+}
+
+.wave-region[data-kind="silence"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(140, 52, 42, 0.1) 3px,
+    rgba(140, 52, 42, 0.1) 4px
+  );
+}
+
+.wave-head {
+  right: auto;
+  width: 1.5px;
+  background: var(--ink);
+}
+
+.wave-hit {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.wave:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.player-time {
+  flex: none;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-bar {
+  display: flex;
+  width: min(860px, 100%);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0 6px;
+}
+
+.seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  corner-shape: squircle;
+  background: var(--paper-elevated);
+}
+
+.seg-btn {
+  border: 0;
+  border-left: 1px solid var(--line);
+  padding: 7px 15px;
+  color: var(--ink-muted);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.seg-btn:first-child {
+  border-left: 0;
+}
+
+.seg-btn:hover {
+  color: var(--ink);
+}
+
+.seg-btn.is-on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.result-note {
+  flex: 1;
+  min-width: 220px;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}

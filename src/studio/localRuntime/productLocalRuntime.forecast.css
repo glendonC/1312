@@ -1,0 +1,48 @@
+
+.product-runtime-request {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.product-runtime-plan header {
+  margin-bottom: 14px;
+}
+
+.product-runtime-plan h2 {
+  margin-top: 4px;
+  font-size: 1.05rem;
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-operations {
+  margin-top: 16px;
+}
+
+.product-runtime-operations h3 {
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-operations ul,
+.product-runtime-plan details ul {
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.6;
+}
+
+.product-runtime-start {
+  margin-top: 14px;
+  border-color: transparent !important;
+  color: #fff !important;
+  background: var(--accent-control) !important;
+  box-shadow: var(--accent-control-shadow);
+}
+
+.product-runtime-error {
+  border-color: var(--flag-line);
+  color: var(--flag);
+  background: var(--flag-soft);
+  font-size: 0.72rem;
+}

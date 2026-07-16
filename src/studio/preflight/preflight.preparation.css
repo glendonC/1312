@@ -1,0 +1,134 @@
+
+.preflight-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.preflight-preparation {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preflight-stage-head {
+  padding-top: 4px;
+}
+
+.preflight-stage-head > span {
+  margin-bottom: 5px;
+  color: var(--accent);
+}
+
+.preflight-stage-head h2 {
+  margin: 0 0 7px;
+  font-size: clamp(1.05rem, 2.3vw, 1.35rem);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  outline: none;
+}
+
+.preflight-forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preflight-forecast-fact {
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.preflight-forecast-fact[data-unavailable="true"] {
+  background: rgba(247, 247, 244, 0.54);
+}
+
+.preflight-forecast-fact > span {
+  margin-bottom: 9px;
+}
+
+.preflight-forecast-fact b {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: var(--weight-medium);
+}
+
+.preflight-forecast-fact[data-unavailable="true"] b {
+  color: var(--ink-muted);
+}
+
+.preflight-contract-gap,
+.preflight-preview-warning {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 2px solid var(--hold);
+  color: var(--ink-soft);
+  background: var(--hold-soft);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.preflight-confirmation-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+.preflight-confirmation-summary div {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.preflight-confirmation-summary div:nth-child(odd) {
+  padding-right: 18px;
+}
+
+.preflight-confirmation-summary dt,
+.preflight-confirmation-summary dd {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.preflight-confirmation-summary dt {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
+.preflight-confirmation-summary dd {
+  color: var(--ink-soft);
+}
+
+.preflight-next-sequence {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.preflight-next-sequence ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.preflight-preview-warning b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}

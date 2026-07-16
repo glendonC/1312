@@ -1,0 +1,123 @@
+
+/* Layout changes only the canvas, so it stays adjacent to — but outside — the run control. */
+.dock-layout {
+  position: absolute;
+  bottom: 3px;
+  left: calc(100% + 12px);
+}
+
+.dock-layout-trigger {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.dock-layout-trigger svg,
+.dock-layout-option-icon svg {
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dock-layout-trigger .layout-glyph-core,
+.dock-layout-option-icon .layout-glyph-core {
+  fill: currentColor;
+  stroke: none;
+}
+
+.dock-layout-trigger:hover,
+.dock-layout-trigger[aria-expanded="true"] {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.86);
+  transform: scale(1.04);
+}
+
+.dock-layout-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  display: grid;
+  width: 154px;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: 17px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+}
+
+.dock-layout-menu[hidden] {
+  display: none;
+}
+
+.dock-layout-option {
+  display: grid;
+  height: 38px;
+  grid-template-columns: 28px 1fr 16px;
+  align-items: center;
+  padding: 0 8px 0 5px;
+  border: 0;
+  border-radius: 11px;
+  color: var(--ink-soft);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.dock-layout-option:hover,
+.dock-layout-option:focus-visible {
+  color: var(--ink);
+  background: rgba(22, 29, 27, 0.055);
+  outline: none;
+}
+
+.dock-layout-option[aria-checked="true"] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dock-layout-option-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.dock-layout-check {
+  width: 5px;
+  height: 5px;
+  justify-self: end;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.dock-layout-option[aria-checked="true"] .dock-layout-check {
+  background: currentColor;
+}

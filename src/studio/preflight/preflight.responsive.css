@@ -1,0 +1,126 @@
+
+@media (max-width: 720px) {
+  .preflight {
+    top: 64px;
+    width: calc(100vw - 20px);
+    max-height: calc(100svh - 158px);
+    padding: 20px 16px;
+    border-radius: 20px;
+  }
+
+  .preflight[data-preview-mode="submitted-source"] {
+    width: 100%;
+    height: auto;
+    max-height: none;
+    padding: 0;
+  }
+
+  .preflight[data-preview-mode="submitted-source-status"] {
+    top: auto;
+    width: 100%;
+    max-height: none;
+    padding: 20px 18px;
+  }
+
+  .preflight-stage-nav ol {
+    min-width: 510px;
+  }
+
+  .preflight-stage-panel {
+    min-height: min(410px, max(220px, calc(100svh - 270px)));
+    max-height: max(220px, calc(100svh - 270px));
+    padding: 20px 18px;
+    border-radius: 19px;
+  }
+
+  .preflight-stage-body {
+    min-height: 292px;
+  }
+
+  .preflight-language-stage,
+  .preflight[data-preview-mode="submitted-source"] .preflight-forecast-ledger {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .preflight-facts,
+  .preflight-primary,
+  .preflight-request-options,
+  .preflight-advanced[open],
+  .preflight-forecast-grid,
+  .preflight-confirmation-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .preflight-unavailable-ledger,
+  .preflight-forecast-ledger {
+    grid-template-columns: 1fr;
+  }
+
+  .preflight-forecast-ledger > aside {
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .preflight-submitted-source {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .preflight-submitted-boundary {
+    width: fit-content;
+    justify-self: start;
+    white-space: normal;
+  }
+
+  .preflight-submitted-details {
+    grid-column: 1;
+  }
+
+  .preflight-submitted-details dl {
+    grid-template-columns: 1fr;
+  }
+
+  .preflight-facts div {
+    grid-template-columns: 7rem minmax(0, 1fr);
+  }
+
+  .preflight-coverage li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .preflight-confirmation-summary div:nth-child(odd) {
+    padding-right: 0;
+  }
+
+  .preflight-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .preflight-actions button {
+    width: 100%;
+  }
+}
+
+@media (max-height: 520px) and (min-width: 721px) {
+  .preflight[data-preview-mode="submitted-source"] {
+    top: auto;
+    height: auto;
+    max-height: none;
+    padding: 0;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 860px) {
+  .preflight-forecast-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .preflight-request-options {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

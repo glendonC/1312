@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 
 import type { RunBundle } from "../transport";
 import {
@@ -10,6 +11,11 @@ import {
   type PreflightSession,
   type RangeAssessment,
 } from "./model";
+import PreparationStageNavigation, {
+  PREPARATION_STAGES,
+  preparationStageIndex,
+  type PreparationStage,
+} from "./PreparationStages";
 
 const LANGUAGE_NAMES: Record<string, string> = { en: "English", ko: "Korean", ja: "Japanese" };
 
@@ -18,25 +24,26 @@ interface ConfirmationFormProps {
   session: PreflightSession;
   facts: RecordedPreflightFacts;
   assessment: RangeAssessment | null;
+  sourceDetails: ReactNode;
   update: (request: Partial<AnalysisRequest>) => void;
   cancel: () => void;
   confirm: () => void;
 }
-
-type PreparationStage = "configure" | "forecast" | "confirm";
 
 export default function ConfirmationForm({
   bundle,
   session,
   facts,
   assessment,
+  sourceDetails,
   update,
   cancel,
   confirm,
 }: ConfirmationFormProps) {
-  const [stage, setStage] = useState<PreparationStage>("configure");
+  const [stage, setStage] = useState<PreparationStage>("source");
+  const [furthestStage, setFurthestStage] = useState(0);
   const stageHeading = useRef<HTMLHeadingElement>(null);
-  const stageHasMounted = useRef(false);
+  const currentStageIndex = preparationStageIndex(stage);
   const { request } = session;
   const selectableDuration = facts.selection.duration;
   const recommendation =
@@ -48,229 +55,203 @@ export default function ConfirmationForm({
           ? `Longer than the recommended ${RECOMMENDED_RANGE_S.max} seconds.`
           : null;
 
-  useEffect(() => {
-    if (!stageHasMounted.current) {
-      stageHasMounted.current = true;
-      return;
-    }
-    const frame = window.requestAnimationFrame(() => {
-      stageHeading.current?.focus();
-      stageHeading.current?.scrollIntoView({ block: "start", inline: "nearest", behavior: "smooth" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [stage]);
+  function selectStage(nextStage: PreparationStage): void {
+    if (preparationStageIndex(nextStage) <= furthestStage) setStage(nextStage);
+  }
 
   function submitStage(): void {
-    if (stage === "configure") {
-      if (assessment?.canReplay) setStage("forecast");
+    if (stage === "confirm") {
+      confirm();
       return;
     }
-    if (stage === "forecast") {
-      setStage("confirm");
+    if (stage === "range" && !assessment?.canReplay) return;
+    const nextIndex = currentStageIndex + 1;
+    const nextStage = PREPARATION_STAGES[nextIndex]?.id;
+    if (!nextStage) return;
+    setFurthestStage((current) => Math.max(current, nextIndex));
+    setStage(nextStage);
+  }
+
+  function previousStage(): void {
+    if (currentStageIndex === 0) {
+      cancel();
       return;
     }
-    confirm();
+    setStage(PREPARATION_STAGES[currentStageIndex - 1].id);
   }
 
   return (
     <form
       className="preflight-form"
       data-preparation-stage={stage}
+      data-palette={PREPARATION_STAGES[currentStageIndex].palette}
+      data-furthest-stage={PREPARATION_STAGES[furthestStage].id}
+      data-recorded-preparation="true"
       onSubmit={(event) => {
         event.preventDefault();
         submitStage();
       }}
     >
-      {stage === "configure" && (
-        <section className="preflight-preparation" aria-labelledby="preflight-stage-title">
-          <PreparationHeading
-            headingRef={stageHeading}
-            kicker="Request setup"
-            title="Choose what Studio should prepare"
-            detail="Confirm the measured selection, language target, and output before replaying the recorded processing sequence."
-          />
+      <PreparationStageNavigation
+        currentStage={stage}
+        furthestStage={furthestStage}
+        selectStage={selectStage}
+      />
 
-          <fieldset className="preflight-group">
-            <legend>Analysis range</legend>
-            <>
-              <Choice
-                name="range"
-                value="full-source"
-                checked={false}
-                disabled
-                label="Entire source · the recorded demo contains only its selected window"
-              />
-              <Choice
-                name="range"
-                value="recorded"
-                checked={request.rangeMode === "recorded"}
-                onChange={() => update({ rangeMode: "recorded", start: 0, end: facts.selection.duration })}
-                label={`Recorded selection · 0:00–${formatSeconds(facts.selection.duration)}`}
-              />
-            </>
-            <Choice name="range" value="suggested" checked={false} disabled label="Suggested range · no recommender output" />
-            <Choice
-              name="range"
-              value="detected"
-              checked={false}
-              disabled
-              label={
-                facts.languageRanges
-                  ? "Measured language ranges · preflight evidence only; no replayable detected-language subrange"
-                  : "Whole detected-language range · no language detector output"
-              }
-            />
-            <Choice
-              name="range"
-              value="custom"
-              checked={request.rangeMode === "custom"}
-              onChange={() => update({ rangeMode: "custom" })}
-              label="Custom start and end"
-            />
-
-            {request.rangeMode === "custom" && (
-              <div className="preflight-range-fields">
-                <NumberField
-                  label="Start, seconds"
-                  value={request.start}
-                  max={selectableDuration}
-                  onChange={(start) => update({ start })}
-                />
-                <NumberField
-                  label="End, seconds"
-                  value={request.end}
-                  max={selectableDuration}
-                  onChange={(end) => update({ end })}
-                />
-              </div>
-            )}
-            <p className="preflight-policy">
-              Recommend {RECOMMENDED_RANGE_S.min}–{RECOMMENDED_RANGE_S.max}s · hosted maximum {HOSTED_MAX_RANGE_S}s.
-              {recommendation && ` ${recommendation}`}
-            </p>
-            {assessment?.duration != null && assessment.duration > HOSTED_MAX_RANGE_S && import.meta.env.DEV && (
-              <Choice
-                name="long-local"
-                value="accept"
-                checked={request.acceptLongLocal}
-                onChange={() => update({ acceptLongLocal: !request.acceptLongLocal })}
-                label="Allow this longer local run with slower processing"
-              />
-            )}
-          </fieldset>
-
-          <div className="preflight-primary">
-            <label>
-              <span>Translation target</span>
-              <select value={request.targetLanguage} onChange={(event) => update({ targetLanguage: event.currentTarget.value })}>
-                <option value={bundle.run.pair.target}>{languageName(bundle.run.pair.target)}</option>
-              </select>
-            </label>
-
-            <fieldset className="preflight-group preflight-output">
-              <legend>Result detail</legend>
-              <Choice
-                name="output"
-                value="captions"
-                checked={request.outputDepth === "captions"}
-                onChange={() => update({ outputDepth: "captions" })}
-                label="Captions only"
-              />
-              <Choice
-                name="output"
-                value="evidence"
-                checked={request.outputDepth === "evidence"}
-                onChange={() => update({ outputDepth: "evidence" })}
-                label="Captions plus evidence and breakdown"
-              />
-            </fieldset>
-          </div>
-
-          <AdvancedFields request={request} update={update} relevance={session.relevance} />
-
-          <details className="preflight-coverage">
-            <summary>Producer coverage</summary>
-            <p>
-              Rights, raw source window, and duration: <code>{facts.producer}</code>.
-              {facts.mediaProbe && (
-                <>
-                  {" "}Tracks and codecs: <code>{facts.mediaProbe.producer}</code>.
-                </>
-              )}
-              {facts.content && (
-                <>
-                  {" "}Raw content identity and {facts.content.derivedArtifacts} derived receipt: <code>SHA-256</code>.
-                </>
-              )}
-              {facts.speechActivity && (
-                <>
-                  {" "}Speech windows: <code>{facts.speechActivity.producer.id} {facts.speechActivity.producer.version}</code>.
-                </>
-              )}
-              {facts.languageRanges && (
-                <>
-                  {" "}Language ranges: <code>{facts.languageRanges.producer.id} {facts.languageRanges.producer.version}</code>.
-                </>
-              )}
-            </p>
-            <ul>
-              {session.missing.map((gap) => (
-                <li key={gap.id}>
-                  <b>{gap.label}</b>
-                  <span>{gap.consequence}</span>
-                </li>
-              ))}
-            </ul>
-            <p>
-              Speaker labels in this run are diarizer output, not human-confirmed identities. An empty <code>music[]</code> means no detector ran, not that the clip was proven music-free.
-            </p>
-          </details>
-
-          {assessment?.reason && (
-            <p className="preflight-block" role="status">
-              {assessment.reason}
-            </p>
-          )}
-        </section>
-      )}
-
-      {stage === "forecast" && (
-        <ForecastReview
-          headingRef={stageHeading}
-          request={request}
-          facts={facts}
-          assessment={assessment}
-        />
-      )}
-
-      {stage === "confirm" && (
-        <ConfirmationReview
-          headingRef={stageHeading}
-          request={request}
-          facts={facts}
-        />
-      )}
-
-      <div className="preflight-actions" data-stage={stage}>
-        {stage === "configure" ? (
-          <button type="button" className="ghost" onClick={cancel}>Cancel</button>
-        ) : (
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => setStage(stage === "confirm" ? "forecast" : "configure")}
+      <motion.section
+        className="preflight-stage-panel"
+        aria-labelledby="preflight-stage-title"
+        layout
+        layoutId="studio-source-guide-panel"
+        transition={{ layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={stage}
+            className="preflight-stage-body"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            onAnimationComplete={() => stageHeading.current?.focus({ preventScroll: true })}
           >
-            {stage === "confirm" ? "Back to forecast" : "Back to request"}
+            {stage === "source" && (
+              <section className="preflight-preparation">
+                <PreparationHeading
+                  headingRef={stageHeading}
+                  kicker="Recorded source"
+                  title={facts.title}
+                  detail="Review the receipted source boundary before choosing the replay request."
+                />
+                {sourceDetails}
+                <details className="preflight-coverage">
+                  <summary>Producer coverage</summary>
+                  <p>
+                    Rights, raw source window, and duration: <code>{facts.producer}</code>.
+                    {facts.mediaProbe && <> Tracks and codecs: <code>{facts.mediaProbe.producer}</code>.</>}
+                    {facts.content && <> Raw content identity and {facts.content.derivedArtifacts} derived receipt: <code>SHA-256</code>.</>}
+                    {facts.speechActivity && <> Speech windows: <code>{facts.speechActivity.producer.id} {facts.speechActivity.producer.version}</code>.</>}
+                    {facts.languageRanges && <> Language ranges: <code>{facts.languageRanges.producer.id} {facts.languageRanges.producer.version}</code>.</>}
+                  </p>
+                  <ul>{session.missing.map((gap) => <li key={gap.id}><b>{gap.label}</b><span>{gap.consequence}</span></li>)}</ul>
+                </details>
+              </section>
+            )}
+
+            {stage === "range" && (
+              <section className="preflight-preparation">
+                <PreparationHeading
+                  headingRef={stageHeading}
+                  kicker="Analysis range"
+                  title="Choose the recorded section to replay"
+                  detail="The demo contains one measured source window. You can replay it as recorded or narrow it locally."
+                />
+                <fieldset className="preflight-group preflight-range-stage">
+                  <legend>Requested section</legend>
+                  <Choice name="range" value="full-source" checked={false} disabled label="Entire source · the recorded demo contains only its selected window" />
+                  <Choice
+                    name="range"
+                    value="recorded"
+                    checked={request.rangeMode === "recorded"}
+                    onChange={() => update({ rangeMode: "recorded", start: 0, end: facts.selection.duration })}
+                    label={`Recorded selection · 0:00–${formatSeconds(facts.selection.duration)}`}
+                  />
+                  <Choice
+                    name="range"
+                    value="custom"
+                    checked={request.rangeMode === "custom"}
+                    onChange={() => update({ rangeMode: "custom" })}
+                    label="Custom start and end"
+                  />
+                  <Choice name="range" value="suggested" checked={false} disabled label="Suggested range · no recommender output" />
+                  <Choice
+                    name="range"
+                    value="detected"
+                    checked={false}
+                    disabled
+                    label={facts.languageRanges
+                      ? "Measured language ranges · preflight evidence only; no replayable detected-language subrange"
+                      : "Whole detected-language range · no language detector output"}
+                  />
+                  {request.rangeMode === "custom" && (
+                    <div className="preflight-range-fields">
+                      <NumberField label="Start, seconds" value={request.start} max={selectableDuration} onChange={(start) => update({ start })} />
+                      <NumberField label="End, seconds" value={request.end} max={selectableDuration} onChange={(end) => update({ end })} />
+                    </div>
+                  )}
+                  <p className="preflight-policy">
+                    Recommend {RECOMMENDED_RANGE_S.min}–{RECOMMENDED_RANGE_S.max}s · hosted maximum {HOSTED_MAX_RANGE_S}s.
+                    {recommendation && ` ${recommendation}`}
+                  </p>
+                  {assessment?.duration != null && assessment.duration > HOSTED_MAX_RANGE_S && import.meta.env.DEV && (
+                    <Choice
+                      name="long-local"
+                      value="accept"
+                      checked={request.acceptLongLocal}
+                      onChange={() => update({ acceptLongLocal: !request.acceptLongLocal })}
+                      label="Allow this longer local run with slower processing"
+                    />
+                  )}
+                </fieldset>
+                {assessment?.reason && <p className="preflight-block" role="status">{assessment.reason}</p>}
+              </section>
+            )}
+
+            {stage === "language" && (
+              <section className="preflight-preparation">
+                <PreparationHeading
+                  headingRef={stageHeading}
+                  kicker="Language direction"
+                  title="Confirm how the recorded run handles language"
+                  detail="The source declaration and language pack belong to the recorded receipt; only the translation target and relevant controls are replay inputs."
+                />
+                <div className="preflight-language-stage">
+                  <div className="preflight-recorded-language">
+                    <span>Recorded source language</span>
+                    <b>{languageName(facts.declaredLanguage)}</b>
+                    <small>Declared in the recorded clip · not newly detected</small>
+                  </div>
+                  <label className="preflight-target-language">
+                    <span>Translation target</span>
+                    <select value={request.targetLanguage} onChange={(event) => update({ targetLanguage: event.currentTarget.value })}>
+                      <option value={bundle.run.pair.target}>{languageName(bundle.run.pair.target)}</option>
+                    </select>
+                  </label>
+                </div>
+                <AdvancedFields request={request} update={update} relevance={session.relevance} />
+              </section>
+            )}
+
+            {stage === "output" && (
+              <section className="preflight-preparation">
+                <PreparationHeading
+                  headingRef={stageHeading}
+                  kicker="Requested output"
+                  title="Choose the replay detail"
+                  detail="This selects which recorded result surfaces will be shown after the replay completes."
+                />
+                <fieldset className="preflight-group preflight-output-stage">
+                  <legend>Result detail</legend>
+                  <Choice name="output" value="captions" checked={request.outputDepth === "captions"} onChange={() => update({ outputDepth: "captions" })} label="Captions only" />
+                  <Choice name="output" value="evidence" checked={request.outputDepth === "evidence"} onChange={() => update({ outputDepth: "evidence" })} label="Captions plus evidence and breakdown" />
+                </fieldset>
+              </section>
+            )}
+
+            {stage === "forecast" && <ForecastReview headingRef={stageHeading} request={request} facts={facts} assessment={assessment} />}
+            {stage === "confirm" && <ConfirmationReview headingRef={stageHeading} request={request} facts={facts} />}
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="preflight-actions" data-stage={stage}>
+          <button type="button" className="ghost" onClick={previousStage}>
+            {stage === "source" ? "Back to source choices" : `Back to ${PREPARATION_STAGES[currentStageIndex - 1].label}`}
           </button>
-        )}
-        <button type="submit" className="cta" disabled={stage === "configure" && !assessment?.canReplay}>
-          {stage === "configure"
-            ? "Continue to forecast"
-            : stage === "forecast"
-              ? "Review request"
-              : "Replay recorded analysis"}
-        </button>
-      </div>
+          <button type="submit" className="cta" disabled={stage === "range" && !assessment?.canReplay}>
+            {stage === "confirm" ? "Replay recorded analysis" : `Continue to ${PREPARATION_STAGES[currentStageIndex + 1].label}`}
+          </button>
+        </div>
+      </motion.section>
     </form>
   );
 }

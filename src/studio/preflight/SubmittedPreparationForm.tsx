@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useRef, useState, type CSSProperties, type RefObject } from "react";
 
 import type { StudioPreviewSession } from "../previewSession";
 import type { RemoteSourceResolutionReceipt } from "../sourceResolution";
-import SourceDisplay from "../SourceDisplay";
 import {
   SUBMITTED_PREPARATION_POLICY,
   type SubmittedSourceLanguageIntent,
@@ -14,9 +14,13 @@ import {
   type PreflightSession,
   type RangeAssessment,
 } from "./model";
+import PreparationStageNavigation, {
+  PREPARATION_STAGES,
+  preparationStageIndex,
+  type PreparationStage,
+} from "./PreparationStages";
 
 const LANGUAGE_NAMES: Record<string, string> = { en: "English", ko: "Korean", ja: "Japanese" };
-type PreparationStage = "configure" | "forecast" | "confirm";
 
 interface SubmittedPreparationFormProps {
   resolution: RemoteSourceResolutionReceipt;
@@ -39,43 +43,54 @@ export default function SubmittedPreparationForm({
   cancel,
   confirm,
 }: SubmittedPreparationFormProps) {
-  const [stage, setStage] = useState<PreparationStage>("configure");
+  const [stage, setStage] = useState<PreparationStage>("source");
+  const [furthestStage, setFurthestStage] = useState(0);
   const stageHeading = useRef<HTMLHeadingElement>(null);
-  const stageHasMounted = useRef(false);
   const durationSeconds = resolution.source.durationMs / 1_000;
   const preparation = previewSession.preparation;
-
-  useEffect(() => {
-    if (!stageHasMounted.current) {
-      stageHasMounted.current = true;
-      return;
-    }
-    const frame = window.requestAnimationFrame(() => {
-      stageHeading.current?.focus();
-      stageHeading.current?.scrollIntoView({ block: "start", inline: "nearest", behavior: "smooth" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [stage]);
-
-  function submitStage(): void {
-    if (stage === "configure") {
-      if (assessment.canReplay && preparation.status === "ready") setStage("forecast");
-      return;
-    }
-    if (stage === "forecast") {
-      setStage("confirm");
-      return;
-    }
-    confirm();
-  }
-
+  const currentStageIndex = preparationStageIndex(stage);
+  const requestReady = assessment.canReplay && preparation.status === "ready";
   const blockingMessage = assessment.reason
     ?? (preparation.status === "invalid" ? preparation.message : null);
+
+  function selectStage(nextStage: PreparationStage): void {
+    if (preparationStageIndex(nextStage) <= furthestStage) setStage(nextStage);
+  }
+
+  function submitStage(): void {
+    if (stage === "confirm") {
+      confirm();
+      return;
+    }
+
+    if ((stage === "range" || stage === "language" || stage === "output") && !requestReady) {
+      return;
+    }
+
+    const nextIndex = currentStageIndex + 1;
+    const nextStage = PREPARATION_STAGES[nextIndex]?.id;
+    if (!nextStage) return;
+    setFurthestStage((current) => Math.max(current, nextIndex));
+    setStage(nextStage);
+  }
+
+  function previousStage(): void {
+    if (currentStageIndex === 0) {
+      cancel();
+      return;
+    }
+    setStage(PREPARATION_STAGES[currentStageIndex - 1].id);
+  }
+
+  const advanceDisabled =
+    (stage === "range" || stage === "language" || stage === "output") && !requestReady;
 
   return (
     <form
       className="preflight-form"
       data-preparation-stage={stage}
+      data-palette={PREPARATION_STAGES[currentStageIndex].palette}
+      data-furthest-stage={PREPARATION_STAGES[furthestStage].id}
       data-preparation-status={preparation.status}
       data-submitted-preparation-request-id={
         preparation.status === "ready" ? preparation.request.requestId : undefined
@@ -85,197 +100,327 @@ export default function SubmittedPreparationForm({
         submitStage();
       }}
     >
-      <div className="preflight-submitted-scroll">
-        <header className="preflight-head preflight-submitted-head">
-          <span className="preflight-kicker">Submitted source · metadata resolved</span>
-          <h1 id="preflight-title">{resolution.source.label}</h1>
-          <p>
-            {resolution.source.creator ? `${resolution.source.creator} · ` : ""}
-            {formatSeconds(resolution.source.durationMs / 1_000)} total. Provider metadata only; media bytes have not been retrieved or inspected.
-          </p>
-        </header>
+      <PreparationStageNavigation
+        currentStage={stage}
+        furthestStage={furthestStage}
+        selectStage={selectStage}
+      />
 
-        <div className="preflight-submitted-source" role="note" aria-label="Submitted source metadata boundary">
-          <div>
-            <span>Resolved YouTube source</span>
-            <SourceDisplay source={previewSession.source} title={previewSession.source.raw} />
-            <strong>{resolution.source.label}</strong>
-            <small>{resolution.source.creator ?? "Creator unavailable from provider metadata"}</small>
-          </div>
+      <motion.section
+        className="preflight-stage-panel"
+        aria-labelledby="preflight-stage-title"
+        layout
+        layoutId="studio-source-guide-panel"
+        transition={{ layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={stage}
+            className="preflight-stage-body"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            onAnimationComplete={() => stageHeading.current?.focus({ preventScroll: true })}
+          >
+            {stage === "source" && (
+              <SubmittedSourceStage
+                headingRef={stageHeading}
+                resolution={resolution}
+              />
+            )}
+
+            {stage === "range" && (
+              <SubmittedRangeStage
+                headingRef={stageHeading}
+                durationSeconds={durationSeconds}
+                session={session}
+                assessment={assessment}
+                preparationStatus={preparation.status}
+                blockingMessage={blockingMessage}
+                update={update}
+              />
+            )}
+
+            {stage === "language" && (
+              <SubmittedLanguageStage
+                headingRef={stageHeading}
+                previewSession={previewSession}
+                session={session}
+                blockingMessage={blockingMessage}
+                update={update}
+                updateSourceLanguage={updateSourceLanguage}
+              />
+            )}
+
+            {stage === "output" && (
+              <SubmittedOutputStage
+                headingRef={stageHeading}
+                session={session}
+                update={update}
+              />
+            )}
+
+            {stage === "forecast" && preparation.status === "ready" && (
+              <SubmittedForecast
+                headingRef={stageHeading}
+                resolution={resolution}
+                request={preparation.request}
+              />
+            )}
+
+            {stage === "confirm" && preparation.status === "ready" && (
+              <SubmittedConfirmation
+                headingRef={stageHeading}
+                resolution={resolution}
+                request={preparation.request}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="preflight-actions" data-stage={stage}>
+          <button type="button" className="ghost" onClick={previousStage}>
+            {stage === "source" ? "Cancel" : `Back to ${PREPARATION_STAGES[currentStageIndex - 1].label}`}
+          </button>
+          <button type="submit" className="cta" disabled={advanceDisabled}>
+            {advanceLabel(stage)}
+          </button>
+        </div>
+      </motion.section>
+    </form>
+  );
+}
+
+function SubmittedSourceStage({
+  headingRef,
+  resolution,
+}: {
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  resolution: RemoteSourceResolutionReceipt;
+}) {
+  return (
+    <section className="preflight-preparation">
+      <PreparationHeading
+        headingRef={headingRef}
+        kicker="Source ready"
+        title={`I found the source. It’s ${formatSeconds(resolution.source.durationMs / 1_000)} long.`}
+        detail="I only asked the provider for its title, creator, and duration. The media itself remains untouched."
+      />
+      <div
+        className="preflight-submitted-source"
+        role="note"
+        aria-label="Submitted source metadata boundary"
+      >
+        <div className="preflight-submitted-source-copy">
+          <span>Resolved source</span>
+          <h2>{resolution.source.label}</h2>
+          <small>{resolution.source.creator ?? "Creator unavailable from provider metadata"}</small>
+        </div>
+        <p className="preflight-submitted-boundary">
+          Provider metadata only <span aria-hidden="true">·</span> media not retrieved
+        </p>
+        <details className="preflight-submitted-details">
+          <summary>Source details</summary>
           <dl>
             <div><dt>Full duration</dt><dd>{formatSeconds(resolution.source.durationMs / 1_000)}</dd></div>
             <div><dt>Measurement</dt><dd>Provider metadata</dd></div>
             <div><dt>Resolver</dt><dd>{resolution.producer.tool.id} {resolution.producer.tool.version}</dd></div>
             <div><dt>Processing</dt><dd>Not started</dd></div>
-          </dl>
-        </div>
-
-      {stage === "configure" && (
-        <section className="preflight-preparation" aria-labelledby="preflight-stage-title">
-          <PreparationHeading
-            headingRef={stageHeading}
-            kicker="Request setup"
-            title="Choose the submitted-source request"
-            detail="Only resolved provider metadata and choices you make here belong to this request. Media access, rights, tracks, speech, and language have not been measured."
-          />
-
-          <fieldset className="preflight-group">
-            <legend>Analysis range</legend>
-            <Choice
-              name="range"
-              value="entire"
-              checked={session.request.rangeMode === "entire"}
-              onChange={() => update({ rangeMode: "entire", start: 0, end: durationSeconds })}
-              label={`Entire video · 0:00–${formatSeconds(durationSeconds)}`}
-            />
-            <Choice
-              name="range"
-              value="custom"
-              checked={session.request.rangeMode === "custom"}
-              onChange={() => update({ rangeMode: "custom" })}
-              label="Custom start and end"
-            />
-            {session.request.rangeMode === "custom" && (
-              <div className="preflight-range-fields">
-                <NumberField
-                  label="Start, seconds"
-                  value={session.request.start}
-                  max={durationSeconds}
-                  onChange={(start) => update({ start })}
-                />
-                <NumberField
-                  label="End, seconds"
-                  value={session.request.end}
-                  max={durationSeconds}
-                  onChange={(end) => update({ end })}
-                />
-              </div>
-            )}
-            <p className="preflight-policy">
-              This request contract rejects selections longer than {SUBMITTED_PREPARATION_POLICY.maximumDurationMs / 1_000} seconds.
-              Studio never trims the range. No recommender or content detector has run.
-            </p>
-          </fieldset>
-
-          <fieldset className="preflight-group preflight-language-intent">
-            <legend>Source language</legend>
-            <Choice
-              name="source-language"
-              value="automatic"
-              checked={previewSession.sourceLanguage.mode === "automatic"}
-              onChange={() => updateSourceLanguage({ mode: "automatic", language: null })}
-              label="Automatic · request detection later; nothing is detected yet"
-            />
-            <Choice
-              name="source-language"
-              value="declared"
-              checked={previewSession.sourceLanguage.mode === "declared"}
-              onChange={() => updateSourceLanguage({ mode: "declared", language: "" })}
-              label="Declare the source language"
-            />
-            {previewSession.sourceLanguage.mode === "declared" && (
-              <label className="preflight-declared-language">
-                <span>Declared BCP-47 language</span>
-                <input
-                  type="text"
-                  autoComplete="off"
-                  placeholder="ko"
-                  value={previewSession.sourceLanguage.language}
-                  onChange={(event) => updateSourceLanguage({
-                    mode: "declared",
-                    language: event.currentTarget.value.trim(),
-                  })}
-                />
-              </label>
-            )}
-          </fieldset>
-
-          <div className="preflight-primary">
-            <label>
-              <span>Requested target language</span>
-              <select
-                value={session.request.targetLanguage}
-                onChange={(event) => update({ targetLanguage: event.currentTarget.value })}
-              >
-                <option value="en">English</option>
-              </select>
-            </label>
-
-            <fieldset className="preflight-group preflight-output">
-              <legend>Requested output</legend>
-              <Choice
-                name="output"
-                value="captions"
-                checked={session.request.outputDepth === "captions"}
-                onChange={() => update({ outputDepth: "captions" })}
-                label="Captions only"
-              />
-              <Choice
-                name="output"
-                value="evidence"
-                checked={session.request.outputDepth === "evidence"}
-                onChange={() => update({ outputDepth: "evidence" })}
-                label="Captions plus evidence and breakdown"
-              />
-            </fieldset>
-          </div>
-
-          <dl className="preflight-unavailable-ledger" aria-label="Unavailable submitted-source facts">
             <div><dt>Media bytes</dt><dd>Not retrieved</dd></div>
             <div><dt>Rights</dt><dd>Not established</dd></div>
             <div><dt>Tracks</dt><dd>Not measured</dd></div>
             <div><dt>Detected language</dt><dd>Unavailable</dd></div>
           </dl>
-
-          {preparation.status === "building" && (
-            <p className="preflight-binding" role="status">Binding the exact choices to the validated metadata receipt…</p>
-          )}
-          {blockingMessage && <p className="preflight-block" role="status">{blockingMessage}</p>}
-        </section>
-      )}
-
-      {stage === "forecast" && preparation.status === "ready" && (
-        <SubmittedForecast
-          headingRef={stageHeading}
-          resolution={resolution}
-          request={preparation.request}
-        />
-      )}
-
-      {stage === "confirm" && preparation.status === "ready" && (
-        <SubmittedConfirmation
-          headingRef={stageHeading}
-          resolution={resolution}
-          request={preparation.request}
-        />
-      )}
+        </details>
       </div>
+    </section>
+  );
+}
 
-      <div className="preflight-actions" data-stage={stage}>
-        {stage === "configure" ? (
-          <button type="button" className="ghost" onClick={cancel}>Cancel</button>
-        ) : (
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => setStage(stage === "confirm" ? "forecast" : "configure")}
-          >
-            {stage === "confirm" ? "Back to forecast" : "Back to request"}
-          </button>
+function SubmittedRangeStage({
+  headingRef,
+  durationSeconds,
+  session,
+  assessment,
+  preparationStatus,
+  blockingMessage,
+  update,
+}: {
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  durationSeconds: number;
+  session: PreflightSession;
+  assessment: RangeAssessment;
+  preparationStatus: StudioPreviewSession["preparation"]["status"];
+  blockingMessage: string | null;
+  update: (request: Partial<AnalysisRequest>) => void;
+}) {
+  return (
+    <section className="preflight-preparation">
+      <PreparationHeading
+        headingRef={headingRef}
+        kicker="Analysis range"
+        title="Choose the section to prepare"
+        detail={`Studio can prepare up to ${formatSeconds(SUBMITTED_PREPARATION_POLICY.maximumDurationMs / 1_000)} and never trims your selection.`}
+      />
+      <fieldset className="preflight-group preflight-range-stage">
+        <legend>Requested section</legend>
+        <RangeInstrument
+          durationSeconds={durationSeconds}
+          start={session.request.start}
+          end={session.request.end}
+          overLimit={(assessment.duration ?? 0) > SUBMITTED_PREPARATION_POLICY.maximumDurationMs / 1_000}
+        />
+        <Choice
+          name="range"
+          value="entire"
+          checked={session.request.rangeMode === "entire"}
+          onChange={() => update({ rangeMode: "entire", start: 0, end: durationSeconds })}
+          label={`Entire video · 0:00–${formatSeconds(durationSeconds)}`}
+        />
+        <Choice
+          name="range"
+          value="custom"
+          checked={session.request.rangeMode === "custom"}
+          onChange={() => update({ rangeMode: "custom" })}
+          label="Custom start and end"
+        />
+        {session.request.rangeMode === "custom" && (
+          <div className="preflight-range-fields">
+            <NumberField
+              label="Start, seconds"
+              value={session.request.start}
+              max={durationSeconds}
+              onChange={(start) => update({ start })}
+            />
+            <NumberField
+              label="End, seconds"
+              value={session.request.end}
+              max={durationSeconds}
+              onChange={(end) => update({ end })}
+            />
+          </div>
         )}
-        <button
-          type="submit"
-          className="cta"
-          disabled={stage === "configure" && (!assessment.canReplay || preparation.status !== "ready")}
-        >
-          {stage === "configure"
-            ? "Continue to forecast"
-            : stage === "forecast"
-              ? "Review request"
-              : "Preview recorded processing"}
-        </button>
+        <p className="preflight-policy">
+          {durationSeconds > SUBMITTED_PREPARATION_POLICY.maximumDurationMs / 1_000
+            && "The visible 0:00–2:00 selection is an editable request default, not a content recommendation. "}
+          No recommender or content detector has run.
+        </p>
+      </fieldset>
+      {preparationStatus === "building" && (
+        <p className="preflight-binding" role="status">Updating the exact request…</p>
+      )}
+      {blockingMessage && <p className="preflight-block" role="status">{blockingMessage}</p>}
+    </section>
+  );
+}
+
+function SubmittedLanguageStage({
+  headingRef,
+  previewSession,
+  session,
+  blockingMessage,
+  update,
+  updateSourceLanguage,
+}: {
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  previewSession: StudioPreviewSession;
+  session: PreflightSession;
+  blockingMessage: string | null;
+  update: (request: Partial<AnalysisRequest>) => void;
+  updateSourceLanguage: (intent: SubmittedSourceLanguageIntent) => void;
+}) {
+  return (
+    <section className="preflight-preparation">
+      <PreparationHeading
+        headingRef={headingRef}
+        kicker="Language direction"
+        title="Tell Studio how to handle language"
+        detail="You can request automatic detection later or declare the source language yourself. Nothing has been detected yet."
+      />
+      <div className="preflight-language-stage">
+        <fieldset className="preflight-group preflight-language-intent">
+          <legend>Source language</legend>
+          <Choice
+            name="source-language"
+            value="automatic"
+            checked={previewSession.sourceLanguage.mode === "automatic"}
+            onChange={() => updateSourceLanguage({ mode: "automatic", language: null })}
+            label="Automatic · request detection later"
+          />
+          <Choice
+            name="source-language"
+            value="declared"
+            checked={previewSession.sourceLanguage.mode === "declared"}
+            onChange={() => updateSourceLanguage({ mode: "declared", language: "" })}
+            label="Declare the source language"
+          />
+          {previewSession.sourceLanguage.mode === "declared" && (
+            <label className="preflight-declared-language">
+              <span>Declared BCP-47 language</span>
+              <input
+                type="text"
+                autoComplete="off"
+                placeholder="ko"
+                value={previewSession.sourceLanguage.language}
+                onChange={(event) => updateSourceLanguage({
+                  mode: "declared",
+                  language: event.currentTarget.value.trim(),
+                })}
+              />
+            </label>
+          )}
+        </fieldset>
+        <label className="preflight-target-language">
+          <span>Requested target language</span>
+          <select
+            value={session.request.targetLanguage}
+            onChange={(event) => update({ targetLanguage: event.currentTarget.value })}
+          >
+            <option value="en">English</option>
+          </select>
+        </label>
       </div>
-    </form>
+      {blockingMessage && <p className="preflight-block" role="status">{blockingMessage}</p>}
+    </section>
+  );
+}
+
+function SubmittedOutputStage({
+  headingRef,
+  session,
+  update,
+}: {
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  session: PreflightSession;
+  update: (request: Partial<AnalysisRequest>) => void;
+}) {
+  return (
+    <section className="preflight-preparation">
+      <PreparationHeading
+        headingRef={headingRef}
+        kicker="Requested output"
+        title="Choose what Studio should prepare"
+        detail="This sets the request depth. Processing still has not started."
+      />
+      <fieldset className="preflight-group preflight-output-stage">
+        <legend>Output depth</legend>
+        <Choice
+          name="output"
+          value="captions"
+          checked={session.request.outputDepth === "captions"}
+          onChange={() => update({ outputDepth: "captions" })}
+          label="Captions only"
+        />
+        <Choice
+          name="output"
+          value="evidence"
+          checked={session.request.outputDepth === "evidence"}
+          onChange={() => update({ outputDepth: "evidence" })}
+          label="Captions plus evidence and breakdown"
+        />
+      </fieldset>
+    </section>
   );
 }
 
@@ -309,17 +454,17 @@ function SubmittedForecast({
   request: SubmittedSourcePreparationRequest;
 }) {
   return (
-    <section className="preflight-preparation" aria-labelledby="preflight-stage-title">
+    <section className="preflight-preparation">
       <PreparationHeading
         headingRef={headingRef}
         kicker="Request forecast"
-        title="Known request, unavailable execution forecast"
-        detail="This preparation identity records the source metadata and your choices. No runtime plan or processing estimate exists for the submitted URL."
+        title="Here’s what Studio knows so far"
+        detail="Your choices are bound to the resolved metadata. Runtime timing and cost remain unavailable until a compatible producer runs."
       />
       <div className="preflight-forecast-ledger">
         <section aria-labelledby="forecast-known-title">
           <span>Bound request</span>
-          <h3 id="forecast-known-title">What is known</h3>
+          <h3 id="forecast-known-title">Known</h3>
           <dl>
             <div><dt>Source</dt><dd>{resolution.source.label}</dd></div>
             <div><dt>Creator</dt><dd>{resolution.source.creator ?? "Unavailable from provider metadata"}</dd></div>
@@ -330,7 +475,7 @@ function SubmittedForecast({
           </dl>
         </section>
         <aside aria-labelledby="forecast-unavailable-title">
-          <span>No compatible producer contract</span>
+          <span>Not measured</span>
           <h3 id="forecast-unavailable-title">Unavailable</h3>
           <dl>
             <div><dt>Processing time</dt><dd>Unavailable</dd></div>
@@ -340,7 +485,6 @@ function SubmittedForecast({
           </dl>
         </aside>
       </div>
-      <RequestIdentity request={request} />
     </section>
   );
 }
@@ -355,12 +499,12 @@ function SubmittedConfirmation({
   request: SubmittedSourcePreparationRequest;
 }) {
   return (
-    <section className="preflight-preparation" aria-labelledby="preflight-stage-title">
+    <section className="preflight-preparation">
       <PreparationHeading
         headingRef={headingRef}
         kicker="Final review"
         title="Preview the interface with a recorded run"
-        detail="This final action does not submit a runtime command. It preserves this preparation identity while Studio replays the bundled demonstration."
+        detail="This final action preserves your request while Studio replays the bundled demonstration. It does not submit a runtime command."
       />
       <dl className="preflight-confirmation-summary">
         <div><dt>Source</dt><dd>{resolution.source.label}</dd></div>
@@ -371,14 +515,6 @@ function SubmittedConfirmation({
         <div><dt>Output</dt><dd>{outputLabel(request)}</dd></div>
       </dl>
       <RequestIdentity request={request} />
-      <div className="preflight-next-sequence">
-        <span>What happens next</span>
-        <ol>
-          <li>Studio preserves this preparation request for the preview and Results boundary.</li>
-          <li>The bundled run-006 activity and agents replay as a recorded interface demonstration.</li>
-          <li>Results explicitly report that no submitted-source artifact was produced.</li>
-        </ol>
-      </div>
       <p className="preflight-preview-warning" role="note">
         <b>Submitted-link boundary</b>
         Your submitted link remains untouched. No media was downloaded, registered, analyzed, captioned, or translated.
@@ -388,17 +524,55 @@ function SubmittedConfirmation({
 }
 
 function RequestIdentity({ request }: { request: SubmittedSourcePreparationRequest }) {
+  const shortIdentity = request.requestId.replace("submitted-preparation:", "").slice(0, 12);
   return (
-    <p
+    <details
       className="preflight-request-identity"
       data-submitted-preparation-request-id={request.requestId}
     >
-      <span>Preparation identity</span>
+      <summary>
+        <span>Preparation identity</span>
+        <code>{shortIdentity}…</code>
+      </summary>
       <code>{request.requestId}</code>
       <small>
         {request.schema} · policy {request.policy.id} v{request.policy.version} · no runtime-start semantics
       </small>
-    </p>
+    </details>
+  );
+}
+
+function RangeInstrument({
+  durationSeconds,
+  start,
+  end,
+  overLimit,
+}: {
+  durationSeconds: number;
+  start: number;
+  end: number;
+  overLimit: boolean;
+}) {
+  const safeDuration = Math.max(0.1, durationSeconds);
+  const safeStart = Math.max(0, Math.min(start, safeDuration));
+  const safeEnd = Math.max(safeStart, Math.min(end, safeDuration));
+  const style = {
+    "--range-start": `${(safeStart / safeDuration) * 100}%`,
+    "--range-width": `${((safeEnd - safeStart) / safeDuration) * 100}%`,
+    "--range-limit": `${Math.min(1, (SUBMITTED_PREPARATION_POLICY.maximumDurationMs / 1_000) / safeDuration) * 100}%`,
+  } as CSSProperties;
+
+  return (
+    <div className="preflight-range-instrument" data-over-limit={overLimit ? "true" : undefined}>
+      <div className="preflight-range-track" style={style} aria-hidden="true">
+        <span />
+      </div>
+      <div className="preflight-range-readout" aria-hidden="true">
+        <span>0:00</span>
+        <b>{formatSeconds(safeStart)}–{formatSeconds(safeEnd)}</b>
+        <span>{formatSeconds(durationSeconds)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -444,6 +618,11 @@ function NumberField({
       />
     </label>
   );
+}
+
+function advanceLabel(stage: PreparationStage): string {
+  if (stage === "confirm") return "Preview run-006 recorded processing";
+  return `Continue to ${PREPARATION_STAGES[preparationStageIndex(stage) + 1].label}`;
 }
 
 function languageName(code: string): string {

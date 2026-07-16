@@ -1,6 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
+import AgentMark from "../AgentMark";
+import { ORCHESTRATOR_IDENTITY } from "../agentIdentity";
 import { initialRequest, type AnalysisRequest } from "../preflight/model";
+import PreparationStageNavigation, {
+  PREPARATION_STAGES,
+  preparationStageIndex,
+  type PreparationStage,
+} from "../preflight/PreparationStages";
 import type { EvidenceAssessmentAudit } from "../runtime/production/assessmentAudit";
 import type { EvidenceDecisionReceiptVerification } from "../runtime/production/decisionReceiptAudit";
 import type { PublishReviewIntakeVerification } from "../runtime/production/publishReviewIntakeAudit";
@@ -94,25 +102,29 @@ export default function ProductLocalRuntime({
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [captionBusy, setCaptionBusy] = useState(false);
   const [captionError, setCaptionError] = useState<string | null>(null);
+  const [setupStage, setSetupStage] = useState<PreparationStage>("source");
+  const [furthestSetupStage, setFurthestSetupStage] = useState(0);
   const pollGeneration = useRef(0);
   const ingestGeneration = useRef(0);
   const productionAdapter = useRef<ProductionStudioAdapter | null>(null);
   const evidenceDetails = useRef<HTMLDetailsElement | null>(null);
   const runtimeRoot = useRef<HTMLElement | null>(null);
+  const setupHeading = useRef<HTMLHeadingElement | null>(null);
 
   const selectedSource = sources.find((source) => source.sourceSessionId === sourceId) ?? null;
   const lifecycle = runtime
     ? projectLocalRuntimeLifecycle(runtime.status.lifecycle, runtime.status.reason)
     : null;
-  const requestValid = client !== null &&
+  const rangeValid = client !== null &&
     selectedSource !== null &&
-    isLocalRuntimeLanguageTag(sourceLanguage) &&
-    isLocalRuntimeLanguageTag(analysisRequest.targetLanguage) &&
     Number.isFinite(analysisRequest.start) &&
     Number.isFinite(analysisRequest.end) &&
     analysisRequest.start >= 0 &&
     analysisRequest.end > analysisRequest.start &&
     Math.round(analysisRequest.end * 1_000) <= selectedSource.durationMs;
+  const languageValid = isLocalRuntimeLanguageTag(sourceLanguage) &&
+    isLocalRuntimeLanguageTag(analysisRequest.targetLanguage);
+  const requestValid = rangeValid && languageValid;
   const ingestValid = client !== null &&
     ownedFile !== null &&
     sourceLabel.trim().length > 0 &&
@@ -155,6 +167,8 @@ export default function ProductLocalRuntime({
     setSourceId("");
     setIngest(null);
     setBusy(null);
+    setSetupStage("source");
+    setFurthestSetupStage(0);
   }
 
   async function connect(): Promise<void> {
@@ -260,8 +274,8 @@ export default function ProductLocalRuntime({
     });
   }
 
-  async function reviewPlan(): Promise<void> {
-    if (!client) return;
+  async function reviewPlan(): Promise<boolean> {
+    if (!client) return false;
     stopPolling();
     productionAdapter.current = null;
     setBusy("plan");
@@ -271,9 +285,11 @@ export default function ProductLocalRuntime({
       const request = buildRequest();
       const response = await client.plan(request);
       setReviewed({ request, response });
+      return true;
     } catch (nextError) {
       setReviewed(null);
       setError(errorMessage(nextError));
+      return false;
     } finally {
       setBusy(null);
     }
@@ -619,6 +635,54 @@ export default function ProductLocalRuntime({
     window.requestAnimationFrame(() => details.scrollIntoView({ block: "start", behavior: "smooth" }));
   }
 
+  const currentSetupStageIndex = preparationStageIndex(setupStage);
+
+  function selectSetupStage(nextStage: PreparationStage): void {
+    if (preparationStageIndex(nextStage) <= furthestSetupStage) setSetupStage(nextStage);
+  }
+
+  function previousSetupStage(): void {
+    if (currentSetupStageIndex === 0) {
+      onClose();
+      return;
+    }
+    setSetupStage(PREPARATION_STAGES[currentSetupStageIndex - 1].id);
+  }
+
+  async function submitSetupStage(): Promise<void> {
+    if (setupStage === "confirm") {
+      await start();
+      return;
+    }
+    if (setupStage === "source" && !selectedSource) return;
+    if (setupStage === "range" && !rangeValid) return;
+    if (setupStage === "language" && !languageValid) return;
+    if (setupStage === "output") {
+      if (!requestValid || !(await reviewPlan())) return;
+    }
+    if (setupStage === "forecast" && !reviewed) return;
+
+    const nextIndex = currentSetupStageIndex + 1;
+    const nextStage = PREPARATION_STAGES[nextIndex]?.id;
+    if (!nextStage) return;
+    setFurthestSetupStage((current) => Math.max(current, nextIndex));
+    setSetupStage(nextStage);
+  }
+
+  const setupAdvanceDisabled =
+    (setupStage === "source" && !selectedSource) ||
+    (setupStage === "range" && !rangeValid) ||
+    (setupStage === "language" && !languageValid) ||
+    (setupStage === "output" && (!requestValid || busy !== null)) ||
+    (setupStage === "forecast" && !reviewed) ||
+    (setupStage === "confirm" && busy !== null);
+
+  const setupAdvanceLabel = setupStage === "confirm"
+    ? busy === "start" ? "Accepting and starting local runtime…" : "Accept forecast and start local runtime"
+    : setupStage === "output" && busy === "plan"
+      ? "Reviewing local plan…"
+      : `Continue to ${PREPARATION_STAGES[currentSetupStageIndex + 1].label}`;
+
   if (processingMock) {
     return <ProductionProcessingMock scenario={processingMock} onClose={onClose} />;
   }
@@ -628,312 +692,19 @@ export default function ProductLocalRuntime({
       ref={runtimeRoot}
       className="product-runtime"
       data-runtime={runtime !== null}
-      aria-labelledby="product-runtime-title"
+      aria-label={runtime ? undefined : "Owned local source"}
+      aria-labelledby={runtime ? "product-runtime-title" : undefined}
     >
-      <header className="product-runtime-header">
-        <div>
-          <span>Local production path · separate from replay</span>
-          <h1 id="product-runtime-title">Owned local source</h1>
-        </div>
-        <button type="button" onClick={onClose}>Back to source choices</button>
-      </header>
-
-      <p className="product-runtime-boundary" role="note" hidden={runtime !== null}>
-        This path registers receipted local media with the host, reviews a real workload-floor forecast,
-        and starts the bounded one-child runtime proof. After an exact verified human approval, a separate
-        private caption job may be explicitly requested. Neither path uploads or publishes, and neither implies a multi-agent swarm.
-        Submitted YouTube URLs remain unprocessed recorded previews.
-      </p>
-
-      <details className="product-runtime-operator" hidden={runtime !== null}>
-        <summary>Local host setup and CLI escape hatch</summary>
-        <ol>
-          <li>
-            Start the deterministic host (browser ingest is enabled under ignored <code>.studio/</code> storage):<br />
-            <code>node scripts/run-runtime-host.ts --executor deterministic</code>
-          </li>
-          <li>Paste the printed bearer token, connect, then use the owned-media form below.</li>
-          <li>Operator preflight directories remain supported with <code>--source-directory</code> as a CLI escape hatch.</li>
-        </ol>
-      </details>
-
-      <div className="product-runtime-connect" hidden={runtime !== null}>
-        <label>
-          <span>Local host origin</span>
-          <input
-            type="url"
-            value={baseUrl}
-            disabled={client !== null}
-            onChange={(event) => {
-              disconnect();
-              setBaseUrl(event.currentTarget.value);
-            }}
-          />
-        </label>
-        <label>
-          <span>Paste-once bearer token</span>
-          <input
-            type="password"
-            value={token}
-            disabled={client !== null}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => {
-              disconnect();
-              setToken(event.currentTarget.value);
-            }}
-          />
-        </label>
-        {client ? (
-          <button type="button" onClick={disconnect}>Disconnect local host</button>
-        ) : (
-          <button type="button" disabled={busy !== null || token.length === 0} onClick={() => void connect()}>
-            {busy === "connect" ? "Connecting…" : "Connect to local host"}
-          </button>
-        )}
-      </div>
-
-      {client && !runtime && (
-        <fieldset className="product-runtime-ingest">
-          <legend>Ingest media you own or control</legend>
-          <p>
-            The host preserves the selected bytes privately, runs the real media probe, seals a V1 preflight,
-            and registers the resulting source. This path does not authorize redistribution.
-          </p>
-          <label>
-            <span>Owned media file</span>
-            <input
-              type="file"
-              accept="audio/*,video/*"
-              disabled={busy === "ingest"}
-              onChange={(event) => {
-                setOwnedFile(event.currentTarget.files?.[0] ?? null);
-                setIngest(null);
-                setError(null);
-              }}
-            />
-          </label>
-          <label>
-            <span>Source label</span>
-            <input
-              type="text"
-              value={sourceLabel}
-              maxLength={160}
-              disabled={busy === "ingest"}
-              onChange={(event) => setSourceLabel(event.currentTarget.value)}
-            />
-          </label>
-          <label>
-            <span>Rights holder</span>
-            <input
-              type="text"
-              value={rightsHolder}
-              maxLength={160}
-              disabled={busy === "ingest"}
-              onChange={(event) => setRightsHolder(event.currentTarget.value)}
-            />
-          </label>
-          <label className="product-runtime-attestation">
-            <input
-              type="checkbox"
-              checked={ownershipAttested}
-              disabled={busy === "ingest"}
-              onChange={(event) => setOwnershipAttested(event.currentTarget.checked)}
-            />
-            <span>I attest that I own or control this media and authorize local processing of this copy.</span>
-          </label>
-          <button type="button" disabled={!ingestValid} onClick={() => void ingestOwnedMedia()}>
-            {busy === "ingest" ? "Ingesting owned media…" : "Confirm ownership and ingest"}
-          </button>
-          {ingest && (
-            <div
-              className="product-runtime-ingest-status"
-              data-state={ingest.status}
-              role="status"
-              aria-live="polite"
-              aria-label="Owned media ingest progress"
-            >
-              <b>{ingest.status}</b>
-              {ingest.status === "queued" && <span> · The job is queued for bounded local upload and probe work.</span>}
-              {ingest.status === "probing" && <span> · ffprobe is measuring the preserved media.</span>}
-              {ingest.status === "sealing" && <span> · The host is sealing the immutable V1 preflight.</span>}
-              {ingest.status === "registered" && <span> · The source is registered and selected below.</span>}
-              {ingest.failure && <span> · {ingest.failure.code}: {ingest.failure.message}</span>}
+      {runtime ? (
+        <>
+          <header className="product-runtime-header">
+            <div>
+              <span>Local production path · separate from replay</span>
+              <h1 id="product-runtime-title">Owned local source</h1>
             </div>
-          )}
-        </fieldset>
-      )}
-
-      {client && !runtime && sources.length === 0 && !ingest && (
-        <p className="product-runtime-empty-source" role="status">
-          No owned source is registered yet. Choose a file and complete the ownership attestation above.
-        </p>
-      )}
-
-      {client && selectedSource && !runtime && (
-        <div className="product-runtime-session">
-          <label>
-            <span>Registered owned source</span>
-            <select value={sourceId} onChange={(event) => chooseSource(event.currentTarget.value)}>
-              {sources.map((source) => (
-                <option key={source.sourceSessionId} value={source.sourceSessionId}>
-                  {source.label} · {seconds(source.durationMs)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <dl className="product-runtime-source-facts">
-            <div><dt>Receipt</dt><dd>Owned/local · {selectedSource.rightsScope.replaceAll("_", " ")}</dd></div>
-            <div><dt>Measured duration</dt><dd>{seconds(selectedSource.durationMs)}</dd></div>
-            <div><dt>Measured tracks</dt><dd>{selectedSource.trackCount}</dd></div>
-            <div><dt>Sealed preflight</dt><dd>{selectedSource.preflightSchema}</dd></div>
-            <div><dt>Language evidence</dt><dd>{selectedSource.detectedLanguageEvidenceAvailable ? "Receipted ranges available" : "Unavailable"}</dd></div>
-            <div><dt>Source content</dt><dd>{selectedSource.sourceContentId}</dd></div>
-            <div><dt>Session</dt><dd>{selectedSource.sourceSessionId}</dd></div>
-            <div><dt>Revision</dt><dd>{selectedSource.sourceRevisionId}</dd></div>
-          </dl>
-
-          <fieldset className="product-runtime-request">
-            <legend>Analysis request for the bounded proof</legend>
-            <div className="product-runtime-range">
-              <label>
-                <span>Start, seconds</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={selectedSource.durationMs / 1_000}
-                  step={0.1}
-                  value={analysisRequest.start}
-                  onChange={(event) => updateRequest({ rangeMode: "custom", start: event.currentTarget.valueAsNumber })}
-                />
-              </label>
-              <label>
-                <span>End, seconds</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={selectedSource.durationMs / 1_000}
-                  step={0.1}
-                  value={analysisRequest.end}
-                  onChange={(event) => updateRequest({ rangeMode: "custom", end: event.currentTarget.valueAsNumber })}
-                />
-              </label>
-            </div>
-            <div className="product-runtime-language">
-              <label>
-                <span>Declared source language</span>
-                <input
-                  type="text"
-                  placeholder="ko"
-                  value={sourceLanguage}
-                  onChange={(event) => {
-                    clearReviewedState();
-                    setSourceLanguage(event.currentTarget.value.trim());
-                  }}
-                />
-              </label>
-              <label>
-                <span>Target language</span>
-                <input
-                  type="text"
-                  value={analysisRequest.targetLanguage}
-                  onChange={(event) => updateRequest({ targetLanguage: event.currentTarget.value.trim() })}
-                />
-              </label>
-            </div>
-            <label>
-              <span>Language-pack identity (optional)</span>
-              <input
-                type="text"
-                placeholder="ko-v3"
-                value={languagePackId}
-                onChange={(event) => {
-                  clearReviewedState();
-                  setLanguagePackId(event.currentTarget.value);
-                }}
-              />
-            </label>
-            <label>
-              <span>Requested output contract</span>
-              <select
-                value={analysisRequest.outputDepth}
-                onChange={(event) => updateRequest({ outputDepth: event.currentTarget.value as AnalysisRequest["outputDepth"] })}
-              >
-                <option value="evidence">Evidence contract</option>
-                <option value="captions">Caption request contract (production requires verified review)</option>
-              </select>
-            </label>
-            <button type="button" disabled={!requestValid || busy !== null} onClick={() => void reviewPlan()}>
-              {busy === "plan" ? "Reviewing local plan…" : "Review local plan"}
-            </button>
-            {!requestValid && (
-              <p role="status">
-                Enter explicit BCP-47 language tags such as <code>ko</code>/<code>en</code> and a non-empty range inside the measured duration.
-              </p>
-            )}
-          </fieldset>
-        </div>
-      )}
-
-      {reviewed && workload && !runtime && (
-        <section className="product-runtime-plan" aria-labelledby="product-runtime-plan-title">
-          <header>
-            <span>studio.forecast.v1 · not started or frozen</span>
-            <h2 id="product-runtime-plan-title">Local runtime plan</h2>
+            <button type="button" onClick={onClose}>Back to source choices</button>
           </header>
-          <dl>
-            <div>
-              <dt>Selected range</dt>
-              <dd>
-                {seconds(reviewed.response.forecast.inputs.selectedRange.startMs)}–{seconds(reviewed.response.forecast.inputs.selectedRange.endMs)} · {seconds(workload.selectedMediaDurationMs)}
-              </dd>
-            </div>
-            <div>
-              <dt>Workload floor</dt>
-              <dd>
-                {seconds(workload.requestedOperationMediaDurationMs)} across {workload.operationCount} explicit {workload.operationCount === 1 ? "operation" : "operations"}
-              </dd>
-            </div>
-            <div><dt>Elapsed time</dt><dd>Unavailable</dd></div>
-            <div><dt>Model usage</dt><dd>Unavailable</dd></div>
-            <div><dt>Estimated API cost</dt><dd>Unavailable · amount and currency are null</dd></div>
-            <div><dt>Forecast content</dt><dd>{reviewed.response.forecast.content.contentId}</dd></div>
-          </dl>
-          <div className="product-runtime-operations">
-            <h3>Explicit work plan</h3>
-            <ul>
-              {workload.operations.map((operation) => (
-                <li key={operation.operationId}>
-                  <code>{operation.kind}</code> · {seconds(operation.requestedMediaDurationMs)}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <details>
-            <summary>Forecast assumptions and exclusions</summary>
-            <ul>
-              {reviewed.response.forecast.assumptions.map((assumption) => (
-                <li key={assumption.code}>{assumption.statement}</li>
-              ))}
-            </ul>
-          </details>
-          {!runtime && (
-            <button
-              type="button"
-              className="product-runtime-start"
-              disabled={busy !== null}
-              onClick={() => void start()}
-            >
-              {busy === "start" ? "Accepting and starting local runtime…" : "Accept forecast and start local runtime"}
-            </button>
-          )}
-        </section>
-      )}
-
-      {error && <p className="product-runtime-error" role="alert">{error}</p>}
-
-      {runtime && lifecycle && selectedSource && (
+          {lifecycle && selectedSource && (
         <section className="product-runtime-status" aria-labelledby="product-runtime-status-title">
           <h2 id="product-runtime-status-title" className="product-runtime-visually-hidden">Local runtime status</h2>
           <ProductionProcessingCanvas
@@ -1004,7 +775,172 @@ export default function ProductLocalRuntime({
             />
           </details>
         </section>
+          )}
+        </>
+      ) : (
+        <div className="product-runtime-setup-lockup">
+          <div className="product-runtime-setup-guide">
+            <div className="welcome-orchestrator-anchor" aria-hidden="true">
+              <div className="welcome-orchestrator-core">
+                <AgentMark identity={ORCHESTRATOR_IDENTITY} status={busy ? "working" : "idle"} />
+              </div>
+            </div>
+            <div className="welcome-guide-copy">
+              <strong>Owned media guide</strong>
+              <span role="status" aria-live="polite">
+                {client ? selectedSource ? "Source ready" : "Add a source" : "Connect local host"}
+              </span>
+            </div>
+          </div>
+
+          <form
+            className="preflight-form product-runtime-setup-form"
+            data-preparation-stage={setupStage}
+            data-palette={PREPARATION_STAGES[currentSetupStageIndex].palette}
+            data-furthest-stage={PREPARATION_STAGES[furthestSetupStage].id}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitSetupStage();
+            }}
+          >
+            <PreparationStageNavigation currentStage={setupStage} furthestStage={furthestSetupStage} selectStage={selectSetupStage} />
+            <motion.section
+              className="preflight-stage-panel"
+              aria-labelledby="preflight-stage-title"
+              layout
+              transition={{ layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={setupStage}
+                  className="preflight-stage-body"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  onAnimationComplete={() => setupHeading.current?.focus({ preventScroll: true })}
+                >
+                  {setupStage === "source" && (
+                    <section className="preflight-preparation">
+                      <OwnedSetupHeading headingRef={setupHeading} kicker="Local production path · separate from replay" title={client ? "Add or choose owned media" : "Connect the local source host"} detail={client ? "Register media you own or control, then choose its receipted source session." : "The owned-media path uses a local host and a paste-once bearer token. Nothing is uploaded to a remote service."} />
+                      <p className="product-runtime-boundary" role="note">
+                        This path registers receipted local media, reviews a real workload-floor forecast, and starts a bounded local runtime. After an exact verified human approval, a separate private caption job may be explicitly requested. Neither path uploads or publishes. Submitted YouTube URLs remain unprocessed recorded previews.
+                      </p>
+                      <details className="product-runtime-operator">
+                        <summary>Local host setup and CLI escape hatch</summary>
+                        <ol>
+                          <li>Start the deterministic host: <code>node scripts/run-runtime-host.ts --executor deterministic</code></li>
+                          <li>Paste the printed bearer token, connect, then add owned media below.</li>
+                          <li>Operator preflight directories remain supported with <code>--source-directory</code>.</li>
+                        </ol>
+                      </details>
+                      <div className="product-runtime-connect">
+                        <label><span>Local host origin</span><input type="url" value={baseUrl} disabled={client !== null} onChange={(event) => { disconnect(); setBaseUrl(event.currentTarget.value); }} /></label>
+                        <label><span>Paste-once bearer token</span><input type="password" value={token} disabled={client !== null} autoComplete="off" spellCheck={false} onChange={(event) => { disconnect(); setToken(event.currentTarget.value); }} /></label>
+                        {client
+                          ? <button type="button" onClick={disconnect}>Disconnect local host</button>
+                          : <button type="button" disabled={busy !== null || token.length === 0} onClick={() => void connect()}>{busy === "connect" ? "Connecting…" : "Connect to local host"}</button>}
+                      </div>
+                      {client && (
+                        <fieldset className="product-runtime-ingest">
+                          <legend>Ingest media you own or control</legend>
+                          <p>The host preserves the selected bytes privately, measures the media, and seals a V1 preflight. This does not authorize redistribution.</p>
+                          <label><span>Owned media file</span><input type="file" accept="audio/*,video/*" disabled={busy === "ingest"} onChange={(event) => { setOwnedFile(event.currentTarget.files?.[0] ?? null); setIngest(null); setError(null); }} /></label>
+                          <div className="product-runtime-ingest-fields">
+                            <label><span>Source label</span><input type="text" value={sourceLabel} maxLength={160} disabled={busy === "ingest"} onChange={(event) => setSourceLabel(event.currentTarget.value)} /></label>
+                            <label><span>Rights holder</span><input type="text" value={rightsHolder} maxLength={160} disabled={busy === "ingest"} onChange={(event) => setRightsHolder(event.currentTarget.value)} /></label>
+                          </div>
+                          <label className="product-runtime-attestation"><input type="checkbox" checked={ownershipAttested} disabled={busy === "ingest"} onChange={(event) => setOwnershipAttested(event.currentTarget.checked)} /><span>I attest that I own or control this media and authorize local processing of this copy.</span></label>
+                          <button type="button" disabled={!ingestValid} onClick={() => void ingestOwnedMedia()}>{busy === "ingest" ? "Ingesting owned media…" : "Confirm ownership and ingest"}</button>
+                          {ingest && <div className="product-runtime-ingest-status" data-state={ingest.status} role="status" aria-live="polite" aria-label="Owned media ingest progress"><b>{ingest.status}</b>{ingest.status === "queued" && <span> · Queued for bounded local upload and probe work.</span>}{ingest.status === "probing" && <span> · Measuring the preserved media.</span>}{ingest.status === "sealing" && <span> · Sealing the immutable V1 preflight.</span>}{ingest.status === "registered" && <span> · The source is registered and selected below.</span>}{ingest.failure && <span> · {ingest.failure.code}: {ingest.failure.message}</span>}</div>}
+                        </fieldset>
+                      )}
+                      {client && sources.length === 0 && !ingest && <p className="product-runtime-empty-source" role="status">No owned source is registered yet. Choose a file and complete the ownership attestation above.</p>}
+                      {client && selectedSource && (
+                        <div className="product-runtime-session">
+                          <label><span>Registered owned source</span><select value={sourceId} onChange={(event) => chooseSource(event.currentTarget.value)}>{sources.map((source) => <option key={source.sourceSessionId} value={source.sourceSessionId}>{source.label} · {seconds(source.durationMs)}</option>)}</select></label>
+                          <dl className="product-runtime-source-facts">
+                            <div><dt>Receipt</dt><dd>Owned/local · {selectedSource.rightsScope.replaceAll("_", " ")}</dd></div>
+                            <div><dt>Measured duration</dt><dd>{seconds(selectedSource.durationMs)}</dd></div>
+                            <div><dt>Measured tracks</dt><dd>{selectedSource.trackCount}</dd></div>
+                            <div><dt>Sealed preflight</dt><dd>{selectedSource.preflightSchema}</dd></div>
+                            <div><dt>Language evidence</dt><dd>{selectedSource.detectedLanguageEvidenceAvailable ? "Receipted ranges available" : "Unavailable"}</dd></div>
+                          </dl>
+                        </div>
+                      )}
+                    </section>
+                  )}
+
+                  {setupStage === "range" && selectedSource && (
+                    <section className="preflight-preparation">
+                      <OwnedSetupHeading headingRef={setupHeading} kicker="Analysis range" title="Choose the owned-media section" detail="The requested range must stay inside the host-measured source duration." />
+                      <fieldset className="product-runtime-request"><legend>Requested section</legend><div className="product-runtime-range"><label><span>Start, seconds</span><input type="number" min={0} max={selectedSource.durationMs / 1_000} step={0.1} value={analysisRequest.start} onChange={(event) => updateRequest({ rangeMode: "custom", start: event.currentTarget.valueAsNumber })} /></label><label><span>End, seconds</span><input type="number" min={0} max={selectedSource.durationMs / 1_000} step={0.1} value={analysisRequest.end} onChange={(event) => updateRequest({ rangeMode: "custom", end: event.currentTarget.valueAsNumber })} /></label></div>{!rangeValid && <p role="status">Choose a non-empty range inside {seconds(selectedSource.durationMs)}.</p>}</fieldset>
+                    </section>
+                  )}
+
+                  {setupStage === "language" && (
+                    <section className="preflight-preparation">
+                      <OwnedSetupHeading headingRef={setupHeading} kicker="Language direction" title="Declare the language request" detail="Use explicit BCP-47 language tags. The optional pack identity remains part of the reviewed local request." />
+                      <div className="product-runtime-language"><label><span>Declared source language</span><input type="text" placeholder="ko" value={sourceLanguage} onChange={(event) => { clearReviewedState(); setSourceLanguage(event.currentTarget.value.trim()); }} /></label><label><span>Target language</span><input type="text" value={analysisRequest.targetLanguage} onChange={(event) => updateRequest({ targetLanguage: event.currentTarget.value.trim() })} /></label></div>
+                      <label><span>Language-pack identity (optional)</span><input type="text" placeholder="ko-v3" value={languagePackId} onChange={(event) => { clearReviewedState(); setLanguagePackId(event.currentTarget.value); }} /></label>
+                      {!languageValid && <p className="preflight-block" role="status">Enter explicit BCP-47 language tags such as <code>ko</code> and <code>en</code>.</p>}
+                    </section>
+                  )}
+
+                  {setupStage === "output" && (
+                    <section className="preflight-preparation">
+                      <OwnedSetupHeading headingRef={setupHeading} kicker="Requested output" title="Choose the local output contract" detail="The evidence contract runs the bounded proof. Caption production still requires its separate verified review." />
+                      <label className="product-runtime-output"><span>Requested output contract</span><select value={analysisRequest.outputDepth} onChange={(event) => updateRequest({ outputDepth: event.currentTarget.value as AnalysisRequest["outputDepth"] })}><option value="evidence">Evidence contract</option><option value="captions">Caption request contract (production requires verified review)</option></select></label>
+                    </section>
+                  )}
+
+                  {setupStage === "forecast" && reviewed && workload && (
+                    <section className="preflight-preparation product-runtime-plan" aria-labelledby="preflight-stage-title">
+                      <OwnedSetupHeading headingRef={setupHeading} kicker="studio.forecast.v1 · not started or frozen" title="Review the local runtime plan" detail="Measured workload facts are shown; elapsed time, model usage, and cost remain unavailable rather than invented." />
+                      <dl><div><dt>Selected range</dt><dd>{seconds(reviewed.response.forecast.inputs.selectedRange.startMs)}–{seconds(reviewed.response.forecast.inputs.selectedRange.endMs)} · {seconds(workload.selectedMediaDurationMs)}</dd></div><div><dt>Workload floor</dt><dd>{seconds(workload.requestedOperationMediaDurationMs)} across {workload.operationCount} explicit {workload.operationCount === 1 ? "operation" : "operations"}</dd></div><div><dt>Elapsed time</dt><dd>Unavailable</dd></div><div><dt>Model usage</dt><dd>Unavailable</dd></div><div><dt>Estimated API cost</dt><dd>Unavailable · amount and currency are null</dd></div><div><dt>Forecast content</dt><dd>{reviewed.response.forecast.content.contentId}</dd></div></dl>
+                      <details><summary>Forecast assumptions and explicit work</summary><ul>{workload.operations.map((operation) => <li key={operation.operationId}><code>{operation.kind}</code> · {seconds(operation.requestedMediaDurationMs)}</li>)}{reviewed.response.forecast.assumptions.map((assumption) => <li key={assumption.code}>{assumption.statement}</li>)}</ul></details>
+                    </section>
+                  )}
+
+                  {setupStage === "confirm" && reviewed && workload && selectedSource && (
+                    <section className="preflight-preparation">
+                      <OwnedSetupHeading headingRef={setupHeading} kicker="Final review" title="Start the bounded local runtime" detail="This final action accepts the exact reviewed forecast and creates the local runtime start receipt." />
+                      <dl className="preflight-confirmation-summary"><div><dt>Source</dt><dd>{selectedSource.label}</dd></div><div><dt>Range</dt><dd>{seconds(reviewed.response.forecast.inputs.selectedRange.startMs)}–{seconds(reviewed.response.forecast.inputs.selectedRange.endMs)}</dd></div><div><dt>Language</dt><dd>{sourceLanguage} → {analysisRequest.targetLanguage}</dd></div><div><dt>Output</dt><dd>{analysisRequest.outputDepth === "evidence" ? "Evidence contract" : "Caption request contract"}</dd></div></dl>
+                      <p className="preflight-preview-warning" role="note"><b>Local runtime boundary</b>The host preserves this copy privately. Starting does not upload or publish the media.</p>
+                    </section>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+
+              {error && <p className="product-runtime-error" role="alert">{error}</p>}
+              <div className="preflight-actions" data-stage={setupStage}>
+                <button type="button" className="ghost" onClick={previousSetupStage}>{setupStage === "source" ? "Back to source choices" : `Back to ${PREPARATION_STAGES[currentSetupStageIndex - 1].label}`}</button>
+                <button type="submit" className="cta" disabled={setupAdvanceDisabled}>{setupAdvanceLabel}</button>
+              </div>
+            </motion.section>
+          </form>
+        </div>
       )}
     </section>
+  );
+}
+
+function OwnedSetupHeading({
+  headingRef,
+  kicker,
+  title,
+  detail,
+}: {
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  kicker: string;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <header className="preflight-stage-head">
+      <span>{kicker}</span>
+      <h2 ref={headingRef} id="preflight-stage-title" tabIndex={-1}>{title}</h2>
+      <p>{detail}</p>
+    </header>
   );
 }

@@ -45,7 +45,7 @@ export default function Preflight() {
       <section
         className="preflight"
         data-preview-mode="submitted-source"
-        aria-labelledby="preflight-title"
+        aria-labelledby="preflight-stage-title"
       >
         <SubmittedPreparationForm
           resolution={resolution}
@@ -64,7 +64,11 @@ export default function Preflight() {
   if (session.status !== "ready" || !session.facts || !bundle) {
     const fixture = session.provenance.kind === "contract_fixture";
     return (
-      <section className="preflight" aria-labelledby="preflight-title">
+      <section
+        className="preflight"
+        data-preview-mode={previewSession ? "submitted-source-status" : undefined}
+        aria-labelledby="preflight-title"
+      >
         <header className="preflight-head">
           <span className="preflight-kicker">Source preflight</span>
           <h1 id="preflight-title">{session.title}</h1>
@@ -105,80 +109,51 @@ export default function Preflight() {
     <section
       className="preflight"
       data-preview-mode="recorded-demo"
-      aria-labelledby="preflight-title"
+      aria-labelledby="preflight-stage-title"
     >
-      <header className="preflight-head">
-        <span className="preflight-kicker">Confirm recorded source</span>
-        <h1 id="preflight-title">{facts.title}</h1>
-        <p>{session.message}</p>
-      </header>
+      <ConfirmationForm
+        bundle={bundle}
+        session={session}
+        facts={facts}
+        assessment={assessment}
+        sourceDetails={<RecordedSourceFacts bundle={bundle} facts={facts} />}
+        update={update}
+        cancel={dismiss}
+        confirm={confirm}
+      />
+    </section>
+  );
+}
 
-      <details className="preflight-recorded-facts" open>
-        <summary className="preflight-facts-intro">
-          <span>Recorded source facts</span>
-        </summary>
-
-        <dl className="preflight-facts">
-        <div>
-          <dt>Source receipt</dt>
-          <dd>{facts.rights.basis === "ownership_attestation" ? "Owned local bytes receipted" : "Remote source ingested when recorded"}</dd>
-        </div>
-        <div>
-          <dt>{facts.creator ? "Source" : "Creator"}</dt>
-          <dd>{facts.creator ?? "Not inferred from ownership or filename"}</dd>
-        </div>
-        <div>
-          <dt>Rights</dt>
-          <dd>
-            {facts.rights.label}
-            {facts.rights.assertedBy ? ` · attested by ${facts.rights.assertedBy}` : ""}
-          </dd>
-        </div>
-        <div>
-          <dt>Selected window</dt>
-          <dd>
-            {facts.selection.sourceStart}–{facts.selection.sourceEnd} · {formatSeconds(facts.selection.duration)}
-          </dd>
-        </div>
-        <div>
-          <dt>Recorded media</dt>
-          <dd>
-            {facts.playableMedia ? "Playable artifact" : "No playable artifact"} · {facts.waveformSamples} waveform samples
-          </dd>
-        </div>
-        {facts.mediaProbe && (
-          <div>
-            <dt>Tracks</dt>
-            <dd>{mediaSummary(facts.mediaProbe.container, facts.mediaProbe.tracks)}</dd>
-          </div>
-        )}
-        {facts.content && (
-          <div>
-            <dt>Raw provenance</dt>
-            <dd>
-              SHA-256 {facts.content.hash.slice(0, 12)}… · {formatBytes(facts.content.bytes)} · {facts.content.preservation.replaceAll("_", " ")}
-            </dd>
-          </div>
-        )}
+function RecordedSourceFacts({
+  bundle,
+  facts,
+}: {
+  bundle: NonNullable<ReturnType<typeof useBundle>>;
+  facts: NonNullable<PreflightSession["facts"]>;
+}) {
+  return (
+    <details className="preflight-recorded-facts">
+      <summary className="preflight-facts-intro"><span>Recorded source facts</span></summary>
+      <dl className="preflight-facts">
+        <div><dt>Source receipt</dt><dd>{facts.rights.basis === "ownership_attestation" ? "Owned local bytes receipted" : "Remote source ingested when recorded"}</dd></div>
+        <div><dt>{facts.creator ? "Source" : "Creator"}</dt><dd>{facts.creator ?? "Not inferred from ownership or filename"}</dd></div>
+        <div><dt>Rights</dt><dd>{facts.rights.label}{facts.rights.assertedBy ? ` · attested by ${facts.rights.assertedBy}` : ""}</dd></div>
+        <div><dt>Selected window</dt><dd>{facts.selection.sourceStart}–{facts.selection.sourceEnd} · {formatSeconds(facts.selection.duration)}</dd></div>
+        <div><dt>Recorded media</dt><dd>{facts.playableMedia ? "Playable artifact" : "No playable artifact"} · {facts.waveformSamples} waveform samples</dd></div>
+        {facts.mediaProbe && <div><dt>Tracks</dt><dd>{mediaSummary(facts.mediaProbe.container, facts.mediaProbe.tracks)}</dd></div>}
+        {facts.content && <div><dt>Raw provenance</dt><dd>SHA-256 {facts.content.hash.slice(0, 12)}… · {formatBytes(facts.content.bytes)} · {facts.content.preservation.replaceAll("_", " ")}</dd></div>}
         {facts.speechActivity && (
           <div data-testid="speech-activity-evidence">
             <dt>Detector-measured speech</dt>
             <dd>
-              {formatDetectorSeconds(facts.speechActivity.speechDuration)} speech ·{" "}
-              {(facts.speechActivity.coverage * 100).toFixed(1)}% of decoded samples ·{" "}
-              {facts.speechActivity.windows.length} speech {facts.speechActivity.windows.length === 1 ? "window" : "windows"}
+              {formatDetectorSeconds(facts.speechActivity.speechDuration)} speech · {(facts.speechActivity.coverage * 100).toFixed(1)}% of decoded samples · {facts.speechActivity.windows.length} speech {facts.speechActivity.windows.length === 1 ? "window" : "windows"}
               <br />
               {facts.speechActivity.windows.length > 0
-                ? facts.speechActivity.windows
-                    .map(
-                      (window) =>
-                        `${formatDetectorSeconds(window.startSeconds)}–${formatDetectorSeconds(window.endSeconds)}`,
-                    )
-                    .join(" · ")
+                ? facts.speechActivity.windows.map((window) => `${formatDetectorSeconds(window.startSeconds)}–${formatDetectorSeconds(window.endSeconds)}`).join(" · ")
                 : "The detector produced no speech windows."}
               <br />
-              {facts.speechActivity.producer.id} {facts.speechActivity.producer.version} · model revision{" "}
-              {facts.speechActivity.producer.modelRevision.slice(0, 12)}…
+              {facts.speechActivity.producer.id} {facts.speechActivity.producer.version} · model revision {facts.speechActivity.producer.modelRevision.slice(0, 12)}…
             </dd>
           </div>
         )}
@@ -186,49 +161,21 @@ export default function Preflight() {
           <div data-testid="language-range-evidence">
             <dt>Language detector ranges</dt>
             <dd>
-              {facts.languageRanges.ranges.length} receipted speech-range{" "}
-              {facts.languageRanges.ranges.length === 1 ? "result" : "results"}
+              {facts.languageRanges.ranges.length} receipted speech-range {facts.languageRanges.ranges.length === 1 ? "result" : "results"}
               {facts.languageRanges.ranges.map((range) => (
-                <span
-                  key={`${range.speechWindowIndex}:${range.chunkIndex}`}
-                  data-testid="language-range"
-                  data-language-status={range.decision.status}
-                >
-                  <br />
-                  {formatDetectorSeconds(range.startSeconds)}–{formatDetectorSeconds(range.endSeconds)} ·{" "}
-                  {languageRangeDecision(range)}
+                <span key={`${range.speechWindowIndex}:${range.chunkIndex}`} data-testid="language-range" data-language-status={range.decision.status}>
+                  <br />{formatDetectorSeconds(range.startSeconds)}–{formatDetectorSeconds(range.endSeconds)} · {languageRangeDecision(range)}
                 </span>
               ))}
-              <br />
-              {facts.languageRanges.producer.id} {facts.languageRanges.producer.version} ·{" "}
-              {facts.languageRanges.producer.modelId} {facts.languageRanges.producer.quantization} · model revision{" "}
-              {facts.languageRanges.producer.modelRevision.slice(0, 12)}…
-              <br />
-              Probabilities are uncalibrated model softmax scores.
+              <br />{facts.languageRanges.producer.id} {facts.languageRanges.producer.version} · {facts.languageRanges.producer.modelId} {facts.languageRanges.producer.quantization} · model revision {facts.languageRanges.producer.modelRevision.slice(0, 12)}…
+              <br />Probabilities are uncalibrated model softmax scores.
             </dd>
           </div>
         )}
-        <div>
-          <dt>Clip language declaration</dt>
-          <dd>{facts.declaredLanguage} recorded in run.clip.lang · not detector output</dd>
-        </div>
-        <div>
-          <dt>Language pack</dt>
-          <dd>{bundle.run.pack} selected for the recorded job · not detector output</dd>
-        </div>
-        </dl>
-      </details>
-
-      <ConfirmationForm
-        bundle={bundle}
-        session={session}
-        facts={facts}
-        assessment={assessment}
-        update={update}
-        cancel={cancel}
-        confirm={confirm}
-      />
-    </section>
+        <div><dt>Clip language declaration</dt><dd>{facts.declaredLanguage} recorded in run.clip.lang · not detector output</dd></div>
+        <div><dt>Language pack</dt><dd>{bundle.run.pack} selected for the recorded job · not detector output</dd></div>
+      </dl>
+    </details>
   );
 }
 

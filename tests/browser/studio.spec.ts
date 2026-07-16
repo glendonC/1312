@@ -70,20 +70,27 @@ function productStudioUrl(): string {
 }
 
 async function finishPreparation(page: Page, previewMode = true, keyboard = false): Promise<void> {
-  const continueAction = page.getByRole("button", { name: "Continue to forecast" });
-  if (keyboard) await continueAction.press("Enter");
-  else await continueAction.click();
+  for (const label of [
+    "Continue to Range",
+    "Continue to Language",
+    "Continue to Output",
+    "Continue to Forecast",
+  ]) {
+    const action = page.getByRole("button", { name: label });
+    if (keyboard) await action.press("Enter");
+    else await action.click();
+  }
   await expect(page.getByRole("heading", {
-    name: previewMode ? "Known request, unavailable execution forecast" : "Review what can be known before starting",
+    name: previewMode ? "Here’s what Studio knows so far" : "Review what can be known before starting",
   })).toBeVisible();
-  const reviewAction = page.getByRole("button", { name: "Review request" });
+  const reviewAction = page.getByRole("button", { name: "Continue to Review" });
   if (keyboard) await reviewAction.press("Enter");
   else await reviewAction.click();
   await expect(page.getByRole("heading", {
     name: previewMode ? "Preview the interface with a recorded run" : "Replay this recorded processing request",
   })).toBeVisible();
   const finalAction = page.getByRole("button", {
-    name: previewMode ? "Preview recorded processing" : "Replay recorded analysis",
+    name: previewMode ? "Preview run-006 recorded processing" : "Replay recorded analysis",
   });
   if (keyboard) await finalAction.press("Enter");
   else await finalAction.click();
@@ -201,7 +208,7 @@ async function renderedDifference(
 test("the lab is opt-in during development", async ({ page }) => {
   await page.goto("/studio/");
   await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Use owned local source" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add owned media" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Studio trace lab" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Local runtime host" })).toHaveCount(0);
 
@@ -213,7 +220,7 @@ test("the lab is opt-in during development", async ({ page }) => {
 
 test("the default Studio exposes a separate owned-source operator path", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Use owned local source" }).click();
+  await page.getByRole("button", { name: "Add owned media" }).click();
 
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await expect(productRuntime).toBeVisible();
@@ -228,7 +235,44 @@ test("the default Studio exposes a separate owned-source operator path", async (
 
   await productRuntime.getByRole("button", { name: "Back to source choices" }).click();
   await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run Demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Explore recorded demo" })).toBeVisible();
+});
+
+test("recorded and owned setup paths share the centered staged panel", async ({ page }) => {
+  await page.goto("/studio/");
+  const dockBefore = await page.locator(".studio-source-dock").boundingBox();
+
+  await page.getByRole("button", { name: "Explore recorded demo" }).click();
+  const recorded = page.locator('.preflight[data-preview-mode="recorded-demo"]');
+  const recordedPanel = recorded.locator(".preflight-stage-panel");
+  await expect(recorded.locator(".preflight-stage-nav button")).toHaveCount(6);
+  await expect(recordedPanel).toBeVisible();
+  await expect(recorded).toHaveCSS("position", "relative");
+  await expect(recorded).toHaveCSS("box-shadow", "none");
+  await expect(recorded).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(page.getByRole("button", { name: "01 Source" })).toHaveAttribute("aria-current", "step");
+  await expect(page.getByRole("button", { name: "02 Range" })).toBeDisabled();
+
+  const dockDuringRecorded = await page.locator(".studio-source-dock").boundingBox();
+  for (const key of ["x", "y", "width", "height"] as const) {
+    expect(Math.abs((dockDuringRecorded?.[key] ?? Infinity) - (dockBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
+  }
+
+  await page.getByRole("button", { name: "Back to source choices" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add owned media" }).click();
+  const owned = page.getByRole("region", { name: "Owned local source" });
+  await expect(owned.locator(".preflight-stage-nav button")).toHaveCount(6);
+  await expect(owned.locator(".preflight-stage-panel")).toBeVisible();
+  await expect(owned.locator(".product-runtime-header")).toHaveCount(0);
+  await expect(owned).toHaveAttribute("data-runtime", "false");
+  await expect(owned.getByRole("button", { name: "Continue to Range" })).toBeDisabled();
+  await owned.getByRole("button", { name: "Back to source choices" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => window.innerWidth),
+  );
 });
 
 test("the development processing fixture exposes honest running state and worker focus", async ({ page }) => {
@@ -284,7 +328,7 @@ test("owned browser media requires rights, registers, and continues through the 
   test.skip(!token, "requires an operator-started deterministic runtime host");
 
   await page.goto(productStudioUrl());
-  await page.getByRole("button", { name: "Use owned local source" }).click();
+  await page.getByRole("button", { name: "Add owned media" }).click();
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await productRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
   await productRuntime.getByRole("button", { name: "Connect to local host" }).click();
@@ -308,11 +352,15 @@ test("owned browser media requires rights, registers, and continues through the 
   await expect(productRuntime.getByLabel("Registered owned source")).toContainText("Browser-owned WAV");
   await expect(productRuntime.locator(".product-runtime-source-facts").getByText("Unavailable", { exact: true })).toBeVisible();
 
+  await productRuntime.getByRole("button", { name: "Continue to Range" }).click();
+  await productRuntime.getByRole("button", { name: "Continue to Language" }).click();
   await productRuntime.getByLabel("Declared source language").fill("ko");
-  await productRuntime.getByRole("button", { name: "Review local plan" }).click();
-  const plan = productRuntime.getByRole("region", { name: "Local runtime plan" });
+  await productRuntime.getByRole("button", { name: "Continue to Output" }).click();
+  await productRuntime.getByRole("button", { name: "Continue to Forecast" }).click();
+  const plan = productRuntime.getByRole("region", { name: "Review the local runtime plan" });
   await expect(plan).toBeVisible();
-  await plan.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
+  await productRuntime.getByRole("button", { name: "Continue to Review" }).click();
+  await productRuntime.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
   const status = productRuntime.getByRole("region", { name: "Local runtime status" });
   await expect(status.getByRole("heading", { name: "Terminal", exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
@@ -324,24 +372,28 @@ test("the product path reviews and freezes an exact local forecast without enter
   test.skip(!token, "requires an operator-started deterministic runtime host");
 
   await page.goto(productStudioUrl());
-  await page.getByRole("button", { name: "Use owned local source" }).click();
+  await page.getByRole("button", { name: "Add owned media" }).click();
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await productRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
   await productRuntime.getByRole("button", { name: "Connect to local host" }).click();
   await expect(productRuntime.getByLabel("Registered owned source")).toBeVisible();
   await expect(productRuntime.getByText("Owned/local", { exact: false })).toBeVisible();
 
+  await productRuntime.getByRole("button", { name: "Continue to Range" }).click();
+  await productRuntime.getByRole("button", { name: "Continue to Language" }).click();
   await productRuntime.getByLabel("Declared source language").fill("ko");
   await productRuntime.getByLabel("Language-pack identity (optional)").fill("ko-v3");
-  await productRuntime.getByRole("button", { name: "Review local plan" }).click();
+  await productRuntime.getByRole("button", { name: "Continue to Output" }).click();
+  await productRuntime.getByRole("button", { name: "Continue to Forecast" }).click();
 
-  const plan = productRuntime.getByRole("region", { name: "Local runtime plan" });
+  const plan = productRuntime.getByRole("region", { name: "Review the local runtime plan" });
   await expect(plan.getByText("studio.forecast.v1 · not started or frozen")).toBeVisible();
   await expect(plan.getByText("Workload floor")).toBeVisible();
   await expect(plan.getByText("Unavailable", { exact: true })).toHaveCount(2);
   await expect(plan.getByText(/Unavailable · amount and currency are null/)).toBeVisible();
 
-  await plan.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
+  await productRuntime.getByRole("button", { name: "Continue to Review" }).click();
+  await productRuntime.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
   const status = productRuntime.getByRole("region", { name: "Local runtime status" });
   await expect(status.getByRole("heading", { name: "Terminal", exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(status.getByText(/Closed at validated journal head/)).toBeVisible();
@@ -400,7 +452,7 @@ test("the input stage introduces the orchestrator before asking for a source", a
 
   await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
   await expect(page.getByText(/sit back and watch it come together/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run Demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Explore recorded demo" })).toBeVisible();
 
   const identity = page.locator('[data-agent-identity="orchestrator-root"]');
   await expect(identity).toBeVisible();
@@ -429,6 +481,140 @@ test("the input stage introduces the orchestrator before asking for a source", a
   await expect(addSource).toBeFocused();
 });
 
+test("client navigation from Home preserves Studio material tokens", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "View demo", exact: true }).click();
+  await expect(page).toHaveURL(/\/studio\/$/);
+  await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
+
+  const option = page.locator('.studio-source-option[data-palette="peach"]');
+  await expect(option).toBeVisible();
+  const clientNavigationStyle = await option.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      palette: style.getPropertyValue("--palette-color").trim(),
+      highlight: style.getPropertyValue("--glass-highlight-soft").trim(),
+      blur: style.getPropertyValue("--glass-blur-compact").trim(),
+      backgroundImage: style.backgroundImage,
+      backdropFilter: style.backdropFilter,
+      borderRadius: style.borderRadius,
+      boxShadow: style.boxShadow,
+    };
+  });
+
+  expect(clientNavigationStyle.palette).not.toBe("");
+  expect(clientNavigationStyle.highlight).not.toBe("");
+  expect(clientNavigationStyle.blur).not.toBe("");
+  expect(clientNavigationStyle.backgroundImage).not.toBe("none");
+  expect(clientNavigationStyle.backdropFilter).not.toBe("none");
+  expect(clientNavigationStyle.borderRadius).toBe("12px");
+  expect(clientNavigationStyle.boxShadow).toContain("inset");
+
+  await page.reload();
+  await expect(option).toBeVisible();
+  await expect.poll(async () => option.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundImage: style.backgroundImage,
+      backdropFilter: style.backdropFilter,
+      borderRadius: style.borderRadius,
+      boxShadow: style.boxShadow,
+    };
+  })).toEqual({
+    backgroundImage: clientNavigationStyle.backgroundImage,
+    backdropFilter: clientNavigationStyle.backdropFilter,
+    borderRadius: clientNavigationStyle.borderRadius,
+    boxShadow: clientNavigationStyle.boxShadow,
+  });
+});
+
+test("secondary source options use compact inset glass and an accessible sample menu", async ({ page }) => {
+  await page.goto("/studio/");
+
+  const optionRow = page.locator(".studio-source-options");
+  const optionControls = optionRow.locator(".studio-source-option");
+  const demo = page.getByRole("button", { name: "Explore recorded demo" });
+  const ownedMedia = page.getByRole("button", { name: "Add owned media" });
+  const samples = page.getByRole("button", { name: "Korean samples" });
+
+  await expect(optionRow).toBeVisible();
+  await expect(optionControls).toHaveCount(3);
+  await expect(demo).toBeVisible();
+  await expect(ownedMedia).toBeVisible();
+  await expect(samples).toHaveAttribute("aria-haspopup", "menu");
+  expect(await optionControls.evaluateAll((controls) => controls.map((control) => ({
+    palette: control.getAttribute("data-palette"),
+    height: Math.round(control.getBoundingClientRect().height),
+    radius: Number.parseFloat(getComputedStyle(control).borderRadius),
+  })))).toEqual([
+    { palette: "peach", height: 34, radius: 12 },
+    { palette: "blue", height: 34, radius: 12 },
+    { palette: "coral", height: 34, radius: 12 },
+  ]);
+
+  const optionShadowsAreInset = await optionControls.evaluateAll((controls) => {
+    const splitLayers = (value: string) => {
+      const layers: string[] = [];
+      let depth = 0;
+      let start = 0;
+      for (let index = 0; index < value.length; index += 1) {
+        if (value[index] === "(") depth += 1;
+        if (value[index] === ")") depth -= 1;
+        if (value[index] === "," && depth === 0) {
+          layers.push(value.slice(start, index).trim());
+          start = index + 1;
+        }
+      }
+      layers.push(value.slice(start).trim());
+      return layers;
+    };
+    return controls.every((control) => {
+      const shadow = getComputedStyle(control).boxShadow;
+      return shadow === "none" || splitLayers(shadow).every((layer) => layer.includes("inset"));
+    });
+  });
+  expect(optionShadowsAreInset).toBe(true);
+
+  await samples.focus();
+  await samples.press("ArrowDown");
+  const menu = page.getByRole("menu", { name: "Saved Korean samples" });
+  const firstSample = page.getByRole("menuitem", { name: "Korean sample 01 YouTube link" });
+  const secondSample = page.getByRole("menuitem", { name: "Korean sample 02 YouTube link" });
+  await expect(menu).toBeVisible();
+  await expect(firstSample).toBeFocused();
+  await firstSample.press("ArrowDown");
+  await expect(secondSample).toBeFocused();
+  await secondSample.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(samples).toBeFocused();
+
+  await samples.click();
+  await expect(firstSample).toBeFocused();
+  await page.getByRole("heading", { name: /Welcome to Studio/ }).click();
+  await expect(menu).toHaveCount(0);
+
+  await samples.click();
+  await firstSample.click();
+  const sourceField = page.getByRole("textbox", { name: "Clip link" });
+  await expect(sourceField).toBeFocused();
+  await expect(sourceField).toHaveValue(
+    "https://www.youtube.com/watch?v=hWxESR68Olg&list=RDhWxESR68Olg&start_radio=1&pp=oAcB",
+  );
+  await page.waitForTimeout(420);
+  const sourceBarBefore = await page.locator(".source-entry .dock-bar").boundingBox();
+
+  await samples.click();
+  await secondSample.click();
+  await expect(sourceField).toBeFocused();
+  await expect(sourceField).toHaveValue("https://www.youtube.com/watch?v=XauBqFepc-s");
+  await expect(page.getByRole("button", { name: "Resolve source metadata" })).toBeVisible();
+  await page.waitForTimeout(240);
+  const sourceBarAfter = await page.locator(".source-entry .dock-bar").boundingBox();
+  for (const key of ["x", "y", "width", "height"] as const) {
+    expect(Math.abs((sourceBarAfter?.[key] ?? Infinity) - (sourceBarBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
+  }
+});
+
 test("a failed source check reports directly above the source dock", async ({ page }) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Input Source" }).click();
@@ -449,32 +635,27 @@ test("a failed source check reports directly above the source dock", async ({ pa
   expect((noticeBox?.y ?? 0) + (noticeBox?.height ?? 0)).toBeLessThan(dockBox?.y ?? 0);
 });
 
-test("an identified source contracts into a compact review control", async ({ page }) => {
+test("an identified source keeps the URL editor unchanged", async ({ page }) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Input Source" }).click();
   const source = page.getByRole("textbox", { name: "Clip link" });
   const editor = page.locator(".source-entry .dock-bar");
+  await page.waitForTimeout(420);
   const editorBox = await editor.boundingBox();
 
   await source.fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   await source.press("Tab");
+  await page.waitForTimeout(240);
 
-  const review = page.locator(".source-entry .dock-bar-source");
-  await expect(review).toBeVisible();
-  const editSource = page.getByRole("button", { name: /Edit source/ });
-  await expect(editSource).toBeVisible();
-  await expect(editSource.locator(".source-display-url")).toBeVisible();
-
+  await expect(source).toBeVisible();
+  await expect(source).toHaveValue("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await expect(page.locator(".source-entry .dock-bar-source")).toHaveCount(0);
   expect(editorBox).not.toBeNull();
-  await expect
-    .poll(async () => {
-      const reviewBox = await review.boundingBox();
-      return (editorBox?.width ?? 0) - (reviewBox?.width ?? Infinity);
-    })
-    .toBeGreaterThan(20);
-
-  await editSource.locator(".source-display-url").click();
-  await expect(source).toBeFocused();
+  const editorAfterBlur = await editor.boundingBox();
+  expect(editorAfterBlur).not.toBeNull();
+  for (const key of ["x", "y", "width", "height"] as const) {
+    expect(Math.abs((editorAfterBlur?.[key] ?? Infinity) - (editorBox?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
+  }
 });
 
 test("the welcome composition fits every supported viewport", async ({ page }, testInfo) => {
@@ -495,27 +676,41 @@ test("the welcome composition fits every supported viewport", async ({ page }, t
     const orchestrator = page.locator(".welcome-orchestrator-anchor");
     const panel = page.locator(".welcome-panel");
     const addSource = page.getByRole("button", { name: "Input Source" });
-    const demo = page.getByRole("button", { name: "Run Demo" });
-    const [orchestratorBox, panelBox, addSourceBox, demoBox] = await Promise.all([
+    const options = page.locator(".studio-source-options");
+    const demo = page.getByRole("button", { name: "Explore recorded demo" });
+    const ownedMedia = page.getByRole("button", { name: "Add owned media" });
+    const samples = page.getByRole("button", { name: "Korean samples" });
+    const [orchestratorBox, panelBox, addSourceBox, optionsBox] = await Promise.all([
       orchestrator.boundingBox(),
       panel.boundingBox(),
       addSource.boundingBox(),
-      demo.boundingBox(),
+      options.boundingBox(),
     ]);
 
     expect(orchestratorBox).not.toBeNull();
     expect(panelBox).not.toBeNull();
     expect(addSourceBox).not.toBeNull();
-    expect(demoBox).not.toBeNull();
+    expect(optionsBox).not.toBeNull();
     expect(orchestratorBox?.x ?? 0).toBeLessThan(panelBox?.x ?? 0);
     expect(
       Math.abs((addSourceBox?.x ?? 0) + (addSourceBox?.width ?? 0) / 2 - viewport.width / 2),
     ).toBeLessThanOrEqual(0.5);
-    expect(demoBox?.width ?? 0).toBeGreaterThan(72);
-    expect(demoBox?.width ?? 0).toBeLessThan(112);
-    expect(demoBox?.height).toBe(40);
+    await expect(demo).toBeVisible();
+    await expect(ownedMedia).toBeVisible();
+    await expect(samples).toBeVisible();
+    expect(optionsBox?.y ?? 0).toBeGreaterThanOrEqual((panelBox?.y ?? 0) + (panelBox?.height ?? 0));
 
-    for (const locator of [orchestrator, panel, addSource, demo]) {
+    await samples.click();
+    const sampleMenu = page.getByRole("menu", { name: "Saved Korean samples" });
+    await expect(sampleMenu).toBeVisible();
+    const sampleMenuBox = await sampleMenu.boundingBox();
+    expect(sampleMenuBox).not.toBeNull();
+    expect(sampleMenuBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect((sampleMenuBox?.x ?? 0) + (sampleMenuBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
+    await page.keyboard.press("Escape");
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+
+    for (const locator of [orchestrator, panel, addSource, options, demo, ownedMedia, samples]) {
       const box = await locator.boundingBox();
       expect(box).not.toBeNull();
       expect(box?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
@@ -529,19 +724,54 @@ test("the welcome composition fits every supported viewport", async ({ page }, t
 test("a submitted source moves through setup and forecast before the recorded interface preview", async ({ page }) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "Clip link" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  const clipField = page.getByRole("textbox", { name: "Clip link" });
+  const submittedUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+  await clipField.fill(submittedUrl);
+  await page.waitForTimeout(420);
+  const welcomeLockupBefore = await page.locator(".welcome-lockup").boundingBox();
+  const welcomeOrbBefore = await page.locator(".welcome-orchestrator-anchor").boundingBox();
+  const welcomePanelBefore = await page.locator(".welcome-panel").boundingBox();
+  const sourceDockBefore = await page.locator(".studio-source-dock").boundingBox();
+  const sourceBarBefore = await page.locator(".source-entry .dock-bar").boundingBox();
   await page.keyboard.press("Enter");
 
   await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
+  await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Metadata resolved" })).toBeVisible();
+  await expect(page.getByRole("heading", {
+    name: "I found the source. It’s 1:23 long.",
+  })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
-  await expect(page.getByText("Recorded test producer · 1:23 total.")).toBeVisible();
+  await expect(page.getByText("Recorded test producer", { exact: true })).toBeVisible();
+  await expect(clipField).toBeVisible();
+  await expect(clipField).toHaveValue(submittedUrl);
+  await expect(page.getByRole("button", { name: "Explore recorded demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add owned media" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Korean samples" })).toBeVisible();
+  await page.waitForTimeout(420);
+  const welcomeLockupAfter = await page.locator(".welcome-lockup").boundingBox();
+  const welcomeOrbAfter = await page.locator(".welcome-orchestrator-anchor").boundingBox();
+  const welcomePanelAfter = await page.locator(".preflight-stage-panel").boundingBox();
+  const sourceDockAfter = await page.locator(".studio-source-dock").boundingBox();
+  const sourceBarAfter = await page.locator(".source-entry .dock-bar").boundingBox();
+  for (const key of ["x", "y", "width", "height"] as const) {
+    expect(Math.abs((sourceDockAfter?.[key] ?? Infinity) - (sourceDockBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
+    expect(Math.abs((sourceBarAfter?.[key] ?? Infinity) - (sourceBarBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
+  }
+  expect(Math.abs((welcomeLockupAfter?.x ?? Infinity) - (welcomeLockupBefore?.x ?? -Infinity))).toBeLessThanOrEqual(1);
+  expect(Math.abs((welcomeLockupAfter?.width ?? Infinity) - (welcomeLockupBefore?.width ?? -Infinity))).toBeLessThanOrEqual(1);
+  for (const key of ["x", "y", "width", "height"] as const) {
+    expect(Math.abs((welcomeOrbAfter?.[key] ?? Infinity) - (welcomeOrbBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(1);
+  }
+  const welcomePanelCenterBefore = (welcomePanelBefore?.x ?? Infinity) + (welcomePanelBefore?.width ?? 0) / 2;
+  const welcomePanelCenterAfter = (welcomePanelAfter?.x ?? -Infinity) + (welcomePanelAfter?.width ?? 0) / 2;
+  expect(Math.abs(welcomePanelCenterAfter - welcomePanelCenterBefore)).toBeLessThanOrEqual(1);
   const sourceBoundary = page.getByRole("note", { name: "Submitted source metadata boundary" });
+  await sourceBoundary.getByText("Source details", { exact: true }).click();
   await expect(sourceBoundary.getByText("1:23", { exact: true })).toBeVisible();
   await expect(sourceBoundary.getByText("Provider metadata", { exact: true })).toBeVisible();
   await expect(sourceBoundary.getByText("Not started", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Entire video · 0:00–1:23")).toBeChecked();
   await expect(page.getByLabel("Recorded selection · 0:00–0:40")).toHaveCount(0);
-  await expect(page.getByLabel("Automatic · request detection later; nothing is detected yet")).toBeChecked();
   await expect(page.getByText("Recorded fixture facts · not the submitted link")).toHaveCount(0);
   await expect(page.getByText("Didi's Korean Culture Podcast")).toHaveCount(0);
   await expect(page.getByText("Creative Commons Attribution license (reuse allowed)")).toHaveCount(0);
@@ -550,44 +780,90 @@ test("a submitted source moves through setup and forecast before the recorded in
 
   const requestForm = page.locator(".preflight-form");
   await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
+  await expect(requestForm.locator(".preflight-stage-nav button")).toHaveCount(6);
+  await expect(page.getByRole("button", { name: "01 Source" })).toHaveAttribute("aria-current", "step");
+  await expect(page.getByRole("button", { name: "02 Range" })).toBeDisabled();
+  const stagePaletteContracts = await requestForm.locator(".preflight-stage-nav").evaluate((navigation) =>
+    [...navigation.querySelectorAll("button")].map((button) => {
+      const style = getComputedStyle(button);
+      return {
+        name: button.getAttribute("data-palette"),
+        color: style.getPropertyValue("--palette-color").trim(),
+        ink: style.getPropertyValue("--palette-ink").trim(),
+        soft: style.getPropertyValue("--palette-soft").trim(),
+        shadow: style.boxShadow,
+      };
+    }),
+  );
+  expect(stagePaletteContracts.map(({ name }) => name)).toEqual([
+    "coral",
+    "citron",
+    "blue",
+    "lilac",
+    "peach",
+    "teal",
+  ]);
+  expect(new Set(stagePaletteContracts.map(({ color }) => color)).size).toBe(6);
+  expect(new Set(stagePaletteContracts.map(({ ink }) => ink)).size).toBe(6);
+  expect(new Set(stagePaletteContracts.map(({ soft }) => soft)).size).toBe(6);
+  expect(stagePaletteContracts.every(({ shadow }) =>
+    shadow
+      .split(/,\s*(?=(?:rgba?|color)\()/)
+      .every((layer) => layer.includes("inset")),
+  )).toBe(true);
+  await expect(requestForm).toHaveAttribute("data-palette", "coral");
+  expect(await requestForm.evaluate((element) => getComputedStyle(element, "::before").content)).toBe("none");
   const initialRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
   expect(initialRequestId).toMatch(/^submitted-preparation:/);
 
+  await page.getByRole("button", { name: "Continue to Range" }).click();
+  await expect(page.getByRole("heading", { name: "Choose the section to prepare" })).toBeFocused();
+  await expect(requestForm).toHaveAttribute("data-palette", "citron");
+  await expect(page.getByLabel("Entire video · 0:00–1:23")).toBeChecked();
   await page.getByLabel("Custom start and end").check();
   const rangeEnd = page.getByRole("spinbutton", { name: "End, seconds" });
   await rangeEnd.fill("90");
   await expect(page.getByText("Choose a valid range within 0:00–1:23.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue to forecast" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeDisabled();
   await rangeEnd.fill("60");
-  await expect(page.getByRole("button", { name: "Continue to forecast" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
   await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
   const changedRangeRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
   expect(changedRangeRequestId).not.toBe(initialRequestId);
+  await page.getByLabel("Entire video · 0:00–1:23").check();
 
+  await page.getByRole("button", { name: "Continue to Language" }).click();
+  await expect(requestForm).toHaveAttribute("data-palette", "blue");
+  await expect(page.getByLabel("Automatic · request detection later")).toBeChecked();
   await page.getByLabel("Declare the source language").check();
   await page.getByRole("textbox", { name: "Declared BCP-47 language" }).fill("ko");
   await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
   const changedLanguageRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
   expect(changedLanguageRequestId).not.toBe(changedRangeRequestId);
-  await page.getByLabel("Entire video · 0:00–1:23").check();
 
-  await page.getByRole("button", { name: "Continue to forecast" }).click();
-  const forecast = page.getByRole("heading", { name: "Known request, unavailable execution forecast" });
+  await page.getByRole("button", { name: "Continue to Output" }).click();
+  await expect(requestForm).toHaveAttribute("data-palette", "lilac");
+  await expect(page.getByLabel("Captions plus evidence and breakdown")).toBeChecked();
+  await page.getByRole("button", { name: "Continue to Forecast" }).click();
+  await expect(requestForm).toHaveAttribute("data-palette", "peach");
+  const forecast = page.getByRole("heading", { name: "Here’s what Studio knows so far" });
   await expect(forecast).toBeVisible();
   await expect(forecast).toBeFocused();
   await expect(page.getByText("Processing time")).toBeVisible();
   await expect(page.getByText("Estimated cost")).toBeVisible();
   await expect(page.getByText("Runtime scale")).toBeVisible();
   await expect(page.getByText("Korean · user declared")).toBeVisible();
-  await expect(page.locator("[data-submitted-preparation-request-id]")).toHaveCount(2);
-  await page.getByRole("button", { name: "Back to request" }).click();
-  await expect(page.getByRole("heading", { name: "Choose the submitted-source request" })).toBeFocused();
-  await page.getByRole("button", { name: "Continue to forecast" }).click();
-  await page.getByRole("button", { name: "Review request" }).click();
+  await expect(page.locator("[data-submitted-preparation-request-id]")).toHaveCount(1);
+  await page.getByRole("button", { name: "02 Range" }).click();
+  await expect(page.getByRole("heading", { name: "Choose the section to prepare" })).toBeFocused();
+  await page.getByRole("button", { name: "05 Forecast" }).click();
+  await expect(forecast).toBeFocused();
+  await page.getByRole("button", { name: "Continue to Review" }).click();
+  await expect(requestForm).toHaveAttribute("data-palette", "teal");
   await expect(page.getByRole("heading", { name: "Preview the interface with a recorded run" })).toBeFocused();
   await expect(page.getByText(/submitted link remains untouched/i)).toBeVisible();
   await expect(page.getByText(/does not submit a runtime command/i)).toBeVisible();
-  await page.getByRole("button", { name: "Preview recorded processing" }).click();
+  await page.getByRole("button", { name: "Preview run-006 recorded processing" }).click();
 
   await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
   await expect(page.locator('.hub [data-agent-identity="orchestrator-root"]')).toBeVisible();
@@ -617,6 +893,68 @@ test("a submitted source moves through setup and forecast before the recorded in
       return dockBox.x + dockBox.width - (stopBox.x + stopBox.width);
     })
     .toBeLessThanOrEqual(10);
+});
+
+test("submitted metadata resolution stays in the welcome composition", async ({ page }) => {
+  await page.unroute("**/api/studio/source-resolutions");
+  let releaseResolution!: () => void;
+  const resolutionGate = new Promise<void>((resolve) => {
+    releaseResolution = resolve;
+  });
+  await page.route("**/api/studio/source-resolutions", async (route) => {
+    const request = route.request().postDataJSON() as { url: string };
+    await resolutionGate;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(sourceResolutionReceipt(request.url)),
+    });
+  });
+
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/resolvingfixture");
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Resolving provider metadata" })).toBeVisible();
+  await expect(page.getByRole("heading", {
+    name: "One moment—I’m asking YouTube for the title, creator, and duration. The media itself remains untouched.",
+  })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Clip link" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Clip link" })).toHaveValue("https://youtu.be/resolvingfixture");
+  await expect(page.locator(".preflight")).toHaveCount(0);
+
+  releaseResolution();
+  await expect(page.getByRole("status").filter({ hasText: "Metadata resolved" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "I found the source. It’s 1:23 long." })).toBeVisible();
+});
+
+test("a long submitted source opens with an explicit editable two-minute request default", async ({ page }) => {
+  await page.unroute("**/api/studio/source-resolutions");
+  await page.route("**/api/studio/source-resolutions", async (route) => {
+    const request = route.request().postDataJSON() as { url: string };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(sourceResolutionReceipt(request.url, 203_000)),
+    });
+  });
+
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/longfixture");
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByRole("heading", {
+    name: "I found the source. It’s 3:23 long.",
+  })).toBeVisible();
+  await page.getByRole("button", { name: "Continue to Range" }).click();
+  await expect(page.getByLabel("Custom start and end")).toBeChecked();
+  await expect(page.getByRole("spinbutton", { name: "Start, seconds" })).toHaveValue("0");
+  await expect(page.getByRole("spinbutton", { name: "End, seconds" })).toHaveValue("120");
+  await expect(page.getByText(/editable request default, not a content recommendation/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
 });
 
 test("submitted preview Results reports no submitted artifact before recorded demo output", async ({ page }, testInfo) => {
@@ -660,7 +998,7 @@ test("a remote metadata failure keeps duration and range controls unavailable", 
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Input Source" }).click();
   await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/privatevideo");
-  await page.getByRole("button", { name: "Launch investigation" }).click();
+  await page.getByRole("button", { name: "Resolve source metadata" }).click();
 
   await expect(page.getByRole("heading", { name: "Source metadata unavailable" })).toBeVisible();
   await expect(page.getByText("YouTube video metadata is unavailable.")).toBeVisible();
@@ -688,23 +1026,41 @@ test("the submitted preparation sequence stays horizontally contained at every s
     await page.goto("/studio/");
     await page.getByRole("button", { name: "Input Source" }).click();
     await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/dQw4w9WgXcQ");
-    await page.getByRole("button", { name: "Launch investigation" }).click();
+    await page.getByRole("button", { name: "Resolve source metadata" }).click();
 
-    const panel = page.locator(".preflight");
-    await expect(page.getByRole("heading", { name: "Choose the submitted-source request" })).toBeVisible();
+    const panel = page.locator(".preflight-stage-panel");
+    await expect(page.getByRole("heading", { name: "I found the source. It’s 1:23 long." })).toBeVisible();
+    await expect(page.locator('.studio-welcome[data-source-guide="true"]')).toBeVisible();
+    await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
+    await expect(panel).toHaveCSS("position", "relative");
+    await expect(panel).toHaveCSS("overflow-y", "auto");
+    await expect(page.getByRole("textbox", { name: "Clip link" })).toHaveValue("https://youtu.be/dQw4w9WgXcQ");
+    const sourceDock = page.locator(".studio-source-dock");
+    const sourceDockBox = await sourceDock.boundingBox();
+    expect(sourceDockBox).not.toBeNull();
+    expect(
+      Math.abs((sourceDockBox?.x ?? 0) + (sourceDockBox?.width ?? 0) / 2 - viewport.width / 2),
+    ).toBeLessThanOrEqual(0.5);
+    const expectedDockBottom = Math.min(34, Math.max(20, viewport.height * 0.04));
+    expect(
+      Math.abs(viewport.height - ((sourceDockBox?.y ?? 0) + (sourceDockBox?.height ?? 0)) - expectedDockBottom),
+    ).toBeLessThanOrEqual(0.6);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
     const panelBox = await panel.boundingBox();
     expect(panelBox).not.toBeNull();
     expect(panelBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
     expect((panelBox?.x ?? 0) + (panelBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
 
-    await page.getByRole("button", { name: "Continue to forecast" }).click();
-    await expect(page.getByRole("heading", { name: "Known request, unavailable execution forecast" })).toBeFocused();
+    await page.getByRole("button", { name: "Continue to Range" }).click();
+    await page.getByRole("button", { name: "Continue to Language" }).click();
+    await page.getByRole("button", { name: "Continue to Output" }).click();
+    await page.getByRole("button", { name: "Continue to Forecast" }).click();
+    await expect(page.getByRole("heading", { name: "Here’s what Studio knows so far" })).toBeFocused();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
 
-    await page.getByRole("button", { name: "Review request" }).click();
+    await page.getByRole("button", { name: "Continue to Review" }).click();
     await expect(page.getByRole("heading", { name: "Preview the interface with a recorded run" })).toBeFocused();
-    await expect(page.getByRole("button", { name: "Preview recorded processing" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Preview run-006 recorded processing" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   }
 });
@@ -1346,7 +1702,7 @@ test("the source capsule sizes to content before applying its maximum", async ({
 
 test("the recorded run uses its receipted source identity", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Run Demo" }).click();
+  await page.getByRole("button", { name: "Explore recorded demo" }).click();
   await finishPreparation(page, false);
 
   const source = page.getByRole("group", {
@@ -1454,7 +1810,9 @@ test("owned-media preflight keeps receipted language decisions separate from job
   await page.getByRole("button", { name: "Ready", exact: true }).click();
   await page.getByRole("button", { name: "Collapse trace lab" }).click();
   await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("button", { name: "Run Demo" }).click();
+  await page.getByRole("button", { name: "Explore recorded demo" }).click();
+
+  await page.getByText("Recorded source facts", { exact: true }).click();
 
   const speech = page.getByTestId("speech-activity-evidence");
   await expect(speech).toBeVisible();
@@ -1480,9 +1838,6 @@ test("owned-media preflight keeps receipted language decisions separate from job
 
   await expect(page.getByText(/recorded in run\.clip\.lang · not detector output/)).toBeVisible();
   await expect(page.getByText(/selected for the recorded job · not detector output/)).toBeVisible();
-  await expect(
-    page.getByLabel(/Measured language ranges · preflight evidence only; no replayable detected-language subrange/),
-  ).toBeDisabled();
 
   await page.getByText("Producer coverage").click();
   for (const withheld of [
@@ -1492,4 +1847,9 @@ test("owned-media preflight keeps receipted language decisions separate from job
   ]) {
     await expect(page.getByText(withheld, { exact: true })).toBeVisible();
   }
+
+  await page.getByRole("button", { name: "Continue to Range" }).click();
+  await expect(
+    page.getByLabel(/Measured language ranges · preflight evidence only; no replayable detected-language subrange/),
+  ).toBeDisabled();
 });

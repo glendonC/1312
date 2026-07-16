@@ -14,6 +14,7 @@ import type {
 } from "./model.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "./model.ts";
 import { reopenPublishReviewDecisions } from "./publishReviewDecisionAudit.ts";
+import { reopenPromotedRootOutputs } from "./rootOutputDispositionAudit.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
 import {
   assertCaptionProductionRequest,
@@ -24,6 +25,7 @@ import {
 
 export type CaptionProductionHostErrorCode =
   | "verified_unrevoked_approval_required"
+  | "verified_accepted_child_output_required"
   | "unsupported_caption_language_pair"
   | "caption_limits_exceeded"
   | "illegal_caption_transition"
@@ -115,6 +117,41 @@ export class CaptionProductionHost {
       );
     }
 
+    let promotions;
+    try {
+      promotions = await reopenPromotedRootOutputs(state, this.artifacts);
+    } catch (error) {
+      throw new CaptionProductionHostError(
+        "stored_lineage_invalid",
+        "The accepted child and root-promotion lineage failed closed recursive verification",
+        { cause: error },
+      );
+    }
+    const matchingPromotions = promotions.filter((candidate) =>
+      candidate.receipt.delegation.grants.some((grant) => grant.capability === "media.seek") &&
+      candidate.evidence.mediaOperationIds.length > 0 &&
+      candidate.receipt.delegation.mediaScope.some((scope) =>
+        scope.artifactId === source.id &&
+        scope.startMs <= analysis.range.startMs &&
+        scope.endMs >= analysis.range.endMs
+      )
+    );
+    if (matchingPromotions.length !== 1) {
+      throw new CaptionProductionHostError(
+        "verified_accepted_child_output_required",
+        "Caption candidates require one exact verified current-run promoted child output covering the source window",
+      );
+    }
+    const promotion = matchingPromotions[0];
+    const acceptedChildOutput = state.artifacts[promotion.receipt.input.artifactId];
+    const rootPromotionArtifact = state.artifacts[promotion.receiptArtifactId];
+    if (!acceptedChildOutput || !rootPromotionArtifact) {
+      throw new CaptionProductionHostError(
+        "stored_lineage_invalid",
+        "The verified caption promotion artifacts are missing from the current run",
+      );
+    }
+
     let reviews;
     try {
       reviews = await reopenPublishReviewDecisions(
@@ -156,6 +193,17 @@ export class CaptionProductionHost {
       range: structuredClone(analysis.range),
       sourceLanguage: "ko",
       targetLanguage: "en",
+      acceptedChildOutput: {
+        artifactId: acceptedChildOutput.id,
+        contentId: acceptedChildOutput.content.contentId,
+      },
+      rootPromotion: {
+        dispositionId: promotion.receipt.dispositionId,
+        artifactId: rootPromotionArtifact.id,
+        contentId: rootPromotionArtifact.content.contentId,
+        receiptId: promotion.receipt.receiptId,
+        receiptContentId: promotion.receiptContentId,
+      },
     };
     let started = false;
     try {
@@ -218,14 +266,47 @@ export class CaptionProductionHost {
           "Caption executor evidence changed while the bounded job was running",
         );
       }
+      try {
+        await this.artifacts.resolveVerified(source);
+        const promotionsAfter = await reopenPromotedRootOutputs(this.ledger.state(), this.artifacts);
+        if (!promotionsAfter.some((candidate) =>
+          candidate.receipt.dispositionId === promotion.receipt.dispositionId &&
+          candidate.receiptArtifactId === promotion.receiptArtifactId &&
+          candidate.receiptContentId === promotion.receiptContentId &&
+          candidate.receipt.input.artifactId === promotion.receipt.input.artifactId &&
+          candidate.receipt.input.contentId === promotion.receipt.input.contentId
+        )) throw new Error("The selected root promotion is no longer verified");
+      } catch (error) {
+        throw new CaptionProductionHostError(
+          "stored_lineage_invalid",
+          "The current-run source or accepted promotion changed while caption production was running",
+          { cause: error },
+        );
+      }
+      const derivation = executor.executionScope === "test_demo_only"
+        ? "recorded_fixture_test_demo_only" as const
+        : "current_run_source_execution" as const;
+      const captionLines: CaptionProductionArtifact["lines"] = lines.map((line) => ({
+        ...structuredClone(line),
+        lineage: {
+          derivation,
+          source: {
+            artifactId: input.sourceArtifactId,
+            contentId: input.sourceContentId,
+            window: { startMs: line.startMs, endMs: line.endMs },
+          },
+          acceptedChildOutput: structuredClone(input.acceptedChildOutput),
+          rootPromotion: structuredClone(input.rootPromotion),
+        },
+      }));
       const caption: CaptionProductionArtifact = {
         schema: "studio.caption-production.artifact.v1",
         jobId,
         runId: this.ledger.runId,
         input,
         executor,
-        lines: structuredClone(lines),
-        result: deriveCaptionProductionResult(lines),
+        lines: captionLines,
+        result: deriveCaptionProductionResult(captionLines),
       };
       validateCaptionProductionArtifact(caption);
       const storedCaption = await this.artifacts.storeJson(caption);

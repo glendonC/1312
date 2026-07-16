@@ -13,6 +13,7 @@ import type {
   ContentIdentity,
   CaptionProductionArtifact,
   CaptionProductionReceipt,
+  CaptionQualityControlReceipt,
   EvidenceAssessmentReceipt,
   EvidenceDecisionReceipt,
   ExecutorSpanReceipt,
@@ -677,7 +678,12 @@ export class ContentAddressedArtifactStore {
       storageKey: input.storedCaption.storageKey,
       durationMs: null,
       tracks: [],
-      sourceArtifactIds: [input.caption.input.sourceArtifactId, approval.artifactId],
+      sourceArtifactIds: [
+        input.caption.input.sourceArtifactId,
+        input.caption.input.acceptedChildOutput.artifactId,
+        input.caption.input.rootPromotion.artifactId,
+        approval.artifactId,
+      ],
       producerTaskId: null,
       producerAgentId: null,
       origin: {
@@ -688,6 +694,8 @@ export class ContentAddressedArtifactStore {
         approvalReviewId: approval.reviewId,
         approvalArtifactId: approval.artifactId,
         sourceArtifactId: input.caption.input.sourceArtifactId,
+        acceptedChildArtifactId: input.caption.input.acceptedChildOutput.artifactId,
+        rootPromotionArtifactId: input.caption.input.rootPromotion.artifactId,
       },
     };
     const receiptArtifact: RuntimeArtifact = {
@@ -706,7 +714,7 @@ export class ContentAddressedArtifactStore {
       storageKey: input.storedReceipt.storageKey,
       durationMs: null,
       tracks: [],
-      sourceArtifactIds: [captionArtifact.id, approval.artifactId],
+      sourceArtifactIds: [captionArtifact.id, input.caption.input.rootPromotion.artifactId, approval.artifactId],
       producerTaskId: null,
       producerAgentId: null,
       origin: {
@@ -718,11 +726,56 @@ export class ContentAddressedArtifactStore {
         approvalArtifactId: approval.artifactId,
         captionArtifactId: captionArtifact.id,
         captionContentId: captionArtifact.content.contentId,
+        rootPromotionArtifactId: input.caption.input.rootPromotion.artifactId,
       },
     };
     assertRuntimeArtifact(captionArtifact);
     assertRuntimeArtifact(receiptArtifact);
     return { captionArtifact, receiptArtifact };
+  }
+
+  buildCaptionQualityControlArtifact(input: {
+    runId: string;
+    receipt: CaptionQualityControlReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({
+        runId: input.runId,
+        qcId: input.receipt.qcId,
+        kind: "caption-quality-control-receipt",
+        contentId: input.storedReceipt.content.contentId,
+      })}`,
+      runId: input.runId,
+      kind: input.receipt.decision.outcome === "accepted"
+        ? "caption-quality-control-accepted-receipt"
+        : "caption-quality-control-withheld-receipt",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [
+        input.receipt.input.captionArtifactId,
+        input.receipt.lineage.candidateInput.rootPromotion.artifactId,
+      ],
+      producerTaskId: null,
+      producerAgentId: null,
+      origin: {
+        kind: "caption_quality_control",
+        qcId: input.receipt.qcId,
+        jobId: input.receipt.input.jobId,
+        captionArtifactId: input.receipt.input.captionArtifactId,
+        captionContentId: input.receipt.input.captionContentId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+        outcome: input.receipt.decision.outcome,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
   }
 
   async record(ledger: RuntimeLedger, artifact: RuntimeArtifact, causationId: string | null = null): Promise<void> {

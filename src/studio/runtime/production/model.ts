@@ -357,6 +357,8 @@ export interface CaptionProductionOutputArtifactOrigin {
   approvalReviewId: string;
   approvalArtifactId: string;
   sourceArtifactId: string;
+  acceptedChildArtifactId: string;
+  rootPromotionArtifactId: string;
 }
 
 export interface CaptionProductionReceiptArtifactOrigin {
@@ -368,6 +370,18 @@ export interface CaptionProductionReceiptArtifactOrigin {
   approvalArtifactId: string;
   captionArtifactId: string;
   captionContentId: string;
+  rootPromotionArtifactId: string;
+}
+
+export interface CaptionQualityControlArtifactOrigin {
+  kind: "caption_quality_control";
+  qcId: string;
+  jobId: string;
+  captionArtifactId: string;
+  captionContentId: string;
+  receiptId: string;
+  receiptContentId: string;
+  outcome: "accepted" | "withheld";
 }
 
 export interface RuntimeArtifact {
@@ -397,7 +411,8 @@ export interface RuntimeArtifact {
     | PublishReviewDecisionArtifactOrigin
     | PublishReviewRevocationArtifactOrigin
     | CaptionProductionOutputArtifactOrigin
-    | CaptionProductionReceiptArtifactOrigin;
+    | CaptionProductionReceiptArtifactOrigin
+    | CaptionQualityControlArtifactOrigin;
 }
 
 export interface WorkerOutputEnvelope {
@@ -930,6 +945,25 @@ export interface CaptionProductionLine {
   id: string;
   startMs: number;
   endMs: number;
+  lineage: {
+    derivation: "recorded_fixture_test_demo_only" | "current_run_source_execution";
+    source: {
+      artifactId: string;
+      contentId: string;
+      window: { startMs: number; endMs: number };
+    };
+    acceptedChildOutput: {
+      artifactId: string;
+      contentId: string;
+    };
+    rootPromotion: {
+      dispositionId: string;
+      artifactId: string;
+      contentId: string;
+      receiptId: string;
+      receiptContentId: string;
+    };
+  };
   source: {
     language: "ko";
     state: Extract<CaptionLineState, "available" | "unavailable">;
@@ -954,6 +988,8 @@ export interface CaptionExecutorDescriptor {
   id: "studio.recorded-caption-fixture-adapter" | "studio.openai-caption-producer";
   version: "1";
   classification: CaptionExecutorClassification;
+  executionScope: "test_demo_only" | "current_run";
+  cognitionClaim: "none";
   recognizer: string | null;
   translator: string | null;
   sourceCaptionContentId: string | null;
@@ -970,6 +1006,17 @@ export interface CaptionProductionArtifact {
     range: { startMs: number; endMs: number };
     sourceLanguage: "ko";
     targetLanguage: "en";
+    acceptedChildOutput: {
+      artifactId: string;
+      contentId: string;
+    };
+    rootPromotion: {
+      dispositionId: string;
+      artifactId: string;
+      contentId: string;
+      receiptId: string;
+      receiptContentId: string;
+    };
   };
   executor: CaptionExecutorDescriptor;
   lines: CaptionProductionLine[];
@@ -1008,6 +1055,56 @@ export interface CaptionProductionReceipt {
     captionArtifactId: string;
     captionContentId: string;
     captionBytes: number;
+  };
+}
+
+export type CaptionQualityControlOutcome = "accepted" | "withheld";
+
+export type CaptionQualityControlReasonCode =
+  | "current_run_candidate_structurally_complete"
+  | "recorded_fixture_test_demo_only"
+  | "candidate_has_unavailable_or_withheld_lines"
+  | "candidate_has_no_lines";
+
+export interface CaptionQualityControlRequest {
+  candidate: {
+    jobId: string;
+    captionArtifactId: string;
+    captionContentId: string;
+    captionReceiptId: string;
+    captionReceiptContentId: string;
+  };
+}
+
+export interface CaptionQualityControlReceipt {
+  schema: "studio.caption-quality-control.receipt.v1";
+  receiptId: string;
+  qcId: string;
+  input: {
+    jobId: string;
+    captionArtifactId: string;
+    captionContentId: string;
+    captionReceiptId: string;
+    captionReceiptContentId: string;
+  };
+  lineage: {
+    candidateInput: CaptionProductionArtifact["input"];
+    executor: CaptionExecutorDescriptor;
+  };
+  producer: {
+    id: "studio.host-caption-quality-control";
+    version: "1";
+    independence: "separate_from_caption_executor";
+    policy: "structural_current_run_gate_without_semantic_quality_score";
+  };
+  decision: {
+    outcome: CaptionQualityControlOutcome;
+    reasonCodes: CaptionQualityControlReasonCode[];
+    lines: Array<{
+      lineId: string;
+      outcome: CaptionQualityControlOutcome;
+      reasonCode: CaptionQualityControlReasonCode;
+    }>;
   };
 }
 
@@ -1150,6 +1247,8 @@ export interface CaptionProductionRecord {
   sourceContentId: string;
   analysisRequestId: string;
   range: { startMs: number; endMs: number };
+  acceptedChildOutput: CaptionProductionArtifact["input"]["acceptedChildOutput"];
+  rootPromotion: CaptionProductionArtifact["input"]["rootPromotion"];
   limits: typeof CAPTION_PRODUCTION_LIMITS;
   executor: CaptionExecutorDescriptor;
   status: "started" | "completed" | "failed";
@@ -1165,6 +1264,20 @@ export interface CaptionProductionRecord {
   withheldCount: number | null;
   unavailableCount: number | null;
   failure: string | null;
+}
+
+export interface CaptionQualityControlRecord {
+  id: string;
+  jobId: string;
+  captionArtifactId: string;
+  captionContentId: string;
+  captionReceiptId: string;
+  captionReceiptContentId: string;
+  outputArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+  outcome: CaptionQualityControlOutcome;
+  reasonCodes: CaptionQualityControlReasonCode[];
 }
 
 export type ExecutorOutcome = "completed" | "failed" | "timed_out";
@@ -1364,6 +1477,7 @@ export interface RuntimeProjection {
   publishReviewDecisions: Record<string, PublishReviewDecisionRecord>;
   publishReviewRevocations: Record<string, PublishReviewRevocationRecord>;
   captionProductions: Record<string, CaptionProductionRecord>;
+  captionQualityControls: Record<string, CaptionQualityControlRecord>;
   executions: Record<string, ExecutorRecord>;
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;

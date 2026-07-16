@@ -21,6 +21,11 @@ import {
   CaptionProductionHostError,
 } from "../captionProductionHost.ts";
 import {
+  CaptionQualityControlHost,
+  CaptionQualityControlHostError,
+} from "../captionQualityControlHost.ts";
+import { reopenCaptionQualityControls } from "../captionQualityControlAudit.ts";
+import {
   RecordedCaptionFixtureExecutor,
   type CaptionProductionExecutor,
 } from "../captionProductionExecutor.ts";
@@ -48,6 +53,7 @@ import type {
   RuntimeHostAssessmentAuditResponse,
   RuntimeHostCaptionProductionResultsResponse,
   RuntimeHostCaptionProductionResponse,
+  RuntimeHostCaptionQualityControlResponse,
   RuntimeHostDecisionReceiptResponse,
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
@@ -75,6 +81,7 @@ import {
 } from "../validation/publishReviewDecision.ts";
 import type { PublishReviewOperator } from "../model.ts";
 import { assertCaptionProductionRequest } from "../validation/captionProduction.ts";
+import { assertCaptionQualityControlRequest } from "../validation/captionQualityControl.ts";
 
 export interface RuntimeStartServiceOptions {
   store: DurableRuntimeCommandStore;
@@ -761,6 +768,7 @@ export class RuntimeStartService {
   }
 
   private rethrowCaptionHostError(error: unknown): never {
+    if (error instanceof RuntimeHostError) throw error;
     if (error instanceof CaptionProductionHostError) {
       if (error.code === "stored_lineage_invalid") {
         throw new RuntimeHostError(
@@ -778,6 +786,14 @@ export class RuntimeStartService {
           { cause: error },
         );
       }
+      if (error.code === "verified_accepted_child_output_required") {
+        throw new RuntimeHostError(
+          "caption_current_run_causality_required",
+          error.message,
+          409,
+          { cause: error },
+        );
+      }
       throw new RuntimeHostError(
         "illegal_caption_transition",
         error.message,
@@ -788,6 +804,23 @@ export class RuntimeStartService {
     throw new RuntimeHostError(
       "stored_content_inconsistent",
       "Caption production could not be recorded against verified stored lineage.",
+      409,
+      { cause: error },
+    );
+  }
+
+  private rethrowCaptionQualityControlHostError(error: unknown): never {
+    if (error instanceof CaptionQualityControlHostError) {
+      throw new RuntimeHostError(
+        error.code === "stored_lineage_invalid" ? "stored_content_inconsistent" : "illegal_caption_qc_transition",
+        error.message,
+        409,
+        { cause: error },
+      );
+    }
+    throw new RuntimeHostError(
+      "stored_content_inconsistent",
+      "Caption QC could not be recorded against verified stored candidate lineage.",
       409,
       { cause: error },
     );
@@ -958,6 +991,69 @@ export class RuntimeStartService {
     };
   }
 
+  async captionQualityControls(runtimeId: string): Promise<RuntimeHostCaptionQualityControlResponse> {
+    const record = await this.store.findByRuntimeId(runtimeId);
+    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+    const reconciled = await this.reconcile(record, false);
+    const paths = this.store.paths(runtimeId);
+    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
+    let qualityControls;
+    try {
+      qualityControls = await reopenCaptionQualityControls(
+        journal.state,
+        journal.events,
+        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+      );
+    } catch (error) {
+      throw new RuntimeHostError(
+        "stored_content_inconsistent",
+        "A stored caption QC receipt or current-run candidate lineage failed closed validation.",
+        409,
+        { cause: error },
+      );
+    }
+    return {
+      schema: "studio.local-runtime-caption-quality-controls.v1",
+      commandId: reconciled.commandId,
+      runtimeId,
+      journalHead: journal.head,
+      qualityControls,
+    };
+  }
+
+  async createCaptionQualityControl(
+    runtimeId: string,
+    value: unknown,
+  ): Promise<RuntimeHostCaptionQualityControlResponse> {
+    let request;
+    try {
+      request = assertCaptionQualityControlRequest(value);
+    } catch (error) {
+      throw new RuntimeHostError(
+        "invalid_caption_qc_request",
+        "The caption QC request is invalid or contains open fields.",
+        400,
+        { cause: error },
+      );
+    }
+    return this.withReviewMutation(runtimeId, async () => {
+      const record = await this.store.findByRuntimeId(runtimeId);
+      if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+      await this.reconcile(record, false);
+      const paths = this.store.paths(runtimeId);
+      try {
+        const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
+        await new CaptionQualityControlHost(
+          ledger,
+          new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+        ).decide(request);
+      } catch (error) {
+        this.rethrowCaptionQualityControlHostError(error);
+      }
+      return this.captionQualityControls(runtimeId);
+    });
+  }
+
   async createCaptionProduction(
     runtimeId: string,
     value: unknown,
@@ -995,7 +1091,7 @@ export class RuntimeStartService {
           throw new Error("The runtime source artifact is missing from the production ledger");
         }
         const sourcePath = await artifacts.resolveVerified(source);
-        await new CaptionProductionHost(
+        const produced = await new CaptionProductionHost(
           ledger,
           artifacts,
           this.captionExecutor,
@@ -1007,6 +1103,19 @@ export class RuntimeStartService {
             analysisRequest: start.record.analysisRequest,
           },
         ).produce(request);
+        try {
+          await new CaptionQualityControlHost(ledger, artifacts).decide({
+            candidate: {
+              jobId: produced.caption.jobId,
+              captionArtifactId: produced.captionArtifactId,
+              captionContentId: produced.captionContentId,
+              captionReceiptId: produced.receipt.receiptId,
+              captionReceiptContentId: produced.receiptContentId,
+            },
+          });
+        } catch (error) {
+          this.rethrowCaptionQualityControlHostError(error);
+        }
       } catch (error) {
         this.rethrowCaptionHostError(error);
       }

@@ -19,6 +19,7 @@ import type {
   CaptionProductionVerification,
   VerifiedCaptionProductionResult,
 } from "../captionProductionAudit.ts";
+import type { CaptionQualityControlVerification } from "../captionQualityControlAudit.ts";
 
 export const RUNTIME_HOST_LIFECYCLE_STATES = [
   "accepted",
@@ -243,7 +244,16 @@ export interface RuntimeHostCaptionProductionResultsResponse {
   results: VerifiedCaptionProductionResult[];
 }
 
+export interface RuntimeHostCaptionQualityControlResponse {
+  schema: "studio.local-runtime-caption-quality-controls.v1";
+  commandId: string;
+  runtimeId: string;
+  journalHead: number;
+  qualityControls: CaptionQualityControlVerification[];
+}
+
 export type RuntimeHostCaptionProductionRequest = import("../model.ts").CaptionProductionRequest;
+export type RuntimeHostCaptionQualityControlRequest = import("../model.ts").CaptionQualityControlRequest;
 
 export interface InitializedRuntimeApplication {
   runtimeRoot: string;

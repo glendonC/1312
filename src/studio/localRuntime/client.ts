@@ -8,6 +8,8 @@ import type {
   RuntimeHostCaptionProductionRequest,
   RuntimeHostCaptionProductionResultsResponse,
   RuntimeHostCaptionProductionResponse,
+  RuntimeHostCaptionQualityControlResponse,
+  RuntimeHostCaptionQualityControlRequest,
   RuntimeHostDecisionReceiptResponse,
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
@@ -1280,12 +1282,15 @@ function captionProductionResponse(
       fail(`${captionContext}.integrity`, "does not carry closed caption verification.");
     }
     const executor = object(caption.executor, `${captionContext}.executor`);
-    exact(executor, ["id", "version", "classification", "recognizer", "translator", "sourceCaptionContentId"], `${captionContext}.executor`);
+    exact(executor, ["id", "version", "classification", "executionScope", "cognitionClaim", "recognizer", "translator", "sourceCaptionContentId"], `${captionContext}.executor`);
     if (executor.version !== "1") fail(`${captionContext}.executor.version`, "is unsupported.");
     if (
       (executor.classification === "recorded_real_pipeline_fixture" && executor.id !== "studio.recorded-caption-fixture-adapter") ||
       (executor.classification === "real_recognizer_translator" && executor.id !== "studio.openai-caption-producer") ||
-      (executor.classification !== "recorded_real_pipeline_fixture" && executor.classification !== "real_recognizer_translator")
+      (executor.classification !== "recorded_real_pipeline_fixture" && executor.classification !== "real_recognizer_translator") ||
+      (executor.classification === "recorded_real_pipeline_fixture" && executor.executionScope !== "test_demo_only") ||
+      (executor.classification === "real_recognizer_translator" && executor.executionScope !== "current_run") ||
+      executor.cognitionClaim !== "none"
     ) fail(`${captionContext}.executor`, "identity and classification do not agree.");
     const recognizer = executor.recognizer === null ? null : string(executor.recognizer, `${captionContext}.executor.recognizer`);
     const translator = executor.translator === null ? null : string(executor.translator, `${captionContext}.executor.translator`);
@@ -1327,6 +1332,8 @@ function captionProductionResponse(
         id: executor.id as "studio.recorded-caption-fixture-adapter" | "studio.openai-caption-producer",
         version: "1" as const,
         classification: executor.classification as "recorded_real_pipeline_fixture" | "real_recognizer_translator",
+        executionScope: executor.executionScope as "test_demo_only" | "current_run",
+        cognitionClaim: "none" as const,
         recognizer,
         translator,
         sourceCaptionContentId,
@@ -1404,6 +1411,89 @@ async function captionProductionResultsResponse(
     runtimeId,
     journalHead: integer(item.journalHead, `${context}.journalHead`),
     results,
+  };
+}
+
+function captionQualityControlResponse(
+  value: unknown,
+  expectedRuntimeId: string,
+): RuntimeHostCaptionQualityControlResponse {
+  const context = "Runtime host caption quality controls";
+  const item = object(value, context);
+  exact(item, ["schema", "commandId", "runtimeId", "journalHead", "qualityControls"], context);
+  if (item.schema !== "studio.local-runtime-caption-quality-controls.v1") fail(context, "schema is unsupported.");
+  const runtimeId = identity(item.runtimeId, `${context}.runtimeId`);
+  if (runtimeId !== expectedRuntimeId) fail(context, "runtime identity changed.");
+  if (!Array.isArray(item.qualityControls)) fail(`${context}.qualityControls`, "must be an array.");
+  const qcIds = new Set<string>();
+  const qualityControls = item.qualityControls.map((candidate, index) => {
+    const qcContext = `${context}.qualityControls[${index}]`;
+    const qc = object(candidate, qcContext);
+    exact(qc, [
+      "qcId", "jobId", "captionArtifactId", "captionContentId", "outputArtifactId",
+      "receiptId", "receiptContentId", "integrity", "policy", "outcome", "reasonCodes",
+      "acceptedLineIds", "withheldLineIds",
+    ], qcContext);
+    const qcId = identity(qc.qcId, `${qcContext}.qcId`);
+    if (qcIds.has(qcId)) fail(`${qcContext}.qcId`, "is duplicated.");
+    qcIds.add(qcId);
+    if (qc.integrity !== "stored_independent_qc_with_verified_current_run_candidate") {
+      fail(`${qcContext}.integrity`, "does not carry closed independent QC verification.");
+    }
+    if (qc.policy !== "structural_current_run_gate_without_semantic_quality_score") {
+      fail(`${qcContext}.policy`, "claims an unsupported quality policy.");
+    }
+    if (qc.outcome !== "accepted" && qc.outcome !== "withheld") {
+      fail(`${qcContext}.outcome`, "is unsupported.");
+    }
+    if (!Array.isArray(qc.reasonCodes) || qc.reasonCodes.length !== 1) {
+      fail(`${qcContext}.reasonCodes`, "must contain one closed reason.");
+    }
+    const reasons = new Set([
+      "current_run_candidate_structurally_complete",
+      "recorded_fixture_test_demo_only",
+      "candidate_has_unavailable_or_withheld_lines",
+      "candidate_has_no_lines",
+    ]);
+    const reasonCode = string(qc.reasonCodes[0], `${qcContext}.reasonCodes[0]`);
+    if (!reasons.has(reasonCode)) fail(`${qcContext}.reasonCodes[0]`, "is unsupported.");
+    const lineIds = (value: unknown, path: string): string[] => {
+      if (!Array.isArray(value)) fail(path, "must be an array.");
+      const ids = value.map((entry, lineIndex) => identity(entry, `${path}[${lineIndex}]`));
+      if (new Set(ids).size !== ids.length) fail(path, "contains duplicate line identities.");
+      return ids;
+    };
+    const acceptedLineIds = lineIds(qc.acceptedLineIds, `${qcContext}.acceptedLineIds`);
+    const withheldLineIds = lineIds(qc.withheldLineIds, `${qcContext}.withheldLineIds`);
+    if (acceptedLineIds.some((id) => withheldLineIds.includes(id))) {
+      fail(qcContext, "a line cannot be both accepted and withheld.");
+    }
+    if (
+      (qc.outcome === "accepted" && (reasonCode !== "current_run_candidate_structurally_complete" || acceptedLineIds.length === 0 || withheldLineIds.length > 0)) ||
+      (qc.outcome === "withheld" && reasonCode === "current_run_candidate_structurally_complete")
+    ) fail(qcContext, "outcome, reason, and line decisions do not agree.");
+    return {
+      qcId,
+      jobId: identity(qc.jobId, `${qcContext}.jobId`),
+      captionArtifactId: identity(qc.captionArtifactId, `${qcContext}.captionArtifactId`),
+      captionContentId: contentId(qc.captionContentId, `${qcContext}.captionContentId`),
+      outputArtifactId: identity(qc.outputArtifactId, `${qcContext}.outputArtifactId`),
+      receiptId: identity(qc.receiptId, `${qcContext}.receiptId`),
+      receiptContentId: contentId(qc.receiptContentId, `${qcContext}.receiptContentId`),
+      integrity: "stored_independent_qc_with_verified_current_run_candidate" as const,
+      policy: "structural_current_run_gate_without_semantic_quality_score" as const,
+      outcome: qc.outcome as "accepted" | "withheld",
+      reasonCodes: [reasonCode as "current_run_candidate_structurally_complete" | "recorded_fixture_test_demo_only" | "candidate_has_unavailable_or_withheld_lines" | "candidate_has_no_lines"],
+      acceptedLineIds,
+      withheldLineIds,
+    };
+  });
+  return {
+    schema: "studio.local-runtime-caption-quality-controls.v1",
+    commandId: identity(item.commandId, `${context}.commandId`),
+    runtimeId,
+    journalHead: integer(item.journalHead, `${context}.journalHead`),
+    qualityControls,
   };
 }
 
@@ -1644,6 +1734,29 @@ export class LocalRuntimeHostClient {
   ): Promise<RuntimeHostCaptionProductionResultsResponse> {
     return captionProductionResultsResponse(
       await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/caption-production-results`),
+      runtimeId,
+    );
+  }
+
+  async captionQualityControls(
+    runtimeId: string,
+  ): Promise<RuntimeHostCaptionQualityControlResponse> {
+    return captionQualityControlResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/caption-quality-controls`),
+      runtimeId,
+    );
+  }
+
+  async createCaptionQualityControl(
+    runtimeId: string,
+    request: RuntimeHostCaptionQualityControlRequest,
+  ): Promise<RuntimeHostCaptionQualityControlResponse> {
+    return captionQualityControlResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/caption-quality-controls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      }),
       runtimeId,
     );
   }

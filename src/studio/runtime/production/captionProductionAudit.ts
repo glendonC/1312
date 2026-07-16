@@ -15,6 +15,7 @@ import type {
 } from "./model.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "./model.ts";
 import { reopenPublishReviewDecisions } from "./publishReviewDecisionAudit.ts";
+import { reopenPromotedRootOutputs } from "./rootOutputDispositionAudit.ts";
 import type { RuntimeEvent } from "./protocol.ts";
 import {
   validateCaptionProductionArtifact,
@@ -97,6 +98,7 @@ export async function reopenCaptionProductionResults(
   artifacts: ContentAddressedArtifactStore,
 ): Promise<VerifiedCaptionProductionResult[]> {
   const reviews = await reopenPublishReviewDecisions(state, events, artifacts);
+  const promotions = await reopenPromotedRootOutputs(state, artifacts);
   const verified: VerifiedCaptionProductionResult[] = [];
   const completed = Object.values(state.captionProductions)
     .filter((job) => job.status === "completed")
@@ -126,12 +128,16 @@ export async function reopenCaptionProductionResults(
       event.type === "caption.production_completed" && event.data.jobId === job.id);
     const captionArtifact = state.artifacts[job.captionArtifactId];
     const receiptArtifact = state.artifacts[job.receiptArtifactId];
+    const sourceArtifact = state.artifacts[job.sourceArtifactId];
     if (
       !started || started.type !== "caption.production_started" ||
       !completion || completion.type !== "caption.production_completed" ||
       !captionArtifact || captionArtifact.origin.kind !== "caption_production_output" ||
-      !receiptArtifact || receiptArtifact.origin.kind !== "caption_production_receipt"
+      !receiptArtifact || receiptArtifact.origin.kind !== "caption_production_receipt" ||
+      !sourceArtifact || sourceArtifact.origin.kind !== "ingest" ||
+      sourceArtifact.content.contentId !== job.sourceContentId
     ) throw new Error(`Caption production ${job.id} has no closed journal and artifact lineage`);
+    await artifacts.resolveVerified(sourceArtifact);
 
     let authorityState: CaptionProductionVerification["authorityState"] = "unrevoked";
     if (approval.revocation) {
@@ -163,7 +169,14 @@ export async function reopenCaptionProductionResults(
       captionArtifact.origin.approvalReviewId !== approval.reviewId ||
       captionArtifact.origin.approvalArtifactId !== approval.artifactId ||
       captionArtifact.origin.sourceArtifactId !== job.sourceArtifactId ||
-      !sameCanonical(captionArtifact.sourceArtifactIds, [job.sourceArtifactId, approval.artifactId]) ||
+      captionArtifact.origin.acceptedChildArtifactId !== started.data.input.acceptedChildOutput.artifactId ||
+      captionArtifact.origin.rootPromotionArtifactId !== started.data.input.rootPromotion.artifactId ||
+      !sameCanonical(captionArtifact.sourceArtifactIds, [
+        job.sourceArtifactId,
+        started.data.input.acceptedChildOutput.artifactId,
+        started.data.input.rootPromotion.artifactId,
+        approval.artifactId,
+      ]) ||
       receiptArtifact.id !== expectedReceiptArtifactId || receiptArtifact.runId !== state.runId ||
       receiptArtifact.kind !== "caption-production-receipt" || receiptArtifact.mediaClass !== "non_media" ||
       receiptArtifact.publication !== "private" || receiptArtifact.content.contentId !== job.receiptContentId ||
@@ -175,7 +188,12 @@ export async function reopenCaptionProductionResults(
       receiptArtifact.origin.approvalArtifactId !== approval.artifactId ||
       receiptArtifact.origin.captionArtifactId !== captionArtifact.id ||
       receiptArtifact.origin.captionContentId !== captionArtifact.content.contentId ||
-      !sameCanonical(receiptArtifact.sourceArtifactIds, [captionArtifact.id, approval.artifactId]) ||
+      receiptArtifact.origin.rootPromotionArtifactId !== started.data.input.rootPromotion.artifactId ||
+      !sameCanonical(receiptArtifact.sourceArtifactIds, [
+        captionArtifact.id,
+        started.data.input.rootPromotion.artifactId,
+        approval.artifactId,
+      ]) ||
       completion.data.captionArtifactId !== captionArtifact.id ||
       completion.data.captionContentId !== captionArtifact.content.contentId ||
       completion.data.receiptArtifactId !== receiptArtifact.id ||
@@ -196,7 +214,24 @@ export async function reopenCaptionProductionResults(
       "Caption-production verification",
       "receipt",
     );
+    const promotion = promotions.find((candidate) =>
+      candidate.receipt.delegation.grants.some((grant) => grant.capability === "media.seek") &&
+      candidate.evidence.mediaOperationIds.length > 0 &&
+      candidate.receipt.dispositionId === caption.input.rootPromotion.dispositionId &&
+      candidate.receiptArtifactId === caption.input.rootPromotion.artifactId &&
+      candidate.receiptContentId === caption.input.rootPromotion.contentId &&
+      candidate.receipt.receiptId === caption.input.rootPromotion.receiptId &&
+      candidate.receiptContentId === caption.input.rootPromotion.receiptContentId &&
+      candidate.receipt.input.artifactId === caption.input.acceptedChildOutput.artifactId &&
+      candidate.receipt.input.contentId === caption.input.acceptedChildOutput.contentId &&
+      candidate.receipt.delegation.mediaScope.some((scope) =>
+        scope.artifactId === caption.input.sourceArtifactId &&
+        scope.startMs <= caption.input.range.startMs &&
+        scope.endMs >= caption.input.range.endMs
+      )
+    );
     if (
+      !promotion ||
       captionArtifact.content.bytes !== storedCaption.bytes ||
       receiptArtifact.content.bytes !== storedReceipt.bytes ||
       caption.jobId !== job.id || caption.runId !== state.runId ||

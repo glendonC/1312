@@ -57,7 +57,7 @@ export function validateCaptionExecutorDescriptor(
   path: string,
 ): CaptionExecutorDescriptor {
   const item = object(value, context, path);
-  exact(item, ["id", "version", "classification", "recognizer", "translator", "sourceCaptionContentId"], context, path);
+  exact(item, ["id", "version", "classification", "executionScope", "cognitionClaim", "recognizer", "translator", "sourceCaptionContentId"], context, path);
   const classification = oneOf<CaptionExecutorDescriptor["classification"]>(
     item.classification,
     new Set(["recorded_real_pipeline_fixture", "real_recognizer_translator"]),
@@ -74,13 +74,20 @@ export function validateCaptionExecutorDescriptor(
   const recognizer = item.recognizer === null ? null : string(item.recognizer, context, `${path}.recognizer`);
   const translator = item.translator === null ? null : string(item.translator, context, `${path}.translator`);
   const sourceCaptionContentId = nullableContentId(item.sourceCaptionContentId, context, `${path}.sourceCaptionContentId`);
+  const executionScope = oneOf<CaptionExecutorDescriptor["executionScope"]>(
+    item.executionScope,
+    new Set(["test_demo_only", "current_run"]),
+    context,
+    `${path}.executionScope`,
+  );
+  literal(item.cognitionClaim, "none", context, `${path}.cognitionClaim`);
   if (
     (classification === "recorded_real_pipeline_fixture" &&
-      (id !== "studio.recorded-caption-fixture-adapter" || recognizer === null || translator === null)) ||
+      (id !== "studio.recorded-caption-fixture-adapter" || executionScope !== "test_demo_only" || recognizer === null || translator === null)) ||
     (classification === "real_recognizer_translator" &&
-      (id !== "studio.openai-caption-producer" || recognizer === null || translator === null || sourceCaptionContentId !== null))
+      (id !== "studio.openai-caption-producer" || executionScope !== "current_run" || recognizer === null || translator === null || sourceCaptionContentId !== null))
   ) fail(context, path, "executor identity, classification, and evidence must agree");
-  return { id, version: "1", classification, recognizer, translator, sourceCaptionContentId };
+  return { id, version: "1", classification, executionScope, cognitionClaim: "none", recognizer, translator, sourceCaptionContentId };
 }
 
 export function assertCaptionProductionRequest(value: unknown): CaptionProductionRequest {
@@ -94,7 +101,7 @@ export function assertCaptionProductionRequest(value: unknown): CaptionProductio
 
 export function validateCaptionProductionInput(value: unknown, context: string, path: string): CaptionProductionArtifact["input"] {
   const item = object(value, context, path);
-  exact(item, ["sourceArtifactId", "sourceContentId", "analysisRequestId", "range", "sourceLanguage", "targetLanguage"], context, path);
+  exact(item, ["sourceArtifactId", "sourceContentId", "analysisRequestId", "range", "sourceLanguage", "targetLanguage", "acceptedChildOutput", "rootPromotion"], context, path);
   const range = object(item.range, context, `${path}.range`);
   exact(range, ["startMs", "endMs"], context, `${path}.range`);
   const startMs = integer(range.startMs, context, `${path}.range.startMs`);
@@ -102,6 +109,10 @@ export function validateCaptionProductionInput(value: unknown, context: string, 
   if (endMs <= startMs || endMs - startMs > CAPTION_PRODUCTION_LIMITS.maxDurationMs) {
     fail(context, `${path}.range`, "must be non-empty and within the caption duration ceiling");
   }
+  const acceptedChildOutput = object(item.acceptedChildOutput, context, `${path}.acceptedChildOutput`);
+  exact(acceptedChildOutput, ["artifactId", "contentId"], context, `${path}.acceptedChildOutput`);
+  const rootPromotion = object(item.rootPromotion, context, `${path}.rootPromotion`);
+  exact(rootPromotion, ["dispositionId", "artifactId", "contentId", "receiptId", "receiptContentId"], context, `${path}.rootPromotion`);
   return {
     sourceArtifactId: stableIdentity(item.sourceArtifactId, context, `${path}.sourceArtifactId`),
     sourceContentId: contentId(item.sourceContentId, context, `${path}.sourceContentId`),
@@ -109,12 +120,33 @@ export function validateCaptionProductionInput(value: unknown, context: string, 
     range: { startMs, endMs },
     sourceLanguage: literal(item.sourceLanguage, "ko", context, `${path}.sourceLanguage`),
     targetLanguage: literal(item.targetLanguage, "en", context, `${path}.targetLanguage`),
+    acceptedChildOutput: {
+      artifactId: stableIdentity(acceptedChildOutput.artifactId, context, `${path}.acceptedChildOutput.artifactId`),
+      contentId: contentId(acceptedChildOutput.contentId, context, `${path}.acceptedChildOutput.contentId`),
+    },
+    rootPromotion: {
+      dispositionId: stableIdentity(rootPromotion.dispositionId, context, `${path}.rootPromotion.dispositionId`),
+      artifactId: stableIdentity(rootPromotion.artifactId, context, `${path}.rootPromotion.artifactId`),
+      contentId: contentId(rootPromotion.contentId, context, `${path}.rootPromotion.contentId`),
+      receiptId: stableIdentity(rootPromotion.receiptId, context, `${path}.rootPromotion.receiptId`),
+      receiptContentId: contentId(rootPromotion.receiptContentId, context, `${path}.rootPromotion.receiptContentId`),
+    },
   };
 }
 
 function validateLine(value: unknown, context: string, path: string): CaptionProductionLine {
   const item = object(value, context, path);
-  exact(item, ["id", "startMs", "endMs", "source", "target"], context, path);
+  exact(item, ["id", "startMs", "endMs", "lineage", "source", "target"], context, path);
+  const lineage = object(item.lineage, context, `${path}.lineage`);
+  exact(lineage, ["derivation", "source", "acceptedChildOutput", "rootPromotion"], context, `${path}.lineage`);
+  const lineageSource = object(lineage.source, context, `${path}.lineage.source`);
+  exact(lineageSource, ["artifactId", "contentId", "window"], context, `${path}.lineage.source`);
+  const lineageWindow = object(lineageSource.window, context, `${path}.lineage.source.window`);
+  exact(lineageWindow, ["startMs", "endMs"], context, `${path}.lineage.source.window`);
+  const lineageChild = object(lineage.acceptedChildOutput, context, `${path}.lineage.acceptedChildOutput`);
+  exact(lineageChild, ["artifactId", "contentId"], context, `${path}.lineage.acceptedChildOutput`);
+  const lineagePromotion = object(lineage.rootPromotion, context, `${path}.lineage.rootPromotion`);
+  exact(lineagePromotion, ["dispositionId", "artifactId", "contentId", "receiptId", "receiptContentId"], context, `${path}.lineage.rootPromotion`);
   const source = object(item.source, context, `${path}.source`);
   exact(source, ["language", "state", "text", "reasonCode"], context, `${path}.source`);
   const target = object(item.target, context, `${path}.target`);
@@ -159,10 +191,41 @@ function validateLine(value: unknown, context: string, path: string): CaptionPro
       targetReason !== "translator_unavailable" && targetReason !== "translator_missing_line") ||
     (targetState === "withheld" && targetReason !== "recorded_quality_gate_withheld")
   ) fail(context, path, "line state, text, and closed reason do not agree");
+  const startMs = integer(item.startMs, context, `${path}.startMs`);
+  const endMs = integer(item.endMs, context, `${path}.endMs`, 1);
+  const windowStartMs = integer(lineageWindow.startMs, context, `${path}.lineage.source.window.startMs`);
+  const windowEndMs = integer(lineageWindow.endMs, context, `${path}.lineage.source.window.endMs`, 1);
+  if (windowStartMs !== startMs || windowEndMs !== endMs) {
+    fail(context, `${path}.lineage.source.window`, "must equal the exact caption line window");
+  }
   return {
     id: stableIdentity(item.id, context, `${path}.id`),
-    startMs: integer(item.startMs, context, `${path}.startMs`),
-    endMs: integer(item.endMs, context, `${path}.endMs`, 1),
+    startMs,
+    endMs,
+    lineage: {
+      derivation: oneOf<CaptionProductionLine["lineage"]["derivation"]>(
+        lineage.derivation,
+        new Set(["recorded_fixture_test_demo_only", "current_run_source_execution"]),
+        context,
+        `${path}.lineage.derivation`,
+      ),
+      source: {
+        artifactId: stableIdentity(lineageSource.artifactId, context, `${path}.lineage.source.artifactId`),
+        contentId: contentId(lineageSource.contentId, context, `${path}.lineage.source.contentId`),
+        window: { startMs: windowStartMs, endMs: windowEndMs },
+      },
+      acceptedChildOutput: {
+        artifactId: stableIdentity(lineageChild.artifactId, context, `${path}.lineage.acceptedChildOutput.artifactId`),
+        contentId: contentId(lineageChild.contentId, context, `${path}.lineage.acceptedChildOutput.contentId`),
+      },
+      rootPromotion: {
+        dispositionId: stableIdentity(lineagePromotion.dispositionId, context, `${path}.lineage.rootPromotion.dispositionId`),
+        artifactId: stableIdentity(lineagePromotion.artifactId, context, `${path}.lineage.rootPromotion.artifactId`),
+        contentId: contentId(lineagePromotion.contentId, context, `${path}.lineage.rootPromotion.contentId`),
+        receiptId: stableIdentity(lineagePromotion.receiptId, context, `${path}.lineage.rootPromotion.receiptId`),
+        receiptContentId: contentId(lineagePromotion.receiptContentId, context, `${path}.lineage.rootPromotion.receiptContentId`),
+      },
+    },
     source: { language: literal(source.language, "ko", context, `${path}.source.language`), state: sourceState, text: sourceText, reasonCode: sourceReason },
     target: { language: literal(target.language, "en", context, `${path}.target.language`), state: targetState, text: targetText, reasonCode: targetReason },
   };
@@ -212,6 +275,7 @@ export function validateCaptionProductionArtifact(
   exact(item, ["schema", "jobId", "runId", "input", "executor", "lines", "result"], context, path);
   literal(item.schema, "studio.caption-production.artifact.v1", context, `${path}.schema`);
   const input = validateCaptionProductionInput(item.input, context, `${path}.input`);
+  const executor = validateCaptionExecutorDescriptor(item.executor, context, `${path}.executor`);
   const lines = array(item.lines, context, `${path}.lines`).map((line, index) =>
     validateLine(line, context, `${path}.lines[${index}]`));
   if (lines.length > CAPTION_PRODUCTION_LIMITS.maxLines || new Set(lines.map((line) => line.id)).size !== lines.length) {
@@ -222,6 +286,16 @@ export function validateCaptionProductionArtifact(
     if (line.startMs < input.range.startMs || line.endMs > input.range.endMs || line.endMs <= line.startMs || line.startMs < previousEnd) {
       fail(context, `${path}.lines[${index}]`, "must be ordered, non-overlapping, and inside the approved analysis range");
     }
+    const expectedDerivation = executor.executionScope === "test_demo_only"
+      ? "recorded_fixture_test_demo_only"
+      : "current_run_source_execution";
+    if (
+      line.lineage.derivation !== expectedDerivation ||
+      line.lineage.source.artifactId !== input.sourceArtifactId ||
+      line.lineage.source.contentId !== input.sourceContentId ||
+      JSON.stringify(line.lineage.acceptedChildOutput) !== JSON.stringify(input.acceptedChildOutput) ||
+      JSON.stringify(line.lineage.rootPromotion) !== JSON.stringify(input.rootPromotion)
+    ) fail(context, `${path}.lines[${index}].lineage`, "does not match the current run input and executor scope");
     previousEnd = line.endMs;
   }
   const encoder = new TextEncoder();
@@ -239,7 +313,7 @@ export function validateCaptionProductionArtifact(
     jobId: stableIdentity(item.jobId, context, `${path}.jobId`),
     runId: stableIdentity(item.runId, context, `${path}.runId`),
     input,
-    executor: validateCaptionExecutorDescriptor(item.executor, context, `${path}.executor`),
+    executor,
     lines,
     result,
   };

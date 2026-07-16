@@ -12,7 +12,7 @@ Working order: finish and verify each slice before starting the next.
 
 ## 2. Root -> child round trip
 
-- Status: complete for Slice 2; awaiting commit approval.
+- Status: committed and complete in `7a136eb`.
 - Real: one root-owned scheduler request receives role-constrained grants, one child consumes a one-use permit under the durable host launch claim, and one reported worker-output artifact receives a content-addressed root promote/reject disposition with exact spawn, scope, grant, execution, report, artifact, and receipt lineage.
 - Missing: model-driven root planning or synthesis, more than one child/output, recursion, peer coordination, and autonomous choice of whether or what to delegate; the current root policy remains deterministic host composition.
 - Done when: the journal proves request -> grant -> child work -> report -> root decision with exact task, scope, artifact, and receipt lineage, including rejection paths.
@@ -20,11 +20,11 @@ Working order: finish and verify each slice before starting the next.
 
 ## 3. Current-run captions and QC
 
-- Status: pending.
-- Real: approval-gated caption production exists; its default executor may be `recorded_real_pipeline_fixture`.
-- Missing: current-run caption causality from owned media through child evidence into caption output, followed by an independent QC decision.
+- Status: implemented and verified; awaiting commit approval.
+- Real: caption production now fails closed unless it can recursively reopen one same-run `promoted_to_root` child output whose granted media scope covers the immutable owned source/window. The candidate input and every timed line retain exact source/content/window, accepted-child, and root-promotion artifact/receipt lineage. A separate host then emits one content-addressed QC receipt: structurally complete `current_run` executor output can be accepted, while incomplete/empty output and every `recorded_real_pipeline_fixture` candidate are withheld. The executor contract pins `cognitionClaim: none`; fixture reuse is pinned `test_demo_only` and cannot take the accept path.
+- Missing: semantic caption/translation quality judgment, an LLM judge, a score, public Results/publish wiring, and any larger swarm. Automated acceptance exercises the current-run branch with a bounded test executor seam; this slice records no new live external recognizer/translator result and makes no translation-quality claim.
 - Done when: captions are produced for the current run, every line retains source/window lineage, QC can accept or withhold with receipts, and fixture output is never labeled live cognition.
-- Fake-claim risk: presenting recorded captions, coverage counts, or approval as current-run translation quality.
+- Fake-claim risk: presenting fixture candidates, structural completeness, line counts, or QC acceptance as live cognition or semantic translation quality.
 
 ## 4. Richer live swarm UI
 

@@ -21,6 +21,8 @@ export type {
   RuntimeHostCaptionProductionRequest,
   RuntimeHostCaptionProductionResultsResponse,
   RuntimeHostCaptionProductionResponse,
+  RuntimeHostCaptionQualityControlResponse,
+  RuntimeHostCaptionQualityControlRequest,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewDecisionRequest,

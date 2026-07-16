@@ -18,9 +18,11 @@ export interface CaptionExecutorInput {
   range: { startMs: number; endMs: number };
 }
 
+export type CaptionExecutorLine = Omit<CaptionProductionLine, "lineage">;
+
 export interface CaptionProductionExecutor {
   describe(input: CaptionExecutorInput): Promise<CaptionExecutorDescriptor>;
-  execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionProductionLine[]>;
+  execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionExecutorLine[]>;
 }
 
 interface LegacyCaptionCue {
@@ -64,13 +66,15 @@ export class RecordedCaptionFixtureExecutor implements CaptionProductionExecutor
       id: "studio.recorded-caption-fixture-adapter",
       version: "1",
       classification: "recorded_real_pipeline_fixture",
+      executionScope: "test_demo_only",
+      cognitionClaim: "none",
       recognizer: "gpt-4o-transcribe-diarize (recorded prior run)",
       translator: "gpt-5 (recorded prior run)",
       sourceCaptionContentId: fixture?.contentId ?? null,
     };
   }
 
-  async execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionProductionLine[]> {
+  async execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionExecutorLine[]> {
     if (signal.aborted) throw new Error("Caption fixture execution was aborted");
     const fixture = await fixtureValue(input.fixtureCaptionPath);
     if (!fixture) return [];
@@ -78,7 +82,7 @@ export class RecordedCaptionFixtureExecutor implements CaptionProductionExecutor
     if (root?.pair?.source !== "ko" || root?.pair?.target !== "en" || !Array.isArray(root.cues)) {
       throw new Error("Recorded caption fixture is not the compatible timed ko-to-en shape");
     }
-    const lines: CaptionProductionLine[] = [];
+    const lines: CaptionExecutorLine[] = [];
     for (const [index, candidate] of (root.cues as LegacyCaptionCue[]).entries()) {
       if (signal.aborted) throw new Error("Caption fixture execution was aborted");
       const startMs = Math.round(Number(candidate.t_start) * 1_000);
@@ -180,13 +184,15 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
       id: "studio.openai-caption-producer",
       version: "1",
       classification: "real_recognizer_translator",
+      executionScope: "current_run",
+      cognitionClaim: "none",
       recognizer: "gpt-4o-transcribe-diarize",
       translator: "gpt-5",
       sourceCaptionContentId: null,
     };
   }
 
-  async execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionProductionLine[]> {
+  async execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionExecutorLine[]> {
     const temporary = await mkdtemp(join(tmpdir(), "studio-caption-production-"));
     const audioPath = join(temporary, "range.wav");
     try {
@@ -212,7 +218,7 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
       }
       const segments = (transcription as { segments?: unknown }).segments;
       if (!Array.isArray(segments)) return [];
-      const sourceLines: CaptionProductionLine[] = segments.map((candidate, index): CaptionProductionLine => {
+      const sourceLines: CaptionExecutorLine[] = segments.map((candidate, index): CaptionExecutorLine => {
         const segment = candidate as { start?: unknown; end?: unknown; text?: unknown };
         const startMs = input.range.startMs + Math.round(Number(segment.start) * 1_000);
         const endMs = input.range.startMs + Math.round(Number(segment.end) * 1_000);
@@ -275,7 +281,7 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
             }
           }
         }
-        return sourceLines.map((line): CaptionProductionLine => {
+        return sourceLines.map((line): CaptionExecutorLine => {
           if (line.source.state !== "available") return line;
           const target = byId.get(line.id);
           return target

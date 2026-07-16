@@ -20,6 +20,7 @@ import {
   validateCaptionProductionLimits,
   validateCaptionProductionReceipt,
 } from "./captionProduction.ts";
+import { validateCaptionQualityControlReceipt } from "./captionQualityControl.ts";
 import {
   validateExecutorSpanReceipt,
   validateModelUsageReceipt,
@@ -95,7 +96,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "handoff_host", "launcher"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "launcher"]),
     context,
     "event.producer.kind",
   );
@@ -315,6 +316,12 @@ export function assertRuntimeEvent(
     exact(data, ["jobId", "reason"], context, "event.data");
     string(data.jobId, context, "event.data.jobId");
     string(data.reason, context, "event.data.reason");
+  } else if (type === "caption.quality_control_decided") {
+    exact(data, ["qcId", "outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.qcId, context, "event.data.qcId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateCaptionQualityControlReceipt(data.receipt, context, "event.data.receipt");
   } else if (type === "report.submitted") {
     exact(data, ["report"], context, "event.data");
     validateReportRecord(data.report, context, "event.data.report");

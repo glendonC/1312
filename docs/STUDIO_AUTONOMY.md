@@ -50,14 +50,22 @@ artifacts.
     `reject_with_reasons` receipt with closed reasons and an optional bounded note. Approval authorizes
     only the separate bounded caption producer to consume that verified receipt. If approval must be
     withdrawn, append one immutable revocation receipt; never delete or silently replace review history.
-18. Produce captions only through a separate host authority whose request contains one exact approval
-    identity and nothing else. Reopen the complete review/intake/decision/assessment/read chain and
+18. Produce caption candidates only through a separate host authority whose request contains one exact approval
+    identity and nothing else. Reopen the complete review/intake/decision/assessment/read chain plus one
+    same-run accepted child output and `promoted_to_root` receipt whose granted media scope covers the source window, and
     require the approval to be unrevoked immediately before the first caption journal mutation. Derive
     source and range from immutable run state; enforce hard duration, line, text-byte, artifact-byte,
-    and wall ceilings; emit private content-addressed timed KO+EN artifact and receipt objects. Preserve
+    and wall ceilings; emit private content-addressed timed KO+EN artifact and receipt objects. Every line
+    retains exact source/content/window, accepted-child, and root-promotion lineage. Preserve
     withheld/unavailable instead of inventing target prose. A later revocation blocks new starts and
     marks already completed artifacts as pre-revocation; it does not delete them. Caption completion is
     not correctness, upload, publication, public availability, or permission to publish.
+19. Decide caption QC through a separate host after recursively reopening the stored candidate and its
+    current-run lineage. The fixed policy emits no score and makes no semantic judgment: only a non-empty
+    `current_run` executor result with source and target available on every line is accepted. Empty or
+    incomplete candidates and all `recorded_real_pipeline_fixture` candidates are withheld with closed
+    reasons. Fixture execution is `test_demo_only`, every executor declares `cognitionClaim: none`, and one
+    candidate can receive only one immutable content-addressed QC receipt.
 
 ## Optimize the media before spawning the full swarm
 
@@ -322,8 +330,8 @@ values distinctly and explain which assumptions dominate the estimate.
 | Workspaces | Role-specific legacy trace projections plus boring production-only source-artifact, task, spawn-decision, grant, operation, output-lineage, and report regions with in-page links only to identities rendered in that projection | A production agent workspace remains separate work |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD/language receipts, post-run evidence index, a receipted ffmpeg extract host, and one range-bound ffmpeg audio-activity observation that returns only `signal` or `digital_silence` with volume measurements. Task-private bridges expose granted `media_extract`/`media_seek`, `evidence_read`, `evidence_assess`, and `evidence_decide`; evidence reads are source/window-bound and return only intersecting facts clipped to the task window. The default run-005 proof executes one observation, two reads, one bounded assessment, then one deterministic decision over the audited assessment; V1 gets none of the evidence/assessment/decision grants | Additional individually implemented media operations and detector-backed speech/acoustic/overlap tracks or stems; audio activity is not speech or meaning |
 | Coordination | Legacy trace prose plus one production root→child round trip: the root-owned scheduler request receives role-constrained grants, the child consumes a one-use permit beneath the durable host launch claim, and one reported worker-output artifact receives a private content-addressed `studio.root-output-disposition.receipt.v1` promoting or rejecting it with exact spawn/scope/grant/execution/report/artifact lineage. Existing evidence assessment/decision, intake, human review/revocation, and caption producers remain separate | Model-driven root planning/synthesis and larger coordination remain missing; the current root choice is deterministic host composition, not autonomous cognition, and legacy prose never becomes handoff authority |
-| Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
-| Results | Recorded Results remain separate. The owned-source path projects validated decisions, private queued/rejected intake, immutable human approve/reject/revoke receipts, and private caption job/artifact identities plus honest counts. It does not merge those artifacts into replay Results and has no upload or publication producer | Wire verified production captions into the Studio Results surface without replay identity; keep Bet G, study, upload, and publication separate |
+| Accuracy | Cross-recognizer agreement, gates, honest nulls, plus an independent receipt-backed structural current-run caption QC gate that accepts or withholds without a score | Semantic caption/translation quality judgment and additional independent checks for separated or overlapping sources |
+| Results | Recorded Results remain separate. The owned-source path projects validated decisions, private queued/rejected intake, immutable human approve/reject/revoke receipts, private caption candidate identities/counts, and separately readable QC receipts. It does not merge those artifacts into replay Results and has no upload or publication producer | Wire verified production captions into the Studio Results surface without replay identity; keep Bet G, study, upload, and publication separate |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
 | Observability | Append-only production journal plus a deterministic content-addressed post-run index, normalized task/agent/operation/execution/handoff/failure facts, structured in-memory filters and aggregations, source identity links, and the separate local Run Explorer | Queue/dependency/reporting spans, critical-path semantics, model-adapter identity and provider units where available, persistent multi-run storage, and retention/access policy |
 | Forecasting | Versioned, content-addressed forecast and run-start freeze artifacts derive a deterministic workload floor from the measured media envelope, selected range, and explicit operation ranges. Default Studio validates and shows the exact pre-start floor and assumptions while rendering elapsed, usage, amount, and currency unavailable | Operation/tier selection, price-book adapter, model-usage estimate producer, elapsed-time and historical calibration, interactive comparison, and separate forecast evaluation |
@@ -348,9 +356,9 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 3 — tasks and agents | One receipt-backed root→child round trip implemented | `scripts/run-local-worker.ts` requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the bounded `codex exec` launcher. The scheduler enforces a closed worker-role capability matrix; the launcher consumes one permit, registers one isolated child, and requires every granted tool before report-up. The root then promotes or rejects exactly one reported worker-output artifact through `studio.root-output-disposition.receipt.v1`, which closes the accepted spawn, child scope/grants, executor receipt, report decision, input content, and root identity. The durable host launch claim prevents automatic relaunch. Root planning remains deterministic host composition; there is no model root, synthesis, second child, or recursion. The guarded 2026-07-15 real-Codex attempt remains incomplete and is not upgraded by deterministic coverage. |
 | 4 — scoped media/evidence | One perceptual operation plus extract, bounded read, assessment, and audited decision implemented | `media.extract` retains exact ffmpeg extraction authority. The granted `media.seek` path now emits a content-bound `studio.media-perception.receipt.v1` with one exact-range `audio_activity` value (`signal` or `digital_silence`) and volume measurements; it does not claim speech, words, speakers, music, or meaning. `evidence.read` v2 scopes each preflight artifact to its one source and task window and clips every intersecting returned fact to that window. `analysis.evidence.assess` and `analysis.evidence.decide` retain their prior hard bounds and audit-state policy. Separate bridges inject task/agent/operation identity and accept no paths, bytes, prose, caller outcome, or publication controls. Run-005 executes one observation, two reads, one assessment, and one decision; V1 runs only the observation. No new speech/language detector, caption, or publisher runs. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
-| 6 — provenance | Partially implemented | Root output disposition, assessment, decision, intake, human review, review-revocation, and caption-production events retain exact inputs and private content-addressed artifacts. Root disposition is a delegation/handoff receipt only: it does not certify the worker output's meaning. Each later authenticated read reopens its own bytes and recursively verifies its prior chain. Product regions expose the existing downstream facts, while richer root-promotion UI remains deliberately absent. Reading is not an artifact producer; assessment is opinion; decision is an audit-state gate; intake is unreviewed queue lineage; approval is eligibility only. Caption coverage is not quality, upload, or publication. |
+| 6 — provenance | Partially implemented | Root output disposition, assessment, decision, intake, human review, review-revocation, caption-candidate, and independent caption-QC events retain exact inputs and private content-addressed artifacts. Caption lines close source/content/window → accepted child → root promotion lineage, and QC reopens it before deciding. Root disposition is a delegation/handoff receipt only: it does not certify meaning. Reading is not an artifact producer; assessment is opinion; decision is an audit-state gate; intake is unreviewed queue lineage; approval is eligibility only; structural QC is not semantic quality, upload, or publication. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
-| 8 — verification | Partially implemented | Runtime tests carry run-005 through grant → read → assessment → audit → deterministic decision → queued intake → attested approval → bounded caption production → full caption/receipt/upstream re-verification, as well as reject and revoke branches. The fixture produces 16 timed lines with 13 EN available, 2 withheld, and 1 unavailable; tests reject no approval, revoked approval, raw/path/prose/open input, duplicate starts, and artifact tamper, and prove V1 emptiness. Stdio MCP and fake-Codex seams execute the earlier gate; the optional real caption executor and real Codex are not required for seam acceptance. Browser assertions cover the new region when an external deterministic host is supplied. |
+| 8 — verification | Partially implemented | Runtime tests carry run-005 through grant → read → assessment → audit → deterministic decision → queued intake → attested approval → promoted child → bounded caption candidate → independent QC → full recursive re-verification. The recorded fixture's 16 lines are explicitly test/demo-only and receive a withhold receipt; a bounded test executor exercises the current-run accept contract. Tests cover line-lineage drift, forged/duplicate QC, candidate/QC tamper, no approval, revoke, and open input. No new live external recognizer/translator run or semantic-quality judgment is claimed. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
 | 10 — forecasting | Deterministic floor plus product forecast surface implemented | `studio.forecast.v1` sums only explicit requested operation ranges inside a content-identified `studio.media-probe.v1` duration envelope. Baseline is labeled as a workload floor; expected, conservative, elapsed time, model usage, pricing, currency, and API cost remain null/unavailable. `POST /v1/runtime-plans` returns the exact forecast without creating a command or runtime directory. Default Studio validates it, shows its range/floor/operation/assumptions, and leaves unavailable values unavailable. Start freezes that same content into `run-start.json`; no pricing, calibration, operation-choice, or evaluation producer is claimed. |
 | 11 — local runtime-start host | Local product fragment implemented | The plan/start/poll path registers V2/V3 evidence, derives paired optional read/assess/decide grants, requires one decision after verified assessment, then invokes host-only intake. Separate authenticated reads reopen assessment, decision, intake, immutable human decision/revocation, and caption artifact/receipt content plus full lineage. Closed review mutations bind the host-configured reviewer; caption mutation accepts only an exact approval identity and shares its serialization with revocation. Browser-ingested V1 remains empty through captions. The forecast remains the exact one-seek media workload floor; post-start gate, intake, review, and captions are not forecast work. Restart recovery never relaunches ambiguous work, and production events never enter replay topology. |
@@ -439,6 +447,9 @@ POST /v1/runtimes/:runtimeId/publish-review-decisions
 POST /v1/runtimes/:runtimeId/publish-review-revocations
 GET  /v1/runtimes/:runtimeId/caption-productions
 POST /v1/runtimes/:runtimeId/caption-productions
+GET  /v1/runtimes/:runtimeId/caption-production-results
+GET  /v1/runtimes/:runtimeId/caption-quality-controls
+POST /v1/runtimes/:runtimeId/caption-quality-controls
 ```
 
 Owned ingest state is `queued`, `probing`, `sealing`, `registered`, or `failed`. These are host
@@ -505,20 +516,33 @@ labels, mismatched ids, rejected intake, tamper/drift, and duplicate or illegal 
 Caption production is a third application-host authority, not a child tool and not an extension of
 review. `POST /caption-productions` accepts exactly `{ approval: { reviewId, artifactId, receiptId,
 receiptContentId } }`. The host resolves the source from the runtime artifact store and the range from
-`studio.runtime-start.v1`, reopens the complete approval lineage, and requires no revocation before
+`studio.runtime-start.v1`, reopens the complete approval lineage plus the same-run accepted child
+output, completed executor receipt, and root `promoted_to_root` receipt, requires its media scope to
+cover the caption window, and requires no revocation before
 appending `caption.production_started`. Review/caption/revocation mutations share one per-runtime
 serialization path. The fixed limits are 120,000 ms, 64 lines, 32 KiB KO text, 32 KiB EN text,
 128 KiB per canonical artifact, and 60,000 ms wall time. Completion stores a private
-`studio.caption-production.artifact.v1` with timed KO+EN lines and closed available/withheld/
+`studio.caption-production.artifact.v1` with timed KO+EN candidates and closed available/withheld/
 unavailable reasons, then a private `studio.caption-production.receipt.v1` binding the exact
-approval, source, range, executor classification, limits, result counts, and caption content id.
+approval, source, range, accepted child, root promotion, executor classification, limits, result
+counts, and caption content id. Every line repeats its exact source/content/window and accepted-child/
+promotion identities.
 The default `recorded_real_pipeline_fixture` executor composes run-005's prior real recognizer/
-translator output; `runtime:host:caption-real` explicitly opts into `real_recognizer_translator`
+translator output only as `test_demo_only` with `cognitionClaim: none`;
+`runtime:host:caption-real` explicitly opts into `real_recognizer_translator` and `current_run`
 with ffmpeg plus the recognizer/translator APIs. Missing recognizer/translator output stays
 unavailable. GET re-hashes both objects and recursively re-verifies approval/revocation and all
 upstream receipts. Revocation before or during completion invalidates the start/read; later
 revocation returns `revoked_after_completion` while retaining artifact identities. There is one job
 per approval and no upload/publication action.
+After candidate completion, a separate caption-QC host repeats that recursive read and writes one
+private `studio.caption-quality-control.receipt.v1`. Its fixed
+`structural_current_run_gate_without_semantic_quality_score` policy accepts only a non-empty
+`current_run` candidate whose source and target are available on every line. It withholds empty or
+incomplete candidates and always withholds recorded fixture reuse. The QC GET exposes verified
+accept/withhold identities and line ids, not a score or a claim that the language is correct. The
+closed QC POST accepts only the exact candidate/production-receipt identity—never a caller-authored
+outcome—so a completed candidate can be independently decided after an interrupted service call.
 Default `/studio/` now offers an explicit **Use owned local source** path that lists registered
 sessions, shows validated source facts, reviews the exact floor, starts, reads lifecycle, and polls
 validated events. The product poll sends complete validated batches through the production-only
@@ -527,7 +551,8 @@ workers, capability grants, media operations, evidence reads/assessments, assess
 assessment receipt audits, evidence decisions, decision artifacts, verified decision receipts,
 publish-review intake lineage/artifacts/verified receipts, human review controls and immutable
 decision/revocation lineage/artifacts/verified receipts, output lineage, and structured reports.
-The same separate projection now adds caption job state, executor classification, artifact/content
+The same separate projection now adds caption job state, executor classification and explicit
+test-demo/current-run scope with no cognition claim, artifact/content
 identities, line/available/withheld/unavailable counts, and revocation-after-completion state. It does
 not project caption prose, merge into `RunBundle`, or claim a Results/replay identity.
 The read endpoints carry no paths or receipt bytes; they
@@ -539,8 +564,9 @@ invokes the real ffmpeg seek host, reads both pre-existing pinned
 receipts, emits one `studio.evidence-assessment.receipt.v1`, reopens it for audit, and emits then
 reopens one `studio.evidence-decision.receipt.v1`, then queues one verified publish-review intake;
 a withheld fixture emits rejected intake with preserved reasons. After explicit approval, the
-run-005 fixture adapter emits 16 bounded timed KO+EN lines while preserving two withheld targets and
-one unavailable source/target. A V1 proof projects empty evidence, assessment, assessment-audit,
+run-005 fixture adapter emits 16 test/demo-only bounded timed KO+EN candidates while preserving two
+withheld targets and one unavailable source/target; independent QC withholds the entire fixture
+candidate and does not treat its counts as current-run quality. A V1 proof projects empty evidence, assessment, assessment-audit,
 decision, intake, human-review, and caption regions. These regions remain empty whenever no
 validated events exist. Raw ingest
 artifacts are not relabelled as outputs: their region exposes identity and content facts only, and
@@ -1036,7 +1062,8 @@ The next production slices, in dependency order:
     `studio.caption-production.artifact.v1` and `studio.caption-production.receipt.v1` objects with
     timed KO+EN lines and first-class withheld/unavailable states. The default executor adapts the
     run-005 output previously produced by the real run-clip recognizer/translator and labels itself
-    `recorded_real_pipeline_fixture`; an explicitly guarded OpenAI executor is available but was not
+    `recorded_real_pipeline_fixture`; it is now contractually `test_demo_only` with
+    `cognitionClaim: none`. An explicitly guarded OpenAI executor is available but was not
     required for acceptance. GET verification reopens caption/receipt bytes and the complete approval
     chain. Revocation blocks new starts; a later revocation retains completed artifacts and returns
     `revoked_after_completion`. Product wiring shows only job state, executor, identities, and counts
@@ -1052,7 +1079,21 @@ The next production slices, in dependency order:
     cover accepted promotion, report rejection, premature/contradictory/wrong-artifact/duplicate
     promotion refusal, spawn denial, out-of-parent scope, role/grant denial, and forged receipt
     lineage. The root action remains deterministic host composition, not model planning or synthesis;
-    there is no second child, recursion, peer chat, richer swarm UI, or caption/QC causality.
+    there is no second child, recursion, peer chat, or richer swarm UI. Slice 2 itself stopped before
+    caption/QC causality; the separate Slice 3 entry below adds that downstream boundary without
+    upgrading this deterministic root action into model planning.
+21. Implemented 2026-07-16: caption candidates now require one recursively verified same-run
+    `promoted_to_root` child output whose granted media scope covers the immutable owned source window.
+    Candidate input and every line retain exact source/content/window, accepted-child, and root-promotion
+    artifact/receipt identities. A separate host then emits one private content-addressed
+    `studio.caption-quality-control.receipt.v1`; its fixed structural policy accepts only a non-empty
+    `current_run` candidate with source and target available on every line, and withholds incomplete,
+    empty, or any recorded-fixture candidate. Fixture reuse is `test_demo_only`, every executor declares
+    `cognitionClaim: none`, and QC emits no score or semantic-language judgment. Focused tests cover the
+    accept and withhold receipts, line-lineage drift, wrong/duplicate QC identity, promoted receipt and
+    candidate/QC tamper, and client/HTTP reads. The accept branch uses a bounded test executor seam; no
+    new live external recognizer/translator run, LLM judge, publication, Results merge, Bet G claim,
+    second child, or richer swarm UI is included.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow
 the same rule: choose a real deterministic producer first, then add the contract, fixture, policy,

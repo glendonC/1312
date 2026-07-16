@@ -52,6 +52,9 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "caption.production_completed") {
     return { kind: "caption_production", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "caption.quality_control_decided") {
+    return { kind: "caption_quality_control", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "root.output_disposition_recorded") {
     return { kind: "root_output_disposition", receipt: event.data.receipt, rawReceiptContentId: null };
   }

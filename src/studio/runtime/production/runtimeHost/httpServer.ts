@@ -396,6 +396,38 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
         return;
       }
 
+      const captionQcRuntimeId = routeIdentity(
+        url.pathname,
+        /^\/v1\/runtimes\/([^/]+)\/caption-quality-controls$/,
+      );
+      if (captionQcRuntimeId !== null) {
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        if (request.method === "GET") {
+          sendJson(response, 200, await options.service.captionQualityControls(captionQcRuntimeId), origin);
+          return;
+        }
+        if (request.method !== "POST") {
+          throw new RuntimeHostError("method_not_allowed", "Only GET and POST are supported for this endpoint.", 405);
+        }
+        if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+          throw new RuntimeHostError(
+            "unsupported_content_type",
+            "Caption QC requires Content-Type: application/json.",
+            415,
+          );
+        }
+        sendJson(
+          response,
+          201,
+          await options.service.createCaptionQualityControl(
+            captionQcRuntimeId,
+            await readJsonBody(request, maximumBytes),
+          ),
+          origin,
+        );
+        return;
+      }
+
       const runtimeId = routeIdentity(url.pathname, /^\/v1\/runtimes\/([^/]+)$/);
       if (runtimeId !== null) {
         if (request.method !== "GET") throw new RuntimeHostError("method_not_allowed", "Only GET is supported for this endpoint.", 405);

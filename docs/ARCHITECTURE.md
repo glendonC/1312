@@ -187,22 +187,30 @@ verified receipt. An approval may be superseded by one immutable
 authenticated review read re-hashes both receipt kinds and the entire intake/decision/assessment/read
 chain. Rejected intake, forged reviewer identity, raw/open/path/caption input, illegal duplicate
 transitions, tamper, and drift fail closed.
-Caption production is another application-host boundary, separate from human review and from the
+Caption candidate production is another application-host boundary, separate from human review and from the
 child capability set. Its POST accepts only one exact approval receipt identity. The host resolves
 the source artifact and accepted analysis range from immutable runtime state, reopens the complete
-review/intake/decision/assessment/read chain immediately before the first caption event, and requires
+review/intake/decision/assessment/read chain plus one same-run accepted child output and root
+`promoted_to_root` receipt covering that source window immediately before the first caption event, and requires
 the approval to remain unrevoked. `caption.production_started/completed/failed` bind fixed limits,
-executor classification, exact source/range/approval lineage, and terminal artifacts. Completion
+executor classification, exact source/range/approval/accepted-child/promotion lineage, and terminal artifacts. Completion
 stores a private content-addressed `studio.caption-production.artifact.v1` of ordered timed KO+EN
-lines plus `studio.caption-production.receipt.v1`. Missing source/translation stays unavailable and
+candidate lines plus `studio.caption-production.receipt.v1`; every line retains its exact
+source/content/window and accepted-child/promotion identities. Missing source/translation stays unavailable and
 quality-gated target stays withheld with null text. The default adapter reuses the shape produced by
-the real run-clip recognizer/translator while classifying the current job as recorded fixture reuse;
+the real run-clip recognizer/translator while classifying the current job as recorded fixture reuse,
+`test_demo_only`, and `cognitionClaim: none`;
 an explicit guarded executor can run the recognizer and translator. The authenticated caption GET
 re-hashes both objects and the full authority chain. Revocation blocks new starts; if it follows a
 completed job, prior artifacts remain immutable and are labeled `revoked_after_completion`.
 The authenticated production-results read exposes those already-verified timed lines to the active
 local-runtime surface without exposing storage paths. Captions remain private production artifacts:
 no upload, CDN, public publication, replay Results identity, or English-quality claim follows.
+A separate caption-QC host reopens that full candidate lineage and emits one immutable private
+`studio.caption-quality-control.receipt.v1`. Its deterministic structural policy accepts only a
+non-empty `current_run` candidate with both source and target available on every line; it withholds
+empty/incomplete candidates and all recorded fixtures. This proves gate execution and disposition,
+not semantic correctness, translation quality, cognition, or a score.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
@@ -361,7 +369,7 @@ This row shape is future fine-tune data.
 5. ✅ Standalone preflight index with unsupported detector findings withheld
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
-8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment/decision, host-verified queued/rejected publish-review intake, immutable attested human review/revocation receipts, approval-gated bounded caption artifacts/receipts, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
+8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment/decision, host-verified queued/rejected publish-review intake, immutable attested human review/revocation receipts, promotion-bound line-lineage caption candidates, independent accept/withhold QC receipts, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
 9. 🔄 Build the immutable observability index from real launcher journals; add further media operations only as separate authorized slices
 10. ⏳ Acoustic/overlap/separation producers and study export
 

@@ -1471,6 +1471,20 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     );
     assert.equal(JSON.stringify(productionResultsBody).includes(runtime.directory), false);
     assert.equal(JSON.stringify(productionResultsBody).includes(FIXTURE), false);
+    const qualityControlResponse = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/caption-quality-controls`,
+      { headers: authorized },
+    );
+    assert.equal(qualityControlResponse.status, 200);
+    const qualityControlBody = await qualityControlResponse.json() as {
+      schema: string;
+      runtimeId: string;
+      qualityControls: Array<{ outcome: string; reasonCodes: string[] }>;
+    };
+    assert.equal(qualityControlBody.schema, "studio.local-runtime-caption-quality-controls.v1");
+    assert.equal(qualityControlBody.runtimeId, ack.runtimeId);
+    assert.equal(qualityControlBody.qualityControls[0].outcome, "withheld");
+    assert.deepEqual(qualityControlBody.qualityControls[0].reasonCodes, ["recorded_fixture_test_demo_only"]);
     const revokeReview = await fetch(
       `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-revocations`,
       {

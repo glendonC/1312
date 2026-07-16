@@ -4,6 +4,7 @@ import type {
   CaptionProductionArtifact,
   CaptionProductionReceipt,
   CaptionProductionRequest,
+  CaptionQualityControlReceipt,
   Capability,
   CapabilityGrant,
   EvidenceAssessmentReceipt,
@@ -42,6 +43,7 @@ export type RuntimeProducerKind =
   | "publish_review_intake_host"
   | "publish_review_host"
   | "caption_production_host"
+  | "caption_quality_control_host"
   | "handoff_host"
   | "launcher";
 
@@ -308,6 +310,16 @@ export interface CaptionProductionFailedEvent extends RuntimeEventBase {
   data: { jobId: string; reason: string };
 }
 
+export interface CaptionQualityControlDecidedEvent extends RuntimeEventBase {
+  type: "caption.quality_control_decided";
+  data: {
+    qcId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: CaptionQualityControlReceipt;
+  };
+}
+
 export interface ReportSubmittedEvent extends RuntimeEventBase {
   type: "report.submitted";
   data: { report: ReportRecord };
@@ -368,6 +380,7 @@ export type RuntimeEvent =
   | CaptionProductionStartedEvent
   | CaptionProductionCompletedEvent
   | CaptionProductionFailedEvent
+  | CaptionQualityControlDecidedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent
   | RootOutputDispositionRecordedEvent;

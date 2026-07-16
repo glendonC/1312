@@ -30,7 +30,7 @@ export interface ObservabilityEventSource {
 
 export interface ObservabilityReceiptSource {
   receiptId: string;
-  kind: "media_operation" | "evidence_assessment" | "evidence_decision" | "publish_review_intake" | "publish_review_decision" | "publish_review_revocation" | "caption_production" | "root_output_disposition" | "executor_span" | "model_usage";
+  kind: "media_operation" | "evidence_assessment" | "evidence_decision" | "publish_review_intake" | "publish_review_decision" | "publish_review_revocation" | "caption_production" | "caption_quality_control" | "root_output_disposition" | "executor_span" | "model_usage";
   eventId: string;
   contentId: string;
   storage: "artifact_store" | "embedded_event";

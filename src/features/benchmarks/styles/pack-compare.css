@@ -100,7 +100,7 @@
 }
 
 .difficulty-stack article:nth-child(1) { background: var(--bench-blue-soft); }
-.difficulty-stack article:nth-child(2) { background: #eef1cd; }
+.difficulty-stack article:nth-child(2) { background: var(--palette-citron-soft); }
 .difficulty-stack article:nth-child(3) { background: var(--bench-coral-soft); }
 
 .difficulty-stack .tag-list {
@@ -155,9 +155,9 @@
 }
 
 .condition-board article[data-system-role="internal_control"] { background: var(--bench-blue-soft); }
-.condition-board article[data-system-role="control"] { background: #eef1cd; }
+.condition-board article[data-system-role="control"] { background: var(--palette-citron-soft); }
 .condition-board article[data-system-role="public_foil"] { background: var(--bench-coral-soft); }
-.condition-board article[data-system-role="optional_baseline"] { background: #f0e4f2; }
+.condition-board article[data-system-role="optional_baseline"] { background: var(--palette-lilac-soft); }
 
 .condition-board article[data-system-role="subject"] .state-chip {
   border-color: rgba(255, 255, 255, 0.35);

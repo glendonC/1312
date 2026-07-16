@@ -194,7 +194,7 @@
 .method-headline > summary { background: #17201e; color: #fff; }
 .method-headline > summary p { color: rgba(255, 255, 255, 0.62); }
 .method-diagnostic > summary { background: var(--bench-blue-soft); }
-.method-research-only > summary { background: #f0e4f2; }
+.method-research-only > summary { background: var(--palette-lilac-soft); }
 .method-omit > summary { background: var(--bench-coral-soft); }
 
 .method-list {

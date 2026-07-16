@@ -7,15 +7,15 @@
   --bench-muted: rgba(21, 32, 29, 0.58);
   --bench-line: rgba(21, 32, 29, 0.13);
   --bench-line-strong: rgba(21, 32, 29, 0.22);
-  --bench-coral: #f16b50;
-  --bench-coral-soft: #ffe1d8;
-  --bench-citron: #dce75b;
-  --bench-blue: #a9cae6;
-  --bench-blue-soft: #e2eef5;
-  --bench-lilac: #d7b8dd;
-  --bench-peach: #f3c7a6;
-  --bench-teal: #2a6b66;
-  --bench-teal-soft: #cce8dc;
+  --bench-coral: var(--palette-coral);
+  --bench-coral-soft: var(--palette-coral-soft);
+  --bench-citron: var(--palette-citron);
+  --bench-blue: var(--palette-blue);
+  --bench-blue-soft: var(--palette-blue-soft);
+  --bench-lilac: var(--palette-lilac);
+  --bench-peach: var(--palette-peach);
+  --bench-teal: var(--palette-teal);
+  --bench-teal-soft: var(--palette-teal-soft);
   --bench-outcome-correct: var(--bench-teal);
   --bench-outcome-wrong: var(--bench-coral);
   --bench-outcome-withheld: #c2b432;
@@ -33,8 +33,8 @@
   padding: var(--interior-main-start) var(--page-x) 72px;
   color: var(--bench-ink);
   background:
-    radial-gradient(circle at 78% 12%, rgba(169, 202, 230, 0.22), transparent 28rem),
-    radial-gradient(circle at 14% 82%, rgba(215, 184, 221, 0.17), transparent 30rem),
+    radial-gradient(circle at 78% 12%, color-mix(in srgb, var(--palette-blue) 22%, transparent), transparent 28rem),
+    radial-gradient(circle at 14% 82%, color-mix(in srgb, var(--palette-lilac) 17%, transparent), transparent 30rem),
     var(--bench-paper);
 }
 
@@ -471,7 +471,7 @@
 .priority-research-only {
   border-color: rgba(98, 70, 108, 0.24);
   color: #65466b;
-  background: #f0e4f2;
+  background: var(--palette-lilac-soft);
 }
 
 /* ---- Sequential prev/next: read the report front to back ---- */

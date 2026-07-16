@@ -35,11 +35,11 @@
 }
 
 .card-ingest {
-  background: #ef6548;
+  background: var(--palette-coral);
 }
 
 .card-analyze {
-  background: #dce751;
+  background: var(--palette-citron);
 }
 
 .card-verify {
@@ -47,7 +47,7 @@
 }
 
 .card-deliver {
-  background: #a9c8e1;
+  background: var(--palette-blue);
 }
 
 .card-heading {

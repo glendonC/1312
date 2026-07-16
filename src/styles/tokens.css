@@ -10,9 +10,38 @@
   --line: rgba(22, 29, 27, 0.1);
   --line-strong: rgba(22, 29, 27, 0.16);
 
-  --accent: #2a6b66;
-  --accent-soft: rgba(42, 107, 102, 0.12);
-  --accent-line: rgba(42, 107, 102, 0.32);
+  /* House palette contract.
+     Each color exposes one expressive surface, one readable ink, and one soft
+     tint. Components consume the generic --palette-* roles through
+     data-palette instead of depending on named colors directly. To extend the
+     system, add a named triplet and its data-palette mapping below. */
+  --palette-coral: #f16b50;
+  --palette-coral-ink: #9f3f2d;
+  --palette-coral-soft: #ffe1d8;
+  --palette-citron: #dce75b;
+  --palette-citron-ink: #687316;
+  --palette-citron-soft: #eef1c8;
+  --palette-blue: #a9cae6;
+  --palette-blue-ink: #3f7098;
+  --palette-blue-soft: #e2eef5;
+  --palette-lilac: #d7b8dd;
+  --palette-lilac-ink: #76558d;
+  --palette-lilac-soft: #eee2f3;
+  --palette-peach: #f3c7a6;
+  --palette-peach-ink: #9b5c25;
+  --palette-peach-soft: #f6e1c9;
+  --palette-teal: #2a6b66;
+  --palette-teal-ink: #1d5752;
+  --palette-teal-soft: #cce8dc;
+
+  /* Teal is the default palette when a component does not name another. */
+  --palette-color: var(--palette-teal);
+  --palette-ink: var(--palette-teal-ink);
+  --palette-soft: var(--palette-teal-soft);
+
+  --accent: var(--palette-teal);
+  --accent-soft: color-mix(in srgb, var(--palette-teal) 12%, transparent);
+  --accent-line: color-mix(in srgb, var(--palette-teal) 32%, transparent);
   --accent-control: linear-gradient(180deg, #357f79 0%, var(--accent) 100%);
   --accent-control-hover: linear-gradient(180deg, #3d8b84 0%, #2f746e 100%);
   --accent-control-shadow:
@@ -42,7 +71,19 @@
   --hold-line: rgba(95, 111, 107, 0.34);
 
   --glass-border: rgba(255, 255, 255, 0.58);
+  --glass-border-luminous: rgba(255, 255, 255, 0.72);
+  --glass-border-bright: rgba(255, 255, 255, 0.88);
   --glass-fill: rgba(255, 255, 255, 0.14);
+  --glass-highlight-soft: rgba(255, 255, 255, 0.46);
+  --glass-highlight: rgba(255, 255, 255, 0.62);
+  --glass-highlight-strong: rgba(255, 255, 255, 0.88);
+  --glass-reflection: rgba(255, 255, 255, 0.16);
+  --glass-cast-subtle: rgba(22, 29, 27, 0.025);
+  --glass-cast-soft: rgba(22, 29, 27, 0.055);
+  --glass-blur-compact: 16px;
+  --glass-blur-panel: 30px;
+  --glass-saturation-compact: 1.35;
+  --glass-saturation-panel: 1.7;
   --glass-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.72),
     inset 0 -1px 2px rgba(23, 59, 58, 0.08),
@@ -60,6 +101,42 @@
   --weight-thin: 300;
   --weight-regular: 400;
   --weight-medium: 500;
+}
+
+:where([data-palette="coral"]) {
+  --palette-color: var(--palette-coral);
+  --palette-ink: var(--palette-coral-ink);
+  --palette-soft: var(--palette-coral-soft);
+}
+
+:where([data-palette="citron"]) {
+  --palette-color: var(--palette-citron);
+  --palette-ink: var(--palette-citron-ink);
+  --palette-soft: var(--palette-citron-soft);
+}
+
+:where([data-palette="blue"]) {
+  --palette-color: var(--palette-blue);
+  --palette-ink: var(--palette-blue-ink);
+  --palette-soft: var(--palette-blue-soft);
+}
+
+:where([data-palette="lilac"]) {
+  --palette-color: var(--palette-lilac);
+  --palette-ink: var(--palette-lilac-ink);
+  --palette-soft: var(--palette-lilac-soft);
+}
+
+:where([data-palette="peach"]) {
+  --palette-color: var(--palette-peach);
+  --palette-ink: var(--palette-peach-ink);
+  --palette-soft: var(--palette-peach-soft);
+}
+
+:where([data-palette="teal"]) {
+  --palette-color: var(--palette-teal);
+  --palette-ink: var(--palette-teal-ink);
+  --palette-soft: var(--palette-teal-soft);
 }
 
 @media (max-width: 640px) {

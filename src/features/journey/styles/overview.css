@@ -114,8 +114,8 @@
 .journey-entry {
   /* Each entry gets a distinct house color from the same palette Method and
      Benchmarks use. --entry is read by JS to tint the atmosphere squircle. */
-  --entry: var(--accent);
-  --entry-soft: #cfe9dd;
+  --entry: var(--palette-ink);
+  --entry-soft: var(--palette-soft);
   min-height: 104px;
   padding: 16px 12px;
   border-radius: 16px;
@@ -124,13 +124,6 @@
   text-decoration: none;
   transition: color 160ms ease, background-color 160ms ease, transform 180ms ease;
 }
-
-.journey-entry[data-palette="coral"] { --entry: #c2503a; --entry-soft: #ffe0d6; }
-.journey-entry[data-palette="lilac"] { --entry: #7c5c94; --entry-soft: #eee2f3; }
-.journey-entry[data-palette="blue"] { --entry: #3f7098; --entry-soft: #e1edf5; }
-.journey-entry[data-palette="citron"] { --entry: #7f8a1f; --entry-soft: #eef1c8; }
-.journey-entry[data-palette="teal"] { --entry: #2a6b66; --entry-soft: #cde9de; }
-.journey-entry[data-palette="peach"] { --entry: #b06a2c; --entry-soft: #f6e1c9; }
 
 .journey-entry:hover,
 .journey-entry:focus-visible {

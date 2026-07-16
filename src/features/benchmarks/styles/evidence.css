@@ -274,5 +274,5 @@
 }
 
 .fact-source { background: var(--bench-blue-soft); }
-.fact-run { background: #eef1cd; }
+.fact-run { background: var(--palette-citron-soft); }
 .fact-result { background: var(--bench-coral-soft); }

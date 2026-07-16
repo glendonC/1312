@@ -9,6 +9,7 @@ import "../../features/journey/styles/index.css";
 const posts = (await getCollection("journey", ({ data }) => !data.draft)).sort(
   (a, b) => a.data.date.valueOf() - b.data.date.valueOf(),
 );
+const entryPalettes = ["coral", "lilac", "blue", "citron", "teal", "peach"];
 
 ---
 
@@ -43,12 +44,13 @@ const posts = (await getCollection("journey", ({ data }) => !data.draft)).sort(
             </div>
             <ol class="journey-entry-list">
               {
-                posts.map((post) => (
+                posts.map((post, index) => (
                   <li>
                     <a
                       class="journey-entry"
                       href={`/journey/${post.id}/`}
                       data-type={post.data.type}
+                      data-palette={entryPalettes[index % entryPalettes.length]}
                       data-journey-entry
                     >
                       <time datetime={post.data.date.toISOString()}>{formatLogDate(post.data.date)}</time>

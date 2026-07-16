@@ -1,5 +1,135 @@
 /* Methods */
 
+.method-facts {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--bench-line-strong);
+  border-bottom: 1px solid var(--bench-line-strong);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.method-facts div {
+  min-width: 0;
+  padding: 18px;
+}
+
+.method-facts div + div {
+  border-left: 1px solid var(--bench-line);
+}
+
+.method-facts dt,
+.method-facts dd {
+  margin: 0;
+}
+
+.method-facts dt {
+  color: var(--bench-muted);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.method-facts dd {
+  margin-top: 12px;
+  font-size: clamp(1.5rem, 2.6vw, 2.4rem);
+  font-weight: var(--weight-thin);
+  letter-spacing: -0.05em;
+}
+
+.metric-deck {
+  display: grid;
+  margin-top: 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  display: flex;
+  min-width: 0;
+  min-height: 290px;
+  padding: clamp(20px, 2.3vw, 30px);
+  flex-direction: column;
+  border-radius: var(--bench-r-card);
+  box-shadow: 0 14px 38px rgba(22, 29, 27, 0.07);
+  transition: box-shadow 220ms ease, transform 220ms ease;
+}
+
+.metric-card:hover {
+  box-shadow: 0 24px 58px rgba(22, 29, 27, 0.13);
+  transform: translateY(-3px);
+}
+
+.metric-meaning { background: var(--bench-citron); }
+.metric-outcomes { background: var(--bench-coral); }
+.metric-serious { background: var(--bench-blue); }
+
+.metric-card > span {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.metric-card > strong {
+  display: flex;
+  margin-top: auto;
+  flex-direction: column;
+  font-size: clamp(3.7rem, 5vw, 5.5rem);
+  font-weight: var(--weight-thin);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.08em;
+  line-height: 0.78;
+}
+
+.metric-card > strong small {
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.14em;
+  font-weight: var(--weight-regular);
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.metric-outcome-colors {
+  display: grid;
+  height: 10px;
+  margin-top: 24px;
+  overflow: hidden;
+  border-radius: 5px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  corner-shape: squircle;
+}
+
+.metric-outcome-colors .outcome-correct { background: var(--bench-outcome-correct); }
+.metric-outcome-colors .outcome-wrong { background: var(--bench-outcome-wrong); }
+.metric-outcome-colors .outcome-withheld { background: var(--bench-outcome-withheld); }
+.metric-outcome-colors .outcome-missing { background: var(--bench-outcome-missing); }
+
+.metric-card footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(21, 32, 29, 0.26);
+}
+
+.metric-card footer p,
+.metric-card footer small {
+  display: block;
+  margin: 0;
+}
+
+.metric-card footer p {
+  font-size: 0.72rem;
+  line-height: 1.42;
+}
+
+.metric-card footer small {
+  margin-top: 5px;
+  color: rgba(21, 32, 29, 0.6);
+  font-size: 0.61rem;
+  line-height: 1.4;
+}
+
 .method-groups {
   display: grid;
   gap: 10px;

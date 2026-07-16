@@ -16,6 +16,10 @@
   --bench-peach: #f3c7a6;
   --bench-teal: #2a6b66;
   --bench-teal-soft: #cce8dc;
+  --bench-outcome-correct: var(--bench-teal);
+  --bench-outcome-wrong: var(--bench-coral);
+  --bench-outcome-withheld: #c2b432;
+  --bench-outcome-missing: #69736f;
   --bench-gold-ink: #8a6f2a;
   --bench-gold-line: rgba(184, 150, 63, 0.4);
   --bench-gold-soft: rgba(184, 150, 63, 0.1);
@@ -26,11 +30,12 @@
   --bench-r-inner: 8px;
   --bench-r-tag: 6px;
   min-height: 100vh;
-  /* Extra bottom room so the sequential prev/next row clears the fixed
-     evidence-boundary button that floats in the bottom-left corner. */
-  padding: var(--interior-main-start) var(--page-x) 112px;
+  padding: var(--interior-main-start) var(--page-x) 72px;
   color: var(--bench-ink);
-  background: var(--bench-paper);
+  background:
+    radial-gradient(circle at 78% 12%, rgba(169, 202, 230, 0.22), transparent 28rem),
+    radial-gradient(circle at 14% 82%, rgba(215, 184, 221, 0.17), transparent 30rem),
+    var(--bench-paper);
 }
 
 .bench-shell {
@@ -61,7 +66,7 @@
 
 .bench-tabs {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--bench-line-strong);
   border-radius: var(--bench-r-card);
@@ -70,9 +75,9 @@
 
 .bench-tab {
   display: grid;
-  padding: 15px 12px 16px;
+  min-height: 62px;
+  padding: 15px 12px;
   place-items: center;
-  gap: 7px;
   border: 0;
   border-left: 1px solid var(--bench-line);
   background: transparent;
@@ -212,6 +217,124 @@
 .section-summary.is-secondary {
   margin-top: 14px;
   color: rgba(21, 32, 29, 0.58);
+}
+
+/* ---- Overview: one result, then only the numbers that qualify it ---- */
+
+.snapshot-scores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.snapshot-score {
+  padding: clamp(22px, 3vw, 34px);
+  border: 0;
+  border-radius: var(--bench-r-card);
+  box-shadow: 0 14px 38px rgba(22, 29, 27, 0.07);
+  transition: box-shadow 220ms ease, transform 220ms ease;
+}
+
+.snapshot-score:hover {
+  box-shadow: 0 24px 58px rgba(22, 29, 27, 0.12);
+  transform: translateY(-3px);
+}
+
+.snapshot-score.is-cold {
+  background: var(--bench-blue);
+}
+
+.snapshot-score.is-prepared {
+  background: var(--bench-coral);
+}
+
+.snapshot-score > span,
+.snapshot-facts dt {
+  color: var(--bench-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.snapshot-score strong {
+  display: inline-flex;
+  margin-top: 28px;
+  align-items: baseline;
+  gap: 0.12em;
+  font-size: clamp(3.8rem, 7vw, 6.6rem);
+  font-weight: var(--weight-thin);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.075em;
+  line-height: 0.8;
+}
+
+.snapshot-score strong small {
+  color: rgba(21, 32, 29, 0.58);
+  font-size: 0.42em;
+  letter-spacing: -0.03em;
+}
+
+.snapshot-meter {
+  height: 9px;
+  margin-top: 30px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.42);
+  corner-shape: squircle;
+}
+
+.snapshot-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--bench-ink);
+}
+
+.snapshot-score.is-prepared .snapshot-meter span {
+  background: var(--bench-ink);
+}
+
+.snapshot-score p {
+  margin: 10px 0 0;
+  color: var(--bench-muted);
+  font-size: 0.7rem;
+}
+
+.snapshot-facts {
+  display: grid;
+  margin: 14px 0 0;
+  border-top: 1px solid var(--bench-line-strong);
+  border-bottom: 1px solid var(--bench-line-strong);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.snapshot-facts div {
+  min-width: 0;
+  padding: 16px;
+}
+
+.snapshot-facts div + div {
+  border-left: 1px solid var(--bench-line);
+}
+
+.snapshot-facts dt,
+.snapshot-facts dd {
+  margin: 0;
+}
+
+.snapshot-facts dd {
+  margin-top: 8px;
+  font-size: clamp(1.35rem, 2.5vw, 2.2rem);
+  font-weight: var(--weight-thin);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+}
+
+.snapshot-facts dd small {
+  color: var(--bench-muted);
+  font-size: 0.45em;
+  letter-spacing: 0;
 }
 
 /* ---- Overview: the evidence conveyor (colored stage blocks, Method-style) ---- */

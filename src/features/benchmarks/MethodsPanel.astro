@@ -1,12 +1,35 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import {
-  evaluationLabels,
-  metricGroups,
-  priorityLabels,
-  supportLabels,
-} from "./model";
+import { labelsReceipt, scoreReceipt } from "./model";
 import { sectionCopy } from "./sections";
+
+const totalUnits = scoreReceipt.systems["1321-prepped"].headline.critical_meaning.total;
+const methodRows = [
+  {
+    id: "meaning",
+    value: totalUnits,
+    unit: "units",
+    label: "Meaning preserved",
+    measure: `Passes out of ${totalUnits}`,
+    basis: "Blinded human review",
+  },
+  {
+    id: "outcomes",
+    value: 4,
+    unit: "states",
+    label: "Outcome split",
+    measure: "Correct · wrong · withheld · missing",
+    basis: `Every one of the ${totalUnits} units`,
+  },
+  {
+    id: "serious",
+    value: 0,
+    unit: "this test",
+    label: "Serious errors",
+    measure: "Count divided by captions shown",
+    basis: "Blinded human review",
+  },
+];
 ---
 
 <section
@@ -22,42 +45,30 @@ import { sectionCopy } from "./sections";
     <SectionLede copy={sectionCopy.methods} />
 
     <div class="section-body">
-      <div class="method-groups">
-        {metricGroups.map((group) => (
-          <details class={`method-group method-${group.id}`} open={group.id === "headline"}>
-            <summary>
-              <strong>{group.metrics.length}</strong>
-              <div><h3>{group.label}</h3><p>{group.note}</p></div>
-              <span aria-hidden="true">+</span>
-            </summary>
-            <div class="method-list">
-              {group.metrics.map((metric) => (
-                <details class="method-item">
-                  <summary>
-                    <div><strong>{metric.label}</strong><span>{metric.layer}</span></div>
-                    <span class={`support-mark support-${metric.support}`}>{supportLabels[metric.support]}</span>
-                  </summary>
-                  <div class="method-detail">
-                    <p class="method-question">{metric.question}</p>
-                    <dl>
-                      <div><dt>Scored by</dt><dd>{evaluationLabels[metric.evaluation]}</dd></div>
-                      <div><dt>Evidence required</dt><dd>{metric.requiredData}</dd></div>
-                      <div><dt>Limitation</dt><dd>{metric.limitation}</dd></div>
-                      <div><dt>Contract field</dt><dd><code>{metric.field}</code></dd></div>
-                    </dl>
-                    <footer>
-                      <span class={`priority-mark priority-${metric.priority}`}>{priorityLabels[metric.priority]}</span>
-                      {metric.reference && (
-                        <a href={metric.reference.url} target="_blank" rel="noopener noreferrer">
-                          {metric.reference.label} ↗
-                        </a>
-                      )}
-                    </footer>
-                  </div>
-                </details>
-              ))}
-            </div>
-          </details>
+      <dl class="method-facts">
+        <div><dt>Reviewers</dt><dd>{labelsReceipt.reviewers.length}</dd></div>
+        <div><dt>Review blinded</dt><dd>Yes</dd></div>
+        <div><dt>Model grader</dt><dd>None</dd></div>
+      </dl>
+
+      <div class="metric-deck" aria-label="Published benchmark metrics">
+        {methodRows.map((row) => (
+          <article class={`metric-card metric-${row.id}`}>
+            <span>{row.label}</span>
+            <strong>{row.value}<small>{row.unit}</small></strong>
+            {row.id === "outcomes" && (
+              <div class="metric-outcome-colors" aria-hidden="true">
+                <span class="outcome-correct"></span>
+                <span class="outcome-wrong"></span>
+                <span class="outcome-withheld"></span>
+                <span class="outcome-missing"></span>
+              </div>
+            )}
+            <footer>
+              <p>{row.measure}</p>
+              <small>{row.basis}</small>
+            </footer>
+          </article>
         ))}
       </div>
     </div>

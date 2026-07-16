@@ -1,17 +1,18 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import {
-  freezeReceipt,
-  labelsReceipt,
-  missingArtifacts,
-  missingEvidence,
-  readyArtifacts,
-  receiptFiles,
-  scoreReceipt,
-  shortIdentity,
-  workItems,
-} from "./model";
 import { sectionCopy } from "./sections";
+
+const checks = [
+  { label: "Test set locked before scoring", state: "verified" },
+  { label: "Both systems used the same source", state: "verified" },
+  { label: "Human review completed blind", state: "verified" },
+  { label: "Published score arithmetic verified", state: "verified" },
+  { label: "Two control clips scored", state: "pending" },
+  { label: "Public baseline scored", state: "pending" },
+  { label: "Repeat-run variance measured", state: "pending" },
+] as const;
+const verified = checks.filter((check) => check.state === "verified").length;
+const pending = checks.length - verified;
 ---
 
 <section
@@ -27,63 +28,19 @@ import { sectionCopy } from "./sections";
     <SectionLede copy={sectionCopy.receipts} />
 
     <div class="section-body">
-      <div class="work-ledger">
-        <div class="ledger-heading"><span>Evidence step</span><span>Current state</span></div>
-        {workItems.map((item) => (
-          <article>
-            <span class={`ledger-marker state-${item.state}`} aria-hidden="true"></span>
-            <div><h3>{item.label}</h3><p>{item.meta}</p></div>
-            <span class={`state-chip state-${item.state}`}>
-              <span aria-hidden="true">{item.state === "ready" ? "✓" : item.state === "measured" ? "●" : "▨"}</span>
-              {item.stateLabel}
-            </span>
-          </article>
+      <div class="audit-summary" aria-label={`${verified} verified and ${pending} pending audit checks`}>
+        <div><strong>{verified}</strong><span>Verified</span></div>
+        <div><strong>{pending}</strong><span>Pending</span></div>
+      </div>
+
+      <div class="audit-list" role="list" aria-label="Benchmark audit checks">
+        {checks.map((check) => (
+          <div class:list={["audit-row", `is-${check.state}`]} role="listitem">
+            <span class="audit-marker" aria-hidden="true">{check.state === "verified" ? "✓" : ""}</span>
+            <strong>{check.label}</strong>
+            <span>{check.state === "verified" ? "Verified" : "Pending"}</span>
+          </div>
         ))}
-      </div>
-
-      <div class="receipt-stack">
-        <article class="receipt-summary">
-          <span>Evidence receipts present</span>
-          <strong>{readyArtifacts}<small> / {receiptFiles.length}</small></strong>
-          <p>{missingArtifacts} comparison receipts are explicitly absent.</p>
-        </article>
-
-        <details class="receipt-details" open>
-          <summary>Receipt bindings and gaps <span>{receiptFiles.length}</span></summary>
-          <ul>
-            {receiptFiles.map((artifact) => (
-              <li>
-                <span class={`ledger-marker state-${artifact.state}`} aria-hidden="true"></span>
-                <div>
-                  <code>{artifact.path}</code>
-                  <small>{artifact.role}</small>
-                  <small class="receipt-identity">{shortIdentity(artifact.identity)}</small>
-                </div>
-                <span>{artifact.state === "ready" ? "Bound" : "Missing"}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-
-        <details class="receipt-details">
-          <summary>Still outside this score <span>{missingEvidence.length}</span></summary>
-          <ul>
-            {missingEvidence.map((item) => (
-              <li>
-                <span class="ledger-marker state-missing" aria-hidden="true"></span>
-                <div><strong>{item.label}</strong><small>{item.detail}</small></div>
-                <span>Missing</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      </div>
-
-      <div class="protocol-strip" aria-label="Protocol decisions applied to run-007">
-        <div><span>Judgment</span><strong>{scoreReceipt.systems["1321-prepped"].headline.critical_meaning.total} pre-registered critical units</strong></div>
-        <div><span>Review</span><strong>{labelsReceipt.reviewers.length} blinded reviewers</strong></div>
-        <div><span>Judge</span><strong>{scoreReceipt.judge === null ? "No model grader" : scoreReceipt.judge}</strong></div>
-        <div><span>Freeze</span><strong>{freezeReceipt.frozen_at}</strong></div>
       </div>
     </div>
   </div>

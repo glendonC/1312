@@ -1,16 +1,11 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import { freezeReceipt, labelsReceipt, scoreReceipt } from "./model";
+import { displayRate, freezeReceipt, labelsReceipt, scoreReceipt } from "./model";
 import { sectionCopy } from "./sections";
 
-const stages = [
-  { n: "01", name: "Pack frozen", desc: "Three gold clips bound before the run.", color: "coral", meta: `${freezeReceipt.clips.length} / ${freezeReceipt.clips.length}`, state: "complete" },
-  { n: "02", name: "Hard clip captured", desc: "One real-media run pinned without gold in the capture.", color: "citron", meta: scoreReceipt.run, state: "complete" },
-  { n: "03", name: "Outputs reviewed", desc: "Human output labels were blinded and bound to the exact capture.", color: "blue", meta: `${labelsReceipt.reviewers.length} reviewers`, state: "complete" },
-  { n: "04", name: "Score published", desc: "Prepared and cold scored over the same 13 critical units.", color: "lilac", meta: "1 hard clip", state: "current" },
-  { n: "05", name: "Controls unrun", desc: "The two frozen local-eval controls have no output or score.", color: "teal", meta: "0 / 2", state: "missing" },
-  { n: "06", name: "Series incomplete", desc: "YouTube auto and Run 2+ receipts do not exist yet.", color: "peach", meta: "Missing", state: "missing" },
-];
+const prepared = scoreReceipt.systems["1321-prepped"].headline.critical_meaning;
+const cold = scoreReceipt.systems["1321-cold"].headline.critical_meaning;
+const scoredClips = 1;
 ---
 
 <section
@@ -25,18 +20,31 @@ const stages = [
     <SectionLede copy={sectionCopy.overview} size="hero" />
 
     <div class="section-body">
-      <ol class="conveyor" aria-label="How a benchmark gets built, stage by stage">
-        {stages.map((stage) => (
-          <li class:list={["stage", `stage-${stage.color}`, `is-${stage.state}`]}>
-            <span class="stage-n">[{stage.n}]</span>
-            <div class="stage-text">
-              <h3>{stage.name}</h3>
-              <p>{stage.desc}</p>
-            </div>
-            <span class="stage-meta">{stage.meta}</span>
-          </li>
-        ))}
-      </ol>
+      <div class="snapshot-scores" aria-label="Headline benchmark scores">
+        <article class="snapshot-score is-cold">
+          <span>No preparation</span>
+          <strong>{cold.passes}<small> / {cold.total}</small></strong>
+          <div class="snapshot-meter" aria-label={`${Math.round(cold.rate * 100)} percent`}>
+            <span style={`width:${cold.rate * 100}%`}></span>
+          </div>
+          <p>{displayRate(cold.rate)} meaning preserved</p>
+        </article>
+        <article class="snapshot-score is-prepared">
+          <span>Prepared</span>
+          <strong>{prepared.passes}<small> / {prepared.total}</small></strong>
+          <div class="snapshot-meter" aria-label={`${Math.round(prepared.rate * 100)} percent`}>
+            <span style={`width:${prepared.rate * 100}%`}></span>
+          </div>
+          <p>{displayRate(prepared.rate)} meaning preserved</p>
+        </article>
+      </div>
+
+      <dl class="snapshot-facts">
+        <div><dt>Lead</dt><dd>+{cold.passes - prepared.passes}<small> units</small></dd></div>
+        <div><dt>Coverage</dt><dd>{scoredClips}<small> / {freezeReceipt.clips.length} clips</small></dd></div>
+        <div><dt>Reviewers</dt><dd>{labelsReceipt.reviewers.length}</dd></div>
+        <div><dt>Serious errors</dt><dd>0</dd></div>
+      </dl>
     </div>
   </div>
 </section>

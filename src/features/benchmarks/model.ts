@@ -91,13 +91,11 @@ requireReceiptLink(
 requireReceiptLink(scoreReceipt.delta_vs_cold.critical_meaning_rate < 0, "receipt no longer shows cold leading");
 
 export const tabs = [
-  { id: "overview", label: "Overview", n: "00", color: "ink" },
-  { id: "evidence", label: "Evidence", n: "01", color: "coral" },
-  { id: "pack", label: "Test pack", n: "02", color: "citron" },
-  { id: "compare", label: "Compare", n: "03", color: "blue" },
-  { id: "results", label: "Results", n: "04", color: "lilac" },
-  { id: "methods", label: "Methods", n: "05", color: "teal" },
-  { id: "receipts", label: "Receipts", n: "06", color: "peach" },
+  { id: "overview", label: "Overview", color: "ink" },
+  { id: "evidence", label: "Coverage", color: "coral" },
+  { id: "results", label: "Results", color: "lilac" },
+  { id: "methods", label: "Method", color: "teal" },
+  { id: "receipts", label: "Audit", color: "peach" },
 ] as const;
 
 export const roleLabels: Record<string, string> = {
@@ -110,7 +108,7 @@ export const roleLabels: Record<string, string> = {
 
 export const scoredSystems = Object.entries(scoreReceipt.systems).map(([id, result]) => ({
   id,
-  label: id === "1321-prepped" ? "1321 prepared" : "1321 cold",
+  label: id === "1321-prepped" ? "Prepared" : "No preparation",
   role: result.role,
   result,
   capture: captureReceipt.systems.find((system) => system.id === id),
@@ -136,7 +134,7 @@ export const packClips = freezeReceipt.clips.map((clip, index) => {
 
 export const evidenceRows = packClips.map((clip) => ({
   id: clip.clip_id,
-  label: clip.isScoredClip ? "Hard 01" : `Control ${clip.index}`,
+  label: clip.isScoredClip ? "Scored clip" : `Control ${clip.index}`,
   source: true,
   gold: true,
   capture: clip.captured,

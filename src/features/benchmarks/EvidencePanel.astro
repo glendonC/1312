@@ -19,20 +19,17 @@ import { sectionCopy } from "./sections";
     <div class="section-body">
       <div class="evidence-board">
         <div class="board-summary">
-          <div>
-            <strong>1</strong>
-            <span>scored clip</span>
-          </div>
-          <p>One hard clip is scored. Two frozen controls remain unrun.</p>
+          <strong>1<small> / 3</small></strong>
+          <span>clips scored</span>
         </div>
 
         <div class="evidence-matrix" role="table" aria-label="Evidence readiness by frozen clip">
           <div class="matrix-row matrix-head" role="row">
             <span role="columnheader">Clip</span>
             <span role="columnheader">Source</span>
-            <span role="columnheader">Gold</span>
-            <span role="columnheader">Capture</span>
-            <span role="columnheader">Labels</span>
+            <span role="columnheader">Key</span>
+            <span role="columnheader">Output</span>
+            <span role="columnheader">Review</span>
             <span role="columnheader">Score</span>
           </div>
           {evidenceRows.map((row) => (
@@ -49,6 +46,12 @@ import { sectionCopy } from "./sections";
           ))}
         </div>
       </div>
+
+      <dl class="coverage-facts">
+        <div><dt>Test clips</dt><dd>3</dd></div>
+        <div><dt>Scored</dt><dd>1</dd></div>
+        <div><dt>Pending</dt><dd>2</dd></div>
+      </dl>
     </div>
   </div>
 </section>

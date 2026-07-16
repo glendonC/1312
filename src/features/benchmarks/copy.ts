@@ -5,11 +5,11 @@ export const benchmarkCopy = {
   hypothesis:
     "On the same frozen Korean media, a prepared 1321 workflow should preserve more critical meaning than the same stack run cold and a dated YouTube auto-translation capture.",
   evidenceBoundary:
-    "This page publishes one real scored hard clip from run-007. It is not a completed pack result.",
+    "This page reports one scored clip. It is not a complete test-set result.",
   demoBoundary:
-    "The scored Studio replay is a synthetic, planted-error demo. It is not a clip, run, or score in this pack.",
+    "The Studio demo is separate from this benchmark and does not contribute to these scores.",
   publicationRule:
-    "Only the frozen clip, bound capture, blinded labels, and score receipt may support the numbers shown. Local controls, YouTube auto, and repeat runs remain missing.",
+    "Only verified source, review, and score data supports the numbers shown. Control clips, the public baseline, and repeat runs remain pending.",
 } as const;
 
 export const supportLabels: Record<SupportState, string> = {

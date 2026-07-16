@@ -1,11 +1,9 @@
 ---
-import ComparePanel from "./ComparePanel.astro";
 import EvidencePanel from "./EvidencePanel.astro";
 import MethodsPanel from "./MethodsPanel.astro";
 import OverviewPanel from "./OverviewPanel.astro";
 import ReceiptsPanel from "./ReceiptsPanel.astro";
 import ResultsPanel from "./ResultsPanel.astro";
-import TestPackPanel from "./TestPackPanel.astro";
 import { tabs } from "./model";
 ---
 
@@ -29,7 +27,6 @@ import { tabs } from "./model";
         tabindex={index === 0 ? 0 : -1}
         data-bench-tab={tab.id}
       >
-        <span class="tab-n">[{tab.n}]</span>
         <span class="tab-label">{tab.label}</span>
       </button>
     ))}
@@ -38,29 +35,10 @@ import { tabs } from "./model";
   <div class="instrument-panels">
     <OverviewPanel />
     <EvidencePanel />
-    <TestPackPanel />
-    <ComparePanel />
     <ResultsPanel />
     <MethodsPanel />
     <ReceiptsPanel />
   </div>
-
-  <nav class="bench-seq" aria-label="Section sequence" data-bench-seq>
-    <button type="button" class="bench-seq-btn bench-seq-prev" data-bench-seq-prev>
-      <span class="bench-seq-arrow" aria-hidden="true">&larr;</span>
-      <span class="bench-seq-text">
-        <span class="bench-seq-dir">Previous</span>
-        <span class="bench-seq-name" data-bench-seq-prev-name></span>
-      </span>
-    </button>
-    <button type="button" class="bench-seq-btn bench-seq-next" data-bench-seq-next>
-      <span class="bench-seq-text">
-        <span class="bench-seq-dir">Next</span>
-        <span class="bench-seq-name" data-bench-seq-next-name></span>
-      </span>
-      <span class="bench-seq-arrow" aria-hidden="true">&rarr;</span>
-    </button>
-  </nav>
 </section>
 
 <script>

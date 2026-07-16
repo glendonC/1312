@@ -19,6 +19,7 @@ export {
 export type {
   RuntimeHostAssessmentAuditResponse,
   RuntimeHostCaptionProductionRequest,
+  RuntimeHostCaptionProductionResultsResponse,
   RuntimeHostCaptionProductionResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,

@@ -55,6 +55,10 @@ test("attested approval explicitly produces private bounded captions without pub
 
   const captions = production.locator('[data-production-region="caption-production"]');
   await expect(captions.getByRole("heading", { name: "Caption production" })).toBeVisible();
+  const productionResults = page.locator('[data-production-results-region="caption-lineage"]');
+  await expect(productionResults.getByRole("heading", { name: "Production caption results" })).toBeVisible();
+  await expect(productionResults.locator('[data-production-results-empty="no-verified-caption-job"]')).toBeVisible();
+  await expect(productionResults.locator("[data-production-results-job-id]")).toHaveCount(0);
   await captions.locator('[data-production-caption-action="start"]').click();
   const job = captions.locator('[data-production-caption-job-id]');
   await expect(job).toHaveCount(1, { timeout: 10_000 });
@@ -69,6 +73,10 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(captions.locator("[data-production-caption-publish-boundary]")).toContainText(
     "Upload, CDN delivery, and public publication are absent",
   );
+  await expect(productionResults.locator('[data-production-results-job-id]')).toHaveCount(1, { timeout: 10_000 });
+  await expect(productionResults.locator('[data-production-results-line-id]')).toHaveCount(16);
+  await expect(productionResults).toContainText("not replay Results identity");
+  await expect(productionResults).toContainText("does not claim transcription accuracy, English quality, or a Bet G score");
 });
 
 test("attested reviewer rejects one verified queued intake with a visible closed reason", async ({ page }, testInfo) => {

@@ -1369,6 +1369,30 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     };
     assert.equal(captionBody.schema, "studio.local-runtime-caption-productions.v1");
     assert.deepEqual(captionBody.captions[0].result, { status: "unavailable", lineCount: 0, sourceAvailableCount: 0, targetAvailableCount: 0, withheldCount: 0, unavailableCount: 0 });
+    const productionResultsResponse = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/caption-production-results`,
+      { headers: authorized },
+    );
+    assert.equal(productionResultsResponse.status, 200);
+    const productionResultsBody = await productionResultsResponse.json() as {
+      schema: string;
+      runtimeId: string;
+      results: Array<{
+        verification: { jobId: string; captionArtifactId: string };
+        artifact: { schema: string; jobId: string; runId: string; lines: unknown[] };
+      }>;
+    };
+    assert.equal(productionResultsBody.schema, "studio.local-runtime-caption-production-results.v1");
+    assert.equal(productionResultsBody.runtimeId, ack.runtimeId);
+    assert.equal(productionResultsBody.results.length, 1);
+    assert.equal(productionResultsBody.results[0].artifact.schema, "studio.caption-production.artifact.v1");
+    assert.equal(productionResultsBody.results[0].artifact.runId, ack.runtimeId);
+    assert.equal(
+      productionResultsBody.results[0].artifact.jobId,
+      productionResultsBody.results[0].verification.jobId,
+    );
+    assert.equal(JSON.stringify(productionResultsBody).includes(runtime.directory), false);
+    assert.equal(JSON.stringify(productionResultsBody).includes(FIXTURE), false);
     const revokeReview = await fetch(
       `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-revocations`,
       {

@@ -383,6 +383,19 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
         return;
       }
 
+      const captionResultsRuntimeId = routeIdentity(
+        url.pathname,
+        /^\/v1\/runtimes\/([^/]+)\/caption-production-results$/,
+      );
+      if (captionResultsRuntimeId !== null) {
+        if (request.method !== "GET") {
+          throw new RuntimeHostError("method_not_allowed", "Only GET is supported for this endpoint.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        sendJson(response, 200, await options.service.captionProductionResults(captionResultsRuntimeId), origin);
+        return;
+      }
+
       const runtimeId = routeIdentity(url.pathname, /^\/v1\/runtimes\/([^/]+)$/);
       if (runtimeId !== null) {
         if (request.method !== "GET") throw new RuntimeHostError("method_not_allowed", "Only GET is supported for this endpoint.", 405);

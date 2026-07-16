@@ -8,6 +8,7 @@ import {
 } from "./artifactStore.ts";
 import type {
   CaptionExecutorDescriptor,
+  CaptionProductionArtifact,
   CaptionProductionReceipt,
   CaptionProductionStatus,
   RuntimeProjection,
@@ -44,6 +45,11 @@ export interface CaptionProductionVerification {
     withheldCount: number;
     unavailableCount: number;
   };
+}
+
+export interface VerifiedCaptionProductionResult {
+  verification: CaptionProductionVerification;
+  artifact: CaptionProductionArtifact;
 }
 
 function expectedStorageKey(contentId: string): string {
@@ -85,13 +91,13 @@ function receiptIdentity(receipt: CaptionProductionReceipt): string {
 }
 
 /** Reopens immutable KO+EN artifacts and repeats the full approval/revocation integrity audit. */
-export async function reopenCaptionProductions(
+export async function reopenCaptionProductionResults(
   state: RuntimeProjection,
   events: readonly RuntimeEvent[],
   artifacts: ContentAddressedArtifactStore,
-): Promise<CaptionProductionVerification[]> {
+): Promise<VerifiedCaptionProductionResult[]> {
   const reviews = await reopenPublishReviewDecisions(state, events, artifacts);
-  const verified: CaptionProductionVerification[] = [];
+  const verified: VerifiedCaptionProductionResult[] = [];
   const completed = Object.values(state.captionProductions)
     .filter((job) => job.status === "completed")
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -227,23 +233,35 @@ export async function reopenCaptionProductions(
     ) throw new Error(`Stored caption production ${job.id} changed its authority, content, or result counts`);
 
     verified.push({
-      jobId: job.id,
-      approval: {
-        reviewId: approval.reviewId,
-        artifactId: approval.artifactId,
-        receiptId: approval.receiptId,
-        receiptContentId: approval.receiptContentId,
+      verification: {
+        jobId: job.id,
+        approval: {
+          reviewId: approval.reviewId,
+          artifactId: approval.artifactId,
+          receiptId: approval.receiptId,
+          receiptContentId: approval.receiptContentId,
+        },
+        authorityState,
+        integrity: "stored_caption_and_receipt_with_verified_approval",
+        captionArtifactId: captionArtifact.id,
+        captionContentId: captionArtifact.content.contentId,
+        receiptArtifactId: receiptArtifact.id,
+        receiptId: receipt.receiptId,
+        receiptContentId: receiptArtifact.content.contentId,
+        executor: structuredClone(caption.executor),
+        result: structuredClone(caption.result),
       },
-      authorityState,
-      integrity: "stored_caption_and_receipt_with_verified_approval",
-      captionArtifactId: captionArtifact.id,
-      captionContentId: captionArtifact.content.contentId,
-      receiptArtifactId: receiptArtifact.id,
-      receiptId: receipt.receiptId,
-      receiptContentId: receiptArtifact.content.contentId,
-      executor: structuredClone(caption.executor),
-      result: structuredClone(caption.result),
+      artifact: structuredClone(caption),
     });
   }
   return verified;
+}
+
+export async function reopenCaptionProductions(
+  state: RuntimeProjection,
+  events: readonly RuntimeEvent[],
+  artifacts: ContentAddressedArtifactStore,
+): Promise<CaptionProductionVerification[]> {
+  return (await reopenCaptionProductionResults(state, events, artifacts))
+    .map((result) => result.verification);
 }

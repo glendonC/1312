@@ -12,7 +12,10 @@ import { reopenEvidenceAssessmentAudits } from "../assessmentAudit.ts";
 import { reopenEvidenceDecisionReceipts } from "../decisionReceiptAudit.ts";
 import { reopenPublishReviewIntakes } from "../publishReviewIntakeAudit.ts";
 import { reopenPublishReviewDecisions } from "../publishReviewDecisionAudit.ts";
-import { reopenCaptionProductions } from "../captionProductionAudit.ts";
+import {
+  reopenCaptionProductionResults,
+  reopenCaptionProductions,
+} from "../captionProductionAudit.ts";
 import {
   CaptionProductionHost,
   CaptionProductionHostError,
@@ -43,6 +46,7 @@ import type {
   InitializedRuntimeApplication,
   RuntimeHostCommandRecord,
   RuntimeHostAssessmentAuditResponse,
+  RuntimeHostCaptionProductionResultsResponse,
   RuntimeHostCaptionProductionResponse,
   RuntimeHostDecisionReceiptResponse,
   RuntimeHostFailureReason,
@@ -919,6 +923,38 @@ export class RuntimeStartService {
       runtimeId,
       journalHead: journal.head,
       captions,
+    };
+  }
+
+  async captionProductionResults(
+    runtimeId: string,
+  ): Promise<RuntimeHostCaptionProductionResultsResponse> {
+    const record = await this.store.findByRuntimeId(runtimeId);
+    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+    const reconciled = await this.reconcile(record, false);
+    const paths = this.store.paths(runtimeId);
+    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
+    let results;
+    try {
+      results = await reopenCaptionProductionResults(
+        journal.state,
+        journal.events,
+        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+      );
+    } catch (error) {
+      throw new RuntimeHostError(
+        "stored_content_inconsistent",
+        "A stored caption artifact, receipt, or approval lineage failed closed validation.",
+        409,
+        { cause: error },
+      );
+    }
+    return {
+      schema: "studio.local-runtime-caption-production-results.v1",
+      commandId: reconciled.commandId,
+      runtimeId,
+      journalHead: journal.head,
+      results,
     };
   }
 

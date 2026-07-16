@@ -198,8 +198,9 @@ the real run-clip recognizer/translator while classifying the current job as rec
 an explicit guarded executor can run the recognizer and translator. The authenticated caption GET
 re-hashes both objects and the full authority chain. Revocation blocks new starts; if it follows a
 completed job, prior artifacts remain immutable and are labeled `revoked_after_completion`.
-Captions remain private production artifacts: no upload, CDN, public publication, Results/replay
-identity, or English-quality claim follows.
+The authenticated production-results read exposes those already-verified timed lines to the active
+local-runtime surface without exposing storage paths. Captions remain private production artifacts:
+no upload, CDN, public publication, replay Results identity, or English-quality claim follows.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,

@@ -109,6 +109,7 @@ test("V1 and an unapproved run expose no captions; raw bytes, paths, and final p
     const acknowledgement = await runtime.service.start(runtime.request);
     await terminal(runtime.service, acknowledgement.commandId);
     assert.deepEqual((await runtime.service.captionProductions(acknowledgement.runtimeId)).captions, []);
+    assert.deepEqual((await runtime.service.captionProductionResults(acknowledgement.runtimeId)).results, []);
     const fake = {
       approval: {
         reviewId: "publish-review:unapproved",
@@ -161,6 +162,16 @@ test("exact approval produces immutable timed KO+EN artifacts with honest withhe
       withheldCount: 2,
       unavailableCount: 1,
     });
+    const productionResults = await runtime.service.captionProductionResults(approval.runtimeId);
+    assert.equal(productionResults.schema, "studio.local-runtime-caption-production-results.v1");
+    assert.equal(productionResults.results.length, 1);
+    assert.deepEqual(productionResults.results[0].verification, caption);
+    assert.equal(productionResults.results[0].artifact.runId, approval.runtimeId);
+    assert.equal(productionResults.results[0].artifact.lines.length, 16);
+    assert.deepEqual(
+      productionResults.results[0].artifact.lines.map((line) => [line.source.language, line.target.language]),
+      Array.from({ length: 16 }, () => ["ko", "en"]),
+    );
     const digest = caption.captionContentId.replace("sha256:", "");
     const value = JSON.parse(await readFile(join(
       runtime.store.paths(approval.runtimeId).artifactStoreRoot,
@@ -214,6 +225,45 @@ test("exact approval produces immutable timed KO+EN artifacts with honest withhe
     assert.deepEqual(await client.createCaptionProduction(approval.runtimeId, approval.request), result);
     assert.match(requestedPath, /\/caption-productions$/);
     assert.deepEqual(JSON.parse(requestedBody), approval.request);
+    const resultsClient = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "caption-test-token",
+      fetch: async () => new Response(JSON.stringify(productionResults), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    });
+    assert.deepEqual(await resultsClient.captionProductionResults(approval.runtimeId), productionResults);
+    const mismatchedResults = structuredClone(productionResults);
+    mismatchedResults.results[0].artifact.jobId = "caption-production:mismatched";
+    const mismatchedClient = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "caption-test-token",
+      fetch: async () => new Response(JSON.stringify(mismatchedResults), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    });
+    await assert.rejects(
+      mismatchedClient.captionProductionResults(approval.runtimeId),
+      /verified identities, executor, or result counts do not match the artifact/,
+    );
+    const tamperedResults = structuredClone(productionResults);
+    const originalSourceText = tamperedResults.results[0].artifact.lines[0].source.text;
+    assert.notEqual(originalSourceText, null);
+    tamperedResults.results[0].artifact.lines[0].source.text = `${originalSourceText} tampered`;
+    const tamperedClient = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "caption-test-token",
+      fetch: async () => new Response(JSON.stringify(tamperedResults), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    });
+    await assert.rejects(
+      tamperedClient.captionProductionResults(approval.runtimeId),
+      /artifact bytes do not match the verified caption content identity/,
+    );
     const tamperedResponse = structuredClone(result) as unknown as {
       captions: Array<{ result: { lineCount: number } }>;
     };
@@ -252,6 +302,7 @@ test("revocation blocks new starts and later revocation supersedes authority wit
       /exact recursively verified unrevoked approval/,
     );
     assert.deepEqual((await blocked.service.captionProductions(approval.runtimeId)).captions, []);
+    assert.deepEqual((await blocked.service.captionProductionResults(approval.runtimeId)).results, []);
   } finally {
     await rm(blocked.directory, { recursive: true, force: true });
   }
@@ -270,7 +321,9 @@ test("revocation blocks new starts and later revocation supersedes authority wit
       revocation: { reasonCodes: ["new_review_required"], note: null },
     });
     const retained = (await completed.service.captionProductions(approval.runtimeId)).captions[0];
+    const retainedResult = (await completed.service.captionProductionResults(approval.runtimeId)).results[0];
     assert.equal(retained.authorityState, "revoked_after_completion");
+    assert.equal(retainedResult.verification.authorityState, "revoked_after_completion");
     assert.equal(retained.captionArtifactId, identities.captionArtifactId);
     assert.equal(retained.receiptArtifactId, identities.receiptArtifactId);
   } finally {
@@ -293,6 +346,10 @@ test("caption read fails closed when content-addressed timed output is tampered"
     ), "{}\n", "utf8");
     await assert.rejects(
       runtime.service.captionProductions(approval.runtimeId),
+      /failed closed validation/,
+    );
+    await assert.rejects(
+      runtime.service.captionProductionResults(approval.runtimeId),
       /failed closed validation/,
     );
   } finally {

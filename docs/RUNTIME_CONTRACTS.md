@@ -201,6 +201,15 @@ return an honest empty list. The default executor is classified
 executor is `real_recognizer_translator`. Neither classification claims English quality, upload,
 publication, public bytes, or Studio completeness.
 
+`GET /v1/runtimes/:runtimeId/caption-production-results` returns
+`studio.local-runtime-caption-production-results.v1`. It repeats the same complete caption,
+receipt, approval, and revocation audit and, only after that audit closes, includes the validated
+`studio.caption-production.artifact.v1` timed KO/EN projection beside its verification identities.
+No completed job, including V1-only and revoked-before-start paths, returns an empty list. Stored
+tamper rejects the whole read as `stored_content_inconsistent`; the browser never resolves a
+fixture or object-store path. This authenticated private read adds no replay identity, upload, CDN,
+publication, English-quality claim, or score.
+
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a
 `fixtureOnly` event production evidence. The “projection / surface” column remains future UI work

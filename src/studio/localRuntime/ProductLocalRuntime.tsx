@@ -5,7 +5,10 @@ import type { EvidenceAssessmentAudit } from "../runtime/production/assessmentAu
 import type { EvidenceDecisionReceiptVerification } from "../runtime/production/decisionReceiptAudit";
 import type { PublishReviewIntakeVerification } from "../runtime/production/publishReviewIntakeAudit";
 import type { PublishReviewDecisionVerification } from "../runtime/production/publishReviewDecisionAudit";
-import type { CaptionProductionVerification } from "../runtime/production/captionProductionAudit";
+import type {
+  CaptionProductionVerification,
+  VerifiedCaptionProductionResult,
+} from "../runtime/production/captionProductionAudit";
 import type {
   OwnedMediaIngestStatus,
   RuntimeHostCaptionProductionRequest,
@@ -21,6 +24,7 @@ import {
   type ProductionStudioProjection,
 } from "../runtime/production/studioProjection";
 import { LocalRuntimeHostClient } from "./client";
+import ProductionCaptionResults from "./ProductionCaptionResults";
 import {
   isLocalRuntimeLanguageTag,
   mapAnalysisRequestToRuntimeStart,
@@ -51,6 +55,7 @@ interface RuntimeView {
   publishReviewIntakes: PublishReviewIntakeVerification[];
   publishReviewDecisions: PublishReviewDecisionVerification[];
   captionProductions: CaptionProductionVerification[];
+  captionResults: VerifiedCaptionProductionResult[];
   reviewOperator: RuntimeHostPublishReviewOperator | null;
   cursor: number;
   eventCount: number;
@@ -293,6 +298,9 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
           activeClient.publishReviewDecisions(identity.runtimeId),
           activeClient.captionProductions(identity.runtimeId),
         ]);
+        const captionProductionResultsResponse = captionProductionResponse.captions.length > 0
+          ? await activeClient.captionProductionResults(identity.runtimeId)
+          : null;
         if (
           assessmentAudit.commandId !== identity.commandId ||
           assessmentAudit.runtimeId !== identity.runtimeId ||
@@ -327,6 +335,16 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
           captionProductionResponse.journalHead < poll.nextCursor
         ) {
           throw new Error("Runtime host caption-production identities changed while polling.");
+        }
+        if (
+          captionProductionResultsResponse &&
+          (
+            captionProductionResultsResponse.commandId !== identity.commandId ||
+            captionProductionResultsResponse.runtimeId !== identity.runtimeId ||
+            captionProductionResultsResponse.journalHead < poll.nextCursor
+          )
+        ) {
+          throw new Error("Runtime host production-caption result identities changed while polling.");
         }
         if (adapter.view().lastSeq !== after) {
           throw new Error("Production adapter cursor changed outside the validated poll path.");
@@ -386,6 +404,15 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         if (visibleCaptionProductions.length !== completedCaptions.length) {
           throw new Error("A completed caption job has no reopened fail-closed artifact and receipt verification.");
         }
+        const visibleCaptionResults = (captionProductionResultsResponse?.results ?? []).filter((result) =>
+          visibleCaptionProductions.some((caption) =>
+            JSON.stringify(caption) === JSON.stringify(result.verification)));
+        if (
+          visibleCaptionResults.length !== visibleCaptionProductions.length ||
+          visibleCaptionResults.length !== (captionProductionResultsResponse?.results.length ?? 0)
+        ) {
+          throw new Error("A verified caption job has no matching host-verified timed production result.");
+        }
         after = poll.nextCursor;
         setRuntime((current) => {
           if (!current || current.status.runtimeId !== identity.runtimeId) return current;
@@ -397,6 +424,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
             publishReviewIntakes: visiblePublishReviewIntakes,
             publishReviewDecisions: visiblePublishReviewDecisions,
             captionProductions: visibleCaptionProductions,
+            captionResults: visibleCaptionResults,
             reviewOperator: publishReviewDecisionResponse.reviewer,
             status: {
               ...statusView(status),
@@ -428,6 +456,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
               publishReviewIntakes: [],
               publishReviewDecisions: [],
               captionProductions: [],
+              captionResults: [],
               pollState: "error",
               pollMessage: `Polling stopped after cursor ${current.cursor}: ${errorMessage(pollError)}`,
             }
@@ -466,6 +495,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         publishReviewIntakes: [],
         publishReviewDecisions: [],
         captionProductions: [],
+        captionResults: [],
         reviewOperator: null,
         cursor: 0,
         eventCount: 0,
@@ -914,6 +944,10 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
             onPublishReviewDecision={submitPublishReviewDecision}
             onPublishReviewRevocation={submitPublishReviewRevocation}
             onCaptionProduction={submitCaptionProduction}
+          />
+          <ProductionCaptionResults
+            runtimeId={runtime.status.runtimeId}
+            results={runtime.captionResults}
           />
         </section>
       )}

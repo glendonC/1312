@@ -1,9 +1,12 @@
 import { assertRuntimeEvent } from "../runtime/production/validation/events.ts";
+import { validateCaptionProductionArtifact } from "../runtime/production/validation/captionProduction.ts";
+import { canonicalJsonLine, identifyUtf8 } from "../runtime/production/observability/hash.ts";
 import type {
   OwnedMediaIngestRequest,
   OwnedMediaIngestStatus,
   RuntimeHostAssessmentAuditResponse,
   RuntimeHostCaptionProductionRequest,
+  RuntimeHostCaptionProductionResultsResponse,
   RuntimeHostCaptionProductionResponse,
   RuntimeHostDecisionReceiptResponse,
   RuntimeHostFailureReason,
@@ -1347,6 +1350,63 @@ function captionProductionResponse(
   };
 }
 
+async function captionProductionResultsResponse(
+  value: unknown,
+  expectedRuntimeId: string,
+): Promise<RuntimeHostCaptionProductionResultsResponse> {
+  const context = "Runtime host caption production results";
+  const item = object(value, context);
+  exact(item, ["schema", "commandId", "runtimeId", "journalHead", "results"], context);
+  if (item.schema !== "studio.local-runtime-caption-production-results.v1") {
+    fail(context, "schema is unsupported.");
+  }
+  const runtimeId = identity(item.runtimeId, `${context}.runtimeId`);
+  if (runtimeId !== expectedRuntimeId) fail(context, "runtime identity changed.");
+  if (!Array.isArray(item.results)) fail(`${context}.results`, "must be an array.");
+  const entries = item.results.map((candidate, index) => {
+    const resultContext = `${context}.results[${index}]`;
+    const result = object(candidate, resultContext);
+    exact(result, ["verification", "artifact"], resultContext);
+    return result;
+  });
+  const verifications = captionProductionResponse({
+    schema: "studio.local-runtime-caption-productions.v1",
+    commandId: item.commandId,
+    runtimeId,
+    journalHead: item.journalHead,
+    captions: entries.map((entry) => entry.verification),
+  }, runtimeId).captions;
+  const results = await Promise.all(entries.map(async (entry, index) => {
+    const resultContext = `${context}.results[${index}]`;
+    const verification = verifications[index];
+    const artifact = validateCaptionProductionArtifact(
+      entry.artifact,
+      context,
+      `results[${index}].artifact`,
+    );
+    if (
+      artifact.runId !== runtimeId ||
+      artifact.jobId !== verification.jobId ||
+      JSON.stringify(artifact.executor) !== JSON.stringify(verification.executor) ||
+      JSON.stringify(artifact.result) !== JSON.stringify(verification.result)
+    ) {
+      fail(resultContext, "verified identities, executor, or result counts do not match the artifact.");
+    }
+    const measuredContent = await identifyUtf8(canonicalJsonLine(artifact));
+    if (measuredContent.contentId !== verification.captionContentId) {
+      fail(resultContext, "artifact bytes do not match the verified caption content identity.");
+    }
+    return { verification, artifact };
+  }));
+  return {
+    schema: "studio.local-runtime-caption-production-results.v1",
+    commandId: identity(item.commandId, `${context}.commandId`),
+    runtimeId,
+    journalHead: integer(item.journalHead, `${context}.journalHead`),
+    results,
+  };
+}
+
 export function normalizeLocalRuntimeHostBaseUrl(value: string): string {
   let url: URL;
   try {
@@ -1575,6 +1635,15 @@ export class LocalRuntimeHostClient {
   async captionProductions(runtimeId: string): Promise<RuntimeHostCaptionProductionResponse> {
     return captionProductionResponse(
       await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/caption-productions`),
+      runtimeId,
+    );
+  }
+
+  async captionProductionResults(
+    runtimeId: string,
+  ): Promise<RuntimeHostCaptionProductionResultsResponse> {
+    return captionProductionResultsResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/caption-production-results`),
       runtimeId,
     );
   }

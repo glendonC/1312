@@ -1,6 +1,8 @@
 import { assertRuntimeEvent } from "./assertions.ts";
 import type {
   Capability,
+  CaptionExecutorClassification,
+  CaptionProductionStatus,
   EvidenceAssessmentScope,
   EvidenceDecisionReasonCode,
   EvidenceDecisionScope,
@@ -277,6 +279,40 @@ export interface ProductionStudioPublishReviewRevocationArtifactView {
   approvalReceiptContentId: string;
 }
 
+export interface ProductionStudioCaptionProductionView {
+  jobId: string;
+  status: "started" | "completed" | "failed";
+  approvalReviewId: string;
+  approvalArtifactId: string;
+  sourceArtifactId: string;
+  analysisRequestId: string;
+  range: { startMs: number; endMs: number };
+  executorClassification: CaptionExecutorClassification;
+  captionArtifactId: string | null;
+  captionContentId: string | null;
+  receiptArtifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  resultStatus: CaptionProductionStatus | null;
+  lineCount: number | null;
+  sourceAvailableCount: number | null;
+  targetAvailableCount: number | null;
+  withheldCount: number | null;
+  unavailableCount: number | null;
+  failure: string | null;
+}
+
+export interface ProductionStudioCaptionArtifactView {
+  artifactId: string;
+  role: "timed_captions" | "production_receipt";
+  kind: "caption-production-output" | "caption-production-receipt";
+  contentId: string;
+  bytes: number;
+  jobId: string;
+  approvalReviewId: string;
+  approvalArtifactId: string;
+}
+
 export interface ProductionStudioReportView {
   reportId: string;
   taskId: string;
@@ -385,6 +421,7 @@ export interface ProductionStudioProjection {
   publishReviewIntakes: ProductionStudioPublishReviewIntakeView[];
   publishReviewDecisions: ProductionStudioPublishReviewDecisionView[];
   publishReviewRevocations: ProductionStudioPublishReviewRevocationView[];
+  captionProductions: ProductionStudioCaptionProductionView[];
   sourceArtifacts: ProductionStudioSourceArtifactView[];
   evidenceArtifacts: ProductionStudioEvidenceArtifactView[];
   assessmentArtifacts: ProductionStudioEvidenceAssessmentArtifactView[];
@@ -392,6 +429,7 @@ export interface ProductionStudioProjection {
   publishReviewIntakeArtifacts: ProductionStudioPublishReviewIntakeArtifactView[];
   publishReviewDecisionArtifacts: ProductionStudioPublishReviewDecisionArtifactView[];
   publishReviewRevocationArtifacts: ProductionStudioPublishReviewRevocationArtifactView[];
+  captionArtifacts: ProductionStudioCaptionArtifactView[];
   outputArtifacts: ProductionStudioOutputArtifactView[];
   counts: {
     tasks: number;
@@ -407,6 +445,7 @@ export interface ProductionStudioProjection {
     publishReviewIntakes: number;
     publishReviewDecisions: number;
     publishReviewRevocations: number;
+    captionProductions: number;
     sourceArtifacts: number;
     evidenceArtifacts: number;
     assessmentArtifacts: number;
@@ -414,6 +453,7 @@ export interface ProductionStudioProjection {
     publishReviewIntakeArtifacts: number;
     publishReviewDecisionArtifacts: number;
     publishReviewRevocationArtifacts: number;
+    captionArtifacts: number;
     outputArtifacts: number;
   };
 }
@@ -633,6 +673,31 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     }))
     .sort((left, right) => left.revocationId.localeCompare(right.revocationId));
 
+  const captionProductions = Object.values(state.captionProductions)
+    .map((job): ProductionStudioCaptionProductionView => ({
+      jobId: job.id,
+      status: job.status,
+      approvalReviewId: job.approvalReviewId,
+      approvalArtifactId: job.approvalArtifactId,
+      sourceArtifactId: job.sourceArtifactId,
+      analysisRequestId: job.analysisRequestId,
+      range: structuredClone(job.range),
+      executorClassification: job.executor.classification,
+      captionArtifactId: job.captionArtifactId,
+      captionContentId: job.captionContentId,
+      receiptArtifactId: job.receiptArtifactId,
+      receiptId: job.receiptId,
+      receiptContentId: job.receiptContentId,
+      resultStatus: job.resultStatus,
+      lineCount: job.lineCount,
+      sourceAvailableCount: job.sourceAvailableCount,
+      targetAvailableCount: job.targetAvailableCount,
+      withheldCount: job.withheldCount,
+      unavailableCount: job.unavailableCount,
+      failure: job.failure,
+    }))
+    .sort((left, right) => left.jobId.localeCompare(right.jobId));
+
   const sourceArtifacts = Object.values(state.artifacts)
     .filter((artifact) => artifact.origin.kind === "ingest")
     .map((artifact): ProductionStudioSourceArtifactView => {
@@ -671,7 +736,9 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
         artifact.origin.kind === "evidence_decision" ||
         artifact.origin.kind === "publish_review_intake" ||
         artifact.origin.kind === "publish_review_decision" ||
-        artifact.origin.kind === "publish_review_revocation"
+        artifact.origin.kind === "publish_review_revocation" ||
+        artifact.origin.kind === "caption_production_output" ||
+        artifact.origin.kind === "caption_production_receipt"
       ) {
         throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
       }
@@ -890,6 +957,32 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     })
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
 
+  const captionArtifacts = Object.values(state.artifacts)
+    .filter((artifact) =>
+      artifact.origin.kind === "caption_production_output" ||
+      artifact.origin.kind === "caption_production_receipt")
+    .map((artifact): ProductionStudioCaptionArtifactView => {
+      if (
+        artifact.origin.kind !== "caption_production_output" &&
+        artifact.origin.kind !== "caption_production_receipt"
+      ) throw new Error(`Production Studio projection: caption artifact ${artifact.id} changed origin`);
+      if (
+        artifact.producerTaskId !== null || artifact.producerAgentId !== null ||
+        artifact.mediaClass !== "non_media" || artifact.publication !== "private"
+      ) throw new Error(`Production Studio projection: caption artifact ${artifact.id} is invalid`);
+      return {
+        artifactId: artifact.id,
+        role: artifact.origin.kind === "caption_production_output" ? "timed_captions" : "production_receipt",
+        kind: artifact.kind as "caption-production-output" | "caption-production-receipt",
+        contentId: artifact.content.contentId,
+        bytes: artifact.content.bytes,
+        jobId: artifact.origin.jobId,
+        approvalReviewId: artifact.origin.approvalReviewId,
+        approvalArtifactId: artifact.origin.approvalArtifactId,
+      };
+    })
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
+
   const workers = Object.values(state.agents)
     .map((agent): ProductionStudioWorkerView => {
       const task = state.tasks[agent.taskId];
@@ -956,6 +1049,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     publishReviewIntakes,
     publishReviewDecisions,
     publishReviewRevocations,
+    captionProductions,
     sourceArtifacts,
     evidenceArtifacts,
     assessmentArtifacts,
@@ -963,6 +1057,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     publishReviewIntakeArtifacts,
     publishReviewDecisionArtifacts,
     publishReviewRevocationArtifacts,
+    captionArtifacts,
     outputArtifacts,
     counts: {
       tasks: tasks.length,
@@ -978,6 +1073,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       publishReviewIntakes: publishReviewIntakes.length,
       publishReviewDecisions: publishReviewDecisions.length,
       publishReviewRevocations: publishReviewRevocations.length,
+      captionProductions: captionProductions.length,
       sourceArtifacts: sourceArtifacts.length,
       evidenceArtifacts: evidenceArtifacts.length,
       assessmentArtifacts: assessmentArtifacts.length,
@@ -985,6 +1081,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       publishReviewIntakeArtifacts: publishReviewIntakeArtifacts.length,
       publishReviewDecisionArtifacts: publishReviewDecisionArtifacts.length,
       publishReviewRevocationArtifacts: publishReviewRevocationArtifacts.length,
+      captionArtifacts: captionArtifacts.length,
       outputArtifacts: outputArtifacts.length,
     },
   };

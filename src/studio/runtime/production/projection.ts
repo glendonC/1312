@@ -44,6 +44,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     publishReviewIntakes: {},
     publishReviewDecisions: {},
     publishReviewRevocations: {},
+    captionProductions: {},
     executions: {},
     modelUsage: {},
     reports: {},
@@ -189,6 +190,34 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
           JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([revocation.approvalArtifactId]),
         event,
         `artifact ${artifact.id} changed its verified approval input`,
+      );
+    } else if (artifact.origin.kind === "caption_production_output") {
+      const job = next.captionProductions[artifact.origin.jobId];
+      invariant(job?.status === "started", event, `artifact ${artifact.id} has no active caption production`);
+      invariant(
+        artifact.producerTaskId === null && artifact.producerAgentId === null &&
+          artifact.origin.approvalReviewId === job.approvalReviewId &&
+          artifact.origin.approvalArtifactId === job.approvalArtifactId &&
+          artifact.origin.sourceArtifactId === job.sourceArtifactId &&
+          artifact.content.contentId !== artifact.origin.receiptContentId &&
+          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([job.sourceArtifactId, job.approvalArtifactId]),
+        event,
+        `artifact ${artifact.id} changed its caption source or approval authority`,
+      );
+    } else if (artifact.origin.kind === "caption_production_receipt") {
+      const job = next.captionProductions[artifact.origin.jobId];
+      const caption = next.artifacts[artifact.origin.captionArtifactId];
+      invariant(job?.status === "started", event, `artifact ${artifact.id} has no active caption production`);
+      invariant(
+        artifact.producerTaskId === null && artifact.producerAgentId === null &&
+          caption?.origin.kind === "caption_production_output" &&
+          caption.origin.jobId === job.id &&
+          caption.content.contentId === artifact.origin.captionContentId &&
+          artifact.origin.approvalReviewId === job.approvalReviewId &&
+          artifact.origin.approvalArtifactId === job.approvalArtifactId &&
+          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([caption.id, job.approvalArtifactId]),
+        event,
+        `artifact ${artifact.id} changed its caption output or approval authority`,
       );
     }
     next.artifacts[artifact.id] = artifact;
@@ -1156,6 +1185,125 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     invariant(revocation?.status === "started", event, `publish-review revocation ${event.data.revocationId} is not active`);
     revocation.status = "failed";
     revocation.failure = event.data.reason;
+    return next;
+  }
+
+  if (event.type === "caption.production_started") {
+    invariant(event.producer.kind === "caption_production_host", event, "caption production must come from the caption host");
+    const request = event.data.request;
+    const approval = next.publishReviewDecisions[request.approval.reviewId];
+    invariant(
+      approval?.status === "completed" &&
+        approval.outcome === "approve_for_caption_production" &&
+        approval.artifactId === request.approval.artifactId &&
+        approval.receiptId === request.approval.receiptId &&
+        approval.receiptContentId === request.approval.receiptContentId,
+      event,
+      `caption production ${event.data.jobId} has no exact completed approval`,
+    );
+    invariant(
+      !Object.values(next.publishReviewRevocations).some((revocation) =>
+        revocation.reviewId === approval.id && revocation.status !== "failed"),
+      event,
+      `caption production ${event.data.jobId} cannot start from a revoked or revoking approval`,
+    );
+    invariant(!next.captionProductions[event.data.jobId], event, `caption production ${event.data.jobId} is duplicated`);
+    invariant(
+      !Object.values(next.captionProductions).some((job) => job.approvalReviewId === approval.id),
+      event,
+      `approval ${approval.id} already has caption-production lineage`,
+    );
+    const source = next.artifacts[event.data.input.sourceArtifactId];
+    invariant(
+      source?.origin.kind === "ingest" && source.content.contentId === event.data.input.sourceContentId,
+      event,
+      `caption production ${event.data.jobId} has no exact runtime source artifact`,
+    );
+    next.captionProductions[event.data.jobId] = {
+      id: event.data.jobId,
+      approvalReviewId: approval.id,
+      approvalArtifactId: request.approval.artifactId,
+      approvalReceiptId: request.approval.receiptId,
+      approvalReceiptContentId: request.approval.receiptContentId,
+      sourceArtifactId: source.id,
+      sourceContentId: source.content.contentId,
+      analysisRequestId: event.data.input.analysisRequestId,
+      range: structuredClone(event.data.input.range),
+      limits: structuredClone(event.data.limits),
+      executor: structuredClone(event.data.executor),
+      status: "started",
+      captionArtifactId: null,
+      captionContentId: null,
+      receiptArtifactId: null,
+      receiptId: null,
+      receiptContentId: null,
+      resultStatus: null,
+      lineCount: null,
+      sourceAvailableCount: null,
+      targetAvailableCount: null,
+      withheldCount: null,
+      unavailableCount: null,
+      failure: null,
+    };
+    return next;
+  }
+
+  if (event.type === "caption.production_completed") {
+    invariant(event.producer.kind === "caption_production_host", event, "caption completion must come from the caption host");
+    const job = next.captionProductions[event.data.jobId];
+    invariant(job?.status === "started", event, `caption production ${event.data.jobId} is not active`);
+    const captionArtifact = next.artifacts[event.data.captionArtifactId];
+    const receiptArtifact = next.artifacts[event.data.receiptArtifactId];
+    const receipt = event.data.receipt;
+    invariant(
+      captionArtifact?.origin.kind === "caption_production_output" &&
+        captionArtifact.origin.jobId === job.id &&
+        captionArtifact.content.contentId === event.data.captionContentId &&
+        receiptArtifact?.origin.kind === "caption_production_receipt" &&
+        receiptArtifact.origin.jobId === job.id &&
+        receiptArtifact.origin.captionArtifactId === captionArtifact.id &&
+        receiptArtifact.content.contentId === event.data.receiptContentId,
+      event,
+      `caption production ${job.id} has no exact output and receipt artifacts`,
+    );
+    invariant(
+      receipt.jobId === job.id &&
+        receipt.authority.approval.reviewId === job.approvalReviewId &&
+        receipt.authority.approval.artifactId === job.approvalArtifactId &&
+        receipt.authority.approval.receiptId === job.approvalReceiptId &&
+        receipt.authority.approval.receiptContentId === job.approvalReceiptContentId &&
+        receipt.input.sourceArtifactId === job.sourceArtifactId &&
+        receipt.input.sourceContentId === job.sourceContentId &&
+        receipt.input.analysisRequestId === job.analysisRequestId &&
+        JSON.stringify(receipt.input.range) === JSON.stringify(job.range) &&
+        JSON.stringify(receipt.limits) === JSON.stringify(job.limits) &&
+        JSON.stringify(receipt.producer.executor) === JSON.stringify(job.executor) &&
+        receipt.result.captionArtifactId === captionArtifact.id &&
+        receipt.result.captionContentId === captionArtifact.content.contentId,
+      event,
+      `caption production ${job.id} receipt changed its authority, input, or executor`,
+    );
+    job.status = "completed";
+    job.captionArtifactId = captionArtifact.id;
+    job.captionContentId = captionArtifact.content.contentId;
+    job.receiptArtifactId = receiptArtifact.id;
+    job.receiptId = receipt.receiptId;
+    job.receiptContentId = receiptArtifact.content.contentId;
+    job.resultStatus = receipt.result.status;
+    job.lineCount = receipt.result.lineCount;
+    job.sourceAvailableCount = receipt.result.sourceAvailableCount;
+    job.targetAvailableCount = receipt.result.targetAvailableCount;
+    job.withheldCount = receipt.result.withheldCount;
+    job.unavailableCount = receipt.result.unavailableCount;
+    return next;
+  }
+
+  if (event.type === "caption.production_failed") {
+    invariant(event.producer.kind === "caption_production_host", event, "caption failure must come from the caption host");
+    const job = next.captionProductions[event.data.jobId];
+    invariant(job?.status === "started", event, `caption production ${event.data.jobId} is not active`);
+    job.status = "failed";
+    job.failure = event.data.reason;
     return next;
   }
 

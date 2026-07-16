@@ -469,6 +469,56 @@ export function validateRuntimeArtifact(
     ) {
       fail(context, path, "publish-review revocations must be private host-produced receipts over one verified approval artifact");
     }
+  } else if (kind === "caption_production_output") {
+    exact(
+      origin,
+      ["kind", "jobId", "receiptId", "receiptContentId", "approvalReviewId", "approvalArtifactId", "sourceArtifactId"],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.jobId, context, `${path}.origin.jobId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    string(origin.approvalReviewId, context, `${path}.origin.approvalReviewId`);
+    const approvalArtifactId = string(origin.approvalArtifactId, context, `${path}.origin.approvalArtifactId`);
+    const sourceArtifactId = string(origin.sourceArtifactId, context, `${path}.origin.sourceArtifactId`);
+    if (
+      mediaClass !== "non_media" ||
+      item.publication !== "private" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      task !== null ||
+      agent !== null ||
+      JSON.stringify(sources) !== JSON.stringify([sourceArtifactId, approvalArtifactId])
+    ) {
+      fail(context, path, "caption output must be a private host-produced artifact over exact source and approval lineage");
+    }
+  } else if (kind === "caption_production_receipt") {
+    exact(
+      origin,
+      ["kind", "jobId", "receiptId", "receiptContentId", "approvalReviewId", "approvalArtifactId", "captionArtifactId", "captionContentId"],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.jobId, context, `${path}.origin.jobId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    string(origin.approvalReviewId, context, `${path}.origin.approvalReviewId`);
+    const approvalArtifactId = string(origin.approvalArtifactId, context, `${path}.origin.approvalArtifactId`);
+    const captionArtifactId = string(origin.captionArtifactId, context, `${path}.origin.captionArtifactId`);
+    contentId(origin.captionContentId, context, `${path}.origin.captionContentId`);
+    if (
+      mediaClass !== "non_media" ||
+      item.publication !== "private" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      task !== null ||
+      agent !== null ||
+      JSON.stringify(sources) !== JSON.stringify([captionArtifactId, approvalArtifactId]) ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) {
+      fail(context, path, "caption receipts must be private content-addressed lineage over caption output and approval");
+    }
   } else {
     fail(context, `${path}.origin.kind`, `has unknown value ${kind}`);
   }

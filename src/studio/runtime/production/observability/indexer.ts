@@ -43,6 +43,15 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "publish.review.intake_completed") {
     return { kind: "publish_review_intake", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "publish.review.decision_completed") {
+    return { kind: "publish_review_decision", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
+  if (event.type === "publish.review.revocation_completed") {
+    return { kind: "publish_review_revocation", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
+  if (event.type === "caption.production_completed") {
+    return { kind: "caption_production", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "executor.finished") {
     return { kind: "executor_span", receipt: event.data.receipt, rawReceiptContentId: null };
   }

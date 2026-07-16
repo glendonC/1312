@@ -336,6 +336,27 @@ export interface PublishReviewRevocationArtifactOrigin {
   approvalReceiptContentId: string;
 }
 
+export interface CaptionProductionOutputArtifactOrigin {
+  kind: "caption_production_output";
+  jobId: string;
+  receiptId: string;
+  receiptContentId: string;
+  approvalReviewId: string;
+  approvalArtifactId: string;
+  sourceArtifactId: string;
+}
+
+export interface CaptionProductionReceiptArtifactOrigin {
+  kind: "caption_production_receipt";
+  jobId: string;
+  receiptId: string;
+  receiptContentId: string;
+  approvalReviewId: string;
+  approvalArtifactId: string;
+  captionArtifactId: string;
+  captionContentId: string;
+}
+
 export interface RuntimeArtifact {
   schema: "studio.runtime.artifact.v1";
   id: string;
@@ -360,7 +381,9 @@ export interface RuntimeArtifact {
     | EvidenceDecisionArtifactOrigin
     | PublishReviewIntakeArtifactOrigin
     | PublishReviewDecisionArtifactOrigin
-    | PublishReviewRevocationArtifactOrigin;
+    | PublishReviewRevocationArtifactOrigin
+    | CaptionProductionOutputArtifactOrigin
+    | CaptionProductionReceiptArtifactOrigin;
 }
 
 export interface WorkerOutputEnvelope {
@@ -851,6 +874,114 @@ export interface PublishReviewRevocationReceipt {
   };
 }
 
+export const CAPTION_PRODUCTION_LIMITS = {
+  maxDurationMs: 120_000,
+  maxLines: 64,
+  maxSourceBytes: 32 * 1024,
+  maxTargetBytes: 32 * 1024,
+  maxArtifactBytes: 128 * 1024,
+  maxWallMs: 60_000,
+} as const;
+
+export interface CaptionProductionRequest {
+  approval: PublishReviewDecisionReceiptIdentity;
+}
+
+export type CaptionLineState = "available" | "withheld" | "unavailable";
+
+export type CaptionLineReasonCode =
+  | "recorded_quality_gate_withheld"
+  | "recognizer_unavailable"
+  | "recognizer_empty"
+  | "translator_unavailable"
+  | "translator_missing_line"
+  | "source_unavailable";
+
+export interface CaptionProductionLine {
+  id: string;
+  startMs: number;
+  endMs: number;
+  source: {
+    language: "ko";
+    state: Extract<CaptionLineState, "available" | "unavailable">;
+    text: string | null;
+    reasonCode: Extract<CaptionLineReasonCode, "recognizer_unavailable" | "recognizer_empty"> | null;
+  };
+  target: {
+    language: "en";
+    state: CaptionLineState;
+    text: string | null;
+    reasonCode: CaptionLineReasonCode | null;
+  };
+}
+
+export type CaptionProductionStatus = "completed" | "partial" | "withheld" | "unavailable";
+
+export type CaptionExecutorClassification =
+  | "recorded_real_pipeline_fixture"
+  | "real_recognizer_translator";
+
+export interface CaptionExecutorDescriptor {
+  id: "studio.recorded-caption-fixture-adapter" | "studio.openai-caption-producer";
+  version: "1";
+  classification: CaptionExecutorClassification;
+  recognizer: string | null;
+  translator: string | null;
+  sourceCaptionContentId: string | null;
+}
+
+export interface CaptionProductionArtifact {
+  schema: "studio.caption-production.artifact.v1";
+  jobId: string;
+  runId: string;
+  input: {
+    sourceArtifactId: string;
+    sourceContentId: string;
+    analysisRequestId: string;
+    range: { startMs: number; endMs: number };
+    sourceLanguage: "ko";
+    targetLanguage: "en";
+  };
+  executor: CaptionExecutorDescriptor;
+  lines: CaptionProductionLine[];
+  result: {
+    status: CaptionProductionStatus;
+    lineCount: number;
+    sourceAvailableCount: number;
+    targetAvailableCount: number;
+    withheldCount: number;
+    unavailableCount: number;
+  };
+}
+
+export interface CaptionProductionReceipt {
+  schema: "studio.caption-production.receipt.v1";
+  receiptId: string;
+  jobId: string;
+  authority: {
+    approval: PublishReviewDecisionReceiptIdentity;
+    verification: {
+      integrity: "stored_review_and_verified_queued_intake";
+      producer: "host_publish_review_v1";
+      outcome: "approve_for_caption_production";
+      unrevokedAtStart: true;
+    };
+  };
+  input: CaptionProductionArtifact["input"];
+  producer: {
+    id: "studio.host-caption-production";
+    version: "1";
+    policy: "verified_unrevoked_approval_only";
+    executor: CaptionExecutorDescriptor;
+  };
+  limits: typeof CAPTION_PRODUCTION_LIMITS;
+  result: CaptionProductionArtifact["result"] & {
+    captionArtifactId: string;
+    captionContentId: string;
+    captionBytes: number;
+  };
+}
+
 export interface OperationRecord {
   id: string;
   capability: "media.extract" | "media.seek";
@@ -973,6 +1104,33 @@ export interface PublishReviewRevocationRecord {
   receiptContentId: string | null;
   reasonCodes: PublishReviewRevocationReasonCode[];
   note: string | null;
+  failure: string | null;
+}
+
+export interface CaptionProductionRecord {
+  id: string;
+  approvalReviewId: string;
+  approvalArtifactId: string;
+  approvalReceiptId: string;
+  approvalReceiptContentId: string;
+  sourceArtifactId: string;
+  sourceContentId: string;
+  analysisRequestId: string;
+  range: { startMs: number; endMs: number };
+  limits: typeof CAPTION_PRODUCTION_LIMITS;
+  executor: CaptionExecutorDescriptor;
+  status: "started" | "completed" | "failed";
+  captionArtifactId: string | null;
+  captionContentId: string | null;
+  receiptArtifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  resultStatus: CaptionProductionStatus | null;
+  lineCount: number | null;
+  sourceAvailableCount: number | null;
+  targetAvailableCount: number | null;
+  withheldCount: number | null;
+  unavailableCount: number | null;
   failure: string | null;
 }
 
@@ -1105,6 +1263,7 @@ export interface RuntimeProjection {
   publishReviewIntakes: Record<string, PublishReviewIntakeRecord>;
   publishReviewDecisions: Record<string, PublishReviewDecisionRecord>;
   publishReviewRevocations: Record<string, PublishReviewRevocationRecord>;
+  captionProductions: Record<string, CaptionProductionRecord>;
   executions: Record<string, ExecutorRecord>;
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;

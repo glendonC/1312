@@ -1306,6 +1306,12 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
       reviews: unknown[];
     };
     assert.deepEqual(reviewAuthority.reviews, []);
+    const emptyCaptions = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/caption-productions`,
+      { headers: authorized },
+    );
+    assert.equal(emptyCaptions.status, 200);
+    assert.deepEqual((await emptyCaptions.json() as { captions: unknown[] }).captions, []);
     const createReview = await fetch(
       `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-decisions`,
       {
@@ -1341,6 +1347,28 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
       }>;
     };
     assert.equal(reviewBody.reviews[0].state, "approved_for_caption_production");
+    const createCaptions = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/caption-productions`,
+      {
+        method: "POST",
+        headers: { ...authorized, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          approval: {
+            reviewId: reviewBody.reviews[0].reviewId,
+            artifactId: reviewBody.reviews[0].artifactId,
+            receiptId: reviewBody.reviews[0].receiptId,
+            receiptContentId: reviewBody.reviews[0].receiptContentId,
+          },
+        }),
+      },
+    );
+    assert.equal(createCaptions.status, 201);
+    const captionBody = await createCaptions.json() as {
+      schema: string;
+      captions: Array<{ authorityState: string; result: { status: string; lineCount: number } }>;
+    };
+    assert.equal(captionBody.schema, "studio.local-runtime-caption-productions.v1");
+    assert.deepEqual(captionBody.captions[0].result, { status: "unavailable", lineCount: 0, sourceAvailableCount: 0, targetAvailableCount: 0, withheldCount: 0, unavailableCount: 0 });
     const revokeReview = await fetch(
       `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-revocations`,
       {
@@ -1363,6 +1391,12 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     );
     assert.equal(revokeReview.status, 201);
     assert.equal((await revokeReview.json() as { reviews: Array<{ state: string }> }).reviews[0].state, "approval_revoked");
+    const retainedCaptions = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/caption-productions`,
+      { headers: authorized },
+    );
+    assert.equal((await retainedCaptions.json() as { captions: Array<{ authorityState: string }> })
+      .captions[0].authorityState, "revoked_after_completion");
   } finally {
     await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     await cleanup(runtime);
@@ -1606,6 +1640,7 @@ test("browser-owned ingest fails closed on rights and paths, preserves bytes, ho
     assert.equal(v1Inspector.projection.publishReviewIntakeArtifacts.length, 0);
     assert.deepEqual((await service.publishReviewIntakes(acknowledgement.runtimeId)).intakes, []);
     assert.deepEqual((await service.publishReviewDecisions(acknowledgement.runtimeId)).reviews, []);
+    assert.deepEqual((await service.captionProductions(acknowledgement.runtimeId)).captions, []);
 
     const reopenedSources = await RuntimeSourceRegistry.open({ sourceDirectories: [] });
     await OwnedMediaIngestService.open({

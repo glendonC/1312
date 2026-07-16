@@ -15,6 +15,7 @@ import type {
   PublishReviewRevocationRequest,
 } from "../model.ts";
 import type { PublishReviewDecisionVerification } from "../publishReviewDecisionAudit.ts";
+import type { CaptionProductionVerification } from "../captionProductionAudit.ts";
 
 export const RUNTIME_HOST_LIFECYCLE_STATES = [
   "accepted",
@@ -222,6 +223,16 @@ export interface RuntimeHostPublishReviewDecisionResponse {
 
 export type RuntimeHostPublishReviewDecisionRequest = PublishReviewDecisionRequest;
 export type RuntimeHostPublishReviewRevocationRequest = PublishReviewRevocationRequest;
+
+export interface RuntimeHostCaptionProductionResponse {
+  schema: "studio.local-runtime-caption-productions.v1";
+  commandId: string;
+  runtimeId: string;
+  journalHead: number;
+  captions: CaptionProductionVerification[];
+}
+
+export type RuntimeHostCaptionProductionRequest = import("../model.ts").CaptionProductionRequest;
 
 export interface InitializedRuntimeApplication {
   runtimeRoot: string;

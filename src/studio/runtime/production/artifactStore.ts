@@ -11,6 +11,8 @@ import {
 } from "./assertions.ts";
 import type {
   ContentIdentity,
+  CaptionProductionArtifact,
+  CaptionProductionReceipt,
   EvidenceAssessmentReceipt,
   EvidenceDecisionReceipt,
   ExecutorSpanReceipt,
@@ -77,6 +79,19 @@ export function createSourceArtifactId(runId: string, descriptor: SourceArtifact
     contentId: descriptor.content.contentId,
     adapterId: descriptor.adapterId,
     sourceReceiptRef: descriptor.sourceReceiptRef,
+  })}`;
+}
+
+export function createCaptionArtifactId(
+  runId: string,
+  jobId: string,
+  contentId: string,
+): string {
+  return `artifact:${canonicalSha256({
+    runId,
+    jobId,
+    kind: "caption-production-output",
+    contentId,
   })}`;
 }
 
@@ -589,6 +604,84 @@ export class ContentAddressedArtifactStore {
     };
     assertRuntimeArtifact(artifact);
     return artifact;
+  }
+
+  buildCaptionProductionArtifacts(input: {
+    runId: string;
+    caption: CaptionProductionArtifact;
+    receipt: CaptionProductionReceipt;
+    storedCaption: { content: ContentIdentity; storageKey: string };
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): { captionArtifact: RuntimeArtifact; receiptArtifact: RuntimeArtifact } {
+    const approval = input.receipt.authority.approval;
+    const captionArtifactId = createCaptionArtifactId(
+      input.runId,
+      input.caption.jobId,
+      input.storedCaption.content.contentId,
+    );
+    if (
+      input.caption.jobId !== input.receipt.jobId ||
+      input.receipt.result.captionArtifactId !== captionArtifactId ||
+      input.receipt.result.captionContentId !== input.storedCaption.content.contentId ||
+      input.receipt.result.captionBytes !== input.storedCaption.content.bytes
+    ) throw new Error("Caption receipt does not bind the exact stored caption artifact");
+    const captionArtifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: captionArtifactId,
+      runId: input.runId,
+      kind: "caption-production-output",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedCaption.content,
+      storageKey: input.storedCaption.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [input.caption.input.sourceArtifactId, approval.artifactId],
+      producerTaskId: null,
+      producerAgentId: null,
+      origin: {
+        kind: "caption_production_output",
+        jobId: input.caption.jobId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+        approvalReviewId: approval.reviewId,
+        approvalArtifactId: approval.artifactId,
+        sourceArtifactId: input.caption.input.sourceArtifactId,
+      },
+    };
+    const receiptArtifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({
+        runId: input.runId,
+        jobId: input.receipt.jobId,
+        kind: "caption-production-receipt",
+        contentId: input.storedReceipt.content.contentId,
+      })}`,
+      runId: input.runId,
+      kind: "caption-production-receipt",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [captionArtifact.id, approval.artifactId],
+      producerTaskId: null,
+      producerAgentId: null,
+      origin: {
+        kind: "caption_production_receipt",
+        jobId: input.receipt.jobId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+        approvalReviewId: approval.reviewId,
+        approvalArtifactId: approval.artifactId,
+        captionArtifactId: captionArtifact.id,
+        captionContentId: captionArtifact.content.contentId,
+      },
+    };
+    assertRuntimeArtifact(captionArtifact);
+    assertRuntimeArtifact(receiptArtifact);
+    return { captionArtifact, receiptArtifact };
   }
 
   async record(ledger: RuntimeLedger, artifact: RuntimeArtifact, causationId: string | null = null): Promise<void> {

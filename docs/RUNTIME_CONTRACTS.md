@@ -53,11 +53,18 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
 - a separate immutable approval-revocation producer and an authenticated review read endpoint that
   re-hash decision/revocation bytes and recursively verify intake, decision, assessment, and read
   lineage without creating caption or publication state;
+- a separate caption-production host that accepts only one exact approval identity, recursively
+  verifies it remains unrevoked, derives source/range from immutable runtime state, and emits private
+  content-addressed timed KO+EN artifact and receipt objects under fixed duration/line/text/artifact/
+  wall limits, preserving withheld/unavailable;
+- an authenticated caption read that re-hashes both stored objects and recursively repeats approval,
+  revocation, intake, decision, assessment, and read verification without exposing caller paths or
+  claiming upload/publication;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
 The exact runtime test executes that path against the receipted run-005 media, performs two reads,
-one assessment, one audited decision, one host-only publish-review intake, and independent approve,
-reject, and revoke review paths, then reopens the event journal to prove replay equivalence. It also
+one assessment, one audited decision, one host-only publish-review intake, independent approve,
+reject, and revoke review paths, and an approval-gated caption job, then reopens the event journal to prove replay equivalence. It also
 rejects fixture-only input, provider-field leakage,
 duplicate work, limit violations, scope escalation, invalid registration, source/evidence-byte
 drift, unauthorized media/evidence/assessment/decision calls, unread assessment inputs, non-audited
@@ -70,7 +77,7 @@ production-journal Studio adapter now exist, but `/studio/runtime/` is an inspec
 start workers. The default owned-source path consumes validated poll batches through that adapter
 and renders production-only source-artifact, task, spawn request/decision, worker, grant, operation,
 output-artifact lineage, decision facts, queued/rejected publish-review intake lineage, immutable
-human review/revocation facts, and report
+human review/revocation facts, caption job/artifact identities and counts, and report
 facts without creating a `RunBundle`, legacy trace, or replay agent. The source region exposes only
 validated ingest-origin identity and content facts, and
 artifact references link only when their source/output destination is rendered. The deterministic
@@ -91,8 +98,10 @@ decision that passes the complete decision-receipt verification and records only
 `rejected`; it performs no review and creates no captions or publication state. Human review is a
 second application-host authority over verified queued intake. It binds the configured local reviewer
 and explicit attestation to one immutable approve/reject receipt; only an approval may receive one
-separate immutable revocation. Approval means eligibility for a future bounded caption producer,
-not caption, correctness, upload, or publication state. The other media operations and
+separate immutable revocation. Approval means eligibility for the separate bounded caption producer,
+not caption, correctness, upload, or publication state. Caption production is a third application-
+host authority, shares per-runtime mutation serialization with review revocation, accepts no source,
+range, path, bytes, or prose, and cannot upload or publish. The other media operations and
 detector/model calls in this proposal remain unavailable. The tables below
 continue to document the fixture contract itself and should not be read as the production wire
 schema.
@@ -122,7 +131,7 @@ private artifact, outcome, reasons, and audited counts. `GET
 /v1/runtimes/:runtimeId/decision-receipts` returns
 `studio.local-runtime-decision-receipts.v1` only after stored decision bytes, every input audit, and
 the re-derived policy agree with the full journal. `proceed_to_publish_review` means only that the
-separate host intake producer may queue the receipt for future human review. No review, caption,
+separate host intake producer may place the receipt in the human-review queue. No review, caption,
 upload, or publication follows.
 
 The production event union also includes `publish.review.intake_started`,
@@ -161,8 +170,36 @@ resource accepts closed decision POSTs; `POST
 single local reviewer id/label and exact attestations in the GET response; the caller cannot supply
 the label. Raw receipt bytes, paths, captions, prose-as-output, open fields, rejected intake, forged
 reviewer identity, tamper/drift, and illegal transitions fail closed. V1 and absent review lineage
-return an honest empty list. No endpoint generates captions, translation, study output, upload, or
-publication.
+return an honest empty list. These review endpoints generate no captions, translation, study output,
+upload, or publication; caption production requires its own explicit endpoint and re-verification.
+
+The production event union also includes `caption.production_started`,
+`caption.production_completed`, and `caption.production_failed`. These are application-host events,
+not child events. Start binds one exact approval identity plus the host-derived ingest artifact,
+content id, analysis request/range, fixed KO/EN pair, executor descriptor, and exact
+`CAPTION_PRODUCTION_LIMITS`: 120,000 ms, 64 lines, 32 KiB source text, 32 KiB target text, 128 KiB
+canonical artifact, and 60,000 ms wall time. Completion binds a private
+`studio.caption-production.artifact.v1`, a private `studio.caption-production.receipt.v1`, exact
+content-addressed artifact/receipt identities, closed `completed|partial|withheld|unavailable`
+status, and line/source-available/target-available/withheld/unavailable counts. Timed lines are
+ordered, non-overlapping, inside the approved half-open range, fixed to KO source and EN target, and
+carry available/withheld/unavailable state with closed reasons. An unavailable or withheld target
+has null text; the host never invents fluent EN to close a gap.
+
+`GET /v1/runtimes/:runtimeId/caption-productions` returns
+`studio.local-runtime-caption-productions.v1`; the same resource accepts POST with exactly one
+`PublishReviewDecisionReceiptIdentity`. The host first reopens the stored approval through the full
+review/intake/decision/assessment/read verification and requires no revocation before the start
+event. Caller review bytes, reject receipts, revoked approvals, paths, source/range/executor fields,
+caption prose, and open fields fail closed. The authenticated GET re-hashes the stored caption and
+receipt, rechecks artifact/journal/count/executor/source/range bindings, and recursively repeats the
+approval audit. Revocation before or during the job invalidates the start/read. A revocation whose
+start follows caption completion leaves immutable prior artifacts visible with
+`revoked_after_completion`; it prevents any new start and deletes nothing. V1 and no-approval runs
+return an honest empty list. The default executor is classified
+`recorded_real_pipeline_fixture` because it adapts the existing run-clip output; the opt-in live
+executor is `real_recognizer_translator`. Neither classification claims English quality, upload,
+publication, public bytes, or Studio completeness.
 
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a

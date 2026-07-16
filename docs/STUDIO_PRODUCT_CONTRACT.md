@@ -109,7 +109,8 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
   consumed cursor. An atomic production-only adapter now folds those events into separate source-
   artifact, task, spawn request/decision, worker, grant, operation, output-artifact lineage, and
   report view-models in the owned-source status surface. This is a real and wired local product
-  fragment, not a caption or swarm loop.
+  fragment, not a complete caption or swarm loop. An explicit post-review caption action is now a
+  separate host authority described below; runtime start itself still creates no captions.
 - `/studio/runtime/` validates one operator-selected local NDJSON journal and projects normalized
   facts. A host journal remains manually loadable there, but the inspector does not start or
   connect to the host. Its own page states that it “does not start a worker, search raw logs, or
@@ -156,7 +157,7 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
   assessments; the host then re-runs the full assessment audit before deciding. Its deterministic
   audit-state policy emits only `withheld` with stable preserved-gap reason codes or
   `proceed_to_publish_review` with `all_audited_claims_supported`. The latter means only that the
-  separate host intake producer may queue the receipt for future human review; no caption,
+  separate host intake producer may place the receipt in the human-review queue; no caption,
   publication, correctness, or media-truth claim follows. Run-005 emits one private content-addressed
   `studio.evidence-decision.receipt.v1`; V1 receives no decision grant. A separate authenticated
   read path re-hashes that receipt, re-runs every input audit, and re-derives the outcome before the
@@ -174,12 +175,27 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
   attestation; it cannot forge the reviewer label. The producer emits one immutable private
   `studio.publish-review-decision.receipt.v1` with either `approve_for_caption_production` or
   `reject_with_reasons`, closed reason codes, and an optional bounded note. Approval means only that
-  a future bounded caption producer may consume the verified approval receipt. A separate immutable
+  the separate bounded caption producer may be explicitly requested with that exact verified receipt. A separate immutable
   `studio.publish-review-revocation.receipt.v1` may revoke an approval; rejection and revocation
   reasons remain visible, and no decision is deleted or replaced. Both the mutation and authenticated
   read paths reopen the intake and its complete decision/assessment/read lineage. Rejected intake,
   raw bytes, paths, open output fields, tamper, drift, forged reviewer identity, and duplicate or
   illegal transitions fail closed. V1 and absent/rejected/unverified intake remain honestly empty.
+- Caption production is a separate host-authoritative, private producer. Its closed POST body
+  contains only the exact approval receipt identity; raw review bytes, paths, source selection,
+  caller-authored captions, translation prose, and “already final” fields are rejected. Immediately
+  before `caption.production_started`, the host reopens the review, intake, decision, assessment,
+  and read chain and requires the approval to remain unrevoked. It derives the immutable analysis
+  range and source artifact from the run, enforces 120 s / 64 line / 32 KiB per language / 128 KiB
+  artifact / 60 s wall ceilings, and emits private content-addressed
+  `studio.caption-production.artifact.v1` plus `studio.caption-production.receipt.v1`. Timed source
+  is fixed to KO and target to EN; available, withheld, and unavailable states carry closed reason
+  codes and missing EN is never filled with plausible prose. The default run-005 executor adapts
+  the recorded output of the real `run-clip.mjs` recognizer/translator pipeline and labels that
+  classification honestly; an explicit opt-in executor can run the recognizer and translator.
+  Revocation before start blocks the job. Revocation after completion retains the immutable
+  artifacts and changes their verified authority state to `revoked_after_completion`. Neither
+  executor uploads or publishes.
 - `scripts/run-clip.mjs` performs the older real API-backed clip pipeline and writes a recorded run
   folder. Its emitted legacy traces look like a swarm, but it is not the production scheduler or a
   live Studio session.
@@ -199,8 +215,8 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 | 8. Coordinate | Children inspect scoped inputs and report structured outputs upward | Recorded prose remains replay-only; the local child can invoke scheduler-granted media, existing-evidence read, read-receipt assessment, and audited-assessment decision tools through task-private bridges. After the decision, a separate host producer re-verifies its exact receipt identity and records queued/rejected publish-review intake before report acceptance; it accepts no worker prose or caller-selected outcome | A+B / bounded media/evidence/assessment/decision tools, host intake, plus report-up path wired; larger coordination missing | Parent/orchestrator execution, dependencies, and retries |
 | 9. Work through media | Agents seek, loop, mark, extract, inspect frames/tracks, and run detectors | Recorded workspaces remain projections. The local child exposes only scheduler-granted `media.seek`/`media.extract`, `evidence.read`, `analysis.evidence.assess`, and then `analysis.evidence.decide`; run-005 performs one real seek, two reads, one range/citation-bound assessment, and one deterministic audit-state decision. These consume existing VAD/language facts only; they do not run detectors or return playable media | B+C / real seek, existing-evidence read, assessment, and decision path plus bridge-tested extract; remaining tools/detectors missing | Add operations/detectors individually with grants, receipts, and honest child-visible results |
 | 10. Control run | Pause, resume, cancel, reconnect, and show accepted state | Pause/resume/stop control replay only. Lab and product local clients project host lifecycle and retry polling from the last consumed journal cursor; product polling atomically updates the separate production fact projection. The host has no pause/resume/cancel endpoint | A+B+C / recorded controls; real local polling/projection wired; runtime controls missing | Add a separate request/ack protocol for live controls without changing replay controls |
-| 11. Publish output | Timed source, translation, withheld lines, captions, study, evidence, exports | Recorded captions, comparison, scores, evidence, glossary, and artifact links render. Production records queued/rejected intake and now permits one attested human decision over verified queued intake: `approve_for_caption_production` or `reject_with_reasons`, plus immutable approval revocation. It still has no caption, upload, or publication producer | A+B / recorded replay plus real local intake and human-review receipts; caption/publication production missing | Add a bounded caption/translation producer that consumes only a verified, unrevoked approval receipt; keep upload/publication separate |
-| 12. Inspect real run | Operator can audit actual tasks, operations, usage, handoffs, and failures | The owned-source status surface projects source/evidence/assessment/decision artifacts, tasks, spawns, workers, grants, media operations, evidence reads/assessments/decisions, intake, human review/revocation lineage, output lineage, and reports. Separate receipt regions appear only after the host reopens and validates stored bytes and complete lineage; withheld, reject, and revoke reasons remain visible. Artifact references link only to identities rendered in that projection. The fuller local journal remains manually loadable in `/studio/runtime/` | B / bounded product projection, stored-receipt audits, plus full inspector | Expand only with producer-backed facts; do not deep-link into unrelated inspector state |
+| 11. Produce private captions | Timed source, translation, withheld/unavailable lines, immutable artifacts and receipts | Recorded Results remain separate. For the owned-source path, one exact verified unrevoked approval enables an explicit bounded caption action. It emits private timed KO+EN artifact/receipt identities with line, available, withheld, and unavailable counts. The default deterministic host adapts run-005's recorded real-pipeline captions; the optional real executor is separately labeled. Study, upload, CDN, and public publication are absent | A+B / recorded Results plus real local private caption production; publication missing | Wire verified production captions into Results without claiming replay identity, then design a later publication authority |
+| 12. Inspect real run | Operator can audit actual tasks, operations, usage, handoffs, and failures | The owned-source status surface projects source/evidence/assessment/decision artifacts, tasks, spawns, workers, grants, media operations, evidence reads/assessments/decisions, intake, human review/revocation lineage, caption job/artifact identities and counts, output lineage, and reports. Separate receipt regions appear only after the host reopens and validates stored bytes and complete lineage; withheld, unavailable, reject, and revoke reasons remain visible. Artifact references link only to identities rendered in that projection. The fuller local journal remains manually loadable in `/studio/runtime/` | B / bounded product projection, stored-receipt audits, plus full inspector | Expand only with producer-backed facts; do not deep-link into unrelated inspector state |
 
 ## Surface and control inventory
 
@@ -322,12 +338,13 @@ visibly labelled as example data and must never enter recorded or production evi
 | `run.production.assessment-receipt-audits` | **Assessment receipt audit** | Reopens the stored assessment receipt and every cited evidence-read receipt by content identity, re-hashes canonical bytes, validates the complete journal/artifact/task lineage, then shows each claim kind/value/exact millisecond range/preserved state and receipt/content/fact-index citation | Empty/unavailable when no completed assessment exists or any byte/identity/lineage check fails. Integrity and citation closure do not certify the assessment meaning or media truth | B / real read-only runtime-host audit and product projection |
 | `run.production.evidence-decisions` | **Evidence decisions** | Shows validated `analysis.evidence.decision_started` identity, exact audited-assessment identity inputs, task/worker/grant binding, hard input bound, terminal outcome/reasons, and receipt/artifact identity | Empty for V1/absent audit input; no assessment, grant, audit response, or worker claim implies a decision | B / real deterministic decision host, child bridge, adapter, and product projection |
 | `run.production.decision-artifacts` | **Decision artifacts** | Shows the private content-addressed `studio.evidence-decision.receipt.v1` and exact input assessment operation/artifact/receipt/content identities | It is an audit-state gate receipt, not captions, publication, or a media-truth certificate | B / real artifact-store and product projection |
-| `run.production.decision-receipts` | **Publish-review decision receipts** | Reopens and re-hashes the stored decision, re-runs every assessment audit, re-derives the deterministic policy, then shows executor classification, `withheld` or `proceed_to_publish_review`, reason codes, and audited inputs | Empty/unavailable for V1, absent, failed, skipped, tampered, or drifted paths. `proceed_to_publish_review` permits only host queue intake; human review remains future and `withheld` stays visible | B / real read-only runtime-host verification and product projection |
+| `run.production.decision-receipts` | **Publish-review decision receipts** | Reopens and re-hashes the stored decision, re-runs every assessment audit, re-derives the deterministic policy, then shows executor classification, `withheld` or `proceed_to_publish_review`, reason codes, and audited inputs | Empty/unavailable for V1, absent, failed, skipped, tampered, or drifted paths. `proceed_to_publish_review` permits only host queue intake; it does not itself imply that the now-wired human review occurred, and `withheld` stays visible | B / real read-only runtime-host verification and product projection |
 | `run.production.publish-review-intakes` | **Publish-review intake lineage** | Shows the host-produced started/completed/failed intake, exact verified decision identity, private receipt artifact, and only `queued` or `rejected` with preserved decision reasons | Empty for V1 or absent/failed/tampered decisions. `queued` means awaiting review; `rejected` retains why queue entry was refused | B / real host producer, journal, artifact, and product projection |
 | `run.production.publish-review-intake-receipts` | **Verified publish-review intake receipts** | Reopens and re-hashes the intake receipt, re-verifies the decision plus every audited input, and returns no partial lineage | Empty/unavailable on intake, decision, assessment, read, artifact, or journal drift. Never infer reviewed/published/caption state | B / real read-only runtime-host verification and product projection |
 | `run.production.publish-review-human-review` | **Human review** | Lists verified queued intake, identifies the host-configured local reviewer, requires the exact attestation and closed reason code, accepts an optional bounded note, and offers **Approve for caption production** or **Reject with reasons**. An unrevoked approval separately offers **Revoke approval** with closed reason and attestation | Honest empty states distinguish V1/absent, rejected intake, unverified response, no pending intake, and unavailable reviewer. Controls never accept paths, raw bytes, captions, prose-as-output, or caller-selected reviewer labels | B / real host authority, thin client wiring, and boring product controls |
 | `run.production.publish-review-decision-lineage` | **Human review decision lineage** | Shows started/completed/failed decision and revocation events, reviewer id/label, immutable outcome, reason codes, notes, exact input identities, and content-addressed private artifacts | Reject and revoke reasons remain visible. A rejected intake cannot be reviewed, a rejected decision cannot become approval without a new intake, and revocation supersedes rather than deletes approval | B / real journal, artifact, and product projection |
 | `run.production.publish-review-decision-receipts` | **Verified human review receipts** | Reopens and hashes decision/revocation bytes and recursively re-verifies queued intake plus complete decision/assessment/read lineage at the current journal head | Entire read fails closed on bytes, identity, host reviewer, state, transition, artifact, or journal drift. Approval is caption-producer eligibility only | B / real authenticated runtime-host verification and product projection |
+| `run.production.caption-production` | **Caption production** | For one visible exact unrevoked approval, offers **Start bounded caption production**. Shows `caption.production_started/completed/failed`, executor classification, immutable caption/receipt artifact and content identities, result status, line count, source/target available counts, withheld count, unavailable count, and later-revoked authority state | V1/no approval/reject/revoked/tampered paths remain empty or fail closed. Caption prose is not accepted from the caller or projected here. Coverage is not quality; upload/publication are explicitly absent | B / real host authority, deterministic run-005 adapter, optional real executor, thin client, and boring production projection |
 | `run.production.output-lineage` | **Output artifact lineage** | Shows non-ingest artifacts with artifact/content identity, producer task/worker, receipted execution or operation origin, recorded upstream artifact ids, and validated report references | An empty upstream list is displayed as not recorded; it is not replaced with task inputs or guessed media ancestry | B / real and wired for the bounded worker output; media-operation outputs appear only when their validated events exist |
 | `run.production.identity-hooks` | In-page identity links | Links rendered task/spawn/grant/operation inputs and scopes, artifact producer task/worker, rendered read-receipt/operation identities, rendered upstream source/output artifacts, and validated report references to stable destinations in the same production region | An unrendered receipt, older execution, or any other identity without a rendered destination remains plain text; no `/studio/runtime/` deep-link is fabricated | B / real client navigation over validated projected identities |
 | `run.production.reports` | **Structured reports** | Shows the validated report summary, output artifact ids, parent edge, status, and decision reason when present | A submitted report keeps its decision reason unavailable until `report.decided` is validated | B / real and wired bounded facts |
@@ -480,12 +497,14 @@ submit-to-result wiring slice.
 | Evidence-decision receipt verification | Agent analysis/review gate | Authenticated local runtime-host read over the complete journal and private content-addressed decision/assessment/read receipts | Real local and product-wired; stored decision bytes, every assessment audit, and policy derivation must all agree. It does not create or publish captions | Architecture |
 | Publish-review intake receipt | Review intake | Separate host producer over one exact host-verified decision receipt identity | Real local and product-wired; only queued/rejected, private, content-addressed lineage. V1 is empty and no review or publication follows | Architecture |
 | Publish-review intake verification | Review intake | Authenticated local runtime-host read over intake plus complete decision/assessment/read lineage | Real local and product-wired; any stored-byte, identity, policy, or journal drift rejects the whole response | Architecture |
+| Caption production receipt/artifact | Private caption production | Separate caption host over one exact recursively verified unrevoked approval; deterministic recorded-real-pipeline adapter or explicit real recognizer/translator executor | Real local and product-wired as a separate production projection. Timed KO+EN lines preserve withheld/unavailable; content and receipt artifacts are private and immutable | Architecture |
+| Caption production verification | Private caption inspection | Authenticated local runtime-host read over caption/receipt objects, approval/revocation state, and the complete upstream review chain | Real local and product-wired; tamper or a revocation that started before completion fails closed. Later revocation retains identities and marks prior production | Architecture |
 | Runtime source artifact | Source/provenance | Production artifact store | Real local; validated ingest-origin identity and content facts project in the default owned-source region without storage paths or a task-producer claim | Architecture |
 | Remaining media tools/detectors | Agent workspace | None | Missing | Architecture |
 | Worker execution and measured usage | Agent/observability | Codex launcher | Real for one child | Architecture |
 | Worker output artifact | Agent/result | Codex launcher/artifact store | Real for one child; output identity, producer, executor receipt lineage, report references, and honest in-page links to rendered identities are projected in the default owned-source surface | Architecture |
 | Structured handoff and decision | Coordination/result | Report host | Real for one child and projected from the validated host journal in the default owned-source surface | Architecture |
-| Captions and cue decisions | Results | Legacy run pipeline/recorded bundles | Real recorded output; no production runtime publisher | Architecture |
+| Captions and cue decisions | Results | Legacy run pipeline/recorded bundles plus separate private production caption artifacts | Private production artifacts are real and shown only in the production facts region; existing Results still reads recorded runs and no publisher exists | Shared product definition then architecture |
 | Glossary/corrections/study artifact | Results/study | Legacy run pipeline and memory proposal path | Partial recorded artifacts | Shared product definition then architecture |
 | Production observability index | Run Explorer | Post-run indexer | Real local and inspector-wired | Architecture |
 
@@ -516,12 +535,14 @@ operator starts the loopback host and connects Studio with its bearer token
   -> Studio separately reads host-verified assessment audits and decision receipts at the same journal head
   -> host records and Studio reads verified queued/rejected publish-review intake lineage
   -> for queued intake only, the host records one attested approve/reject receipt
+  -> for one exact unrevoked approval only, Studio may explicitly request a bounded private caption job
+  -> host journals the job and Studio shows only recursively verified caption/receipt identities and honest counts
   -> an approval may be superseded by one immutable host-verified revocation receipt
   -> Studio projects terminal, failed, or interrupted state with the host's safe reason
 ```
 
 Hosted/link ingest, pause/resume/cancel acknowledgement, hosted execution, child-visible media bytes
-or semantic inspection, captions or study publication, and production swarm integration remain separate future
+or semantic inspection, Results integration, study production/publication, upload, and production swarm integration remain separate future
 boundaries; the local host does not provide them.
 
 Minimum action results:
@@ -540,8 +561,9 @@ Minimum action results:
 | Produce publish-review intake | One private content-addressed `queued` or `rejected` receipt over an exact reverified decision identity | Reject raw decision bytes, paths, caller captions/prose/outcome, proceed-without-audit, tamper, drift, duplicates, and any withheld attempt to queue |
 | Review queued intake | One private content-addressed `approve_for_caption_production` or `reject_with_reasons` receipt binding the host-configured reviewer, required attestation, closed reasons, optional bounded note, and exact verified intake identity | Re-verify complete lineage before mutation; reject non-queued or raw intake, paths, captions/open output, forged reviewer identity, tamper/drift, duplicate decisions, and invalid reasons/attestation |
 | Revoke approval | One private immutable revocation receipt that supersedes one exact verified unrevoked approval and preserves reviewer, attestation, closed reasons, and optional bounded note | Reject rejection revocation, duplicate revocation, forged identity, changed approval bytes/lineage, raw/open input, and every attempt to delete or silently replace the approval |
+| Produce private captions | One private immutable timed KO+EN artifact plus one receipt, closed status/counts/reasons, exact source/range/approval lineage, executor classification, and hard duration/line/text/artifact/wall ceilings | Accept only the exact approval identity; recursively re-verify it unrevoked before start; reject raw review bytes, rejects, revocations, paths, caller prose/captions, duplicates, tamper, language mismatch, or ceiling breaches. Missing translation remains unavailable/withheld |
 | Request control | Future correlation id and pending state; no host endpoint exists yet | Do not display accepted state before acknowledgement |
-| Publish result | Future immutable artifact ids plus terminal/partial/withheld status; no caption/upload/publication endpoint exists | Do not treat `proceed_to_publish_review`, queued intake, or review approval as captions, correctness, upload, or publication; withheld/reject/revoke reasons remain visible |
+| Publish result | Future upload/publication receipt and authority; private caption artifacts alone are not published results | Do not treat `proceed_to_publish_review`, queued intake, review approval, or private caption completion as correctness, upload, CDN delivery, public bytes, or publication; withheld/unavailable/reject/revoke reasons remain visible |
 
 ## UIUX acceptance checklist
 
@@ -627,8 +649,9 @@ create a registered V1 source from explicitly attested browser-selected bytes. I
 
 Still open: hosted/link ingest, speech/language detection for browser V1 ingest, operation/tier
 choices, calibrated estimation, and every larger-runtime item below.
-This slice does not produce autonomous media captions or expose media bytes to the child. It exposes
-only bounded facts already present in validated VAD/language receipts; it creates no new findings.
+The one-child analysis proof does not produce captions or expose media bytes to the child. A separate
+post-review host action now produces private bounded captions from the host-owned source and prior
+receipts. It is not a child capability, new detector finding, Results merge, upload, or publication.
 
 ### Larger runtime work
 
@@ -637,7 +660,7 @@ only bounded facts already present in validated VAD/language receipts; it create
 - Remaining child media operations and detector bridges, acoustic classification, overlap,
   separation, and visual context
 - Multi-task dependencies, retries, partial publication, merge, and QC
-- Production caption/study publisher and exports
+- Production-caption integration into Results, plus separate study/upload/publication authorities and exports
 - Live control acknowledgements plus hosted reconnect, retention, and access policy
 - Calibrated elapsed-time estimator, usage estimator, and versioned pricing adapter
 
@@ -665,8 +688,10 @@ UI/UX changes must not:
 - Treat publish-review `queued` as reviewed, captioned, uploaded, published, or public; it is only
   durable intake lineage awaiting a human review receipt
 - Treat `approve_for_caption_production` as captions existing, English correctness, media truth,
-  upload, publication, public bytes, or authorization for any producer other than a future bounded
-  caption producer that explicitly verifies the unrevoked approval receipt
+  upload, publication, public bytes, or authorization for any producer other than the bounded
+  caption producer that explicitly and recursively verifies the unrevoked approval receipt
+- Treat a caption artifact or receipt as proof of transcription/translation quality, upload,
+  publication, public availability, replay identity, or full Studio/swarm completion
 - Hide, delete, or silently replace a human rejection or approval revocation and its stable reasons
 - Hide or soft-delete a `withheld` decision or its stable reason codes
 
@@ -706,6 +731,7 @@ semantics without updating this contract with the UIUX owner.
 | Stored decision and audited-input verification | `src/studio/runtime/production/decisionReceiptAudit.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/ProductLocalRuntime.tsx` |
 | Host publish-review intake and stored lineage verification | `src/studio/runtime/production/publishReviewIntakeHost.ts`, `src/studio/runtime/production/publishReviewIntakeAudit.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
 | Host human review/revocation and stored lineage verification | `src/studio/runtime/production/publishReviewHost.ts`, `src/studio/runtime/production/publishReviewDecisionAudit.ts`, `src/studio/runtime/production/validation/publishReviewDecision.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
+| Bounded caption producer and recursive stored verification | `src/studio/runtime/production/captionProductionHost.ts`, `src/studio/runtime/production/captionProductionAudit.ts`, `src/studio/runtime/production/captionProductionExecutor.ts`, `src/studio/runtime/production/validation/captionProduction.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
 | Scheduler/journal/media/handoff fragments | `src/studio/runtime/production/` |
 | Dedicated source-artifact/task/spawn/worker/grant/operation/output-artifact/report adapter | `src/studio/runtime/production/studioProjection.ts` |
 | Workload floor and unavailable estimates | `src/studio/runtime/production/forecast/`, `tests/studio-forecast-production.test.ts` |

@@ -3,6 +3,8 @@ import type {
   OwnedMediaIngestRequest,
   OwnedMediaIngestStatus,
   RuntimeHostAssessmentAuditResponse,
+  RuntimeHostCaptionProductionRequest,
+  RuntimeHostCaptionProductionResponse,
   RuntimeHostDecisionReceiptResponse,
   RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
@@ -1226,6 +1228,125 @@ function publishReviewDecisionResponse(
   };
 }
 
+function captionProductionResponse(
+  value: unknown,
+  expectedRuntimeId: string,
+): RuntimeHostCaptionProductionResponse {
+  const context = "Runtime host caption productions";
+  const item = object(value, context);
+  exact(item, ["schema", "commandId", "runtimeId", "journalHead", "captions"], context);
+  if (item.schema !== "studio.local-runtime-caption-productions.v1") fail(context, "schema is unsupported.");
+  const runtimeId = identity(item.runtimeId, `${context}.runtimeId`);
+  if (runtimeId !== expectedRuntimeId) fail(context, "runtime identity changed.");
+  if (!Array.isArray(item.captions)) fail(`${context}.captions`, "must be an array.");
+  const jobIds = new Set<string>();
+  const approvals = new Set<string>();
+  const captions = item.captions.map((candidate, index) => {
+    const captionContext = `${context}.captions[${index}]`;
+    const caption = object(candidate, captionContext);
+    exact(caption, [
+      "jobId",
+      "approval",
+      "authorityState",
+      "integrity",
+      "captionArtifactId",
+      "captionContentId",
+      "receiptArtifactId",
+      "receiptId",
+      "receiptContentId",
+      "executor",
+      "result",
+    ], captionContext);
+    const jobId = identity(caption.jobId, `${captionContext}.jobId`);
+    if (jobIds.has(jobId)) fail(`${captionContext}.jobId`, "is duplicated.");
+    jobIds.add(jobId);
+    const approval = object(caption.approval, `${captionContext}.approval`);
+    exact(approval, ["reviewId", "artifactId", "receiptId", "receiptContentId"], `${captionContext}.approval`);
+    const approvalValue = {
+      reviewId: identity(approval.reviewId, `${captionContext}.approval.reviewId`),
+      artifactId: identity(approval.artifactId, `${captionContext}.approval.artifactId`),
+      receiptId: identity(approval.receiptId, `${captionContext}.approval.receiptId`),
+      receiptContentId: contentId(approval.receiptContentId, `${captionContext}.approval.receiptContentId`),
+    };
+    if (approvals.has(approvalValue.reviewId)) fail(`${captionContext}.approval.reviewId`, "already has captions.");
+    approvals.add(approvalValue.reviewId);
+    if (caption.authorityState !== "unrevoked" && caption.authorityState !== "revoked_after_completion") {
+      fail(`${captionContext}.authorityState`, "is unsupported.");
+    }
+    if (caption.integrity !== "stored_caption_and_receipt_with_verified_approval") {
+      fail(`${captionContext}.integrity`, "does not carry closed caption verification.");
+    }
+    const executor = object(caption.executor, `${captionContext}.executor`);
+    exact(executor, ["id", "version", "classification", "recognizer", "translator", "sourceCaptionContentId"], `${captionContext}.executor`);
+    if (executor.version !== "1") fail(`${captionContext}.executor.version`, "is unsupported.");
+    if (
+      (executor.classification === "recorded_real_pipeline_fixture" && executor.id !== "studio.recorded-caption-fixture-adapter") ||
+      (executor.classification === "real_recognizer_translator" && executor.id !== "studio.openai-caption-producer") ||
+      (executor.classification !== "recorded_real_pipeline_fixture" && executor.classification !== "real_recognizer_translator")
+    ) fail(`${captionContext}.executor`, "identity and classification do not agree.");
+    const recognizer = executor.recognizer === null ? null : string(executor.recognizer, `${captionContext}.executor.recognizer`);
+    const translator = executor.translator === null ? null : string(executor.translator, `${captionContext}.executor.translator`);
+    const sourceCaptionContentId = executor.sourceCaptionContentId === null
+      ? null
+      : contentId(executor.sourceCaptionContentId, `${captionContext}.executor.sourceCaptionContentId`);
+    if (
+      recognizer === null || translator === null ||
+      (executor.classification === "real_recognizer_translator" && sourceCaptionContentId !== null)
+    ) {
+      fail(`${captionContext}.executor`, "real execution evidence is inconsistent.");
+    }
+    const result = object(caption.result, `${captionContext}.result`);
+    exact(result, ["status", "lineCount", "sourceAvailableCount", "targetAvailableCount", "withheldCount", "unavailableCount"], `${captionContext}.result`);
+    if (!["completed", "partial", "withheld", "unavailable"].includes(result.status as string)) {
+      fail(`${captionContext}.result.status`, "is unsupported.");
+    }
+    const lineCount = integer(result.lineCount, `${captionContext}.result.lineCount`);
+    const sourceAvailableCount = integer(result.sourceAvailableCount, `${captionContext}.result.sourceAvailableCount`);
+    const targetAvailableCount = integer(result.targetAvailableCount, `${captionContext}.result.targetAvailableCount`);
+    const withheldCount = integer(result.withheldCount, `${captionContext}.result.withheldCount`);
+    const unavailableCount = integer(result.unavailableCount, `${captionContext}.result.unavailableCount`);
+    if (
+      lineCount > 64 || sourceAvailableCount > lineCount || targetAvailableCount > lineCount ||
+      withheldCount > lineCount || unavailableCount > lineCount ||
+      targetAvailableCount + withheldCount > lineCount
+    ) fail(`${captionContext}.result`, "counts exceed the closed line ceiling.");
+    return {
+      jobId,
+      approval: approvalValue,
+      authorityState: caption.authorityState as "unrevoked" | "revoked_after_completion",
+      integrity: "stored_caption_and_receipt_with_verified_approval" as const,
+      captionArtifactId: identity(caption.captionArtifactId, `${captionContext}.captionArtifactId`),
+      captionContentId: contentId(caption.captionContentId, `${captionContext}.captionContentId`),
+      receiptArtifactId: identity(caption.receiptArtifactId, `${captionContext}.receiptArtifactId`),
+      receiptId: identity(caption.receiptId, `${captionContext}.receiptId`),
+      receiptContentId: contentId(caption.receiptContentId, `${captionContext}.receiptContentId`),
+      executor: {
+        id: executor.id as "studio.recorded-caption-fixture-adapter" | "studio.openai-caption-producer",
+        version: "1" as const,
+        classification: executor.classification as "recorded_real_pipeline_fixture" | "real_recognizer_translator",
+        recognizer,
+        translator,
+        sourceCaptionContentId,
+      },
+      result: {
+        status: result.status as "completed" | "partial" | "withheld" | "unavailable",
+        lineCount,
+        sourceAvailableCount,
+        targetAvailableCount,
+        withheldCount,
+        unavailableCount,
+      },
+    };
+  });
+  return {
+    schema: "studio.local-runtime-caption-productions.v1",
+    commandId: identity(item.commandId, `${context}.commandId`),
+    runtimeId,
+    journalHead: integer(item.journalHead, `${context}.journalHead`),
+    captions,
+  };
+}
+
 export function normalizeLocalRuntimeHostBaseUrl(value: string): string {
   let url: URL;
   try {
@@ -1443,6 +1564,27 @@ export class LocalRuntimeHostClient {
   ): Promise<RuntimeHostPublishReviewDecisionResponse> {
     return publishReviewDecisionResponse(
       await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/publish-review-revocations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      }),
+      runtimeId,
+    );
+  }
+
+  async captionProductions(runtimeId: string): Promise<RuntimeHostCaptionProductionResponse> {
+    return captionProductionResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/caption-productions`),
+      runtimeId,
+    );
+  }
+
+  async createCaptionProduction(
+    runtimeId: string,
+    request: RuntimeHostCaptionProductionRequest,
+  ): Promise<RuntimeHostCaptionProductionResponse> {
+    return captionProductionResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/caption-productions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),

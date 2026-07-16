@@ -1,5 +1,9 @@
 import type {
   AgentRecord,
+  CaptionExecutorDescriptor,
+  CaptionProductionArtifact,
+  CaptionProductionReceipt,
+  CaptionProductionRequest,
   Capability,
   CapabilityGrant,
   EvidenceAssessmentReceipt,
@@ -36,6 +40,7 @@ export type RuntimeProducerKind =
   | "decision_host"
   | "publish_review_intake_host"
   | "publish_review_host"
+  | "caption_production_host"
   | "handoff_host"
   | "launcher";
 
@@ -271,6 +276,34 @@ export interface PublishReviewRevocationFailedEvent extends RuntimeEventBase {
   data: { revocationId: string; reason: string };
 }
 
+export interface CaptionProductionStartedEvent extends RuntimeEventBase {
+  type: "caption.production_started";
+  data: {
+    jobId: string;
+    request: CaptionProductionRequest;
+    input: CaptionProductionArtifact["input"];
+    limits: CaptionProductionReceipt["limits"];
+    executor: CaptionExecutorDescriptor;
+  };
+}
+
+export interface CaptionProductionCompletedEvent extends RuntimeEventBase {
+  type: "caption.production_completed";
+  data: {
+    jobId: string;
+    captionArtifactId: string;
+    captionContentId: string;
+    receiptArtifactId: string;
+    receiptContentId: string;
+    receipt: CaptionProductionReceipt;
+  };
+}
+
+export interface CaptionProductionFailedEvent extends RuntimeEventBase {
+  type: "caption.production_failed";
+  data: { jobId: string; reason: string };
+}
+
 export interface ReportSubmittedEvent extends RuntimeEventBase {
   type: "report.submitted";
   data: { report: ReportRecord };
@@ -318,6 +351,9 @@ export type RuntimeEvent =
   | PublishReviewRevocationStartedEvent
   | PublishReviewRevocationCompletedEvent
   | PublishReviewRevocationFailedEvent
+  | CaptionProductionStartedEvent
+  | CaptionProductionCompletedEvent
+  | CaptionProductionFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent;
 

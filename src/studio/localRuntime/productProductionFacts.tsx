@@ -4,7 +4,9 @@ import type { EvidenceAssessmentAudit } from "../runtime/production/assessmentAu
 import type { EvidenceDecisionReceiptVerification } from "../runtime/production/decisionReceiptAudit";
 import type { PublishReviewIntakeVerification } from "../runtime/production/publishReviewIntakeAudit";
 import type { PublishReviewDecisionVerification } from "../runtime/production/publishReviewDecisionAudit";
+import type { CaptionProductionVerification } from "../runtime/production/captionProductionAudit";
 import type {
+  RuntimeHostCaptionProductionRequest,
   RuntimeHostPublishReviewDecisionRequest,
   RuntimeHostPublishReviewOperator,
   RuntimeHostPublishReviewRevocationRequest,
@@ -13,6 +15,7 @@ import type {
   ProductionStudioGrantView,
   ProductionStudioProjection,
 } from "../runtime/production/studioProjection";
+import { seconds } from "./productLocalRuntimeShared";
 
 type ProductionIdentityKind = "task" | "worker" | "operation" | "execution" | "artifact" | "receipt" | "report";
 
@@ -246,7 +249,8 @@ function PublishReviewDecisionControl({
         </button>
       </div>
       <p>
-        Approval permits only a future caption producer to consume this receipt. It creates no
+        Approval permits only the separate bounded caption producer to consume this receipt after
+        another host verification. Approval itself creates no
         captions, upload, publication, media-truth, or English-correctness claim.
       </p>
     </article>
@@ -322,6 +326,10 @@ function PublishReviewRevocationControl({
       >
         Revoke caption-production approval
       </button>
+      <p>
+        Revocation blocks every new caption start. Already completed immutable caption artifacts
+        remain inspectable and are marked as produced before revocation; they are not silently deleted.
+      </p>
     </div>
   );
 }
@@ -332,22 +340,30 @@ export function ProductionJournalFacts({
   decisionReceipts,
   publishReviewIntakes,
   publishReviewDecisions,
+  captionProductions,
   reviewOperator,
   reviewBusy,
   reviewError,
+  captionBusy,
+  captionError,
   onPublishReviewDecision,
   onPublishReviewRevocation,
+  onCaptionProduction,
 }: {
   projection: ProductionStudioProjection;
   assessmentAudits: readonly EvidenceAssessmentAudit[];
   decisionReceipts: readonly EvidenceDecisionReceiptVerification[];
   publishReviewIntakes: readonly PublishReviewIntakeVerification[];
   publishReviewDecisions: readonly PublishReviewDecisionVerification[];
+  captionProductions: readonly CaptionProductionVerification[];
   reviewOperator: RuntimeHostPublishReviewOperator | null;
   reviewBusy: boolean;
   reviewError: string | null;
+  captionBusy: boolean;
+  captionError: string | null;
   onPublishReviewDecision: (request: RuntimeHostPublishReviewDecisionRequest) => Promise<void>;
   onPublishReviewRevocation: (request: RuntimeHostPublishReviewRevocationRequest) => Promise<void>;
+  onCaptionProduction: (request: RuntimeHostCaptionProductionRequest) => Promise<void>;
 }) {
   const outputArtifactIds = new Set(projection.outputArtifacts.map((artifact) => artifact.artifactId));
   const renderedArtifactIds = new Set([
@@ -358,6 +374,7 @@ export function ProductionJournalFacts({
     ...projection.publishReviewIntakeArtifacts.map((artifact) => artifact.artifactId),
     ...projection.publishReviewDecisionArtifacts.map((artifact) => artifact.artifactId),
     ...projection.publishReviewRevocationArtifacts.map((artifact) => artifact.artifactId),
+    ...projection.captionArtifacts.map((artifact) => artifact.artifactId),
     ...outputArtifactIds,
   ]);
   const operationIds = new Set([
@@ -422,6 +439,23 @@ export function ProductionJournalFacts({
     intake.status === "completed" &&
     intake.outcome === "queued" &&
     !visiblePublishReviewIntakes.some((verified) => verified.intakeId === intake.intakeId));
+  const visibleCaptionProductions = captionProductions.filter((caption) =>
+    projection.captionProductions.some((job) =>
+      job.jobId === caption.jobId &&
+      job.status === "completed" &&
+      job.approvalReviewId === caption.approval.reviewId &&
+      job.captionArtifactId === caption.captionArtifactId &&
+      job.captionContentId === caption.captionContentId &&
+      job.receiptArtifactId === caption.receiptArtifactId &&
+      job.receiptId === caption.receiptId &&
+      job.receiptContentId === caption.receiptContentId) &&
+    renderedArtifactIds.has(caption.captionArtifactId) &&
+    renderedArtifactIds.has(caption.receiptArtifactId));
+  const eligibleCaptionApprovals = visiblePublishReviewDecisions.filter((review) =>
+    review.outcome === "approve_for_caption_production" &&
+    review.state === "approved_for_caption_production" &&
+    review.revocation === null &&
+    !projection.captionProductions.some((job) => job.approvalReviewId === review.reviewId));
   const executionIds = new Set(
     projection.workers.flatMap((worker) => worker.execution ? [worker.execution.id] : []),
   );
@@ -1592,8 +1626,8 @@ export function ProductionJournalFacts({
         <h4 id="product-runtime-publish-review-decision-receipts-title">Verified human review receipts</h4>
         <p>
           The host reopens each review and optional revocation receipt, then repeats intake,
-          decision, assessment, and read verification. Approval means only that a future caption
-          producer may consume this review receipt. It creates no captions, upload, publication,
+          decision, assessment, and read verification. Approval means only that the separate caption
+          producer may consume this review receipt after another host verification. It creates no captions, upload, publication,
           media-truth, or English-correctness claim.
         </p>
         {visiblePublishReviewDecisions.length === 0 ? (
@@ -1678,6 +1712,109 @@ export function ProductionJournalFacts({
             })}
           </div>
         )}
+      </section>
+
+      <section
+        data-production-region="caption-production"
+        aria-labelledby="product-runtime-caption-production-title"
+      >
+        <h4 id="product-runtime-caption-production-title">Caption production</h4>
+        <p>
+          This is a separate private KO + EN production authority. The host accepts only an exact,
+          recursively verified, unrevoked approval identity and derives the media, range, and producer
+          inputs itself. Coverage counts do not claim transcription or English quality. Withheld and
+          unavailable lines remain first-class.
+        </p>
+        {captionError ? <p role="alert" data-production-caption-error>{captionError}</p> : null}
+        {eligibleCaptionApprovals.map((review) => (
+          <article key={review.reviewId} data-production-caption-approval-id={review.reviewId}>
+            <header><h5>Eligible approval</h5><span>not captioned</span></header>
+            <dl>
+              <div><dt>Review</dt><dd>{review.reviewId}</dd></div>
+              <div><dt>Approval receipt</dt><dd>{review.receiptId}</dd></div>
+              <div><dt>Approval content</dt><dd>{review.receiptContentId}</dd></div>
+            </dl>
+            <button
+              type="button"
+              disabled={captionBusy || reviewBusy}
+              data-production-caption-action="start"
+              onClick={() => void onCaptionProduction({
+                approval: {
+                  reviewId: review.reviewId,
+                  artifactId: review.artifactId,
+                  receiptId: review.receiptId,
+                  receiptContentId: review.receiptContentId,
+                },
+              })}
+            >
+              {captionBusy ? "Producing bounded captions…" : "Start bounded caption production"}
+            </button>
+            <p>Creates private artifacts only. It does not upload or publish.</p>
+          </article>
+        ))}
+        {eligibleCaptionApprovals.length === 0 && projection.captionProductions.length === 0 ? (
+          <p className="product-runtime-unavailable" data-production-caption-empty="no-eligible-approval">
+            No exact unrevoked caption-production approval is currently eligible. Review alone never
+            implies that captions exist.
+          </p>
+        ) : null}
+        {projection.captionProductions.length > 0 ? (
+          <div className="product-runtime-fact-list">
+            {projection.captionProductions.map((job) => {
+              const verified = visibleCaptionProductions.find((caption) => caption.jobId === job.jobId) ?? null;
+              return (
+                <article
+                  key={job.jobId}
+                  data-production-caption-job-id={job.jobId}
+                  data-status={job.status}
+                  data-caption-authority-state={verified?.authorityState ?? "unverified_or_incomplete"}
+                >
+                  <header><h5>studio.caption-production.receipt.v1</h5><span>{verified?.result.status ?? job.status}</span></header>
+                  <dl>
+                    <div><dt>Job</dt><dd>{job.jobId}</dd></div>
+                    <div><dt>Approval</dt><dd>{job.approvalReviewId}</dd></div>
+                    <div><dt>Approved range</dt><dd>{seconds(job.range.startMs)}–{seconds(job.range.endMs)}</dd></div>
+                    <div><dt>Executor classification</dt><dd>{job.executorClassification}</dd></div>
+                    <div><dt>Authority now</dt><dd>{verified?.authorityState ?? "Unavailable until full completion audit"}</dd></div>
+                    <div><dt>Lines</dt><dd data-production-caption-line-count>{verified?.result.lineCount ?? "Unavailable until completion"}</dd></div>
+                    <div><dt>Source available</dt><dd>{verified?.result.sourceAvailableCount ?? "Unavailable until completion"}</dd></div>
+                    <div><dt>Target available</dt><dd>{verified?.result.targetAvailableCount ?? "Unavailable until completion"}</dd></div>
+                    <div><dt>Withheld</dt><dd data-production-caption-withheld-count>{verified?.result.withheldCount ?? "Unavailable until completion"}</dd></div>
+                    <div><dt>Unavailable</dt><dd data-production-caption-unavailable-count>{verified?.result.unavailableCount ?? "Unavailable until completion"}</dd></div>
+                    <div><dt>Caption artifact</dt><dd>{verified?.captionArtifactId ?? "Unavailable until completion audit"}</dd></div>
+                    <div><dt>Caption content</dt><dd>{verified?.captionContentId ?? "Unavailable until completion audit"}</dd></div>
+                    <div><dt>Receipt artifact</dt><dd>{verified?.receiptArtifactId ?? "Unavailable until completion audit"}</dd></div>
+                    <div><dt>Receipt content</dt><dd>{verified?.receiptContentId ?? "Unavailable until completion audit"}</dd></div>
+                    <div><dt>Failure</dt><dd>{job.failure ?? "Not recorded"}</dd></div>
+                  </dl>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
+        {projection.captionArtifacts.length > 0 ? (
+          <div className="product-runtime-fact-list">
+            {projection.captionArtifacts.map((artifact) => (
+              <article
+                key={artifact.artifactId}
+                id={productionIdentityTarget("artifact", artifact.artifactId)}
+                data-production-caption-artifact-id={artifact.artifactId}
+                data-caption-artifact-role={artifact.role}
+              >
+                <header><h5>{artifact.kind}</h5><span>private · immutable</span></header>
+                <dl>
+                  <div><dt>Artifact</dt><dd>{artifact.artifactId}</dd></div>
+                  <div><dt>Content</dt><dd>{artifact.contentId} · {artifact.bytes} bytes</dd></div>
+                  <div><dt>Job</dt><dd>{artifact.jobId}</dd></div>
+                  <div><dt>Approval</dt><dd>{artifact.approvalReviewId}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        ) : null}
+        <p data-production-caption-publish-boundary>
+          Upload, CDN delivery, and public publication are absent and require a later separate authority.
+        </p>
       </section>
 
       <section

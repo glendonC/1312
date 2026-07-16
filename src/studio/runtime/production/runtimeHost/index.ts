@@ -18,6 +18,8 @@ export {
 } from "./journalPolling.ts";
 export type {
   RuntimeHostAssessmentAuditResponse,
+  RuntimeHostCaptionProductionRequest,
+  RuntimeHostCaptionProductionResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewDecisionRequest,
@@ -36,6 +38,11 @@ export {
   RuntimeApplicationInterrupted,
 } from "./runtimeApplication.ts";
 export { RuntimeStartService } from "./service.ts";
+export {
+  OpenAiCaptionProductionExecutor,
+  RecordedCaptionFixtureExecutor,
+  type CaptionProductionExecutor,
+} from "../captionProductionExecutor.ts";
 export { RuntimeSourceRegistry } from "./sourceRegistry.ts";
 export {
   DEFAULT_OWNED_MEDIA_INGEST_BYTES,

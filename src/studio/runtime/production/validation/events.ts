@@ -14,6 +14,13 @@ import {
   validatePublishReviewRevocationReceipt,
 } from "./publishReviewDecision.ts";
 import {
+  assertCaptionProductionRequest,
+  validateCaptionExecutorDescriptor,
+  validateCaptionProductionInput,
+  validateCaptionProductionLimits,
+  validateCaptionProductionReceipt,
+} from "./captionProduction.ts";
+import {
   validateExecutorSpanReceipt,
   validateModelUsageReceipt,
 } from "./execution.ts";
@@ -87,7 +94,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "handoff_host", "launcher"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "handoff_host", "launcher"]),
     context,
     "event.producer.kind",
   );
@@ -278,6 +285,25 @@ export function assertRuntimeEvent(
   } else if (type === "publish.review.revocation_failed") {
     exact(data, ["revocationId", "reason"], context, "event.data");
     string(data.revocationId, context, "event.data.revocationId");
+    string(data.reason, context, "event.data.reason");
+  } else if (type === "caption.production_started") {
+    exact(data, ["jobId", "request", "input", "limits", "executor"], context, "event.data");
+    string(data.jobId, context, "event.data.jobId");
+    assertCaptionProductionRequest(data.request);
+    validateCaptionProductionInput(data.input, context, "event.data.input");
+    validateCaptionProductionLimits(data.limits, context, "event.data.limits");
+    validateCaptionExecutorDescriptor(data.executor, context, "event.data.executor");
+  } else if (type === "caption.production_completed") {
+    exact(data, ["jobId", "captionArtifactId", "captionContentId", "receiptArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.jobId, context, "event.data.jobId");
+    string(data.captionArtifactId, context, "event.data.captionArtifactId");
+    contentId(data.captionContentId, context, "event.data.captionContentId");
+    string(data.receiptArtifactId, context, "event.data.receiptArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateCaptionProductionReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "caption.production_failed") {
+    exact(data, ["jobId", "reason"], context, "event.data");
+    string(data.jobId, context, "event.data.jobId");
     string(data.reason, context, "event.data.reason");
   } else if (type === "report.submitted") {
     exact(data, ["report"], context, "event.data");

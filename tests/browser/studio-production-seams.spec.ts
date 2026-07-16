@@ -30,11 +30,11 @@ async function openCompletedDeterministicProjection(page: Page, endSeconds?: num
   return status.getByRole("region", { name: "Production task and handoff facts" });
 }
 
-test("attested reviewer approves one verified queued intake for future caption production only", async ({ page }, testInfo) => {
+test("attested approval explicitly produces private bounded captions without publication", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one deterministic desktop review path is sufficient");
   test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
 
-  const production = await openCompletedDeterministicProjection(page, 0.9);
+  const production = await openCompletedDeterministicProjection(page, 47.2);
   const review = production.locator('[data-production-region="publish-review-human-review"]');
   await expect(review.getByRole("heading", { name: "Queued intake human review" })).toBeVisible();
   const control = review.locator("[data-production-review-control-intake-id]");
@@ -49,9 +49,26 @@ test("attested reviewer approves one verified queued intake for future caption p
   await expect(receipt).toHaveAttribute("data-review-outcome", "approve_for_caption_production");
   await expect(receipt).toHaveAttribute("data-review-state", "approved_for_caption_production");
   await expect(receipt.locator('[data-production-review-reason-code="reviewer_attested_caption_production_may_proceed"]')).toHaveCount(1);
-  await expect(receipts.getByText(/future caption producer may consume this review receipt/)).toBeVisible();
-  await expect(production.getByText(/creates no captions, upload, publication/)).toBeVisible();
+  await expect(receipts.getByText(/separate caption producer may consume this review receipt/)).toBeVisible();
+  await expect(production.getByText(/It creates no captions, upload, publication/)).toBeVisible();
   await expect(production.locator('[data-production-publish-review-revocation-receipt-id]')).toHaveCount(0);
+
+  const captions = production.locator('[data-production-region="caption-production"]');
+  await expect(captions.getByRole("heading", { name: "Caption production" })).toBeVisible();
+  await captions.locator('[data-production-caption-action="start"]').click();
+  const job = captions.locator('[data-production-caption-job-id]');
+  await expect(job).toHaveCount(1, { timeout: 10_000 });
+  await expect(job).toHaveAttribute("data-status", "completed");
+  await expect(job).toHaveAttribute("data-caption-authority-state", "unrevoked");
+  await expect(job.locator("[data-production-caption-line-count]")).toHaveText("16");
+  await expect(job.locator("[data-production-caption-withheld-count]")).toHaveText("2");
+  await expect(job.locator("[data-production-caption-unavailable-count]")).toHaveText("1");
+  await expect(captions.locator('[data-production-caption-artifact-id]')).toHaveCount(2);
+  await expect(captions.locator('[data-caption-artifact-role="timed_captions"]')).toHaveCount(1);
+  await expect(captions.locator('[data-caption-artifact-role="production_receipt"]')).toHaveCount(1);
+  await expect(captions.locator("[data-production-caption-publish-boundary]")).toContainText(
+    "Upload, CDN delivery, and public publication are absent",
+  );
 });
 
 test("attested reviewer rejects one verified queued intake with a visible closed reason", async ({ page }, testInfo) => {

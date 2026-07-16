@@ -1,10 +1,13 @@
 import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import {
   DurableRuntimeCommandStore,
   DeterministicRuntimeExecutor,
   OwnedMediaIngestService,
+  OpenAiCaptionProductionExecutor,
+  RecordedCaptionFixtureExecutor,
   RuntimeSourceRegistry,
   RuntimeStartService,
   codexWorkerLauncherFactory,
@@ -51,6 +54,22 @@ if (executorMode !== "deterministic" && executorMode !== "codex") {
 if (executorMode === "codex" && !flag("--allow-real-codex")) {
   throw new Error("Real Codex execution requires --allow-real-codex");
 }
+const captionExecutorMode = value("--caption-executor") ?? "recorded";
+if (captionExecutorMode !== "recorded" && captionExecutorMode !== "openai") {
+  throw new Error("--caption-executor must be recorded or openai");
+}
+if (captionExecutorMode === "openai" && !flag("--allow-real-caption-production")) {
+  throw new Error("Real caption production requires --allow-real-caption-production");
+}
+
+async function openAiKey(): Promise<string> {
+  const environmentKey = process.env.OPENAI_API_KEY?.trim();
+  if (environmentKey) return environmentKey;
+  const contents = await readFile(resolve(REPOSITORY, ".env"), "utf8").catch(() => "");
+  const key = (contents.match(/^OPENAI_API_KEY=(.+)$/m) ?? [])[1]?.trim();
+  if (!key) throw new Error("Real caption production requires OPENAI_API_KEY or OPENAI_API_KEY in .env");
+  return key;
+}
 
 const runtimeRoot = resolve(value("--runtime-root") ?? resolve(REPOSITORY, ".studio/runtime-host"));
 const ownedIngestRoot = resolve(value("--owned-ingest-root") ?? resolve(REPOSITORY, ".studio/owned-sources"));
@@ -74,6 +93,9 @@ const ownedMediaIngest = await OwnedMediaIngestService.open({
 });
 const store = await DurableRuntimeCommandStore.open(runtimeRoot);
 const deterministic = executorMode === "deterministic" ? new DeterministicRuntimeExecutor() : null;
+const captionExecutor = captionExecutorMode === "openai"
+  ? new OpenAiCaptionProductionExecutor({ apiKey: await openAiKey() })
+  : new RecordedCaptionFixtureExecutor();
 const service = await RuntimeStartService.open({
   store,
   sources,
@@ -81,6 +103,7 @@ const service = await RuntimeStartService.open({
     ? deterministic.factory()
     : codexWorkerLauncherFactory({ model: value("--model"), maximumWallMs: 45_000 }),
   reviewer: { id: reviewerId, label: reviewerLabel },
+  captionExecutor,
 });
 const token = randomBytes(32).toString("hex");
 const server = createRuntimeHostHttpServer({ service, ownedMediaIngest, token, allowedOrigins });
@@ -102,6 +125,9 @@ process.stdout.write(`${JSON.stringify({
   reviewer: { id: reviewerId, label: reviewerLabel },
   runtimeRoot,
   executor: executorMode === "codex" ? "real-codex-opt-in" : "deterministic-no-model",
+  captionExecutor: captionExecutorMode === "openai"
+    ? "real-recognizer-translator-opt-in"
+    : "recorded-real-pipeline-fixture-adapter",
   authorizationToken: token,
 }, null, 2)}\n`);
 

@@ -179,12 +179,27 @@ configures one local reviewer id/label and exposes exact decision/revocation att
 submit only the matching id, attestation, closed reason codes, and optional bounded note. It
 recursively verifies one queued intake before appending an immutable private
 `studio.publish-review-decision.receipt.v1` with `approve_for_caption_production` or
-`reject_with_reasons`. Approval only permits a future bounded caption producer to consume that
+`reject_with_reasons`. Approval only permits the separate bounded caption producer to consume that
 verified receipt. An approval may be superseded by one immutable
 `studio.publish-review-revocation.receipt.v1`; rejection and revocation remain visible. The
 authenticated review read re-hashes both receipt kinds and the entire intake/decision/assessment/read
 chain. Rejected intake, forged reviewer identity, raw/open/path/caption input, illegal duplicate
 transitions, tamper, and drift fail closed.
+Caption production is another application-host boundary, separate from human review and from the
+child capability set. Its POST accepts only one exact approval receipt identity. The host resolves
+the source artifact and accepted analysis range from immutable runtime state, reopens the complete
+review/intake/decision/assessment/read chain immediately before the first caption event, and requires
+the approval to remain unrevoked. `caption.production_started/completed/failed` bind fixed limits,
+executor classification, exact source/range/approval lineage, and terminal artifacts. Completion
+stores a private content-addressed `studio.caption-production.artifact.v1` of ordered timed KO+EN
+lines plus `studio.caption-production.receipt.v1`. Missing source/translation stays unavailable and
+quality-gated target stays withheld with null text. The default adapter reuses the shape produced by
+the real run-clip recognizer/translator while classifying the current job as recorded fixture reuse;
+an explicit guarded executor can run the recognizer and translator. The authenticated caption GET
+re-hashes both objects and the full authority chain. Revocation blocks new starts; if it follows a
+completed job, prior artifacts remain immutable and are labeled `revoked_after_completion`.
+Captions remain private production artifacts: no upload, CDN, public publication, Results/replay
+identity, or English-quality claim follows.
 
 The launcher consumes a scheduler-issued one-use permit, registers the assigned worker, and invokes
 the installed Codex CLI with fixed arguments in an isolated temporary directory: ephemeral session,
@@ -222,11 +237,13 @@ seek does not drive a UI playhead. The evidence bridge may return only the bound
 already in a pinned producer receipt; empty, unavailable, unknown, withheld, and truncated are not
 converted into new claims.
 The default deterministic run-005 proof executes one seek, two evidence reads, one assessment, one
-decision over the audited assessment, and one host-produced queued publish-review intake.
+decision over the audited assessment, one host-produced queued publish-review intake, and—only
+after explicit approval—one separately requested caption job.
 The queued intake can then receive one explicit local human approve/reject receipt and an approval
 can receive one revocation receipt. Browser-ingested V1 has no evidence-read, assessment, decision,
-intake, or review lineage and projects those regions as unavailable/empty. `queued` remains
-unreviewed until its receipt exists; this runtime has no caption producer, uploader, or publisher.
+intake, review, or caption lineage and projects those regions as unavailable/empty. `queued` remains
+unreviewed until its receipt exists. Caption completion remains separate from Results and this
+runtime still has no uploader or publisher.
 
 ### Explicitly deferred
 
@@ -340,7 +357,7 @@ This row shape is future fine-tune data.
 5. ✅ Standalone preflight index with unsupported detector findings withheld
 6. ✅ Local bounded runtime foundation and one scoped media operation
 7. ✅ Proposal-first memory gate and retrospective evidence index
-8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment/decision, host-verified queued/rejected publish-review intake, immutable attested human review/revocation receipts, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
+8. ✅ Pinned VAD, speech-window language producer, bounded evidence-read assessment/decision, host-verified queued/rejected publish-review intake, immutable attested human review/revocation receipts, approval-gated bounded caption artifacts/receipts, Codex launcher, executor/usage receipts, and separate production-journal Studio projection
 9. 🔄 Build the immutable observability index from real launcher journals; add further media operations only as separate authorized slices
 10. ⏳ Acoustic/overlap/separation producers and study export
 

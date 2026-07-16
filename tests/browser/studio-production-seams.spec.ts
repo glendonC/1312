@@ -26,7 +26,7 @@ async function openCompletedDeterministicProjection(page: Page, endSeconds?: num
     .click();
 
   const status = productRuntime.getByRole("region", { name: "Local runtime status" });
-  await expect(status.getByText(/Terminal/)).toBeVisible({ timeout: 10_000 });
+  await expect(status.getByRole("heading", { name: "Terminal", exact: true })).toBeVisible({ timeout: 10_000 });
   return status.getByRole("region", { name: "Production task and handoff facts" });
 }
 
@@ -35,6 +35,26 @@ test("attested approval explicitly produces private bounded captions without pub
   test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
 
   const production = await openCompletedDeterministicProjection(page, 47.2);
+  const processingCanvas = page.getByRole("region", { name: "Processing canvas" });
+  await expect(processingCanvas).toBeVisible();
+  await expect(processingCanvas.getByRole("heading", { name: "Project-generated Korean conversation fixture" })).toBeVisible();
+  await expect(processingCanvas.getByRole("heading", { name: "Terminal" })).toBeVisible();
+  await expect(processingCanvas.getByText("Closed at validated journal head", { exact: false })).toBeVisible();
+  await expect(processingCanvas.getByRole("button", { name: "Pause" })).toHaveCount(0);
+  await expect(processingCanvas.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  await expect(processingCanvas.getByRole("button", { name: "Stop" })).toHaveCount(0);
+  await expect(processingCanvas.getByText(/no pause or cancellation command/)).toBeVisible();
+  const worker = processingCanvas.getByRole("button", { name: "Inspect bounded-media-child, Complete" });
+  await expect(worker).toBeVisible();
+  await worker.click();
+  const workerFocus = page.getByRole("dialog", { name: "bounded-media-child" });
+  await expect(workerFocus).toBeVisible();
+  await expect(workerFocus.getByText(/not an autonomous playback control/)).toBeVisible();
+  await expect(workerFocus.getByText("analysis.evidence.assess", { exact: false })).toBeVisible();
+  await workerFocus.getByRole("button", { name: "Close" }).press("Escape");
+  await expect(workerFocus).toHaveCount(0);
+  await expect(worker).toBeFocused();
+
   const review = production.locator('[data-production-region="publish-review-human-review"]');
   await expect(review.getByRole("heading", { name: "Queued intake human review" })).toBeVisible();
   const control = review.locator("[data-production-review-control-intake-id]");
@@ -77,6 +97,8 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(productionResults.locator('[data-production-results-line-id]')).toHaveCount(16);
   await expect(productionResults).toContainText("not replay Results identity");
   await expect(productionResults).toContainText("does not claim transcription accuracy, English quality, or a Bet G score");
+  await expect(processingCanvas.getByRole("heading", { name: "Private artifact available" })).toBeVisible();
+  await expect(processingCanvas.getByText(/16 timed lines/)).toBeVisible();
 });
 
 test("attested reviewer rejects one verified queued intake with a visible closed reason", async ({ page }, testInfo) => {

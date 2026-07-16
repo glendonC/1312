@@ -24,6 +24,8 @@ import {
   type ProductionStudioProjection,
 } from "../runtime/production/studioProjection";
 import { LocalRuntimeHostClient } from "./client";
+import ProductionProcessingCanvas from "./ProductionProcessingCanvas";
+import ProductionProcessingMock, { type ProcessingMockScenario } from "./ProductionProcessingMock";
 import ProductionCaptionResults from "./ProductionCaptionResults";
 import {
   isLocalRuntimeLanguageTag,
@@ -64,7 +66,13 @@ interface RuntimeView {
   pollMessage: string;
 }
 
-export default function ProductLocalRuntime({ onClose }: { onClose: () => void }) {
+export default function ProductLocalRuntime({
+  onClose,
+  processingMock = null,
+}: {
+  onClose: () => void;
+  processingMock?: ProcessingMockScenario | null;
+}) {
   const [baseUrl, setBaseUrl] = useState(defaultHostUrl);
   const [token, setToken] = useState("");
   const [client, setClient] = useState<LocalRuntimeHostClient | null>(null);
@@ -89,6 +97,8 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
   const pollGeneration = useRef(0);
   const ingestGeneration = useRef(0);
   const productionAdapter = useRef<ProductionStudioAdapter | null>(null);
+  const evidenceDetails = useRef<HTMLDetailsElement | null>(null);
+  const runtimeRoot = useRef<HTMLElement | null>(null);
 
   const selectedSource = sources.find((source) => source.sourceSessionId === sourceId) ?? null;
   const lifecycle = runtime
@@ -115,6 +125,11 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
     pollGeneration.current += 1;
     ingestGeneration.current += 1;
   }, []);
+
+  useEffect(() => {
+    if (!runtime?.status.runtimeId) return;
+    runtimeRoot.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [runtime?.status.runtimeId]);
 
   function stopPolling(): void {
     pollGeneration.current += 1;
@@ -597,8 +612,24 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
 
   const workload = reviewed?.response.forecast.scenarios.baseline.workload ?? null;
 
+  function openRecordedEvidence(): void {
+    const details = evidenceDetails.current;
+    if (!details) return;
+    details.open = true;
+    window.requestAnimationFrame(() => details.scrollIntoView({ block: "start", behavior: "smooth" }));
+  }
+
+  if (processingMock) {
+    return <ProductionProcessingMock scenario={processingMock} onClose={onClose} />;
+  }
+
   return (
-    <section className="product-runtime" aria-labelledby="product-runtime-title">
+    <section
+      ref={runtimeRoot}
+      className="product-runtime"
+      data-runtime={runtime !== null}
+      aria-labelledby="product-runtime-title"
+    >
       <header className="product-runtime-header">
         <div>
           <span>Local production path · separate from replay</span>
@@ -607,14 +638,14 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         <button type="button" onClick={onClose}>Back to source choices</button>
       </header>
 
-      <p className="product-runtime-boundary" role="note">
+      <p className="product-runtime-boundary" role="note" hidden={runtime !== null}>
         This path registers receipted local media with the host, reviews a real workload-floor forecast,
         and starts the bounded one-child runtime proof. After an exact verified human approval, a separate
         private caption job may be explicitly requested. Neither path uploads or publishes, and neither implies a multi-agent swarm.
         Submitted YouTube URLs remain unprocessed recorded previews.
       </p>
 
-      <details className="product-runtime-operator">
+      <details className="product-runtime-operator" hidden={runtime !== null}>
         <summary>Local host setup and CLI escape hatch</summary>
         <ol>
           <li>
@@ -626,7 +657,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         </ol>
       </details>
 
-      <div className="product-runtime-connect">
+      <div className="product-runtime-connect" hidden={runtime !== null}>
         <label>
           <span>Local host origin</span>
           <input
@@ -662,7 +693,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         )}
       </div>
 
-      {client && (
+      {client && !runtime && (
         <fieldset className="product-runtime-ingest">
           <legend>Ingest media you own or control</legend>
           <p>
@@ -733,13 +764,13 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         </fieldset>
       )}
 
-      {client && sources.length === 0 && !ingest && (
+      {client && !runtime && sources.length === 0 && !ingest && (
         <p className="product-runtime-empty-source" role="status">
           No owned source is registered yet. Choose a file and complete the ownership attestation above.
         </p>
       )}
 
-      {client && selectedSource && (
+      {client && selectedSource && !runtime && (
         <div className="product-runtime-session">
           <label>
             <span>Registered owned source</span>
@@ -830,7 +861,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
                 onChange={(event) => updateRequest({ outputDepth: event.currentTarget.value as AnalysisRequest["outputDepth"] })}
               >
                 <option value="evidence">Evidence contract</option>
-                <option value="captions">Captions request contract (no caption producer)</option>
+                <option value="captions">Caption request contract (production requires verified review)</option>
               </select>
             </label>
             <button type="button" disabled={!requestValid || busy !== null} onClick={() => void reviewPlan()}>
@@ -845,7 +876,7 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
         </div>
       )}
 
-      {reviewed && workload && (
+      {reviewed && workload && !runtime && (
         <section className="product-runtime-plan" aria-labelledby="product-runtime-plan-title">
           <header>
             <span>studio.forecast.v1 · not started or frozen</span>
@@ -902,53 +933,76 @@ export default function ProductLocalRuntime({ onClose }: { onClose: () => void }
 
       {error && <p className="product-runtime-error" role="alert">{error}</p>}
 
-      {runtime && lifecycle && (
+      {runtime && lifecycle && selectedSource && (
         <section className="product-runtime-status" aria-labelledby="product-runtime-status-title">
-          <header>
-            <span>Production journal · not replay topology</span>
-            <h2 id="product-runtime-status-title">Local runtime status</h2>
-          </header>
-          <p data-tone={lifecycle.tone} role="status"><b>{lifecycle.label}</b> · {lifecycle.detail}</p>
-          <dl>
-            <div><dt>Command</dt><dd>{runtime.status.commandId}</dd></div>
-            <div><dt>Runtime</dt><dd>{runtime.status.runtimeId}</dd></div>
-            <div><dt>Journal</dt><dd>{runtime.status.journalId}</dd></div>
-            <div><dt>Frozen forecast</dt><dd>{runtime.status.forecast?.frozenForecastId ?? "Unavailable after initialization failure"}</dd></div>
-            <div><dt>Start receipt</dt><dd>{runtime.status.runStartReceipt?.contentId ?? "Unavailable after initialization failure"}</dd></div>
-            <div><dt>Journal poll</dt><dd>{runtime.pollMessage}</dd></div>
-            <div><dt>Consumed evidence</dt><dd>Cursor {runtime.cursor} · {runtime.eventCount} validated events{runtime.lastEventType ? ` · last ${runtime.lastEventType}` : ""}</dd></div>
-          </dl>
-          {runtime.pollState === "error" && client && productionAdapter.current && (
-            <button type="button" onClick={() => {
-              const adapter = productionAdapter.current;
-              if (adapter) void beginPolling(client, runtime.status, runtime.cursor, adapter);
-            }}>
-              Retry polling from cursor {runtime.cursor}
-            </button>
-          )}
-          <p>
-            Audit the host journal separately in <a href="/studio/runtime/">Production Run Explorer</a>. These events are not inserted into the recorded RunBundle or agent graph.
-          </p>
-          <ProductionJournalFacts
-            projection={runtime.production}
-            assessmentAudits={runtime.assessmentAudits}
-            decisionReceipts={runtime.decisionReceipts}
-            publishReviewIntakes={runtime.publishReviewIntakes}
-            publishReviewDecisions={runtime.publishReviewDecisions}
-            captionProductions={runtime.captionProductions}
-            reviewOperator={runtime.reviewOperator}
-            reviewBusy={reviewBusy}
-            reviewError={reviewError}
-            captionBusy={captionBusy}
-            captionError={captionError}
-            onPublishReviewDecision={submitPublishReviewDecision}
-            onPublishReviewRevocation={submitPublishReviewRevocation}
-            onCaptionProduction={submitCaptionProduction}
+          <h2 id="product-runtime-status-title" className="product-runtime-visually-hidden">Local runtime status</h2>
+          <ProductionProcessingCanvas
+            source={selectedSource}
+            lifecycle={lifecycle}
+            status={runtime.status}
+            production={runtime.production}
+            cursor={runtime.cursor}
+            eventCount={runtime.eventCount}
+            lastEventType={runtime.lastEventType}
+            pollState={runtime.pollState}
+            pollMessage={runtime.pollMessage}
+            captionResultCount={runtime.captionResults.length}
+            onOpenEvidence={openRecordedEvidence}
+            onRetryPolling={runtime.pollState === "error" && client && productionAdapter.current
+              ? () => {
+                  const adapter = productionAdapter.current;
+                  if (adapter) void beginPolling(client, runtime.status, runtime.cursor, adapter);
+                }
+              : undefined}
+            onPrepareAnotherRun={clearReviewedState}
           />
-          <ProductionCaptionResults
-            runtimeId={runtime.status.runtimeId}
-            results={runtime.captionResults}
-          />
+
+          <details
+            ref={evidenceDetails}
+            id="product-processing-evidence"
+            className="product-runtime-evidence"
+            open
+          >
+            <summary>
+              <span>
+                <b>Recorded evidence and review controls</b>
+                <small>{runtime.eventCount} validated events · separate from replay</small>
+              </span>
+            </summary>
+            <div className="product-runtime-evidence-boundary">
+              <p>
+                Audit the host journal separately in <a href="/studio/runtime/">Production Run Explorer</a>.
+                These events are not inserted into the recorded RunBundle or its agent graph.
+              </p>
+              <dl>
+                <div><dt>Command</dt><dd>{runtime.status.commandId}</dd></div>
+                <div><dt>Runtime</dt><dd>{runtime.status.runtimeId}</dd></div>
+                <div><dt>Journal</dt><dd>{runtime.status.journalId}</dd></div>
+                <div><dt>Frozen forecast</dt><dd>{runtime.status.forecast?.frozenForecastId ?? "Unavailable after initialization failure"}</dd></div>
+                <div><dt>Start receipt</dt><dd>{runtime.status.runStartReceipt?.contentId ?? "Unavailable after initialization failure"}</dd></div>
+              </dl>
+            </div>
+            <ProductionJournalFacts
+              projection={runtime.production}
+              assessmentAudits={runtime.assessmentAudits}
+              decisionReceipts={runtime.decisionReceipts}
+              publishReviewIntakes={runtime.publishReviewIntakes}
+              publishReviewDecisions={runtime.publishReviewDecisions}
+              captionProductions={runtime.captionProductions}
+              reviewOperator={runtime.reviewOperator}
+              reviewBusy={reviewBusy}
+              reviewError={reviewError}
+              captionBusy={captionBusy}
+              captionError={captionError}
+              onPublishReviewDecision={submitPublishReviewDecision}
+              onPublishReviewRevocation={submitPublishReviewRevocation}
+              onCaptionProduction={submitCaptionProduction}
+            />
+            <ProductionCaptionResults
+              runtimeId={runtime.status.runtimeId}
+              results={runtime.captionResults}
+            />
+          </details>
         </section>
       )}
     </section>

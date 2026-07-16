@@ -5,6 +5,10 @@ import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { Play } from "./glyphs";
 import ProductLocalRuntime from "./localRuntime/ProductLocalRuntime";
+import {
+  isProcessingMockScenario,
+  type ProcessingMockScenario,
+} from "./localRuntime/ProductionProcessingMock";
 import Preflight from "./preflight/Preflight";
 import SourceEntry from "./SourceEntry";
 import { useBundle, useStudio } from "./store";
@@ -117,7 +121,12 @@ function StudioOwnedSourceControl({ open }: { open: () => void }) {
 }
 
 export default function InputAct() {
-  const [ownedSourceOpen, setOwnedSourceOpen] = useState(false);
+  const [processingMock] = useState<ProcessingMockScenario | null>(() => {
+    if (!import.meta.env.DEV || typeof window === "undefined") return null;
+    const requested = new URLSearchParams(window.location.search).get("processingMock");
+    return isProcessingMockScenario(requested) ? requested : null;
+  });
+  const [ownedSourceOpen, setOwnedSourceOpen] = useState(processingMock !== null);
   const loadStatus = useStudio((state) => state.loadStatus);
   const error = useStudio((state) => state.error);
   const retry = useStudio((state) => state.retry);
@@ -141,7 +150,10 @@ export default function InputAct() {
       {preflightStatus !== "idle" && !clientSourceCheck && !ownedSourceOpen && <Preflight />}
 
       {ownedSourceOpen && loadStatus === "ready" && (
-        <ProductLocalRuntime onClose={() => setOwnedSourceOpen(false)} />
+        <ProductLocalRuntime
+          processingMock={processingMock}
+          onClose={() => setOwnedSourceOpen(false)}
+        />
       )}
 
       {!ownedSourceOpen && (preflightStatus === "idle" || clientSourceCheck) && loadStatus === "ready" && (

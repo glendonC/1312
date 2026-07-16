@@ -24,6 +24,7 @@ test("production validation facade preserves its exact public export surface", (
     "assertProductionSourceSession",
     "assertReportDecisionRequest",
     "assertReportSubmitRequest",
+    "assertRootOutputDispositionRequest",
     "assertRuntimeArtifact",
     "assertRuntimeEvent",
     "assertRuntimeLimits",
@@ -33,6 +34,7 @@ test("production validation facade preserves its exact public export surface", (
     "validateEvidenceAssessmentReceipt",
     "validateEvidenceDecisionReceipt",
     "validateEvidenceReadReceipt",
+    "validateRootOutputDispositionReceipt",
   ]);
 });
 

@@ -23,6 +23,7 @@ import type {
   PublishReviewRevocationReceipt,
   PublishReviewRevocationRequest,
   ReportRecord,
+  RootOutputDispositionReceipt,
   RuntimeArtifact,
   SpawnRejection,
   SpawnRequestInput,
@@ -323,6 +324,16 @@ export interface ReportDecidedEvent extends RuntimeEventBase {
   };
 }
 
+export interface RootOutputDispositionRecordedEvent extends RuntimeEventBase {
+  type: "root.output_disposition_recorded";
+  data: {
+    dispositionId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: RootOutputDispositionReceipt;
+  };
+}
+
 export type RuntimeEvent =
   | ArtifactRecordedEvent
   | TaskCreatedEvent
@@ -358,7 +369,8 @@ export type RuntimeEvent =
   | CaptionProductionCompletedEvent
   | CaptionProductionFailedEvent
   | ReportSubmittedEvent
-  | ReportDecidedEvent;
+  | ReportDecidedEvent
+  | RootOutputDispositionRecordedEvent;
 
 export type PendingRuntimeEvent = RuntimeEvent extends infer Event
   ? Event extends RuntimeEvent

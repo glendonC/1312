@@ -321,7 +321,7 @@ values distinctly and explain which assumptions dominate the estimate.
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and an atomic production-only source-artifact/task/spawn-decision/worker/grant/operation/output-artifact/report projection streamed by the owned-source host poll | Add larger scheduler behavior without altering recorded bundles or claiming a complete swarm |
 | Workspaces | Role-specific legacy trace projections plus boring production-only source-artifact, task, spawn-decision, grant, operation, output-lineage, and report regions with in-page links only to identities rendered in that projection | A production agent workspace remains separate work |
 | Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD/language receipts, post-run evidence index, a receipted ffmpeg extract host, and one range-bound ffmpeg audio-activity observation that returns only `signal` or `digital_silence` with volume measurements. Task-private bridges expose granted `media_extract`/`media_seek`, `evidence_read`, `evidence_assess`, and `evidence_decide`; evidence reads are source/window-bound and return only intersecting facts clipped to the task window. The default run-005 proof executes one observation, two reads, one bounded assessment, then one deterministic decision over the audited assessment; V1 gets none of the evidence/assessment/decision grants | Additional individually implemented media operations and detector-backed speech/acoustic/overlap tracks or stems; audio activity is not speech or meaning |
-| Coordination | Legacy trace prose plus real bounded Codex child execution, a receipted structured opinion over completed read receipts, a separate deterministic decision over audited assessment identities, a host-only queued/rejected publish-review intake producer, one host-authoritative attested human review/revocation producer, a separate bounded caption producer, worker-output artifacts, structured report-up, and separate validated assessment/decision/intake/review/caption/report projections in the owned-source product path | Parent/orchestrator execution and larger task coordination; never retrofit legacy prose into handoffs, caption input, or publication authority |
+| Coordination | Legacy trace prose plus one production root→child round trip: the root-owned scheduler request receives role-constrained grants, the child consumes a one-use permit beneath the durable host launch claim, and one reported worker-output artifact receives a private content-addressed `studio.root-output-disposition.receipt.v1` promoting or rejecting it with exact spawn/scope/grant/execution/report/artifact lineage. Existing evidence assessment/decision, intake, human review/revocation, and caption producers remain separate | Model-driven root planning/synthesis and larger coordination remain missing; the current root choice is deterministic host composition, not autonomous cognition, and legacy prose never becomes handoff authority |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Recorded Results remain separate. The owned-source path projects validated decisions, private queued/rejected intake, immutable human approve/reject/revoke receipts, and private caption job/artifact identities plus honest counts. It does not merge those artifacts into replay Results and has no upload or publication producer | Wire verified production captions into the Studio Results surface without replay identity; keep Bet G, study, upload, and publication separate |
 | Learning | Immutable proposal/decision/revocation/materialization lifecycle; legacy memory marked unreviewed | Reviewer UX and recording the exact accepted snapshot consumed by a future run |
@@ -338,17 +338,17 @@ query normalized facts, resolve source event/receipt/artifact identities, and pr
 workers. It does not start the runtime, search raw journal text, insert events into `run-005` or
 `run-006`, or claim that local smoke activity is a recorded demo run.
 
-## Implementation ledger — 2026-07-15
+## Implementation ledger — 2026-07-16
 
 | Phase | Status | Honest boundary |
 |---|---|---|
 | 0 — evidence shell | Implemented | Build/runtime assertions and exact negative mutations are present. A targeted desktop Playwright case now asserts the host-backed non-empty operation and output lineage, but it was not browser-executed in this slice because the in-app browser exposed no target. |
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
 | 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Default Studio now sends explicitly attested owned bytes to the development host, which composes the existing ingest and V1 seal producers and hot-registers the validated source. This browser path does not run speech or language detection, so those findings remain honestly unavailable. Pinned Silero VAD and Whisper language producers remain available to the CLI preflight chain. Hosted/link submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
-| 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, installs only granted media/evidence/assessment/decision MCP tools, and requires every granted media capability, evidence artifact scope, assessment grant, and decision grant to complete before accepting output. `run-005` remains only the explicit npm smoke/test input. One guarded real-Codex attempt on 2026-07-15 completed seek plus both reads but hit the 45-second wall limit before assess/decide; it is not a passed closed-chain verification. |
+| 3 — tasks and agents | One receipt-backed root→child round trip implemented | `scripts/run-local-worker.ts` requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the bounded `codex exec` launcher. The scheduler enforces a closed worker-role capability matrix; the launcher consumes one permit, registers one isolated child, and requires every granted tool before report-up. The root then promotes or rejects exactly one reported worker-output artifact through `studio.root-output-disposition.receipt.v1`, which closes the accepted spawn, child scope/grants, executor receipt, report decision, input content, and root identity. The durable host launch claim prevents automatic relaunch. Root planning remains deterministic host composition; there is no model root, synthesis, second child, or recursion. The guarded 2026-07-15 real-Codex attempt remains incomplete and is not upgraded by deterministic coverage. |
 | 4 — scoped media/evidence | One perceptual operation plus extract, bounded read, assessment, and audited decision implemented | `media.extract` retains exact ffmpeg extraction authority. The granted `media.seek` path now emits a content-bound `studio.media-perception.receipt.v1` with one exact-range `audio_activity` value (`signal` or `digital_silence`) and volume measurements; it does not claim speech, words, speakers, music, or meaning. `evidence.read` v2 scopes each preflight artifact to its one source and task window and clips every intersecting returned fact to that window. `analysis.evidence.assess` and `analysis.evidence.decide` retain their prior hard bounds and audit-state policy. Separate bridges inject task/agent/operation identity and accept no paths, bytes, prose, caller outcome, or publication controls. Run-005 executes one observation, two reads, one assessment, and one decision; V1 runs only the observation. No new speech/language detector, caption, or publisher runs. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
-| 6 — provenance | Partially implemented | Assessment, decision, intake, human review, review-revocation, and caption-production started/completed/failed events retain exact inputs, private content-addressed artifacts, and terminal facts. Each authenticated read reopens its own bytes and recursively verifies the complete prior chain. Product regions expose queued/rejected intake, immutable approve/reject/revoke receipts, reviewer identity/attestation, caption executor/status/counts/artifact identities, and stable gap reasons. Reading is not an artifact producer; assessment is an opinion; decision is an audit-state gate; intake is unreviewed queue lineage; approval is eligibility only. Caption coverage is not quality, upload, or publication. |
+| 6 — provenance | Partially implemented | Root output disposition, assessment, decision, intake, human review, review-revocation, and caption-production events retain exact inputs and private content-addressed artifacts. Root disposition is a delegation/handoff receipt only: it does not certify the worker output's meaning. Each later authenticated read reopens its own bytes and recursively verifies its prior chain. Product regions expose the existing downstream facts, while richer root-promotion UI remains deliberately absent. Reading is not an artifact producer; assessment is opinion; decision is an audit-state gate; intake is unreviewed queue lineage; approval is eligibility only. Caption coverage is not quality, upload, or publication. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
 | 8 — verification | Partially implemented | Runtime tests carry run-005 through grant → read → assessment → audit → deterministic decision → queued intake → attested approval → bounded caption production → full caption/receipt/upstream re-verification, as well as reject and revoke branches. The fixture produces 16 timed lines with 13 EN available, 2 withheld, and 1 unavailable; tests reject no approval, revoked approval, raw/path/prose/open input, duplicate starts, and artifact tamper, and prove V1 emptiness. Stdio MCP and fake-Codex seams execute the earlier gate; the optional real caption executor and real Codex are not required for seam acceptance. Browser assertions cover the new region when an external deterministic host is supplied. |
 | 9 — observability | First production query path implemented | A deterministic post-run indexer rejects malformed production journals, hashes the exact journal and canonical event/receipt sources, cross-checks stored receipt links, and emits only currently produced task, agent, `media.extract`/`media.seek`, handoff, active-span, measured-token, and failure facts. The typed query store supports structured filters and aggregations across immutable indexes; `/studio/runtime/` uses one operator-selected local index and links results to source identities without raw-log search. CLI-default model identity, provider units, billing, queue/dependency/reporting spans, critical path, persistent cross-run storage, and retention/access policy remain unavailable. |
@@ -468,11 +468,21 @@ non-whitespace punctuation; it is an authorization unit, not measured model/prov
 paired `analysis.evidence.decide` grant permits one decision over at most four audited assessment
 identities. Its host re-runs the assessment audit after the decision-start event and applies the
 closed `withhold_on_preserved_gap_state` policy; the child cannot submit reasons or an outcome. The
-child must complete every granted read, the assessment, and the decision. V1 receives none of
+child is an `analysis` worker; the scheduler's role matrix permits its seek/read/assess/decide/report
+set while refusing those analysis powers to a media worker. The child must complete every granted
+read, assessment, and decision. V1 receives none of
 these grants. The child
 receives no media path or bytes, and no transcription,
 translation, captions, study output, new detector execution, parent/orchestrator model execution,
 or multi-worker swarm is implied.
+After report-up, the deterministic host acts under the working root task identity to accept or
+reject the report and records exactly one private `studio.root-output-disposition.receipt.v1` over
+one selected worker-output artifact. The receipt binds the accepted spawn request, child role,
+exact scopes and grants, completed executor receipt, report decision, input content identity, and
+root authority; its root-owned artifact retains the child artifact as lineage. Promotion refuses
+pending/rejected reports, unreported artifacts, wrong root identity, scope/grant drift, duplicate
+disposition, and content drift. This proves a bounded control-plane round trip, not a model root's
+planning, semantic understanding, synthesis, recursion, or peer communication.
 After a completed decision, the application-level host invokes a separate publish-review intake
 producer; no new child capability or MCP tool is exposed. The intake producer accepts only the exact
 decision operation/artifact/receipt/content identity, calls the same stored decision verification as
@@ -523,7 +533,9 @@ not project caption prose, merge into `RunBundle`, or claim a Results/replay ide
 The read endpoints carry no paths or receipt bytes; they
 return empty lists until their completed operation exists and fail the whole response closed when
 stored content or lineage does not agree with the validated journal.
-The deterministic run-005 proof invokes the real ffmpeg seek host, reads both pre-existing pinned
+The deterministic run-005 proof records root request → role-constrained grant → one-use child permit
+and durable launch claim → child work → structured report → root promotion. Within the child work it
+invokes the real ffmpeg seek host, reads both pre-existing pinned
 receipts, emits one `studio.evidence-assessment.receipt.v1`, reopens it for audit, and emits then
 reopens one `studio.evidence-decision.receipt.v1`, then queues one verified publish-review intake;
 a withheld fixture emits rejected intake with preserved reasons. After explicit approval, the
@@ -973,7 +985,7 @@ The next production slices, in dependency order:
     Deterministic, stdio MCP, and fake-Codex seams are tested; real Codex and browser assertions were
     not executed for this tranche.
 15. Implemented 2026-07-15: the authenticated assessment-audit endpoint reopens the private
-    `studio.evidence-assessment.receipt.v1` object and every cited `studio.evidence-read.receipt.v1`
+    `studio.evidence-assessment.receipt.v1` object and every cited `studio.evidence-read.receipt.v2`
     object by content identity, verifies canonical hashes/receipt ids, exact claim range/value/state
     derivation, returned-fact indexes, and journal/artifact/task lineage, and returns only the closed
     claim/citation view. Product navigation targets only already-rendered read receipts, artifacts,
@@ -1031,6 +1043,16 @@ The next production slices, in dependency order:
     under stable caption-production selectors. Focused host/client tests cover no approval, happy
     path, revoked approval, caller path/prose/open input, tamper, and V1 empty. No upload, public
     publication, Results merge, English-quality, SOTA, or Studio-completeness claim is made.
+20. Implemented 2026-07-16: one root-owned spawn request receives only capabilities allowed by a
+    closed worker-role matrix; one child consumes the scheduler's one-use permit beneath the durable
+    host launch claim, completes its bounded work, and reports one content-addressed worker output.
+    The working root accepts or rejects the report, then `studio.root-output-disposition.receipt.v1`
+    binds the exact accepted spawn, child scope/grants, executor receipt, report decision, selected
+    artifact/content, and root identity into one private root-owned promote/reject artifact. Tests
+    cover accepted promotion, report rejection, premature/contradictory/wrong-artifact/duplicate
+    promotion refusal, spawn denial, out-of-parent scope, role/grant denial, and forged receipt
+    lineage. The root action remains deterministic host composition, not model planning or synthesis;
+    there is no second child, recursion, peer chat, richer swarm UI, or caption/QC causality.
 
 Acoustic classification, overlap detection, source separation, and separation-quality gates follow
 the same rule: choose a real deterministic producer first, then add the contract, fixture, policy,

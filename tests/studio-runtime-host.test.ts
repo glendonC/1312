@@ -377,9 +377,73 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(atHead.nextCursor, cursor);
     assert.equal(atHead.reachedHead, true);
     assert.equal(cursor, terminalStatus.journalHead);
+    assert.equal(await runtime.store.hasLaunchClaim(ack.commandId), true);
     const direct = await readValidatedRuntimeJournal(runtime.store.paths(ack.runtimeId).journalPath, ack.runtimeId);
     assert.deepEqual(collected, direct.events);
     assert.deepEqual(projectRuntimeEvents(ack.runtimeId, collected), direct.state);
+    const roundTripTypes = [
+      "spawn.requested",
+      "spawn.decided",
+      "executor.finished",
+      "report.submitted",
+      "report.decided",
+      "root.output_disposition_recorded",
+    ];
+    const roundTripIndexes = roundTripTypes.map((type) =>
+      direct.events.findIndex((event) => event.type === type));
+    assert.ok(roundTripIndexes.every((index) => index >= 0));
+    assert.deepEqual(roundTripIndexes, [...roundTripIndexes].sort((left, right) => left - right));
+    const rootDispositionEvent = direct.events.find((event) =>
+      event.type === "root.output_disposition_recorded");
+    assert.ok(rootDispositionEvent?.type === "root.output_disposition_recorded");
+    const rootDisposition = rootDispositionEvent.data.receipt;
+    const childRegisteredIndex = direct.events.findIndex((event) =>
+      event.type === "agent.registered" &&
+      event.data.agent.id === rootDisposition.delegation.childAgentId);
+    assert.ok(childRegisteredIndex > roundTripIndexes[1] && childRegisteredIndex < roundTripIndexes[2]);
+    assert.equal(rootDisposition.schema, "studio.root-output-disposition.receipt.v1");
+    assert.equal(rootDisposition.decision.outcome, "promoted_to_root");
+    assert.equal(rootDisposition.delegation.workerKind, "analysis");
+    assert.deepEqual(
+      rootDisposition.delegation.grants,
+      direct.state.tasks[rootDisposition.delegation.childTaskId].grants,
+    );
+    assert.deepEqual(
+      rootDisposition.delegation.mediaScope,
+      direct.state.tasks[rootDisposition.delegation.childTaskId].mediaScope,
+    );
+    assert.equal(rootDisposition.input.artifactId, direct.state.reports[rootDisposition.report.reportId].outputArtifactIds[0]);
+    assert.equal(Object.keys(direct.state.rootOutputDispositions).length, 1);
+    assert.equal(
+      direct.state.rootOutputDispositions[rootDisposition.dispositionId].outputArtifactId,
+      rootDispositionEvent.data.outputArtifactId,
+    );
+    const rootDispositionArtifact = direct.state.artifacts[rootDispositionEvent.data.outputArtifactId];
+    assert.equal(rootDispositionArtifact.origin.kind, "root_output_disposition");
+    assert.deepEqual(rootDispositionArtifact.sourceArtifactIds, [rootDisposition.input.artifactId]);
+    assert.equal(rootDispositionArtifact.producerTaskId, rootDisposition.authority.rootTaskId);
+    assert.equal(rootDispositionArtifact.producerAgentId, rootDisposition.authority.rootAgentId);
+    const changedGrant = structuredClone(direct.events);
+    const changedGrantEvent = changedGrant.find((event) =>
+      event.type === "root.output_disposition_recorded");
+    assert.ok(changedGrantEvent?.type === "root.output_disposition_recorded");
+    const mediaGrant = changedGrantEvent.data.receipt.delegation.grants.find((grant) =>
+      grant.capability === "media.seek");
+    assert.ok(mediaGrant?.mediaScope[0]);
+    mediaGrant.mediaScope[0].startMs += 1;
+    assert.throws(
+      () => projectRuntimeEvents(ack.runtimeId, changedGrant),
+      /changed spawn, scope, or grant lineage/,
+    );
+    const changedArtifactIdentity = structuredClone(direct.events);
+    const changedArtifactEvent = changedArtifactIdentity.find((event) =>
+      event.type === "root.output_disposition_recorded");
+    assert.ok(changedArtifactEvent?.type === "root.output_disposition_recorded");
+    changedArtifactEvent.data.receipt.input.contentId = `sha256:${"0".repeat(64)}`;
+    assert.throws(
+      () => projectRuntimeEvents(ack.runtimeId, changedArtifactIdentity),
+      /changed child output identity/,
+    );
     const inspector = await loadRuntimeInspectorJournal(
       await readFile(runtime.store.paths(ack.runtimeId).journalPath, "utf8"),
     );

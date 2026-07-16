@@ -4,7 +4,7 @@ Working order: finish and verify each slice before starting the next.
 
 ## 1. Range-bound perception and evidence reads
 
-- Status: complete for Slice 1; awaiting commit approval.
+- Status: committed and complete in `b3f1468`.
 - Real: one host-owned operation returns a content-bound `signal`/`digital_silence` observation for one source and granted half-open window; existing detector evidence reads are bound to that source/window and clip intersecting facts to it.
 - Missing: speech/word/music/speaker perception and any additional perceptual operation.
 - Done when: the closed contract, content-bound receipt, journal/projection, deterministic success cases, and scope/content/window failure cases pass; no returned evidence fact escapes the granted window.
@@ -12,11 +12,11 @@ Working order: finish and verify each slice before starting the next.
 
 ## 2. Root -> child round trip
 
-- Status: pending.
-- Real: scheduler, one child launch, and report-up primitives exist, but the production proof is host-scripted.
-- Missing: a receipt-backed root decision to spawn one bounded child, consume its report, and promote or reject its output.
+- Status: complete for Slice 2; awaiting commit approval.
+- Real: one root-owned scheduler request receives role-constrained grants, one child consumes a one-use permit under the durable host launch claim, and one reported worker-output artifact receives a content-addressed root promote/reject disposition with exact spawn, scope, grant, execution, report, artifact, and receipt lineage.
+- Missing: model-driven root planning or synthesis, more than one child/output, recursion, peer coordination, and autonomous choice of whether or what to delegate; the current root policy remains deterministic host composition.
 - Done when: the journal proves request -> grant -> child work -> report -> root decision with exact task, scope, artifact, and receipt lineage, including rejection paths.
-- Fake-claim risk: calling a predetermined host sequence agent delegation or synthesis.
+- Fake-claim risk: calling the receipted deterministic round trip autonomous planning, multi-agent synthesis, or evidence that the root understood the media.
 
 ## 3. Current-run captions and QC
 

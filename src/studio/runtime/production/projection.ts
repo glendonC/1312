@@ -48,6 +48,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     executions: {},
     modelUsage: {},
     reports: {},
+    rootOutputDispositions: {},
   };
 }
 
@@ -109,6 +110,19 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
         execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId,
         event,
         `artifact ${artifact.id} changed its worker execution producer`,
+      );
+    } else if (artifact.origin.kind === "root_output_disposition") {
+      const report = next.reports[artifact.origin.reportId];
+      const expectedStatus = artifact.origin.outcome === "promoted_to_root" ? "accepted" : "rejected";
+      invariant(report?.status === expectedStatus, event, `artifact ${artifact.id} has no matching root report decision`);
+      invariant(
+        report.parentTaskId === artifact.producerTaskId &&
+          report.parentAgentId === artifact.producerAgentId &&
+          report.outputArtifactIds.includes(artifact.origin.inputArtifactId) &&
+          artifact.sourceArtifactIds.length === 1 &&
+          artifact.sourceArtifactIds[0] === artifact.origin.inputArtifactId,
+        event,
+        `artifact ${artifact.id} changed its root disposition lineage`,
       );
     } else if (artifact.origin.kind === "evidence_assessment") {
       const assessment = next.evidenceAssessments[artifact.origin.operationId];
@@ -1380,6 +1394,88 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     report.decisionReason = event.data.reason;
     child.status = event.data.accepted ? "completed" : "working";
     next.agents[report.agentId].status = event.data.accepted ? "retired" : "working";
+    return next;
+  }
+
+  if (event.type === "root.output_disposition_recorded") {
+    invariant(event.producer.kind === "handoff_host", event, "root output dispositions must come from the handoff host");
+    const receipt = event.data.receipt;
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    const report = next.reports[receipt.report.reportId];
+    const input = next.artifacts[receipt.input.artifactId];
+    const spawn = next.spawnRequests[receipt.delegation.spawnRequestId];
+    const child = next.tasks[receipt.delegation.childTaskId];
+    const expectedStatus = receipt.decision.outcome === "promoted_to_root" ? "accepted" : "rejected";
+    invariant(!next.rootOutputDispositions[event.data.dispositionId], event, `root disposition ${event.data.dispositionId} is duplicated`);
+    invariant(
+      receipt.dispositionId === event.data.dispositionId,
+      event,
+      `root disposition ${event.data.dispositionId} changed identity`,
+    );
+    invariant(report?.status === expectedStatus, event, `root disposition ${receipt.dispositionId} has no matching report decision`);
+    invariant(
+      report.decisionReason === receipt.report.decisionReason &&
+        report.taskId === receipt.delegation.childTaskId &&
+        report.agentId === receipt.delegation.childAgentId &&
+        report.parentTaskId === receipt.authority.rootTaskId &&
+        report.parentAgentId === receipt.authority.rootAgentId &&
+        report.outputArtifactIds.includes(receipt.input.artifactId),
+      event,
+      `root disposition ${receipt.dispositionId} changed report lineage`,
+    );
+    invariant(
+      spawn?.accepted === true &&
+        spawn.requestedByTaskId === receipt.authority.rootTaskId &&
+        spawn.requestedByAgentId === receipt.authority.rootAgentId &&
+        spawn.taskId === receipt.delegation.childTaskId &&
+        spawn.agentId === receipt.delegation.childAgentId &&
+        child?.workerKind === receipt.delegation.workerKind &&
+        JSON.stringify(child.mediaScope) === JSON.stringify(receipt.delegation.mediaScope) &&
+        sameGrants(child.grants, receipt.delegation.grants),
+      event,
+      `root disposition ${receipt.dispositionId} changed spawn, scope, or grant lineage`,
+    );
+    invariant(
+      input?.origin.kind === "worker_output" &&
+        input.id === receipt.input.artifactId &&
+        input.content.contentId === receipt.input.contentId &&
+        input.kind === receipt.input.kind &&
+        input.producerTaskId === receipt.input.producerTaskId &&
+        input.producerAgentId === receipt.input.producerAgentId &&
+        input.origin.executionId === receipt.input.executionId &&
+        input.origin.receiptId === receipt.input.executorReceiptId &&
+        input.origin.receiptContentId === receipt.input.executorReceiptContentId,
+      event,
+      `root disposition ${receipt.dispositionId} changed child output identity`,
+    );
+    invariant(
+      artifact?.origin.kind === "root_output_disposition" &&
+        artifact.origin.dispositionId === receipt.dispositionId &&
+        artifact.origin.reportId === receipt.report.reportId &&
+        artifact.origin.inputArtifactId === receipt.input.artifactId &&
+        artifact.origin.outcome === receipt.decision.outcome &&
+        artifact.origin.receiptId === receipt.receiptId &&
+        artifact.origin.receiptContentId === event.data.receiptContentId &&
+        artifact.content.contentId === event.data.receiptContentId &&
+        artifact.producerTaskId === receipt.authority.rootTaskId &&
+        artifact.producerAgentId === receipt.authority.rootAgentId,
+      event,
+      `root disposition ${receipt.dispositionId} is not bound to its root-owned receipt artifact`,
+    );
+    next.rootOutputDispositions[receipt.dispositionId] = {
+      id: receipt.dispositionId,
+      reportId: receipt.report.reportId,
+      spawnRequestId: receipt.delegation.spawnRequestId,
+      rootTaskId: receipt.authority.rootTaskId,
+      rootAgentId: receipt.authority.rootAgentId,
+      childTaskId: receipt.delegation.childTaskId,
+      childAgentId: receipt.delegation.childAgentId,
+      inputArtifactId: receipt.input.artifactId,
+      outputArtifactId: artifact.id,
+      outcome: receipt.decision.outcome,
+      receiptId: receipt.receiptId,
+      receiptContentId: event.data.receiptContentId,
+    };
     return next;
   }
 

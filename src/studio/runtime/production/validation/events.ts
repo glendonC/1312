@@ -25,6 +25,7 @@ import {
   validateModelUsageReceipt,
 } from "./execution.ts";
 import { validateReportRecord } from "./handoffs.ts";
+import { validateRootOutputDispositionReceipt } from "./rootHandoff.ts";
 import {
   assertMediaExtractRequest,
   assertMediaSeekRequest,
@@ -329,6 +330,17 @@ export function assertRuntimeEvent(
     string(data.decidedByAgentId, context, "event.data.decidedByAgentId");
     boolean(data.accepted, context, "event.data.accepted");
     string(data.reason, context, "event.data.reason");
+  } else if (type === "root.output_disposition_recorded") {
+    exact(
+      data,
+      ["dispositionId", "outputArtifactId", "receiptContentId", "receipt"],
+      context,
+      "event.data",
+    );
+    string(data.dispositionId, context, "event.data.dispositionId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateRootOutputDispositionReceipt(data.receipt, context, "event.data.receipt");
   } else {
     fail(context, "event.type", `has unknown value ${type}`);
   }

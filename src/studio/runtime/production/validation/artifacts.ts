@@ -238,6 +238,53 @@ export function validateRuntimeArtifact(
         "worker output artifacts require a task producer and cannot claim media lineage",
       );
     }
+  } else if (kind === "root_output_disposition") {
+    exact(
+      origin,
+      [
+        "kind",
+        "dispositionId",
+        "reportId",
+        "inputArtifactId",
+        "outcome",
+        "receiptId",
+        "receiptContentId",
+      ],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.dispositionId, context, `${path}.origin.dispositionId`);
+    string(origin.reportId, context, `${path}.origin.reportId`);
+    const inputArtifactId = string(origin.inputArtifactId, context, `${path}.origin.inputArtifactId`);
+    oneOf(
+      origin.outcome,
+      new Set(["promoted_to_root", "rejected_by_root"]),
+      context,
+      `${path}.origin.outcome`,
+    );
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(
+      origin.receiptContentId,
+      context,
+      `${path}.origin.receiptContentId`,
+    );
+    if (
+      mediaClass !== "non_media" ||
+      item.publication !== "private" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      sources.length !== 1 ||
+      sources[0] !== inputArtifactId ||
+      task === null ||
+      agent === null ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) {
+      fail(
+        context,
+        path,
+        "root output disposition artifacts must be private content-addressed receipts with one child output and one root producer",
+      );
+    }
   } else if (kind === "preflight_evidence") {
     exact(
       origin,

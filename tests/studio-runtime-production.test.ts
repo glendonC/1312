@@ -27,6 +27,7 @@ import {
   validateRuntimeObservabilityIndex,
 } from "../src/studio/runtime/production/observability/validation.ts";
 import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
+import { RootOutputDispositionHost } from "../src/studio/runtime/production/rootOutputDispositionHost.ts";
 import {
   applyRuntimeEvent,
   initialRuntimeProjection,
@@ -462,6 +463,39 @@ test("scheduler issues media.seek only when the capability is grantable", async 
   }
 });
 
+test("scheduler rejects capabilities that do not belong to the requested child role", async () => {
+  const runtime = await harness({
+    ...BASE_LIMITS,
+    grantableCapabilities: [
+      ...BASE_LIMITS.grantableCapabilities,
+      "analysis.evidence.assess",
+    ],
+  });
+  try {
+    const input = childInput(runtime);
+    input.requiredCapabilities = ["analysis.evidence.assess", "report.submit"];
+    const decision = await runtime.scheduler.requestSpawn(
+      runtime.rootTaskId,
+      runtime.rootAgentId,
+      input,
+    );
+    assert.equal(decision.accepted, false);
+    assert.equal(decision.rejection, "capability_not_grantable");
+    assert.equal(decision.permit, null);
+    const events = await runtime.ledger.events();
+    const requested = events.find((event) =>
+      event.type === "spawn.requested" && event.data.requestId === decision.requestId);
+    const denied = events.find((event) =>
+      event.type === "spawn.decided" && event.data.requestId === decision.requestId);
+    assert.ok(requested?.type === "spawn.requested");
+    assert.ok(denied?.type === "spawn.decided");
+    assert.equal(denied.data.accepted, false);
+    assert.deepEqual(denied.data.grants, []);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
 test("Codex launcher registers a bounded child, receipts active time and measured usage, then reports up", async () => {
   const runtime = await harness(BASE_LIMITS, "file");
   try {
@@ -516,15 +550,58 @@ test("Codex launcher registers a bounded child, receipts active time and measure
       accepted: true,
       reason: "The child returned its required structured output and made no unsupported media claim.",
     });
+    const dispositions = new RootOutputDispositionHost(runtime.ledger, runtime.store);
+    await assert.rejects(
+      dispositions.record({
+        reportId: result.report.id,
+        rootTaskId: runtime.rootTaskId,
+        rootAgentId: runtime.rootAgentId,
+        outputArtifactId: runtime.sourceArtifactId,
+        outcome: "promoted_to_root",
+        reason: "This must fail because the source was not the reported child output.",
+      }),
+      /outside the decided report/,
+    );
+    const disposition = await dispositions.record({
+      reportId: result.report.id,
+      rootTaskId: runtime.rootTaskId,
+      rootAgentId: runtime.rootAgentId,
+      outputArtifactId: result.artifacts[0].id,
+      outcome: "promoted_to_root",
+      reason: "The root selected the exact accepted child output and retained its delegation lineage.",
+    });
     const state = runtime.ledger.state();
     assert.equal(state.executions["execution:codex-worker"].status, "completed");
     assert.equal(state.tasks[decision.permit!.taskId].status, "completed");
     assert.equal(state.agents[decision.permit!.agentId].status, "retired");
+    assert.equal(Object.keys(state.rootOutputDispositions).length, 1);
+    assert.deepEqual(state.rootOutputDispositions[disposition.receipt.dispositionId], {
+      id: disposition.receipt.dispositionId,
+      reportId: result.report.id,
+      spawnRequestId: decision.requestId,
+      rootTaskId: runtime.rootTaskId,
+      rootAgentId: runtime.rootAgentId,
+      childTaskId: decision.permit!.taskId,
+      childAgentId: decision.permit!.agentId,
+      inputArtifactId: result.artifacts[0].id,
+      outputArtifactId: disposition.outputArtifactId,
+      outcome: "promoted_to_root",
+      receiptId: disposition.receipt.receiptId,
+      receiptContentId: disposition.receiptContentId,
+    });
+    assert.deepEqual(disposition.receipt.delegation.grants, state.tasks[decision.permit!.taskId].grants);
+    assert.deepEqual(disposition.receipt.delegation.mediaScope, state.tasks[decision.permit!.taskId].mediaScope);
+    assert.equal(disposition.receipt.input.contentId, result.artifacts[0].content.contentId);
+    assert.deepEqual(
+      JSON.parse((await runtime.store.receiptBytes(disposition.receiptContentId)).toString("utf8")),
+      disposition.receipt,
+    );
 
     const events = await runtime.ledger.events();
     assert.ok(events.some((event) => event.type === "executor.started" && event.producer.kind === "launcher"));
     assert.ok(events.some((event) => event.type === "model.usage_recorded" && event.producer.kind === "launcher"));
     assert.ok(events.some((event) => event.type === "executor.finished" && event.producer.kind === "launcher"));
+    assert.ok(events.some((event) => event.type === "root.output_disposition_recorded" && event.producer.kind === "handoff_host"));
     assert.ok(events.every((event) => !("fixtureOnly" in event)));
 
     const rawJournal = await readFile(join(runtime.directory, "events.ndjson"), "utf8");
@@ -623,6 +700,80 @@ test("Codex launcher registers a bounded child, receipts active time and measure
   }
 });
 
+test("root rejects a child report with a content-addressed disposition and refuses premature or contradictory promotion", async () => {
+  const runtime = await harness();
+  try {
+    const decision = await runtime.scheduler.requestSpawn(
+      runtime.rootTaskId,
+      runtime.rootAgentId,
+      codexChildInput(runtime),
+    );
+    assert.ok(decision.permit);
+    const fake = await fakeCodex(runtime);
+    const reports = new BoundedReportHost(runtime.ledger, () => "report:root-rejection");
+    const launcher = new CodexExecWorkerLauncher(
+      runtime.ledger,
+      runtime.scheduler,
+      runtime.store,
+      reports,
+      {
+        executable: fake.executable,
+        executableArgsPrefix: fake.prefix,
+        nextExecutionId: () => "execution:root-rejection",
+        maximumWallMs: 5_000,
+      },
+    );
+    const launched = await launcher.launch(decision.permit);
+    const dispositions = new RootOutputDispositionHost(runtime.ledger, runtime.store);
+    const promotionRequest = {
+      reportId: launched.report.id,
+      rootTaskId: runtime.rootTaskId,
+      rootAgentId: runtime.rootAgentId,
+      outputArtifactId: launched.artifacts[0].id,
+      outcome: "promoted_to_root" as const,
+      reason: "Premature promotion must fail.",
+    };
+    await assert.rejects(
+      dispositions.record(promotionRequest),
+      /matching decided child report/,
+    );
+    await reports.decide({
+      reportId: launched.report.id,
+      decidedByTaskId: runtime.rootTaskId,
+      decidedByAgentId: runtime.rootAgentId,
+      accepted: false,
+      reason: "The root rejected this bounded child output for the deterministic rejection path.",
+    });
+    await assert.rejects(
+      dispositions.record(promotionRequest),
+      /matching decided child report/,
+    );
+    const rejected = await dispositions.record({
+      ...promotionRequest,
+      outcome: "rejected_by_root",
+      reason: "The exact reported output was rejected and was not promoted into root-owned work.",
+    });
+    assert.equal(rejected.receipt.decision.outcome, "rejected_by_root");
+    assert.equal(rejected.receipt.input.artifactId, launched.artifacts[0].id);
+    assert.equal(runtime.ledger.state().reports[launched.report.id].status, "rejected");
+    assert.equal(runtime.ledger.state().tasks[decision.permit.taskId].status, "working");
+    assert.equal(
+      runtime.ledger.state().rootOutputDispositions[rejected.receipt.dispositionId].outcome,
+      "rejected_by_root",
+    );
+    await assert.rejects(
+      dispositions.record({
+        ...promotionRequest,
+        outcome: "rejected_by_root",
+        reason: "A second disposition must fail.",
+      }),
+      /already exists/,
+    );
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
 test("Codex launcher binds a scheduler-granted media.seek child to the real receipted bridge", async () => {
   const runtime = await harness(BASE_LIMITS, "file");
   try {
@@ -703,6 +854,7 @@ test("Codex launcher fails closed on unsupported capabilities and invalid child 
     const runtime = await harness();
     try {
       const unsupported = codexChildInput(runtime);
+      unsupported.workerKind = "orchestrator";
       unsupported.requiredCapabilities = ["task.spawn.request", "report.submit"];
       const decision = await runtime.scheduler.requestSpawn(
         runtime.rootTaskId,

@@ -757,7 +757,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
         artifact.origin.kind === "publish_review_decision" ||
         artifact.origin.kind === "publish_review_revocation" ||
         artifact.origin.kind === "caption_production_output" ||
-        artifact.origin.kind === "caption_production_receipt"
+        artifact.origin.kind === "caption_production_receipt" ||
+        artifact.origin.kind === "root_output_disposition"
       ) {
         throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
       }

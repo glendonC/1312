@@ -19,6 +19,7 @@ import type {
   SpawnRequestInput,
 } from "../model.ts";
 import { BoundedReportHost } from "../reportHost.ts";
+import { RootOutputDispositionHost } from "../rootOutputDispositionHost.ts";
 import { createRuntimeStart } from "../runStart/runtimeStart.ts";
 import { writeRuntimeStartReceipt } from "../runStart/receiptWriter.ts";
 import { BoundedRuntimeScheduler } from "../scheduler.ts";
@@ -143,8 +144,8 @@ function childInput(
         : "retain the honest absence of granted detector evidence, ") +
       "retain the returned operation/artifact/receipt identities, bounded audio-activity observation, and evidence facts, " +
       "and report them without turning signal/silence into speech, transcription, translation, caption, or meaning claims.",
-    workerKind: "media",
-    workerLabel: "bounded-media-child",
+    workerKind: "analysis",
+    workerLabel: "bounded-evidence-child",
     mediaScope,
     inputArtifactIds: [sourceArtifactId, ...evidenceArtifactIds],
     requiredOutputs: [
@@ -287,11 +288,23 @@ export async function runBoundedRuntimeApplication(
       reason:
         "The bounded child returned its structured artifact after its authorized receipted audio-activity observation, any granted window-filtered evidence reads, required bounded assessment, required audited decision, and separate host-verified publish-review intake when a decision existed.",
     });
+    if (launched.report.outputArtifactIds.length !== 1) {
+      throw new Error("Bounded root promotion requires exactly one reported child output artifact");
+    }
+    await new RootOutputDispositionHost(ledger, artifacts).record({
+      reportId: launched.report.id,
+      rootTaskId: rootPermit.taskId,
+      rootAgentId: rootPermit.agentId,
+      outputArtifactId: launched.report.outputArtifactIds[0],
+      outcome: "promoted_to_root",
+      reason:
+        "The root promoted the exact accepted child output with its spawn, grant, scope, execution, report, artifact, and receipt lineage intact.",
+    });
     await scheduler.transitionTask(
       rootPermit.taskId,
       rootPermit.agentId,
       "withheld",
-      "The local launcher proof ended after one receipted audio-activity observation, any available window-filtered pinned evidence reads, one bounded assessment and audited decision when granted, and child report; it produced no captions, study result, or publication.",
+      "The local launcher proof ended after one root-to-child permit, one receipted audio-activity observation, any available window-filtered pinned evidence reads, one bounded assessment and audited decision when granted, and one root-promoted child report artifact; it produced no captions, study result, or publication.",
     );
   } catch (error) {
     if (error instanceof RuntimeApplicationInterrupted) throw error;

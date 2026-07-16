@@ -25,6 +25,7 @@ import {
   MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS,
   MAX_EVIDENCE_READ_BYTES,
   MAX_EVIDENCE_READ_ITEMS,
+  roleAllowsCapabilities,
 } from "./validation/scheduling.ts";
 
 export interface RuntimeIdentityFactory {
@@ -181,6 +182,7 @@ export class BoundedRuntimeScheduler {
     return (
       input.requiredCapabilities.length > 0 &&
       input.requiredCapabilities.every((capability) => this.limits.grantableCapabilities.includes(capability)) &&
+      roleAllowsCapabilities(input.workerKind, input.requiredCapabilities) &&
       (!input.requiredCapabilities.some((capability) => capability.startsWith("media.")) || input.mediaScope.length > 0) &&
       (!input.requiredCapabilities.includes("evidence.read") ||
         (evidenceArtifacts.length > 0 &&

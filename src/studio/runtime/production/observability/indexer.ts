@@ -52,6 +52,9 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "caption.production_completed") {
     return { kind: "caption_production", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "root.output_disposition_recorded") {
+    return { kind: "root_output_disposition", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "executor.finished") {
     return { kind: "executor_span", receipt: event.data.receipt, rawReceiptContentId: null };
   }
@@ -305,6 +308,13 @@ export async function buildRuntimeObservabilityIndex(
           sources: refs([event.eventId]),
         });
       }
+    } else if (event.type === "root.output_disposition_recorded") {
+      const receipt = event.data.receipt;
+      append(reportEvents, receipt.report.reportId, event.eventId);
+      append(taskEvents, receipt.authority.rootTaskId, event.eventId);
+      append(taskEvents, receipt.delegation.childTaskId, event.eventId);
+      append(agentEvents, receipt.authority.rootAgentId, event.eventId);
+      append(agentEvents, receipt.delegation.childAgentId, event.eventId);
     } else if (event.type === "artifact.recorded") {
       const artifact = event.data.artifact;
       if (artifact.origin.kind === "media_operation" || artifact.origin.kind === "media_observation") {

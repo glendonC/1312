@@ -21,6 +21,7 @@ import type {
   PublishReviewDecisionReceipt,
   PublishReviewIntakeReceipt,
   PublishReviewRevocationReceipt,
+  RootOutputDispositionReceipt,
   RuntimeArtifact,
   SourceArtifactDescriptor,
   WorkerOutputEnvelope,
@@ -326,6 +327,46 @@ export class ContentAddressedArtifactStore {
         executionId: envelope.executionId,
         receiptId: input.receipt.receiptId,
         receiptContentId: input.receiptContentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildRootOutputDispositionArtifact(input: {
+    runId: string;
+    receipt: RootOutputDispositionReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({
+        runId: input.runId,
+        dispositionId: input.receipt.dispositionId,
+        kind: "root-output-disposition-receipt",
+        contentId: input.storedReceipt.content.contentId,
+      })}`,
+      runId: input.runId,
+      kind: input.receipt.decision.outcome === "promoted_to_root"
+        ? "root-promoted-output-receipt"
+        : "root-rejected-output-receipt",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [input.receipt.input.artifactId],
+      producerTaskId: input.receipt.authority.rootTaskId,
+      producerAgentId: input.receipt.authority.rootAgentId,
+      origin: {
+        kind: "root_output_disposition",
+        dispositionId: input.receipt.dispositionId,
+        reportId: input.receipt.report.reportId,
+        inputArtifactId: input.receipt.input.artifactId,
+        outcome: input.receipt.decision.outcome,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
       },
     };
     assertRuntimeArtifact(artifact);

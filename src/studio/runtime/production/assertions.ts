@@ -23,6 +23,10 @@ export {
   assertReportSubmitRequest,
 } from "./validation/handoffs.ts";
 export {
+  assertRootOutputDispositionRequest,
+  validateRootOutputDispositionReceipt,
+} from "./validation/rootHandoff.ts";
+export {
   assertProductionAnalysisRequest,
   assertProductionSourceSession,
 } from "./validation/language.ts";

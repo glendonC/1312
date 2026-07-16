@@ -12,6 +12,7 @@ import {
   type RuntimeLimits,
   type SpawnRequestInput,
   type TaskRecord,
+  type WorkerKind,
 } from "../model.ts";
 import {
   array,
@@ -54,6 +55,30 @@ export const MAX_EVIDENCE_ASSESS_CITATIONS = 32;
 export const MAX_EVIDENCE_ASSESS_TOKENS = 512;
 export const MAX_EVIDENCE_DECISIONS = 1;
 export const MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS = 4;
+
+const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
+  orchestrator: new Set(["task.spawn.request", "report.submit"]),
+  media: new Set(["media.extract", "media.seek", "report.submit"]),
+  analysis: new Set([
+    "media.seek",
+    "evidence.read",
+    "analysis.evidence.assess",
+    "analysis.evidence.decide",
+    "report.submit",
+  ]),
+  translation: new Set(["media.seek", "evidence.read", "report.submit"]),
+  quality: new Set([
+    "media.seek",
+    "evidence.read",
+    "analysis.evidence.assess",
+    "analysis.evidence.decide",
+    "report.submit",
+  ]),
+};
+
+export function roleAllowsCapabilities(workerKind: WorkerKind, capabilities: readonly Capability[]): boolean {
+  return capabilities.every((capability) => ROLE_CAPABILITIES[workerKind].has(capability));
+}
 
 function budget(value: unknown, context: string, path: string): asserts value is RuntimeBudget {
   const item = object(value, context, path);
@@ -342,7 +367,7 @@ export function assertTaskRecord(
   string(item.runId, context, `${path}.runId`);
   string(item.workloadKey, context, `${path}.workloadKey`);
   string(item.objective, context, `${path}.objective`);
-  oneOf(item.workerKind, WORKER_KINDS, context, `${path}.workerKind`);
+  const workerKind = oneOf<WorkerKind>(item.workerKind, WORKER_KINDS, context, `${path}.workerKind`);
   string(item.workerLabel, context, `${path}.workerLabel`);
   nullableString(item.parentTaskId, context, `${path}.parentTaskId`);
   nullableString(item.parentAgentId, context, `${path}.parentAgentId`);
@@ -354,7 +379,10 @@ export function assertTaskRecord(
   outputs(item.requiredOutputs, context, `${path}.requiredOutputs`);
   uniqueStrings(item.dependencies, context, `${path}.dependencies`);
   budget(item.budget, context, `${path}.budget`);
-  validateGrants(item.grants, context, `${path}.grants`);
+  const grants = validateGrants(item.grants, context, `${path}.grants`);
+  if (!roleAllowsCapabilities(workerKind, grants.map((grant) => grant.capability))) {
+    fail(context, `${path}.grants`, "contains a capability outside the worker role");
+  }
   oneOf(item.status, TASK_STATUSES, context, `${path}.status`);
 }
 
@@ -374,8 +402,11 @@ export function assertAgentRecord(
   string(item.taskId, context, `${path}.taskId`);
   nullableString(item.parentTaskId, context, `${path}.parentTaskId`);
   nullableString(item.parentAgentId, context, `${path}.parentAgentId`);
-  oneOf(item.kind, WORKER_KINDS, context, `${path}.kind`);
+  const kind = oneOf<WorkerKind>(item.kind, WORKER_KINDS, context, `${path}.kind`);
   string(item.label, context, `${path}.label`);
-  validateGrants(item.grants, context, `${path}.grants`);
+  const grants = validateGrants(item.grants, context, `${path}.grants`);
+  if (!roleAllowsCapabilities(kind, grants.map((grant) => grant.capability))) {
+    fail(context, `${path}.grants`, "contains a capability outside the worker role");
+  }
   oneOf(item.status, AGENT_STATUSES, context, `${path}.status`);
 }

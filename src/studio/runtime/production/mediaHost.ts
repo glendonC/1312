@@ -60,6 +60,48 @@ function decodedDurationUs(stdout: string, maximumUs: number): number {
   return duration;
 }
 
+const DIGITAL_SILENCE_THRESHOLD_DB = -60 as const;
+
+function audioActivity(stderr: string): {
+  value: "signal" | "digital_silence";
+  measurements: {
+    meanVolumeDb: number | null;
+    peakVolumeDb: number | null;
+    silenceThresholdDb: typeof DIGITAL_SILENCE_THRESHOLD_DB;
+  };
+} {
+  const values = (name: "mean_volume" | "max_volume"): string[] => [
+    ...stderr.matchAll(new RegExp(`${name}:\\s+(-?inf|-?\\d+(?:\\.\\d+)?) dB`, "g")),
+  ].map((match) => match[1]);
+  const samples = [...stderr.matchAll(/n_samples:\s+(\d+)/g)].map((match) => Number(match[1]));
+  if (!samples.some((count) => Number.isSafeInteger(count) && count > 0)) {
+    throw new Error("ffmpeg perception reported no decoded audio samples");
+  }
+  const meanRaw = values("mean_volume").at(-1);
+  const peakRaw = values("max_volume").at(-1);
+  if (!meanRaw || !peakRaw) throw new Error("ffmpeg perception did not report volume measurements");
+  const parse = (value: string): number | null => {
+    if (value === "-inf") return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed > 0) throw new Error("ffmpeg perception reported invalid volume");
+    return parsed;
+  };
+  const meanVolumeDb = parse(meanRaw);
+  const peakVolumeDb = parse(peakRaw);
+  if ((meanVolumeDb === null) !== (peakVolumeDb === null)) {
+    throw new Error("ffmpeg perception reported inconsistent volume measurements");
+  }
+  if (meanVolumeDb !== null && peakVolumeDb !== null && meanVolumeDb > peakVolumeDb) {
+    throw new Error("ffmpeg perception reported impossible volume measurements");
+  }
+  return {
+    value: peakVolumeDb === null || peakVolumeDb <= DIGITAL_SILENCE_THRESHOLD_DB
+      ? "digital_silence"
+      : "signal",
+    measurements: { meanVolumeDb, peakVolumeDb, silenceThresholdDb: DIGITAL_SILENCE_THRESHOLD_DB },
+  };
+}
+
 export class FfmpegCapabilityHost {
   private versionPromise: Promise<string> | null = null;
   private readonly ledger: RuntimeLedger;
@@ -299,13 +341,13 @@ export class FfmpegCapabilityHost {
         this.options.timeoutMs ?? 30_000,
         this.ledger.state().tasks[request.taskId].budget.wallMs,
       );
-      const { stdout } = await execute(
+      const { stdout, stderr } = await execute(
         this.options.ffmpeg ?? "ffmpeg",
         [
           "-nostdin",
           "-hide_banner",
           "-loglevel",
-          "error",
+          "info",
           "-ss",
           seconds(request.startMs),
           "-t",
@@ -314,6 +356,8 @@ export class FfmpegCapabilityHost {
           inputPath,
           "-map",
           `0:${track.index}`,
+          "-af",
+          "volumedetect",
           "-f",
           "null",
           "-",
@@ -324,6 +368,7 @@ export class FfmpegCapabilityHost {
         timeoutMs,
       );
       const observedDurationUs = decodedDurationUs(stdout, (request.endMs - request.startMs) * 1_000);
+      const activity = audioActivity(stderr);
       const receiptBody = {
         operationId: request.operationId,
         capability: "media.seek" as const,
@@ -334,13 +379,20 @@ export class FfmpegCapabilityHost {
           startMs: request.startMs,
           endMs: request.endMs,
         },
-        producer: { id: "ffmpeg.bounded-seek-observation" as const, version: await this.version() },
+        producer: { id: "ffmpeg.audio-activity-observation" as const, version: await this.version() },
         input: { artifactId: source.id, contentId: source.content.contentId },
-        observation: { status: "decoded" as const, decodedDurationUs: observedDurationUs },
+        observation: {
+          status: "observed" as const,
+          decodedDurationUs: observedDurationUs,
+          kind: "audio_activity" as const,
+          value: activity.value,
+          range: { startMs: request.startMs, endMs: request.endMs },
+          measurements: activity.measurements,
+        },
         sourceArtifactIds: [source.id],
       };
       const receipt: MediaSeekObservationReceipt = {
-        schema: "studio.media-operation.receipt.v1",
+        schema: "studio.media-perception.receipt.v1",
         receiptId: `receipt:${canonicalSha256(receiptBody)}`,
         ...receiptBody,
       };

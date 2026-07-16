@@ -125,7 +125,8 @@ test("worker contract uses one closed schema, validator, and no-media prompt", (
   });
   assert.match(workerPrompt(mediaContract), /scheduler-granted media tools: media_seek/);
   assert.match(workerPrompt(mediaContract), /operation occurred only when the tool returns/);
-  assert.match(workerPrompt(mediaContract), /not media bytes or semantic findings/);
+  assert.match(workerPrompt(mediaContract), /audio_activity observation: signal or digital_silence/);
+  assert.match(workerPrompt(mediaContract), /does not identify speech, words, speakers, music, or meaning/);
 });
 
 test("bounded process runner reports output overflow without accepting excess bytes", async () => {

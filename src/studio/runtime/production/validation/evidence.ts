@@ -83,16 +83,29 @@ export function validateEvidenceReadReceipt(
     context,
     path,
   );
-  literal(item.schema, "studio.evidence-read.receipt.v1", context, `${path}.schema`);
+  literal(item.schema, "studio.evidence-read.receipt.v2", context, `${path}.schema`);
   string(item.receiptId, context, `${path}.receiptId`);
   string(item.operationId, context, `${path}.operationId`);
   literal(item.capability, "evidence.read", context, `${path}.capability`);
 
   const authorization = object(item.authorization, context, `${path}.authorization`);
-  exact(authorization, ["grantId", "taskId", "agentId", "maxBytes", "maxItems"], context, `${path}.authorization`);
+  exact(
+    authorization,
+    ["grantId", "taskId", "agentId", "sourceArtifactId", "startMs", "endMs", "maxBytes", "maxItems"],
+    context,
+    `${path}.authorization`,
+  );
   string(authorization.grantId, context, `${path}.authorization.grantId`);
   string(authorization.taskId, context, `${path}.authorization.taskId`);
   string(authorization.agentId, context, `${path}.authorization.agentId`);
+  const sourceArtifactId = string(
+    authorization.sourceArtifactId,
+    context,
+    `${path}.authorization.sourceArtifactId`,
+  );
+  const startMs = integer(authorization.startMs, context, `${path}.authorization.startMs`);
+  const endMs = integer(authorization.endMs, context, `${path}.authorization.endMs`, 1);
+  if (endMs <= startMs) fail(context, `${path}.authorization`, "must contain a non-empty source window");
   const maxBytes = integer(authorization.maxBytes, context, `${path}.authorization.maxBytes`, 1);
   const maxItems = integer(authorization.maxItems, context, `${path}.authorization.maxItems`, 1);
   if (maxBytes > MAX_EVIDENCE_READ_BYTES || maxItems > MAX_EVIDENCE_READ_ITEMS) {
@@ -119,12 +132,23 @@ export function validateEvidenceReadReceipt(
   }
 
   const producer = object(item.producer, context, `${path}.producer`);
-  exact(producer, ["id", "version"], context, `${path}.producer`);
+  exact(producer, ["id", "version", "rangePolicy"], context, `${path}.producer`);
   literal(producer.id, "studio.bounded-evidence-read", context, `${path}.producer.id`);
-  literal(producer.version, "1", context, `${path}.producer.version`);
+  literal(producer.version, "2", context, `${path}.producer.version`);
+  literal(
+    producer.rangePolicy,
+    "intersect_and_clip_to_authorized_window",
+    context,
+    `${path}.producer.rangePolicy`,
+  );
 
   const facts = array(item.facts, context, `${path}.facts`);
-  facts.forEach((entry, index) => fact(entry, context, `${path}.facts[${index}]`));
+  facts.forEach((entry, index) => {
+    fact(entry, context, `${path}.facts[${index}]`);
+    if (entry.startMs < startMs || entry.endMs > endMs) {
+      fail(context, `${path}.facts[${index}]`, "escapes the authorized source window");
+    }
+  });
   const result = object(item.result, context, `${path}.result`);
   exact(result, ["availableItems", "returnedItems", "returnedFactBytes", "truncated"], context, `${path}.result`);
   const available = integer(result.availableItems, context, `${path}.result.availableItems`);
@@ -147,4 +171,7 @@ export function validateEvidenceReadReceipt(
   contentId(lineage.preflightContentId, context, `${path}.lineage.preflightContentId`);
   const sources = uniqueStrings(lineage.sourceArtifactIds, context, `${path}.lineage.sourceArtifactIds`);
   if (sources.length !== 1) fail(context, `${path}.lineage.sourceArtifactIds`, "must name one runtime source artifact");
+  if (sources[0] !== sourceArtifactId) {
+    fail(context, `${path}.lineage.sourceArtifactIds`, "must equal the authorized source artifact");
+  }
 }

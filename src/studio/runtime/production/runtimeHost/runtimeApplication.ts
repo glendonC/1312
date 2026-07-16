@@ -141,8 +141,8 @@ function childInput(
       (evidenceArtifactIds.length > 0
         ? `read each of the ${evidenceArtifactIds.length} explicitly granted preflight evidence artifacts, create one bounded range assessment over only those completed read receipts, then request one deterministic decision over only the audited assessment identity, `
         : "retain the honest absence of granted detector evidence, ") +
-      "retain the returned operation/artifact/receipt identities and bounded evidence facts, and report them without making " +
-      "media-content, transcription, translation, caption, or detector claims.",
+      "retain the returned operation/artifact/receipt identities, bounded audio-activity observation, and evidence facts, " +
+      "and report them without turning signal/silence into speech, transcription, translation, caption, or meaning claims.",
     workerKind: "media",
     workerLabel: "bounded-media-child",
     mediaScope,
@@ -195,7 +195,7 @@ export async function runBoundedRuntimeApplication(
     workloadKey: `root:${initialized.runStart.runtimeId}`,
     objective:
       `Coordinate one bounded local worker launch for ${initialized.runStart.analysisRequest.requestId} ` +
-      "with one receipted bounded seek, any explicitly pinned evidence reads, and no invented media-content claims.",
+      "with one receipted bounded audio-activity observation, any explicitly pinned evidence reads, and no invented media-content claims.",
     workerKind: "orchestrator",
     workerLabel: "local-orchestrator",
     mediaScope,
@@ -285,13 +285,13 @@ export async function runBoundedRuntimeApplication(
       decidedByAgentId: rootPermit.agentId,
       accepted: true,
       reason:
-        "The bounded child returned its structured artifact after its authorized receipted seek, any granted evidence reads, required bounded assessment, required audited decision, and separate host-verified publish-review intake when a decision existed.",
+        "The bounded child returned its structured artifact after its authorized receipted audio-activity observation, any granted window-filtered evidence reads, required bounded assessment, required audited decision, and separate host-verified publish-review intake when a decision existed.",
     });
     await scheduler.transitionTask(
       rootPermit.taskId,
       rootPermit.agentId,
       "withheld",
-      "The local launcher proof ended after one receipted seek observation, any available pinned evidence reads, one bounded assessment and audited decision when granted, and child report; it produced no captions, study result, or publication.",
+      "The local launcher proof ended after one receipted audio-activity observation, any available window-filtered pinned evidence reads, one bounded assessment and audited decision when granted, and child report; it produced no captions, study result, or publication.",
     );
   } catch (error) {
     if (error instanceof RuntimeApplicationInterrupted) throw error;

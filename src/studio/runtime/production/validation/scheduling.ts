@@ -85,9 +85,18 @@ function scopes(value: unknown, context: string, path: string): MediaScope[] {
 
 function evidenceScope(value: unknown, context: string, path: string): asserts value is EvidenceReadScope {
   const item = object(value, context, path);
-  exact(item, ["artifactId", "evidenceKind", "maxBytes", "maxItems"], context, path);
+  exact(
+    item,
+    ["artifactId", "evidenceKind", "sourceArtifactId", "startMs", "endMs", "maxBytes", "maxItems"],
+    context,
+    path,
+  );
   string(item.artifactId, context, `${path}.artifactId`);
   oneOf(item.evidenceKind, EVIDENCE_KINDS, context, `${path}.evidenceKind`);
+  string(item.sourceArtifactId, context, `${path}.sourceArtifactId`);
+  const startMs = integer(item.startMs, context, `${path}.startMs`);
+  const endMs = integer(item.endMs, context, `${path}.endMs`, 1);
+  if (endMs <= startMs) fail(context, path, "must contain a non-empty source window");
   const maxBytes = integer(item.maxBytes, context, `${path}.maxBytes`, 1);
   const maxItems = integer(item.maxItems, context, `${path}.maxItems`, 1);
   if (maxBytes > MAX_EVIDENCE_READ_BYTES) {

@@ -104,6 +104,9 @@ export interface ProductionStudioEvidenceReadView {
   grantId: string;
   inputArtifactId: string;
   evidenceKind: EvidenceKind;
+  sourceArtifactId: string;
+  startMs: number;
+  endMs: number;
   maxBytes: number;
   maxItems: number;
   receiptId: string | null;
@@ -358,6 +361,18 @@ export interface ProductionStudioOperationView {
   requestedDurationMs: number;
   outputArtifactId: string | null;
   receiptId: string | null;
+  observation: {
+    status: "observed";
+    decodedDurationUs: number;
+    kind: "audio_activity";
+    value: "signal" | "digital_silence";
+    range: { startMs: number; endMs: number };
+    measurements: {
+      meanVolumeDb: number | null;
+      peakVolumeDb: number | null;
+      silenceThresholdDb: -60;
+    };
+  } | null;
   failure: string | null;
 }
 
@@ -545,6 +560,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       requestedDurationMs: operation.endMs - operation.startMs,
       outputArtifactId: operation.outputArtifactId,
       receiptId: operation.receiptId,
+      observation: structuredClone(operation.observation),
       failure: operation.failure,
     }))
     .sort((left, right) => left.operationId.localeCompare(right.operationId));
@@ -559,6 +575,9 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       grantId: operation.grantId,
       inputArtifactId: operation.artifactId,
       evidenceKind: operation.evidenceKind,
+      sourceArtifactId: operation.sourceArtifactId,
+      startMs: operation.startMs,
+      endMs: operation.endMs,
       maxBytes: operation.maxBytes,
       maxItems: operation.maxItems,
       receiptId: operation.receiptId,

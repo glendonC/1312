@@ -385,11 +385,11 @@ export class ContentAddressedArtifactStore {
       id: `artifact:${canonicalSha256({
         runId: input.runId,
         operationId: input.operationId,
-        kind: "media-seek-observation",
+        kind: "media-audio-activity-observation",
         contentId: input.storedReceipt.content.contentId,
       })}`,
       runId: input.runId,
-      kind: "media-seek-observation",
+      kind: "media-audio-activity-observation",
       mediaClass: "non_media",
       publication: "private",
       content: input.storedReceipt.content,

@@ -65,6 +65,24 @@ function allocated(state: RuntimeProjection): { wallMs: number; toolCalls: numbe
   );
 }
 
+function evidenceWindow(
+  state: RuntimeProjection,
+  input: SpawnRequestInput,
+  evidenceArtifactId: string,
+): { sourceArtifactId: string; startMs: number; endMs: number } | null {
+  const artifact = state.artifacts[evidenceArtifactId];
+  if (artifact?.origin.kind !== "preflight_evidence" || artifact.sourceArtifactIds.length !== 1) return null;
+  const sourceArtifactId = artifact.sourceArtifactIds[0];
+  const windows = new Map(
+    input.mediaScope
+      .filter((scope) => scope.artifactId === sourceArtifactId)
+      .map((scope) => [`${scope.startMs}:${scope.endMs}`, scope] as const),
+  );
+  if (windows.size !== 1) return null;
+  const window = [...windows.values()][0];
+  return { sourceArtifactId, startMs: window.startMs, endMs: window.endMs };
+}
+
 export interface SpawnDecision {
   requestId: string;
   accepted: boolean;
@@ -111,9 +129,12 @@ export class BoundedRuntimeScheduler {
                 if (artifact.origin.kind !== "preflight_evidence") {
                   throw new Error("Scheduler evidence scope changed during grant construction");
                 }
+                const window = evidenceWindow(state, input, artifact.id);
+                if (!window) throw new Error("Scheduler evidence scope lost its exact source window");
                 return {
                   artifactId: artifact.id,
                   evidenceKind: artifact.origin.evidenceKind,
+                  ...window,
                   maxBytes: MAX_EVIDENCE_READ_BYTES,
                   maxItems: MAX_EVIDENCE_READ_ITEMS,
                 };
@@ -154,12 +175,16 @@ export class BoundedRuntimeScheduler {
   }
 
   private capabilityValid(state: RuntimeProjection, input: SpawnRequestInput): boolean {
+    const evidenceArtifacts = input.inputArtifactIds.filter(
+      (artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence",
+    );
     return (
       input.requiredCapabilities.length > 0 &&
       input.requiredCapabilities.every((capability) => this.limits.grantableCapabilities.includes(capability)) &&
       (!input.requiredCapabilities.some((capability) => capability.startsWith("media.")) || input.mediaScope.length > 0) &&
       (!input.requiredCapabilities.includes("evidence.read") ||
-        input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence")) &&
+        (evidenceArtifacts.length > 0 &&
+          evidenceArtifacts.every((artifactId) => evidenceWindow(state, input, artifactId) !== null))) &&
       (!input.requiredCapabilities.includes("analysis.evidence.assess") ||
         (input.requiredCapabilities.includes("evidence.read") &&
           input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence"))) &&

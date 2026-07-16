@@ -59,13 +59,14 @@ async function evidenceHarness(registerChild = true) {
     runBudget: { wallMs: 30_000, toolCalls: 4 },
     grantableCapabilities: ["task.spawn.request", "report.submit", "evidence.read"],
   }, new SequenceIdentities());
-  const inputArtifactIds = evidence.map((artifact) => artifact.id);
+  const inputArtifactIds = [source.id, ...evidence.map((artifact) => artifact.id)];
+  const mediaScope = [{ artifactId: source.id, trackId: "stream:0", startMs: 0, endMs: 1_000 }];
   const root = await scheduler.createRoot({
     workloadKey: "root:child-evidence-bridge",
     objective: "Authorize one bounded child evidence bridge test.",
     workerKind: "orchestrator",
     workerLabel: "evidence-bridge-root",
-    mediaScope: [],
+    mediaScope,
     inputArtifactIds,
     requiredOutputs: [{ name: "run report", artifactKind: "run-report", required: true }],
     requiredCapabilities: ["task.spawn.request"],
@@ -79,7 +80,7 @@ async function evidenceHarness(registerChild = true) {
     objective: "Read each granted, pre-existing speech/language receipt without adding findings.",
     workerKind: "analysis",
     workerLabel: "evidence-reader",
-    mediaScope: [],
+    mediaScope,
     inputArtifactIds,
     requiredOutputs: [{ name: "evidence report", artifactKind: "worker-execution-report", required: true }],
     requiredCapabilities: ["evidence.read", "report.submit"],
@@ -211,6 +212,11 @@ test("stdio MCP reads real pinned VAD/language evidence under grant, item, byte,
       assert.equal(result.schema, "studio.child-evidence-tool-result.v1");
       assert.equal(result.inputArtifactId, artifact.id);
       assert.equal(result.receipt.input.contentId, artifact.content.contentId);
+      assert.equal(result.receipt.authorization.sourceArtifactId, runtime.source.id);
+      assert.equal(result.receipt.authorization.startMs, 0);
+      assert.equal(result.receipt.authorization.endMs, 1_000);
+      assert.ok(result.receipt.facts.length > 0);
+      assert.ok(result.receipt.facts.every((fact) => fact.startMs >= 0 && fact.endMs <= 1_000));
       assert.ok(result.receipt.result.returnedItems <= result.receipt.authorization.maxItems);
       assert.ok(result.receipt.result.returnedFactBytes <= result.receipt.authorization.maxBytes);
       assert.match(result.receiptContentId, /^sha256:/);
@@ -225,6 +231,26 @@ test("stdio MCP reads real pinned VAD/language evidence under grant, item, byte,
     assert.equal(product.evidenceArtifacts.length, 2);
     assert.equal(product.evidenceReads.length, 2);
     assert.ok(product.evidenceReads.every((read) => read.status === "completed"));
+    assert.ok(product.evidenceReads.every((read) =>
+      read.sourceArtifactId === runtime.source.id && read.startMs === 0 && read.endMs === 1_000));
+
+    const escapedWindow = structuredClone(events);
+    const escapedCompletion = escapedWindow.find((event) => event.type === "evidence.read_completed");
+    assert.ok(escapedCompletion?.type === "evidence.read_completed");
+    escapedCompletion.data.receipt.facts[0].endMs = 1_001;
+    assert.throws(
+      () => projectProductionRuntimeJournal(escapedWindow),
+      /escapes the authorized source window/,
+    );
+
+    const changedAuthorization = structuredClone(events);
+    const changedCompletion = changedAuthorization.find((event) => event.type === "evidence.read_completed");
+    assert.ok(changedCompletion?.type === "evidence.read_completed");
+    changedCompletion.data.receipt.authorization.endMs = 2_000;
+    assert.throws(
+      () => projectProductionRuntimeJournal(changedAuthorization),
+      /receipt changed authorization/,
+    );
 
     const beforeRejected = events.length;
     await assert.rejects(

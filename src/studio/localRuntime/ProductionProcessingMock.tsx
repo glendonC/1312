@@ -173,6 +173,7 @@ function activeProjection(): ProductionStudioProjection {
       requestedDurationMs: 47_200,
       outputArtifactId: null,
       receiptId: null,
+      observation: null,
       failure: null,
     }],
     counts: {

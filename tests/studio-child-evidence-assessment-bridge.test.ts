@@ -81,13 +81,14 @@ async function assessmentHarness(registerChild = true) {
       "analysis.evidence.decide",
     ],
   }, new SequenceIdentities());
-  const inputArtifactIds = evidence.map((artifact) => artifact.id);
+  const inputArtifactIds = [source.id, ...evidence.map((artifact) => artifact.id)];
+  const mediaScope = [{ artifactId: source.id, trackId: "stream:0", startMs: 0, endMs: 3_000 }];
   const root = await scheduler.createRoot({
     workloadKey: "root:child-evidence-assessment",
     objective: "Authorize one bounded child evidence-assessment test.",
     workerKind: "orchestrator",
     workerLabel: "evidence-assessment-root",
-    mediaScope: [],
+    mediaScope,
     inputArtifactIds,
     requiredOutputs: [{ name: "run report", artifactKind: "run-report", required: true }],
     requiredCapabilities: ["task.spawn.request"],
@@ -101,7 +102,7 @@ async function assessmentHarness(registerChild = true) {
     objective: "Read pinned receipts, then assess only their returned facts under hard bounds.",
     workerKind: "analysis",
     workerLabel: "evidence-assessor",
-    mediaScope: [],
+    mediaScope,
     inputArtifactIds,
     requiredOutputs: [{ name: "evidence report", artifactKind: "worker-execution-report", required: true }],
     requiredCapabilities: [

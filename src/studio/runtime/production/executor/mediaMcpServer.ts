@@ -17,7 +17,7 @@ const server = new McpServer(
   { name: "studio-bounded-media", version: "1" },
   {
     instructions:
-      "Use only the listed media tools and exact granted scopes. A media operation occurred only when the tool returns a receipted result. The tools expose receipts, not decoded media semantics.",
+      "Use only the listed media tools and exact granted scopes. A media operation occurred only when the tool returns a receipted result. media_seek returns only a bounded audio-activity observation; it does not expose words, speakers, music, or meaning.",
   },
 );
 
@@ -38,7 +38,7 @@ for (const tool of manifest.tools) {
       title,
       description:
         `${tool.capability} through the existing 1321 media host. ` +
-        "The host rechecks the scheduler grant, exact media scope, task tool-call budget, source bytes, and half-open integer-millisecond range, then returns only a real journaled receipt and artifact identity.",
+        "The host rechecks the scheduler grant, exact media scope, task tool-call budget, source bytes, and half-open integer-millisecond range. media_seek returns a content-bound signal or digital-silence observation with volume measurements; media.extract returns only its derived-artifact receipt.",
       inputSchema,
       annotations: {
         title,

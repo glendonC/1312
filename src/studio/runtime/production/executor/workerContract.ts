@@ -137,7 +137,7 @@ export function workerPrompt(task: TaskRecord): string {
         `This executor exposes only these scheduler-granted media tools: ${mediaTools.join(", ")}.`,
         "Invoke only the tool and exact artifact, track, and half-open millisecond range named by the contract.",
         "A media operation occurred only when the tool returns a studio.child-media-tool-result.v1 receipt.",
-        "The tools return receipt and artifact identities, not media bytes or semantic findings; do not claim what the media contains, sounds like, says, or means.",
+        "media_seek returns one host-produced audio_activity observation: signal or digital_silence with volume measurements for the exact range. It does not identify speech, words, speakers, music, or meaning. media_extract returns no semantic finding.",
         "Include the returned operation, artifact, receipt, and receipt-content identities in the required worker output.",
       ].join(" ");
   const evidenceScope = task.grants
@@ -148,7 +148,7 @@ export function workerPrompt(task: TaskRecord): string {
     : [
         "This executor exposes evidence_read for each scheduler-granted evidence artifact in the contract.",
         "Invoke it exactly once for every granted artifactId and use only the bounded facts returned in studio.child-evidence-tool-result.v1.",
-        "The evidence existed before this read; the read creates no new detector finding and does not expose paths or raw media bytes.",
+        "The evidence existed before this read; facts are selected by intersection and clipped to the exact granted source window. The read creates no new detector finding and does not expose paths or raw media bytes.",
         "Preserve operation, input-artifact, receipt, receipt-content, producer, decision, and preflight-lineage identities in the required worker output.",
         "Do not infer claims beyond the returned facts; unknown, withheld, empty, and truncated remain explicit.",
       ].join(" ");

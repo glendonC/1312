@@ -44,6 +44,9 @@ export type EvidenceKind = "speech_activity" | "language_ranges";
 export interface EvidenceReadScope {
   artifactId: string;
   evidenceKind: EvidenceKind;
+  sourceArtifactId: string;
+  startMs: number;
+  endMs: number;
   maxBytes: number;
   maxItems: number;
 }
@@ -486,7 +489,7 @@ export interface MediaExtractReceipt {
 }
 
 export interface MediaSeekObservationReceipt {
-  schema: "studio.media-operation.receipt.v1";
+  schema: "studio.media-perception.receipt.v1";
   receiptId: string;
   operationId: string;
   capability: "media.seek";
@@ -502,7 +505,7 @@ export interface MediaSeekObservationReceipt {
     endMs: number;
   };
   producer: {
-    id: "ffmpeg.bounded-seek-observation";
+    id: "ffmpeg.audio-activity-observation";
     version: string;
   };
   input: {
@@ -510,8 +513,16 @@ export interface MediaSeekObservationReceipt {
     contentId: string;
   };
   observation: {
-    status: "decoded";
+    status: "observed";
     decodedDurationUs: number;
+    kind: "audio_activity";
+    value: "signal" | "digital_silence";
+    range: { startMs: number; endMs: number };
+    measurements: {
+      meanVolumeDb: number | null;
+      peakVolumeDb: number | null;
+      silenceThresholdDb: -60;
+    };
   };
   sourceArtifactIds: string[];
 }
@@ -554,7 +565,7 @@ export interface EvidenceReadRequest {
 }
 
 export interface EvidenceReadReceipt {
-  schema: "studio.evidence-read.receipt.v1";
+  schema: "studio.evidence-read.receipt.v2";
   receiptId: string;
   operationId: string;
   capability: "evidence.read";
@@ -562,6 +573,9 @@ export interface EvidenceReadReceipt {
     grantId: string;
     taskId: string;
     agentId: string;
+    sourceArtifactId: string;
+    startMs: number;
+    endMs: number;
     maxBytes: number;
     maxItems: number;
   };
@@ -572,7 +586,11 @@ export interface EvidenceReadReceipt {
     evidenceKind: EvidenceKind;
     receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
   };
-  producer: { id: "studio.bounded-evidence-read"; version: "1" };
+  producer: {
+    id: "studio.bounded-evidence-read";
+    version: "2";
+    rangePolicy: "intersect_and_clip_to_authorized_window";
+  };
   facts: EvidenceFact[];
   result: {
     availableItems: number;
@@ -995,6 +1013,7 @@ export interface OperationRecord {
   status: "started" | "completed" | "failed";
   outputArtifactId: string | null;
   receiptId: string | null;
+  observation: MediaSeekObservationReceipt["observation"] | null;
   failure: string | null;
 }
 
@@ -1005,6 +1024,9 @@ export interface EvidenceReadRecord {
   grantId: string;
   artifactId: string;
   evidenceKind: EvidenceKind;
+  sourceArtifactId: string;
+  startMs: number;
+  endMs: number;
   maxBytes: number;
   maxItems: number;
   status: "started" | "completed" | "failed";

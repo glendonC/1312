@@ -146,6 +146,9 @@ export interface EvidenceReadStartedEvent extends RuntimeEventBase {
     request: EvidenceReadRequest;
     grantId: string;
     evidenceKind: EvidenceReadReceipt["input"]["evidenceKind"];
+    sourceArtifactId: string;
+    startMs: number;
+    endMs: number;
     maxBytes: number;
     maxItems: number;
   };

@@ -403,6 +403,9 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.operations.length, 1);
     assert.equal(inspector.projection.operations[0].capability, "media.seek");
     assert.equal(inspector.projection.operations[0].status, "completed");
+    assert.equal(inspector.projection.operations[0].observation?.kind, "audio_activity");
+    assert.equal(inspector.projection.operations[0].observation?.value, "signal");
+    assert.deepEqual(inspector.projection.operations[0].observation?.range, { startMs: 0, endMs: 1_000 });
     assert.equal(inspector.projection.evidenceArtifacts.length, 2);
     assert.deepEqual(
       inspector.projection.evidenceArtifacts.map((artifact) => artifact.evidenceKind).sort(),
@@ -420,7 +423,18 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     const evidenceGrant = inspector.projection.grants.find((grant) => grant.capability === "evidence.read");
     assert.ok(evidenceGrant);
     assert.equal(evidenceGrant.evidenceScope.length, 2);
-    assert.ok(evidenceGrant.evidenceScope.every((scope) => scope.maxBytes === 32 * 1024 && scope.maxItems === 64));
+    assert.ok(evidenceGrant.evidenceScope.every((scope) =>
+      scope.sourceArtifactId === inspector.projection.sourceArtifacts[0].artifactId &&
+      scope.startMs === 0 &&
+      scope.endMs === 1_000 &&
+      scope.maxBytes === 32 * 1024 &&
+      scope.maxItems === 64));
+    const completedReads = direct.events.filter((event) => event.type === "evidence.read_completed");
+    assert.equal(completedReads.length, 2);
+    assert.ok(completedReads.every((event) =>
+      event.data.receipt.authorization.startMs === 0 &&
+      event.data.receipt.authorization.endMs === 1_000 &&
+      event.data.receipt.facts.every((fact) => fact.startMs >= 0 && fact.endMs <= 1_000)));
     assert.equal(inspector.projection.evidenceAssessments.length, 1);
     const assessment = inspector.projection.evidenceAssessments[0];
     assert.equal(assessment.status, "completed");

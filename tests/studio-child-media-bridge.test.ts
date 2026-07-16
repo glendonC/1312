@@ -167,12 +167,27 @@ test("stdio MCP child seek crosses grant, budget, media host, journal, artifact,
       outputArtifactId: string;
       receiptId: string;
       receiptContentId: string;
+      receipt: {
+        schema: string;
+        observation: {
+          kind: string;
+          value: string;
+          range: { startMs: number; endMs: number };
+        };
+      };
     };
     assert.equal(result.schema, "studio.child-media-tool-result.v1");
     assert.equal(result.capability, "media.seek");
     assert.equal(result.operationId, "operation:child-media-bridge:media.seek:1");
     assert.match(result.receiptId, /^receipt:/);
     assert.match(result.receiptContentId, /^sha256:/);
+    assert.equal(result.receipt.schema, "studio.media-perception.receipt.v1");
+    assert.equal(result.receipt.observation.kind, "audio_activity");
+    assert.equal(result.receipt.observation.value, "signal");
+    assert.deepEqual(result.receipt.observation.range, {
+      startMs: runtime.scope.startMs,
+      endMs: runtime.scope.endMs,
+    });
 
     const state = runtime.ledger.state();
     assert.equal(state.operations[result.operationId].status, "completed");
@@ -185,6 +200,7 @@ test("stdio MCP child seek crosses grant, budget, media host, journal, artifact,
     assert.equal(product.operations.length, 1);
     assert.equal(product.operations[0].capability, "media.seek");
     assert.equal(product.operations[0].receiptId, result.receiptId);
+    assert.equal(product.operations[0].observation?.value, "signal");
     assert.ok(product.outputArtifacts.some((artifact) => artifact.artifactId === result.outputArtifactId));
 
     const beforeRejected = events.length;

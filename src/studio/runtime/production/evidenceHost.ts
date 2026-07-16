@@ -134,6 +134,28 @@ function allFacts(authorized: AuthorizedEvidenceRead, value: unknown): EvidenceF
     : languageFacts(value as LanguageRangesReceipt);
 }
 
+function factsInAuthorizedWindow(
+  facts: EvidenceFact[],
+  window: { startMs: number; endMs: number },
+): EvidenceFact[] {
+  const startSample = Math.ceil(window.startMs * SAMPLE_RATE / 1_000);
+  const endSample = Math.floor(window.endMs * SAMPLE_RATE / 1_000);
+  if (endSample <= startSample) throw new Error("Evidence read window cannot address a complete audio sample");
+  return facts
+    .filter((fact) => fact.endSample > startSample && fact.startSample < endSample)
+    .map((fact) => {
+      const clippedStartSample = Math.max(fact.startSample, startSample);
+      const clippedEndSample = Math.min(fact.endSample, endSample);
+      return {
+        ...fact,
+        startSample: clippedStartSample,
+        endSample: clippedEndSample,
+        startMs: Math.max(window.startMs, startMilliseconds(clippedStartSample)),
+        endMs: Math.min(window.endMs, endMilliseconds(clippedEndSample)),
+      };
+    });
+}
+
 function boundedFacts(
   facts: EvidenceFact[],
   maxItems: number,
@@ -182,6 +204,9 @@ export class BoundedEvidenceReadHost {
                 request: authorized.request,
                 grantId: authorized.grant.id,
                 evidenceKind: authorized.scope.evidenceKind,
+                sourceArtifactId: authorized.scope.sourceArtifactId,
+                startMs: authorized.scope.startMs,
+                endMs: authorized.scope.endMs,
                 maxBytes: authorized.remainingBytes,
                 maxItems: authorized.remainingItems,
               },
@@ -203,7 +228,7 @@ export class BoundedEvidenceReadHost {
       } catch {
         throw new Error("Registered evidence is no longer valid JSON");
       }
-      const available = allFacts(authorized, value);
+      const available = factsInAuthorizedWindow(allFacts(authorized, value), authorized.scope);
       const projected = boundedFacts(available, authorized.remainingItems, authorized.remainingBytes);
       if (authorized.artifact.origin.kind !== "preflight_evidence") {
         throw new Error("Evidence read artifact origin changed after content verification");
@@ -215,6 +240,9 @@ export class BoundedEvidenceReadHost {
           grantId: authorized.grant.id,
           taskId: authorized.request.taskId,
           agentId: authorized.request.agentId,
+          sourceArtifactId: authorized.scope.sourceArtifactId,
+          startMs: authorized.scope.startMs,
+          endMs: authorized.scope.endMs,
           maxBytes: authorized.remainingBytes,
           maxItems: authorized.remainingItems,
         },
@@ -225,7 +253,11 @@ export class BoundedEvidenceReadHost {
           evidenceKind: authorized.artifact.origin.evidenceKind,
           receiptSchema: authorized.artifact.origin.receiptSchema,
         },
-        producer: { id: "studio.bounded-evidence-read" as const, version: "1" as const },
+        producer: {
+          id: "studio.bounded-evidence-read" as const,
+          version: "2" as const,
+          rangePolicy: "intersect_and_clip_to_authorized_window" as const,
+        },
         facts: projected.facts,
         result: {
           availableItems: available.length,
@@ -240,7 +272,7 @@ export class BoundedEvidenceReadHost {
         },
       };
       const receipt: EvidenceReadReceipt = {
-        schema: "studio.evidence-read.receipt.v1",
+        schema: "studio.evidence-read.receipt.v2",
         receiptId: `evidence-read:${canonicalSha256(body)}`,
         ...body,
       };

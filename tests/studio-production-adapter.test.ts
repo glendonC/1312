@@ -549,6 +549,7 @@ test("production adapter projects only validated media operation identities and 
     requestedDurationMs: 1_000,
     outputArtifactId: OPERATION_OUTPUT_ARTIFACT_ID,
     receiptId: "receipt:authorized-extract",
+    observation: null,
     failure: null,
   }]);
 

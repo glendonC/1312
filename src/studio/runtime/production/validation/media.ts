@@ -89,7 +89,14 @@ export function validateMediaOperationReceipt(
     context,
     path,
   );
-  literal(item.schema, "studio.media-operation.receipt.v1", context, `${path}.schema`);
+  literal(
+    item.schema,
+    capability === "media.extract"
+      ? "studio.media-operation.receipt.v1"
+      : "studio.media-perception.receipt.v1",
+    context,
+    `${path}.schema`,
+  );
   string(item.receiptId, context, `${path}.receiptId`);
   string(item.operationId, context, `${path}.operationId`);
   const authorization = object(item.authorization, context, `${path}.authorization`);
@@ -110,7 +117,7 @@ export function validateMediaOperationReceipt(
     producer.id,
     capability === "media.extract"
       ? "ffmpeg.audio-range-extract"
-      : "ffmpeg.bounded-seek-observation",
+      : "ffmpeg.audio-activity-observation",
     context,
     `${path}.producer.id`,
   );
@@ -134,8 +141,13 @@ export function validateMediaOperationReceipt(
     string(output.trackId, context, `${path}.output.trackId`);
   } else {
     const observation = object(item.observation, context, `${path}.observation`);
-    exact(observation, ["status", "decodedDurationUs"], context, `${path}.observation`);
-    literal(observation.status, "decoded", context, `${path}.observation.status`);
+    exact(
+      observation,
+      ["status", "decodedDurationUs", "kind", "value", "range", "measurements"],
+      context,
+      `${path}.observation`,
+    );
+    literal(observation.status, "observed", context, `${path}.observation.status`);
     const decodedDurationUs = integer(
       observation.decodedDurationUs,
       context,
@@ -148,6 +160,56 @@ export function validateMediaOperationReceipt(
         `${path}.observation.decodedDurationUs`,
         "exceeds the authorized range duration",
       );
+    }
+    literal(observation.kind, "audio_activity", context, `${path}.observation.kind`);
+    const value = oneOf<"signal" | "digital_silence">(
+      observation.value,
+      new Set(["signal", "digital_silence"]),
+      context,
+      `${path}.observation.value`,
+    );
+    const range = object(observation.range, context, `${path}.observation.range`);
+    exact(range, ["startMs", "endMs"], context, `${path}.observation.range`);
+    if (
+      integer(range.startMs, context, `${path}.observation.range.startMs`) !== start ||
+      integer(range.endMs, context, `${path}.observation.range.endMs`, 1) !== end
+    ) {
+      fail(context, `${path}.observation.range`, "must equal the authorized request range");
+    }
+    const measurements = object(observation.measurements, context, `${path}.observation.measurements`);
+    exact(
+      measurements,
+      ["meanVolumeDb", "peakVolumeDb", "silenceThresholdDb"],
+      context,
+      `${path}.observation.measurements`,
+    );
+    const finiteOrNull = (candidate: unknown, measurementPath: string): number | null => {
+      if (candidate === null) return null;
+      if (typeof candidate !== "number" || !Number.isFinite(candidate)) {
+        fail(context, measurementPath, "must be null or finite");
+      }
+      return candidate;
+    };
+    const meanVolumeDb = finiteOrNull(
+      measurements.meanVolumeDb,
+      `${path}.observation.measurements.meanVolumeDb`,
+    );
+    const peakVolumeDb = finiteOrNull(
+      measurements.peakVolumeDb,
+      `${path}.observation.measurements.peakVolumeDb`,
+    );
+    if (measurements.silenceThresholdDb !== -60) {
+      fail(context, `${path}.observation.measurements.silenceThresholdDb`, "must equal -60");
+    }
+    if ((meanVolumeDb === null) !== (peakVolumeDb === null)) {
+      fail(context, `${path}.observation.measurements`, "volume measurements must be available together");
+    }
+    if (meanVolumeDb !== null && peakVolumeDb !== null && (meanVolumeDb > peakVolumeDb || peakVolumeDb > 0)) {
+      fail(context, `${path}.observation.measurements`, "contains impossible volume measurements");
+    }
+    const expected = peakVolumeDb === null || peakVolumeDb <= -60 ? "digital_silence" : "signal";
+    if (value !== expected) {
+      fail(context, `${path}.observation.value`, "does not match the receipted peak-volume threshold");
     }
   }
   const sources = uniqueStrings(item.sourceArtifactIds, context, `${path}.sourceArtifactIds`);

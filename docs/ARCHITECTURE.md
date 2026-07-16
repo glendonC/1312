@@ -125,7 +125,7 @@ Production work lives under `src/studio/runtime/production/` and does not import
 
 The production runtime provides a versioned event protocol, append-only journal, pure projection,
 bounded scheduler, dynamic registry, content-addressed artifact store, centralized authorization,
-one real ffmpeg audio-range extraction operation, one bounded ffmpeg seek observation, structured
+one real ffmpeg audio-range extraction operation, one bounded ffmpeg audio-activity observation, structured
 child report-up, bounded reads of already-produced pinned speech/language evidence, a bounded
 structured assessment over completed evidence-read receipts, a deterministic bounded decision over
 audited assessment identities, a host-only publish-review intake producer over verified decision
@@ -135,14 +135,16 @@ Media scopes use exact track ids and half-open integer-millisecond ranges. The s
 task identity, depth, parentage, ownership, grants, and reservations; callers cannot submit desired
 state. The media host re-hashes its source before execution and accepts no caller path or arbitrary
 executable arguments. Extraction records tool, input/output, grant, range, receipt, and derived
-lineage; bounded seek decodes the granted audio interval to a null sink and stores its receipt as a
-content-addressed non-media observation artifact with raw-source lineage.
+lineage; bounded seek decodes the granted audio interval through `volumedetect`, returns only
+`signal` or `digital_silence` with volume measurements, and stores its receipt as a content-addressed
+non-media observation artifact with raw-source lineage.
 The owned-source adapter registers only producer-validated V2/V3 speech-activity and language-range
 receipts as private content-addressed runtime artifacts. `evidence.read` grants name exact artifact
-identities with hard byte and fact-count limits. The evidence host rechecks live ownership, the
+and source identities, one task window, and hard byte and fact-count limits. The evidence host rechecks live ownership, the
 exact grant, combined task tool-call budget, stored content identity, receipt schema/producer, and
-preflight/source lineage before returning bounded structured windows or decisions in another
-content-addressed receipt. It accepts no path, range, query, or caller-selected output bound, exposes
+preflight/source lineage before returning intersecting structured windows or decisions clipped to
+that granted window in another content-addressed receipt. It accepts no path, caller-selected range,
+query, or caller-selected output bound, exposes
 no raw media bytes, and creates no detector finding.
 `analysis.evidence.assess` is a separate opinion layer: it accepts only completed same-task
 evidence-read receipt/content identities plus closed, range-bound claims. The assessment host
@@ -233,9 +235,10 @@ production adapter folds `studio.runtime.event.v1` directly and `/studio/runtime
 operator-selected local journal; neither creates a `RunBundle` nor inserts local activity into a
 recorded demo. Step, loop, mark, track selection, frames, live control acknowledgement, and
 detector/model tool calls remain unavailable capabilities rather than UI claims. The bounded child
-media bridge returns receipt and artifact identities, not media bytes or semantic findings, and a
-seek does not drive a UI playhead. The evidence bridge may return only the bounded facts that were
-already in a pinned producer receipt; empty, unavailable, unknown, withheld, and truncated are not
+media bridge returns receipt and artifact identities, not media bytes; its seek path adds only a
+content-bound exact-range `signal`/`digital_silence` audio-activity observation and does not identify
+speech or meaning. A seek does not drive a UI playhead. The evidence bridge may return only facts
+from a pinned producer receipt that intersect the task window, clipped to that window; empty, unavailable, unknown, withheld, and truncated are not
 converted into new claims.
 The default deterministic run-005 proof executes one seek, two evidence reads, one assessment, one
 decision over the audited assessment, one host-produced queued publish-review intake, and—only

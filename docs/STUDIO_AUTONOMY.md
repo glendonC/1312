@@ -1,7 +1,7 @@
 # Studio Autonomous Media Runtime
 
 Status: living implementation ledger for the Studio, media runtime, and development lab
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 ## Purpose
 
@@ -320,7 +320,7 @@ values distinctly and explain which assumptions dominate the estimate.
 | Source and run start | A loopback runtime-start host accepts explicitly attested bounded owned bytes or operator-selected preflight directories, invokes the existing ingest/ffprobe/V1-seal chain for browser media, revalidates every indexed byte, hot-registers and resolves stable session/revision identities, exposes a read-only exact plan, durably claims `commandId`, writes an immutable adjacent `studio.runtime-start.v1`, and launches one bounded child at most once. Default Studio can ingest, select, plan, start, and poll without entering replay state | Hosted/link ingest, speech/language detection for browser V1 ingest, a separately versioned production start event if later required, and scheduler task propagation of the accepted language context |
 | Agent topology | Legacy parent/divided-from projection plus a separate production scheduler, dynamic registry, bounded Codex launcher, and an atomic production-only source-artifact/task/spawn-decision/worker/grant/operation/output-artifact/report projection streamed by the owned-source host poll | Add larger scheduler behavior without altering recorded bundles or claiming a complete swarm |
 | Workspaces | Role-specific legacy trace projections plus boring production-only source-artifact, task, spawn-decision, grant, operation, output-lineage, and report regions with in-page links only to identities rendered in that projection | A production agent workspace remains separate work |
-| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD/language receipts, post-run evidence index, receipted ffmpeg extract/seek hosts, and task-private bridges for granted `media_extract`/`media_seek`, `evidence_read`, `evidence_assess`, and `evidence_decide`. The default run-005 proof executes one seek, two reads, one bounded assessment, then one deterministic decision over the audited assessment; V1 gets none of the evidence/assessment/decision grants | Additional individually implemented media operations and detector-backed acoustic/overlap tracks or stems |
+| Media evidence | Playhead, marks, waveform, real ffprobe, pinned VAD/language receipts, post-run evidence index, a receipted ffmpeg extract host, and one range-bound ffmpeg audio-activity observation that returns only `signal` or `digital_silence` with volume measurements. Task-private bridges expose granted `media_extract`/`media_seek`, `evidence_read`, `evidence_assess`, and `evidence_decide`; evidence reads are source/window-bound and return only intersecting facts clipped to the task window. The default run-005 proof executes one observation, two reads, one bounded assessment, then one deterministic decision over the audited assessment; V1 gets none of the evidence/assessment/decision grants | Additional individually implemented media operations and detector-backed speech/acoustic/overlap tracks or stems; audio activity is not speech or meaning |
 | Coordination | Legacy trace prose plus real bounded Codex child execution, a receipted structured opinion over completed read receipts, a separate deterministic decision over audited assessment identities, a host-only queued/rejected publish-review intake producer, one host-authoritative attested human review/revocation producer, a separate bounded caption producer, worker-output artifacts, structured report-up, and separate validated assessment/decision/intake/review/caption/report projections in the owned-source product path | Parent/orchestrator execution and larger task coordination; never retrofit legacy prose into handoffs, caption input, or publication authority |
 | Accuracy | Cross-recognizer agreement, gates, honest nulls | Additional independent checks for separated or overlapping sources |
 | Results | Recorded Results remain separate. The owned-source path projects validated decisions, private queued/rejected intake, immutable human approve/reject/revoke receipts, and private caption job/artifact identities plus honest counts. It does not merge those artifacts into replay Results and has no upload or publication producer | Wire verified production captions into the Studio Results surface without replay identity; keep Bet G, study, upload, and publication separate |
@@ -346,7 +346,7 @@ workers. It does not start the runtime, search raw journal text, insert events i
 | 1 — Studio lab | Implemented | Replay controls, cursor reconstruction, checkpoints, and inspector use the production reducer. Scenario breadth still grows only when recorded evidence exists. |
 | 2 — preflight | Partially implemented | Owned/local ingest, explicit rights, SHA-256 identity, real ffprobe metadata, and immutable V1/V2/V3 preflight indexes are real. Default Studio now sends explicitly attested owned bytes to the development host, which composes the existing ingest and V1 seal producers and hot-registers the validated source. This browser path does not run speech or language detection, so those findings remain honestly unavailable. Pinned Silero VAD and Whisper language producers remain available to the CLI preflight chain. Hosted/link submission, acoustic/overlap/visual detectors, and measured recommendation remain absent. |
 | 3 — tasks and agents | Local vertical slice implemented | `scripts/run-local-worker.ts` requires an explicit owned-preflight directory and language/output inputs, writes the validated run-start receipt, then uses the bounded `codex exec` launcher. The launcher consumes a scheduler permit, registers one isolated child, installs only granted media/evidence/assessment/decision MCP tools, and requires every granted media capability, evidence artifact scope, assessment grant, and decision grant to complete before accepting output. `run-005` remains only the explicit npm smoke/test input. One guarded real-Codex attempt on 2026-07-15 completed seek plus both reads but hit the 45-second wall limit before assess/decide; it is not a passed closed-chain verification. |
-| 4 — scoped media/evidence | Two media operations plus bounded read, assessment, and audited decision implemented | `media.extract`/`media.seek` retain their exact ffmpeg authority. `evidence.read` and `analysis.evidence.assess` retain their existing bounds. `analysis.evidence.decide` accepts only exact same-task assessment operation/artifact/receipt/content identities, re-runs the full live assessment audit, and enforces 1 decision/4 audited assessments. Its closed deterministic policy withholds any preserved withheld/unknown/truncated state; otherwise it emits `proceed_to_publish_review`. Separate bridges inject task/agent/operation identity and accept no paths, bytes, prose, caller outcome, or publication controls. Run-005 executes one seek, two reads, one assessment, and one decision; V1 runs only the seek. No detector, caption, or publisher runs. |
+| 4 — scoped media/evidence | One perceptual operation plus extract, bounded read, assessment, and audited decision implemented | `media.extract` retains exact ffmpeg extraction authority. The granted `media.seek` path now emits a content-bound `studio.media-perception.receipt.v1` with one exact-range `audio_activity` value (`signal` or `digital_silence`) and volume measurements; it does not claim speech, words, speakers, music, or meaning. `evidence.read` v2 scopes each preflight artifact to its one source and task window and clips every intersecting returned fact to that window. `analysis.evidence.assess` and `analysis.evidence.decide` retain their prior hard bounds and audit-state policy. Separate bridges inject task/agent/operation identity and accept no paths, bytes, prose, caller outcome, or publication controls. Run-005 executes one observation, two reads, one assessment, and one decision; V1 runs only the observation. No new speech/language detector, caption, or publisher runs. |
 | 5 — hardest audio | Blocked on producers | No pinned deterministic music/noise classifier, overlap detector, separation system, or quality gate exists. Raw media remains preserved and all such findings stay withheld. |
 | 6 — provenance | Partially implemented | Assessment, decision, intake, human review, review-revocation, and caption-production started/completed/failed events retain exact inputs, private content-addressed artifacts, and terminal facts. Each authenticated read reopens its own bytes and recursively verifies the complete prior chain. Product regions expose queued/rejected intake, immutable approve/reject/revoke receipts, reviewer identity/attestation, caption executor/status/counts/artifact identities, and stable gap reasons. Reading is not an artifact producer; assessment is an opinion; decision is an audit-state gate; intake is unreviewed queue lineage; approval is eligibility only. Caption coverage is not quality, upload, or publication. |
 | 7 — memory | Production foundation implemented | Future run output becomes immutable evidence-bound proposals; separate decisions, supersession, revocation, and materialization are enforced. Current legacy memory remains unreviewed and current bench data cannot promote a rule. |
@@ -455,10 +455,12 @@ exact forecast; the product client fails closed if command, runtime, analysis-re
 content identities differ from review.
 
 There is no pause/resume/cancel endpoint. The host does not link-ingest or host remote sources. It
-starts only the existing one-child proof objective with one exact scheduler-granted `media.seek`.
+starts only the existing one-child proof objective with one exact scheduler-granted `media.seek`
+audio-activity observation over the selected source and half-open window.
 When the selected sealed preflight already contains V2/V3 evidence, initialization also registers
 the existing speech/language receipt artifacts and the scheduler grants `evidence.read` with exact
-artifact ids and 32 KiB/64-fact ceilings. The scheduler also grants `analysis.evidence.assess` with
+artifact ids, source artifact id, task window, and 32 KiB/64-fact ceilings. Reads select only facts
+that intersect the window and clip returned ranges to it. The scheduler also grants `analysis.evidence.assess` with
 the same artifact allowlist and hard ceilings of one assessment, four completed read receipts,
 eight claims, 32 cited returned-fact indexes, and 512 deterministic structured-token units. A
 structured token is counted over canonical claim JSON as Unicode word runs or individual
@@ -887,13 +889,15 @@ The next production slices, in dependency order:
 4. Implemented 2026-07-14 for the available producer: the launcher receipts monotonic active spans
    and exact `turn.completed` token usage with a content-addressed raw receipt. Model identity when
    the CLI default is used, provider units, billing, and non-active span phases stay null/unavailable.
-5. Implemented 2026-07-14, extended 2026-07-15: bounded `media.seek` observation re-hashes the source, invokes ffmpeg with
-   fixed host arguments to seek and decode only the exact granted audio interval to a null sink,
-   stores its receipt as a content-addressed non-media artifact with raw-source lineage, and journals
-   it through the production projection. A task-private loopback bridge now exposes `media_seek` and/or
+5. Implemented 2026-07-14, extended 2026-07-16: bounded `media.seek` perception re-hashes the source, invokes ffmpeg with
+   fixed host arguments to decode only the exact granted audio interval, and emits one `signal` or
+   `digital_silence` observation from receipted mean/peak volume measurements. It stores the
+   `studio.media-perception.receipt.v1` as a content-addressed non-media artifact with raw-source
+   lineage and journals the semantic observation through the production projection. A task-private loopback bridge exposes `media_seek` and/or
    `media_extract` only when the scheduler task owns the matching grant and exact scope; the media host
    remains authoritative for live ownership, budget, source hash, range, event, artifact, and receipt
-   checks. No UI playhead, step/loop/mark, frame, or other media operation is claimed.
+   checks. Audio activity is not speech, words, music, speakers, or meaning. No UI playhead,
+   step/loop/mark, frame, or other media operation is claimed.
 6. Implemented 2026-07-14: deterministic immutable observability index over validated real
    production journals, exact journal and canonical source hashes, stored-receipt cross-checks,
    normalized task/agent/media-operation/handoff/active-span/measured-token/failure facts, typed
@@ -948,18 +952,19 @@ The next production slices, in dependency order:
     grant -> call -> journal -> projection. The launcher is configured and host-tested with a fake
     Codex JSONL process; a real model-backed `codex exec` invocation remains operator-only and was not
     required to establish the bridge or media-host evidence.
-13. Implemented 2026-07-15: `evidence.read` registers only already-validated V2/V3 speech/language
+13. Implemented 2026-07-15, range-bound 2026-07-16: `evidence.read` registers only already-validated V2/V3 speech/language
     receipts as private content-addressed preflight-evidence artifacts, derives exact scheduler
-    scopes with 32 KiB/64-fact ceilings, and exposes one path-free `evidence_read` MCP tool through a
+    scopes with one exact source artifact, task window, and 32 KiB/64-fact ceilings, and exposes one path-free `evidence_read` MCP tool through a
     separate task-private loopback bridge. The host rechecks live ownership, combined tool-call and
-    remaining per-artifact budgets, content identity, receipt kind, and lineage; the read receipt
-    embeds only bounded windows/decisions. Run-005 deterministically reads both existing artifacts;
+    remaining per-artifact budgets, content identity, receipt kind, source, window, and lineage; the
+    `studio.evidence-read.receipt.v2` selects intersecting facts and clips every returned range to the
+    authorized half-open window. Run-005 deterministically reads both existing artifacts;
     browser V1 has no grant and no facts. Launcher completion requires every granted evidence
     artifact to be read. Product projection adds boring **Evidence artifacts** and **Evidence reads**
     regions. Deterministic and fake-Codex seams are tested; a real model-backed Codex invocation was
     not run for this tranche.
 14. Implemented 2026-07-15: `analysis.evidence.assess` consumes only completed same-task
-    `studio.evidence-read.receipt.v1` identity/content pairs through the path-free `evidence_assess`
+    `studio.evidence-read.receipt.v2` identity/content pairs through the path-free `evidence_assess`
     MCP tool. The host re-hashes stored receipts, rechecks live ownership/grant/tool-call and
     assessment/receipt/claim/citation/structured-token budgets, rejects unread receipts and invalid
     returned-fact indexes/ranges/values, derives upstream supported/unknown/withheld/truncated state,

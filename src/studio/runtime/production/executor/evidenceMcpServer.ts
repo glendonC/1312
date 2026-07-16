@@ -17,7 +17,7 @@ const server = new McpServer(
   { name: "studio-bounded-evidence", version: "1" },
   {
     instructions:
-      "Read only the listed existing evidence artifacts. The host returns bounded producer facts and receipt lineage; reading does not create or broaden findings.",
+      "Read only the listed existing evidence artifacts. The host returns producer facts intersecting and clipped to the scheduler-granted source window; reading does not create or broaden findings.",
   },
 );
 
@@ -28,7 +28,7 @@ server.registerTool(
     title,
     description:
       "Read an explicitly granted, already-produced VAD or language evidence receipt. " +
-      "The host rechecks live ownership, exact artifact scope, tool-call/item/byte budgets, and content identity. Paths and raw media bytes are unavailable.",
+      "The host rechecks live ownership, exact artifact/source/time scope, tool-call/item/byte budgets, and content identity. Paths, out-of-window facts, and raw media bytes are unavailable.",
     inputSchema: z.object({ artifactId: z.string().min(1) }).strict().refine(
       (value) => allowedArtifacts.has(value.artifactId),
       { message: "artifactId must be one of the scheduler-granted evidence artifacts" },

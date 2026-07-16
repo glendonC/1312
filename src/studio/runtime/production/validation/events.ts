@@ -194,10 +194,19 @@ export function assertRuntimeEvent(
     string(data.operationId, context, "event.data.operationId");
     string(data.reason, context, "event.data.reason");
   } else if (type === "evidence.read_started") {
-    exact(data, ["request", "grantId", "evidenceKind", "maxBytes", "maxItems"], context, "event.data");
+    exact(
+      data,
+      ["request", "grantId", "evidenceKind", "sourceArtifactId", "startMs", "endMs", "maxBytes", "maxItems"],
+      context,
+      "event.data",
+    );
     assertEvidenceReadRequest(data.request, context);
     string(data.grantId, context, "event.data.grantId");
     oneOf(data.evidenceKind, new Set(["speech_activity", "language_ranges"]), context, "event.data.evidenceKind");
+    string(data.sourceArtifactId, context, "event.data.sourceArtifactId");
+    const startMs = integer(data.startMs, context, "event.data.startMs");
+    const endMs = integer(data.endMs, context, "event.data.endMs", 1);
+    if (endMs <= startMs) fail(context, "event.data", "must contain a non-empty evidence window");
     integer(data.maxBytes, context, "event.data.maxBytes", 1);
     integer(data.maxItems, context, "event.data.maxItems", 1);
   } else if (type === "evidence.read_completed") {

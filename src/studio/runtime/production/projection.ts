@@ -455,6 +455,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
       status: "started",
       outputArtifactId: null,
       receiptId: null,
+      observation: null,
       failure: null,
     };
     return next;
@@ -508,7 +509,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
       );
     } else {
       invariant(
-        artifact.kind === "media-seek-observation" &&
+        artifact.kind === "media-audio-activity-observation" &&
           artifact.origin.kind === "media_observation" &&
           artifact.origin.receiptId === receipt.receiptId &&
           artifact.origin.receiptContentId === artifact.content.contentId,
@@ -519,6 +520,9 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
     operation.status = "completed";
     operation.outputArtifactId = artifact.id;
     operation.receiptId = event.data.receipt.receiptId;
+    operation.observation = receipt.capability === "media.seek"
+      ? structuredClone(receipt.observation)
+      : null;
     return next;
   }
 
@@ -550,6 +554,19 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
       `evidence read ${request.operationId} input is unavailable`,
     );
     invariant(
+      artifact.sourceArtifactIds.length === 1 &&
+        artifact.sourceArtifactIds[0] === scope.sourceArtifactId &&
+        event.data.sourceArtifactId === scope.sourceArtifactId &&
+        event.data.startMs === scope.startMs &&
+        event.data.endMs === scope.endMs &&
+        task.mediaScope.some((mediaScope) =>
+          mediaScope.artifactId === scope.sourceArtifactId &&
+          mediaScope.startMs === scope.startMs &&
+          mediaScope.endMs === scope.endMs),
+      event,
+      `evidence read ${request.operationId} changed its exact source window`,
+    );
+    invariant(
       event.data.maxBytes > 0 && event.data.maxBytes <= scope.maxBytes &&
         event.data.maxItems > 0 && event.data.maxItems <= scope.maxItems,
       event,
@@ -569,6 +586,9 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
       grantId: event.data.grantId,
       artifactId: request.artifactId,
       evidenceKind: event.data.evidenceKind,
+      sourceArtifactId: event.data.sourceArtifactId,
+      startMs: event.data.startMs,
+      endMs: event.data.endMs,
       maxBytes: event.data.maxBytes,
       maxItems: event.data.maxItems,
       status: "started",
@@ -598,6 +618,9 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
         receipt.authorization.grantId === operation.grantId &&
         receipt.authorization.taskId === operation.taskId &&
         receipt.authorization.agentId === operation.agentId &&
+        receipt.authorization.sourceArtifactId === operation.sourceArtifactId &&
+        receipt.authorization.startMs === operation.startMs &&
+        receipt.authorization.endMs === operation.endMs &&
         receipt.authorization.maxBytes === operation.maxBytes &&
         receipt.authorization.maxItems === operation.maxItems,
       event,

@@ -21,14 +21,15 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
 - a bounded scheduler that derives task ids, depth, parentage, ownership, grants, and reservations;
 - a dynamic registry that registers only a scheduler-issued launch permit;
 - a content-addressed artifact store with closed ingest, preflight-evidence, and media-operation origins;
-- a capability host that performs real, scoped ffmpeg audio-range extraction and bounded audio seek
-  observation, with content-addressed receipts and source lineage;
+- a capability host that performs real, scoped ffmpeg audio-range extraction and one bounded
+  `signal`/`digital_silence` audio-activity observation, with content-addressed receipts and source lineage;
 - a task-private child bridge that publishes only scheduler-granted `media_extract`/`media_seek`,
   accepts no caller paths or operation ids, and delegates authorization, budget, source, range,
   journal, artifact, and receipt authority to that capability host;
 - an `evidence.read` host plus separate task-private bridge that publishes only `evidence_read`,
   accepts only an exact scheduler-granted artifact id, injects task/agent/operation identity, and
-  returns bounded facts from already-validated pinned VAD/language receipts with original lineage;
+  returns only facts intersecting the scheduler-granted source/window, clipped to that window, from
+  already-validated pinned VAD/language receipts with original lineage;
 - an `analysis.evidence.assess` host plus separate task-private bridge that publishes only
   `evidence_assess`, accepts completed same-task evidence-read receipt/content identities and closed
   range/citation claims, injects task/agent/operation identity, and emits a content-addressed
@@ -85,7 +86,7 @@ host exercises one real bounded seek plus worker-output receipt/report lineage. 
 service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
 `media_seek`, `evidence_read`, `evidence_assess`, and/or `evidence_decide` only for matching live task grants, in addition to the closed
 structured report output. `evidence.read` is not a detector call: it reads registered, immutable
-V2/V3 receipt artifacts under per-artifact 32 KiB/64-fact ceilings and the shared task tool-call
+V2/V3 receipt artifacts under an exact source/task window, per-artifact 32 KiB/64-fact ceilings, and the shared task tool-call
 budget. `analysis.evidence.assess` adds a separate 1-assessment/4-receipt/8-claim/32-cited-index/
 512-structured-token ceiling and requires exact fact indexes and bounding ranges. V1 and absent
 receipts produce none of those grants. `analysis.evidence.decide` adds a separate one-decision/four-

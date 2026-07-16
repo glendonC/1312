@@ -112,8 +112,8 @@ export function createRuntimePlan(input: RuntimePlanInput): RuntimePlan {
 }
 
 /**
- * Build the first honest plan: one bounded, receipted media.seek child proof scoped to the selected
- * source range. It does not claim semantic inspection, transcription, translation, captions, or study work.
+ * Build the first honest plan: one bounded, receipted media.seek audio-activity observation scoped
+ * to the selected source range. It does not claim speech, transcription, translation, captions, or study work.
  */
 export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
   assertProductionSourceSession(input.sourceSession);

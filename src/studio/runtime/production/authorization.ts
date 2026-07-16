@@ -120,6 +120,16 @@ export function authorizeEvidenceRead(
   const scope = grant?.evidenceScope.find((candidate) =>
     candidate.artifactId === artifact.id && candidate.evidenceKind === evidenceKind);
   if (!grant || !scope) throw new Error("Evidence read is outside the task's authoritative artifact grant");
+  if (
+    artifact.sourceArtifactIds.length !== 1 ||
+    artifact.sourceArtifactIds[0] !== scope.sourceArtifactId ||
+    !task.mediaScope.some((mediaScope) =>
+      mediaScope.artifactId === scope.sourceArtifactId &&
+      mediaScope.startMs === scope.startMs &&
+      mediaScope.endMs === scope.endMs)
+  ) {
+    throw new Error("Evidence read grant is no longer bound to the task's exact source window");
+  }
   const priorCalls = taskCapabilityCalls(state, task.id);
   if (priorCalls >= task.budget.toolCalls) throw new Error("Evidence read exceeds the task tool-call budget");
   const priorReads = Object.values(state.evidenceReads).filter(

@@ -317,9 +317,20 @@ function validateManifest(value: unknown): ChildEvidenceToolManifest {
   for (const candidate of tool.evidenceScope) {
     const scope = record(candidate);
     if (
-      !scope || !exact(scope, ["artifactId", "evidenceKind", "maxBytes", "maxItems"]) ||
+      !scope || !exact(scope, [
+        "artifactId",
+        "evidenceKind",
+        "sourceArtifactId",
+        "startMs",
+        "endMs",
+        "maxBytes",
+        "maxItems",
+      ]) ||
       typeof scope.artifactId !== "string" || !scope.artifactId ||
       (scope.evidenceKind !== "speech_activity" && scope.evidenceKind !== "language_ranges") ||
+      typeof scope.sourceArtifactId !== "string" || !scope.sourceArtifactId ||
+      !Number.isSafeInteger(scope.startMs) || (scope.startMs as number) < 0 ||
+      !Number.isSafeInteger(scope.endMs) || (scope.endMs as number) <= (scope.startMs as number) ||
       !Number.isSafeInteger(scope.maxBytes) || (scope.maxBytes as number) <= 0 ||
       (scope.maxBytes as number) > MAX_EVIDENCE_READ_BYTES ||
       !Number.isSafeInteger(scope.maxItems) || (scope.maxItems as number) <= 0 ||

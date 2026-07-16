@@ -181,7 +181,7 @@ function seekChildInput(runtime: RuntimeHarness): SpawnRequestInput {
       { artifactId: runtime.sourceArtifactId, trackId: "stream:0", startMs: 1_000, endMs: 1_800 },
     ],
     inputArtifactIds: [runtime.sourceArtifactId],
-    requiredOutputs: [{ name: "seek observation", artifactKind: "media-seek-observation", required: true }],
+    requiredOutputs: [{ name: "audio activity observation", artifactKind: "media-audio-activity-observation", required: true }],
     requiredCapabilities: ["media.seek", "report.submit"],
     dependencies: [],
     budget: { wallMs: 20_000, toolCalls: 1 },
@@ -972,7 +972,7 @@ test("capability host performs a real authorized ffmpeg extraction with receipte
   }
 });
 
-test("capability host performs a real bounded seek with a content-addressed observation receipt", async () => {
+test("capability host performs a real bounded audio-activity observation with a content-addressed receipt", async () => {
   const runtime = await harness(BASE_LIMITS, "file");
   try {
     const decision = await runtime.scheduler.requestSpawn(
@@ -1040,17 +1040,23 @@ test("capability host performs a real bounded seek with a content-addressed obse
       startMs: 1_000,
       endMs: 1_800,
     });
-    assert.equal(result.artifact.kind, "media-seek-observation");
+    assert.equal(result.artifact.kind, "media-audio-activity-observation");
     assert.equal(result.artifact.mediaClass, "non_media");
     assert.equal(result.artifact.publication, "private");
     assert.deepEqual(result.artifact.sourceArtifactIds, [runtime.sourceArtifactId]);
     assert.equal(result.artifact.origin.kind, "media_observation");
     assert.equal(result.receipt.capability, "media.seek");
+    assert.equal(result.receipt.schema, "studio.media-perception.receipt.v1");
     assert.equal(result.receipt.request.startMs, 1_000);
     assert.equal(result.receipt.request.endMs, 1_800);
-    assert.equal(result.receipt.observation.status, "decoded");
+    assert.equal(result.receipt.observation.status, "observed");
     assert.ok(result.receipt.observation.decodedDurationUs > 0);
     assert.ok(result.receipt.observation.decodedDurationUs <= 800_000);
+    assert.equal(result.receipt.observation.kind, "audio_activity");
+    assert.equal(result.receipt.observation.value, "signal");
+    assert.deepEqual(result.receipt.observation.range, { startMs: 1_000, endMs: 1_800 });
+    assert.equal(result.receipt.observation.measurements.silenceThresholdDb, -60);
+    assert.ok(result.receipt.observation.measurements.peakVolumeDb! > -60);
     assert.match(result.receipt.producer.version, /^ffmpeg version /);
 
     assert.equal(result.artifact.origin.kind, "media_observation");
@@ -1070,6 +1076,7 @@ test("capability host performs a real bounded seek with a content-addressed obse
     assert.equal(state.operations["operation:authorized-seek"].capability, "media.seek");
     assert.equal(state.operations["operation:authorized-seek"].status, "completed");
     assert.equal(state.operations["operation:authorized-seek"].outputArtifactId, result.artifact.id);
+    assert.deepEqual(state.operations["operation:authorized-seek"].observation, result.receipt.observation);
 
     const operationEvents = await runtime.ledger.events();
     const started = operationEvents.find(
@@ -1098,6 +1105,20 @@ test("capability host performs a real bounded seek with a content-addressed obse
     assert.throws(
       () => projectRuntimeEvents("runtime-test", changedInput),
       /receipt changed its input lineage/,
+    );
+
+    const changedObservation = structuredClone(operationEvents);
+    const changedObservationCompletion = changedObservation[completedIndex];
+    assert.equal(changedObservationCompletion.type, "media.operation_completed");
+    if (
+      changedObservationCompletion.type === "media.operation_completed" &&
+      changedObservationCompletion.data.receipt.capability === "media.seek"
+    ) {
+      changedObservationCompletion.data.receipt.observation.value = "digital_silence";
+    }
+    assert.throws(
+      () => projectRuntimeEvents("runtime-test", changedObservation),
+      /does not match the receipted peak-volume threshold/,
     );
 
     const changedArtifact = structuredClone(operationEvents);
@@ -1143,14 +1164,14 @@ test("capability host performs a real bounded seek with a content-addressed obse
       taskId: permit.taskId,
       agentId: permit.agentId,
       outputArtifactIds: [result.artifact.id],
-      summary: "The host decoded only the granted range and stored its observation receipt by content address.",
+      summary: "The host observed audio activity only in the granted range and stored its receipt by content address.",
     });
     await reports.decide({
       reportId: report.id,
       decidedByTaskId: runtime.rootTaskId,
       decidedByAgentId: runtime.rootAgentId,
       accepted: true,
-      reason: "The seek receipt, source lineage, and host-produced observation artifact are present.",
+      reason: "The perception receipt, source lineage, and host-produced observation artifact are present.",
     });
     const finalState = runtime.ledger.state();
     assert.equal(finalState.reports[report.id].status, "accepted");

@@ -566,6 +566,15 @@
   cursor: pointer;
 }
 
+/* The bar establishes its full silhouette before the action enters. Keeping
+   motion on this wrapper preserves the button's own hover transform. */
+.dock-go-reveal {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
 .dock-source-review {
   display: flex;
   min-width: 0;

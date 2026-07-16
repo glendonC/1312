@@ -164,9 +164,20 @@ export default function SourceEntry() {
               </span>
             )}
 
-            <button type="submit" className="dock-go" aria-label="Launch investigation">
-              <Arrow />
-            </button>
+            <motion.span
+              className="dock-go-reveal"
+              initial={{ opacity: 0, x: 10, scale: 0.72 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{
+                duration: 0.2,
+                delay: 0.26,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+            >
+              <button type="submit" className="dock-go" aria-label="Launch investigation">
+                <Arrow />
+              </button>
+            </motion.span>
           </motion.form>
         )}
       </AnimatePresence>

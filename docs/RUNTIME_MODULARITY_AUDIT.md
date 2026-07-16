@@ -63,6 +63,20 @@ executor/launcherFailure.ts   safe operator-facing adapter failure
 launcher.ts                   scheduler/registry coordination, receipts, artifacts, and handoff
 ```
 
+Owned-orchestration additions keep the root boundary separate:
+
+```text
+jobContext.ts                           immutable root construction and scheduler attenuation
+executor/orchestratorContract.ts        root prompt, result schema, and validator
+executor/orchestratorBridge.ts          granted spawn/wait policy and injected authority
+executor/orchestratorBridgeHttp.ts      authenticated loopback transport only
+executor/orchestratorMcpServer.ts       exact two-tool MCP registration
+executor/codexInvocation.ts             closed ambient-tool/config arguments
+orchestratorLauncher.ts                 Codex root process and executor/usage receipts
+runtimeHost/deterministicOrchestrator.ts explicit fake orchestration seam
+recovery.ts                             replay interruption without model-turn resumption
+```
+
 `launcher.ts` retains `CodexExecWorkerLauncher`, `CodexWorkerLauncherOptions`, and
 `CodexWorkerLaunchResult`. Its fixed command, ephemeral/read-only execution, no-inherited-shell
 policy, output schema, usage receipt, artifact lineage, and report-up behavior remain intact.

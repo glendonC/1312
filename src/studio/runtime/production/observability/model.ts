@@ -1,6 +1,6 @@
 import type {
   AgentStatus,
-  ExecutorOutcome,
+  ExecutorStatus,
   TaskStatus,
   WorkerKind,
 } from "../model.ts";
@@ -95,7 +95,7 @@ export interface IndexedExecution {
   executionId: string;
   taskId: string;
   agentId: string;
-  status: "active" | ExecutorOutcome;
+  status: ExecutorStatus;
   startedAt: string;
   endedAt: string | null;
   activeDurationMs: number | null;
@@ -212,7 +212,7 @@ export interface ObservabilityFilters {
   agentIds?: readonly string[];
   taskStatuses?: readonly TaskStatus[];
   operationCapabilities?: readonly IndexedOperationCapability[];
-  executionOutcomes?: readonly ("active" | ExecutorOutcome)[];
+  executionOutcomes?: readonly ExecutorStatus[];
   failureKinds?: readonly IndexedFailure["kind"][];
 }
 

@@ -1,4 +1,4 @@
-import { mkdir, open, readFile } from "node:fs/promises";
+import { mkdir, open, readFile, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { assertRuntimeEvent } from "./assertions.ts";
@@ -9,6 +9,13 @@ import { applyRuntimeEvent, projectRuntimeEvents } from "./projection.ts";
 export interface EventJournal {
   readAll(): Promise<RuntimeEvent[]>;
   appendBatch(events: readonly RuntimeEvent[]): Promise<void>;
+}
+
+export class RuntimeJournalConflict extends Error {
+  constructor(message = "The runtime journal advanced before this transaction acquired its append claim.") {
+    super(message);
+    this.name = "RuntimeJournalConflict";
+  }
 }
 
 export class MemoryEventJournal implements EventJournal {
@@ -59,12 +66,37 @@ export class FileEventJournal implements EventJournal {
     if (events.length === 0) return;
     events.forEach((event, index) => assertRuntimeEvent(event, `Runtime journal append[${index}]`));
     await mkdir(dirname(this.path), { recursive: true });
-    const handle = await open(this.path, "a", 0o600);
+    const lockPath = `${this.path}.append.lock`;
+    let lock;
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      try {
+        lock = await open(lockPath, "wx", 0o600);
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    }
+    if (!lock) throw new RuntimeJournalConflict("The runtime journal append claim remained unavailable.");
     try {
-      await handle.writeFile(`${events.map((event) => JSON.stringify(event)).join("\n")}\n`, "utf8");
-      await handle.sync();
+      const current = await this.readAll();
+      const expectedSeq = (current.at(-1)?.seq ?? 0) + 1;
+      if (events[0].seq !== expectedSeq) throw new RuntimeJournalConflict();
+      for (let index = 1; index < events.length; index += 1) {
+        if (events[index].seq !== events[index - 1].seq + 1) {
+          throw new RuntimeJournalConflict("The runtime journal append batch is not contiguous.");
+        }
+      }
+      const handle = await open(this.path, "a", 0o600);
+      try {
+        await handle.writeFile(`${events.map((event) => JSON.stringify(event)).join("\n")}\n`, "utf8");
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
     } finally {
-      await handle.close();
+      await lock.close();
+      await unlink(lockPath).catch(() => undefined);
     }
   }
 }

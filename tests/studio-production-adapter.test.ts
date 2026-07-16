@@ -6,6 +6,8 @@ import {
   projectProductionRuntimeJournal,
 } from "../src/studio/runtime/production/studioProjection.ts";
 import type { RuntimeProducerKind } from "../src/studio/runtime/production/protocol.ts";
+import { canonicalSha256 } from "../src/studio/runtime/production/artifactStore.ts";
+import type { TaskJobContext } from "../src/studio/runtime/production/model.ts";
 
 const RUN_ID = "runtime:production-adapter-test";
 const ROOT_TASK_ID = "task:root";
@@ -67,18 +69,64 @@ const CHILD_INPUT = {
   workerKind: "analysis",
   workerLabel: "bounded acknowledgement worker",
   mediaScope: [],
-  inputArtifactIds: [],
+  inputArtifactIds: [SOURCE_ARTIFACT_ID],
   requiredOutputs: [{ name: "acknowledgement", artifactKind: "worker-ack", required: true }],
   requiredCapabilities: ["report.submit"],
   dependencies: [],
   budget: { wallMs: 1_000, toolCalls: 1 },
 };
 
+function jobContext(contentId: string, range: { startMs: number; endMs: number }): TaskJobContext {
+  const body = {
+    source: { artifactId: SOURCE_ARTIFACT_ID, contentId },
+    analysisRequest: {
+      requestId: "analysis-request:production-adapter",
+      requestedRange: { ...range },
+      taskRange: { ...range },
+      options: {
+        speechScope: "foreground" as const,
+        includeLyrics: false,
+        speaker: null,
+        honorifics: "preserve" as const,
+        translationStyle: "natural" as const,
+        captionDensity: "balanced" as const,
+        slowAnalysis: false,
+      },
+    },
+    requestedSourceLanguagePolicy: { mode: "unknown" as const, languages: [] as [], reason: null },
+    targetLanguage: "en",
+    selectedLanguagePackId: null,
+    outputDepth: "evidence" as const,
+    detectorEvidence: [],
+  };
+  return { schema: "studio.task-job-context.v1", contextId: `job-context:${canonicalSha256(body)}`, ...body };
+}
+
 function productionJournal(): unknown[] {
   const startedAt = "2026-07-15T12:00:09.000Z";
   const digest = "a".repeat(64);
+  const sourceDigest = "f".repeat(64);
+  const context = jobContext(`sha256:${sourceDigest}`, { startMs: 0, endMs: 1_000 });
   return [
-    event(1, "scheduler", "task.created", {
+    event(1, "artifact_store", "artifact.recorded", {
+      artifact: {
+        schema: "studio.runtime.artifact.v1",
+        id: SOURCE_ARTIFACT_ID,
+        runId: RUN_ID,
+        kind: "owned-source",
+        mediaClass: "raw",
+        publication: "private",
+        content: { algorithm: "sha256", digest: sourceDigest, contentId: `sha256:${sourceDigest}`, bytes: 1 },
+        storageKey: `objects/sha256/ff/${sourceDigest}`,
+        durationMs: 1_000,
+        tracks: [{ id: "stream:0", index: 0, kind: "audio", codec: "pcm_s16le", durationMs: 1_000 }],
+        sourceArtifactIds: [],
+        producerTaskId: null,
+        producerAgentId: null,
+        origin: { kind: "ingest", adapterId: "owned-local-source-adapter.v1", sourceReceiptRef: "receipt:owned" },
+      },
+    }),
+    event(2, "scheduler", "task.created", {
       task: {
         id: ROOT_TASK_ID,
         runId: RUN_ID,
@@ -91,16 +139,29 @@ function productionJournal(): unknown[] {
         depth: 0,
         assignedAgentId: ROOT_AGENT_ID,
         ownerAgentId: null,
+        jobContext: context,
         mediaScope: [],
-        inputArtifactIds: [],
+        inputArtifactIds: [SOURCE_ARTIFACT_ID],
         requiredOutputs: [],
         dependencies: [],
         budget: { wallMs: 2_000, toolCalls: 2 },
         grants: [ROOT_GRANT],
         status: "scheduled",
+        terminalReason: null,
       },
     }),
-    event(2, "registry", "agent.registered", {
+    event(3, "launcher", "task.launch_claimed", {
+      claim: {
+        id: `launch:${ROOT_TASK_ID}`,
+        requestId: "root-task",
+        taskId: ROOT_TASK_ID,
+        agentId: ROOT_AGENT_ID,
+        executorKind: "deterministic_test",
+        claimedAt: "2026-07-15T12:00:03.000Z",
+        executionId: null,
+      },
+    }),
+    event(4, "registry", "agent.registered", {
       agent: {
         id: ROOT_AGENT_ID,
         taskId: ROOT_TASK_ID,
@@ -112,19 +173,21 @@ function productionJournal(): unknown[] {
         status: "registered",
       },
     }),
-    event(3, "scheduler", "task.transitioned", {
+    event(5, "scheduler", "task.transitioned", {
       taskId: ROOT_TASK_ID,
       agentId: ROOT_AGENT_ID,
       status: "working",
       reason: null,
     }),
-    event(4, "scheduler", "spawn.requested", {
+    event(6, "scheduler", "spawn.requested", {
       requestId: "request:child",
       requestedByTaskId: ROOT_TASK_ID,
       requestedByAgentId: ROOT_AGENT_ID,
+      authoredByExecutionId: null,
+      toolCallId: null,
       input: CHILD_INPUT,
     }),
-    event(5, "scheduler", "spawn.decided", {
+    event(7, "scheduler", "spawn.decided", {
       requestId: "request:child",
       accepted: true,
       rejection: null,
@@ -132,7 +195,7 @@ function productionJournal(): unknown[] {
       agentId: CHILD_AGENT_ID,
       grants: [REPORT_GRANT],
     }),
-    event(6, "scheduler", "task.created", {
+    event(8, "scheduler", "task.created", {
       task: {
         id: CHILD_TASK_ID,
         runId: RUN_ID,
@@ -145,6 +208,7 @@ function productionJournal(): unknown[] {
         depth: 1,
         assignedAgentId: CHILD_AGENT_ID,
         ownerAgentId: null,
+        jobContext: context,
         mediaScope: [],
         inputArtifactIds: [],
         requiredOutputs: CHILD_INPUT.requiredOutputs,
@@ -152,9 +216,21 @@ function productionJournal(): unknown[] {
         budget: CHILD_INPUT.budget,
         grants: [REPORT_GRANT],
         status: "scheduled",
+        terminalReason: null,
       },
     }),
-    event(7, "registry", "agent.registered", {
+    event(9, "launcher", "task.launch_claimed", {
+      claim: {
+        id: `launch:${CHILD_TASK_ID}`,
+        requestId: "request:child",
+        taskId: CHILD_TASK_ID,
+        agentId: CHILD_AGENT_ID,
+        executorKind: "deterministic_test",
+        claimedAt: "2026-07-15T12:00:09.000Z",
+        executionId: null,
+      },
+    }),
+    event(10, "registry", "agent.registered", {
       agent: {
         id: CHILD_AGENT_ID,
         taskId: CHILD_TASK_ID,
@@ -166,19 +242,20 @@ function productionJournal(): unknown[] {
         status: "registered",
       },
     }),
-    event(8, "scheduler", "task.transitioned", {
+    event(11, "scheduler", "task.transitioned", {
       taskId: CHILD_TASK_ID,
       agentId: CHILD_AGENT_ID,
       status: "working",
       reason: null,
     }),
-    event(9, "launcher", "executor.started", {
+    event(12, "launcher", "executor.started", {
       executionId: "execution:child",
       taskId: CHILD_TASK_ID,
       agentId: CHILD_AGENT_ID,
+      launchClaimId: `launch:${CHILD_TASK_ID}`,
       startedAt,
     }),
-    event(10, "artifact_store", "artifact.recorded", {
+    event(13, "artifact_store", "artifact.recorded", {
       artifact: {
         schema: "studio.runtime.artifact.v1",
         id: OUTPUT_ARTIFACT_ID,
@@ -206,7 +283,7 @@ function productionJournal(): unknown[] {
         },
       },
     }),
-    event(11, "launcher", "executor.finished", {
+    event(14, "launcher", "executor.finished", {
       receipt: {
         schema: "studio.executor-span.receipt.v1",
         receiptId: "span:child",
@@ -230,7 +307,7 @@ function productionJournal(): unknown[] {
         failure: null,
       },
     }),
-    event(12, "handoff_host", "report.submitted", {
+    event(15, "handoff_host", "report.submitted", {
       report: {
         id: "report:child",
         taskId: CHILD_TASK_ID,
@@ -243,7 +320,7 @@ function productionJournal(): unknown[] {
         decisionReason: null,
       },
     }),
-    event(13, "handoff_host", "report.decided", {
+    event(16, "handoff_host", "report.decided", {
       reportId: "report:child",
       decidedByTaskId: ROOT_TASK_ID,
       decidedByAgentId: ROOT_AGENT_ID,
@@ -258,6 +335,7 @@ function operationJournal(): unknown[] {
   const outputDigest = "d".repeat(64);
   const receiptContentDigest = "e".repeat(64);
   const scope = [{ artifactId: SOURCE_ARTIFACT_ID, trackId: "stream:0", startMs: 1_000, endMs: 2_000 }];
+  const context = jobContext(`sha256:${sourceDigest}`, { startMs: 1_000, endMs: 2_000 });
   const extractGrant = {
     id: OPERATION_GRANT_ID,
     capability: "media.extract",
@@ -309,6 +387,7 @@ function operationJournal(): unknown[] {
         depth: 0,
         assignedAgentId: ROOT_AGENT_ID,
         ownerAgentId: null,
+        jobContext: context,
         mediaScope: scope,
         inputArtifactIds: [SOURCE_ARTIFACT_ID],
         requiredOutputs: [{ name: "audio range", artifactKind: "media-range-audio", required: true }],
@@ -316,9 +395,21 @@ function operationJournal(): unknown[] {
         budget: { wallMs: 2_000, toolCalls: 1 },
         grants: [extractGrant],
         status: "scheduled",
+        terminalReason: null,
       },
     }),
-    event(3, "registry", "agent.registered", {
+    event(3, "launcher", "task.launch_claimed", {
+      claim: {
+        id: `launch:${ROOT_TASK_ID}`,
+        requestId: "root-task",
+        taskId: ROOT_TASK_ID,
+        agentId: ROOT_AGENT_ID,
+        executorKind: "deterministic_test",
+        claimedAt: "2026-07-15T12:00:03.000Z",
+        executionId: null,
+      },
+    }),
+    event(4, "registry", "agent.registered", {
       agent: {
         id: ROOT_AGENT_ID,
         taskId: ROOT_TASK_ID,
@@ -330,13 +421,13 @@ function operationJournal(): unknown[] {
         status: "registered",
       },
     }),
-    event(4, "scheduler", "task.transitioned", {
+    event(5, "scheduler", "task.transitioned", {
       taskId: ROOT_TASK_ID,
       agentId: ROOT_AGENT_ID,
       status: "working",
       reason: null,
     }),
-    event(5, "media_host", "media.operation_started", {
+    event(6, "media_host", "media.operation_started", {
       capability: "media.extract",
       request: {
         operationId: OPERATION_ID,
@@ -349,7 +440,7 @@ function operationJournal(): unknown[] {
       },
       grantId: OPERATION_GRANT_ID,
     }),
-    event(6, "artifact_store", "artifact.recorded", {
+    event(7, "artifact_store", "artifact.recorded", {
       artifact: {
         schema: "studio.runtime.artifact.v1",
         id: OPERATION_OUTPUT_ARTIFACT_ID,
@@ -377,7 +468,7 @@ function operationJournal(): unknown[] {
         },
       },
     }),
-    event(7, "media_host", "media.operation_completed", {
+    event(8, "media_host", "media.operation_completed", {
       operationId: OPERATION_ID,
       outputArtifactId: OPERATION_OUTPUT_ARTIFACT_ID,
       receipt: {
@@ -414,7 +505,7 @@ test("production adapter projects spawn and output lineage with existing facts o
     kind: "production_runtime_journal",
     recordedDemo: false,
   });
-  assert.equal(projection.lastSeq, 13);
+  assert.equal(projection.lastSeq, 16);
   assert.deepEqual(projection.counts, {
     tasks: 2,
     workers: 2,
@@ -422,6 +513,9 @@ test("production adapter projects spawn and output lineage with existing facts o
     executions: 1,
     reports: 1,
     spawnRequests: 1,
+    taskLaunches: 2,
+    reportWaits: 0,
+    orchestratorDecisions: 0,
     rootOutputDispositions: 0,
     operations: 0,
     evidenceReads: 0,
@@ -432,7 +526,7 @@ test("production adapter projects spawn and output lineage with existing facts o
     publishReviewRevocations: 0,
     captionProductions: 0,
     captionQualityControls: 0,
-    sourceArtifacts: 0,
+    sourceArtifacts: 1,
     evidenceArtifacts: 0,
     assessmentArtifacts: 0,
     decisionArtifacts: 0,
@@ -489,7 +583,7 @@ test("production adapter projects spawn and output lineage with existing facts o
     workerKind: CHILD_INPUT.workerKind,
     workerLabel: CHILD_INPUT.workerLabel,
     mediaScope: [],
-    inputArtifactIds: [],
+    inputArtifactIds: [SOURCE_ARTIFACT_ID],
     requiredOutputs: CHILD_INPUT.requiredOutputs,
     requiredCapabilities: ["report.submit"],
     dependencies: [],
@@ -497,6 +591,8 @@ test("production adapter projects spawn and output lineage with existing facts o
     rejection: null,
     taskId: CHILD_TASK_ID,
     agentId: CHILD_AGENT_ID,
+    authoredByExecutionId: null,
+    toolCallId: null,
   }]);
   assert.deepEqual(projection.outputArtifacts, [{
     artifactId: OUTPUT_ARTIFACT_ID,
@@ -563,7 +659,7 @@ test("production adapter projects only validated media operation identities and 
   assert.equal(sourceOnly.sourceArtifacts[0].durationMs, null);
 
   const adapter = new ProductionStudioAdapter(RUN_ID);
-  const started = adapter.appendBatch(operationJournal().slice(0, 5));
+  const started = adapter.appendBatch(operationJournal().slice(0, 6));
   assert.deepEqual(
     {
       status: started.operations[0].status,
@@ -574,7 +670,7 @@ test("production adapter projects only validated media operation identities and 
     { status: "started", outputArtifactId: null, receiptId: null, failure: null },
   );
 
-  const failed = adapter.append(event(6, "media_host", "media.operation_failed", {
+  const failed = adapter.append(event(7, "media_host", "media.operation_failed", {
     operationId: OPERATION_ID,
     reason: "ffmpeg range extraction failed",
   }));
@@ -587,13 +683,13 @@ test("production adapter projects only validated media operation identities and 
 test("production adapter keeps pending and rejected spawn decisions explicit", () => {
   const journal = productionJournal();
   const adapter = new ProductionStudioAdapter(RUN_ID);
-  const pending = adapter.appendBatch(journal.slice(0, 4));
+  const pending = adapter.appendBatch(journal.slice(0, 6));
   assert.equal(pending.spawnRequests[0].decision, "pending");
   assert.equal(pending.spawnRequests[0].rejection, null);
   assert.equal(pending.spawnRequests[0].taskId, null);
   assert.equal(pending.spawnRequests[0].agentId, null);
 
-  const rejected = adapter.append(event(5, "scheduler", "spawn.decided", {
+  const rejected = adapter.append(event(7, "scheduler", "spawn.decided", {
     requestId: "request:child",
     accepted: false,
     rejection: "max_active_workers",
@@ -610,19 +706,19 @@ test("production adapter keeps pending and rejected spawn decisions explicit", (
 test("production adapter applies a poll batch atomically and keeps the last valid view on rejection", () => {
   const journal = productionJournal();
   const adapter = new ProductionStudioAdapter(RUN_ID);
-  const accepted = adapter.appendBatch(journal.slice(0, 3));
-  const malformed = structuredClone(journal[4]) as { seq: number; eventId: string };
+  const accepted = adapter.appendBatch(journal.slice(0, 5));
+  const malformed = structuredClone(journal[6]) as { seq: number; eventId: string };
   malformed.seq = 99;
   malformed.eventId = `event:${RUN_ID}:99`;
 
   assert.throws(
-    () => adapter.appendBatch([journal[3], malformed]),
-    /sequence expected 5, received 99/,
+    () => adapter.appendBatch([journal[5], malformed]),
+    /sequence expected 7, received 99/,
   );
   assert.deepEqual(adapter.view(), accepted);
 
   const duplicateGrantBatch = JSON.parse(
-    JSON.stringify(journal.slice(3, 7)).replaceAll(REPORT_GRANT_ID, ROOT_GRANT.id),
+    JSON.stringify(journal.slice(5, 8)).replaceAll(REPORT_GRANT_ID, ROOT_GRANT.id),
   ) as unknown[];
   assert.throws(
     () => adapter.appendBatch(duplicateGrantBatch),

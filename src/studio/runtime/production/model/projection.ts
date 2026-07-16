@@ -24,7 +24,11 @@ import type {
 } from "./review.ts";
 import type {
   AgentRecord,
+  OrchestratorDecisionRecord,
+  OrchestratorToolCallRecord,
+  ReportsWaitRecord,
   SpawnRequestRecord,
+  TaskLaunchRecord,
   TaskRecord,
 } from "./tasks.ts";
 
@@ -35,6 +39,10 @@ export interface RuntimeProjection {
   agents: Record<string, AgentRecord>;
   artifacts: Record<string, RuntimeArtifact>;
   spawnRequests: Record<string, SpawnRequestRecord>;
+  taskLaunches: Record<string, TaskLaunchRecord>;
+  orchestratorToolCalls: Record<string, OrchestratorToolCallRecord>;
+  reportWaits: Record<string, ReportsWaitRecord>;
+  orchestratorDecisions: Record<string, OrchestratorDecisionRecord>;
   operations: Record<string, OperationRecord>;
   evidenceReads: Record<string, EvidenceReadRecord>;
   evidenceAssessments: Record<string, EvidenceAssessmentRecord>;

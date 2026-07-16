@@ -31,6 +31,9 @@ import {
   projectOperations,
   projectReports,
   projectRootOutputDispositions,
+  projectTaskLaunches,
+  projectReportWaits,
+  projectOrchestratorDecisions,
   projectSpawnRequests,
   projectTasks,
   projectWorkers,
@@ -44,6 +47,9 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
   const reports = projectReports(state);
   const spawnRequests = projectSpawnRequests(state);
   const rootOutputDispositions = projectRootOutputDispositions(state);
+  const taskLaunches = projectTaskLaunches(state);
+  const reportWaits = projectReportWaits(state);
+  const orchestratorDecisions = projectOrchestratorDecisions(state);
   const operations = projectOperations(state);
   const evidenceReads = projectEvidenceReads(state);
   const evidenceAssessments = projectEvidenceAssessments(state);
@@ -74,6 +80,9 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     grants,
     reports,
     spawnRequests,
+    taskLaunches,
+    reportWaits,
+    orchestratorDecisions,
     rootOutputDispositions,
     operations,
     evidenceReads,
@@ -100,6 +109,9 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       executions: Object.keys(state.executions).length,
       reports: reports.length,
       spawnRequests: spawnRequests.length,
+      taskLaunches: taskLaunches.length,
+      reportWaits: reportWaits.length,
+      orchestratorDecisions: orchestratorDecisions.length,
       rootOutputDispositions: rootOutputDispositions.length,
       operations: operations.length,
       evidenceReads: evidenceReads.length,

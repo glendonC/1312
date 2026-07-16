@@ -63,6 +63,34 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   claiming upload/publication;
 - a structured handoff host that validates required child output and parent-only acceptance.
 
+### Durable agent-directed orchestration kernel
+
+New owned runs carry one content-addressed `studio.task-job-context.v1` on every scheduler task.
+The root binds the registered source artifact/content, exact analysis request and requested range,
+requested source-language policy, target language, selected pack, output depth, and detector-evidence
+artifact/content identities. Child contexts are constructed only by scheduler inheritance or range/
+evidence attenuation; the model-facing spawn schema contains no context, task, agent, grant,
+dependency-task, launch, executor, or path fields.
+
+The Codex root is a separate executor role with an explicitly configured model. Ambient Codex
+configuration and the documented shell, web, app, hook, goal, memory, remote-plugin, and built-in
+multi-agent tool families are disabled for that process. Its sole MCP server exposes exactly
+`task_spawn_request` and `task_reports_wait` under matching scheduler grants. Spawn records the root
+execution/tool-call causation, returns one accepted/rejected scheduler decision, and starts accepted
+per-task launch promises without waiting. Wait journals `waiting_for_children` and returns only
+terminal task/report/artifact identities or closed failure states.
+
+Every executing task now has one durable `task.launch_claimed` event. `executor.started` consumes
+that exact claim and a task cannot acquire a second executor in replay. File-journal appends reject
+stale sequence writers. Recovery never resumes an ambiguous model turn: it appends
+`runtime.interrupted`, closes active executor/task identities, and does not create a report.
+
+The deterministic orchestrator remains an explicitly named test seam. Its host-authored child
+contract proves scheduler/launch/replay mechanics only and is not model-planning evidence. The
+guarded real-Codex proof requires `STUDIO_RUN_REAL_CODEX_SWARM=1` and an explicit
+`STUDIO_OWNED_SWARM_MODEL`; by default it retains its run-start receipt, journal, and
+content-addressed executor/usage objects under `.studio/owned-swarm-proofs`.
+
 The exact runtime test executes that path against the receipted run-005 media, performs two reads,
 one assessment, one audited decision, one host-only publish-review intake, independent approve,
 reject, and revoke review paths, and an approval-gated caption job, then reopens the event journal to prove replay equivalence. It also

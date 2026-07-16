@@ -81,11 +81,11 @@ export function validateExecutorSpanReceipt(
   const outputs = uniqueStrings(item.outputArtifactIds, context, `${path}.outputArtifactIds`);
   const usage = nullableString(item.modelUsageReceiptId, context, `${path}.modelUsageReceiptId`);
   const failure = nullableString(item.failure, context, `${path}.failure`);
-  if (outcome === "completed" && (exitCode !== 0 || outputs.length === 0 || failure !== null)) {
+  if (outcome === "completed" && (exitCode !== 0 || failure !== null)) {
     fail(
       context,
       path,
-      "completed spans require exit zero, outputs, and no failure",
+      "completed spans require exit zero and no failure",
     );
   }
   if (outcome === "completed" && producerId === "codex.exec" && usage === null) {

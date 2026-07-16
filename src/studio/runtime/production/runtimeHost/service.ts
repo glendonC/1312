@@ -33,7 +33,8 @@ import {
   PublishReviewHost,
   PublishReviewHostError,
 } from "../publishReviewHost.ts";
-import { FileEventJournal, RuntimeLedger } from "../journal.ts";
+import { FileEventJournal, RuntimeJournalConflict, RuntimeLedger } from "../journal.ts";
+import { interruptAmbiguousRuntime } from "../recovery.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
 import {
   createRuntimePlan,
@@ -68,8 +69,10 @@ import {
   initializeRuntimeApplication,
   runBoundedRuntimeApplication,
   RuntimeApplicationInterrupted,
+  type BoundedOrchestratorLauncherFactory,
   type BoundedWorkerLauncherFactory,
 } from "./runtimeApplication.ts";
+import { deterministicOrchestratorLauncherFactory } from "./deterministicOrchestrator.ts";
 import { RuntimeSourceRegistry } from "./sourceRegistry.ts";
 import { parseRuntimeHostStartRequest } from "./validation.ts";
 import {
@@ -87,6 +90,7 @@ export interface RuntimeStartServiceOptions {
   store: DurableRuntimeCommandStore;
   sources: RuntimeSourceRegistry;
   launcherFactory: BoundedWorkerLauncherFactory;
+  orchestratorLauncherFactory?: BoundedOrchestratorLauncherFactory;
   acceptedBy?: string;
   now?: () => Date;
   runtimeIdForCommand?: (commandId: string) => string;
@@ -126,6 +130,7 @@ export class RuntimeStartService {
   private readonly store: DurableRuntimeCommandStore;
   private readonly sources: RuntimeSourceRegistry;
   private readonly launcherFactory: BoundedWorkerLauncherFactory;
+  private readonly orchestratorLauncherFactory: BoundedOrchestratorLauncherFactory;
   private readonly acceptedBy: string;
   private readonly now: () => Date;
   private readonly runtimeIdForCommand: (commandId: string) => string;
@@ -140,6 +145,7 @@ export class RuntimeStartService {
     this.store = options.store;
     this.sources = options.sources;
     this.launcherFactory = options.launcherFactory;
+    this.orchestratorLauncherFactory = options.orchestratorLauncherFactory ?? deterministicOrchestratorLauncherFactory();
     this.acceptedBy = options.acceptedBy ?? "operator:local-runtime-host";
     this.now = options.now ?? (() => new Date());
     this.runtimeIdForCommand = options.runtimeIdForCommand ?? deterministicRuntimeId;
@@ -402,11 +408,16 @@ export class RuntimeStartService {
     initialized: InitializedRuntimeApplication,
   ): Promise<void> {
     try {
-      await runBoundedRuntimeApplication(initialized, this.launcherFactory);
+      await runBoundedRuntimeApplication(initialized, this.launcherFactory, this.orchestratorLauncherFactory);
       await this.reconcile(record, false);
     } catch (error) {
       const current = await this.store.read(record.commandId);
       if (!current) return;
+      if (error instanceof RuntimeJournalConflict) {
+        // A recovery writer advanced the durable journal. This stale executor must not overwrite
+        // the recovery lifecycle or attempt another append from its stale projection.
+        return;
+      }
       if (error instanceof RuntimeApplicationInterrupted) {
         const journal = await readValidatedRuntimeJournal(
           this.store.paths(current.runtimeId).journalPath,
@@ -515,7 +526,7 @@ export class RuntimeStartService {
       }
       return record;
     }
-    const journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
+    let journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
     if (journal.head === 0) {
       if (recovery && !terminal(record.lifecycle)) {
         const launched = await this.store.hasLaunchClaim(record.commandId);
@@ -532,7 +543,7 @@ export class RuntimeStartService {
       return record;
     }
     const evidence = lifecycleFromRuntimeEvidence(journal.state);
-    if (evidence.lifecycle === "terminal" || evidence.lifecycle === "failed") {
+    if (evidence.lifecycle === "terminal" || evidence.lifecycle === "failed" || evidence.lifecycle === "interrupted") {
       if (
         record.lifecycle !== evidence.lifecycle ||
         record.journalHead !== journal.head ||
@@ -543,9 +554,22 @@ export class RuntimeStartService {
       return record;
     }
     if (recovery && !terminal(record.lifecycle)) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const ledger = await RuntimeLedger.open(record.runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
+        try {
+          await interruptAmbiguousRuntime(
+            ledger,
+            "The runtime host restarted while accepted task launch or model execution state remained ambiguous; no executor was relaunched and no report was invented.",
+          );
+          break;
+        } catch (error) {
+          if (!(error instanceof RuntimeJournalConflict) || attempt === 2) throw error;
+        }
+      }
+      journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
       return this.replaceLifecycle(record, "interrupted", {
         code: "nonterminal_journal_after_restart",
-        message: "The recovered journal is nonterminal; this host will not launch a replacement child.",
+        message: "The recovered journal records explicit interruption; this host will not launch a replacement model turn or child.",
       }, journal.head);
     }
     if (!terminal(record.lifecycle) && record.lifecycle !== evidence.lifecycle) {

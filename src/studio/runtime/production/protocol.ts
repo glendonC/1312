@@ -18,6 +18,7 @@ import type {
   MediaOperationRequest,
   MediaOperationReceipt,
   ModelUsageReceipt,
+  OrchestratorDecisionRecord,
   PublishReviewDecisionReceipt,
   PublishReviewDecisionRequest,
   PublishReviewIntakeReceipt,
@@ -28,8 +29,10 @@ import type {
   RuntimeArtifact,
   SpawnRejection,
   SpawnRequestInput,
+  TaskLaunchRecord,
   TaskRecord,
   TaskStatus,
+  TerminalChildIdentity,
 } from "./model.ts";
 
 export type RuntimeProducerKind =
@@ -45,7 +48,8 @@ export type RuntimeProducerKind =
   | "caption_production_host"
   | "caption_quality_control_host"
   | "handoff_host"
-  | "launcher";
+  | "launcher"
+  | "recovery_host";
 
 export interface RuntimeEventBase {
   schema: "studio.runtime.event.v1";
@@ -74,6 +78,8 @@ export interface SpawnRequestedEvent extends RuntimeEventBase {
     requestId: string;
     requestedByTaskId: string;
     requestedByAgentId: string;
+    authoredByExecutionId: string | null;
+    toolCallId: string | null;
     input: SpawnRequestInput;
   };
 }
@@ -95,6 +101,46 @@ export interface AgentRegisteredEvent extends RuntimeEventBase {
   data: { agent: AgentRecord };
 }
 
+export interface TaskLaunchClaimedEvent extends RuntimeEventBase {
+  type: "task.launch_claimed";
+  data: { claim: TaskLaunchRecord };
+}
+
+export interface OrchestratorToolCalledEvent extends RuntimeEventBase {
+  type: "orchestrator.tool_called";
+  data: {
+    callId: string;
+    executionId: string;
+    taskId: string;
+    tool: "task_spawn_request" | "task_reports_wait";
+  };
+}
+
+export interface ReportsWaitStartedEvent extends RuntimeEventBase {
+  type: "reports.wait_started";
+  data: { waitId: string; executionId: string; parentTaskId: string };
+}
+
+export interface ReportsWaitReturnedEvent extends RuntimeEventBase {
+  type: "reports.wait_returned";
+  data: {
+    waitId: string;
+    result: "all_terminal" | "closed_failure";
+    failure: "no_children" | "child_interrupted" | "child_failed" | null;
+    children: TerminalChildIdentity[];
+  };
+}
+
+export interface OrchestratorDecisionRecordedEvent extends RuntimeEventBase {
+  type: "orchestrator.decision_recorded";
+  data: { decision: OrchestratorDecisionRecord };
+}
+
+export interface RuntimeInterruptedEvent extends RuntimeEventBase {
+  type: "runtime.interrupted";
+  data: { reason: string; taskIds: string[]; executionIds: string[] };
+}
+
 export interface TaskTransitionedEvent extends RuntimeEventBase {
   type: "task.transitioned";
   data: { taskId: string; agentId: string; status: TaskStatus; reason: string | null };
@@ -106,6 +152,7 @@ export interface ExecutorStartedEvent extends RuntimeEventBase {
     executionId: string;
     taskId: string;
     agentId: string;
+    launchClaimId: string;
     startedAt: string;
   };
 }
@@ -351,7 +398,13 @@ export type RuntimeEvent =
   | TaskCreatedEvent
   | SpawnRequestedEvent
   | SpawnDecidedEvent
+  | TaskLaunchClaimedEvent
   | AgentRegisteredEvent
+  | OrchestratorToolCalledEvent
+  | ReportsWaitStartedEvent
+  | ReportsWaitReturnedEvent
+  | OrchestratorDecisionRecordedEvent
+  | RuntimeInterruptedEvent
   | TaskTransitionedEvent
   | ExecutorStartedEvent
   | ModelUsageRecordedEvent

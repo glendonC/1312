@@ -11,6 +11,7 @@ import {
   loadOwnedSourceSession,
 } from "../src/studio/runtime/production/runStart.ts";
 import {
+  codexOrchestratorLauncherFactory,
   codexWorkerLauncherFactory,
   initializeRuntimeApplication,
   runBoundedRuntimeApplication,
@@ -64,6 +65,8 @@ const loadedSource = await loadOwnedSourceSession(resolve(requiredArgument("--so
 const rangeStartMs = integerArgument("--range-start-ms", 0);
 const rangeEndMs = integerArgument("--range-end-ms", loadedSource.session.source.durationMs);
 const outputDepth = argument("--output-depth") ?? "evidence";
+const model = requiredArgument("--model");
+const maximumWallMs = integerArgument("--maximum-wall-ms", 60_000);
 if (outputDepth !== "captions" && outputDepth !== "evidence") {
   throw new Error("--output-depth must be captions or evidence");
 }
@@ -93,8 +96,11 @@ const initialized = await initializeRuntimeApplication({
   analysisRequest,
 });
 await runBoundedRuntimeApplication(initialized, codexWorkerLauncherFactory({
-  model: argument("--model"),
-  maximumWallMs: 45_000,
+  model,
+  maximumWallMs: Math.min(maximumWallMs, 45_000),
+}), codexOrchestratorLauncherFactory({
+  model,
+  maximumWallMs,
 }));
 const runStart = initialized.runStart;
 const runStartContent = await identifyFile(runStartPath);

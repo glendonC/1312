@@ -116,6 +116,7 @@ export function workerPrompt(task: TaskRecord): string {
         : []);
   const contract = {
     taskId: task.id,
+    jobContext: task.jobContext,
     objective: task.objective,
     workerKind: task.workerKind,
     requiredOutputs: task.requiredOutputs.filter((output) => output.required),

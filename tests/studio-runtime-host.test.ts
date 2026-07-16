@@ -453,7 +453,7 @@ test("polling is exclusive, bounded, restart-safe, and projects the complete val
     assert.equal(inspector.projection.workers.length, 2);
     assert.deepEqual(
       inspector.projection.grants.map((grant) => grant.capability).sort(),
-      ["analysis.evidence.assess", "analysis.evidence.decide", "evidence.read", "media.seek", "report.submit", "task.spawn.request"],
+      ["analysis.evidence.assess", "analysis.evidence.decide", "evidence.read", "media.seek", "report.submit", "task.reports.wait", "task.spawn.request"],
     );
     assert.equal(inspector.projection.reports.length, 1);
     assert.equal(inspector.projection.reports[0].status, "accepted");

@@ -29,6 +29,20 @@ export interface ProductionStudioTaskView {
   assignedAgentId: string;
   ownerAgentId: string | null;
   status: TaskStatus;
+  terminalReason: string | null;
+  jobContext: {
+    contextId: string;
+    sourceArtifactId: string;
+    sourceContentId: string;
+    analysisRequestId: string;
+    requestedRange: { startMs: number; endMs: number };
+    taskRange: { startMs: number; endMs: number };
+    requestedSourceLanguagePolicy: import("../model.ts").RequestedSourceLanguage;
+    targetLanguage: string;
+    selectedLanguagePackId: string | null;
+    outputDepth: "captions" | "evidence";
+    detectorEvidence: Array<{ artifactId: string; contentId: string; evidenceKind: EvidenceKind }>;
+  };
   mediaScope: MediaScope[];
   inputArtifactIds: string[];
   requiredOutputs: RequiredOutput[];
@@ -41,7 +55,7 @@ export interface ProductionStudioWorkerView {
   label: string;
   kind: WorkerKind;
   status: "registered" | "working" | "reporting" | "retired";
-  taskStatus: "scheduled" | "working" | "reported" | "completed" | "failed" | "withheld";
+  taskStatus: TaskStatus;
   objective: string;
   parentAgentId: string | null;
   parentTaskId: string | null;
@@ -50,7 +64,8 @@ export interface ProductionStudioWorkerView {
   mediaScope: MediaScope[];
   execution: null | {
     id: string;
-    status: "active" | "completed" | "failed" | "timed_out";
+    launchClaimId: string;
+    status: "active" | "completed" | "failed" | "timed_out" | "interrupted";
     activeDurationMs: number | null;
     usage: null | {
       model: string | null;
@@ -372,6 +387,36 @@ export interface ProductionStudioSpawnView {
   rejection: SpawnRejection | null;
   taskId: string | null;
   agentId: string | null;
+  authoredByExecutionId: string | null;
+  toolCallId: string | null;
+}
+
+export interface ProductionStudioTaskLaunchView {
+  launchClaimId: string;
+  requestId: string;
+  taskId: string;
+  agentId: string;
+  executorKind: "codex" | "deterministic_test";
+  claimedAt: string;
+  executionId: string | null;
+  executorState: "claimed" | "active" | "completed" | "failed" | "timed_out" | "interrupted";
+}
+
+export interface ProductionStudioReportsWaitView {
+  waitId: string;
+  executionId: string;
+  parentTaskId: string;
+  status: "waiting" | "returned";
+  result: "all_terminal" | "closed_failure" | null;
+  failure: "no_children" | "child_interrupted" | "child_failed" | null;
+  children: import("../model.ts").TerminalChildIdentity[];
+}
+
+export interface ProductionStudioOrchestratorDecisionView {
+  executionId: string;
+  taskId: string;
+  outcome: "completed" | "no_request" | "withheld";
+  reason: string;
 }
 
 export interface ProductionStudioRootOutputDispositionView {
@@ -472,6 +517,9 @@ export interface ProductionStudioProjection {
   grants: ProductionStudioGrantView[];
   reports: ProductionStudioReportView[];
   spawnRequests: ProductionStudioSpawnView[];
+  taskLaunches: ProductionStudioTaskLaunchView[];
+  reportWaits: ProductionStudioReportsWaitView[];
+  orchestratorDecisions: ProductionStudioOrchestratorDecisionView[];
   rootOutputDispositions: ProductionStudioRootOutputDispositionView[];
   operations: ProductionStudioOperationView[];
   evidenceReads: ProductionStudioEvidenceReadView[];
@@ -498,6 +546,9 @@ export interface ProductionStudioProjection {
     executions: number;
     reports: number;
     spawnRequests: number;
+    taskLaunches: number;
+    reportWaits: number;
+    orchestratorDecisions: number;
     rootOutputDispositions: number;
     operations: number;
     evidenceReads: number;

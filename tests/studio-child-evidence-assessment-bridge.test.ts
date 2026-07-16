@@ -36,6 +36,7 @@ import type {
 import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
 import { loadOwnedSourceSession } from "../src/studio/runtime/production/runStart/sourceSessionLoader.ts";
 import { BoundedRuntimeScheduler, type RuntimeIdentityFactory } from "../src/studio/runtime/production/scheduler.ts";
+import { runtimeTestJobContext } from "./runtime-test-job-context.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
 import { countAssessmentTokens } from "../src/studio/runtime/production/validation/assessment.ts";
 
@@ -94,7 +95,8 @@ async function assessmentHarness(registerChild = true) {
     requiredCapabilities: ["task.spawn.request"],
     dependencies: [],
     budget: { wallMs: 10_000, toolCalls: 1 },
-  });
+  }, runtimeTestJobContext({ source, evidence, range: { startMs: 0, endMs: 3_000 } }));
+  await scheduler.claimTaskLaunch(root, "deterministic_test", "2026-07-15T12:00:00.000Z");
   await scheduler.registerAgent(root);
   await scheduler.transitionTask(root.taskId, root.agentId, "working");
   const child: SpawnRequestInput = {
@@ -117,6 +119,7 @@ async function assessmentHarness(registerChild = true) {
   const decision = await scheduler.requestSpawn(root.taskId, root.agentId, child);
   assert.ok(decision.permit);
   if (registerChild) {
+    await scheduler.claimTaskLaunch(decision.permit, "deterministic_test", "2026-07-15T12:00:00.000Z");
     await scheduler.registerAgent(decision.permit);
     await scheduler.transitionTask(decision.permit.taskId, decision.permit.agentId, "working");
   }

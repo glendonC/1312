@@ -9,8 +9,31 @@ import {
   workerPrompt,
 } from "../src/studio/runtime/production/executor/workerContract.ts";
 import type { TaskRecord } from "../src/studio/runtime/production/model.ts";
+import { canonicalSha256 } from "../src/studio/runtime/production/artifactStore.ts";
 
 function task(): TaskRecord {
+  const contextBody = {
+    source: { artifactId: "artifact:test-source", contentId: `sha256:${"a".repeat(64)}` },
+    analysisRequest: {
+      requestId: "analysis-request:worker-contract",
+      requestedRange: { startMs: 0, endMs: 1_000 },
+      taskRange: { startMs: 0, endMs: 1_000 },
+      options: {
+        speechScope: "foreground" as const,
+        includeLyrics: false,
+        speaker: null,
+        honorifics: "preserve" as const,
+        translationStyle: "natural" as const,
+        captionDensity: "balanced" as const,
+        slowAnalysis: false,
+      },
+    },
+    requestedSourceLanguagePolicy: { mode: "unknown" as const, languages: [] as [], reason: null },
+    targetLanguage: "en",
+    selectedLanguagePackId: null,
+    outputDepth: "evidence" as const,
+    detectorEvidence: [],
+  };
   return {
     id: "task:worker-contract",
     runId: "runtime:worker-contract",
@@ -23,6 +46,11 @@ function task(): TaskRecord {
     depth: 1,
     assignedAgentId: "agent:worker-contract",
     ownerAgentId: "agent:worker-contract",
+    jobContext: {
+      schema: "studio.task-job-context.v1",
+      contextId: `job-context:${canonicalSha256(contextBody)}`,
+      ...contextBody,
+    },
     mediaScope: [],
     inputArtifactIds: [],
     requiredOutputs: [{ name: "ack", artifactKind: "worker-ack", required: true }],
@@ -41,6 +69,7 @@ function task(): TaskRecord {
       },
     ],
     status: "working",
+    terminalReason: null,
   };
 }
 

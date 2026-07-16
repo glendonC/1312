@@ -4,6 +4,10 @@ export {
   DeterministicRuntimeExecutor,
   type DeterministicExecutionMode,
 } from "./deterministicExecutor.ts";
+export {
+  deterministicOrchestratorLauncherFactory,
+  type DeterministicOrchestratorMode,
+} from "./deterministicOrchestrator.ts";
 export { RuntimeHostError } from "./errors.ts";
 export {
   assertRuntimeHostBindAddress,
@@ -36,6 +40,7 @@ export type {
 } from "./model.ts";
 export {
   codexWorkerLauncherFactory,
+  codexOrchestratorLauncherFactory,
   initializeRuntimeApplication,
   runBoundedRuntimeApplication,
   RuntimeApplicationInterrupted,

@@ -12,18 +12,26 @@ export function applyExecutionMediaEvent(next: RuntimeProjection, event: Runtime
       `execution ${event.data.executionId} has no working owner`,
     );
     invariant(!next.executions[event.data.executionId], event, `execution ${event.data.executionId} is duplicated`);
+    const launch = next.taskLaunches[task.id];
+    invariant(
+      launch?.id === event.data.launchClaimId && launch.agentId === event.data.agentId && launch.executionId === null,
+      event,
+      `execution ${event.data.executionId} has no unused durable launch claim`,
+    );
     invariant(
       !Object.values(next.executions).some(
-        (execution) => execution.taskId === task.id && execution.status === "active",
+        (execution) => execution.taskId === task.id,
       ),
       event,
-      `task ${task.id} already has an active executor`,
+      `task ${task.id} already has an executor`,
     );
+    launch.executionId = event.data.executionId;
     next.executions[event.data.executionId] = {
       id: event.data.executionId,
       taskId: task.id,
       agentId: event.data.agentId,
       startedAt: event.data.startedAt,
+      launchClaimId: launch.id,
       status: "active",
       receipt: null,
       outputArtifactIds: [],

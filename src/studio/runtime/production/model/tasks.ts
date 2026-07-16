@@ -1,5 +1,6 @@
 export const CAPABILITIES = [
   "task.spawn.request",
+  "task.reports.wait",
   "report.submit",
   "media.extract",
   "media.seek",
@@ -70,7 +71,15 @@ export interface RequiredOutput {
 }
 
 export type WorkerKind = "orchestrator" | "media" | "analysis" | "translation" | "quality";
-export type TaskStatus = "scheduled" | "working" | "reported" | "completed" | "failed" | "withheld";
+export type TaskStatus =
+  | "scheduled"
+  | "working"
+  | "waiting_for_children"
+  | "reported"
+  | "completed"
+  | "failed"
+  | "withheld"
+  | "interrupted";
 export type AgentStatus = "registered" | "working" | "reporting" | "retired";
 
 /** The requested source language is policy input. Detector evidence never mutates this value. */
@@ -95,6 +104,39 @@ export interface LanguageJobContext {
   detectedLanguageEvidenceContentIds: string[];
 }
 
+/** Path-free, content-addressed authority inherited or attenuated by the scheduler. */
+export interface TaskJobContext {
+  schema: "studio.task-job-context.v1";
+  contextId: string;
+  source: {
+    artifactId: string;
+    contentId: string;
+  };
+  analysisRequest: {
+    requestId: string;
+    requestedRange: { startMs: number; endMs: number };
+    taskRange: { startMs: number; endMs: number };
+    options: {
+      speechScope: "foreground" | "all";
+      includeLyrics: boolean;
+      speaker: string | null;
+      honorifics: "preserve" | "naturalize";
+      translationStyle: "literal" | "natural";
+      captionDensity: "compact" | "balanced" | "relaxed";
+      slowAnalysis: boolean;
+    };
+  };
+  requestedSourceLanguagePolicy: RequestedSourceLanguage;
+  targetLanguage: string;
+  selectedLanguagePackId: string | null;
+  outputDepth: "captions" | "evidence";
+  detectorEvidence: Array<{
+    artifactId: string;
+    contentId: string;
+    evidenceKind: EvidenceKind;
+  }>;
+}
+
 export interface TaskRecord {
   id: string;
   runId: string;
@@ -107,6 +149,7 @@ export interface TaskRecord {
   depth: number;
   assignedAgentId: string;
   ownerAgentId: string | null;
+  jobContext: TaskJobContext;
   mediaScope: MediaScope[];
   inputArtifactIds: string[];
   requiredOutputs: RequiredOutput[];
@@ -114,6 +157,7 @@ export interface TaskRecord {
   budget: RuntimeBudget;
   grants: CapabilityGrant[];
   status: TaskStatus;
+  terminalReason: string | null;
 }
 
 export interface CapabilityGrant {
@@ -152,6 +196,14 @@ export interface SpawnRequestInput {
   budget: RuntimeBudget;
 }
 
+/**
+ * Exact model-facing spawn contract. Task, agent, grant, and dependency task identities are
+ * deliberately absent; the scheduler resolves dependency workload keys and derives ownership.
+ */
+export interface OrchestratorSpawnContract extends Omit<SpawnRequestInput, "dependencies"> {
+  dependencyWorkloadKeys: string[];
+}
+
 export type SpawnRejection =
   | "requester_not_authorized"
   | "max_depth"
@@ -170,6 +222,16 @@ export interface LaunchPermit {
   registrationSecret: string;
 }
 
+export interface TaskLaunchRecord {
+  id: string;
+  requestId: string;
+  taskId: string;
+  agentId: string;
+  executorKind: "codex" | "deterministic_test";
+  claimedAt: string;
+  executionId: string | null;
+}
+
 export interface SpawnRequestRecord {
   id: string;
   requestedByTaskId: string;
@@ -179,4 +241,41 @@ export interface SpawnRequestRecord {
   rejection: SpawnRejection | null;
   taskId: string | null;
   agentId: string | null;
+  authoredByExecutionId: string | null;
+  toolCallId: string | null;
+}
+
+export type ReportsWaitFailure = "no_children" | "child_interrupted" | "child_failed";
+
+export interface TerminalChildIdentity {
+  taskId: string;
+  status: "reported" | "completed" | "failed" | "withheld" | "interrupted";
+  reportId: string | null;
+  artifactIds: string[];
+  failure: { state: "failed" | "withheld" | "interrupted"; reason: string } | null;
+}
+
+export interface ReportsWaitRecord {
+  id: string;
+  executionId: string;
+  parentTaskId: string;
+  status: "waiting" | "returned";
+  result: "all_terminal" | "closed_failure" | null;
+  failure: ReportsWaitFailure | null;
+  children: TerminalChildIdentity[];
+}
+
+export interface OrchestratorToolCallRecord {
+  id: string;
+  executionId: string;
+  taskId: string;
+  tool: "task_spawn_request" | "task_reports_wait";
+  spawnRequestId: string | null;
+}
+
+export interface OrchestratorDecisionRecord {
+  executionId: string;
+  taskId: string;
+  outcome: "completed" | "no_request" | "withheld";
+  reason: string;
 }

@@ -125,6 +125,8 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
     this.owner.launchInvocations += 1;
     await this.owner.control.waitBeforeFirstEvent();
     const { ledger, scheduler, artifacts, reports } = this.context;
+    const launchClaim = await scheduler.claimTaskLaunch(permit, "deterministic_test", this.owner.now().toISOString());
+    if (!launchClaim.won) throw new Error("Task already has a durable launch claim and cannot start another executor");
     await scheduler.registerAgent(permit);
     await scheduler.transitionTask(permit.taskId, permit.agentId, "working");
     const task = ledger.state().tasks[permit.taskId];
@@ -135,7 +137,13 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       () => ({
         pending: [{
           type: "executor.started",
-          data: { executionId, taskId: task.id, agentId: task.assignedAgentId, startedAt },
+          data: {
+            executionId,
+            taskId: task.id,
+            agentId: task.assignedAgentId,
+            launchClaimId: launchClaim.claim.id,
+            startedAt,
+          },
         }] satisfies PendingRuntimeEvent[],
         result: undefined,
       }),

@@ -10,6 +10,7 @@ import {
   RecordedCaptionFixtureExecutor,
   RuntimeSourceRegistry,
   RuntimeStartService,
+  codexOrchestratorLauncherFactory,
   codexWorkerLauncherFactory,
   createRuntimeHostHttpServer,
   listenRuntimeHost,
@@ -53,6 +54,10 @@ if (executorMode !== "deterministic" && executorMode !== "codex") {
 }
 if (executorMode === "codex" && !flag("--allow-real-codex")) {
   throw new Error("Real Codex execution requires --allow-real-codex");
+}
+const configuredModel = value("--model");
+if (executorMode === "codex" && !configuredModel) {
+  throw new Error("Real Codex orchestration requires an explicit --model identity");
 }
 const captionExecutorMode = value("--caption-executor") ?? "recorded";
 if (captionExecutorMode !== "recorded" && captionExecutorMode !== "openai") {
@@ -101,7 +106,13 @@ const service = await RuntimeStartService.open({
   sources,
   launcherFactory: deterministic
     ? deterministic.factory()
-    : codexWorkerLauncherFactory({ model: value("--model"), maximumWallMs: 45_000 }),
+    : codexWorkerLauncherFactory({ model: configuredModel, maximumWallMs: 45_000 }),
+  ...(deterministic ? {} : {
+    orchestratorLauncherFactory: codexOrchestratorLauncherFactory({
+      model: configuredModel!,
+      maximumWallMs: 60_000,
+    }),
+  }),
   reviewer: { id: reviewerId, label: reviewerLabel },
   captionExecutor,
 });

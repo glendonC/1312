@@ -21,7 +21,7 @@ export interface ValidatedRuntimeJournal {
 }
 
 export interface RuntimeEvidenceLifecycle {
-  lifecycle: Extract<RuntimeHostLifecycleState, "initializing" | "running" | "terminal" | "failed">;
+  lifecycle: Extract<RuntimeHostLifecycleState, "initializing" | "running" | "terminal" | "failed" | "interrupted">;
   reason: RuntimeHostFailureReason | null;
 }
 
@@ -109,8 +109,23 @@ export function lifecycleFromRuntimeEvidence(state: RuntimeProjection): RuntimeE
   const executions = Object.values(state.executions);
   const activeExecution = executions.some((execution) => execution.status === "active");
   const terminalTasks = tasks.length > 0 && tasks.every((task) =>
-    task.status === "completed" || task.status === "failed" || task.status === "withheld"
+    task.status === "completed" || task.status === "failed" || task.status === "withheld" || task.status === "interrupted"
   );
+  const interruptedEvidence = tasks.some((task) => task.status === "interrupted") ||
+    executions.some((execution) => execution.status === "interrupted");
+  if (interruptedEvidence && !activeExecution) {
+    const recoveredRestart = tasks.some((task) =>
+      task.status === "interrupted" && task.terminalReason?.startsWith("The runtime host restarted"));
+    return {
+      lifecycle: "interrupted",
+      reason: {
+        code: recoveredRestart ? "nonterminal_journal_after_restart" : "executor_interrupted",
+        message: recoveredRestart
+          ? "Validated journal recovery made ambiguous work explicitly interrupted; no replacement was launched."
+          : "Validated runtime evidence contains explicit interrupted task or executor state; no replacement was launched.",
+      },
+    };
+  }
   const failedEvidence = tasks.some((task) => task.status === "failed") ||
     executions.some((execution) => execution.status === "failed" || execution.status === "timed_out");
   if (failedEvidence && !activeExecution) {

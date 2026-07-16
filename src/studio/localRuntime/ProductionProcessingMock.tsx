@@ -44,6 +44,19 @@ const SOURCE: RuntimeHostSourceSummary = {
 const ROOT_OBJECTIVE = "Coordinate one bounded local worker launch with one receipted bounded seek, explicitly pinned evidence reads, and no invented media-content claims.";
 const CHILD_OBJECTIVE = "Invoke media.seek once for the granted source range, consume only explicitly granted evidence, retain returned operation and receipt identities, and report without making transcription, translation, caption, or publication claims.";
 const MEDIA_SCOPE = [{ artifactId: SOURCE_ARTIFACT_ID, trackId: "stream:0", startMs: 0, endMs: 47_200 }];
+const JOB_CONTEXT = {
+  contextId: `job-context:${"0".repeat(64)}`,
+  sourceArtifactId: SOURCE_ARTIFACT_ID,
+  sourceContentId: SOURCE.sourceContentId,
+  analysisRequestId: "analysis-request:processing-contract-snapshot",
+  requestedRange: { startMs: 0, endMs: 47_200 },
+  taskRange: { startMs: 0, endMs: 47_200 },
+  requestedSourceLanguagePolicy: { mode: "declared" as const, languages: ["ko"] as [string], reason: null },
+  targetLanguage: "en",
+  selectedLanguagePackId: "ko-v3",
+  outputDepth: "evidence" as const,
+  detectorEvidence: [],
+};
 
 function failureFor(scenario: ProcessingMockScenario): RuntimeHostFailureReason | null {
   if (scenario === "failed") {
@@ -91,6 +104,8 @@ function activeProjection(): ProductionStudioProjection {
         assignedAgentId: ROOT_AGENT_ID,
         ownerAgentId: ROOT_AGENT_ID,
         status: "working",
+        terminalReason: null,
+        jobContext: JOB_CONTEXT,
         mediaScope: MEDIA_SCOPE,
         inputArtifactIds: [SOURCE_ARTIFACT_ID],
         requiredOutputs: [{ name: "run report", artifactKind: "run-report", required: true }],
@@ -108,6 +123,8 @@ function activeProjection(): ProductionStudioProjection {
         assignedAgentId: CHILD_AGENT_ID,
         ownerAgentId: CHILD_AGENT_ID,
         status: "working",
+        terminalReason: null,
+        jobContext: JOB_CONTEXT,
         mediaScope: MEDIA_SCOPE,
         inputArtifactIds: [SOURCE_ARTIFACT_ID],
         requiredOutputs: [{ name: "execution report", artifactKind: "worker-execution-report", required: true }],
@@ -152,6 +169,7 @@ function activeProjection(): ProductionStudioProjection {
         mediaScope: MEDIA_SCOPE,
         execution: {
           id: "execution:deterministic:processing-contract-snapshot",
+          launchClaimId: `launch:${CHILD_TASK_ID}`,
           status: "active",
           activeDurationMs: null,
           usage: null,

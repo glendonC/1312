@@ -1,4 +1,5 @@
 export type ExecutorOutcome = "completed" | "failed" | "timed_out";
+export type ExecutorStatus = "active" | ExecutorOutcome | "interrupted";
 
 export interface ExecutorSpanReceipt {
   schema: "studio.executor-span.receipt.v1";
@@ -43,7 +44,7 @@ export interface ModelUsageReceipt {
     id: "codex.exec";
     version: string;
   };
-  /** The CLI JSONL contract does not currently identify the selected model. */
+  /** Explicit host configuration; the CLI usage event is measured separately below. */
   model: string | null;
   measured: {
     inputTokens: number;
@@ -69,7 +70,8 @@ export interface ExecutorRecord {
   taskId: string;
   agentId: string;
   startedAt: string;
-  status: "active" | ExecutorOutcome;
+  launchClaimId: string;
+  status: ExecutorStatus;
   receipt: ExecutorSpanReceipt | null;
   outputArtifactIds: string[];
   modelUsageReceiptId: string | null;

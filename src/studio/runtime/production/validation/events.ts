@@ -33,6 +33,7 @@ import {
   validateMediaOperationReceipt,
 } from "./media.ts";
 import {
+  array,
   boolean,
   contentId,
   exact,
@@ -44,6 +45,7 @@ import {
   object,
   oneOf,
   string,
+  uniqueStrings,
 } from "./primitives.ts";
 import {
   TASK_STATUSES,
@@ -96,7 +98,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "launcher"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -115,13 +117,18 @@ export function assertRuntimeEvent(
   } else if (type === "spawn.requested") {
     exact(
       data,
-      ["requestId", "requestedByTaskId", "requestedByAgentId", "input"],
+      ["requestId", "requestedByTaskId", "requestedByAgentId", "authoredByExecutionId", "toolCallId", "input"],
       context,
       "event.data",
     );
     string(data.requestId, context, "event.data.requestId");
     string(data.requestedByTaskId, context, "event.data.requestedByTaskId");
     string(data.requestedByAgentId, context, "event.data.requestedByAgentId");
+    nullableString(data.authoredByExecutionId, context, "event.data.authoredByExecutionId");
+    nullableString(data.toolCallId, context, "event.data.toolCallId");
+    if ((data.authoredByExecutionId === null) !== (data.toolCallId === null)) {
+      fail(context, "event.data", "must carry executor authorship and tool-call identity together");
+    }
     assertSpawnRequestInput(data.input, context);
   } else if (type === "spawn.decided") {
     exact(
@@ -157,6 +164,68 @@ export function assertRuntimeEvent(
   } else if (type === "agent.registered") {
     exact(data, ["agent"], context, "event.data");
     assertAgentRecord(data.agent, context, "event.data.agent");
+  } else if (type === "task.launch_claimed") {
+    exact(data, ["claim"], context, "event.data");
+    const claim = object(data.claim, context, "event.data.claim");
+    exact(claim, ["id", "requestId", "taskId", "agentId", "executorKind", "claimedAt", "executionId"], context, "event.data.claim");
+    string(claim.id, context, "event.data.claim.id");
+    string(claim.requestId, context, "event.data.claim.requestId");
+    string(claim.taskId, context, "event.data.claim.taskId");
+    string(claim.agentId, context, "event.data.claim.agentId");
+    oneOf(claim.executorKind, new Set(["codex", "deterministic_test"]), context, "event.data.claim.executorKind");
+    isoTimestamp(claim.claimedAt, context, "event.data.claim.claimedAt");
+    nullableString(claim.executionId, context, "event.data.claim.executionId");
+  } else if (type === "orchestrator.tool_called") {
+    exact(data, ["callId", "executionId", "taskId", "tool"], context, "event.data");
+    string(data.callId, context, "event.data.callId");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.taskId, context, "event.data.taskId");
+    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait"]), context, "event.data.tool");
+  } else if (type === "reports.wait_started") {
+    exact(data, ["waitId", "executionId", "parentTaskId"], context, "event.data");
+    string(data.waitId, context, "event.data.waitId");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.parentTaskId, context, "event.data.parentTaskId");
+  } else if (type === "reports.wait_returned") {
+    exact(data, ["waitId", "result", "failure", "children"], context, "event.data");
+    string(data.waitId, context, "event.data.waitId");
+    const result = oneOf<string>(data.result, new Set(["all_terminal", "closed_failure"]), context, "event.data.result");
+    const failure = data.failure === null ? null : oneOf<string>(data.failure, new Set(["no_children", "child_interrupted", "child_failed"]), context, "event.data.failure");
+    if ((result === "all_terminal") !== (failure === null)) fail(context, "event.data", "wait result and failure disagree");
+    const children = array(data.children, context, "event.data.children");
+    const taskIds: string[] = [];
+    for (const [index, childValue] of children.entries()) {
+      const child = object(childValue, context, `event.data.children[${index}]`);
+      exact(child, ["taskId", "status", "reportId", "artifactIds", "failure"], context, `event.data.children[${index}]`);
+      taskIds.push(string(child.taskId, context, `event.data.children[${index}].taskId`));
+      const status = oneOf<string>(child.status, new Set(["reported", "completed", "failed", "withheld", "interrupted"]), context, `event.data.children[${index}].status`);
+      nullableString(child.reportId, context, `event.data.children[${index}].reportId`);
+      uniqueStrings(child.artifactIds, context, `event.data.children[${index}].artifactIds`);
+      if (child.failure === null) {
+        if (status === "failed" || status === "withheld" || status === "interrupted") fail(context, `event.data.children[${index}].failure`, "is required for a failed child");
+      } else {
+        const childFailure = object(child.failure, context, `event.data.children[${index}].failure`);
+        exact(childFailure, ["state", "reason"], context, `event.data.children[${index}].failure`);
+        oneOf(childFailure.state, new Set(["failed", "withheld", "interrupted"]), context, `event.data.children[${index}].failure.state`);
+        string(childFailure.reason, context, `event.data.children[${index}].failure.reason`);
+        if (childFailure.state !== status) fail(context, `event.data.children[${index}].failure.state`, "must match child status");
+      }
+    }
+    if (new Set(taskIds).size !== taskIds.length) fail(context, "event.data.children", "must not repeat child tasks");
+  } else if (type === "orchestrator.decision_recorded") {
+    exact(data, ["decision"], context, "event.data");
+    const decision = object(data.decision, context, "event.data.decision");
+    exact(decision, ["executionId", "taskId", "outcome", "reason"], context, "event.data.decision");
+    string(decision.executionId, context, "event.data.decision.executionId");
+    string(decision.taskId, context, "event.data.decision.taskId");
+    oneOf(decision.outcome, new Set(["completed", "no_request", "withheld"]), context, "event.data.decision.outcome");
+    string(decision.reason, context, "event.data.decision.reason");
+  } else if (type === "runtime.interrupted") {
+    exact(data, ["reason", "taskIds", "executionIds"], context, "event.data");
+    string(data.reason, context, "event.data.reason");
+    const taskIds = uniqueStrings(data.taskIds, context, "event.data.taskIds");
+    const executionIds = uniqueStrings(data.executionIds, context, "event.data.executionIds");
+    if (taskIds.length === 0 && executionIds.length === 0) fail(context, "event.data", "must close at least one ambiguous identity");
   } else if (type === "task.transitioned") {
     exact(data, ["taskId", "agentId", "status", "reason"], context, "event.data");
     string(data.taskId, context, "event.data.taskId");
@@ -164,10 +233,11 @@ export function assertRuntimeEvent(
     oneOf(data.status, TASK_STATUSES, context, "event.data.status");
     nullableString(data.reason, context, "event.data.reason");
   } else if (type === "executor.started") {
-    exact(data, ["executionId", "taskId", "agentId", "startedAt"], context, "event.data");
+    exact(data, ["executionId", "taskId", "agentId", "launchClaimId", "startedAt"], context, "event.data");
     string(data.executionId, context, "event.data.executionId");
     string(data.taskId, context, "event.data.taskId");
     string(data.agentId, context, "event.data.agentId");
+    string(data.launchClaimId, context, "event.data.launchClaimId");
     isoTimestamp(data.startedAt, context, "event.data.startedAt");
   } else if (type === "model.usage_recorded") {
     exact(data, ["receipt"], context, "event.data");

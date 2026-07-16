@@ -293,6 +293,9 @@ export class CodexExecWorkerLauncher {
       throw new Error("Codex executor supports only report.submit plus scheduler-granted media.extract/media.seek/evidence.read/analysis.evidence.assess/analysis.evidence.decide");
     }
 
+    const claimedAt = this.options.now().toISOString();
+    const launchClaim = await this.scheduler.claimTaskLaunch(permit, "codex", claimedAt);
+    if (!launchClaim.won) throw new Error("Task already has a durable launch claim and cannot start another executor");
     const version = await this.version();
     await this.scheduler.registerAgent(permit);
     await this.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
@@ -307,7 +310,13 @@ export class CodexExecWorkerLauncher {
       { producer: { kind: "launcher", id: "codex-exec-worker-launcher" }, causationId: permit.requestId },
       () => ({
         pending: [
-          { type: "executor.started", data: { executionId, taskId: task.id, agentId: task.assignedAgentId, startedAt } },
+          { type: "executor.started", data: {
+            executionId,
+            taskId: task.id,
+            agentId: task.assignedAgentId,
+            launchClaimId: launchClaim.claim.id,
+            startedAt,
+          } },
         ] satisfies PendingRuntimeEvent[],
         result: undefined,
       }),

@@ -4,6 +4,9 @@ import type {
   ProductionStudioOperationView,
   ProductionStudioReportView,
   ProductionStudioRootOutputDispositionView,
+  ProductionStudioTaskLaunchView,
+  ProductionStudioReportsWaitView,
+  ProductionStudioOrchestratorDecisionView,
   ProductionStudioSpawnView,
   ProductionStudioTaskView,
   ProductionStudioWorkerView,
@@ -23,6 +26,20 @@ export function projectTasks(state: RuntimeProjection) {
       assignedAgentId: task.assignedAgentId,
       ownerAgentId: task.ownerAgentId,
       status: task.status,
+      terminalReason: task.terminalReason,
+      jobContext: {
+        contextId: task.jobContext.contextId,
+        sourceArtifactId: task.jobContext.source.artifactId,
+        sourceContentId: task.jobContext.source.contentId,
+        analysisRequestId: task.jobContext.analysisRequest.requestId,
+        requestedRange: { ...task.jobContext.analysisRequest.requestedRange },
+        taskRange: { ...task.jobContext.analysisRequest.taskRange },
+        requestedSourceLanguagePolicy: structuredClone(task.jobContext.requestedSourceLanguagePolicy),
+        targetLanguage: task.jobContext.targetLanguage,
+        selectedLanguagePackId: task.jobContext.selectedLanguagePackId,
+        outputDepth: task.jobContext.outputDepth,
+        detectorEvidence: structuredClone(task.jobContext.detectorEvidence),
+      },
       mediaScope: structuredClone(task.mediaScope),
       inputArtifactIds: [...task.inputArtifactIds],
       requiredOutputs: structuredClone(task.requiredOutputs),
@@ -90,9 +107,49 @@ export function projectSpawnRequests(state: RuntimeProjection) {
       rejection: request.rejection,
       taskId: request.taskId,
       agentId: request.agentId,
+      authoredByExecutionId: request.authoredByExecutionId,
+      toolCallId: request.toolCallId,
     }))
     .sort((left, right) => left.requestId.localeCompare(right.requestId));
   return spawnRequests;
+}
+
+export function projectTaskLaunches(state: RuntimeProjection) {
+  return Object.values(state.taskLaunches)
+    .map((launch): ProductionStudioTaskLaunchView => {
+      const execution = launch.executionId ? state.executions[launch.executionId] : null;
+      return {
+        launchClaimId: launch.id,
+        requestId: launch.requestId,
+        taskId: launch.taskId,
+        agentId: launch.agentId,
+        executorKind: launch.executorKind,
+        claimedAt: launch.claimedAt,
+        executionId: launch.executionId,
+        executorState: execution?.status ?? "claimed",
+      };
+    })
+    .sort((left, right) => left.taskId.localeCompare(right.taskId));
+}
+
+export function projectReportWaits(state: RuntimeProjection) {
+  return Object.values(state.reportWaits)
+    .map((wait): ProductionStudioReportsWaitView => ({
+      waitId: wait.id,
+      executionId: wait.executionId,
+      parentTaskId: wait.parentTaskId,
+      status: wait.status,
+      result: wait.result,
+      failure: wait.failure,
+      children: structuredClone(wait.children),
+    }))
+    .sort((left, right) => left.waitId.localeCompare(right.waitId));
+}
+
+export function projectOrchestratorDecisions(state: RuntimeProjection) {
+  return Object.values(state.orchestratorDecisions)
+    .map((decision): ProductionStudioOrchestratorDecisionView => structuredClone(decision))
+    .sort((left, right) => left.executionId.localeCompare(right.executionId));
 }
 
 
@@ -181,6 +238,7 @@ export function projectWorkers(state: RuntimeProjection) {
         execution: execution
           ? {
               id: execution.id,
+              launchClaimId: execution.launchClaimId,
               status: execution.status,
               activeDurationMs: execution.receipt?.monotonicDurationMs ?? null,
               usage: usage

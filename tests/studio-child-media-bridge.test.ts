@@ -22,6 +22,7 @@ import type {
   SpawnRequestInput,
 } from "../src/studio/runtime/production/model.ts";
 import { BoundedRuntimeScheduler, type RuntimeIdentityFactory } from "../src/studio/runtime/production/scheduler.ts";
+import { runtimeTestJobContext } from "./runtime-test-job-context.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
 
 const FIXTURE = resolve("public/demo/runs/run-005");
@@ -102,7 +103,8 @@ async function bridgeHarness(
     requiredCapabilities: ["task.spawn.request"],
     dependencies: [],
     budget: { wallMs: 10_000, toolCalls: 1 },
-  });
+  }, runtimeTestJobContext({ source, range: { startMs: 1_000, endMs: 1_800 } }));
+  await scheduler.claimTaskLaunch(root, "deterministic_test", "2026-07-15T12:00:00.000Z");
   await scheduler.registerAgent(root);
   await scheduler.transitionTask(root.taskId, root.agentId, "working");
   const input: SpawnRequestInput = {
@@ -119,6 +121,7 @@ async function bridgeHarness(
   };
   const decision = await scheduler.requestSpawn(root.taskId, root.agentId, input);
   assert.ok(decision.permit);
+  await scheduler.claimTaskLaunch(decision.permit, "deterministic_test", "2026-07-15T12:00:00.000Z");
   await scheduler.registerAgent(decision.permit);
   await scheduler.transitionTask(decision.permit.taskId, decision.permit.agentId, "working");
   const task = ledger.state().tasks[decision.permit.taskId];

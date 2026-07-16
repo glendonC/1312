@@ -11,26 +11,30 @@ import {
   CodexExecWorkerLauncher,
   type CodexWorkerLauncherOptions,
 } from "../launcher.ts";
+import {
+  CodexExecOrchestratorLauncher,
+  type CodexOrchestratorLauncherOptions,
+} from "../orchestratorLauncher.ts";
 import type {
   LaunchPermit,
   ProductionAnalysisRequest,
   ReportRecord,
   RuntimeLimits,
-  SpawnRequestInput,
 } from "../model.ts";
 import { BoundedReportHost } from "../reportHost.ts";
 import { RootOutputDispositionHost } from "../rootOutputDispositionHost.ts";
 import { createRuntimeStart } from "../runStart/runtimeStart.ts";
 import { writeRuntimeStartReceipt } from "../runStart/receiptWriter.ts";
 import { BoundedRuntimeScheduler } from "../scheduler.ts";
+import { createRootTaskJobContext } from "../jobContext.ts";
 import type { LoadedOwnedSourceSession } from "../runStart/sourceSessionLoader.ts";
 import type { InitializedRuntimeApplication } from "./model.ts";
 
 export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
-  maxDepth: 1,
-  maxActiveWorkers: 2,
-  runBudget: { wallMs: 120_000, toolCalls: 8 },
-  grantableCapabilities: ["task.spawn.request", "report.submit", "media.extract", "media.seek", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"],
+  maxDepth: 2,
+  maxActiveWorkers: 3,
+  runBudget: { wallMs: 240_000, toolCalls: 32 },
+  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {
@@ -60,6 +64,18 @@ export type BoundedWorkerLauncherFactory = (
   context: BoundedWorkerLauncherContext,
 ) => BoundedWorkerLauncher;
 
+export interface BoundedOrchestratorLauncher {
+  launch(permit: LaunchPermit): Promise<unknown>;
+}
+
+export interface BoundedOrchestratorLauncherContext extends BoundedWorkerLauncherContext {
+  childLauncher: BoundedWorkerLauncher;
+}
+
+export type BoundedOrchestratorLauncherFactory = (
+  context: BoundedOrchestratorLauncherContext,
+) => BoundedOrchestratorLauncher;
+
 export function codexWorkerLauncherFactory(
   options: CodexWorkerLauncherOptions = {},
 ): BoundedWorkerLauncherFactory {
@@ -72,6 +88,13 @@ export function codexWorkerLauncherFactory(
       decisionHost: options.decisionHost ?? decisionHost,
       nextMediaOperationId: options.nextMediaOperationId ?? (() => plannedMediaOperationId),
     });
+}
+
+export function codexOrchestratorLauncherFactory(
+  options: CodexOrchestratorLauncherOptions,
+): BoundedOrchestratorLauncherFactory {
+  return ({ ledger, scheduler, artifacts, childLauncher }) =>
+    new CodexExecOrchestratorLauncher(ledger, scheduler, artifacts, childLauncher, options);
 }
 
 export interface InitializeRuntimeApplicationInput {
@@ -128,50 +151,16 @@ export async function initializeRuntimeApplication(
   };
 }
 
-function childInput(
-  runtimeId: string,
-  request: ProductionAnalysisRequest,
-  sourceArtifactId: string,
-  evidenceArtifactIds: string[],
-  mediaScope: SpawnRequestInput["mediaScope"],
-): SpawnRequestInput {
-  return {
-    workloadKey: `bounded-media-seek:${runtimeId}`,
-    objective:
-      `Invoke media_seek exactly once for the granted source range for ${request.requestId}, ` +
-      (evidenceArtifactIds.length > 0
-        ? `read each of the ${evidenceArtifactIds.length} explicitly granted preflight evidence artifacts, create one bounded range assessment over only those completed read receipts, then request one deterministic decision over only the audited assessment identity, `
-        : "retain the honest absence of granted detector evidence, ") +
-      "retain the returned operation/artifact/receipt identities, bounded audio-activity observation, and evidence facts, " +
-      "and report them without turning signal/silence into speech, transcription, translation, caption, or meaning claims.",
-    workerKind: "analysis",
-    workerLabel: "bounded-evidence-child",
-    mediaScope,
-    inputArtifactIds: [sourceArtifactId, ...evidenceArtifactIds],
-    requiredOutputs: [
-      { name: "execution report", artifactKind: "worker-execution-report", required: true },
-    ],
-    requiredCapabilities: [
-      "media.seek",
-      ...(evidenceArtifactIds.length > 0 ? ["evidence.read" as const] : []),
-      ...(evidenceArtifactIds.length > 0 ? ["analysis.evidence.assess" as const] : []),
-      ...(evidenceArtifactIds.length > 0 ? ["analysis.evidence.decide" as const] : []),
-      "report.submit",
-    ],
-    dependencies: [],
-    budget: { wallMs: 45_000, toolCalls: 1 + evidenceArtifactIds.length + (evidenceArtifactIds.length > 0 ? 2 : 0) },
-  };
-}
-
 function safeChildFailure(error: unknown): string {
   if (error instanceof RuntimeApplicationInterrupted) return error.message;
   return "The bounded child did not produce a terminal accepted report.";
 }
 
-/** Shared application-level one-child composition used by both CLI and runtime host. */
+/** Shared durable orchestration composition used by both CLI and runtime host. */
 export async function runBoundedRuntimeApplication(
   initialized: InitializedRuntimeApplication,
-  launcherFactory: BoundedWorkerLauncherFactory,
+  workerLauncherFactory: BoundedWorkerLauncherFactory,
+  orchestratorLauncherFactory: BoundedOrchestratorLauncherFactory,
 ): Promise<void> {
   const journal = new FileEventJournal(initialized.journalPath);
   const ledger = await RuntimeLedger.open(initialized.runStart.runtimeId, journal);
@@ -195,41 +184,21 @@ export async function runBoundedRuntimeApplication(
   const rootPermit = await scheduler.createRoot({
     workloadKey: `root:${initialized.runStart.runtimeId}`,
     objective:
-      `Coordinate one bounded local worker launch for ${initialized.runStart.analysisRequest.requestId} ` +
-      "with one receipted bounded audio-activity observation, any explicitly pinned evidence reads, and no invented media-content claims.",
+      `Delegate at least one bounded structural execution-report task for ${initialized.runStart.analysisRequest.requestId}, choosing the child contract and decomposition yourself, then wait for every accepted child. ` +
+      "This slice proves only durable orchestration depth: request only execution reports, preserve scheduler rejection or deliberate no-request evidence, wait for every accepted child, and make no semantic media, synthesis, caption, quality, or publication claim.",
     workerKind: "orchestrator",
     workerLabel: "local-orchestrator",
     mediaScope,
     inputArtifactIds: [initialized.sourceArtifact.id, ...initialized.evidenceArtifacts.map((artifact) => artifact.id)],
     requiredOutputs: [{ name: "run report", artifactKind: "run-report", required: true }],
-    requiredCapabilities: ["task.spawn.request"],
+    requiredCapabilities: ["task.spawn.request", "task.reports.wait"],
     dependencies: [],
-    budget: { wallMs: 60_000, toolCalls: 2 },
-  });
-  await scheduler.registerAgent(rootPermit);
-  await scheduler.transitionTask(rootPermit.taskId, rootPermit.agentId, "working");
-
-  const decision = await scheduler.requestSpawn(
-    rootPermit.taskId,
-    rootPermit.agentId,
-    childInput(
-      initialized.runStart.runtimeId,
-      initialized.runStart.analysisRequest,
-      initialized.sourceArtifact.id,
-      initialized.evidenceArtifacts.map((artifact) => artifact.id),
-      mediaScope,
-    ),
-  );
-  if (!decision.permit) {
-    await scheduler.transitionTask(
-      rootPermit.taskId,
-      rootPermit.agentId,
-      "failed",
-      "The bounded proof child was rejected by scheduler policy.",
-    );
-    throw new Error(`Bounded proof child was rejected: ${decision.rejection ?? "unknown"}`);
-  }
-
+    budget: { wallMs: 60_000, toolCalls: 8 },
+  }, createRootTaskJobContext({
+    sourceArtifact: initialized.sourceArtifact,
+    evidenceArtifacts: initialized.evidenceArtifacts,
+    analysisRequest: initialized.runStart.analysisRequest,
+  }));
   const reports = new BoundedReportHost(ledger);
   const mediaHost = new FfmpegCapabilityHost(ledger, artifacts);
   const evidenceHost = new BoundedEvidenceReadHost(ledger, artifacts);
@@ -244,7 +213,7 @@ export async function runBoundedRuntimeApplication(
   ) {
     throw new Error("Bounded runtime application requires one exact planned media.seek operation");
   }
-  const launcher = launcherFactory({
+  const launcherContext: BoundedWorkerLauncherContext = {
     ledger,
     scheduler,
     artifacts,
@@ -254,16 +223,14 @@ export async function runBoundedRuntimeApplication(
     assessmentHost,
     decisionHost,
     plannedMediaOperationId: plannedOperation.operationId,
-  });
+  };
+  const childLauncher = workerLauncherFactory(launcherContext);
+  const orchestratorLauncher = orchestratorLauncherFactory({ ...launcherContext, childLauncher });
   try {
-    const launched = await launcher.launch(decision.permit);
+    await orchestratorLauncher.launch(rootPermit);
     const completedDecisions = Object.values(ledger.state().evidenceDecisions).filter((operation) =>
       operation.status === "completed");
-    if (completedDecisions.length > 1) {
-      throw new Error("Bounded runtime application produced more than one evidence decision");
-    }
-    const completedDecision = completedDecisions[0];
-    if (completedDecision) {
+    for (const completedDecision of completedDecisions) {
       if (
         !completedDecision.artifactId ||
         !completedDecision.receiptId ||
@@ -280,36 +247,40 @@ export async function runBoundedRuntimeApplication(
         },
       });
     }
-    await reports.decide({
-      reportId: launched.report.id,
-      decidedByTaskId: rootPermit.taskId,
-      decidedByAgentId: rootPermit.agentId,
-      accepted: true,
-      reason:
-        "The bounded child returned its structured artifact after its authorized receipted audio-activity observation, any granted window-filtered evidence reads, required bounded assessment, required audited decision, and separate host-verified publish-review intake when a decision existed.",
-    });
-    if (launched.report.outputArtifactIds.length !== 1) {
-      throw new Error("Bounded root promotion requires exactly one reported child output artifact");
+    const childReports = Object.values(ledger.state().reports)
+      .filter((report) => report.parentTaskId === rootPermit.taskId && report.status === "submitted")
+      .sort((left, right) => left.id.localeCompare(right.id));
+    for (const report of childReports) {
+      await reports.decide({
+        reportId: report.id,
+        decidedByTaskId: rootPermit.taskId,
+        decidedByAgentId: rootPermit.agentId,
+        accepted: true,
+        reason:
+          "The existing v1 host policy accepted the exact structurally valid child report after the model root had already completed its closed report wait; this is host-owned admission, not model synthesis or semantic quality judgment.",
+      });
+      for (const outputArtifactId of report.outputArtifactIds) {
+        await new RootOutputDispositionHost(ledger, artifacts).record({
+          reportId: report.id,
+          rootTaskId: rootPermit.taskId,
+          rootAgentId: rootPermit.agentId,
+          outputArtifactId,
+          outcome: "promoted_to_root",
+          reason:
+            "The existing v1 host policy promoted the exact accepted child output with spawn, context, grant, executor, report, artifact, and receipt lineage intact.",
+        });
+      }
     }
-    await new RootOutputDispositionHost(ledger, artifacts).record({
-      reportId: launched.report.id,
-      rootTaskId: rootPermit.taskId,
-      rootAgentId: rootPermit.agentId,
-      outputArtifactId: launched.report.outputArtifactIds[0],
-      outcome: "promoted_to_root",
-      reason:
-        "The root promoted the exact accepted child output with its spawn, grant, scope, execution, report, artifact, and receipt lineage intact.",
-    });
     await scheduler.transitionTask(
       rootPermit.taskId,
       rootPermit.agentId,
       "withheld",
-      "The local launcher proof ended after one root-to-child permit, one receipted audio-activity observation, any available window-filtered pinned evidence reads, one bounded assessment and audited decision when granted, and one root-promoted child report artifact; it produced no captions, study result, or publication.",
+      "The model-orchestrated slice ended after closed spawn decisions and terminal child report/failure identities. Existing v1 structural report disposition may have run afterward; no semantic understanding, synthesis, captions, quality judgment, or publication was produced by this slice.",
     );
   } catch (error) {
     if (error instanceof RuntimeApplicationInterrupted) throw error;
     const root = ledger.state().tasks[rootPermit.taskId];
-    if (root?.status === "working") {
+    if (root?.status === "working" || root?.status === "waiting_for_children") {
       await scheduler.transitionTask(rootPermit.taskId, rootPermit.agentId, "failed", safeChildFailure(error));
     }
     throw error;

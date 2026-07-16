@@ -43,6 +43,7 @@ import {
   BoundedRuntimeScheduler,
   type RuntimeIdentityFactory,
 } from "../src/studio/runtime/production/scheduler.ts";
+import { runtimeTestJobContext } from "./runtime-test-job-context.ts";
 
 const FIXTURE = resolve("public/demo/runs/run-005");
 
@@ -139,7 +140,11 @@ async function harness(
     requiredCapabilities: ["task.spawn.request"],
     dependencies: [],
     budget: { wallMs: 60_000, toolCalls: 8 },
-  });
+  }, runtimeTestJobContext({
+    source: sourceArtifact,
+    range: { startMs: 0, endMs: sourceArtifact.durationMs! },
+  }));
+  await scheduler.claimTaskLaunch(rootPermit, "deterministic_test", "2026-07-14T03:00:00.000Z");
   await scheduler.registerAgent(rootPermit);
   await scheduler.transitionTask(rootPermit.taskId, rootPermit.agentId, "working");
   return {
@@ -850,7 +855,7 @@ test("Codex media grant fails closed when the child returns without invoking its
 });
 
 test("Codex launcher fails closed on unsupported capabilities and invalid child output", async (suite) => {
-  await suite.test("unsupported capability is rejected before registration", async () => {
+  await suite.test("unsupported child orchestration capability is rejected by the scheduler before launch", async () => {
     const runtime = await harness();
     try {
       const unsupported = codexChildInput(runtime);
@@ -861,21 +866,9 @@ test("Codex launcher fails closed on unsupported capabilities and invalid child 
         runtime.rootAgentId,
         unsupported,
       );
-      const fake = await fakeCodex(runtime);
-      const launcher = new CodexExecWorkerLauncher(
-        runtime.ledger,
-        runtime.scheduler,
-        runtime.store,
-        new BoundedReportHost(runtime.ledger),
-        { executable: fake.executable, executableArgsPrefix: fake.prefix },
-      );
-      const before = (await runtime.ledger.events()).length;
-      await assert.rejects(
-        launcher.launch(decision.permit!),
-        /supports only report.submit plus scheduler-granted media.extract\/media.seek/,
-      );
-      assert.equal((await runtime.ledger.events()).length, before);
-      assert.equal(runtime.ledger.state().tasks[decision.permit!.taskId].ownerAgentId, null);
+      assert.equal(decision.accepted, false);
+      assert.equal(decision.rejection, "capability_not_grantable");
+      assert.equal(decision.permit, null);
     } finally {
       await cleanup(runtime);
     }
@@ -991,6 +984,7 @@ test("capability host performs a real authorized ffmpeg extraction with receipte
     );
     assert.equal(decision.accepted, true);
     const permit = decision.permit!;
+    await runtime.scheduler.claimTaskLaunch(permit, "deterministic_test", "2026-07-14T03:00:00.000Z");
     await runtime.scheduler.registerAgent(permit);
     await runtime.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
     const host = new FfmpegCapabilityHost(runtime.ledger, runtime.store, { timeoutMs: 20_000 });
@@ -1139,6 +1133,7 @@ test("capability host performs a real bounded audio-activity observation with a 
       task.grants.map((grant) => grant.capability).sort(),
       ["media.seek", "report.submit"],
     );
+    await runtime.scheduler.claimTaskLaunch(permit, "deterministic_test", "2026-07-14T03:00:00.000Z");
     await runtime.scheduler.registerAgent(permit);
     await runtime.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
     const host = new FfmpegCapabilityHost(runtime.ledger, runtime.store, { timeoutMs: 20_000 });
@@ -1361,6 +1356,7 @@ test("media.seek rejects an extract-only caller and source-byte drift", async (s
         childInput(runtime),
       );
       const permit = decision.permit!;
+      await runtime.scheduler.claimTaskLaunch(permit, "deterministic_test", "2026-07-14T03:00:00.000Z");
       await runtime.scheduler.registerAgent(permit);
       await runtime.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
       const host = new FfmpegCapabilityHost(runtime.ledger, runtime.store);
@@ -1392,6 +1388,7 @@ test("media.seek rejects an extract-only caller and source-byte drift", async (s
         seekChildInput(runtime),
       );
       const permit = decision.permit!;
+      await runtime.scheduler.claimTaskLaunch(permit, "deterministic_test", "2026-07-14T03:00:00.000Z");
       await runtime.scheduler.registerAgent(permit);
       await runtime.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
       const source = runtime.ledger.state().artifacts[runtime.sourceArtifactId];
@@ -1432,6 +1429,7 @@ test("capability host rehashes source bytes and records tool failure without an 
       childInput(runtime),
     );
     const permit = decision.permit!;
+    await runtime.scheduler.claimTaskLaunch(permit, "deterministic_test", "2026-07-14T03:00:00.000Z");
     await runtime.scheduler.registerAgent(permit);
     await runtime.scheduler.transitionTask(permit.taskId, permit.agentId, "working");
     const source = runtime.ledger.state().artifacts[runtime.sourceArtifactId];
@@ -1467,6 +1465,7 @@ test("invalid registration permit and non-working media caller fail closed", asy
       runtime.rootAgentId,
       childInput(runtime),
     );
+    await runtime.scheduler.claimTaskLaunch(decision.permit!, "deterministic_test", "2026-07-14T03:00:00.000Z");
     await assert.rejects(
       runtime.scheduler.registerAgent({ ...decision.permit!, registrationSecret: "wrong" }),
       /permit is missing or invalid/,

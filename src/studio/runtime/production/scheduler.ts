@@ -1,16 +1,20 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { assertRuntimeLimits, assertSpawnRequestInput } from "./assertions.ts";
+import { attenuateTaskJobContext } from "./jobContext.ts";
 import type {
   AgentRecord,
   CapabilityGrant,
   LaunchPermit,
   MediaScope,
+  OrchestratorSpawnContract,
   RuntimeLimits,
   RuntimeProjection,
   SpawnRejection,
   SpawnRequestInput,
   TaskRecord,
+  TaskJobContext,
+  TaskLaunchRecord,
   TaskStatus,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
@@ -26,6 +30,8 @@ import {
   MAX_EVIDENCE_READ_BYTES,
   MAX_EVIDENCE_READ_ITEMS,
   roleAllowsCapabilities,
+  assertOrchestratorSpawnContract,
+  assertTaskJobContext,
 } from "./validation/scheduling.ts";
 
 export interface RuntimeIdentityFactory {
@@ -44,7 +50,7 @@ export class RandomRuntimeIdentityFactory implements RuntimeIdentityFactory {
 }
 
 function active(status: TaskStatus): boolean {
-  return status === "scheduled" || status === "working" || status === "reported";
+  return status === "scheduled" || status === "working" || status === "waiting_for_children" || status === "reported";
 }
 
 function scopeContains(parent: MediaScope, child: MediaScope): boolean {
@@ -89,6 +95,11 @@ export interface SpawnDecision {
   accepted: boolean;
   rejection: SpawnRejection | null;
   permit: LaunchPermit | null;
+}
+
+export interface TaskLaunchClaimResult {
+  won: boolean;
+  claim: TaskLaunchRecord;
 }
 
 export class BoundedRuntimeScheduler {
@@ -195,9 +206,38 @@ export class BoundedRuntimeScheduler {
     );
   }
 
-  async createRoot(inputValue: unknown): Promise<LaunchPermit> {
+  private contextValid(
+    state: RuntimeProjection,
+    input: SpawnRequestInput,
+    context: TaskJobContext,
+  ): boolean {
+    const source = state.artifacts[context.source.artifactId];
+    if (
+      !source ||
+      source.origin.kind !== "ingest" ||
+      source.content.contentId !== context.source.contentId ||
+      !input.inputArtifactIds.includes(source.id)
+    ) return false;
+    if (!input.mediaScope.every((scope) =>
+      scope.artifactId !== source.id ||
+      (scope.startMs >= context.analysisRequest.taskRange.startMs &&
+        scope.endMs <= context.analysisRequest.taskRange.endMs))) return false;
+    return context.detectorEvidence.every((evidence) => {
+      const artifact = state.artifacts[evidence.artifactId];
+      return input.inputArtifactIds.includes(evidence.artifactId) &&
+        artifact?.origin.kind === "preflight_evidence" &&
+        artifact.content.contentId === evidence.contentId &&
+        artifact.origin.evidenceKind === evidence.evidenceKind &&
+        artifact.sourceArtifactIds.length === 1 &&
+        artifact.sourceArtifactIds[0] === source.id;
+    });
+  }
+
+  async createRoot(inputValue: unknown, jobContextValue: unknown): Promise<LaunchPermit> {
     assertSpawnRequestInput(inputValue, "Root task");
+    assertTaskJobContext(jobContextValue, "Root task job context");
     const input = inputValue;
+    const jobContext = structuredClone(jobContextValue);
     const result = await this.ledger.transact(
       { producer: { kind: "scheduler", id: "bounded-scheduler" }, causationId: "root-task" },
       ({ state }) => {
@@ -209,6 +249,7 @@ export class BoundedRuntimeScheduler {
         }
         if (!this.scopeValid(state, input)) throw new Error("Root task media scope is not backed by registered artifacts");
         if (!this.capabilityValid(state, input)) throw new Error("Root task requests an unavailable capability");
+        if (!this.contextValid(state, input, jobContext)) throw new Error("Root task job context does not bind its registered inputs");
         if (input.dependencies.length !== 0) throw new Error("Root task cannot have dependencies");
         if (
           input.budget.wallMs > this.limits.runBudget.wallMs ||
@@ -236,6 +277,7 @@ export class BoundedRuntimeScheduler {
           depth: 0,
           assignedAgentId: agentId,
           ownerAgentId: null,
+          jobContext,
           mediaScope: structuredClone(input.mediaScope),
           inputArtifactIds: [...input.inputArtifactIds],
           requiredOutputs: structuredClone(input.requiredOutputs),
@@ -243,6 +285,7 @@ export class BoundedRuntimeScheduler {
           budget: { ...input.budget },
           grants: this.grants(state, taskId, agentId, input),
           status: "scheduled",
+          terminalReason: null,
         };
         return {
           pending: [{ type: "task.created", data: { task } }] satisfies PendingRuntimeEvent[],
@@ -305,6 +348,7 @@ export class BoundedRuntimeScheduler {
     requestedByTaskId: string,
     requestedByAgentId: string,
     inputValue: unknown,
+    authorship: { executionId: string; toolCallId: string } | null = null,
   ): Promise<SpawnDecision> {
     assertSpawnRequestInput(inputValue);
     const input = structuredClone(inputValue);
@@ -318,7 +362,14 @@ export class BoundedRuntimeScheduler {
       ({ state }) => {
         const requestEvent = {
           type: "spawn.requested" as const,
-          data: { requestId, requestedByTaskId, requestedByAgentId, input },
+          data: {
+            requestId,
+            requestedByTaskId,
+            requestedByAgentId,
+            authoredByExecutionId: authorship?.executionId ?? null,
+            toolCallId: authorship?.toolCallId ?? null,
+            input,
+          },
         };
         const rejection = this.violation(state, requestedByTaskId, requestedByAgentId, input);
         if (rejection) {
@@ -356,6 +407,7 @@ export class BoundedRuntimeScheduler {
           depth: parent.depth + 1,
           assignedAgentId: agentId,
           ownerAgentId: null,
+          jobContext: attenuateTaskJobContext(parent.jobContext, input.mediaScope, input.inputArtifactIds),
           mediaScope: structuredClone(input.mediaScope),
           inputArtifactIds: [...input.inputArtifactIds],
           requiredOutputs: structuredClone(input.requiredOutputs),
@@ -363,6 +415,7 @@ export class BoundedRuntimeScheduler {
           budget: { ...input.budget },
           grants,
           status: "scheduled",
+          terminalReason: null,
         };
         return {
           pending: [
@@ -381,6 +434,66 @@ export class BoundedRuntimeScheduler {
     return transaction.result;
   }
 
+  async requestModelSpawn(
+    requestedByTaskId: string,
+    requestedByAgentId: string,
+    executionId: string,
+    toolCallId: string,
+    contractValue: unknown,
+  ): Promise<SpawnDecision> {
+    assertOrchestratorSpawnContract(contractValue);
+    const contract: OrchestratorSpawnContract = structuredClone(contractValue);
+    const state = this.ledger.state();
+    const dependencies = contract.dependencyWorkloadKeys.map((workloadKey) => {
+      const matches = Object.values(state.tasks).filter((task) => task.workloadKey === workloadKey);
+      return matches.length === 1 ? matches[0].id : `unresolved-workload:${workloadKey}`;
+    });
+    const { dependencyWorkloadKeys: _dependencyWorkloadKeys, ...input } = contract;
+    return this.requestSpawn(
+      requestedByTaskId,
+      requestedByAgentId,
+      { ...input, dependencies },
+      { executionId, toolCallId },
+    );
+  }
+
+  async claimTaskLaunch(
+    permitValue: LaunchPermit,
+    executorKind: TaskLaunchRecord["executorKind"],
+    claimedAt: string,
+  ): Promise<TaskLaunchClaimResult> {
+    const expected = this.permits.get(permitValue.requestId);
+    if (
+      !expected || expected.taskId !== permitValue.taskId || expected.agentId !== permitValue.agentId ||
+      expected.registrationSecret !== permitValue.registrationSecret
+    ) throw new Error("Task launch permit is missing or invalid");
+    const transaction = await this.ledger.transact<TaskLaunchClaimResult>(
+      { producer: { kind: "launcher", id: "durable-task-launcher" }, causationId: permitValue.requestId },
+      ({ state }) => {
+        const existing = state.taskLaunches[permitValue.taskId];
+        if (existing) return { pending: [], result: { won: false, claim: existing } };
+        const task = state.tasks[permitValue.taskId];
+        if (!task || task.status !== "scheduled" || task.ownerAgentId !== null || task.assignedAgentId !== permitValue.agentId) {
+          throw new Error("Task launch claim requires one unowned scheduled task");
+        }
+        const claim: TaskLaunchRecord = {
+          id: `launch:${task.id}`,
+          requestId: permitValue.requestId,
+          taskId: task.id,
+          agentId: task.assignedAgentId,
+          executorKind,
+          claimedAt,
+          executionId: null,
+        };
+        return {
+          pending: [{ type: "task.launch_claimed", data: { claim } }] satisfies PendingRuntimeEvent[],
+          result: { won: true, claim },
+        };
+      },
+    );
+    return transaction.result;
+  }
+
   /** Registration is explicit. A worker launcher must call this only after its executor exists. */
   async registerAgent(permitValue: LaunchPermit): Promise<AgentRecord> {
     const expected = this.permits.get(permitValue.requestId);
@@ -396,8 +509,12 @@ export class BoundedRuntimeScheduler {
       { producer: { kind: "registry", id: "dynamic-agent-registry" }, causationId: permitValue.requestId },
       ({ state }) => {
         const task = state.tasks[permitValue.taskId];
+        const launch = state.taskLaunches[permitValue.taskId];
         if (!task || task.assignedAgentId !== permitValue.agentId || task.ownerAgentId !== null) {
           throw new Error("Agent registration task is not available");
+        }
+        if (!launch || launch.agentId !== permitValue.agentId || launch.requestId !== permitValue.requestId) {
+          throw new Error("Agent registration requires the task's durable launch claim");
         }
         const agent: AgentRecord = {
           id: permitValue.agentId,
@@ -420,7 +537,7 @@ export class BoundedRuntimeScheduler {
   }
 
   async transitionTask(taskId: string, agentId: string, status: TaskStatus, reason: string | null = null): Promise<void> {
-    if ((status === "failed" || status === "withheld") && !reason?.trim()) {
+    if ((status === "failed" || status === "withheld" || status === "interrupted") && !reason?.trim()) {
       throw new Error(`${status} transitions require a reason`);
     }
     await this.ledger.transact(

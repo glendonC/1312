@@ -7,16 +7,19 @@ import {
   type EvidenceDecisionScope,
   type EvidenceReadScope,
   type MediaScope,
+  type OrchestratorSpawnContract,
   type RequiredOutput,
   type RuntimeBudget,
   type RuntimeLimits,
   type SpawnRequestInput,
   type TaskRecord,
+  type TaskJobContext,
   type WorkerKind,
 } from "../model.ts";
 import {
   array,
   boolean,
+  contentId,
   exact,
   fail,
   integer,
@@ -26,15 +29,18 @@ import {
   string,
   uniqueStrings,
 } from "./primitives.ts";
+import { expectedTaskJobContextId } from "../jobContext.ts";
 
 const CAPABILITY_SET = new Set<string>(CAPABILITIES);
 export const TASK_STATUSES = new Set([
   "scheduled",
   "working",
+  "waiting_for_children",
   "reported",
   "completed",
   "failed",
   "withheld",
+  "interrupted",
 ]);
 export const AGENT_STATUSES = new Set(["registered", "working", "reporting", "retired"]);
 export const WORKER_KINDS = new Set([
@@ -57,7 +63,7 @@ export const MAX_EVIDENCE_DECISIONS = 1;
 export const MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS = 4;
 
 const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
-  orchestrator: new Set(["task.spawn.request", "report.submit"]),
+  orchestrator: new Set(["task.spawn.request", "task.reports.wait"]),
   media: new Set(["media.extract", "media.seek", "report.submit"]),
   analysis: new Set([
     "media.seek",
@@ -332,6 +338,119 @@ export function assertSpawnRequestInput(
   budget(item.budget, context, "input.budget");
 }
 
+export function assertOrchestratorSpawnContract(
+  value: unknown,
+  context = "Orchestrator spawn contract",
+): asserts value is OrchestratorSpawnContract {
+  const item = object(value, context, "input");
+  exact(
+    item,
+    [
+      "workloadKey",
+      "objective",
+      "workerKind",
+      "workerLabel",
+      "mediaScope",
+      "inputArtifactIds",
+      "requiredOutputs",
+      "requiredCapabilities",
+      "dependencyWorkloadKeys",
+      "budget",
+    ],
+    context,
+    "input",
+  );
+  string(item.workloadKey, context, "input.workloadKey");
+  string(item.objective, context, "input.objective");
+  oneOf(item.workerKind, WORKER_KINDS, context, "input.workerKind");
+  string(item.workerLabel, context, "input.workerLabel");
+  scopes(item.mediaScope, context, "input.mediaScope");
+  uniqueStrings(item.inputArtifactIds, context, "input.inputArtifactIds");
+  outputs(item.requiredOutputs, context, "input.requiredOutputs");
+  capabilities(item.requiredCapabilities, context, "input.requiredCapabilities");
+  uniqueStrings(item.dependencyWorkloadKeys, context, "input.dependencyWorkloadKeys");
+  budget(item.budget, context, "input.budget");
+}
+
+function languageTag(value: unknown, context: string, path: string): string {
+  const result = string(value, context, path);
+  if (!/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(result)) {
+    fail(context, path, "must be a BCP-47 language tag");
+  }
+  return result;
+}
+
+function range(value: unknown, context: string, path: string): { startMs: number; endMs: number } {
+  const item = object(value, context, path);
+  exact(item, ["startMs", "endMs"], context, path);
+  const startMs = integer(item.startMs, context, `${path}.startMs`);
+  const endMs = integer(item.endMs, context, `${path}.endMs`, 1);
+  if (endMs <= startMs) fail(context, path, "must be a non-empty half-open range");
+  return { startMs, endMs };
+}
+
+export function assertTaskJobContext(
+  value: unknown,
+  context = "Task job context",
+  path = "jobContext",
+): asserts value is TaskJobContext {
+  const item = object(value, context, path);
+  exact(item, [
+    "schema", "contextId", "source", "analysisRequest", "requestedSourceLanguagePolicy",
+    "targetLanguage", "selectedLanguagePackId", "outputDepth", "detectorEvidence",
+  ], context, path);
+  if (item.schema !== "studio.task-job-context.v1") fail(context, `${path}.schema`, "is unsupported");
+  const contextIdValue = string(item.contextId, context, `${path}.contextId`);
+  if (!/^job-context:[a-f0-9]{64}$/.test(contextIdValue)) fail(context, `${path}.contextId`, "is malformed");
+  const source = object(item.source, context, `${path}.source`);
+  exact(source, ["artifactId", "contentId"], context, `${path}.source`);
+  string(source.artifactId, context, `${path}.source.artifactId`);
+  contentId(source.contentId, context, `${path}.source.contentId`);
+  const analysis = object(item.analysisRequest, context, `${path}.analysisRequest`);
+  exact(analysis, ["requestId", "requestedRange", "taskRange", "options"], context, `${path}.analysisRequest`);
+  string(analysis.requestId, context, `${path}.analysisRequest.requestId`);
+  const requestedRange = range(analysis.requestedRange, context, `${path}.analysisRequest.requestedRange`);
+  const taskRange = range(analysis.taskRange, context, `${path}.analysisRequest.taskRange`);
+  if (taskRange.startMs < requestedRange.startMs || taskRange.endMs > requestedRange.endMs) {
+    fail(context, `${path}.analysisRequest.taskRange`, "cannot broaden the requested range");
+  }
+  const options = object(analysis.options, context, `${path}.analysisRequest.options`);
+  exact(options, ["speechScope", "includeLyrics", "speaker", "honorifics", "translationStyle", "captionDensity", "slowAnalysis"], context, `${path}.analysisRequest.options`);
+  oneOf(options.speechScope, new Set(["foreground", "all"]), context, `${path}.analysisRequest.options.speechScope`);
+  boolean(options.includeLyrics, context, `${path}.analysisRequest.options.includeLyrics`);
+  nullableString(options.speaker, context, `${path}.analysisRequest.options.speaker`);
+  oneOf(options.honorifics, new Set(["preserve", "naturalize"]), context, `${path}.analysisRequest.options.honorifics`);
+  oneOf(options.translationStyle, new Set(["literal", "natural"]), context, `${path}.analysisRequest.options.translationStyle`);
+  oneOf(options.captionDensity, new Set(["compact", "balanced", "relaxed"]), context, `${path}.analysisRequest.options.captionDensity`);
+  boolean(options.slowAnalysis, context, `${path}.analysisRequest.options.slowAnalysis`);
+  const requestedSource = object(item.requestedSourceLanguagePolicy, context, `${path}.requestedSourceLanguagePolicy`);
+  exact(requestedSource, ["mode", "languages", "reason"], context, `${path}.requestedSourceLanguagePolicy`);
+  const mode = oneOf<string>(requestedSource.mode, new Set(["declared", "automatic", "mixed", "unknown", "withheld"]), context, `${path}.requestedSourceLanguagePolicy.mode`);
+  const languages = array(requestedSource.languages, context, `${path}.requestedSourceLanguagePolicy.languages`).map((entry, index) => languageTag(entry, context, `${path}.requestedSourceLanguagePolicy.languages[${index}]`));
+  if (new Set(languages).size !== languages.length) fail(context, `${path}.requestedSourceLanguagePolicy.languages`, "must not repeat languages");
+  const reason = requestedSource.reason === null ? null : string(requestedSource.reason, context, `${path}.requestedSourceLanguagePolicy.reason`);
+  if (mode === "declared" && (languages.length !== 1 || reason !== null)) fail(context, `${path}.requestedSourceLanguagePolicy`, "declared mode is malformed");
+  if (mode === "mixed" && (languages.length < 2 || reason !== null)) fail(context, `${path}.requestedSourceLanguagePolicy`, "mixed mode is malformed");
+  if ((mode === "automatic" || mode === "unknown") && (languages.length !== 0 || reason !== null)) fail(context, `${path}.requestedSourceLanguagePolicy`, `${mode} mode is malformed`);
+  if (mode === "withheld" && (languages.length !== 0 || reason === null)) fail(context, `${path}.requestedSourceLanguagePolicy`, "withheld mode is malformed");
+  languageTag(item.targetLanguage, context, `${path}.targetLanguage`);
+  nullableString(item.selectedLanguagePackId, context, `${path}.selectedLanguagePackId`);
+  oneOf(item.outputDepth, new Set(["captions", "evidence"]), context, `${path}.outputDepth`);
+  const evidence = array(item.detectorEvidence, context, `${path}.detectorEvidence`);
+  const evidenceIds: string[] = [];
+  for (const [index, entry] of evidence.entries()) {
+    const evidenceItem = object(entry, context, `${path}.detectorEvidence[${index}]`);
+    exact(evidenceItem, ["artifactId", "contentId", "evidenceKind"], context, `${path}.detectorEvidence[${index}]`);
+    evidenceIds.push(string(evidenceItem.artifactId, context, `${path}.detectorEvidence[${index}].artifactId`));
+    contentId(evidenceItem.contentId, context, `${path}.detectorEvidence[${index}].contentId`);
+    oneOf(evidenceItem.evidenceKind, EVIDENCE_KINDS, context, `${path}.detectorEvidence[${index}].evidenceKind`);
+  }
+  if (new Set(evidenceIds).size !== evidenceIds.length) fail(context, `${path}.detectorEvidence`, "must not repeat artifacts");
+  if (contextIdValue !== expectedTaskJobContextId(item as unknown as TaskJobContext)) {
+    fail(context, `${path}.contextId`, "does not match the immutable context body");
+  }
+}
+
 export function assertTaskRecord(
   value: unknown,
   context: string,
@@ -352,6 +471,7 @@ export function assertTaskRecord(
       "depth",
       "assignedAgentId",
       "ownerAgentId",
+      "jobContext",
       "mediaScope",
       "inputArtifactIds",
       "requiredOutputs",
@@ -359,6 +479,7 @@ export function assertTaskRecord(
       "budget",
       "grants",
       "status",
+      "terminalReason",
     ],
     context,
     path,
@@ -374,6 +495,7 @@ export function assertTaskRecord(
   integer(item.depth, context, `${path}.depth`);
   string(item.assignedAgentId, context, `${path}.assignedAgentId`);
   nullableString(item.ownerAgentId, context, `${path}.ownerAgentId`);
+  assertTaskJobContext(item.jobContext, context, `${path}.jobContext`);
   scopes(item.mediaScope, context, `${path}.mediaScope`);
   uniqueStrings(item.inputArtifactIds, context, `${path}.inputArtifactIds`);
   outputs(item.requiredOutputs, context, `${path}.requiredOutputs`);
@@ -384,6 +506,7 @@ export function assertTaskRecord(
     fail(context, `${path}.grants`, "contains a capability outside the worker role");
   }
   oneOf(item.status, TASK_STATUSES, context, `${path}.status`);
+  nullableString(item.terminalReason, context, `${path}.terminalReason`);
 }
 
 export function assertAgentRecord(

@@ -37,6 +37,36 @@ export interface WorkerOutputArtifactOrigin {
   receiptContentId: string;
 }
 
+export interface StudyReportArtifactOrigin {
+  kind: "study_report";
+  executionId: string;
+  receiptId: string;
+  receiptContentId: string;
+  jobContextId: string;
+  outputSlotName: string;
+}
+
+export interface ParentArtifactDispositionArtifactOrigin {
+  kind: "parent_artifact_disposition";
+  dispositionId: string;
+  reportId: string;
+  inputArtifactId: string;
+  outcome: "accepted" | "rejected";
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface ParentAdmissionArtifactOrigin {
+  kind: "parent_admission";
+  admissionId: string;
+  dispositionId: string;
+  reportId: string;
+  inputArtifactId: string;
+  grantId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
 export interface RootOutputDispositionArtifactOrigin {
   kind: "root_output_disposition";
   dispositionId: string;
@@ -164,6 +194,9 @@ export interface RuntimeArtifact {
     | MediaObservationArtifactOrigin
     | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
+    | StudyReportArtifactOrigin
+    | ParentArtifactDispositionArtifactOrigin
+    | ParentAdmissionArtifactOrigin
     | RootOutputDispositionArtifactOrigin
     | PreflightEvidenceArtifactOrigin
     | EvidenceAssessmentArtifactOrigin

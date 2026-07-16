@@ -46,7 +46,8 @@ export const orchestratorOutputSchema = {
 } as const;
 
 export function orchestratorPrompt(task: TaskRecord): string {
-  const requiresDelegation = task.objective.startsWith("Delegate at least one bounded structural execution-report task");
+  const requiresDelegation = task.objective.startsWith("Delegate at least");
+  const requiresCoverageStudyDelegation = task.objective.startsWith("Delegate at least two bounded coverage-study tasks");
   const contract = {
     objective: task.objective,
     jobContext: task.jobContext,
@@ -55,6 +56,7 @@ export function orchestratorPrompt(task: TaskRecord): string {
     budget: task.budget,
     exactTools: ["task_spawn_request", "task_reports_wait"],
     requiresDelegation,
+    requiresCoverageStudyDelegation,
   };
   return [
     "You are the model-executed root orchestrator in the 1321 Studio durable runtime.",
@@ -63,6 +65,9 @@ export function orchestratorPrompt(task: TaskRecord): string {
     requiresDelegation
       ? "This task contract explicitly requires delegation. You must call task_spawn_request at least once with a child contract you author, and if one is accepted you must call task_reports_wait. Returning completed or no_request without a spawn call violates the contract."
       : "When the task contract does not require delegation, a deliberate no-request decision remains available.",
+    ...(requiresCoverageStudyDelegation ? [
+      "This slice-3 task requires at least two accepted child contracts. Every accepted contract must require exactly one studio.study-report.v1 output and must request both speech.transcribe and report.submit. The launcher verifies these model-authored contracts; a rejected request does not count.",
+    ] : []),
     "If any spawn is accepted, call task_reports_wait before returning. Do not treat scheduler acceptance, worker count, signal, VAD, language ID, or a report identity as semantic understanding, transcription, translation, or quality.",
     "Only when requiresDelegation is false and no child request is warranted, make no spawn call and return outcome no_request with a deliberate reason. If a child fails or is interrupted, preserve that state and normally return withheld.",
     "Return only the JSON required by the supplied output schema. No synthesis, captions, publication, or UI action is authorized.",

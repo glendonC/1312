@@ -62,6 +62,7 @@ import {
 } from "./executor/codexEvents.ts";
 import { LauncherFailure } from "./executor/launcherFailure.ts";
 import {
+  buildStudyReportEnvelope,
   validateWorkerResult,
   workerOutputSchema,
   workerPrompt,
@@ -628,7 +629,17 @@ export class CodexExecWorkerLauncher {
       }
       const worker = validateWorkerResult(workerValue, task, semanticEvidenceInputs);
       const prepared = await Promise.all(
-        worker.outputs.map((output) => {
+        worker.outputs.map(async (output) => {
+          if (output.kind === "studio.study-report.v1" && "coverage" in output) {
+            return {
+              kind: "study" as const,
+              prepared: await this.artifacts.prepareStudyReport(
+                this.ledger.runId,
+                buildStudyReportEnvelope(task, output, worker.semanticEvidenceInputs),
+              ),
+            };
+          }
+          if (!("content" in output)) throw new Error("Non-study worker output lost its content field");
           const envelope: WorkerOutputEnvelope = {
             schema: "studio.worker-output.v1",
             executionId,
@@ -637,7 +648,7 @@ export class CodexExecWorkerLauncher {
             ...(semanticEvidenceGrant ? { semanticEvidenceInputs: worker.semanticEvidenceInputs } : {}),
             output,
           };
-          return this.artifacts.prepareWorkerOutput(this.ledger.runId, envelope);
+          return { kind: "worker" as const, prepared: await this.artifacts.prepareWorkerOutput(this.ledger.runId, envelope) };
         }),
       );
       const endedAt = this.options.now().toISOString();
@@ -651,19 +662,24 @@ export class CodexExecWorkerLauncher {
         durationMs,
         outcome: "completed",
         process: processResult,
-        outputArtifactIds: prepared.map((output) => output.artifactId),
+        outputArtifactIds: prepared.map((output) => output.prepared.artifactId),
         usageReceiptId: usage.receiptId,
         failure: null,
       });
       const storedSpan = await this.artifacts.storeJson(span);
-      const outputArtifacts = prepared.map((output) =>
-        this.artifacts.buildWorkerOutputArtifact({
-          runId: this.ledger.runId,
-          receipt: span,
-          receiptContentId: storedSpan.content.contentId,
-          prepared: output,
-        }),
-      );
+      const outputArtifacts = prepared.map((output) => output.kind === "study"
+        ? this.artifacts.buildStudyReportArtifact({
+            runId: this.ledger.runId,
+            receipt: span,
+            receiptContentId: storedSpan.content.contentId,
+            prepared: output.prepared,
+          })
+        : this.artifacts.buildWorkerOutputArtifact({
+            runId: this.ledger.runId,
+            receipt: span,
+            receiptContentId: storedSpan.content.contentId,
+            prepared: output.prepared,
+          }));
       for (const artifact of outputArtifacts) await this.artifacts.record(this.ledger, artifact, executionId);
       await this.ledger.transact(
         { producer: { kind: "launcher", id: "codex-exec-worker-launcher" }, causationId: executionId },

@@ -29,6 +29,10 @@ import type {
   PublishReviewRevocationRequest,
   ReportRecord,
   RootOutputDispositionReceipt,
+  ParentArtifactAdmissionReceipt,
+  ParentArtifactDispositionReceipt,
+  ParentArtifactReadReceipt,
+  ParentArtifactReadRequest,
   RuntimeArtifact,
   SpawnRejection,
   SpawnRequestInput,
@@ -52,6 +56,8 @@ export type RuntimeProducerKind =
   | "caption_production_host"
   | "caption_quality_control_host"
   | "handoff_host"
+  | "admission_host"
+  | "artifact_read_host"
   | "launcher"
   | "recovery_host";
 
@@ -426,6 +432,33 @@ export interface RootOutputDispositionRecordedEvent extends RuntimeEventBase {
   };
 }
 
+export interface ParentArtifactDispositionRecordedEvent extends RuntimeEventBase {
+  type: "parent.artifact_disposition_recorded";
+  data: {
+    dispositionArtifactId: string;
+    dispositionReceiptContentId: string;
+    dispositionReceipt: ParentArtifactDispositionReceipt;
+    admissionArtifactId: string | null;
+    admissionReceiptContentId: string | null;
+    admissionReceipt: ParentArtifactAdmissionReceipt | null;
+  };
+}
+
+export interface ParentArtifactReadStartedEvent extends RuntimeEventBase {
+  type: "parent.artifact_read_started";
+  data: { request: ParentArtifactReadRequest };
+}
+
+export interface ParentArtifactReadCompletedEvent extends RuntimeEventBase {
+  type: "parent.artifact_read_completed";
+  data: { operationId: string; receipt: ParentArtifactReadReceipt };
+}
+
+export interface ParentArtifactReadFailedEvent extends RuntimeEventBase {
+  type: "parent.artifact_read_failed";
+  data: { operationId: string; reason: string };
+}
+
 export type RuntimeEvent =
   | ArtifactRecordedEvent
   | TaskCreatedEvent
@@ -472,7 +505,11 @@ export type RuntimeEvent =
   | CaptionQualityControlDecidedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent
-  | RootOutputDispositionRecordedEvent;
+  | RootOutputDispositionRecordedEvent
+  | ParentArtifactDispositionRecordedEvent
+  | ParentArtifactReadStartedEvent
+  | ParentArtifactReadCompletedEvent
+  | ParentArtifactReadFailedEvent;
 
 export type PendingRuntimeEvent = RuntimeEvent extends infer Event
   ? Event extends RuntimeEvent

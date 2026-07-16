@@ -296,9 +296,28 @@ export class CodexExecOrchestratorLauncher {
       const calls = Object.values(state.orchestratorToolCalls).filter((call) => call.executionId === executionId);
       const spawns = calls.filter((call) => call.tool === "task_spawn_request");
       const waits = calls.filter((call) => call.tool === "task_reports_wait");
-      const requiresDelegation = task.objective.startsWith("Delegate at least one bounded structural execution-report task");
+      const requiresDelegation = task.objective.startsWith("Delegate at least");
+      const requiresCoverageStudyDelegation = task.objective.startsWith("Delegate at least two bounded coverage-study tasks");
       if (requiresDelegation && spawns.length === 0) {
         throw new LauncherFailure("Orchestrator omitted required delegation", "Codex orchestrator did not issue the required spawn tool call.");
+      }
+      if (requiresCoverageStudyDelegation) {
+        const acceptedCoverageRequests = spawns
+          .map((call) => call.spawnRequestId ? state.spawnRequests[call.spawnRequestId] : null)
+          .filter((request) => request?.accepted === true);
+        if (acceptedCoverageRequests.length < 2) {
+          throw new LauncherFailure("Orchestrator omitted required coverage-study depth", "Codex orchestrator did not produce two accepted bounded coverage-study child contracts.");
+        }
+        for (const request of acceptedCoverageRequests) {
+          const outputs = request!.input.requiredOutputs;
+          const capabilities = new Set(request!.input.requiredCapabilities);
+          if (
+            outputs.length !== 1 || outputs[0].required !== true || outputs[0].artifactKind !== "studio.study-report.v1" ||
+            !capabilities.has("speech.transcribe") || !capabilities.has("report.submit")
+          ) {
+            throw new LauncherFailure("Orchestrator changed the coverage-study child contract", "Codex orchestrator returned an accepted child outside the typed coverage-study boundary.");
+          }
+        }
       }
       if ((decision.outcome === "no_request") !== (spawns.length === 0)) {
         throw new LauncherFailure("Orchestrator result disagrees with spawn evidence", "Codex orchestrator response disagreed with its receipted tool calls.");

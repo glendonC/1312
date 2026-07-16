@@ -264,6 +264,46 @@ export function validateRuntimeArtifact(
         "worker output artifacts require a task producer and cannot claim media lineage",
       );
     }
+  } else if (kind === "study_report") {
+    exact(origin, ["kind", "executionId", "receiptId", "receiptContentId", "jobContextId", "outputSlotName"], context, `${path}.origin`);
+    string(origin.executionId, context, `${path}.origin.executionId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    string(origin.jobContextId, context, `${path}.origin.jobContextId`);
+    string(origin.outputSlotName, context, `${path}.origin.outputSlotName`);
+    if (
+      item.kind !== "studio.study-report.v1" || mediaClass !== "non_media" ||
+      item.publication !== "private" || item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 || sources.length === 0 ||
+      task === null || agent === null
+    ) fail(context, path, "study reports must be private typed non-media artifacts with task and source lineage");
+  } else if (kind === "parent_artifact_disposition") {
+    exact(origin, ["kind", "dispositionId", "reportId", "inputArtifactId", "outcome", "receiptId", "receiptContentId"], context, `${path}.origin`);
+    string(origin.dispositionId, context, `${path}.origin.dispositionId`);
+    string(origin.reportId, context, `${path}.origin.reportId`);
+    const inputArtifactId = string(origin.inputArtifactId, context, `${path}.origin.inputArtifactId`);
+    oneOf(origin.outcome, new Set(["accepted", "rejected"]), context, `${path}.origin.outcome`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    if (
+      mediaClass !== "non_media" || item.publication !== "private" || item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 || sources.length !== 1 || sources[0] !== inputArtifactId ||
+      task === null || agent === null || receiptContentId !== (item.content as { contentId: string }).contentId
+    ) fail(context, path, "parent dispositions must be private content-addressed receipts over one study artifact");
+  } else if (kind === "parent_admission") {
+    exact(origin, ["kind", "admissionId", "dispositionId", "reportId", "inputArtifactId", "grantId", "receiptId", "receiptContentId"], context, `${path}.origin`);
+    string(origin.admissionId, context, `${path}.origin.admissionId`);
+    string(origin.dispositionId, context, `${path}.origin.dispositionId`);
+    string(origin.reportId, context, `${path}.origin.reportId`);
+    const inputArtifactId = string(origin.inputArtifactId, context, `${path}.origin.inputArtifactId`);
+    string(origin.grantId, context, `${path}.origin.grantId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    if (
+      mediaClass !== "non_media" || item.publication !== "private" || item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 || sources.length !== 1 || sources[0] !== inputArtifactId ||
+      task === null || agent === null || receiptContentId !== (item.content as { contentId: string }).contentId
+    ) fail(context, path, "parent admissions must be private content-addressed receipts over one accepted study artifact");
   } else if (kind === "root_output_disposition") {
     exact(
       origin,

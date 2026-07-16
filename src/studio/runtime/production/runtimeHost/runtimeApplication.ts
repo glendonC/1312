@@ -23,6 +23,7 @@ import type {
 } from "../model.ts";
 import { BoundedReportHost } from "../reportHost.ts";
 import { RootOutputDispositionHost } from "../rootOutputDispositionHost.ts";
+import { ParentArtifactAdmissionHost } from "../parentArtifactAdmissionHost.ts";
 import { createRuntimeStart } from "../runStart/runtimeStart.ts";
 import { writeRuntimeStartReceipt } from "../runStart/receiptWriter.ts";
 import { BoundedRuntimeScheduler } from "../scheduler.ts";
@@ -184,8 +185,8 @@ export async function runBoundedRuntimeApplication(
   const rootPermit = await scheduler.createRoot({
     workloadKey: `root:${initialized.runStart.runtimeId}`,
     objective:
-      `Delegate at least one bounded structural execution-report task for ${initialized.runStart.analysisRequest.requestId}, choosing the child contract and decomposition yourself, then wait for every accepted child. ` +
-      "This slice proves only durable orchestration depth: request only execution reports, preserve scheduler rejection or deliberate no-request evidence, wait for every accepted child, and make no semantic media, synthesis, caption, quality, or publication claim.",
+      `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing disjoint or overlapping authorized ranges yourself, then wait for every accepted child. ` +
+      "Each accepted child contract must request speech.transcribe and report.submit, require exactly one studio.study-report.v1 output, partition its entire assigned scope with closed supported/withheld/unknown/failed states, and cite only current-run semantic observations for supported claims. Coverage and citation closure are structural facts, not correctness, understanding, agreement, or a complete study. Do not synthesize, caption, judge quality, or publish.",
     workerKind: "orchestrator",
     workerLabel: "local-orchestrator",
     mediaScope,
@@ -199,7 +200,7 @@ export async function runBoundedRuntimeApplication(
     evidenceArtifacts: initialized.evidenceArtifacts,
     analysisRequest: initialized.runStart.analysisRequest,
   }));
-  const reports = new BoundedReportHost(ledger);
+  const reports = new BoundedReportHost(ledger, undefined, artifacts);
   const mediaHost = new FfmpegCapabilityHost(ledger, artifacts);
   const evidenceHost = new BoundedEvidenceReadHost(ledger, artifacts);
   const assessmentHost = new BoundedEvidenceAssessmentHost(ledger, artifacts);
@@ -251,31 +252,45 @@ export async function runBoundedRuntimeApplication(
       .filter((report) => report.parentTaskId === rootPermit.taskId && report.status === "submitted")
       .sort((left, right) => left.id.localeCompare(right.id));
     for (const report of childReports) {
-      await reports.decide({
-        reportId: report.id,
-        decidedByTaskId: rootPermit.taskId,
-        decidedByAgentId: rootPermit.agentId,
-        accepted: true,
-        reason:
-          "The existing v1 host policy accepted the exact structurally valid child report after the model root had already completed its closed report wait; this is host-owned admission, not model synthesis or semantic quality judgment.",
-      });
-      for (const outputArtifactId of report.outputArtifactIds) {
-        await new RootOutputDispositionHost(ledger, artifacts).record({
+      if (report.study) {
+        for (const outputArtifactId of report.outputArtifactIds) {
+          await new ParentArtifactAdmissionHost(ledger, artifacts).record({
+            reportId: report.id,
+            parentTaskId: rootPermit.taskId,
+            parentAgentId: rootPermit.agentId,
+            outputArtifactId,
+            outcome: "accepted",
+            reason:
+              "The host accepted the structurally audited coverage report and granted only a bounded read of its exact content; this is not semantic quality judgment or parent agreement.",
+          });
+        }
+      } else {
+        await reports.decide({
           reportId: report.id,
-          rootTaskId: rootPermit.taskId,
-          rootAgentId: rootPermit.agentId,
-          outputArtifactId,
-          outcome: "promoted_to_root",
+          decidedByTaskId: rootPermit.taskId,
+          decidedByAgentId: rootPermit.agentId,
+          accepted: true,
           reason:
-            "The existing v1 host policy promoted the exact accepted child output with spawn, context, grant, executor, report, artifact, and receipt lineage intact.",
+            "The existing host policy accepted the exact structurally valid child report; this is host-owned admission, not model synthesis or semantic quality judgment.",
         });
+        for (const outputArtifactId of report.outputArtifactIds) {
+          await new RootOutputDispositionHost(ledger, artifacts).record({
+            reportId: report.id,
+            rootTaskId: rootPermit.taskId,
+            rootAgentId: rootPermit.agentId,
+            outputArtifactId,
+            outcome: "promoted_to_root",
+            reason:
+              "The existing v1 host policy promoted the exact accepted child output with spawn, context, grant, executor, report, artifact, and receipt lineage intact.",
+          });
+        }
       }
     }
     await scheduler.transitionTask(
       rootPermit.taskId,
       rootPermit.agentId,
       "withheld",
-      "The model-orchestrated slice ended after closed spawn decisions and terminal child report/failure identities. Existing v1 structural report disposition may have run afterward; no semantic understanding, synthesis, captions, quality judgment, or publication was produced by this slice.",
+      "The model-orchestrated slice ended after closed spawn decisions and terminal coverage-report/failure identities. Host-owned disposition/admission may have run afterward; no semantic correctness, parent synthesis, captions, quality judgment, or publication was produced by this slice.",
     );
   } catch (error) {
     if (error instanceof RuntimeApplicationInterrupted) throw error;

@@ -13,6 +13,7 @@ import {
   string,
   uniqueStrings,
 } from "./primitives.ts";
+import { validateStudyReportSubmissionBinding } from "./studyReports.ts";
 
 export function validateReportRecord(
   value: unknown,
@@ -30,6 +31,7 @@ export function validateReportRecord(
       "parentAgentId",
       "outputArtifactIds",
       "summary",
+      ...(item.study === undefined ? [] : ["study"]),
       "status",
       "decisionReason",
     ],
@@ -46,6 +48,9 @@ export function validateReportRecord(
     fail(context, `${path}.outputArtifactIds`, "must contain an output artifact");
   }
   string(item.summary, context, `${path}.summary`);
+  if (item.study !== undefined && item.study !== null) {
+    validateStudyReportSubmissionBinding(item.study, context, `${path}.study`);
+  }
   const status = oneOf<string>(
     item.status,
     new Set(["submitted", "accepted", "rejected"]),

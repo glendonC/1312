@@ -3,6 +3,7 @@ import type {
   MediaScope,
   WorkerKind,
 } from "./tasks.ts";
+import type { StudyReportSubmissionBinding } from "./studyReports.ts";
 
 export interface ReportRecord {
   id: string;
@@ -12,6 +13,8 @@ export interface ReportRecord {
   parentAgentId: string;
   outputArtifactIds: string[];
   summary: string;
+  /** Null for the legacy structural-output path; required for studio.study-report.v1. */
+  study: StudyReportSubmissionBinding | null;
   status: "submitted" | "accepted" | "rejected";
   decisionReason: string | null;
 }

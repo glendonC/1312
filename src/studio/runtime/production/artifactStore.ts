@@ -23,14 +23,19 @@ import type {
   PublishReviewDecisionReceipt,
   PublishReviewIntakeReceipt,
   PublishReviewRevocationReceipt,
+  ParentArtifactAdmissionReceipt,
+  ParentArtifactDispositionReceipt,
   RootOutputDispositionReceipt,
   RuntimeArtifact,
   SemanticMediaEvidenceArtifact,
   SourceArtifactDescriptor,
+  StudyReportArtifact,
   WorkerOutputEnvelope,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
+import { STUDY_REPORT_LIMITS } from "./model.ts";
+import { validateStudyReportArtifact } from "./validation/studyReports.ts";
 
 function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -315,6 +320,31 @@ export class ContentAddressedArtifactStore {
     };
   }
 
+  async prepareStudyReport(runId: string, value: unknown): Promise<{
+    artifactId: string;
+    envelope: StudyReportArtifact;
+    content: ContentIdentity;
+    storageKey: string;
+  }> {
+    const envelope = validateStudyReportArtifact(value);
+    if (envelope.runId !== runId) throw new Error("Study report belongs to another run");
+    const stored = await this.storeJson(envelope);
+    if (stored.content.bytes > STUDY_REPORT_LIMITS.maxArtifactBytes) {
+      throw new Error("Study report exceeds its stored-byte ceiling");
+    }
+    return {
+      artifactId: `artifact:${canonicalSha256({
+        runId,
+        taskId: envelope.task.taskId,
+        outputSlot: envelope.outputSlot,
+        kind: "studio.study-report.v1",
+        contentId: stored.content.contentId,
+      })}`,
+      envelope,
+      ...stored,
+    };
+  }
+
   buildSemanticEvidenceArtifact(input: {
     runId: string;
     receiptId: string;
@@ -392,6 +422,120 @@ export class ContentAddressedArtifactStore {
         executionId: envelope.executionId,
         receiptId: input.receipt.receiptId,
         receiptContentId: input.receiptContentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildStudyReportArtifact(input: {
+    runId: string;
+    receipt: ExecutorSpanReceipt;
+    receiptContentId: string;
+    prepared: {
+      artifactId: string;
+      envelope: StudyReportArtifact;
+      content: ContentIdentity;
+      storageKey: string;
+    };
+  }): RuntimeArtifact {
+    const { envelope } = input.prepared;
+    if (
+      envelope.runId !== input.runId ||
+      envelope.task.taskId !== input.receipt.taskId ||
+      envelope.task.agentId !== input.receipt.agentId ||
+      !input.receipt.outputArtifactIds.includes(input.prepared.artifactId)
+    ) throw new Error("Study report does not match its executor receipt");
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: input.prepared.artifactId,
+      runId: input.runId,
+      kind: "studio.study-report.v1",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.prepared.content,
+      storageKey: input.prepared.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: envelope.sourceArtifacts.map((source) => source.artifactId),
+      producerTaskId: envelope.task.taskId,
+      producerAgentId: envelope.task.agentId,
+      origin: {
+        kind: "study_report",
+        executionId: input.receipt.executionId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.receiptContentId,
+        jobContextId: envelope.task.jobContextId,
+        outputSlotName: envelope.outputSlot.name,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildParentAdmissionArtifact(input: {
+    runId: string;
+    receipt: ParentArtifactAdmissionReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const admitted = input.receipt.admitted[0];
+    if (!admitted || input.receipt.admitted.length !== 1) throw new Error("Parent admission requires one exact study artifact");
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({ runId: input.runId, admissionId: input.receipt.admissionId, kind: "parent-admission-receipt", contentId: input.storedReceipt.content.contentId })}`,
+      runId: input.runId,
+      kind: "parent-admission-receipt",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [admitted.artifactId],
+      producerTaskId: input.receipt.parent.taskId,
+      producerAgentId: input.receipt.parent.agentId,
+      origin: {
+        kind: "parent_admission",
+        admissionId: input.receipt.admissionId,
+        dispositionId: input.receipt.dispositionId,
+        reportId: input.receipt.reportId,
+        inputArtifactId: admitted.artifactId,
+        grantId: input.receipt.grant.id,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildParentArtifactDispositionArtifact(input: {
+    runId: string;
+    receipt: ParentArtifactDispositionReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({ runId: input.runId, dispositionId: input.receipt.dispositionId, kind: "parent-artifact-disposition-receipt", contentId: input.storedReceipt.content.contentId })}`,
+      runId: input.runId,
+      kind: input.receipt.decision.outcome === "accepted" ? "parent-accepted-artifact-receipt" : "parent-rejected-artifact-receipt",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [input.receipt.output.artifactId],
+      producerTaskId: input.receipt.parent.taskId,
+      producerAgentId: input.receipt.parent.agentId,
+      origin: {
+        kind: "parent_artifact_disposition",
+        dispositionId: input.receipt.dispositionId,
+        reportId: input.receipt.report.reportId,
+        inputArtifactId: input.receipt.output.artifactId,
+        outcome: input.receipt.decision.outcome,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
       },
     };
     assertRuntimeArtifact(artifact);

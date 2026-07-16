@@ -1,6 +1,8 @@
 import type { ContentAddressedArtifactStore } from "./artifactStore.ts";
 import type { RuntimeProjection } from "./model.ts";
 import { reopenSemanticEvidence } from "./semanticEvidenceAudit.ts";
+import { reopenStudyReport } from "./studyReportAudit.ts";
+import { reopenParentArtifactDisposition } from "./parentArtifactAdmissionAudit.ts";
 import { adaptProductionRuntime, type ProductionStudioProjection } from "./studioProjection.ts";
 
 /** Storage-aware projection: invalid/absent semantic bytes never expose availability identities. */
@@ -23,6 +25,28 @@ export async function adaptAuthenticatedProductionRuntime(
       view.observationCount = null;
       view.availability = null;
       view.failure = "Stored semantic evidence is absent or invalid.";
+    }
+  }
+  for (const view of projection.studyReports) {
+    try {
+      if (view.disposition.dispositionId) {
+        await reopenParentArtifactDisposition(state, artifacts, view.disposition.dispositionId);
+      } else {
+        await reopenStudyReport(state, artifacts, view.artifactId);
+      }
+      view.audit = "verified_on_reopen";
+    } catch {
+      view.audit = "absent_or_invalid";
+      view.coverage = [];
+      view.claims = [];
+      view.counts = {
+        ranges: { supported: 0, withheld: 0, unknown: 0, failed: 0 },
+        durationMs: { supported: 0, withheld: 0, unknown: 0, failed: 0 },
+        claims: 0,
+        citations: 0,
+        observationCitations: 0,
+      };
+      view.admission = { state: "absent", admissionId: null, receiptId: null, receiptContentId: null, grant: null };
     }
   }
   return projection;

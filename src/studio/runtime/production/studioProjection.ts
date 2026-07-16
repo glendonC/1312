@@ -39,6 +39,7 @@ import {
   projectTasks,
   projectWorkers,
 } from "./studioProjection/workMappers.ts";
+import { projectStudyReports, projectStudyReportStates } from "./studioProjection/studyReportMappers.ts";
 
 export * from "./studioProjection/model.ts";
 
@@ -46,6 +47,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
   const tasks = projectTasks(state);
   const grants = projectGrants(state);
   const reports = projectReports(state);
+  const studyReports = projectStudyReports(state);
+  const studyReportStates = projectStudyReportStates(state);
   const spawnRequests = projectSpawnRequests(state);
   const rootOutputDispositions = projectRootOutputDispositions(state);
   const taskLaunches = projectTaskLaunches(state);
@@ -81,6 +84,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     workers,
     grants,
     reports,
+    studyReports,
+    studyReportStates,
     spawnRequests,
     taskLaunches,
     reportWaits,
@@ -111,6 +116,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       grants: grants.length,
       executions: Object.keys(state.executions).length,
       reports: reports.length,
+      studyReports: studyReports.length,
+      studyReportStates: studyReportStates.length,
       spawnRequests: spawnRequests.length,
       taskLaunches: taskLaunches.length,
       reportWaits: reportWaits.length,

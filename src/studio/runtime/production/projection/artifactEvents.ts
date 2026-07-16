@@ -5,7 +5,10 @@ import { invariant } from "./shared.ts";
 export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
   if (event.type === "artifact.recorded") {
     const artifact = event.data.artifact;
-    invariant(event.producer.kind === "artifact_store", event, "artifact evidence must come from the artifact store");
+    const isAtomicParentReceipt =
+      (artifact.origin.kind === "parent_admission" || artifact.origin.kind === "parent_artifact_disposition") &&
+      event.producer.kind === "admission_host";
+    invariant(event.producer.kind === "artifact_store" || isAtomicParentReceipt, event, "artifact evidence must come from its bounded storage or admission host");
     invariant(artifact.runId === next.runId, event, `artifact ${artifact.id} belongs to another run`);
     invariant(!next.artifacts[artifact.id], event, `artifact ${artifact.id} is duplicated`);
     invariant(artifact.sourceArtifactIds.every((id) => Boolean(next.artifacts[id])), event, `artifact ${artifact.id} has missing lineage`);
@@ -36,6 +39,38 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId,
         event,
         `artifact ${artifact.id} changed its worker execution producer`,
+      );
+    } else if (artifact.origin.kind === "study_report") {
+      const origin = artifact.origin;
+      const execution = next.executions[origin.executionId];
+      const task = artifact.producerTaskId ? next.tasks[artifact.producerTaskId] : null;
+      invariant(execution?.status === "active", event, `artifact ${artifact.id} has no active study-report execution`);
+      invariant(
+        execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId &&
+          task?.jobContext.contextId === origin.jobContextId &&
+          task.requiredOutputs.some((slot) => slot.name === origin.outputSlotName && slot.artifactKind === "studio.study-report.v1"),
+        event,
+        `artifact ${artifact.id} changed its study task, context, or output slot`,
+      );
+    } else if (artifact.origin.kind === "parent_artifact_disposition") {
+      const report = next.reports[artifact.origin.reportId];
+      invariant(report?.study && report.status === artifact.origin.outcome, event, `artifact ${artifact.id} has no matching typed report disposition`);
+      invariant(
+        report.parentTaskId === artifact.producerTaskId && report.parentAgentId === artifact.producerAgentId &&
+          report.study.output.artifactId === artifact.origin.inputArtifactId &&
+          artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === artifact.origin.inputArtifactId,
+        event,
+        `artifact ${artifact.id} changed its parent disposition lineage`,
+      );
+    } else if (artifact.origin.kind === "parent_admission") {
+      const report = next.reports[artifact.origin.reportId];
+      invariant(report?.study && report.status === "accepted", event, `artifact ${artifact.id} has no accepted typed report`);
+      invariant(
+        report.parentTaskId === artifact.producerTaskId && report.parentAgentId === artifact.producerAgentId &&
+          report.study.output.artifactId === artifact.origin.inputArtifactId &&
+          artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === artifact.origin.inputArtifactId,
+        event,
+        `artifact ${artifact.id} changed its parent admission lineage`,
       );
     } else if (artifact.origin.kind === "root_output_disposition") {
       const report = next.reports[artifact.origin.reportId];

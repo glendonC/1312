@@ -1,6 +1,7 @@
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { invariant, sameGrants } from "./shared.ts";
+import { deriveStudyReportCounts, validateCoveragePartition } from "../validation/studyReports.ts";
 
 export function applyReportEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
   if (event.type === "report.submitted") {
@@ -28,6 +29,30 @@ export function applyReportEvent(next: RuntimeProjection, event: RuntimeEvent): 
       event,
       `report ${report.id} contains an artifact owned by another task`,
     );
+    if (report.study) {
+      validateCoveragePartition(report.study.coverage, task.mediaScope, `Runtime event ${event.eventId}: report ${report.id} coverage`);
+      invariant(
+        JSON.stringify(report.study.counts) === JSON.stringify(deriveStudyReportCounts({ coverage: report.study.coverage, claims: report.study.claims })),
+        event,
+        `report ${report.id} submitted non-derived coverage or citation counts`,
+      );
+      invariant(report.outputArtifactIds.length === 1 && report.outputArtifactIds[0] === report.study.output.artifactId, event, `report ${report.id} changed its typed output binding`);
+      invariant(
+        report.study.parentEdge.childTaskId === task.id && report.study.parentEdge.childAgentId === report.agentId &&
+          report.study.parentEdge.parentTaskId === report.parentTaskId && report.study.parentEdge.parentAgentId === report.parentAgentId &&
+          report.study.jobContextId === task.jobContext.contextId,
+        event,
+        `report ${report.id} changed its task context or parent edge`,
+      );
+      const artifact = next.artifacts[report.study.output.artifactId];
+      invariant(
+        artifact?.origin.kind === "study_report" && artifact.content.contentId === report.study.output.contentId &&
+          artifact.content.bytes === report.study.output.bytes && artifact.origin.receiptId === report.study.executor.receiptId &&
+          artifact.origin.receiptContentId === report.study.executor.receiptContentId,
+        event,
+        `report ${report.id} changed its study content or executor binding`,
+      );
+    }
     for (const output of task.requiredOutputs.filter((candidate) => candidate.required)) {
       invariant(
         report.outputArtifactIds.some((id) => next.artifacts[id]?.kind === output.artifactKind),
@@ -42,8 +67,12 @@ export function applyReportEvent(next: RuntimeProjection, event: RuntimeEvent): 
   }
 
   if (event.type === "report.decided") {
-    invariant(event.producer.kind === "handoff_host", event, "report decisions must come from the handoff host");
     const report = next.reports[event.data.reportId];
+    invariant(
+      event.producer.kind === "handoff_host" || (event.producer.kind === "admission_host" && Boolean(report?.study)),
+      event,
+      "report decisions must come from the handoff host or atomic typed admission host",
+    );
     invariant(report?.status === "submitted", event, `report ${event.data.reportId} is not pending`);
     const parent = next.tasks[report.parentTaskId];
     const child = next.tasks[report.taskId];

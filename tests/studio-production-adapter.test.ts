@@ -512,6 +512,8 @@ test("production adapter projects spawn and output lineage with existing facts o
     grants: 2,
     executions: 1,
     reports: 1,
+    studyReports: 0,
+    studyReportStates: 0,
     spawnRequests: 1,
     taskLaunches: 2,
     reportWaits: 0,

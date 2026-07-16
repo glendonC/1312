@@ -1,11 +1,53 @@
-import type { SemanticEvidenceCitationInput, TaskRecord } from "../model.ts";
+import { STUDY_REPORT_LIMITS } from "../model.ts";
+import type {
+  SemanticEvidenceCitationInput,
+  StudyClaim,
+  StudyCoverageRange,
+  StudyReportArtifact,
+  TaskRecord,
+} from "../model.ts";
 import { validateSemanticEvidenceCitationInput } from "../validation/semanticEvidence.ts";
+import { validateCoveragePartition, validateStudyReportArtifact } from "../validation/studyReports.ts";
 import { LauncherFailure } from "./launcherFailure.ts";
 
 export interface WorkerResult {
   summary: string;
   semanticEvidenceInputs: SemanticEvidenceCitationInput[];
-  outputs: Array<{ name: string; kind: string; content: string }>;
+  outputs: WorkerResultOutput[];
+}
+
+export type WorkerResultOutput =
+  | { name: string; kind: string; content: string }
+  | { name: string; kind: "studio.study-report.v1"; coverage: StudyCoverageRange[]; claims: StudyClaim[] };
+
+function studySourceArtifacts(task: TaskRecord, inputs: readonly SemanticEvidenceCitationInput[]) {
+  return [
+    { artifactId: task.jobContext.source.artifactId, contentId: task.jobContext.source.contentId },
+    ...inputs.map((input) => ({ artifactId: input.artifactId, contentId: input.contentId }))
+      .sort((left, right) => left.artifactId.localeCompare(right.artifactId)),
+  ];
+}
+
+export function buildStudyReportEnvelope(
+  task: TaskRecord,
+  output: Extract<WorkerResultOutput, { kind: "studio.study-report.v1" }>,
+  semanticEvidenceInputs: SemanticEvidenceCitationInput[],
+): StudyReportArtifact {
+  if (!task.parentTaskId || !task.parentAgentId) throw new Error("Root tasks cannot create child study reports");
+  return validateStudyReportArtifact({
+    schema: "studio.study-report.v1",
+    runId: task.runId,
+    task: { taskId: task.id, agentId: task.assignedAgentId, jobContextId: task.jobContext.contextId },
+    parent: { taskId: task.parentTaskId, agentId: task.parentAgentId },
+    outputSlot: { name: output.name, artifactKind: "studio.study-report.v1" },
+    assignment: { source: structuredClone(task.jobContext.source), mediaScope: structuredClone(task.mediaScope) },
+    coverage: structuredClone(output.coverage),
+    claims: structuredClone(output.claims),
+    semanticEvidenceInputs: structuredClone(semanticEvidenceInputs),
+    sourceArtifacts: studySourceArtifacts(task, semanticEvidenceInputs),
+    limits: STUDY_REPORT_LIMITS,
+    nonClaims: { correctness: "not_assessed", completeness: "partition_only", semanticQuality: "not_assessed" },
+  });
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -83,13 +125,44 @@ export function validateWorkerResult(
     );
   }
 
-  const outputs = item.outputs.map((candidate, index) => {
+  const outputs: WorkerResultOutput[] = item.outputs.map((candidate, index) => {
     const output = record(candidate);
-    if (!output || Object.keys(output).some((key) => !["name", "kind", "content"].includes(key))) {
+    const isStudy = output?.kind === "studio.study-report.v1";
+    const allowed = isStudy ? ["name", "kind", "coverage", "claims"] : ["name", "kind", "content"];
+    if (!output || Object.keys(output).some((key) => !allowed.includes(key)) || allowed.some((key) => !(key in output))) {
       throw new LauncherFailure(
         `Worker output ${index + 1} has an open shape`,
         "Codex worker response failed its output contract.",
       );
+    }
+    if (isStudy) {
+      if (typeof output.name !== "string") throw new LauncherFailure(`Worker study output ${index + 1} is invalid`, "Codex worker response failed its typed study-report contract.");
+      let envelope: StudyReportArtifact;
+      try {
+        envelope = buildStudyReportEnvelope(task, {
+          name: output.name,
+          kind: "studio.study-report.v1",
+          coverage: output.coverage as StudyCoverageRange[],
+          claims: output.claims as StudyClaim[],
+        }, semanticEvidenceInputs);
+        validateCoveragePartition(envelope.coverage, task.mediaScope, "Worker study report coverage");
+      } catch (error) {
+        throw new LauncherFailure(
+          `Worker study report is invalid: ${error instanceof Error ? error.message : "invalid typed report"}`,
+          "Codex worker response failed its typed study-report contract.",
+        );
+      }
+      const expectedByOperation = new Map(semanticEvidenceInputs.map((input) => [input.operationId, input]));
+      for (const claim of envelope.claims) for (const citation of claim.citations) {
+        const expected = expectedByOperation.get(citation.operationId);
+        if (!expected || citation.artifactId !== expected.artifactId || citation.contentId !== expected.contentId ||
+            citation.receiptId !== expected.receiptId || citation.receiptContentId !== expected.receiptContentId ||
+            citation.observations.some((observation) => !expected.observations.some((candidate) =>
+              candidate.observationId === observation.observationId && candidate.startMs === observation.startMs && candidate.endMs === observation.endMs))) {
+          throw new LauncherFailure("Worker study claim contains an unsupported semantic citation", "Codex worker response failed its typed study-report citation contract.");
+        }
+      }
+      return { name: output.name, kind: "studio.study-report.v1", coverage: envelope.coverage, claims: envelope.claims };
     }
     if (
       typeof output.name !== "string" ||
@@ -153,6 +226,58 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
       required: ["operationId", "artifactId", "contentId", "receiptId", "receiptContentId", "observations"],
     },
   };
+  const citation = (semanticEvidenceInputs.items as Record<string, unknown>);
+  const coverage = {
+    type: "array", minItems: 1, maxItems: STUDY_REPORT_LIMITS.maxRanges,
+    items: {
+      type: "object", additionalProperties: false,
+      properties: {
+        artifactId: { type: "string", minLength: 1 }, trackId: { type: "string", minLength: 1 },
+        startMs: { type: "integer", minimum: 0 }, endMs: { type: "integer", minimum: 1 },
+        state: { type: "string", enum: ["supported", "withheld", "unknown", "failed"] },
+        claimIds: { type: "array", maxItems: STUDY_REPORT_LIMITS.maxClaims, items: { type: "string", minLength: 1 }, uniqueItems: true },
+        reason: { oneOf: [
+          { type: "null" },
+          { type: "object", additionalProperties: false, properties: {
+            code: { type: "string", enum: ["semantic_evidence_unavailable", "semantic_evidence_empty", "insufficient_semantic_evidence", "worker_withheld", "operation_failed", "unobserved_range"] },
+            detail: { type: "string", minLength: 1, maxLength: 2_000 },
+          }, required: ["code", "detail"] },
+        ] },
+      },
+      required: ["artifactId", "trackId", "startMs", "endMs", "state", "claimIds", "reason"],
+    },
+  };
+  const claims = {
+    type: "array", maxItems: STUDY_REPORT_LIMITS.maxClaims,
+    items: {
+      type: "object", additionalProperties: false,
+      properties: {
+        claimId: { type: "string", minLength: 1 }, artifactId: { type: "string", minLength: 1 },
+        trackId: { type: "string", minLength: 1 }, startMs: { type: "integer", minimum: 0 },
+        endMs: { type: "integer", minimum: 1 }, statement: { type: "string", minLength: 1, maxLength: 8_000 },
+        citations: { type: "array", minItems: 1, maxItems: STUDY_REPORT_LIMITS.maxCitations, items: citation },
+      },
+      required: ["claimId", "artifactId", "trackId", "startMs", "endMs", "statement", "citations"],
+    },
+  };
+  const outputItems = required.some((output) => output.artifactKind === "studio.study-report.v1")
+    ? { oneOf: required.map((output) => output.artifactKind === "studio.study-report.v1"
+        ? { type: "object", additionalProperties: false, properties: {
+            name: { type: "string", const: output.name }, kind: { type: "string", const: "studio.study-report.v1" }, coverage, claims,
+          }, required: ["name", "kind", "coverage", "claims"] }
+        : { type: "object", additionalProperties: false, properties: {
+            name: { type: "string", const: output.name }, kind: { type: "string", const: output.artifactKind }, content: { type: "string", minLength: 1, maxLength: 8_000 },
+          }, required: ["name", "kind", "content"] }) }
+    : {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string", enum: required.map((output) => output.name) },
+          kind: { type: "string", enum: required.map((output) => output.artifactKind) },
+          content: { type: "string", minLength: 1, maxLength: 8_000 },
+        },
+        required: ["name", "kind", "content"],
+      };
   return {
     type: "object",
     additionalProperties: false,
@@ -163,16 +288,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         type: "array",
         minItems: required.length,
         maxItems: required.length,
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            name: { type: "string", enum: required.map((output) => output.name) },
-            kind: { type: "string", enum: required.map((output) => output.artifactKind) },
-            content: { type: "string", minLength: 1, maxLength: 8_000 },
-          },
-          required: ["name", "kind", "content"],
-        },
+        items: outputItems,
       },
     },
     required: semanticGranted ? ["summary", "semanticEvidenceInputs", "outputs"] : ["summary", "outputs"],
@@ -239,6 +355,15 @@ export function workerPrompt(task: TaskRecord): string {
         "A free-text mention of any identity is not a citation and the output validator will reject it.",
         "Preserve empty, unavailable, unknown, and truncated availability without upgrading it.",
       ].join(" ");
+  const studyBoundary = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.study-report.v1")
+    ? [
+        "Return studio.study-report.v1 as typed coverage and claims, never as a prose-only content field.",
+        "Partition every assigned artifact/track range in order with no gaps or overlaps using only supported, withheld, unknown, or failed.",
+        "Supported ranges require structured claims over the exact same range, and every claim must cite exact semantic artifact/content/receipt and observation identities returned by speech_transcribe.",
+        "Citation observation ranges must close the entire supported claim range; use closed non-supported reasons everywhere else.",
+        "Do not submit a coverage percentage. Coverage is derived from the partition and does not establish correctness or complete study.",
+      ].join(" ")
+    : "No typed study report is required by this task.";
   const assessmentScope = task.grants
     .find((grant) => grant.capability === "analysis.evidence.assess")?.assessmentScope ?? null;
   const assessmentBoundary = assessmentScope === null
@@ -266,6 +391,7 @@ export function workerPrompt(task: TaskRecord): string {
     "Complete only the bounded task contract below and return the JSON required by the supplied output schema.",
     mediaBoundary,
     semanticBoundary,
+    studyBoundary,
     evidenceBoundary,
     assessmentBoundary,
     decisionBoundary,

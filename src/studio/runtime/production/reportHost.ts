@@ -2,24 +2,39 @@ import { randomUUID } from "node:crypto";
 
 import { assertReportDecisionRequest, assertReportSubmitRequest } from "./assertions.ts";
 import type { RuntimeLedger } from "./journal.ts";
+import type { ContentAddressedArtifactStore } from "./artifactStore.ts";
 import type { ReportDecisionRequest, ReportRecord, ReportSubmitRequest } from "./model.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
+import { reopenStudyReport } from "./studyReportAudit.ts";
 
 export class BoundedReportHost {
   private readonly ledger: RuntimeLedger;
   private readonly nextId: () => string;
+  private readonly artifacts: ContentAddressedArtifactStore | null;
 
   constructor(
     ledger: RuntimeLedger,
     nextId: () => string = () => `report:${randomUUID()}`,
+    artifacts: ContentAddressedArtifactStore | null = null,
   ) {
     this.ledger = ledger;
     this.nextId = nextId;
+    this.artifacts = artifacts;
   }
 
   async submit(requestValue: unknown): Promise<ReportRecord> {
     assertReportSubmitRequest(requestValue);
     const request: ReportSubmitRequest = structuredClone(requestValue);
+    const submittedArtifacts = request.outputArtifactIds.map((id) => this.ledger.state().artifacts[id]).filter(Boolean);
+    const typedArtifacts = submittedArtifacts.filter((artifact) => artifact.kind === "studio.study-report.v1");
+    if (typedArtifacts.length > 0 && (typedArtifacts.length !== 1 || request.outputArtifactIds.length !== 1)) {
+      throw new Error("Typed study report submission requires one exact output artifact and output slot");
+    }
+    const study = typedArtifacts.length === 1
+      ? (this.artifacts
+          ? (await reopenStudyReport(this.ledger.state(), this.artifacts, typedArtifacts[0].id)).submission
+          : (() => { throw new Error("Typed study report submission requires authenticated artifact storage"); })())
+      : null;
     const transaction = await this.ledger.transact<ReportRecord>(
       { producer: { kind: "handoff_host", id: "bounded-report-host" }, causationId: request.taskId },
       ({ state }) => {
@@ -52,6 +67,7 @@ export class BoundedReportHost {
           parentAgentId: task.parentAgentId,
           outputArtifactIds: [...request.outputArtifactIds],
           summary: request.summary,
+          study: study ? structuredClone(study) : null,
           status: "submitted",
           decisionReason: null,
         };
@@ -73,6 +89,7 @@ export class BoundedReportHost {
         const report = state.reports[request.reportId];
         const parent = report ? state.tasks[report.parentTaskId] : null;
         if (!report || report.status !== "submitted") throw new Error("Report is not pending a decision");
+        if (report.study) throw new Error("Typed study reports require atomic parent artifact disposition");
         if (
           !parent ||
           parent.id !== request.decidedByTaskId ||

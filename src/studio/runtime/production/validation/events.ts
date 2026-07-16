@@ -28,6 +28,12 @@ import {
 import { validateReportRecord } from "./handoffs.ts";
 import { validateRootOutputDispositionReceipt } from "./rootHandoff.ts";
 import {
+  assertParentArtifactReadRequest,
+  validateParentAdmissionReceipt,
+  validateParentArtifactDispositionReceipt,
+  validateParentArtifactReadReceipt,
+} from "./studyReports.ts";
+import {
   assertMediaExtractRequest,
   assertMediaSeekRequest,
   validateMediaOperationReceipt,
@@ -104,7 +110,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -444,6 +450,29 @@ export function assertRuntimeEvent(
     string(data.outputArtifactId, context, "event.data.outputArtifactId");
     contentId(data.receiptContentId, context, "event.data.receiptContentId");
     validateRootOutputDispositionReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "parent.artifact_disposition_recorded") {
+    exact(data, ["dispositionArtifactId", "dispositionReceiptContentId", "dispositionReceipt", "admissionArtifactId", "admissionReceiptContentId", "admissionReceipt"], context, "event.data");
+    string(data.dispositionArtifactId, context, "event.data.dispositionArtifactId");
+    contentId(data.dispositionReceiptContentId, context, "event.data.dispositionReceiptContentId");
+    validateParentArtifactDispositionReceipt(data.dispositionReceipt, context, "event.data.dispositionReceipt");
+    nullableString(data.admissionArtifactId, context, "event.data.admissionArtifactId");
+    if (data.admissionReceiptContentId !== null) contentId(data.admissionReceiptContentId, context, "event.data.admissionReceiptContentId");
+    if (data.admissionReceipt !== null) validateParentAdmissionReceipt(data.admissionReceipt, context, "event.data.admissionReceipt");
+    if ((data.admissionArtifactId === null) !== (data.admissionReceiptContentId === null) ||
+        (data.admissionArtifactId === null) !== (data.admissionReceipt === null)) {
+      fail(context, "event.data", "must carry admission artifact, bytes, and receipt together");
+    }
+  } else if (type === "parent.artifact_read_started") {
+    exact(data, ["request"], context, "event.data");
+    assertParentArtifactReadRequest(data.request);
+  } else if (type === "parent.artifact_read_completed") {
+    exact(data, ["operationId", "receipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    validateParentArtifactReadReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "parent.artifact_read_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.reason, context, "event.data.reason");
   } else {
     fail(context, "event.type", `has unknown value ${type}`);
   }

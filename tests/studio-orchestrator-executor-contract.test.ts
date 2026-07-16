@@ -61,30 +61,71 @@ if (isRoot) {
     if (!response.ok || body.ok !== true) throw new Error("orchestrator bridge rejected " + name + ": " + JSON.stringify(body));
     return body.result;
   };
-  const child = (side) => ({
+  const child = (side, startMs, endMs) => ({
     workloadKey: "model-child:" + side,
-    objective: "Return one structural execution report for the " + side + " model-authored branch.",
+    objective: "Return one typed coverage study for the " + side + " model-authored branch without making a correctness claim.",
     workerKind: "analysis",
     workerLabel: "model-" + side,
-    mediaScope: [],
+    mediaScope: [{ ...root.mediaScope[0], startMs, endMs }],
     inputArtifactIds: [root.jobContext.source.artifactId],
-    requiredOutputs: [{ name: "execution report", artifactKind: "worker-execution-report", required: true }],
-    requiredCapabilities: ["report.submit"],
+    requiredOutputs: [{ name: "coverage study", artifactKind: "studio.study-report.v1", required: true }],
+    requiredCapabilities: ["speech.transcribe", "report.submit"],
     dependencyWorkloadKeys: [],
-    budget: { wallMs: 10000, toolCalls: 1 },
+    budget: { wallMs: 10000, toolCalls: 2 },
   });
-  const left = await call("task_spawn_request", child("left"));
-  const right = await call("task_spawn_request", child("right"));
+  const midpoint = Math.floor((root.mediaScope[0].startMs + root.mediaScope[0].endMs) / 2);
+  const left = await call("task_spawn_request", child("left", root.mediaScope[0].startMs, midpoint));
+  const right = await call("task_spawn_request", child("right", midpoint, root.mediaScope[0].endMs));
   if (left.decision !== "accepted" || right.decision !== "accepted") throw new Error("fan-out was not accepted");
   const waited = await call("task_reports_wait", {});
   if (waited.result !== "all_terminal" || waited.children.length !== 2) throw new Error("wait did not return two terminal children");
 }
+let childFinal = null;
+if (!isRoot) {
+  const worker = JSON.parse(prompt.split("\\n\\n").at(-1));
+  const scope = worker.grantedSemanticEvidence[0];
+  const response = await fetch(process.env.STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_URL + "/v1/call", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + process.env.STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_TOKEN,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: "speech_transcribe", arguments: scope }),
+  });
+  const body = await response.json();
+  if (!response.ok || body.ok !== true) throw new Error("semantic evidence bridge rejected child call: " + JSON.stringify(body));
+  const evidence = body.result;
+  const input = {
+    operationId: evidence.operationId,
+    artifactId: evidence.artifact.artifactId,
+    contentId: evidence.artifact.contentId,
+    receiptId: evidence.receipt.receiptId,
+    receiptContentId: evidence.receipt.contentId,
+    observations: evidence.observations.map((observation) => ({
+      observationId: observation.observationId,
+      startMs: observation.range.startMs,
+      endMs: observation.range.endMs,
+    })),
+  };
+  const code = evidence.availability.state === "empty"
+    ? "semantic_evidence_empty"
+    : evidence.availability.state === "unavailable"
+      ? "semantic_evidence_unavailable"
+      : "insufficient_semantic_evidence";
+  childFinal = {
+    summary: "The child returned a closed coverage partition; correctness and semantic quality were not assessed.",
+    semanticEvidenceInputs: [input],
+    outputs: [{
+      name: "coverage study",
+      kind: "studio.study-report.v1",
+      coverage: [{ ...scope, state: "unknown", claimIds: [], reason: { code, detail: "The current-run semantic input did not establish supported coverage." } }],
+      claims: [],
+    }],
+  };
+}
 const final = isRoot
   ? { outcome: "completed", reason: "The model-authored two-child fan-out reached a closed terminal wait." }
-  : {
-      summary: "The isolated child returned one structural execution acknowledgement.",
-      outputs: [{ name: "execution report", kind: "worker-execution-report", content: "Structural acknowledgement only; no semantic media claim." }],
-    };
+  : childFinal;
 process.stdout.write(JSON.stringify({ type: "thread.started", thread_id: isRoot ? "thread:root" : "thread:child" }) + "\\n");
 process.stdout.write(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: JSON.stringify(final) } }) + "\\n");
 process.stdout.write(JSON.stringify({
@@ -157,6 +198,9 @@ test("Codex root launcher exposes only two closed tools and receipts model-autho
     assert.equal(Object.values(state.tasks).filter((task) => task.parentTaskId === root.id).length, 2);
     assert.equal(Object.keys(state.taskLaunches).length, 3);
     assert.equal(Object.keys(state.reports).length, 2);
+    assert.ok(Object.values(state.reports).every((report) => report.study?.output.schema === "studio.study-report.v1"));
+    assert.equal(Object.keys(state.parentArtifactDispositions).length, 2);
+    assert.equal(Object.keys(state.parentArtifactReadGrants).length, 2);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

@@ -112,7 +112,7 @@ every media class.
 
 ## 3. Coverage-aware report-up and parent artifact admission
 
-- [ ] Status: blocked on slices 1–2.
+- [x] Status: complete.
 - Real: a child can submit artifacts only from its own task; required output kinds and executor
   lineage are checked; the owning parent alone accepts or rejects a report; one root-only host can
   disposition one free-text worker output.

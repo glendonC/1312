@@ -19,6 +19,11 @@ import type {
   RootOutputDispositionRecord,
 } from "./reports.ts";
 import type {
+  ParentArtifactDispositionRecord,
+  ParentArtifactReadGrant,
+  ParentArtifactReadRecord,
+} from "./studyReports.ts";
+import type {
   PublishReviewDecisionRecord,
   PublishReviewIntakeRecord,
   PublishReviewRevocationRecord,
@@ -58,4 +63,7 @@ export interface RuntimeProjection {
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;
   rootOutputDispositions: Record<string, RootOutputDispositionRecord>;
+  parentArtifactDispositions: Record<string, ParentArtifactDispositionRecord>;
+  parentArtifactReadGrants: Record<string, ParentArtifactReadGrant>;
+  parentArtifactReads: Record<string, ParentArtifactReadRecord>;
 }

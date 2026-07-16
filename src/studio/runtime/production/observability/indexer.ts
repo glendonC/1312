@@ -147,29 +147,37 @@ export async function buildRuntimeObservabilityIndex(
   const receiptSources: ObservabilityReceiptSource[] = [];
   for (const event of events) {
     const candidate = receiptValue(event);
-    if (!candidate) continue;
-    const content = await identifyUtf8(canonicalJsonLine(candidate.receipt));
-    const linkedArtifacts = receiptArtifactLinks(state, candidate.receipt.receiptId);
-    for (const artifact of linkedArtifacts) {
-      const origin = artifact.origin;
-      if (
-        origin.kind === "ingest" ||
-        origin.kind === "preflight_evidence" ||
-        origin.receiptContentId !== content.contentId
-      ) {
-        throw new Error(
-          `Observability receipt ${candidate.receipt.receiptId} does not match its artifact-store content link`,
-        );
-      }
+    const candidates: Array<NonNullable<ReturnType<typeof receiptValue>>> = candidate ? [candidate] : [];
+    if (event.type === "parent.artifact_disposition_recorded") {
+      candidates.push({ kind: "parent_artifact_disposition", receipt: event.data.dispositionReceipt, rawReceiptContentId: null });
+      if (event.data.admissionReceipt) candidates.push({ kind: "parent_admission", receipt: event.data.admissionReceipt, rawReceiptContentId: null });
+    } else if (event.type === "parent.artifact_read_completed") {
+      candidates.push({ kind: "parent_artifact_read", receipt: event.data.receipt, rawReceiptContentId: null });
     }
-    receiptSources.push({
-      receiptId: candidate.receipt.receiptId,
-      kind: candidate.kind,
-      eventId: event.eventId,
-      contentId: content.contentId,
-      storage: linkedArtifacts.length > 0 ? "artifact_store" : "embedded_event",
-      rawReceiptContentId: candidate.rawReceiptContentId,
-    });
+    for (const found of candidates) {
+      const content = await identifyUtf8(canonicalJsonLine(found.receipt));
+      const linkedArtifacts = receiptArtifactLinks(state, found.receipt.receiptId);
+      for (const artifact of linkedArtifacts) {
+        const origin = artifact.origin;
+        if (
+          origin.kind === "ingest" ||
+          origin.kind === "preflight_evidence" ||
+          origin.receiptContentId !== content.contentId
+        ) {
+          throw new Error(
+            `Observability receipt ${found.receipt.receiptId} does not match its artifact-store content link`,
+          );
+        }
+      }
+      receiptSources.push({
+        receiptId: found.receipt.receiptId,
+        kind: found.kind,
+        eventId: event.eventId,
+        contentId: content.contentId,
+        storage: linkedArtifacts.length > 0 ? "artifact_store" : "embedded_event",
+        rawReceiptContentId: found.rawReceiptContentId,
+      });
+    }
   }
 
   const artifactSources: ObservabilityArtifactSource[] = events.flatMap((event) => {
@@ -321,12 +329,26 @@ export async function buildRuntimeObservabilityIndex(
       append(taskEvents, receipt.delegation.childTaskId, event.eventId);
       append(agentEvents, receipt.authority.rootAgentId, event.eventId);
       append(agentEvents, receipt.delegation.childAgentId, event.eventId);
+    } else if (event.type === "parent.artifact_disposition_recorded") {
+      const receipt = event.data.dispositionReceipt;
+      append(reportEvents, receipt.report.reportId, event.eventId);
+      append(taskEvents, receipt.parent.taskId, event.eventId);
+      append(taskEvents, receipt.child.taskId, event.eventId);
+      append(agentEvents, receipt.parent.agentId, event.eventId);
+      append(agentEvents, receipt.child.agentId, event.eventId);
+    } else if (event.type === "parent.artifact_read_started") {
+      append(taskEvents, event.data.request.parentTaskId, event.eventId);
+      append(agentEvents, event.data.request.parentAgentId, event.eventId);
+    } else if (event.type === "parent.artifact_read_completed" || event.type === "parent.artifact_read_failed") {
+      const read = state.parentArtifactReads[event.data.operationId];
+      append(taskEvents, read?.parentTaskId ?? null, event.eventId);
+      append(agentEvents, read?.parentAgentId ?? null, event.eventId);
     } else if (event.type === "artifact.recorded") {
       const artifact = event.data.artifact;
       if (artifact.origin.kind === "media_operation" || artifact.origin.kind === "media_observation") {
         append(operationEvents, artifact.origin.operationId, event.eventId);
         append(operationArtifacts, artifact.origin.operationId, artifact.id);
-      } else if (artifact.origin.kind === "worker_output") {
+      } else if (artifact.origin.kind === "worker_output" || artifact.origin.kind === "study_report") {
         append(executionEvents, artifact.origin.executionId, event.eventId);
         append(executionArtifacts, artifact.origin.executionId, artifact.id);
       }

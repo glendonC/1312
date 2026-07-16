@@ -9,6 +9,7 @@ import { applySemanticEvidenceEvent } from "./projection/semanticEvidenceEvents.
 import { applyReviewEvent } from "./projection/reviewEvents.ts";
 import { invariant } from "./projection/shared.ts";
 import { applyTaskEvent } from "./projection/taskEvents.ts";
+import { applyStudyReportEvent } from "./projection/studyReportEvents.ts";
 
 export function initialRuntimeProjection(runId: string): RuntimeProjection {
   if (!runId.trim()) throw new Error("Runtime projection requires a run id");
@@ -37,6 +38,9 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     modelUsage: {},
     reports: {},
     rootOutputDispositions: {},
+    parentArtifactDispositions: {},
+    parentArtifactReadGrants: {},
+    parentArtifactReads: {},
   };
 }
 
@@ -59,6 +63,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
   if (applyReviewEvent(next, event)) return next;
   if (applyCaptionEvent(next, event)) return next;
   if (applyReportEvent(next, event)) return next;
+  if (applyStudyReportEvent(next, event)) return next;
 
   invariant(false, event, "unknown runtime event");
 }

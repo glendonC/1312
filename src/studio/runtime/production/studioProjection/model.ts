@@ -370,6 +370,53 @@ export interface ProductionStudioReportView {
   decisionReason: string | null;
 }
 
+export interface ProductionStudioStudyReportView {
+  reportId: string;
+  artifactId: string;
+  contentId: string;
+  jobContextId: string;
+  outputSlot: { name: string; artifactKind: "studio.study-report.v1" };
+  coverage: import("../model.ts").StudyCoverageRange[];
+  counts: import("../model.ts").StudyReportCounts;
+  claims: import("../model.ts").StudyClaim[];
+  sourceArtifacts: Array<{ artifactId: string; contentId: string }>;
+  reportStatus: "submitted" | "accepted" | "rejected";
+  disposition: {
+    state: "absent" | "accepted" | "rejected";
+    dispositionId: string | null;
+    receiptId: string | null;
+    receiptContentId: string | null;
+  };
+  admission: {
+    state: "absent" | "admitted";
+    admissionId: string | null;
+    receiptId: string | null;
+    receiptContentId: string | null;
+    grant: import("../model.ts").ParentArtifactReadGrant | null;
+  };
+  reads: Array<{
+    operationId: string;
+    status: "started" | "completed" | "failed";
+    returnedBytes: number | null;
+    returnedItems: number | null;
+    receiptId: string | null;
+    failure: string | null;
+  }>;
+  audit: "not_checked" | "verified_on_reopen" | "absent_or_invalid";
+}
+
+export interface ProductionStudioStudyReportStateView {
+  taskId: string;
+  agentId: string;
+  parentTaskId: string | null;
+  parentAgentId: string | null;
+  outputSlot: { name: string; artifactKind: "studio.study-report.v1" };
+  state: "absent" | "submitted" | "accepted" | "rejected" | "failed" | "withheld" | "interrupted";
+  reportId: string | null;
+  artifactId: string | null;
+  reason: string | null;
+}
+
 export interface ProductionStudioSpawnView {
   requestId: string;
   requestedByTaskId: string;
@@ -557,6 +604,8 @@ export interface ProductionStudioProjection {
   workers: ProductionStudioWorkerView[];
   grants: ProductionStudioGrantView[];
   reports: ProductionStudioReportView[];
+  studyReports: ProductionStudioStudyReportView[];
+  studyReportStates: ProductionStudioStudyReportStateView[];
   spawnRequests: ProductionStudioSpawnView[];
   taskLaunches: ProductionStudioTaskLaunchView[];
   reportWaits: ProductionStudioReportsWaitView[];
@@ -588,6 +637,8 @@ export interface ProductionStudioProjection {
     grants: number;
     executions: number;
     reports: number;
+    studyReports: number;
+    studyReportStates: number;
     spawnRequests: number;
     taskLaunches: number;
     reportWaits: number;

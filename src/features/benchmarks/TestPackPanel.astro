@@ -1,7 +1,25 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import { difficultyGroups, report, roleLabels } from "./model";
+import { captureReceipt, freezeReceipt, packClips, roleLabels } from "./model";
 import { sectionCopy } from "./sections";
+
+const packFacts = [
+  {
+    index: "01",
+    title: "Frozen before capture",
+    description: `${freezeReceipt.pack_id} froze on ${freezeReceipt.frozen_at}. run-007 declares capture-after-freeze.`,
+  },
+  {
+    index: "02",
+    title: "One real-media score",
+    description: `${captureReceipt.clip.id} is a ${captureReceipt.clip.duration_s}-second Korean-to-English clip captured on ${captureReceipt.captured_at}.`,
+  },
+  {
+    index: "03",
+    title: "Controls stop at gold",
+    description: "Both local-eval clips have frozen gold and adjudication receipts, but no system output or score receipt.",
+  },
+];
 ---
 
 <section
@@ -17,38 +35,37 @@ import { sectionCopy } from "./sections";
     <SectionLede copy={sectionCopy.pack} />
 
     <div class="section-body">
-      <div class="clip-reel" aria-label="Planned Korean media clip slots">
-        {report.pack.clips.map((clip, index) => (
-          <article class:list={["clip-frame", clip.source ? "has-source" : "needs-source"]}>
+      <div class="clip-reel" aria-label="Frozen hard-ko-v1 clips">
+        {packClips.map((clip) => (
+          <article class:list={["clip-frame", clip.scored ? "has-source" : "frozen-only"]}>
             <div class="clip-frame-top">
-              <span class="clip-number">{String(index + 1).padStart(2, "0")}</span>
-              <span class:list={["state-chip", clip.source ? "state-ready" : "state-missing"]}>
-                <span aria-hidden="true">{clip.source ? "✓" : "▨"}</span>
-                {clip.source ? "Source acquired" : "Not sourced"}
+              <span class="clip-number">{clip.index}</span>
+              <span class:list={["state-chip", clip.scored ? "state-measured" : "state-ready"]}>
+                <span aria-hidden="true">{clip.scored ? "●" : "✓"}</span>
+                {clip.scored ? "Scored once" : "Gold frozen"}
               </span>
             </div>
             <div class="clip-frame-body">
               <span>{roleLabels[clip.role] ?? clip.role}</span>
-              <h3>{clip.domain_target}</h3>
-              <p>{clip.target_duration_s.min}–{clip.target_duration_s.max} seconds</p>
+              <h3>{clip.label}</h3>
+              <p>{clip.durationS ? `${clip.durationS} seconds · run-007` : "Not run · not scored"}</p>
             </div>
-            <ul class="tag-list" aria-label={`${clip.domain_target} target phenomena`}>
-              {clip.phenomenon_targets.map((phenomenon) => <li>{phenomenon.replaceAll("-", " ")}</li>)}
+            <ul class="tag-list" aria-label={`${clip.label} evidence state`}>
+              <li>{clip.clip_id}</li>
+              <li>frozen gold</li>
+              <li>{clip.scored ? "human output labels" : "outputs missing"}</li>
             </ul>
           </article>
         ))}
       </div>
 
-      <div class="difficulty-stack" aria-label="What the clips are chosen to stress">
-        {difficultyGroups.map((group) => (
+      <div class="difficulty-stack" aria-label="What the frozen pack currently proves">
+        {packFacts.map((fact) => (
           <article>
-            <span>{group.index}</span>
+            <span>{fact.index}</span>
             <div>
-              <h3>{group.title}</h3>
-              <p>{group.description}</p>
-              <ul class="tag-list">
-                {group.tags.map((tag) => <li>{tag.replaceAll("-", " ")}</li>)}
-              </ul>
+              <h3>{fact.title}</h3>
+              <p>{fact.description}</p>
             </div>
           </article>
         ))}

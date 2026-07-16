@@ -1,6 +1,6 @@
 ---
 import Instrument from "./Instrument.astro";
-import { benchmarkCopy, report } from "./model";
+import { benchmarkCopy, publicationNotes, scoreReceipt } from "./model";
 import "./styles/index.css";
 ---
 
@@ -36,10 +36,12 @@ import "./styles/index.css";
 
       <div class="bench-boundary-notes">
         <span class="bench-boundary-eyebrow">Report notes</span>
-        <ul>{report.notes.map((note) => <li>{note}</li>)}</ul>
+        <ul>{publicationNotes.map((note) => <li>{note}</li>)}</ul>
       </div>
 
-      <p class="bench-boundary-demo">{benchmarkCopy.demoBoundary}</p>
+      <p class="bench-boundary-demo">
+        <strong>{scoreReceipt.run}</strong> · scored {scoreReceipt.scored_at}. {benchmarkCopy.demoBoundary}
+      </p>
     </div>
 
     <button
@@ -50,7 +52,7 @@ import "./styles/index.css";
       aria-controls="bench-boundary-panel"
     >
       <span class="bench-boundary-dot" aria-hidden="true">i</span>
-      <span class="bench-boundary-trigger-label">Why no numbers yet</span>
+      <span class="bench-boundary-trigger-label">Evidence boundary</span>
     </button>
   </div>
 </main>

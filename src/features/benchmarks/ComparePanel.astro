@@ -1,7 +1,27 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import { comparisonNotes, report, resultBySystem, roleLabels, statusLabels } from "./model";
+import { comparisonConditions, roleLabels, scoreReceipt } from "./model";
 import { sectionCopy } from "./sections";
+
+const prepped = scoreReceipt.systems["1321-prepped"].headline;
+const cold = scoreReceipt.systems["1321-cold"].headline;
+const comparisonNotes = [
+  {
+    index: "01",
+    title: "The measured comparison",
+    copy: `Prepared and cold share the frozen hard clip and ${cold.critical_meaning.total}-unit denominator. Cold leads critical meaning on this run.`,
+  },
+  {
+    index: "02",
+    title: "What abstention means",
+    copy: `Prepared withheld ${prepped.critical_outcomes.withheld} of ${prepped.critical_outcomes.total} units. Those units are kept separate and are not credited as meaning-preserved.`,
+  },
+  {
+    index: "03",
+    title: "What is not comparable yet",
+    copy: "There is no local-control score, YouTube auto receipt, or repeat-run series to compare.",
+  },
+];
 ---
 
 <section
@@ -18,36 +38,32 @@ import { sectionCopy } from "./sections";
 
     <div class="section-body">
       <div class="same-reel-rule">
-        <span>Same frozen clips</span>
+        <span>Same scored hard clip</span>
         <span aria-hidden="true">──────────────────</span>
-        <span>Different allowed inputs</span>
+        <span>Prepared vs cold only</span>
       </div>
 
-      <div class="condition-board" aria-label="Planned comparison conditions">
-        {report.systems.map((system, index) => {
-          const result = resultBySystem.get(system.id);
-          const measured = result?.status === "scored";
-          return (
-            <article data-system-role={system.role}>
-              <div class="condition-topline">
-                <span>[{String(index + 1).padStart(2, "0")}]</span>
-                <span class:list={["state-chip", measured ? "state-measured" : "state-planned"]}>
-                  <span aria-hidden="true">{measured ? "●" : "○"}</span>
-                  {measured ? "Measured" : statusLabels[system.status] ?? system.status}
-                </span>
-              </div>
-              <span class="condition-role">{roleLabels[system.role] ?? system.role}{system.required ? " · required" : " · optional"}</span>
-              <h3>{system.label}</h3>
-              <ul class="tag-list" aria-label={`${system.label} allowed inputs`}>
-                {system.input_modalities.map((input) => <li>{input.replaceAll("-", " ")}</li>)}
-              </ul>
-              <p>{system.version ?? "Version not pinned"}<span>{system.capture_date ?? "No capture date"}</span></p>
-            </article>
-          );
-        })}
+      <div class="condition-board" aria-label="Measured and missing comparison conditions">
+        {comparisonConditions.map((condition, index) => (
+          <article data-system-role={condition.role}>
+            <div class="condition-topline">
+              <span>[{String(index + 1).padStart(2, "0")}]</span>
+              <span class:list={["state-chip", condition.status === "measured" ? "state-measured" : "state-missing"]}>
+                <span aria-hidden="true">{condition.status === "measured" ? "●" : "▨"}</span>
+                {condition.statusLabel}
+              </span>
+            </div>
+            <span class="condition-role">{roleLabels[condition.role] ?? condition.role}</span>
+            <h3>{condition.label}</h3>
+            <ul class="tag-list" aria-label={`${condition.label} evidence or inputs`}>
+              {condition.inputs.map((input) => <li>{input}</li>)}
+            </ul>
+            <p><span>{condition.meta}</span></p>
+          </article>
+        ))}
       </div>
 
-      <div class="comparison-notes" aria-label="Why these conditions are compared">
+      <div class="comparison-notes" aria-label="How to read the comparison">
         {comparisonNotes.map((note) => (
           <article>
             <span>{note.index}</span>

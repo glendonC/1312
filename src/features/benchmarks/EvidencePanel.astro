@@ -1,6 +1,6 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import { report } from "./model";
+import { evidenceRows } from "./model";
 import { sectionCopy } from "./sections";
 ---
 
@@ -20,32 +20,33 @@ import { sectionCopy } from "./sections";
       <div class="evidence-board">
         <div class="board-summary">
           <div>
-            <strong>{report.pack.target_clip_count}</strong>
-            <span>clip slots</span>
+            <strong>1</strong>
+            <span>scored clip</span>
           </div>
-          <p>Planned targets, not acquired clips.</p>
+          <p>One hard clip is scored. Two frozen controls remain unrun.</p>
         </div>
 
-        <div class="evidence-matrix" role="table" aria-label="Evidence readiness by clip slot">
+        <div class="evidence-matrix" role="table" aria-label="Evidence readiness by frozen clip">
           <div class="matrix-row matrix-head" role="row">
-            <span role="columnheader">Slot</span>
-            <span role="columnheader">Plan</span>
+            <span role="columnheader">Clip</span>
             <span role="columnheader">Source</span>
-            <span role="columnheader">Answer key</span>
-            <span role="columnheader">Review</span>
+            <span role="columnheader">Gold</span>
+            <span role="columnheader">Capture</span>
+            <span role="columnheader">Labels</span>
+            <span role="columnheader">Score</span>
           </div>
-          {report.pack.clips.map((clip, index) => {
-            const isGoldReady = clip.status === "gold_ready" || clip.status === "frozen";
-            return (
-              <div class="matrix-row" role="row">
-                <span class="matrix-label" role="rowheader">{String(index + 1).padStart(2, "0")}</span>
-                <span class="matrix-cell is-planned" role="cell" aria-label="Slot planned">○</span>
-                <span class:list={["matrix-cell", clip.source ? "is-ready" : "is-missing"]} role="cell" aria-label={clip.source ? "Source ready" : "Source missing"}>{clip.source ? "✓" : ""}</span>
-                <span class:list={["matrix-cell", isGoldReady ? "is-ready" : "is-missing"]} role="cell" aria-label={isGoldReady ? "Answer key ready" : "Answer key missing"}>{isGoldReady ? "✓" : ""}</span>
-                <span class:list={["matrix-cell", clip.annotations.reviewed ? "is-ready" : "is-missing"]} role="cell" aria-label={clip.annotations.reviewed ? "Review ready" : "Review missing"}>{clip.annotations.reviewed ? "✓" : ""}</span>
-              </div>
-            );
-          })}
+          {evidenceRows.map((row) => (
+            <div class="matrix-row" role="row">
+              <span class="matrix-label" role="rowheader">{row.label}</span>
+              {(["source", "gold", "capture", "labels", "score"] as const).map((field) => (
+                <span
+                  class:list={["matrix-cell", row[field] ? "is-ready" : "is-missing"]}
+                  role="cell"
+                  aria-label={`${row.label} ${field}: ${row[field] ? "ready" : "missing"}`}
+                >{row[field] ? "✓" : ""}</span>
+              ))}
+            </div>
+          ))}
         </div>
       </div>
     </div>

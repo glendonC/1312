@@ -1,12 +1,12 @@
 ---
-import { benchmarkCopy, report } from "./model";
+import { benchmarkCopy, publicationNotes } from "./model";
 ---
 
 <footer class="bench-footer">
   <p><strong>Evidence boundary.</strong> {benchmarkCopy.evidenceBoundary} {benchmarkCopy.publicationRule}</p>
   <details>
     <summary>Report notes</summary>
-    <ul>{report.notes.map((note) => <li>{note}</li>)}</ul>
+    <ul>{publicationNotes.map((note) => <li>{note}</li>)}</ul>
     <p>{benchmarkCopy.demoBoundary}</p>
   </details>
 </footer>

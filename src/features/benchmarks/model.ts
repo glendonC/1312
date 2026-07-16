@@ -1,7 +1,13 @@
-import reportData from "../../../bench/examples/unscored-report.json";
+import { createHash } from "node:crypto";
+import captureData from "../../../bench/runs/run-007/capture.json";
+import captureRaw from "../../../bench/runs/run-007/capture.json?raw";
+import freezeData from "../../../bench/packs/hard-ko-v1/freeze.json";
+import freezeRaw from "../../../bench/packs/hard-ko-v1/freeze.json?raw";
+import labelsData from "../../../bench/reviews/labels/run-007.json";
+import labelsRaw from "../../../bench/reviews/labels/run-007.json?raw";
+import scoreData from "../../../bench/scores/run-007/score.json";
+import scoreRaw from "../../../bench/scores/run-007/score.json?raw";
 import {
-  annotationRequirements,
-  artifactContract,
   benchmarkCopy,
   displayNumber,
   displayRate,
@@ -12,11 +18,7 @@ import {
   supportLabels,
 } from "./content";
 
-export const report = reportData;
-
 export {
-  annotationRequirements,
-  artifactContract,
   benchmarkCopy,
   displayNumber,
   displayRate,
@@ -27,28 +29,66 @@ export {
   supportLabels,
 };
 
-export const statusLabels: Record<string, string> = {
-  protocol_draft: "Protocol draft",
-  gold_frozen: "Gold frozen",
-  scored: "Scored report",
-  planned: "Planned",
-  sourced: "Source acquired",
-  annotated: "Annotation in progress",
-  gold_ready: "Gold ready",
-  frozen: "Frozen",
-  not_run: "Not run",
-  captured: "Captured",
-  reviewed: "Reviewed",
-};
+export const captureReceipt = captureData;
+export const freezeReceipt = freezeData;
+export const labelsReceipt = labelsData;
+export const scoreReceipt = scoreData;
 
-export const roleLabels: Record<string, string> = {
-  subject: "System under test",
-  internal_control: "Cold control",
-  public_foil: "Public tool",
-  optional_baseline: "Open baseline",
-  control: "Control",
-  hard: "Hard case",
-};
+function fileContentId(raw: string): string {
+  return `sha256:${createHash("sha256").update(raw).digest("hex")}`;
+}
+
+export const receiptContentIds = {
+  capture: fileContentId(captureRaw),
+  freeze: fileContentId(freezeRaw),
+  labels: fileContentId(labelsRaw),
+  score: fileContentId(scoreRaw),
+} as const;
+
+function requireReceiptLink(condition: boolean, message: string): void {
+  if (!condition) throw new Error(`run-007 public evidence binding failed: ${message}`);
+}
+
+// These checks make the public page fail closed if any imported receipt stops
+// pointing at the same pack, clip, run, capture bytes, or label bytes.
+requireReceiptLink(scoreReceipt.run === captureReceipt.capture_id, "score and capture run IDs differ");
+requireReceiptLink(scoreReceipt.run === labelsReceipt.run, "score and labels run IDs differ");
+requireReceiptLink(scoreReceipt.pack_id === freezeReceipt.pack_id, "score and freeze pack IDs differ");
+requireReceiptLink(scoreReceipt.pack_id === labelsReceipt.pack_id, "score and labels pack IDs differ");
+requireReceiptLink(scoreReceipt.clip_id === captureReceipt.clip.id, "score and capture clip IDs differ");
+requireReceiptLink(scoreReceipt.clip_id === labelsReceipt.clip_id, "score and labels clip IDs differ");
+requireReceiptLink(
+  scoreReceipt.bindings.capture.content_id === labelsReceipt.capture.content_id,
+  "score and labels bind different capture bytes",
+);
+requireReceiptLink(
+  scoreReceipt.bindings.capture.content_id === receiptContentIds.capture,
+  "score capture binding does not match capture.json bytes",
+);
+requireReceiptLink(
+  scoreReceipt.bindings.labels.content_id === receiptContentIds.labels,
+  "score labels binding does not match run-007.json bytes",
+);
+requireReceiptLink(
+  scoreReceipt.bindings.freeze.content_id === receiptContentIds.freeze,
+  "score freeze binding does not match freeze.json bytes",
+);
+requireReceiptLink(
+  scoreReceipt.bindings.capture.path === labelsReceipt.capture.path,
+  "score and labels bind different capture paths",
+);
+requireReceiptLink(
+  scoreReceipt.preregistration.frozen_at === freezeReceipt.frozen_at,
+  "score preregistration timestamp differs from freeze",
+);
+requireReceiptLink(scoreReceipt.preregistration.capture_after_freeze, "capture is not declared post-freeze");
+requireReceiptLink(labelsReceipt.blinded, "output labels are not blinded");
+requireReceiptLink(
+  scoreReceipt.delta_vs_cold.subject === "1321-prepped" &&
+    scoreReceipt.delta_vs_cold.internal_control === "1321-cold",
+  "delta system IDs do not match the published comparison",
+);
+requireReceiptLink(scoreReceipt.delta_vs_cold.critical_meaning_rate < 0, "receipt no longer shows cold leading");
 
 export const tabs = [
   { id: "overview", label: "Overview", n: "00", color: "ink" },
@@ -60,113 +100,181 @@ export const tabs = [
   { id: "receipts", label: "Receipts", n: "06", color: "peach" },
 ] as const;
 
-export const sourcedClips = report.pack.clips.filter((clip) => clip.source !== null).length;
-export const goldReadyClips = report.pack.clips.filter(
-  (clip) => clip.status === "gold_ready" || clip.status === "frozen",
-).length;
-export const completedRuns = report.results.filter((result) => result.status === "scored").length;
-export const reviewedRuns = report.results.filter(
-  (result) => result.status === "reviewed" || result.status === "scored",
-).length;
-export const totalAnnotationFields = report.pack.clips.reduce(
-  (sum, clip) => sum + Object.keys(clip.annotations).length,
-  0,
-);
-export const completeAnnotationFields = report.pack.clips.reduce(
-  (sum, clip) => sum + Object.values(clip.annotations).filter(Boolean).length,
-  0,
-);
-export const readyArtifacts = artifactContract.filter((artifact) => artifact.state === "ready").length;
-export const missingArtifacts = artifactContract.length - readyArtifacts;
-export const reportIsScored = report.status === "scored" && completedRuns === report.systems.length;
-export const resultBySystem = new Map(report.results.map((result) => [result.system_id, result]));
+export const roleLabels: Record<string, string> = {
+  subject: "System under test",
+  internal_control: "Cold control",
+  public_foil: "Public tool",
+  control: "Control clip",
+  hard: "Hard clip",
+};
 
-const subjectSystem = report.systems.find((system) => system.role === "subject");
-const subjectResult = subjectSystem ? resultBySystem.get(subjectSystem.id) : undefined;
+export const scoredSystems = Object.entries(scoreReceipt.systems).map(([id, result]) => ({
+  id,
+  label: id === "1321-prepped" ? "1321 prepared" : "1321 cold",
+  role: result.role,
+  result,
+  capture: captureReceipt.systems.find((system) => system.id === id),
+}));
 
-export const heroValue = reportIsScored
-  ? displayRate(subjectResult?.headline.critical_meaning.rate ?? null)
-  : "";
-export const heroValueLabel = reportIsScored ? "Critical meaning preserved" : "Not measured";
+export const resultBySystem = new Map(scoredSystems.map((system) => [system.id, system.result]));
 
-export const progressStages = [
-  { label: "Draft", state: "current", meta: "Current" },
-  { label: "Source", state: sourcedClips === report.pack.target_clip_count ? "complete" : "future", meta: `${sourcedClips}/${report.pack.target_clip_count}` },
-  { label: "Freeze", state: goldReadyClips === report.pack.target_clip_count ? "complete" : "future", meta: `${goldReadyClips}/${report.pack.target_clip_count}` },
-  { label: "Run", state: completedRuns === report.systems.length ? "complete" : "future", meta: `${completedRuns}/${report.systems.length}` },
-  { label: "Review", state: reviewedRuns === report.systems.length ? "complete" : "future", meta: `${reviewedRuns}/${report.systems.length}` },
-  { label: "Publish", state: reportIsScored ? "complete" : "future", meta: reportIsScored ? "Live" : "Locked" },
+export const packClips = freezeReceipt.clips.map((clip, index) => {
+  const isScoredClip = clip.clip_id === scoreReceipt.clip_id;
+  return {
+    ...clip,
+    index: String(index + 1).padStart(2, "0"),
+    isScoredClip,
+    label: isScoredClip
+      ? "Didi's Korean Culture Podcast"
+      : `Local evaluation control ${String(index + 1).padStart(2, "0")}`,
+    durationS: isScoredClip ? captureReceipt.clip.duration_s : null,
+    captured: isScoredClip,
+    outputLabeled: isScoredClip,
+    scored: isScoredClip,
+  };
+});
+
+export const evidenceRows = packClips.map((clip) => ({
+  id: clip.clip_id,
+  label: clip.isScoredClip ? "Hard 01" : `Control ${clip.index}`,
+  source: true,
+  gold: true,
+  capture: clip.captured,
+  labels: clip.outputLabeled,
+  score: clip.scored,
+}));
+
+export const comparisonConditions = [
+  ...scoredSystems.map((system) => ({
+    id: system.id,
+    label: system.label,
+    role: system.role,
+    status: "measured" as const,
+    statusLabel: "Scored on run-007",
+    inputs: system.id === "1321-prepped" ? ["prepared context", "cross-check ASR", "gates"] : ["audio", "shared windows", "no gates"],
+    meta: `${captureReceipt.captured_at} · ${scoreReceipt.clip_id}`,
+  })),
+  {
+    id: "local-eval-controls",
+    label: "Local-eval controls",
+    role: "control",
+    status: "missing" as const,
+    statusLabel: "Not run / not scored",
+    inputs: ["2 frozen clips", "gold ready"],
+    meta: "No output receipt",
+  },
+  {
+    id: "youtube-auto",
+    label: "YouTube auto condition",
+    role: "public_foil",
+    status: "missing" as const,
+    statusLabel: "Not captured / not scored",
+    inputs: ["same hard clip", "public condition"],
+    meta: "No receipt",
+  },
+];
+
+export const publicationNotes = [
+  `This is one scored hard clip from ${scoreReceipt.run}, not a completed ${scoreReceipt.pack_id} pack result.`,
+  `The ${freezeReceipt.clips.filter((clip) => clip.role === "control").length} local-eval controls are frozen, but neither has been run or scored.`,
+  "No YouTube auto condition has been captured or scored.",
+  "No Run 2+ series exists yet; run-007 is one non-deterministic sample.",
+  "The Studio run-006 replay remains a synthetic planted-error demo and is not this pack's score.",
+];
+
+export const missingEvidence = [
+  {
+    label: "Local-eval controls",
+    detail: "2 frozen control clips · 0 run · 0 scored",
+  },
+  {
+    label: "YouTube auto condition",
+    detail: "No dated output, labels, or score receipt",
+  },
+  {
+    label: "Run 2+ series",
+    detail: "No repeat-run receipt; variance is not measured",
+  },
 ] as const;
 
-export const difficultyGroups = [
+export const receiptFiles = [
   {
-    index: "01",
-    title: "Hear the speech",
-    description: "Fast delivery, overlap, music, and dialect test whether the Korean can be recovered cleanly.",
-    tags: ["fast-speech", "overlap", "music", "dialect"],
+    path: "bench/scores/run-007/score.json",
+    role: "Published score receipt for both run-007 systems",
+    identity: receiptContentIds.score,
+    state: "ready" as const,
   },
   {
-    index: "02",
-    title: "Read the context",
-    description: "Humor, implicature, honorifics, and relationships test what audio alone cannot explain.",
-    tags: ["humor", "implicature", "honorifics", "relationships"],
+    path: scoreReceipt.bindings.capture.path,
+    role: "Pinned real-media capture consumed by the score",
+    identity: scoreReceipt.bindings.capture.content_id,
+    state: "ready" as const,
   },
   {
-    index: "03",
-    title: "Keep specifics intact",
-    description: "Names, numbers, fandom terms, code-switching, and on-screen text test exact meaning.",
-    tags: ["names", "numbers", "fandom-terms", "code-switch", "on-screen-text"],
+    path: scoreReceipt.bindings.labels.path,
+    role: "Blinded human output labels consumed by the score",
+    identity: scoreReceipt.bindings.labels.content_id,
+    state: "ready" as const,
+  },
+  {
+    path: scoreReceipt.bindings.freeze.path,
+    role: "Frozen hard-ko-v1 pack receipt",
+    identity: scoreReceipt.bindings.freeze.content_id,
+    state: "ready" as const,
+  },
+  {
+    path: "bench/scores/<local-eval-run>/score.json",
+    role: "Scores for both frozen local-eval control clips",
+    identity: "No receipt",
+    state: "missing" as const,
+  },
+  {
+    path: "bench/runs/<youtube-auto-run>/",
+    role: "Dated YouTube auto output, labels, and score",
+    identity: "No receipt",
+    state: "missing" as const,
+  },
+  {
+    path: "bench/scores/<run-2-plus>/score.json",
+    role: "Repeat-run series for run variance",
+    identity: "No receipt",
+    state: "missing" as const,
   },
 ] as const;
 
-export const comparisonNotes = [
-  {
-    index: "01",
-    title: "Preparation effect",
-    copy: "Prepared versus cold keeps the 1321 stack comparable while changing the context it may use.",
-  },
-  {
-    index: "02",
-    title: "Public reference point",
-    copy: "A date-stamped YouTube capture shows what a familiar public workflow produced on the same media.",
-  },
-  {
-    index: "03",
-    title: "Optional open baseline",
-    copy: "A pinned ASR-to-translation pipeline can provide a reproducible baseline without becoming the headline.",
-  },
-] as const;
+export const readyArtifacts = receiptFiles.filter((artifact) => artifact.state === "ready").length;
+export const missingArtifacts = receiptFiles.length - readyArtifacts;
 
 export const workItems = [
   {
-    label: "Source the five media selections",
-    meta: `${sourcedClips} of ${report.pack.target_clip_count} acquired`,
-    state: sourcedClips === report.pack.target_clip_count ? "ready" : "missing",
-    stateLabel: sourcedClips === report.pack.target_clip_count ? "Ready" : "Missing",
+    label: "Freeze hard-ko-v1",
+    meta: `${freezeReceipt.clips.length} of ${freezeReceipt.clips.length} clip gold files bound · ${freezeReceipt.frozen_at}`,
+    state: "ready",
+    stateLabel: "Ready",
   },
   {
-    label: "Lock the answer key and the key lines",
-    meta: `${completeAnnotationFields} of ${totalAnnotationFields} clip checks complete`,
-    state: goldReadyClips === report.pack.target_clip_count ? "ready" : "missing",
-    stateLabel: goldReadyClips === report.pack.target_clip_count ? "Ready" : "Missing",
+    label: "Capture the hard clip",
+    meta: `${captureReceipt.capture_id} · ${captureReceipt.captured_at} · ${captureReceipt.clip.duration_s} seconds`,
+    state: "measured",
+    stateLabel: "Captured",
   },
   {
-    label: "Capture and score every condition",
-    meta: `${completedRuns} of ${report.systems.length} scored`,
-    state: completedRuns === report.systems.length ? "measured" : "planned",
-    stateLabel: completedRuns === report.systems.length ? "Measured" : "Planned",
+    label: "Complete blinded output review",
+    meta: `${labelsReceipt.reviewers.length} reviewers · labels bound to exact capture bytes`,
+    state: "ready",
+    stateLabel: "Ready",
   },
   {
-    label: "Complete blinded review",
-    meta: `${reviewedRuns} of ${report.systems.length} reviewed`,
-    state: reviewedRuns === report.systems.length ? "ready" : "planned",
-    stateLabel: reviewedRuns === report.systems.length ? "Ready" : "Planned",
+    label: "Score run-007",
+    meta: `Both systems scored across ${scoreReceipt.systems["1321-prepped"].headline.critical_meaning.total} critical units`,
+    state: "measured",
+    stateLabel: "Measured",
   },
   {
-    label: "Publish the scored report and receipts",
-    meta: reportIsScored ? "Versioned report published" : "Unlocks only after review",
-    state: reportIsScored ? "measured" : "planned",
-    stateLabel: reportIsScored ? "Measured" : "Planned",
+    label: "Complete the comparison series",
+    meta: "Local controls, YouTube auto, and Run 2+ remain absent",
+    state: "missing",
+    stateLabel: "Missing",
   },
 ] as const;
 
@@ -180,4 +288,9 @@ export const outcomeClass: Record<string, string> = {
 export function outcomePercent(value: number | null, total: number | null): string {
   if (value === null || total === null || total === 0) return "0%";
   return `${Math.max(0, Math.min(100, (value / total) * 100))}%`;
+}
+
+export function shortIdentity(identity: string): string {
+  const value = identity.replace(/^sha256:/, "");
+  return value.length > 18 ? `${value.slice(0, 12)}…${value.slice(-6)}` : value;
 }

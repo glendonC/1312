@@ -1,12 +1,14 @@
 ---
 import SectionLede from "./SectionLede.astro";
 import {
-  annotationRequirements,
-  artifactContract,
+  freezeReceipt,
+  labelsReceipt,
   missingArtifacts,
+  missingEvidence,
   readyArtifacts,
-  report,
-  supportLabels,
+  receiptFiles,
+  scoreReceipt,
+  shortIdentity,
   workItems,
 } from "./model";
 import { sectionCopy } from "./sections";
@@ -26,13 +28,13 @@ import { sectionCopy } from "./sections";
 
     <div class="section-body">
       <div class="work-ledger">
-        <div class="ledger-heading"><span>Work required</span><span>Current state</span></div>
+        <div class="ledger-heading"><span>Evidence step</span><span>Current state</span></div>
         {workItems.map((item) => (
           <article>
             <span class={`ledger-marker state-${item.state}`} aria-hidden="true"></span>
             <div><h3>{item.label}</h3><p>{item.meta}</p></div>
             <span class={`state-chip state-${item.state}`}>
-              <span aria-hidden="true">{item.state === "ready" ? "✓" : item.state === "measured" ? "●" : item.state === "missing" ? "▨" : "○"}</span>
+              <span aria-hidden="true">{item.state === "ready" ? "✓" : item.state === "measured" ? "●" : "▨"}</span>
               {item.stateLabel}
             </span>
           </article>
@@ -41,42 +43,47 @@ import { sectionCopy } from "./sections";
 
       <div class="receipt-stack">
         <article class="receipt-summary">
-          <span>Required files in place</span>
-          <strong>{readyArtifacts}<small> / {artifactContract.length}</small></strong>
-          <p>{missingArtifacts} required files still need real benchmark data.</p>
+          <span>Evidence receipts present</span>
+          <strong>{readyArtifacts}<small> / {receiptFiles.length}</small></strong>
+          <p>{missingArtifacts} comparison receipts are explicitly absent.</p>
         </article>
 
-        <details class="receipt-details">
-          <summary>Evidence file paths <span>{artifactContract.length}</span></summary>
+        <details class="receipt-details" open>
+          <summary>Receipt bindings and gaps <span>{receiptFiles.length}</span></summary>
           <ul>
-            {artifactContract.map((artifact) => (
+            {receiptFiles.map((artifact) => (
               <li>
-                <span class={`ledger-marker state-${artifact.state === "ready" ? "ready" : "missing"}`} aria-hidden="true"></span>
-                <div><code>{artifact.path}</code><small>{artifact.role}</small></div>
-                <span>{supportLabels[artifact.state]}</span>
+                <span class={`ledger-marker state-${artifact.state}`} aria-hidden="true"></span>
+                <div>
+                  <code>{artifact.path}</code>
+                  <small>{artifact.role}</small>
+                  <small class="receipt-identity">{shortIdentity(artifact.identity)}</small>
+                </div>
+                <span>{artifact.state === "ready" ? "Bound" : "Missing"}</span>
               </li>
             ))}
           </ul>
         </details>
 
         <details class="receipt-details">
-          <summary>What the answer key needs <span>{annotationRequirements.length}</span></summary>
+          <summary>Still outside this score <span>{missingEvidence.length}</span></summary>
           <ul>
-            {annotationRequirements.map((requirement) => (
+            {missingEvidence.map((item) => (
               <li>
-                <span class={`ledger-marker state-${requirement.status === "missing" ? "missing" : "planned"}`} aria-hidden="true"></span>
-                <div><strong>{requirement.label}</strong><small>{requirement.purpose}</small></div>
-                <span>{requirement.status === "missing" ? "Missing" : "Planned"}</span>
+                <span class="ledger-marker state-missing" aria-hidden="true"></span>
+                <div><strong>{item.label}</strong><small>{item.detail}</small></div>
+                <span>Missing</span>
               </li>
             ))}
           </ul>
         </details>
       </div>
 
-      <div class="protocol-strip" aria-label="Protocol decisions">
-        <div><span>Judgment</span><strong>The lines that matter</strong></div>
-        <div><span>Review</span><strong>{report.protocol.minimum_reviewers} blind reviewers + a tiebreaker</strong></div>
-        <div><span>When unsure</span><strong>Held back stays separate</strong></div>
+      <div class="protocol-strip" aria-label="Protocol decisions applied to run-007">
+        <div><span>Judgment</span><strong>{scoreReceipt.systems["1321-prepped"].headline.critical_meaning.total} pre-registered critical units</strong></div>
+        <div><span>Review</span><strong>{labelsReceipt.reviewers.length} blinded reviewers</strong></div>
+        <div><span>Judge</span><strong>{scoreReceipt.judge === null ? "No model grader" : scoreReceipt.judge}</strong></div>
+        <div><span>Freeze</span><strong>{freezeReceipt.frozen_at}</strong></div>
       </div>
     </div>
   </div>

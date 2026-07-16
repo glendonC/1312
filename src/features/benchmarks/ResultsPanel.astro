@@ -3,15 +3,18 @@ import SectionLede from "./SectionLede.astro";
 import {
   displayNumber,
   displayRate,
-  outcomeClass,
+  missingEvidence,
   outcomePercent,
-  outcomeStates,
-  report,
-  reportIsScored,
-  resultBySystem,
   roleLabels,
+  scoreReceipt,
+  scoredSystems,
 } from "./model";
 import { sectionCopy } from "./sections";
+
+const deltaPoints = Math.abs(scoreReceipt.delta_vs_cold.critical_meaning_rate) * 100;
+const preppedMeaning = scoreReceipt.systems["1321-prepped"].headline.critical_meaning;
+const coldMeaning = scoreReceipt.systems["1321-cold"].headline.critical_meaning;
+const preservedUnitGap = coldMeaning.passes - preppedMeaning.passes;
 ---
 
 <section
@@ -27,69 +30,69 @@ import { sectionCopy } from "./sections";
     <SectionLede copy={sectionCopy.results} />
 
     <div class="section-body">
-      {!reportIsScored ? (
-        <>
-          <div class="empty-scorecard" role="note" aria-label="No benchmark result is measured">
-            <div class="empty-score-topline"><span>Lines that matter, preserved</span><span>Awaiting frozen evidence</span></div>
-            <span class="null-hero" aria-hidden="true"></span>
-            <h3>Not measured yet</h3>
-            <p>A single rate appears here only after real clips, a frozen answer key, captured outputs, and blind review exist.</p>
-            <div class="empty-outcome-track" aria-hidden="true"></div>
-            <span class="empty-track-label">No outcome split yet</span>
-            <dl>
-              <div><dt>Lines that matter</dt><dd><span class="null-mark" aria-hidden="true"></span></dd></div>
-              <div><dt>Serious errors shown</dt><dd><span class="null-mark" aria-hidden="true"></span></dd></div>
-              <div><dt>Time to first caption</dt><dd><span class="null-mark" aria-hidden="true"></span></dd></div>
-            </dl>
-          </div>
+      <div class="result-reading" role="note">
+        <span>run-007 · one scored hard clip</span>
+        <strong>Cold leads critical meaning by {preservedUnitGap} of {coldMeaning.total} units.</strong>
+        <p>That is {displayNumber(deltaPoints, { maximumFractionDigits: 1 })} percentage points on this run. It is not a composite winner or a full-pack rank.</p>
+      </div>
 
-          <div class="outcome-key" aria-label="How to read the four outcomes">
-            {outcomeStates.map((outcome, index) => (
-              <article class={outcomeClass[outcome.id]}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <h3>{outcome.label}</h3>
-                <p>{outcome.definition}</p>
-              </article>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div class="scored-results" aria-label="Scored system results">
-          {report.systems.map((system) => {
-            const result = resultBySystem.get(system.id)!;
-            const outcomes = result.headline.critical_outcomes;
-            return (
-              <article class="result-card">
-                <header>
-                  <div><span>{roleLabels[system.role] ?? system.role}</span><h3>{system.label}</h3></div>
-                  <span class="state-chip state-measured"><span aria-hidden="true">●</span>Measured</span>
-                </header>
-                <div class="result-headlines">
-                  <div><strong>{displayRate(result.headline.critical_meaning.rate)}</strong><span>Lines that matter</span></div>
-                  <div><strong>{displayNumber(result.headline.catastrophic.count)}</strong><span>Serious errors</span></div>
-                  <div><strong>{displayNumber(result.headline.latency.first_usable_s, { maximumFractionDigits: 1 })}</strong><span>Seconds to first caption</span></div>
+      <div class="scored-results" aria-label="Scored run-007 system results">
+        {scoredSystems.map((system) => {
+          const headline = system.result.headline;
+          const outcomes = headline.critical_outcomes;
+          return (
+            <article class="result-card">
+              <header>
+                <div><span>{roleLabels[system.role] ?? system.role}</span><h3>{system.label}</h3></div>
+                <span class="state-chip state-measured"><span aria-hidden="true">●</span>Scored</span>
+              </header>
+              <div class="result-headlines">
+                <div>
+                  <strong>{headline.critical_meaning.passes} / {headline.critical_meaning.total}</strong>
+                  <span>Critical meaning preserved</span>
                 </div>
-                <div
-                  class="outcome-bar"
-                  role="img"
-                  aria-label={`${system.label}: ${displayNumber(outcomes.correct)} shown & right, ${displayNumber(outcomes.wrong)} shown & wrong, ${displayNumber(outcomes.withheld)} held back, ${displayNumber(outcomes.missing)} missed`}
-                >
-                  <span class="outcome-correct" style={`width:${outcomePercent(outcomes.correct, outcomes.total)}`}></span>
-                  <span class="outcome-wrong" style={`width:${outcomePercent(outcomes.wrong, outcomes.total)}`}></span>
-                  <span class="outcome-withheld" style={`width:${outcomePercent(outcomes.withheld, outcomes.total)}`}></span>
-                  <span class="outcome-missing" style={`width:${outcomePercent(outcomes.missing, outcomes.total)}`}></span>
+                <div>
+                  <strong>{displayRate(headline.critical_meaning.rate)}</strong>
+                  <span>Same 13-unit denominator</span>
                 </div>
-                <dl class="outcome-values">
-                  <div class="outcome-correct"><dt>Shown &amp; right</dt><dd>{displayNumber(outcomes.correct)}</dd></div>
-                  <div class="outcome-wrong"><dt>Shown &amp; wrong</dt><dd>{displayNumber(outcomes.wrong)}</dd></div>
-                  <div class="outcome-withheld"><dt>Held back</dt><dd>{displayNumber(outcomes.withheld)}</dd></div>
-                  <div class="outcome-missing"><dt>Missed</dt><dd>{displayNumber(outcomes.missing)}</dd></div>
-                </dl>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                <div>
+                  <strong>{headline.catastrophic.count} / {headline.catastrophic.denominator}</strong>
+                  <span>Catastrophic among emitted</span>
+                </div>
+              </div>
+              <div
+                class="outcome-bar"
+                role="img"
+                aria-label={`${system.label}: ${outcomes.correct} correct, ${outcomes.wrong} wrong, ${outcomes.withheld} withheld, ${outcomes.missing} missing`}
+              >
+                <span class="outcome-correct" style={`width:${outcomePercent(outcomes.correct, outcomes.total)}`}></span>
+                <span class="outcome-wrong" style={`width:${outcomePercent(outcomes.wrong, outcomes.total)}`}></span>
+                <span class="outcome-withheld" style={`width:${outcomePercent(outcomes.withheld, outcomes.total)}`}></span>
+                <span class="outcome-missing" style={`width:${outcomePercent(outcomes.missing, outcomes.total)}`}></span>
+              </div>
+              <dl class="outcome-values">
+                <div class="outcome-correct"><dt>Correct</dt><dd>{outcomes.correct}</dd></div>
+                <div class="outcome-wrong"><dt>Wrong</dt><dd>{outcomes.wrong}</dd></div>
+                <div class="outcome-withheld"><dt>Withheld</dt><dd>{outcomes.withheld}</dd></div>
+                <div class="outcome-missing"><dt>Missing</dt><dd>{outcomes.missing}</dd></div>
+              </dl>
+              {system.id === "1321-prepped" && (
+                <p class="result-note">Six withholds explain part of the lower meaning rate. They are not credited as meaning-preserved.</p>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
+      <div class="missing-result-strip" aria-label="Benchmark evidence still missing">
+        {missingEvidence.map((item) => (
+          <article>
+            <span>Missing</span>
+            <strong>{item.label}</strong>
+            <p>{item.detail}</p>
+          </article>
+        ))}
+      </div>
     </div>
   </div>
 </section>

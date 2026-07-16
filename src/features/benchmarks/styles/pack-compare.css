@@ -34,6 +34,11 @@
   background: #e5f1eb;
 }
 
+.clip-frame.frozen-only {
+  border-color: rgba(138, 111, 42, 0.3);
+  background: var(--bench-gold-soft);
+}
+
 .clip-number {
   font-family: var(--font-mono);
   font-size: 0.64rem;
@@ -150,6 +155,7 @@
 }
 
 .condition-board article[data-system-role="internal_control"] { background: var(--bench-blue-soft); }
+.condition-board article[data-system-role="control"] { background: #eef1cd; }
 .condition-board article[data-system-role="public_foil"] { background: var(--bench-coral-soft); }
 .condition-board article[data-system-role="optional_baseline"] { background: #f0e4f2; }
 

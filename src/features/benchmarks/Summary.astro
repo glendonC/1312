@@ -1,39 +1,33 @@
 ---
-import {
-  completedRuns,
-  goldReadyClips,
-  heroValue,
-  heroValueLabel,
-  report,
-  reportIsScored,
-  sourcedClips,
-} from "./model";
+import { freezeReceipt, labelsReceipt, scoreReceipt } from "./model";
+
+const prepped = scoreReceipt.systems["1321-prepped"].headline.critical_meaning;
 ---
 
 <section class="bench-summary" aria-label="Benchmark summary">
   <article class="summary-question">
-    <span>Research question</span>
-    <strong>Does preparation preserve more critical meaning?</strong>
-    <p>Prepared 1321 versus cold, YouTube auto-translate, and an optional open baseline.</p>
+    <span>Observed result</span>
+    <strong>Cold leads critical meaning on run-007.</strong>
+    <p>One scored hard clip. No full-pack or repeat-run claim.</p>
   </article>
   <article>
-    <span>Sources</span>
-    <strong>{sourcedClips}<small> / {report.pack.target_clip_count}</small></strong>
-    <p>Acquired clips</p>
+    <span>Frozen pack</span>
+    <strong>{freezeReceipt.clips.length}</strong>
+    <p>Gold clips</p>
   </article>
   <article>
-    <span>Gold</span>
-    <strong>{goldReadyClips}<small> / {report.pack.target_clip_count}</small></strong>
-    <p>Frozen clips</p>
+    <span>Scored clips</span>
+    <strong>1<small> / {freezeReceipt.clips.length}</small></strong>
+    <p>Hard clip only</p>
   </article>
   <article>
-    <span>Runs</span>
-    <strong>{completedRuns}<small> / {report.systems.length}</small></strong>
-    <p>Scored conditions</p>
+    <span>Review</span>
+    <strong>{labelsReceipt.reviewers.length}</strong>
+    <p>Blinded reviewers</p>
   </article>
-  <article class:list={["summary-performance", reportIsScored && "is-measured"]}>
-    <span>Performance</span>
-    <strong>{heroValue}</strong>
-    <p>{heroValueLabel}</p>
+  <article class="summary-performance is-measured">
+    <span>Prepared meaning</span>
+    <strong>{prepped.passes}<small> / {prepped.total}</small></strong>
+    <p>Critical units preserved</p>
   </article>
 </section>

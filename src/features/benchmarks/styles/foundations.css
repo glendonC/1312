@@ -284,6 +284,13 @@
   color: var(--bench-ink);
 }
 
+.stage.is-missing {
+  border: 1px dashed rgba(120, 47, 40, 0.24);
+  background:
+    repeating-linear-gradient(-45deg, rgba(120, 47, 40, 0.025) 0 6px, transparent 6px 12px),
+    #f2efeb;
+}
+
 /* ---- Status chips shared across panels ---- */
 
 .state-chip,

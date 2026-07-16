@@ -347,7 +347,7 @@
   }
 
   .matrix-row {
-    grid-template-columns: 38px repeat(4, minmax(34px, 1fr));
+    grid-template-columns: 68px repeat(5, minmax(34px, 1fr));
   }
 
   .evidence-facts,
@@ -494,6 +494,10 @@
     font-size: 2.2rem;
   }
 
+  .missing-result-strip {
+    grid-template-columns: 1fr;
+  }
+
   .bench-footer {
     flex-direction: column;
   }
@@ -505,7 +509,7 @@
 
 @media (max-width: 360px) {
   .matrix-row {
-    grid-template-columns: 34px repeat(4, minmax(32px, 1fr));
+    grid-template-columns: 60px repeat(5, minmax(28px, 1fr));
     gap: 5px;
   }
 

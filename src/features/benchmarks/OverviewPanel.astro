@@ -1,24 +1,15 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import {
-  completedRuns,
-  goldReadyClips,
-  report,
-  reviewedRuns,
-  sourcedClips,
-} from "./model";
+import { freezeReceipt, labelsReceipt, scoreReceipt } from "./model";
 import { sectionCopy } from "./sections";
 
-const clips = report.pack.target_clip_count;
-const conditions = report.systems.length;
-
 const stages = [
-  { n: "01", name: "Draft", desc: "Protocol and data contract written.", color: "coral", meta: "Current", done: true, current: true },
-  { n: "02", name: "Source", desc: "Acquire the five hard Korean clips.", color: "citron", meta: `${sourcedClips} / ${clips}`, done: sourcedClips === clips },
-  { n: "03", name: "Freeze", desc: "Lock captions and the answer key.", color: "blue", meta: `${goldReadyClips} / ${clips}`, done: goldReadyClips === clips },
-  { n: "04", name: "Run", desc: "Score all four conditions.", color: "lilac", meta: `${completedRuns} / ${conditions}`, done: completedRuns === conditions },
-  { n: "05", name: "Review", desc: "Blind human rating, no system labels.", color: "teal", meta: `${reviewedRuns} / ${conditions}`, done: reviewedRuns === conditions },
-  { n: "06", name: "Publish", desc: "Versioned scorecard and receipts.", color: "peach", meta: "Locked", done: false },
+  { n: "01", name: "Pack frozen", desc: "Three gold clips bound before the run.", color: "coral", meta: `${freezeReceipt.clips.length} / ${freezeReceipt.clips.length}`, state: "complete" },
+  { n: "02", name: "Hard clip captured", desc: "One real-media run pinned without gold in the capture.", color: "citron", meta: scoreReceipt.run, state: "complete" },
+  { n: "03", name: "Outputs reviewed", desc: "Human output labels were blinded and bound to the exact capture.", color: "blue", meta: `${labelsReceipt.reviewers.length} reviewers`, state: "complete" },
+  { n: "04", name: "Score published", desc: "Prepared and cold scored over the same 13 critical units.", color: "lilac", meta: "1 hard clip", state: "current" },
+  { n: "05", name: "Controls unrun", desc: "The two frozen local-eval controls have no output or score.", color: "teal", meta: "0 / 2", state: "missing" },
+  { n: "06", name: "Series incomplete", desc: "YouTube auto and Run 2+ receipts do not exist yet.", color: "peach", meta: "Missing", state: "missing" },
 ];
 ---
 
@@ -36,7 +27,7 @@ const stages = [
     <div class="section-body">
       <ol class="conveyor" aria-label="How a benchmark gets built, stage by stage">
         {stages.map((stage) => (
-          <li class:list={["stage", `stage-${stage.color}`, stage.current && "is-current"]}>
+          <li class:list={["stage", `stage-${stage.color}`, `is-${stage.state}`]}>
             <span class="stage-n">[{stage.n}]</span>
             <div class="stage-text">
               <h3>{stage.name}</h3>

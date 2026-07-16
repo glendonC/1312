@@ -158,6 +158,7 @@ function registeredGateIds(bundle: RunBundle): Set<string> {
   const ids = new Set<string>();
   for (const gate of bundle.pack.gates) {
     ids.add(gate.id);
+    ids.add(gate.label);
     ids.add(gate.id.slice(gate.id.lastIndexOf(".") + 1));
   }
   return ids;

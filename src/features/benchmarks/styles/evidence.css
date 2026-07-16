@@ -107,7 +107,7 @@
 
 .matrix-row {
   display: grid;
-  grid-template-columns: 58px repeat(4, minmax(40px, 54px));
+  grid-template-columns: 76px repeat(5, minmax(40px, 54px));
   gap: 7px;
   align-items: center;
 }
@@ -129,6 +129,7 @@
 .matrix-label {
   font-family: var(--font-mono);
   font-size: 0.62rem;
+  white-space: nowrap;
 }
 
 .matrix-cell {

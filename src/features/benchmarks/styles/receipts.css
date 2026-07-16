@@ -178,6 +178,11 @@
   line-height: 1.4;
 }
 
+.receipt-details li .receipt-identity {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
 .receipt-details li > span:last-child {
   color: var(--bench-muted);
   font-family: var(--font-mono);
@@ -189,7 +194,7 @@
   margin-top: 14px;
   border-top: 1px solid var(--bench-line-strong);
   border-bottom: 1px solid var(--bench-line-strong);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .protocol-strip div {

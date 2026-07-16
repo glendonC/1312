@@ -2,6 +2,10 @@
 // Left rail mirrors the Method page: title + lede + one muted secondary line.
 // House style: no em dashes.
 
+import captureReceipt from "../../../bench/runs/run-007/capture.json";
+import freezeReceipt from "../../../bench/packs/hard-ko-v1/freeze.json";
+import scoreReceipt from "../../../bench/scores/run-007/score.json";
+
 export interface SectionCopy {
   id: string;
   title: string;
@@ -11,47 +15,51 @@ export interface SectionCopy {
   secondary: string;
 }
 
+const prepped = scoreReceipt.systems["1321-prepped"].headline;
+const cold = scoreReceipt.systems["1321-cold"].headline;
+const controlCount = freezeReceipt.clips.filter((clip) => clip.role === "control").length;
+
 export const sectionCopy: Record<string, SectionCopy> = {
   overview: {
     id: "overview",
     title: "Benchmarks",
-    lede: "Does preparation keep the lines that matter? We test a prepped 1321 run against the same system run cold, and against YouTube’s auto-translation, on the same frozen Korean clips.",
-    secondary: "The test is whether meaning survives, not whether captions sound fluent. No results yet: this page shows the plan and the receipts.",
+    lede: `The first hard-ko-v1 score is in. On ${scoreReceipt.run}'s one scored hard clip, cold preserved more critical meaning than prepared 1321.`,
+    secondary: "This is a one-clip result, not a pack win. Correct, wrong, and withheld stay separate so caution cannot masquerade as quality.",
   },
   evidence: {
     id: "evidence",
     title: "Where the evidence stands",
-    lede: "Every empty cell is intentional. It shows exactly what has to exist before any number can appear.",
-    secondary: "Sourced clips, a frozen answer key, captured runs, then blind review. You can audit the gap yourself instead of trusting a number.",
+    lede: `The pack is frozen. One hard clip has a bound capture, blinded human labels, and a score receipt; the ${controlCount} controls stop at frozen gold.`,
+    secondary: "Every empty cell is a missing artifact, not work inferred from a neighboring receipt.",
   },
   pack: {
     id: "pack",
     title: "The clips we test on",
-    lede: "Five hard Korean clips, chosen to break easy cases: fast speech, overlap, honorifics, names and numbers.",
-    secondary: "Clear controls mixed with real-media failure modes. If it holds up here, it holds up on real video.",
+    lede: `hard-ko-v1 freezes ${freezeReceipt.clips.length} Korean clips: ${controlCount} local-eval controls and one ${captureReceipt.clip.duration_s}-second hard real-media clip.`,
+    secondary: "Only the hard clip has been run and scored. Frozen gold for the controls is not evidence of system quality.",
   },
   compare: {
     id: "compare",
     title: "What we compare against",
-    lede: "Same frozen clips, different allowed inputs, so a comparison can never hide what actually changed.",
-    secondary: "The clips and answer key stay fixed. Only the system and its prep change, because the gap between prepped and cold is the whole point.",
+    lede: "run-007 compares prepared 1321 with its cold internal control on the same hard clip and critical units.",
+    secondary: "The local-eval controls and YouTube auto condition have no output or score receipt. They are not part of this result.",
   },
   results: {
     id: "results",
-    title: "The headline result",
-    lede: "The one number that decides it: of the lines that matter, how many reached English with their meaning intact?",
-    secondary: "Four outcomes stay separate, shown and right, shown and wrong, held back, missed, so caution can’t pass for correctness.",
+    title: "The first honest score",
+    lede: `Cold leads critical meaning on ${scoreReceipt.run}: ${cold.critical_meaning.passes} of ${cold.critical_meaning.total} units preserved, versus ${prepped.critical_meaning.passes} of ${prepped.critical_meaning.total} for prepared 1321.`,
+    secondary: `Prepared withheld ${prepped.critical_outcomes.withheld} units. Withholds avoid some guesses, but they receive no credit for preserving meaning.`,
   },
   methods: {
     id: "methods",
     title: "How we score it",
-    lede: "One headline judgment, backed by standard diagnostics. Nothing becomes a claim without the evidence to earn it.",
-    secondary: "Diagnostics like CER, chrF and COMET locate where it broke. Research-only methods wait for the right data.",
+    lede: `Critical meaning is a human judgment over ${prepped.critical_meaning.total} pre-registered units. Mechanical routing keeps withheld and missing distinct from reviewed output.`,
+    secondary: "No model graded this run. Diagnostics without receipts remain planned, not silently promoted into the score.",
   },
   receipts: {
     id: "receipts",
     title: "The audit trail",
-    lede: "Every score traces back to files anyone can check: source, config, output, runtime, and review.",
-    secondary: "Raw outputs, blinded review labels, and the exact answer key, versioned. You can re-derive our number, or catch us if it’s wrong.",
+    lede: "The score binds the frozen gold, exact capture bytes, and blinded label bytes used for run-007.",
+    secondary: "The ledger also names what does not exist yet, so one valid receipt cannot imply a complete comparison series.",
   },
 };

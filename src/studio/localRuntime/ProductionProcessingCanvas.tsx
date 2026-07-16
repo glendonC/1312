@@ -247,6 +247,7 @@ function WorkerFocus({
   const closeButton = useRef<HTMLButtonElement>(null);
   const worker = workers[index];
   const identity = identities.get(worker.agentId) ?? ORCHESTRATOR_IDENTITY;
+  const workerIsActive = worker.status === "working" || worker.status === "reporting";
 
   useEffect(() => {
     closeButton.current?.focus();
@@ -274,12 +275,17 @@ function WorkerFocus({
             <AgentMark
               identity={identity}
               status={workerAgentStatus(worker)}
-              fieldMotion={worker.status === "working" ? "auto" : "still"}
+              fieldMotion={workerIsActive ? "auto" : "still"}
             />
           </span>
           <span className="processing-kicker">Recorded worker</span>
           <h2 id="processing-focus-title">{worker.label}</h2>
-          <p>{sentence(worker.kind)} · {workerStatusLabel(worker)}</p>
+          <p>
+            {sentence(worker.kind)} ·{" "}
+            <span className={workerIsActive ? "text-shimmer" : undefined}>
+              {workerStatusLabel(worker)}
+            </span>
+          </p>
         </div>
 
         <div className="processing-focus-media" aria-label="Assigned source range">
@@ -453,11 +459,13 @@ export default function ProductionProcessingCanvas({
                       <AgentMark
                         identity={identity}
                         status={workerAgentStatus(worker)}
-                        fieldMotion={worker.status === "working" ? "auto" : "still"}
+                        fieldMotion={activeWorkers.includes(worker) ? "auto" : "still"}
                       />
                     </span>
                     <b>{worker.label}</b>
-                    <small>{workerStatusLabel(worker)}</small>
+                    <small className={activeWorkers.includes(worker) ? "text-shimmer" : undefined}>
+                      {workerStatusLabel(worker)}
+                    </small>
                   </button>
                 );
               })}

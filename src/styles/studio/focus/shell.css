@@ -115,6 +115,16 @@
   color: var(--gold-ink);
 }
 
+.agent-focus-state.text-shimmer {
+  --text-shimmer-base: color-mix(in srgb, var(--agent-current) 66%, var(--ink-muted));
+  --text-shimmer-peak: var(--agent-caustic);
+}
+
+.agent-focus-state.text-shimmer[data-status="gating"] {
+  --text-shimmer-base: var(--gold-ink);
+  --text-shimmer-peak: var(--agent-caustic);
+}
+
 .agent-focus-material-rule,
 .agent-focus-nameplate-rule {
   display: block;

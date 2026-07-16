@@ -249,6 +249,7 @@ test("the development processing fixture exposes honest running state and worker
   await expect(canvas.getByText(/no pause or cancellation command/)).toHaveCount(1);
 
   const worker = canvas.getByRole("button", { name: "Inspect bounded-media-child, Working" });
+  await expect(worker.locator("small")).toHaveClass(/text-shimmer/);
   await worker.click();
   const focus = page.getByRole("dialog", { name: "bounded-media-child" });
   await expect(focus).toBeVisible();
@@ -758,6 +759,7 @@ test("the public Dock pauses and resumes without stopping the run", async ({ pag
 
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await expect(dock).toHaveAttribute("data-paused", "true");
+  await expect(page.locator(".hub .node-state")).not.toHaveClass(/text-shimmer/);
   await expect(page.locator(".dock-status")).toHaveText("Paused");
   const hubMesh = page.locator(".hub .agent-mark-mesh");
   await expect(hubMesh).toHaveAttribute("data-mesh-motion", "still");
@@ -800,6 +802,7 @@ test("the public Dock pauses and resumes without stopping the run", async ({ pag
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await expect(dock).toHaveAttribute("data-paused", "false");
   await expect(hubMesh).toHaveAttribute("data-mesh-motion", "running");
+  await expect(page.locator(".hub .node-state")).toHaveClass(/text-shimmer/);
 
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press(" ");
@@ -894,6 +897,7 @@ test("agent focus presents one bare media stage and one recorded activity narrat
 
   const nameplate = focus.locator(".agent-focus-hero-copy");
   await expect(nameplate.locator(".agent-focus-state")).toContainText("Translating");
+  await expect(nameplate.locator(".agent-focus-state")).not.toHaveClass(/text-shimmer/);
   await expect(nameplate.locator(".agent-focus-role-remit")).toContainText(
     "Drafts the assigned clip window in the target language.",
   );

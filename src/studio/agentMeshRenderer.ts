@@ -104,63 +104,81 @@ const agentFragmentSource = `#version 300 es
     float width = clamp(u_band_width, 0.08, 0.46);
 
     if (u_topology_kind < 0.5) {
-      // Confluence: two broad currents visibly approach and share one outlet.
-      float join = smoothstep(-0.86, 0.72, p.x);
-      float upper = mix(0.42, 0.035, join)
-        + sin(p.x * 1.7 + u_phase.x + cycle * 0.82) * 0.105;
-      float lower = mix(-0.42, -0.035, join)
-        + sin(p.x * 1.55 + u_phase.y - cycle * 0.68) * 0.105;
+      // Confluence: two traveling currents narrow toward a breathing join.
+      float joinEdge = 0.64 + sin(cycle * 0.46 + u_phase.y) * 0.2;
+      float join = smoothstep(-0.88, joinEdge, p.x);
+      float inletBreath = sin(cycle * 0.72 + u_phase.x) * 0.065;
+      float upper = mix(0.46 + inletBreath, 0.025, join)
+        + sin(p.x * 2.05 - cycle * 1.12 + u_phase.x) * 0.14;
+      float lower = mix(-0.46 - inletBreath, -0.025, join)
+        + sin(p.x * 1.88 - cycle * 0.94 + u_phase.y) * 0.13;
       primary = ribbon(abs(p.y - upper), width);
       secondary = ribbon(abs(p.y - lower), width * 0.94);
-      structure = smoothstep(0.28, 0.88, join) * primary * secondary;
+      structure = smoothstep(0.2, 0.82, join) * primary * secondary;
       return;
     }
 
     if (u_topology_kind < 1.5) {
-      // Strata: a small number of deliberate, readable layers rather than noise bands.
-      float upper = p.y + 0.25
-        + sin(p.x * 1.45 + u_phase.x + cycle * 0.48) * 0.065;
-      float lower = p.y - 0.27
-        + sin(p.x * 1.25 + u_phase.y - cycle * 0.38) * 0.075;
+      // Strata: broad layers slide past one another in opposite directions.
+      float layerSlide = sin(cycle * 0.82 + u_phase.x) * 0.14;
+      float upper = p.y + 0.25 + layerSlide
+        + sin(p.x * 1.72 - cycle * 1.08 + u_phase.x) * 0.095;
+      float lower = p.y - 0.27 - layerSlide * 0.82
+        + sin(p.x * 1.48 + cycle * 0.88 + u_phase.y) * 0.1;
       primary = ribbon(abs(upper), width * 1.05);
       secondary = ribbon(abs(lower), width * 0.92);
-      structure = ribbon(abs(p.y + sin(p.x + cycle * 0.3) * 0.035), width * 0.48);
+      structure = ribbon(
+        abs(p.y + sin(p.x * 1.16 - cycle * 0.72) * 0.07),
+        width * 0.48
+      );
       return;
     }
 
     if (u_topology_kind < 2.5) {
-      // Basin: nested masses and a luminous shore, kept broad enough to survive compact nodes.
+      // Basin: two nested masses orbit while the larger shoreline expands and contracts.
       vec2 centreA = vec2(-0.18 + u_phase.x * 0.12, -0.06 + u_phase.y * 0.1);
       vec2 centreB = vec2(0.34 - u_phase.y * 0.08, 0.23 + u_phase.x * 0.08);
       centreA += vec2(
-        sin(cycle * 0.76 + u_phase.y),
-        cos(cycle * 0.62 + u_phase.x)
-      ) * 0.11;
+        cos(cycle * 0.88 + u_phase.y),
+        sin(cycle * 0.88 + u_phase.x)
+      ) * 0.18;
       centreB += vec2(
-        cos(cycle * 0.68 + u_phase.x),
-        sin(cycle * 0.72 + u_phase.y)
-      ) * 0.085;
+        cos(-cycle * 0.7 + u_phase.x),
+        sin(-cycle * 0.7 + u_phase.y)
+      ) * 0.14;
       float distanceA = length((p - centreA) * vec2(0.88, 1.08));
       float distanceB = length((p - centreB) * vec2(1.12, 0.9));
-      primary = 1.0 - smoothstep(0.25 + width * 0.35, 0.82 + width * 0.45, distanceA);
+      float shoreline = 0.5 + sin(cycle * 0.7 + u_phase.x) * 0.065;
+      primary = 1.0 - smoothstep(0.25 + width * 0.35, 0.84 + width * 0.45, distanceA);
       secondary = 1.0 - smoothstep(0.18 + width * 0.28, 0.67 + width * 0.35, distanceB);
-      structure = ribbon(abs(distanceA - (0.48 + sin(cycle * 0.4) * 0.025)), width * 0.68);
+      structure = ribbon(abs(distanceA - shoreline), width * 0.68);
       return;
     }
 
     if (u_topology_kind < 3.5) {
-      // Braid: two independent ribbons cross without dissolving into a single cloudy average.
-      float waveA = sin(p.x * 1.92 + u_phase.x + cycle * 0.7) * 0.22;
-      float waveB = -sin(p.x * 1.92 + u_phase.y + cycle * 0.7) * 0.22;
+      // Braid: ribbons travel in opposite directions, continually changing their crossings.
+      float braidBreath = 0.23 + sin(cycle * 0.58 + u_phase.x) * 0.055;
+      float waveA = sin(p.x * 2.12 + u_phase.x - cycle * 1.32) * braidBreath;
+      float waveB = -sin(p.x * 2.12 + u_phase.y + cycle * 1.06) * braidBreath;
       primary = ribbon(abs(p.y - waveA), width);
       secondary = ribbon(abs(p.y - waveB), width * 0.96);
-      structure = smoothstep(0.18, 0.74, primary * secondary) * 0.56;
+      structure = smoothstep(0.15, 0.7, primary * secondary) * 0.62;
       return;
     }
 
-    // Interference: two low-frequency directional fields produce broad lenses, not pinstripes.
-    float waveA = sin((p.x * 0.92 + p.y * 0.42) * 2.5 + u_phase.x + cycle * 0.54);
-    float waveB = sin((p.y * 0.9 - p.x * 0.48) * 2.35 + u_phase.y - cycle * 0.44);
+    // Interference: counter-rotating fields open and close broad lenses.
+    vec2 fieldA = rotate2d(p, sin(cycle * 0.42 + u_phase.x) * 0.34);
+    vec2 fieldB = rotate2d(p, -sin(cycle * 0.36 + u_phase.y) * 0.3);
+    float waveA = sin(
+      (fieldA.x * 0.92 + fieldA.y * 0.42) * 2.5
+        + u_phase.x
+        + cycle * 1.08
+    );
+    float waveB = sin(
+      (fieldB.y * 0.9 - fieldB.x * 0.48) * 2.35
+        + u_phase.y
+        - cycle * 0.92
+    );
     primary = smoothstep(-0.28, 0.62, waveA);
     secondary = smoothstep(-0.24, 0.66, waveB);
     structure = smoothstep(0.34, 0.82, primary * secondary);
@@ -176,7 +194,9 @@ const agentFragmentSource = `#version 300 es
     ) * u_scale;
     composedPoint += u_phase * 0.12;
 
-    float cycle = (u_time / max(u_drift_seconds, 1.0)) * TAU;
+    // Identity geometry still sets the cadence. A shorter cycle lets each
+    // topology's own movement register at compact node sizes.
+    float cycle = (u_time / max(u_drift_seconds * 0.5, 1.0)) * TAU;
     vec2 seedOffset = vec2(
       fract(u_seed * 0.013),
       fract(u_seed * 0.021)
@@ -185,11 +205,7 @@ const agentFragmentSource = `#version 300 es
     float warpX = fbm(composedPoint * 0.86 + seedOffset + drift);
     float warpY = fbm(composedPoint * 0.86 + seedOffset.yx + vec2(5.2, 1.7) - drift.yx);
     vec2 warpVector = vec2(warpX, warpY) - 0.5;
-    vec2 fieldDrift = vec2(
-      sin(cycle * 0.82 + u_phase.x),
-      cos(cycle * 0.7 + u_phase.y)
-    ) * 0.19;
-    vec2 p = composedPoint + fieldDrift + warpVector * u_warp;
+    vec2 p = composedPoint + warpVector * u_warp;
 
     float primary;
     float secondary;
@@ -198,19 +214,51 @@ const agentFragmentSource = `#version 300 es
     primary = clamp(primary, 0.0, 1.0);
     secondary = clamp(secondary, 0.0, 1.0);
     structure = clamp(structure, 0.0, 1.0);
-    float travelingFlow = smoothstep(
-      -0.72,
-      0.72,
-      sin(dot(p, vec2(1.12, -0.76)) * 1.7 - cycle * 0.92 + u_phase.x * 1.4)
-    );
+    float flowSignal;
+    if (u_topology_kind < 0.5) {
+      flowSignal = sin(p.x * 2.0 - cycle * 1.2 + u_phase.x);
+    } else if (u_topology_kind < 1.5) {
+      flowSignal = sin(p.y * 2.4 + cycle * 0.96 + u_phase.y);
+    } else if (u_topology_kind < 2.5) {
+      flowSignal = sin(length(p - u_phase * 0.08) * 5.2 - cycle * 1.08);
+    } else if (u_topology_kind < 3.5) {
+      flowSignal = sin(p.x * 2.7 - cycle * 1.42 + u_phase.x);
+    } else {
+      flowSignal = sin(dot(p, vec2(1.12, -0.76)) * 2.2 + cycle * 1.24);
+    }
+    float travelingFlow = smoothstep(-0.72, 0.72, flowSignal);
 
     float depthNoise = fbm(p * 1.22 + seedOffset * 0.41 - drift * 0.52);
     float internalOcclusion = smoothstep(0.48, 0.86, depthNoise + (1.0 - max(primary, secondary)) * 0.12);
 
-    vec2 movingCausticPoint = u_caustic_point + vec2(
-      cos(cycle * 0.42 + u_phase.x),
-      sin(cycle * 0.34 + u_phase.y)
-    ) * 0.09;
+    vec2 causticMotion;
+    if (u_topology_kind < 0.5) {
+      causticMotion = vec2(
+        sin(cycle * 0.8 + u_phase.x) * 0.15,
+        cos(cycle * 0.5 + u_phase.y) * 0.045
+      );
+    } else if (u_topology_kind < 1.5) {
+      causticMotion = vec2(
+        sin(cycle * 0.45 + u_phase.x) * 0.035,
+        sin(cycle * 0.86 + u_phase.y) * 0.15
+      );
+    } else if (u_topology_kind < 2.5) {
+      causticMotion = vec2(
+        cos(cycle * 0.82 + u_phase.x),
+        sin(cycle * 0.82 + u_phase.y)
+      ) * 0.15;
+    } else if (u_topology_kind < 3.5) {
+      causticMotion = vec2(
+        sin(cycle * 1.1 + u_phase.x),
+        sin(cycle * 2.2 + u_phase.y)
+      ) * vec2(0.14, 0.08);
+    } else {
+      causticMotion = vec2(
+        cos(cycle * 0.94 + u_phase.x),
+        sin(cycle * 1.24 + u_phase.y)
+      ) * 0.13;
+    }
+    vec2 movingCausticPoint = u_caustic_point + causticMotion;
     float causticDistance = length((uv - movingCausticPoint) * vec2(aspect, 1.0));
     float causticFalloff = 1.0 - smoothstep(0.035, 0.49, causticDistance);
     float causticMask = clamp(
@@ -290,7 +338,6 @@ const agentFragmentSource = `#version 300 es
       * (tightSpecular * 0.42 + broadSpecular * 0.08);
     color += edgeColor * fresnel * (0.13 + transmissionSide * 0.2);
     color += causticColor * fresnel * transmissionSide * 0.12;
-
     color = linearToSrgb(toneMap(color));
 
     // One static, monochrome, pixel-scale grain pass. It never swims with the active field.
@@ -303,7 +350,12 @@ const agentFragmentSource = `#version 300 es
   }
 `;
 
-const THINKING_STATUSES = new Set<AgentStatus>(["spawning", "working", "reporting"]);
+const THINKING_STATUSES = new Set<AgentStatus>([
+  "spawning",
+  "working",
+  "gating",
+  "reporting",
+]);
 
 export function isAgentThinking(status: AgentStatus): boolean {
   return THINKING_STATUSES.has(status);
@@ -336,6 +388,7 @@ function rgb(hex: string): [number, number, number] {
 
 function motionRate(status: AgentStatus): number {
   if (status === "spawning") return 1.3;
+  if (status === "gating") return 0.94;
   if (status === "reporting") return 0.88;
   return 1.08;
 }

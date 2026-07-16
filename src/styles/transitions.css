@@ -11,13 +11,15 @@
 
 /* Shared motion language for work whose duration is unknown. */
 .text-shimmer {
+  --text-shimmer-base: var(--ink-muted);
+  --text-shimmer-peak: var(--ink);
   color: transparent;
   background: linear-gradient(
     100deg,
-    var(--ink-muted) 20%,
-    var(--ink) 42%,
-    var(--ink) 58%,
-    var(--ink-muted) 80%
+    var(--text-shimmer-base) 20%,
+    var(--text-shimmer-peak) 42%,
+    var(--text-shimmer-peak) 58%,
+    var(--text-shimmer-base) 80%
   );
   background-size: 220% 100%;
   background-clip: text;
@@ -81,7 +83,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .text-shimmer {
-    color: var(--ink);
+    color: var(--text-shimmer-base);
     background: none;
     animation: none;
   }

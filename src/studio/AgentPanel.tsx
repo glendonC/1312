@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef } from "react";
 import "../styles/studio/focus/index.css";
 import AgentMark from "./AgentMark";
 import { agentIdentityStyle, createAgentIdentityMap } from "./agentIdentity";
+import { isAgentThinking } from "./agentMeshRenderer";
 import { agentRoleRemit, agentState, agentTitle } from "./agentPresentation";
 import AgentVisualEvidence from "./focus/AgentVisualEvidence";
 import WorkbenchPanel from "./focus/WorkbenchPanel";
@@ -91,6 +92,7 @@ export default function AgentPanel() {
   if (!identity) return <AnimatePresence />;
   const title = agentTitle(selected, role, agent?.label);
   const state = agentState(status, role, cancelled);
+  const stateIsActive = isAgentThinking(status) && !cancelled && !paused;
   const log = isOrchestrator
     ? emitted.filter((trace) => trace.agent === "orchestrator")
     : history;
@@ -169,7 +171,11 @@ export default function AgentPanel() {
             </div>
 
             <div className="agent-focus-hero-copy">
-              <p id="agent-focus-state" className="agent-focus-state" data-status={status}>
+              <p
+                id="agent-focus-state"
+                className={`agent-focus-state${stateIsActive ? " text-shimmer" : ""}`}
+                data-status={status}
+              >
                 <span className="agent-focus-visually-hidden">Recorded state: </span>
                 {state}
               </p>

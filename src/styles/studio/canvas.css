@@ -322,7 +322,6 @@
   display: block;
   max-width: 100%;
   overflow: hidden;
-  font-size: 0.62rem;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -331,12 +330,15 @@
 .node-name {
   margin-top: 8px;
   color: var(--ink-soft);
+  font-size: 0.72rem;
   font-weight: var(--weight-medium);
 }
 
 .node-state {
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--ink-muted);
+  font-size: 0.6rem;
+  font-weight: var(--weight-regular);
 }
 
 .stage[data-agent-focus="true"] .graph {

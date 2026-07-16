@@ -13,6 +13,7 @@ import { memo, useEffect, useState } from "react";
 
 import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
+import { isAgentThinking } from "./agentMeshRenderer";
 import { agentState, agentTitle } from "./agentPresentation";
 import { useAgent, useStudio } from "./store";
 import type { SwarmNode } from "./swarm";
@@ -101,6 +102,7 @@ export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode
   const role = agent.role as Exclude<Role, "orchestrator">;
   const title = agentTitle(agent.id, role);
   const state = agentState(agent.status, role, cancelled);
+  const stateIsActive = isAgentThinking(agent.status) && !cancelled && !paused;
 
   return (
     <div
@@ -127,7 +129,7 @@ export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode
         />
       </span>
       <span className="node-name">{title}</span>
-      <span className="node-state">{state}</span>
+      <span className={`node-state${stateIsActive ? " text-shimmer" : ""}`}>{state}</span>
     </div>
   );
 });
@@ -141,6 +143,7 @@ export const HubNode = memo(function HubNode() {
   const paused = useStudio((s) => s.paused);
   const open = useOpen("orchestrator");
   const state = agentState(status, "orchestrator", cancelled);
+  const stateIsActive = isAgentThinking(status) && !cancelled && !paused;
 
   return (
     <div
@@ -166,7 +169,7 @@ export const HubNode = memo(function HubNode() {
         />
       </span>
       <span className="node-name">Orchestrator</span>
-      <span className="node-state">{state}</span>
+      <span className={`node-state${stateIsActive ? " text-shimmer" : ""}`}>{state}</span>
     </div>
   );
 });

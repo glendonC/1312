@@ -19,6 +19,7 @@ export default function Results() {
   const reset = useStudio((s) => s.reset);
   const emitted = useStudio((s) => s.state.emitted);
   const outputDepth = useStudio((s) => s.outputDepth);
+  const previewSession = useStudio((s) => s.previewSession);
 
   if (!bundle) return null;
 
@@ -54,6 +55,14 @@ export default function Results() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
     >
+      {previewSession?.preparation.status === "ready" && (
+        <SubmittedSourceResultBoundary
+          previewSession={previewSession}
+          recordedRunId={run.id}
+          recordedTitle={run.clip.title}
+        />
+      )}
+
       <Player />
 
       <div className="result-bar">
@@ -172,6 +181,53 @@ export default function Results() {
         </div>
       </details>}
     </motion.div>
+  );
+}
+
+function SubmittedSourceResultBoundary({
+  previewSession,
+  recordedRunId,
+  recordedTitle,
+}: {
+  previewSession: NonNullable<ReturnType<typeof useStudio.getState>["previewSession"]>;
+  recordedRunId: string;
+  recordedTitle: string;
+}) {
+  if (!previewSession.resolution || previewSession.preparation.status !== "ready") return null;
+  const { resolution } = previewSession;
+  const request = previewSession.preparation.request;
+  const sourceLanguage = request.language.source.mode === "automatic"
+    ? "Automatic requested · detection never started"
+    : `${request.language.source.language} · user declared`;
+  return (
+    <section
+      className="submitted-results-boundary"
+      aria-labelledby="submitted-results-title"
+      data-submitted-preparation-request-id={request.requestId}
+    >
+      <header>
+        <span>Submitted source outcome</span>
+        <h2 id="submitted-results-title">No submitted-source artifact exists</h2>
+        <p>
+          Studio preserved the request for <b>{resolution.source.label}</b>, but the submitted URL was not downloaded,
+          registered, analyzed, captioned, or translated.
+        </p>
+      </header>
+      <dl>
+        <div><dt>Selected range</dt><dd>{clock(request.range.startMs / 1_000)}–{clock(request.range.endMs / 1_000)}</dd></div>
+        <div><dt>Source language</dt><dd>{sourceLanguage}</dd></div>
+        <div><dt>Requested target</dt><dd>{request.language.target}</dd></div>
+        <div><dt>Artifact status</dt><dd>Unavailable · no runtime receipt</dd></div>
+      </dl>
+      <p className="submitted-results-identity">
+        <span>Preparation identity</span>
+        <code>{request.requestId}</code>
+      </p>
+      <p className="submitted-results-demo-boundary" role="note">
+        <b>Recorded demo Results below</b>
+        The player, captions, workers, evidence, scores, and timing below belong only to {recordedRunId}: {recordedTitle}.
+      </p>
+    </section>
   );
 }
 

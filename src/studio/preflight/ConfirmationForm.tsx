@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import type { RunBundle } from "../transport";
-import type { RemoteSourceResolutionReceipt } from "../sourceResolution";
 import {
   HOSTED_MAX_RANGE_S,
   RECOMMENDED_RANGE_S,
@@ -22,8 +21,6 @@ interface ConfirmationFormProps {
   update: (request: Partial<AnalysisRequest>) => void;
   cancel: () => void;
   confirm: () => void;
-  previewMode: boolean;
-  previewResolution: RemoteSourceResolutionReceipt | null;
 }
 
 type PreparationStage = "configure" | "forecast" | "confirm";
@@ -36,16 +33,12 @@ export default function ConfirmationForm({
   update,
   cancel,
   confirm,
-  previewMode,
-  previewResolution,
 }: ConfirmationFormProps) {
   const [stage, setStage] = useState<PreparationStage>("configure");
   const stageHeading = useRef<HTMLHeadingElement>(null);
   const stageHasMounted = useRef(false);
   const { request } = session;
-  const selectableDuration = previewResolution
-    ? previewResolution.source.durationMs / 1_000
-    : facts.selection.duration;
+  const selectableDuration = facts.selection.duration;
   const recommendation =
     assessment?.recommendation === "recommended"
       ? "Within the recommended 30–60 second range."
@@ -94,42 +87,27 @@ export default function ConfirmationForm({
             headingRef={stageHeading}
             kicker="Request setup"
             title="Choose what Studio should prepare"
-            detail={previewMode
-              ? "Studio resolved the full video duration from YouTube metadata before showing these controls. Choose the whole video or a bounded custom range."
-              : "Confirm the measured selection, language target, and output before replaying the recorded processing sequence."}
+            detail="Confirm the measured selection, language target, and output before replaying the recorded processing sequence."
           />
 
           <fieldset className="preflight-group">
             <legend>Analysis range</legend>
-            {previewMode ? (
+            <>
               <Choice
                 name="range"
-                value="entire"
-                checked={request.rangeMode === "entire"}
-                disabled={!previewResolution}
-                onChange={() => update({ rangeMode: "entire", start: 0, end: selectableDuration })}
-                label={previewResolution
-                  ? `Entire video · 0:00–${formatSeconds(selectableDuration)}`
-                  : "Entire video · available after source duration is resolved"}
+                value="full-source"
+                checked={false}
+                disabled
+                label="Entire source · the recorded demo contains only its selected window"
               />
-            ) : (
-              <>
-                <Choice
-                  name="range"
-                  value="full-source"
-                  checked={false}
-                  disabled
-                  label="Entire source · the recorded demo contains only its selected window"
-                />
-                <Choice
-                  name="range"
-                  value="recorded"
-                  checked={request.rangeMode === "recorded"}
-                  onChange={() => update({ rangeMode: "recorded", start: 0, end: facts.selection.duration })}
-                  label={`Recorded selection · 0:00–${formatSeconds(facts.selection.duration)}`}
-                />
-              </>
-            )}
+              <Choice
+                name="range"
+                value="recorded"
+                checked={request.rangeMode === "recorded"}
+                onChange={() => update({ rangeMode: "recorded", start: 0, end: facts.selection.duration })}
+                label={`Recorded selection · 0:00–${formatSeconds(facts.selection.duration)}`}
+              />
+            </>
             <Choice name="range" value="suggested" checked={false} disabled label="Suggested range · no recommender output" />
             <Choice
               name="range"
@@ -170,7 +148,7 @@ export default function ConfirmationForm({
               Recommend {RECOMMENDED_RANGE_S.min}–{RECOMMENDED_RANGE_S.max}s · hosted maximum {HOSTED_MAX_RANGE_S}s.
               {recommendation && ` ${recommendation}`}
             </p>
-            {!previewMode && assessment?.duration != null && assessment.duration > HOSTED_MAX_RANGE_S && import.meta.env.DEV && (
+            {assessment?.duration != null && assessment.duration > HOSTED_MAX_RANGE_S && import.meta.env.DEV && (
               <Choice
                 name="long-local"
                 value="accept"
@@ -262,8 +240,6 @@ export default function ConfirmationForm({
           request={request}
           facts={facts}
           assessment={assessment}
-          previewMode={previewMode}
-          previewResolution={previewResolution}
         />
       )}
 
@@ -272,7 +248,6 @@ export default function ConfirmationForm({
           headingRef={stageHeading}
           request={request}
           facts={facts}
-          previewMode={previewMode}
         />
       )}
 
@@ -293,9 +268,7 @@ export default function ConfirmationForm({
             ? "Continue to forecast"
             : stage === "forecast"
               ? "Review request"
-              : previewMode
-                ? "Preview processing experience"
-                : "Replay recorded analysis"}
+              : "Replay recorded analysis"}
         </button>
       </div>
     </form>
@@ -327,15 +300,11 @@ function ForecastReview({
   request,
   facts,
   assessment,
-  previewMode,
-  previewResolution,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   request: AnalysisRequest;
   facts: RecordedPreflightFacts;
   assessment: RangeAssessment | null;
-  previewMode: boolean;
-  previewResolution: RemoteSourceResolutionReceipt | null;
 }) {
   return (
     <section className="preflight-preparation" aria-labelledby="preflight-stage-title">
@@ -349,7 +318,7 @@ function ForecastReview({
         <ForecastFact
           label="Selected media"
           value={`${formatSeconds(request.start)}–${formatSeconds(request.end)}`}
-          detail={`${formatSeconds(assessment?.duration ?? 0)} requested from the ${previewMode ? "resolved video" : "recorded selection"}`}
+          detail={`${formatSeconds(assessment?.duration ?? 0)} requested from the recorded selection`}
         />
         <ForecastFact
           label="Requested output"
@@ -376,13 +345,8 @@ function ForecastReview({
         />
         <ForecastFact
           label="Source resolution"
-          value={previewResolution ? "Metadata resolved" : previewMode ? "Unavailable" : "Recorded receipt loaded"}
-          detail={previewResolution
-            ? `${previewResolution.source.label} · ${formatSeconds(previewResolution.source.durationMs / 1_000)} via ${previewResolution.producer.tool.id} ${previewResolution.producer.tool.version}`
-            : previewMode
-              ? "No source-resolution receipt is available."
-            : "These values belong to the recorded demo source."}
-          unavailable={previewMode && !previewResolution}
+          value="Recorded receipt loaded"
+          detail="These values belong to the recorded demo source."
         />
       </div>
       <p className="preflight-contract-gap" role="note">
@@ -416,19 +380,17 @@ function ConfirmationReview({
   headingRef,
   request,
   facts,
-  previewMode,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   request: AnalysisRequest;
   facts: RecordedPreflightFacts;
-  previewMode: boolean;
 }) {
   return (
     <section className="preflight-preparation" aria-labelledby="preflight-stage-title">
       <PreparationHeading
         headingRef={headingRef}
         kicker="Final review"
-        title={previewMode ? "Start the recorded processing preview" : "Replay this recorded processing request"}
+        title="Replay this recorded processing request"
         detail="Review the exact request before leaving setup. The final action is the future handoff point for a real runtime start receipt."
       />
       <dl className="preflight-confirmation-summary">
@@ -446,10 +408,8 @@ function ConfirmationReview({
         </ol>
       </div>
       <p className="preflight-preview-warning" role="note">
-        <b>{previewMode ? "Submitted-link boundary" : "Recorded-run boundary"}</b>
-        {previewMode
-          ? " Your submitted link remains untouched. This final action previews the experience using the bundled recorded run."
-          : " This final action replays existing evidence; it does not start new media processing."}
+        <b>Recorded-run boundary</b>
+        This final action replays existing evidence; it does not start new media processing.
       </p>
     </section>
   );

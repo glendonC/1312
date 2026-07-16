@@ -1,5 +1,9 @@
 import type { ClipSource, IngestReceipt } from "./types";
 import type { RemoteSourceResolutionReceipt } from "./sourceResolution";
+import type {
+  SubmittedPreparationState,
+  SubmittedSourceLanguageIntent,
+} from "./submittedPreparation";
 
 const YOUTUBE_HOSTS = new Set(["youtube.com", "m.youtube.com", "youtu.be"]);
 
@@ -23,6 +27,13 @@ export interface StudioPreviewSession {
   dataSource: "recorded_run";
   source: PreviewSource;
   resolution: RemoteSourceResolutionReceipt | null;
+  resolutionFailure: {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } | null;
+  sourceLanguage: SubmittedSourceLanguageIntent;
+  preparation: SubmittedPreparationState;
 }
 
 export function presentSource(raw: string): SourcePresentation | null {
@@ -115,5 +126,8 @@ export function createStudioPreviewSession(raw: string): StudioPreviewSession | 
     dataSource: "recorded_run",
     source: { ...presentation, raw: trimmed },
     resolution: null,
+    resolutionFailure: null,
+    sourceLanguage: { mode: "automatic", language: null },
+    preparation: { status: "idle", request: null, message: null },
   };
 }

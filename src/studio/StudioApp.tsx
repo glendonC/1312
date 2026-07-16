@@ -34,6 +34,9 @@ export default function StudioApp({ runId }: { runId: string }) {
     ? presentRecordedSource(bundle.run.clip.source, bundle.ingestReceipt)
     : null;
   const visibleSource = previewSession?.source ?? recordedSource;
+  const submittedPreparation = previewSession?.preparation.status === "ready"
+    ? previewSession.preparation.request
+    : null;
 
   // Held is a property of the whole instrument, not of one control: everything that
   // animates to say "alive" reads this and stops.
@@ -65,8 +68,14 @@ export default function StudioApp({ runId }: { runId: string }) {
               />
             </div>
             {previewSession && (
-              <p id="top-source-provenance" className="top-source-provenance" role="note">
+              <p
+                id="top-source-provenance"
+                className="top-source-provenance"
+                role="note"
+                data-submitted-preparation-request-id={submittedPreparation?.requestId}
+              >
                 This interface preview uses a recorded run. Your source was not processed.
+                {submittedPreparation && " Its preparation request did not start a runtime."}
               </p>
             )}
           </div>

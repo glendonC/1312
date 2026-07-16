@@ -11,6 +11,12 @@ import {
   resolveRemoteSource,
   validateRemoteSourceResolution,
 } from "../src/studio/sourceResolution.ts";
+import {
+  createSubmittedSourcePreparationRequest,
+  type SubmittedPreparationInput,
+  SubmittedPreparationRequestError,
+  validateSubmittedSourcePreparationRequest,
+} from "../src/studio/submittedPreparation.ts";
 
 const URL = "https://www.youtube.com/watch?v=XauBqFepc-s";
 
@@ -28,6 +34,23 @@ function fixtureCommand(calls: Array<{ executable: string; args: string[] }>): S
       }),
       stderr: "",
     };
+  };
+}
+
+function preparationInput(overrides: Partial<SubmittedPreparationInput> = {}): SubmittedPreparationInput {
+  return {
+    start: 0,
+    end: 60,
+    targetLanguage: "en",
+    outputDepth: "evidence",
+    speechScope: "foreground",
+    includeLyrics: false,
+    speaker: null,
+    honorifics: "preserve",
+    translationStyle: "natural",
+    captionDensity: "balanced",
+    slowAnalysis: false,
+    ...overrides,
   };
 }
 
@@ -88,5 +111,104 @@ test("browser validation rejects duration tampering and parses exact resolver er
       && error.code === "source_inaccessible"
       && error.httpStatus === 422
       && error.message === "Video is private.",
+  );
+});
+
+test("submitted preparation request binds the receipt and has no runtime-start semantics", async () => {
+  const receipt = await resolveYouTubeSource(URL, {
+    command: fixtureCommand([]),
+    now: () => new Date("2026-07-16T12:00:00.000Z"),
+  });
+  const request = preparationInput();
+  const preparation = await createSubmittedSourcePreparationRequest(
+    receipt,
+    request,
+    { mode: "automatic", language: null },
+  );
+
+  assert.equal(preparation.schema, "studio.submitted-source-preparation-request.v1");
+  assert.equal(preparation.purpose, "configure_recorded_interface_preview");
+  assert.equal(preparation.resolution.resolutionId, receipt.resolutionId);
+  assert.equal(preparation.resolution.contentId, receipt.content.contentId);
+  assert.deepEqual(preparation.range, { startMs: 0, endMs: 60_000 });
+  assert.deepEqual(preparation.language.source, { mode: "automatic", language: null });
+  assert.equal("runtimeId" in preparation, false);
+  assert.equal("commandId" in preparation, false);
+  assert.deepEqual(await validateSubmittedSourcePreparationRequest(preparation, receipt), preparation);
+});
+
+test("submitted preparation identity changes with range, language intent, and target", async () => {
+  const receipt = await resolveYouTubeSource(URL, {
+    command: fixtureCommand([]),
+    now: () => new Date("2026-07-16T12:00:00.000Z"),
+  });
+  const base = preparationInput();
+  const first = await createSubmittedSourcePreparationRequest(
+    receipt,
+    base,
+    { mode: "automatic", language: null },
+  );
+  const same = await createSubmittedSourcePreparationRequest(
+    receipt,
+    base,
+    { mode: "automatic", language: null },
+  );
+  const changedRange = await createSubmittedSourcePreparationRequest(
+    receipt,
+    { ...base, end: 45 },
+    { mode: "automatic", language: null },
+  );
+  const changedLanguage = await createSubmittedSourcePreparationRequest(
+    receipt,
+    base,
+    { mode: "declared", language: "ko" },
+  );
+  const changedTarget = await createSubmittedSourcePreparationRequest(
+    receipt,
+    { ...base, targetLanguage: "ja" },
+    { mode: "automatic", language: null },
+  );
+
+  assert.equal(first.requestId, same.requestId);
+  assert.notEqual(first.requestId, changedRange.requestId);
+  assert.notEqual(first.requestId, changedLanguage.requestId);
+  assert.notEqual(first.requestId, changedTarget.requestId);
+});
+
+test("submitted preparation rejects over-policy, out-of-bounds, and tampered requests", async () => {
+  const receipt = await resolveYouTubeSource(URL, {
+    command: fixtureCommand([]),
+    now: () => new Date("2026-07-16T12:00:00.000Z"),
+  });
+  await assert.rejects(
+    createSubmittedSourcePreparationRequest(
+      receipt,
+      preparationInput({ end: 121 }),
+      { mode: "automatic", language: null },
+    ),
+    (error: unknown) => error instanceof SubmittedPreparationRequestError
+      && error.message.includes("120-second"),
+  );
+  await assert.rejects(
+    createSubmittedSourcePreparationRequest(
+      receipt,
+      preparationInput({ end: 204 }),
+      { mode: "automatic", language: null },
+    ),
+    (error: unknown) => error instanceof SubmittedPreparationRequestError
+      && error.message.includes("resolved video duration"),
+  );
+
+  const valid = await createSubmittedSourcePreparationRequest(
+    receipt,
+    preparationInput(),
+    { mode: "declared", language: "ko" },
+  );
+  const tampered = structuredClone(valid);
+  tampered.language.target = "ja";
+  await assert.rejects(
+    validateSubmittedSourcePreparationRequest(tampered, receipt),
+    (error: unknown) => error instanceof SubmittedPreparationRequestError
+      && error.message.includes("content identity"),
   );
 });

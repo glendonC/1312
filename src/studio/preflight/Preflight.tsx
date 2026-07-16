@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 
-import SourceDisplay from "../SourceDisplay";
 import { useBundle, useStudio } from "../store";
 import type { MediaProbeTrack } from "../types";
 import ConfirmationForm, { AdvancedFields } from "./ConfirmationForm";
+import SubmittedPreparationForm from "./SubmittedPreparationForm";
 import type { RecordedLanguageRange } from "./languageProjection";
 import {
   assessRecordedRequest,
@@ -22,19 +22,44 @@ export default function Preflight() {
   const cancel = useStudio((state) => state.cancelPreflight);
   const confirm = useStudio((state) => state.confirmPreflight);
   const useRecorded = useStudio((state) => state.openRecordedPreflight);
+  const retrySubmittedSource = useStudio((state) => state.retrySubmittedSource);
+  const updateSubmittedSourceLanguage = useStudio((state) => state.updateSubmittedSourceLanguage);
   const previewSession = useStudio((state) => state.previewSession);
 
   const assessment = useMemo(
     () => {
-      if (!bundle) return null;
       return previewSession?.resolution
         ? assessSubmittedPreviewRequest(session, previewSession.resolution.source.durationMs / 1_000)
-        : assessRecordedRequest(session, bundle, import.meta.env.DEV);
+        : bundle
+          ? assessRecordedRequest(session, bundle, import.meta.env.DEV)
+          : null;
     },
     [bundle, previewSession, session],
   );
 
   if (session.status === "idle") return null;
+
+  if (previewSession?.resolution && session.status === "ready" && assessment) {
+    const resolution = previewSession.resolution;
+    return (
+      <section
+        className="preflight"
+        data-preview-mode="submitted-source"
+        aria-labelledby="preflight-title"
+      >
+        <SubmittedPreparationForm
+          resolution={resolution}
+          previewSession={previewSession}
+          session={session}
+          assessment={assessment}
+          update={update}
+          updateSourceLanguage={updateSubmittedSourceLanguage}
+          cancel={cancel}
+          confirm={confirm}
+        />
+      </section>
+    );
+  }
 
   if (session.status !== "ready" || !session.facts || !bundle) {
     const fixture = session.provenance.kind === "contract_fixture";
@@ -59,9 +84,14 @@ export default function Preflight() {
           <button type="button" className="ghost" onClick={dismiss}>
             {session.status === "cancelled" ? "Close" : "Try another source"}
           </button>
+          {previewSession?.resolutionFailure?.retryable && (
+            <button type="button" className="ghost" onClick={retrySubmittedSource}>
+              Retry same source
+            </button>
+          )}
           {session.status !== "loading_source" && session.status !== "probing" && (
             <button type="button" className="cta" onClick={useRecorded}>
-              Use recorded source
+              Open recorded demo
             </button>
           )}
         </div>
@@ -74,45 +104,18 @@ export default function Preflight() {
   return (
     <section
       className="preflight"
-      data-preview-mode={previewSession ? "submitted-source" : "recorded-demo"}
+      data-preview-mode="recorded-demo"
       aria-labelledby="preflight-title"
     >
       <header className="preflight-head">
-        <span className="preflight-kicker">
-          {previewSession ? "Submitted source · interface preview" : "Confirm recorded source"}
-        </span>
-        <h1 id="preflight-title">
-          {previewSession ? "Set up your processing request" : facts.title}
-        </h1>
-        <p>
-          {previewSession
-            ? "YouTube metadata resolved without downloading the media. Duration now comes from a hashed metadata receipt; content processing has not started."
-            : session.message}
-        </p>
+        <span className="preflight-kicker">Confirm recorded source</span>
+        <h1 id="preflight-title">{facts.title}</h1>
+        <p>{session.message}</p>
       </header>
 
-      {previewSession && (
-        <div className="preflight-submitted-source" role="note" aria-label="Submitted source preview boundary">
-          <div>
-            <span>Submitted link</span>
-            <SourceDisplay source={previewSession.source} title={previewSession.source.raw} />
-          </div>
-          <dl>
-            <div><dt>Client check</dt><dd>Link format accepted</dd></div>
-            <div><dt>Remote resolution</dt><dd>{previewSession.resolution ? "Resolved" : "Unavailable"}</dd></div>
-            <div>
-              <dt>Full duration</dt>
-              <dd>{previewSession.resolution ? formatSeconds(previewSession.resolution.source.durationMs / 1_000) : "Unavailable"}</dd>
-            </div>
-            <div><dt>Processing</dt><dd>Not started</dd></div>
-          </dl>
-        </div>
-      )}
-
-      <details className="preflight-recorded-facts" open={!previewSession}>
+      <details className="preflight-recorded-facts" open>
         <summary className="preflight-facts-intro">
-          <span>{previewSession ? "Recorded fixture facts · not the submitted link" : "Recorded source facts"}</span>
-          {previewSession && <small>Open the demo measurements used by these controls</small>}
+          <span>Recorded source facts</span>
         </summary>
 
         <dl className="preflight-facts">
@@ -224,8 +227,6 @@ export default function Preflight() {
         update={update}
         cancel={cancel}
         confirm={confirm}
-        previewMode={previewSession !== null}
-        previewResolution={previewSession?.resolution ?? null}
       />
     </section>
   );

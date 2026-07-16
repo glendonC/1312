@@ -158,11 +158,37 @@ export function resolvingSubmittedSourcePreflight(): PreflightSession {
   };
 }
 
-export function failedSubmittedSourceResolution(message: string): PreflightSession {
+export function resolvedSubmittedSourcePreflight(durationSeconds: number): PreflightSession {
+  return {
+    ...idlePreflight(),
+    status: "ready",
+    title: "Submitted source metadata resolved",
+    message: "Provider metadata is ready for request setup. Media download and content processing have not started.",
+    request: {
+      ...initialRequest("en", durationSeconds),
+      rangeMode: "entire",
+    },
+    missing: [...PRODUCER_GAPS],
+    provenance: {
+      kind: "remote_resolution",
+      producer: "studio.youtube-metadata-resolver",
+      note: "Only the content-identified YouTube metadata receipt belongs to this submitted source.",
+    },
+  };
+}
+
+export function failedSubmittedSourceResolution(code: string, message: string): PreflightSession {
+  const title = code === "unsupported_source"
+    ? "Source is not supported"
+    : code === "resolver_unavailable"
+      ? "Metadata resolver unavailable"
+      : code === "invalid_resolver_output" || code === "invalid_resolution_receipt"
+        ? "Source metadata could not be verified"
+        : "Source metadata unavailable";
   return {
     ...idlePreflight(),
     status: "inaccessible",
-    title: "Source metadata unavailable",
+    title,
     message,
     missing: [{
       id: "hosted-ingest",

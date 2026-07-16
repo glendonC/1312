@@ -1,0 +1,56 @@
+{
+  "run": "run-007",
+  "clip": "Ux-TMWnmntM",
+  "pack": "ko-v3",
+  "rows": [
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 19,
+      "t_end": 20.2,
+      "raw": "Yeah, yeah.",
+      "final": null,
+      "error_type": "other",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-007",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 8.2,
+      "t_end": 10.85,
+      "raw": "My dream is to open a Korean language school in Thailand.",
+      "final": null,
+      "error_type": "other",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-007",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 12.8,
+      "t_end": 13.65,
+      "raw": "Why? Why?",
+      "final": null,
+      "error_type": "other",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-007",
+      "pack": "ko-v3"
+    },
+    {
+      "source_video": "Ux-TMWnmntM",
+      "t_start": 25.52,
+      "t_end": 39.92,
+      "raw": "They were all so busy that I was the only one who was free, so I ended up doing a month‑long stay in Thailand for free. I lived in Chiang Mai for a month—the neighborhood was so pretty, and the people were so kind, and Korean...",
+      "final": null,
+      "error_type": "boundary",
+      "error_subtype": "ko.numeral_boundary",
+      "lang": "en",
+      "withhold": true,
+      "run": "run-007",
+      "pack": "ko-v3"
+    }
+  ]
+}

@@ -1,0 +1,1476 @@
+{
+  "run": "run-007",
+  "clip": "Ux-TMWnmntM",
+  "wall_s": 253.96,
+  "traces": [
+    {
+      "t": 0,
+      "agent": "orchestrator",
+      "action": "inspect",
+      "target": "run-007",
+      "detail": "40s · Creative Commons Attribution license (reuse allowed) · 16k mono · 1250 KB · 420 peaks",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "orchestrator",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 0.01,
+      "agent": "orchestrator",
+      "action": "spawn",
+      "target": "segment-01",
+      "detail": "one recogniser call covers 40s · one segmenter",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "segment-01",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 0.01,
+      "agent": "segment-01",
+      "action": "open",
+      "target": "workspace",
+      "detail": "isolated workspace · clip.wav",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "segment-01",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 0.01,
+      "agent": "segment-01",
+      "action": "call",
+      "target": "gpt-4o-transcribe-diarize",
+      "detail": "diarized_json · server_vad · request open",
+      "level": "info",
+      "clip_t": 0
+    },
+    {
+      "t": 21.47,
+      "agent": "segment-01",
+      "action": "return",
+      "target": "gpt-4o-transcribe-diarize",
+      "detail": "12 segments · 2 speaker labels (A, B) · 21.5s",
+      "level": "info",
+      "clip_t": 0,
+      "view": {
+        "playhead": 0
+      }
+    },
+    {
+      "t": 21.48,
+      "agent": "segment-01",
+      "action": "scan",
+      "target": "clip.wav",
+      "detail": "400 × 100ms windows · peak 0.271 · 59 under the 0.02 floor",
+      "level": "info",
+      "clip_t": 40,
+      "view": {
+        "playhead": 40
+      }
+    },
+    {
+      "t": 21.48,
+      "agent": "segment-01",
+      "action": "gap",
+      "target": "12.20",
+      "detail": "0.60s with no speech segment · no caption is owed here",
+      "level": "info",
+      "clip_t": 12.2,
+      "view": {
+        "playhead": 12.2
+      }
+    },
+    {
+      "t": 21.48,
+      "agent": "segment-01",
+      "action": "call",
+      "target": "whisper-1",
+      "detail": "second recogniser · the whole clip · word timestamps · cross-check, not a rerun",
+      "level": "info"
+    },
+    {
+      "t": 24.8,
+      "agent": "segment-01",
+      "action": "return",
+      "target": "whisper-1",
+      "detail": "71 words timed · 3.3s · a different model heard the same audio",
+      "level": "info",
+      "clip_t": 0
+    },
+    {
+      "t": 24.8,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c01",
+      "detail": "agreement 1.00 · whisper-1 heard \"분들이 몇 분 계신데\"",
+      "level": "info",
+      "clip_t": 0,
+      "view": {
+        "playhead": 0
+      }
+    },
+    {
+      "t": 24.8,
+      "agent": "segment-01",
+      "action": "mark",
+      "target": "c01",
+      "detail": "몇 분 · honorific person-counter or minutes · ko.counter_homophone",
+      "level": "warn",
+      "clip_t": 0,
+      "view": {
+        "playhead": 0,
+        "mark": {
+          "label": "c01",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 24.8,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c02",
+      "detail": "not corroborated · whisper-1 timed no words in this window · it drops backchannels, so there is nothing to compare",
+      "level": "info",
+      "clip_t": 1.65,
+      "view": {
+        "playhead": 1.65
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c03",
+      "detail": "agreement 1.00 · whisper-1 heard \"어떤 분은 태국 갔다 오셨다고 했거든요\"",
+      "level": "info",
+      "clip_t": 2,
+      "view": {
+        "playhead": 2
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c04",
+      "detail": "agreement 0.89 · whisper-1 heard \"태국이 진짜 좋았다고 그러시더라고요\"",
+      "level": "info",
+      "clip_t": 5.7,
+      "view": {
+        "playhead": 5.7
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c05",
+      "detail": "agreement 0.90 · whisper-1 heard \"제가 태국에 한국어 학원을 차리는게 꿈이에요\"",
+      "level": "info",
+      "clip_t": 8.2,
+      "view": {
+        "playhead": 8.2
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c06",
+      "detail": "agreement 0.75 · whisper-1 heard \"진짜요\"",
+      "level": "info",
+      "clip_t": 11.3,
+      "view": {
+        "playhead": 11.3
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c07",
+      "detail": "not corroborated · whisper-1 timed no words in this window · it drops backchannels, so there is nothing to compare",
+      "level": "info",
+      "clip_t": 11.9,
+      "view": {
+        "playhead": 11.9
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c08",
+      "detail": "agreement 0.50 · whisper-1 heard \"왜요\"",
+      "level": "warn",
+      "clip_t": 12.8,
+      "view": {
+        "playhead": 12.8
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c09",
+      "detail": "agreement 0.71 · whisper-1 heard \"왜요 아니 그 예전에 코로나 사태 이전에 누나랑\"",
+      "level": "info",
+      "clip_t": 13.65,
+      "view": {
+        "playhead": 13.65
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "mark",
+      "target": "c09",
+      "detail": "친누나 · address form or kinship · ko.kinship_address",
+      "level": "warn",
+      "clip_t": 13.65,
+      "view": {
+        "playhead": 13.65,
+        "mark": {
+          "label": "c09",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c10",
+      "detail": "agreement 0.00 · whisper-1 heard \"친누나가\"",
+      "level": "warn",
+      "clip_t": 19,
+      "view": {
+        "playhead": 19
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c11",
+      "detail": "agreement 1.00 · whisper-1 heard \"그 막 그 매형이랑 태국에 한달 살기를 하려고 했는데\"",
+      "level": "info",
+      "clip_t": 20.2,
+      "view": {
+        "playhead": 20.2
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "mark",
+      "target": "c11",
+      "detail": "매형 · address form or kinship · ko.kinship_address",
+      "level": "warn",
+      "clip_t": 20.2,
+      "view": {
+        "playhead": 20.2,
+        "mark": {
+          "label": "c11",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "verify",
+      "target": "c12",
+      "detail": "agreement 0.97 · whisper-1 heard \"그 매형이 너무 바쁘셔가지고 남는 사람이 저밖에 없어서 그 공짜로 태국 한달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어\"",
+      "level": "info",
+      "clip_t": 25.52,
+      "view": {
+        "playhead": 25.52
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "mark",
+      "target": "c12",
+      "detail": "counter 달 · a lost pause eats the numeral · ko.numeral_boundary",
+      "level": "warn",
+      "clip_t": 25.52,
+      "view": {
+        "playhead": 25.52,
+        "mark": {
+          "label": "c12",
+          "hard": true
+        }
+      }
+    },
+    {
+      "t": 24.81,
+      "agent": "segment-01",
+      "action": "report",
+      "target": "12 cues",
+      "detail": "timed source lines · empty target slots · 4 hard candidates · 0 unconfirmed speaker",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "segment-01",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 24.81,
+      "agent": "orchestrator",
+      "action": "spawn",
+      "target": "context-01",
+      "detail": "the glossary needs a transcript · spawning now there is one",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "context-01",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 24.81,
+      "agent": "context-01",
+      "action": "open",
+      "target": "workspace",
+      "detail": "pack ko-v3 · cast opens empty",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "context-01",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 24.81,
+      "agent": "context-01",
+      "action": "call",
+      "target": "gpt-5",
+      "detail": "term and entity resolution over the transcript",
+      "level": "info"
+    },
+    {
+      "t": 86.2,
+      "agent": "context-01",
+      "action": "resolve",
+      "target": "누나",
+      "detail": "address_form · noona",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "누나",
+          "gloss": "noona"
+        }
+      }
+    },
+    {
+      "t": 86.2,
+      "agent": "context-01",
+      "action": "resolve",
+      "target": "친누나",
+      "detail": "term · older sister",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "친누나",
+          "gloss": "older sister"
+        }
+      }
+    },
+    {
+      "t": 86.2,
+      "agent": "context-01",
+      "action": "resolve",
+      "target": "매형",
+      "detail": "term · brother-in-law",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "매형",
+          "gloss": "brother-in-law"
+        }
+      }
+    },
+    {
+      "t": 86.2,
+      "agent": "context-01",
+      "action": "resolve",
+      "target": "태국",
+      "detail": "place · Thailand",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "태국",
+          "gloss": "Thailand"
+        }
+      }
+    },
+    {
+      "t": 86.2,
+      "agent": "context-01",
+      "action": "resolve",
+      "target": "치앙마이",
+      "detail": "place · Chiang Mai",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "치앙마이",
+          "gloss": "Chiang Mai"
+        }
+      }
+    },
+    {
+      "t": 86.2,
+      "agent": "context-01",
+      "action": "resolve",
+      "target": "코로나 사태",
+      "detail": "term · COVID pandemic",
+      "level": "info",
+      "view": {
+        "gloss": {
+          "term": "코로나 사태",
+          "gloss": "COVID pandemic"
+        }
+      }
+    },
+    {
+      "t": 86.2,
+      "agent": "context-01",
+      "action": "report",
+      "target": "glossary",
+      "detail": "6 entries · cast closed at 0 names · 8 gates from ko-v3",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "context-01",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 86.2,
+      "agent": "orchestrator",
+      "action": "merge",
+      "target": "context-01",
+      "detail": "glossary and gates folded into the job context",
+      "level": "info"
+    },
+    {
+      "t": 86.2,
+      "agent": "context-01",
+      "action": "retire",
+      "target": "context-01",
+      "detail": "reported up · nothing left to do",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "context-01",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 86.2,
+      "agent": "segment-01",
+      "action": "retire",
+      "target": "segment-01",
+      "detail": "reported up · nothing left to do",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "segment-01",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 86.2,
+      "agent": "orchestrator",
+      "action": "spawn",
+      "target": "translate-01",
+      "detail": "translate and qc spawn as a pair · rule from run-004",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-01",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 86.2,
+      "agent": "orchestrator",
+      "action": "spawn",
+      "target": "qc-01",
+      "detail": "no translator ships without a gate",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 86.2,
+      "agent": "translate-01",
+      "action": "open",
+      "target": "workspace",
+      "detail": "cues c01–c08",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-01",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 86.2,
+      "agent": "qc-01",
+      "action": "open",
+      "target": "workspace",
+      "detail": "8 gates armed · fail closed",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 86.2,
+      "agent": "orchestrator",
+      "action": "divide",
+      "target": "translate-01",
+      "detail": "12 cues is over the 8-cue worker limit · dividing",
+      "level": "info"
+    },
+    {
+      "t": 86.2,
+      "agent": "translate-01",
+      "action": "divide",
+      "target": "translate-02",
+      "detail": "second half handed to a new worker · 13.7–39.9",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-02",
+          "status": "spawning"
+        }
+      ]
+    },
+    {
+      "t": 86.2,
+      "agent": "translate-02",
+      "action": "open",
+      "target": "workspace",
+      "detail": "cues c09–c12",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-02",
+          "status": "working"
+        }
+      ]
+    },
+    {
+      "t": 90.24,
+      "agent": "orchestrator",
+      "action": "baseline",
+      "target": "cold",
+      "detail": "whisper-1 + one-shot gpt-4o · no glossary · no gates · 4.0s",
+      "level": "info"
+    },
+    {
+      "t": 105.59,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c01",
+      "detail": "gpt-5 · asr_agreement 1.00 · The referent of 'people' isn’t specified, so I kept it generic.",
+      "level": "info",
+      "clip_t": 0,
+      "view": {
+        "draft": {
+          "source": "분들이 몇 분 계신데",
+          "target": "There are a few people...",
+          "conf": 1
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c01",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 105.59,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c01",
+      "detail": "3 gates clean · agreement 1.00",
+      "level": "info",
+      "clip_t": 0,
+      "view": {
+        "gate": {
+          "name": "asr_agreement",
+          "scope": "universal",
+          "value": 1,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c01",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.08,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 111.88,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c02",
+      "detail": "gpt-5 · asr_agreement not corroborated · Rendered as a casual backchannel acknowledgment rather than formal 'Yes.'",
+      "level": "info",
+      "clip_t": 1.65,
+      "view": {
+        "draft": {
+          "source": "네",
+          "target": "Yeah.",
+          "conf": null
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c02",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 111.88,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c02",
+      "detail": "2 gates clean · uncorroborated · committed on gpt-4o-transcribe-diarize alone, and labelled so",
+      "level": "info",
+      "clip_t": 1.65,
+      "view": {},
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c02",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.17,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 127.5,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c09",
+      "detail": "gpt-5 · asr_agreement 0.71 · Unsure if 누나 is a relative or just an older female friend; kept as noona per glossary.",
+      "level": "info",
+      "clip_t": 13.65,
+      "view": {
+        "draft": {
+          "source": "아니 그 예전에 코로나 사태 이전에 누나랑 친누나가",
+          "target": "I mean, before the COVID pandemic, my noona and my older sister...",
+          "conf": 0.714
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c09",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 127.5,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c09",
+      "detail": "4 gates clean · agreement 0.71",
+      "level": "info",
+      "clip_t": 13.65,
+      "view": {
+        "gate": {
+          "name": "asr_agreement",
+          "scope": "universal",
+          "value": 0.714,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c09",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.25,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 128.54,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c03",
+      "detail": "gpt-5 · asr_agreement 1.00 · ‘갔다 오셨다고’ implies they returned; I used ‘been to’ for natural flow.",
+      "level": "info",
+      "clip_t": 2,
+      "view": {
+        "draft": {
+          "source": "어떤 분은 태국 갔다 오셨다고 했거든요.",
+          "target": "Someone said they'd been to Thailand.",
+          "conf": 1
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c03",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 128.54,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c03",
+      "detail": "3 gates clean · agreement 1.00",
+      "level": "info",
+      "clip_t": 2,
+      "view": {
+        "gate": {
+          "name": "asr_agreement",
+          "scope": "universal",
+          "value": 1,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c03",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.33,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 135.61,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c10",
+      "detail": "gpt-5 · asr_agreement 0.00 · Chose a brief backchannel rendering for 네네 to convey active listening.",
+      "level": "warn",
+      "clip_t": 19,
+      "view": {
+        "draft": {
+          "source": "네네",
+          "target": "Yeah, yeah.",
+          "conf": 0
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c10",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 135.61,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c10",
+      "detail": "withheld · asr_agreement gate · two recognisers agree only 0.00 on this window (< 0.6)",
+      "level": "gate",
+      "clip_t": 19,
+      "view": {
+        "gate": {
+          "name": "asr_agreement",
+          "scope": "universal",
+          "value": 0,
+          "limit": 0.6,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "withheld",
+          "text": "withheld"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c10",
+          "state": "withheld"
+        },
+        {
+          "type": "score",
+          "coverage": 0.33,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 139.36,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c04",
+      "detail": "gpt-5 · asr_agreement 0.89 · Rendered 근데 as “And” rather than “But” since there’s no contrast.",
+      "level": "info",
+      "clip_t": 5.7,
+      "view": {
+        "draft": {
+          "source": "근데 태국이 진짜 좋았다고 그러시더라고요.",
+          "target": "And they said Thailand was really great.",
+          "conf": 0.889
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c04",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 139.36,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c04",
+      "detail": "3 gates clean · agreement 0.89",
+      "level": "info",
+      "clip_t": 5.7,
+      "view": {
+        "gate": {
+          "name": "asr_agreement",
+          "scope": "universal",
+          "value": 0.889,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "working"
+        },
+        {
+          "type": "cue",
+          "id": "c04",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.42,
+          "fabrications": 0
+        }
+      ]
+    },
+    {
+      "t": 149.02,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c05",
+      "detail": "gpt-5 · asr_agreement 0.90 · Translated 학원 as 'language school' for naturalness; otherwise straightforward.",
+      "level": "info",
+      "clip_t": 8.2,
+      "view": {
+        "draft": {
+          "source": "저 태국에 한국어 학원을 차리는 게 꿈이에요",
+          "target": "My dream is to open a Korean language school in Thailand.",
+          "conf": 0.895
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c05",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 149.02,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c05",
+      "detail": "entity gate · Korean — not in the closed cast and not in the glossary · sending it back",
+      "level": "gate",
+      "clip_t": 8.2,
+      "view": {
+        "gate": {
+          "name": "entity",
+          "scope": "pack",
+          "value": 0,
+          "limit": 1,
+          "fail": true
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        }
+      ]
+    },
+    {
+      "t": 159.17,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c11",
+      "detail": "gpt-5 · asr_agreement 1.00 · 매형 most likely means the speaker’s older sister’s husband; I translated it as “my brother-in-law.”",
+      "level": "info",
+      "clip_t": 20.2,
+      "view": {
+        "draft": {
+          "source": "그 막 그 매형이랑 태국에 한 달 살기를 하려고 했는데",
+          "target": "Like, they were going to do a month-long stay in Thailand with my brother-in-law, but",
+          "conf": 1
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c11",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 159.17,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c11",
+      "detail": "4 gates clean · agreement 1.00",
+      "level": "info",
+      "clip_t": 20.2,
+      "view": {
+        "gate": {
+          "name": "asr_agreement",
+          "scope": "universal",
+          "value": 1,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "working"
+        },
+        {
+          "type": "cue",
+          "id": "c11",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.5,
+          "fabrications": 1
+        }
+      ]
+    },
+    {
+      "t": 170.06,
+      "agent": "translate-01",
+      "action": "redraft",
+      "target": "c05",
+      "detail": "re-drafted against ko.entity_support",
+      "level": "info",
+      "clip_t": 8.2,
+      "view": {
+        "draft": {
+          "source": "저 태국에 한국어 학원을 차리는 게 꿈이에요",
+          "target": "My dream is to open a Korean language school in Thailand.",
+          "conf": 0.895
+        }
+      }
+    },
+    {
+      "t": 170.06,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c05",
+      "detail": "withheld · entity gate · Korean — not in the closed cast and not in the glossary",
+      "level": "gate",
+      "clip_t": 8.2,
+      "view": {
+        "gate": {
+          "name": "entity",
+          "scope": "pack",
+          "value": 0,
+          "limit": 1,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "withheld",
+          "text": "withheld"
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        },
+        {
+          "type": "cue",
+          "id": "c05",
+          "state": "withheld"
+        },
+        {
+          "type": "score",
+          "coverage": 0.5,
+          "fabrications": 1
+        }
+      ]
+    },
+    {
+      "t": 175.51,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c06",
+      "detail": "gpt-5 · asr_agreement 0.75 · Simple expression of surprise; rendered as 'Oh, really?'.",
+      "level": "info",
+      "clip_t": 11.3,
+      "view": {
+        "draft": {
+          "source": "아 진짜요?",
+          "target": "Oh, really?",
+          "conf": 0.75
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c06",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 175.51,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c06",
+      "detail": "3 gates clean · agreement 0.75",
+      "level": "info",
+      "clip_t": 11.3,
+      "view": {
+        "gate": {
+          "name": "asr_agreement",
+          "scope": "universal",
+          "value": 0.75,
+          "limit": 0.6
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "working"
+        },
+        {
+          "type": "cue",
+          "id": "c06",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.58,
+          "fabrications": 1
+        }
+      ]
+    },
+    {
+      "t": 184.61,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c07",
+      "detail": "gpt-5 · asr_agreement not corroborated · Simple affirmative reply to A’s “Oh really?”",
+      "level": "info",
+      "clip_t": 11.9,
+      "view": {
+        "draft": {
+          "source": "네",
+          "target": "Yes.",
+          "conf": null
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c07",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 184.61,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c07",
+      "detail": "2 gates clean · uncorroborated · committed on gpt-4o-transcribe-diarize alone, and labelled so",
+      "level": "info",
+      "clip_t": 11.9,
+      "view": {},
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c07",
+          "state": "committed"
+        },
+        {
+          "type": "score",
+          "coverage": 0.67,
+          "fabrications": 1
+        }
+      ]
+    },
+    {
+      "t": 190.28,
+      "agent": "translate-02",
+      "action": "draft",
+      "target": "c12",
+      "detail": "gpt-5 · asr_agreement 0.97 · “그 내용이” sounded like a slip that might have meant “they were all” (possibly “the four of them”); I rendered it generically.",
+      "level": "info",
+      "clip_t": 25.52,
+      "view": {
+        "draft": {
+          "source": "그 내용이 너무 바쁘셔가지고 남는 사람이 저밖에 없어서 그 공짜로 태국 한달살기를 한 적이 있어요 아 근데 그 치앙마이에서 한달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어",
+          "target": "They were all so busy that I was the only one who was free, so I ended up doing a month‑long stay in Thailand for free. I lived in Chiang Mai for a month—the neighborhood was so pretty, and the people were so kind, and Korean...",
+          "conf": 0.974
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c12",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 190.28,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c12",
+      "detail": "entity gate · Korean — not in the closed cast and not in the glossary · sending it back",
+      "level": "gate",
+      "clip_t": 25.52,
+      "view": {
+        "gate": {
+          "name": "entity",
+          "scope": "pack",
+          "value": 0,
+          "limit": 1,
+          "fail": true
+        }
+      },
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "gating"
+        }
+      ]
+    },
+    {
+      "t": 191.65,
+      "agent": "translate-01",
+      "action": "draft",
+      "target": "c08",
+      "detail": "gpt-5 · asr_agreement 0.50 · Repetition conveys eager curiosity; a single 'Why?' would also work.",
+      "level": "warn",
+      "clip_t": 12.8,
+      "view": {
+        "draft": {
+          "source": "왜요 왜요?",
+          "target": "Why? Why?",
+          "conf": 0.5
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c08",
+          "state": "drafted"
+        }
+      ]
+    },
+    {
+      "t": 191.65,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c08",
+      "detail": "withheld · asr_agreement gate · two recognisers agree only 0.50 on this window (< 0.6)",
+      "level": "gate",
+      "clip_t": 12.8,
+      "view": {
+        "gate": {
+          "name": "asr_agreement",
+          "scope": "universal",
+          "value": 0.5,
+          "limit": 0.6,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "withheld",
+          "text": "withheld"
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c08",
+          "state": "withheld"
+        },
+        {
+          "type": "score",
+          "coverage": 0.67,
+          "fabrications": 2
+        }
+      ]
+    },
+    {
+      "t": 191.65,
+      "agent": "translate-01",
+      "action": "report",
+      "target": "c01–c08",
+      "detail": "8 cues drafted",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-01",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 253.96,
+      "agent": "translate-02",
+      "action": "redraft",
+      "target": "c12",
+      "detail": "re-drafted against ko.entity_support",
+      "level": "info",
+      "clip_t": 25.52,
+      "view": {
+        "draft": {
+          "source": "그 내용이 너무 바쁘셔가지고 남는 사람이 저밖에 없어서 그 공짜로 태국 한달살기를 한 적이 있어요 아 근데 그 치앙마이에서 한달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어",
+          "target": "They were all so busy that I was the only one free, so I ended up doing a month-long stay in Thailand for free. Oh, and I lived in Chiang Mai for a month—the neighborhood was so pretty, the people were so kind, and the Korean language…",
+          "conf": 0.974
+        }
+      }
+    },
+    {
+      "t": 253.96,
+      "agent": "qc-01",
+      "action": "gate",
+      "target": "c12",
+      "detail": "withheld · entity gate · Korean — not in the closed cast and not in the glossary",
+      "level": "gate",
+      "clip_t": 25.52,
+      "view": {
+        "gate": {
+          "name": "entity",
+          "scope": "pack",
+          "value": 0,
+          "limit": 1,
+          "fail": true
+        },
+        "stamp": {
+          "kind": "withheld",
+          "text": "withheld"
+        }
+      },
+      "effects": [
+        {
+          "type": "cue",
+          "id": "c12",
+          "state": "withheld"
+        },
+        {
+          "type": "score",
+          "coverage": 0.67,
+          "fabrications": 2
+        }
+      ]
+    },
+    {
+      "t": 253.96,
+      "agent": "translate-02",
+      "action": "report",
+      "target": "c09–c12",
+      "detail": "4 cues drafted",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-02",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 253.96,
+      "agent": "qc-01",
+      "action": "report",
+      "target": "12 hard checks",
+      "detail": "8 committed · 4 withheld · 0 corrected · 2 entity-gate hits",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "reporting"
+        }
+      ]
+    },
+    {
+      "t": 253.96,
+      "agent": "translate-01",
+      "action": "retire",
+      "target": "translate-01",
+      "detail": "reported up",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-01",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 253.96,
+      "agent": "translate-02",
+      "action": "retire",
+      "target": "translate-02",
+      "detail": "reported up",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "translate-02",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 253.96,
+      "agent": "qc-01",
+      "action": "retire",
+      "target": "qc-01",
+      "detail": "reported up",
+      "level": "info",
+      "effects": [
+        {
+          "type": "agent",
+          "id": "qc-01",
+          "status": "retired"
+        }
+      ]
+    },
+    {
+      "t": 253.96,
+      "agent": "orchestrator",
+      "action": "merge",
+      "target": "12 cues",
+      "detail": "8 committed · 4 withheld",
+      "level": "info"
+    },
+    {
+      "t": 253.96,
+      "agent": "orchestrator",
+      "action": "score",
+      "target": "run-007",
+      "detail": "coverage 0.67 · 4 withheld · 2 entity-gate hits · hard lines UNSCORED: runtime has no human output labels",
+      "level": "gate",
+      "effects": [
+        {
+          "type": "score",
+          "coverage": 0.67,
+          "fabrications": 2
+        }
+      ]
+    },
+    {
+      "t": 253.96,
+      "agent": "orchestrator",
+      "action": "done",
+      "target": "run-007",
+      "detail": "84 actions · 5 workers · 254.0s wall",
+      "level": "info"
+    }
+  ]
+}

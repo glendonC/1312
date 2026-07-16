@@ -1,0 +1,91 @@
+{
+  "id": "run-007",
+  "pair": {
+    "source": "ko",
+    "target": "en"
+  },
+  "pack": "ko-v3",
+  "clip": {
+    "id": "Ux-TMWnmntM",
+    "title": "Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
+    "title_target": "Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
+    "lang": "ko",
+    "duration": 40,
+    "speakers": [
+      {
+        "id": "A",
+        "label": "speaker A · diarized"
+      },
+      {
+        "id": "B",
+        "label": "speaker B · diarized"
+      }
+    ],
+    "music": [],
+    "silence": [
+      [
+        12.2,
+        12.8
+      ]
+    ],
+    "source": {
+      "kind": "youtube",
+      "label": "Didi's Korean Culture Podcast",
+      "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+      "licence": "Creative Commons Attribution license (reuse allowed)",
+      "note": "Real media. Redistributed under the uploader's Creative Commons licence, credited on screen. Captions, traces and scores for this clip come from a run that actually happened, or they do not exist. Speaker labels are the recogniser's own, not ours: nobody is named in this window, so we do not know which voice is the host and a run that guessed would be inventing the one thing a viewer could check by watching. music[] is empty because no music detector ran, NOT because the clip is known to be clean. silence[] is derived from VAD segment boundaries (gaps ≥ 0.6s), not from an energy floor."
+    },
+    "media": "clip.mp4"
+  },
+  "wall_s": 253.96,
+  "recorded": "2026-07-16",
+  "agents": [
+    {
+      "id": "segment-01",
+      "role": "segment",
+      "label": "segment-01",
+      "parent": "orchestrator"
+    },
+    {
+      "id": "context-01",
+      "role": "context",
+      "label": "context-01",
+      "parent": "orchestrator"
+    },
+    {
+      "id": "translate-01",
+      "role": "translate",
+      "label": "translate-01",
+      "parent": "orchestrator",
+      "window": [
+        0,
+        13.65
+      ]
+    },
+    {
+      "id": "translate-02",
+      "role": "translate",
+      "label": "translate-02",
+      "parent": "orchestrator",
+      "divided_from": "translate-01",
+      "window": [
+        13.65,
+        39.92
+      ]
+    },
+    {
+      "id": "qc-01",
+      "role": "qc",
+      "label": "qc-01",
+      "parent": "orchestrator"
+    }
+  ],
+  "artifacts": [
+    "captions.json",
+    "corrections.json",
+    "glossary.json",
+    "score.json",
+    "traces.json"
+  ],
+  "note": "A run that actually happened on 2026-07-16, against rights-receipted media (Creative Commons Attribution license (reuse allowed)). Source lines are gpt-4o-transcribe-diarize; the confidence the gates read is cross-recogniser agreement with whisper-1, because gpt-4o-transcribe-diarize returns no logprobs and a confidence we cannot measure is one we do not print."
+}

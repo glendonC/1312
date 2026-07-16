@@ -390,6 +390,12 @@ export interface GlossaryFile {
     proposal_manifest: string;
     note: string;
   };
+  /** Present on frozen-benchmark runs that must not feed the cross-run memory conveyor. */
+  routing?: {
+    status: "bench_only";
+    pack_id: string;
+    note: string;
+  };
   cast_closed: boolean;
   entries: GlossaryEntry[];
 }

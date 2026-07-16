@@ -76,6 +76,7 @@ function arg(name, fallback = null) {
 }
 
 const RUN = arg("run", "run-006");
+const BENCH_PACK = arg("bench-pack");
 const DIR = join(ROOT, "public/demo/runs", RUN);
 
 function die(msg) {
@@ -91,6 +92,20 @@ const source = normalizeSourceReceipt(readJson(join(DIR, "source.json")));
 const wave = readJson(join(DIR, "waveform.json"));
 const pack = readJson(join(ROOT, "public/demo/packs/ko-v3.json"));
 const wav = join(DIR, "clip.wav");
+
+// A frozen benchmark clip may be run, but it must never feed the cross-run memory conveyor.
+// Make that routing explicit at invocation time and verify it against the frozen pack before
+// any model call happens. This is separate from scoring: the runtime still knows no judgments.
+if (BENCH_PACK) {
+  const benchPack = readJson(join(ROOT, "bench/packs", BENCH_PACK, "pack.json"));
+  if (benchPack.pack_id !== BENCH_PACK || benchPack.frozen !== true || !benchPack.freeze_receipt) {
+    die(`bench pack ${BENCH_PACK} is not frozen`);
+  }
+  const freeze = readJson(join(ROOT, "bench/packs", BENCH_PACK, benchPack.freeze_receipt));
+  if (freeze.pack_id !== BENCH_PACK || !freeze.clips?.some((clip) => clip.clip_id === source.sourceId)) {
+    die(`source clip ${source.sourceId} is not frozen in bench pack ${BENCH_PACK}`);
+  }
+}
 
 /* --------------------------------------------------------------- the tape */
 
@@ -818,7 +833,7 @@ async function main() {
     "orchestrator",
     "score",
     RUN,
-    `coverage ${coverage.toFixed(2)} · ${withheld} withheld · ${fabrications} entity-gate hits · hard lines UNSCORED: no gold for this clip`,
+    `coverage ${coverage.toFixed(2)} · ${withheld} withheld · ${fabrications} entity-gate hits · hard lines UNSCORED: runtime has no human output labels`,
     { level: "gate", effects: [{ type: "score", coverage, fabrications }] },
   );
 
@@ -901,7 +916,7 @@ async function main() {
       "captions.json",
       "corrections.json",
       "glossary.json",
-      "memory-proposals.json",
+      ...(BENCH_PACK ? [] : ["memory-proposals.json"]),
       "score.json",
       "traces.json",
     ],
@@ -942,12 +957,22 @@ async function main() {
     pack: pack.id,
     scope: "run",
     promoted_to: null,
-    promotion: {
-      status: "pending_review",
-      proposal_kind: "glossary",
-      proposal_manifest: "memory-proposals.json",
-      note: "Run-scoped evidence only. No cross-run memory was changed by this run.",
-    },
+    ...(BENCH_PACK
+      ? {
+          routing: {
+            status: "bench_only",
+            pack_id: BENCH_PACK,
+            note: "Frozen benchmark clips contribute nothing to cross-run memory, so no proposals were created.",
+          },
+        }
+      : {
+          promotion: {
+            status: "pending_review",
+            proposal_kind: "glossary",
+            proposal_manifest: "memory-proposals.json",
+            note: "Run-scoped evidence only. No cross-run memory was changed by this run.",
+          },
+        }),
     // FALSE, and it has to be. A closed cast means we hold the show's real cast list and can
     // demote any name outside it. This is a podcast between two people who are never named in
     // the window: there is no cast to close. Declaring it closed would arm ko.cast_closed
@@ -1013,52 +1038,54 @@ async function main() {
   // Proposal recording happens only after the complete evidence artifacts exist, so each
   // immutable proposal can bind the exact glossary, captions, and trace bytes it asks a
   // different actor to review. Creating a proposal changes no materialized memory.
-  const memoryStore = join(ROOT, "memory/review");
-  const ledger = await loadLedger({ store: memoryStore, workspaceRoot: ROOT });
-  const proposalReceipts = [];
-  for (const entry of glossary) {
-    const prior = acceptedHead(ledger, {
-      namespace: "language/ko/glossary",
-      kind: "glossary",
-      key: entry.term,
-    });
-    const { proposal } = await recordProposal({
-      store: memoryStore,
-      namespace: "language/ko/glossary",
-      kind: "glossary",
-      key: entry.term,
-      value: entry,
-      proposedBy: "context-01",
-      evidencePaths: [
-        `public/demo/runs/${RUN}/glossary.json`,
-        `public/demo/runs/${RUN}/captions.json`,
-        `public/demo/runs/${RUN}/traces.json`,
-      ],
-      supersedes: prior?.proposal_id ?? null,
-      source: { run_id: RUN, clip_id: clip.id, pack_id: pack.id, artifact: "glossary.json" },
-      workspaceRoot: ROOT,
-    });
-    proposalReceipts.push({
-      proposal_id: proposal.proposal_id,
-      proposal_content_id: contentIdForJson(proposal),
-      namespace: proposal.namespace,
-      kind: proposal.kind,
-      key: proposal.key,
+  if (!BENCH_PACK) {
+    const memoryStore = join(ROOT, "memory/review");
+    const ledger = await loadLedger({ store: memoryStore, workspaceRoot: ROOT });
+    const proposalReceipts = [];
+    for (const entry of glossary) {
+      const prior = acceptedHead(ledger, {
+        namespace: "language/ko/glossary",
+        kind: "glossary",
+        key: entry.term,
+      });
+      const { proposal } = await recordProposal({
+        store: memoryStore,
+        namespace: "language/ko/glossary",
+        kind: "glossary",
+        key: entry.term,
+        value: entry,
+        proposedBy: "context-01",
+        evidencePaths: [
+          `public/demo/runs/${RUN}/glossary.json`,
+          `public/demo/runs/${RUN}/captions.json`,
+          `public/demo/runs/${RUN}/traces.json`,
+        ],
+        supersedes: prior?.proposal_id ?? null,
+        source: { run_id: RUN, clip_id: clip.id, pack_id: pack.id, artifact: "glossary.json" },
+        workspaceRoot: ROOT,
+      });
+      proposalReceipts.push({
+        proposal_id: proposal.proposal_id,
+        proposal_content_id: contentIdForJson(proposal),
+        namespace: proposal.namespace,
+        kind: proposal.kind,
+        key: proposal.key,
+        status: "pending_review",
+      });
+      ledger.proposals.push(proposal);
+    }
+    const proposalManifestBody = {
+      schema: "studio.memory.run-proposals.v1",
+      run: RUN,
+      clip: clip.id,
       status: "pending_review",
+      proposals: proposalReceipts,
+    };
+    write("memory-proposals.json", {
+      manifest_id: `memory-proposal-manifest:${contentIdForJson(proposalManifestBody)}`,
+      ...proposalManifestBody,
     });
-    ledger.proposals.push(proposal);
   }
-  const proposalManifestBody = {
-    schema: "studio.memory.run-proposals.v1",
-    run: RUN,
-    clip: clip.id,
-    status: "pending_review",
-    proposals: proposalReceipts,
-  };
-  write("memory-proposals.json", {
-    manifest_id: `memory-proposal-manifest:${contentIdForJson(proposalManifestBody)}`,
-    ...proposalManifestBody,
-  });
 
   console.log(`\n  ${RUN}: ${traces.length} traces · ${wall.toFixed(1)}s wall · ${committed} committed · ${withheld} withheld\n`);
 }

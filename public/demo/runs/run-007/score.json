@@ -1,0 +1,49 @@
+{
+  "run": "run-007",
+  "clip": "Ux-TMWnmntM",
+  "pair": {
+    "source": "ko",
+    "target": "en"
+  },
+  "pack": "ko-v3",
+  "status": "unscored",
+  "rubric": {
+    "hard_lines": 4,
+    "criteria": [
+      "entity",
+      "meaning",
+      "honesty"
+    ],
+    "points_max": 12,
+    "note": "No gold exists for this clip, so NOTHING here is scored for accuracy: points and hard_line are null on every path, and so is delta_vs_cold — a run with nothing to be right against has not beaten the cold path by zero, it has not been compared to it at all. What IS real: coverage, withheld, the two latencies, and the gate hits — measurements of what this run DID, not of whether it was right. 4 lines were flagged hard because they carry a ko-v3 phenomenon, which is a detection in the source that any Korean reader can check, not a verdict on the English. Scoring against gold lives in bench/."
+  },
+  "paths": {
+    "cold": {
+      "label": "Cold one-shot",
+      "points": null,
+      "hard_line": null,
+      "coverage": 0.83,
+      "time_to_usable_s": 90.24,
+      "time_to_complete_s": 90.24,
+      "withheld": 0,
+      "hallucinated": null,
+      "status": "unscored",
+      "note": "whisper-1 + one-shot gpt-4o, no glossary, no gates. It is handed the prepped path's windows for free, so it is a foil for translation, entities and honesty — NOT for segmentation. withheld is 0 because it has no gate and never refuses anything, but coverage is still 0.83: it has no caption on 2 windows because its recogniser never heard the line. Those are MISSES, not refusals, and a coverage number cannot tell them apart — which is why coverage is not a score. The entity gate found 2 proper nouns in its English that trace to nothing in the Korean or the glossary; that is a detection, not a gold-verified error count, so hallucinated is null."
+    },
+    "run-007": {
+      "label": "1321 · this run",
+      "points": null,
+      "hard_line": null,
+      "coverage": 0.67,
+      "time_to_usable_s": 105.59,
+      "time_to_complete_s": 184.61,
+      "withheld": 4,
+      "hallucinated": null,
+      "status": "unscored",
+      "note": "8 of 12 lines committed, 4 withheld by a gate that fired, 0 sent back to the translator and fixed, 2 entity-gate hits. 2 lines were committed uncorroborated: whisper-1 timed no words in those windows — it drops backchannels — so there was nothing to cross-check, and an absence of evidence is not a disagreement. hard_line is null: this run cannot mark its own homework."
+    }
+  },
+  "trail": [],
+  "delta_vs_cold": null,
+  "per_line": []
+}

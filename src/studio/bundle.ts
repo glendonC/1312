@@ -279,6 +279,9 @@ export function assertRunBundle(value: unknown, context = "Studio run bundle"): 
   if (text(glossary.run, context, "glossary.run") !== runId) fail(context, "glossary.run", "does not match run.id");
   if (text(glossary.clip, context, "glossary.clip") !== clipId) fail(context, "glossary.clip", "does not match run.clip.id");
   if (glossary.promotion !== undefined) {
+    if (glossary.routing !== undefined) {
+      fail(context, "glossary", "cannot claim both pending promotion and bench-only routing");
+    }
     if (glossary.promoted_to !== null) fail(context, "glossary.promoted_to", "must be null while review is pending");
     const promotion = record(glossary.promotion, context, "glossary.promotion");
     const expected = ["status", "proposal_kind", "proposal_manifest", "note"];
@@ -297,6 +300,21 @@ export function assertRunBundle(value: unknown, context = "Studio run bundle"): 
       fail(context, "glossary.promotion.proposal_manifest", "must be declared in run.artifacts");
     }
     text(promotion.note, context, "glossary.promotion.note");
+  } else if (glossary.routing !== undefined) {
+    if (glossary.promoted_to !== null) {
+      fail(context, "glossary.promoted_to", "must be null for bench-only routing");
+    }
+    const routing = record(glossary.routing, context, "glossary.routing");
+    const expected = ["status", "pack_id", "note"];
+    const keys = Object.keys(routing);
+    if (keys.length !== expected.length || keys.some((key) => !expected.includes(key))) {
+      fail(context, "glossary.routing", "must use the closed bench-only shape");
+    }
+    if (text(routing.status, context, "glossary.routing.status") !== "bench_only") {
+      fail(context, "glossary.routing.status", "must equal bench_only");
+    }
+    text(routing.pack_id, context, "glossary.routing.pack_id");
+    text(routing.note, context, "glossary.routing.note");
   } else {
     text(glossary.promoted_to, context, "glossary.promoted_to");
   }

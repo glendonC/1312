@@ -200,7 +200,7 @@ const capture = {
     critical_outcomes: null,
     catastrophic: null,
     reason:
-      "There is no gold for this clip and no human has reviewed the output, so accuracy is not merely unmeasured here, it is unmeasurable. Coverage is not a score: 1321 refused 3 lines and cold refused none, which makes cold's coverage the higher number and tells you nothing about which of them was right. Nothing in this file may be rendered on /benchmarks/ as evidence of quality.",
+      "This capture contains no human output judgments, so it cannot measure correctness. Frozen gold is consumed only by the separate score path after exact-byte-bound human labels exist. Coverage is not a score and says nothing about which system was right. Nothing in this file alone may be rendered on /benchmarks/ as evidence of quality.",
   },
 
   units,
@@ -214,7 +214,7 @@ const capture = {
     media: `public/demo/runs/${RUN}/${run.clip.media}`,
   },
 
-  notes: `The first run of the real pipeline over real media, kept so later runs have something to beat. ${emitted} of ${captions.cues.length} lines committed, ${withheld} withheld by a gate that fired, ${uncorroborated} committed uncorroborated because the cross-check recogniser drops backchannels and produced no words in those windows. Confidence throughout is agreement between two independent recognisers, never a model's estimate of itself. Glossary: ${glossary.entries.length} terms, cast NOT closed (nobody is named in the window, so there is no cast to close).`,
+  notes: `A real pipeline execution over real media, pinned before output labeling so later review binds the exact bytes. ${emitted} of ${captions.cues.length} lines committed, ${withheld} withheld by a gate that fired, ${uncorroborated} committed uncorroborated because the cross-check recogniser drops backchannels and produced no words in those windows. Confidence throughout is agreement between two independent recognisers, never a model's estimate of itself. Glossary: ${glossary.entries.length} terms, cast NOT closed (nobody is named in the window, so there is no cast to close).`,
 };
 
 mkdirSync(OUT, { recursive: true });
@@ -227,5 +227,5 @@ console.log(`
   first usable line at ${firstUsable}s · every line by ${complete}s
   gates fired: ${Object.entries(gateHits).map(([k, v]) => `${k} x${v}`).join(", ") || "none"}
 
-  scored: false. It stays false until a human writes the gold.
+  scored: false. A separate receipt can score it only after exact-byte-bound human output labels.
 `);

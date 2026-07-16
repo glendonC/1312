@@ -1,0 +1,292 @@
+{
+  "schema": "studio.recorded-evidence-index.v1",
+  "producer": "scripts/index-recorded-evidence.mjs",
+  "mode": "post_run_index",
+  "run": "run-007",
+  "clip": "Ux-TMWnmntM",
+  "claims": {
+    "artifact_byte_identity": true,
+    "terminal_caption_decisions": true,
+    "original_worker_lineage": false,
+    "structured_handoffs": false
+  },
+  "artifacts": [
+    {
+      "artifact_id": "captions",
+      "kind": "captions",
+      "path": "captions.json",
+      "content": {
+        "id": "sha256:850342a566a8ef6ceb9c25814e4f723590b3611b8bf6c708d9c6c2d2d9517df5",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "850342a566a8ef6ceb9c25814e4f723590b3611b8bf6c708d9c6c2d2d9517df5"
+        },
+        "bytes": 11244
+      },
+      "source_artifact_ids": []
+    },
+    {
+      "artifact_id": "corrections",
+      "kind": "corrections",
+      "path": "corrections.json",
+      "content": {
+        "id": "sha256:ebbbdae59e809ecf5a980b04de268b10720becfe707a90d728c9084582570860",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "ebbbdae59e809ecf5a980b04de268b10720becfe707a90d728c9084582570860"
+        },
+        "bytes": 1446
+      },
+      "source_artifact_ids": []
+    },
+    {
+      "artifact_id": "glossary",
+      "kind": "glossary",
+      "path": "glossary.json",
+      "content": {
+        "id": "sha256:eb937a9ccd79fd350f41fb72d99fda986c9e8bf50ea1dadcc44e0aa30250bc11",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "eb937a9ccd79fd350f41fb72d99fda986c9e8bf50ea1dadcc44e0aa30250bc11"
+        },
+        "bytes": 1387
+      },
+      "source_artifact_ids": []
+    },
+    {
+      "artifact_id": "score",
+      "kind": "score",
+      "path": "score.json",
+      "content": {
+        "id": "sha256:6c272eb471819b1b58b70e0ce1ee2265019af34c0bfa361b57220f8dec9b7c26",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "6c272eb471819b1b58b70e0ce1ee2265019af34c0bfa361b57220f8dec9b7c26"
+        },
+        "bytes": 2579
+      },
+      "source_artifact_ids": []
+    },
+    {
+      "artifact_id": "traces",
+      "kind": "traces",
+      "path": "traces.json",
+      "content": {
+        "id": "sha256:17f2f90508e822ae18ec9d510bd1e68b940555cd13956b858b146fdefdf95466",
+        "hash": {
+          "algorithm": "sha256",
+          "digest": "17f2f90508e822ae18ec9d510bd1e68b940555cd13956b858b146fdefdf95466"
+        },
+        "bytes": 35487
+      },
+      "source_artifact_ids": []
+    }
+  ],
+  "cue_decisions": [
+    {
+      "cue_id": "c01",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 48,
+        "at": 105.59,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c02",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 50,
+        "at": 111.88,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c03",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 54,
+        "at": 128.54,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c04",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 58,
+        "at": 139.36,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c05",
+      "terminal_state": "withheld",
+      "caption_owner_id": "translate-01",
+      "gate": {
+        "id": "entity",
+        "reason": "Korean — not in the closed cast and not in the glossary"
+      },
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 64,
+        "at": 170.06,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c06",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 66,
+        "at": 175.51,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c07",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-01",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 68,
+        "at": 184.61,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c08",
+      "terminal_state": "withheld",
+      "caption_owner_id": "translate-01",
+      "gate": {
+        "id": "asr_agreement",
+        "reason": "two recognisers agree only 0.50 on this window (< 0.6)"
+      },
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 72,
+        "at": 191.65,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c09",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-02",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 52,
+        "at": 127.5,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c10",
+      "terminal_state": "withheld",
+      "caption_owner_id": "translate-02",
+      "gate": {
+        "id": "asr_agreement",
+        "reason": "two recognisers agree only 0.00 on this window (< 0.6)"
+      },
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 56,
+        "at": 135.61,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c11",
+      "terminal_state": "committed",
+      "caption_owner_id": "translate-02",
+      "gate": null,
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 62,
+        "at": 159.17,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    },
+    {
+      "cue_id": "c12",
+      "terminal_state": "withheld",
+      "caption_owner_id": "translate-02",
+      "gate": {
+        "id": "entity",
+        "reason": "Korean — not in the closed cast and not in the glossary"
+      },
+      "evidence_artifact_ids": [
+        "captions",
+        "traces"
+      ],
+      "terminal_effect": {
+        "trace_index": 75,
+        "at": 253.96,
+        "agent_id": "qc-01",
+        "action": "gate"
+      }
+    }
+  ],
+  "note": "Deterministic post-run index over recorded artifact bytes and terminal cue effects. Caption owner and event agent ids are copied labels; original worker lineage and structured handoffs are not reconstructed."
+}

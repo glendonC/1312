@@ -1,0 +1,306 @@
+{
+  "schema": "studio.bench.output-labels.v1",
+  "labels_id": "bench-labels:sha256:d960d95d9d0372cb3ae9c4b2f6a80adf4ddc0f2072e8a97822edd6ec8d484457",
+  "pack_id": "hard-ko-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "run": "run-007",
+  "capture": {
+    "path": "bench/runs/run-007/capture.json",
+    "content_id": "sha256:41027b51b32831e2c16c63ba15cb22a4be1715dd6315e7cb0202f4015ae2aeb4",
+    "bytes": 12343
+  },
+  "blinded": true,
+  "reviewers": [
+    {
+      "name": "Bench Reviewer A",
+      "git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+    },
+    {
+      "name": "Bench Reviewer B",
+      "git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+    }
+  ],
+  "labels": [
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "system_id": "1321-prepped",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0000-0155-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0000-0155-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "system_id": "1321-prepped",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0155-0195-backchannel-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0155-0195-backchannel-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "system_id": "1321-prepped",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0195-0770-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0195-0770-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "system_id": "1321-prepped",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1190-1235-backchannel-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1190-1235-backchannel-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 12.7,
+      "t_end": 13.6,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1270-1360-question-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 14,
+      "t_end": 18.8,
+      "system_id": "1321-prepped",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1400-1880-kinship-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": "Doubles one 누나 into “noona and my older sister” (two people). Consensus of three reviewers."
+    },
+    {
+      "t_start": 14,
+      "t_end": 18.8,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1400-1880-kinship-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 18.8,
+      "t_end": 19,
+      "system_id": "1321-prepped",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1880-1900-backchannel-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": "Gold is a brief 네 backchannel; overlapping kinship prose is not a yes/right/okay. Consensus of three reviewers."
+    },
+    {
+      "t_start": 18.8,
+      "t_end": 19,
+      "system_id": "1321-cold",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1880-1900-backchannel-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": "Same trap as 07A: the 13–19 kinship sentence can be fine on R007-06A, but this 0.2s gold window is only 네. No backchannel appears in the overlap. Consensus of three reviewers."
+    },
+    {
+      "t_start": 19,
+      "t_end": 19.15,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1900-1915-kinship-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": "Matches 친누나 / biological older sister. Consensus of three reviewers."
+    },
+    {
+      "t_start": 19.15,
+      "t_end": 20.2,
+      "system_id": "1321-cold",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1915-2020-backchannel-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": "Not marked “good”: gold is 네 backchannel; overlapping text is kinship continuation, not yes/right/okay. Consensus applied the backchannel rule (same as 07A/07B)."
+    },
+    {
+      "t_start": 20.2,
+      "t_end": 25.2,
+      "system_id": "1321-prepped",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2020-2520-kinship-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": "Explicit brother-in-law (매형); unfinished one-month Thailand plan. Consensus of three reviewers."
+    },
+    {
+      "t_start": 20.2,
+      "t_end": 25.2,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2020-2520-kinship-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": "“her husband” = older sister’s husband (매형); one-month Thailand plan as intention. Consensus of three reviewers."
+    },
+    {
+      "t_start": 25.52,
+      "t_end": 28.12,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2552-2812-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": "Busy referent + only person available; unfinished lead-in preserved inside the fat cue. Consensus of three reviewers."
+    },
+    {
+      "t_start": 28.12,
+      "t_end": 28.32,
+      "system_id": "1321-cold",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2812-2832-backchannel-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": "Backchannel window (네); overlapping long cue has no yes/right/okay. Same rule as 07A/07B/09A. Consensus of three reviewers."
+    },
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "system_id": "1321-cold",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2832-3987-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": "Only one available; free one-month Thailand stay; Chiang Mai month; pretty neighborhood; kind people; cuts on “Korean…”. Consensus of three reviewers."
+    }
+  ],
+  "notes": "Consensus of three human reviewers. Primary adjudicators: Bench Reviewer A <bench-reviewer-a@1321.local> and Bench Reviewer B <bench-reviewer-b@1321.local>. Bench Reviewer C <bench-reviewer-c@1321.local> participated in consensus and is recorded in notes only. Review was blinded: all three graded from the masked A/B worksheet, and system identities, the coordinator lane map, and capture.json system_id mapping were not consulted before judgments were locked. The coordinator mapping was consulted only after consensus lock to materialize the system-bound receipt."
+}

@@ -1,0 +1,59 @@
+{
+  "run": "run-007",
+  "clip": "Ux-TMWnmntM",
+  "pack": "ko-v3",
+  "scope": "run",
+  "promoted_to": null,
+  "routing": {
+    "status": "bench_only",
+    "pack_id": "hard-ko-v1",
+    "note": "Frozen benchmark clips contribute nothing to cross-run memory, so no proposals were created."
+  },
+  "cast_closed": false,
+  "entries": [
+    {
+      "term": "누나",
+      "lang": "ko",
+      "gloss": "noona",
+      "kind": "address_form",
+      "source": "gpt-5 · run-007 term resolution"
+    },
+    {
+      "term": "친누나",
+      "lang": "ko",
+      "gloss": "older sister",
+      "kind": "term",
+      "confirms_relation": true,
+      "source": "gpt-5 · run-007 term resolution"
+    },
+    {
+      "term": "매형",
+      "lang": "ko",
+      "gloss": "brother-in-law",
+      "kind": "term",
+      "confirms_relation": true,
+      "source": "gpt-5 · run-007 term resolution"
+    },
+    {
+      "term": "태국",
+      "lang": "ko",
+      "gloss": "Thailand",
+      "kind": "place",
+      "source": "gpt-5 · run-007 term resolution"
+    },
+    {
+      "term": "치앙마이",
+      "lang": "ko",
+      "gloss": "Chiang Mai",
+      "kind": "place",
+      "source": "gpt-5 · run-007 term resolution"
+    },
+    {
+      "term": "코로나 사태",
+      "lang": "ko",
+      "gloss": "COVID pandemic",
+      "kind": "term",
+      "source": "gpt-5 · run-007 term resolution"
+    }
+  ]
+}

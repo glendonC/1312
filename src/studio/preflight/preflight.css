@@ -6,6 +6,7 @@
   width: min(760px, calc(100vw - 32px));
   max-height: calc(100svh - 190px);
   padding: clamp(20px, 4vw, 34px);
+  overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--glass-border);
   border-radius: 24px;
@@ -42,11 +43,108 @@
 .preflight-policy,
 .preflight-block,
 .preflight-coverage p,
-.preflight-provenance p {
+.preflight-provenance p,
+.preflight-stage-head p,
+.preflight-forecast-fact p {
   margin: 0;
   color: var(--ink-muted);
   font-size: 0.72rem;
   line-height: 1.55;
+}
+
+.preflight-submitted-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  gap: 18px;
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 4%, rgba(255, 255, 255, 0.76));
+}
+
+.preflight-submitted-source > div {
+  min-width: 0;
+}
+
+.preflight-submitted-source > div > span:first-child,
+.preflight-facts-intro > span,
+.preflight-stage-head > span,
+.preflight-forecast-fact > span,
+.preflight-next-sequence > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.preflight-submitted-source .source-display {
+  width: 100%;
+  min-width: 0;
+}
+
+.preflight-submitted-source dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.preflight-submitted-source dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+}
+
+.preflight-submitted-source dt,
+.preflight-submitted-source dd {
+  margin: 0;
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.preflight-submitted-source dt {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
+.preflight-submitted-source dd {
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+.preflight-recorded-facts {
+  margin-top: 22px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.preflight-facts-intro {
+  cursor: pointer;
+}
+
+.preflight-facts-intro > span {
+  margin-bottom: 4px;
+  color: var(--ink-soft);
+}
+
+.preflight-facts-intro small {
+  display: block;
+  max-width: 620px;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  font-weight: var(--weight-regular);
+  line-height: 1.45;
+}
+
+.preflight-recorded-facts:not([open]) {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
 }
 
 .preflight-fixture,
@@ -64,7 +162,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 30px;
-  margin: 24px 0;
+  margin: 12px 0 24px;
   border-top: 1px solid var(--line);
 }
 
@@ -96,6 +194,134 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.preflight-preparation {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.preflight-stage-head {
+  padding-top: 4px;
+}
+
+.preflight-stage-head > span {
+  margin-bottom: 5px;
+  color: var(--accent);
+}
+
+.preflight-stage-head h2 {
+  margin: 0 0 7px;
+  font-size: clamp(1.05rem, 2.3vw, 1.35rem);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  outline: none;
+}
+
+.preflight-forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preflight-forecast-fact {
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.preflight-forecast-fact[data-unavailable="true"] {
+  background: rgba(247, 247, 244, 0.54);
+}
+
+.preflight-forecast-fact > span {
+  margin-bottom: 9px;
+}
+
+.preflight-forecast-fact b {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: var(--weight-medium);
+}
+
+.preflight-forecast-fact[data-unavailable="true"] b {
+  color: var(--ink-muted);
+}
+
+.preflight-contract-gap,
+.preflight-preview-warning {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 2px solid var(--hold);
+  color: var(--ink-soft);
+  background: var(--hold-soft);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.preflight-confirmation-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+.preflight-confirmation-summary div {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.preflight-confirmation-summary div:nth-child(odd) {
+  padding-right: 18px;
+}
+
+.preflight-confirmation-summary dt,
+.preflight-confirmation-summary dd {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.preflight-confirmation-summary dt {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
+.preflight-confirmation-summary dd {
+  color: var(--ink-soft);
+}
+
+.preflight-next-sequence {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.preflight-next-sequence ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.preflight-preview-warning b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ink);
+  font-weight: var(--weight-medium);
 }
 
 .preflight-group {
@@ -282,8 +508,15 @@
 
   .preflight-facts,
   .preflight-primary,
-  .preflight-advanced[open] {
+  .preflight-advanced[open],
+  .preflight-submitted-source,
+  .preflight-forecast-grid,
+  .preflight-confirmation-summary {
     grid-template-columns: 1fr;
+  }
+
+  .preflight-submitted-source {
+    gap: 14px;
   }
 
   .preflight-facts div {
@@ -295,6 +528,10 @@
     gap: 2px;
   }
 
+  .preflight-confirmation-summary div:nth-child(odd) {
+    padding-right: 0;
+  }
+
   .preflight-actions {
     align-items: stretch;
     flex-direction: column-reverse;
@@ -302,5 +539,11 @@
 
   .preflight-actions button {
     width: 100%;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 860px) {
+  .preflight-forecast-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

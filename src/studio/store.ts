@@ -13,10 +13,14 @@ import { useShallow } from "zustand/react/shallow";
 import type { Layout } from "./layout";
 import {
   assessRecordedRequest,
+  assessSubmittedPreviewRequest,
   cancelledPreflight,
+  failedSubmittedSourceResolution,
   idlePreflight,
+  initialRequest,
   loadingRecordedPreflight,
   recordedPreflight,
+  resolvingSubmittedSourcePreflight,
   submittedSourcePreflight,
   unavailableRecordedPreflight,
   type AnalysisRequest,
@@ -24,6 +28,7 @@ import {
   type PreflightSession,
 } from "./preflight/model";
 import { createStudioPreviewSession, type StudioPreviewSession } from "./previewSession";
+import { resolveRemoteSource } from "./sourceResolution";
 import { projectRun } from "./replayProjection";
 import {
   applyTrace,
@@ -115,6 +120,18 @@ interface StudioStore {
 let transport: RunTransport | null = null;
 let handle: RunHandle | null = null;
 let loadVersion = 0;
+let sourceResolutionVersion = 0;
+
+function submittedReadyPreflight(bundle: RunBundle, durationSeconds: number): PreflightSession {
+  const session = recordedPreflight(bundle);
+  return {
+    ...session,
+    request: {
+      ...initialRequest(bundle.run.pair.target, durationSeconds),
+      rangeMode: "entire",
+    },
+  };
+}
 
 export const useStudio = create<StudioStore>((set, get) => ({
   stage: "input",
@@ -158,8 +175,14 @@ export const useStudio = create<StudioStore>((set, get) => ({
     try {
       const bundle = await next.load();
       if (version !== loadVersion) return;
-      set({ bundle, loadStatus: "ready", error: null });
-      if (get().previewSession) get().start();
+      set((current) => ({
+        bundle,
+        loadStatus: "ready",
+        error: null,
+        preflight: current.previewSession?.resolution
+          ? submittedReadyPreflight(bundle, current.previewSession.resolution.source.durationMs / 1_000)
+          : current.preflight,
+      }));
     } catch (err) {
       if (version !== loadVersion) return;
       set({
@@ -176,6 +199,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
   },
 
   openRecordedPreflight() {
+    sourceResolutionVersion += 1;
     const { bundle, loadStatus } = get();
     if (loadStatus === "loading") {
       set({ preflight: loadingRecordedPreflight(), previewSession: null });
@@ -189,14 +213,39 @@ export const useStudio = create<StudioStore>((set, get) => ({
   },
 
   submitSource(source) {
+    const resolutionVersion = ++sourceResolutionVersion;
     const previewSession = createStudioPreviewSession(source);
     if (!previewSession) {
       set({ preflight: submittedSourcePreflight(source), previewSession: null, outcome: null });
       return;
     }
 
-    set({ preflight: idlePreflight(), previewSession, outcome: null });
-    if (get().bundle) get().start();
+    set({
+      preflight: resolvingSubmittedSourcePreflight(),
+      previewSession,
+      outcome: null,
+    });
+    void resolveRemoteSource(source).then((resolution) => {
+      if (resolutionVersion !== sourceResolutionVersion) return;
+      const { bundle } = get();
+      set((current) => {
+        if (current.previewSession?.source.raw !== source) return current;
+        return {
+          previewSession: { ...current.previewSession, resolution },
+          preflight: bundle
+            ? submittedReadyPreflight(bundle, resolution.source.durationMs / 1_000)
+            : loadingRecordedPreflight(),
+        };
+      });
+    }).catch((resolutionError: unknown) => {
+      if (resolutionVersion !== sourceResolutionVersion) return;
+      const message = resolutionError instanceof Error
+        ? resolutionError.message
+        : "Source metadata resolution failed.";
+      set((current) => current.previewSession?.source.raw === source
+        ? { preflight: failedSubmittedSourceResolution(message) }
+        : current);
+    });
   },
 
   updatePreflightRequest(request) {
@@ -209,6 +258,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
   },
 
   dismissPreflight() {
+    sourceResolutionVersion += 1;
     set({ preflight: idlePreflight() });
   },
 
@@ -217,9 +267,11 @@ export const useStudio = create<StudioStore>((set, get) => ({
   },
 
   confirmPreflight() {
-    const { bundle, preflight } = get();
+    const { bundle, preflight, previewSession } = get();
     if (!bundle) return;
-    const assessment = assessRecordedRequest(preflight, bundle, import.meta.env.DEV);
+    const assessment = previewSession?.resolution
+      ? assessSubmittedPreviewRequest(preflight, previewSession.resolution.source.durationMs / 1_000)
+      : assessRecordedRequest(preflight, bundle, import.meta.env.DEV);
     if (!assessment.canReplay) return;
     set({ outputDepth: preflight.request.outputDepth });
     get().start();
@@ -265,6 +317,7 @@ export const useStudio = create<StudioStore>((set, get) => ({
   },
 
   reset() {
+    sourceResolutionVersion += 1;
     handle?.stop();
     handle = null;
     set({

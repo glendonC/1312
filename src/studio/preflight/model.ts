@@ -18,7 +18,7 @@ export type PreflightStatus =
   | "excessive_duration"
   | "cancelled";
 
-export type RangeMode = "recorded" | "suggested" | "detected" | "custom";
+export type RangeMode = "recorded" | "entire" | "suggested" | "detected" | "custom";
 export type OutputDepth = "captions" | "evidence";
 
 export interface AnalysisRequest {
@@ -44,7 +44,7 @@ export interface ProducerGap {
 }
 
 export interface PreflightProvenance {
-  kind: "recorded_ingest" | "contract_fixture" | "client_validation";
+  kind: "recorded_ingest" | "remote_resolution" | "contract_fixture" | "client_validation";
   producer: string | null;
   note: string;
 }
@@ -140,6 +140,39 @@ export function loadingRecordedPreflight(): PreflightSession {
       kind: "recorded_ingest",
       producer: "ReplayTransport",
       note: "Waiting for the recorded bundle and its optional source receipt.",
+    },
+  };
+}
+
+export function resolvingSubmittedSourcePreflight(): PreflightSession {
+  return {
+    ...idlePreflight(),
+    status: "loading_source",
+    title: "Resolving submitted source",
+    message: "Studio is requesting YouTube metadata. No media download or content processing has started.",
+    provenance: {
+      kind: "remote_resolution",
+      producer: "studio.youtube-metadata-resolver",
+      note: "Waiting for a metadata-only duration receipt from the local Studio server.",
+    },
+  };
+}
+
+export function failedSubmittedSourceResolution(message: string): PreflightSession {
+  return {
+    ...idlePreflight(),
+    status: "inaccessible",
+    title: "Source metadata unavailable",
+    message,
+    missing: [{
+      id: "hosted-ingest",
+      label: "Remote source resolution",
+      consequence: "Duration and range controls remain unavailable because no source-resolution receipt exists.",
+    }],
+    provenance: {
+      kind: "remote_resolution",
+      producer: "studio.youtube-metadata-resolver",
+      note: "No media download or processing was started.",
     },
   };
 }
@@ -362,6 +395,56 @@ export function assessRecordedRequest(
   }
 
   return { duration, canReplay: true, reason: null, recommendation, localWarning: overHostedCap };
+}
+
+export function assessSubmittedPreviewRequest(
+  session: PreflightSession,
+  measuredDuration: number,
+): RangeAssessment {
+  if (session.status !== "ready" || !Number.isFinite(measuredDuration) || measuredDuration <= 0) {
+    return {
+      duration: null,
+      canReplay: false,
+      reason: "Source metadata is not ready.",
+      recommendation: null,
+      localWarning: false,
+    };
+  }
+  const { start, end, rangeMode } = session.request;
+  if (![start, end].every(Number.isFinite) || start < 0 || end <= start || end > measuredDuration) {
+    return {
+      duration: Number.isFinite(end - start) ? end - start : null,
+      canReplay: false,
+      reason: `Choose a valid range within 0:00–${formatSeconds(measuredDuration)}.`,
+      recommendation: null,
+      localWarning: false,
+    };
+  }
+  const duration = end - start;
+  const recommendation = duration < RECOMMENDED_RANGE_S.min
+    ? "short"
+    : duration <= RECOMMENDED_RANGE_S.max
+      ? "recommended"
+      : "long";
+  if (duration > HOSTED_MAX_RANGE_S) {
+    return {
+      duration,
+      canReplay: false,
+      reason: `The current hosted request contract is limited to ${HOSTED_MAX_RANGE_S} seconds. Choose a custom range within the resolved video.`,
+      recommendation,
+      localWarning: false,
+    };
+  }
+  if (rangeMode === "suggested" || rangeMode === "detected" || rangeMode === "recorded") {
+    return {
+      duration,
+      canReplay: false,
+      reason: "Choose the resolved entire video or a custom range.",
+      recommendation,
+      localWarning: false,
+    };
+  }
+  return { duration, canReplay: true, reason: null, recommendation, localWarning: false };
 }
 
 export function formatSeconds(value: number): string {

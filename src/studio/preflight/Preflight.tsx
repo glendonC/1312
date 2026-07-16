@@ -1,10 +1,16 @@
 import { useMemo } from "react";
 
+import SourceDisplay from "../SourceDisplay";
 import { useBundle, useStudio } from "../store";
 import type { MediaProbeTrack } from "../types";
 import ConfirmationForm, { AdvancedFields } from "./ConfirmationForm";
 import type { RecordedLanguageRange } from "./languageProjection";
-import { assessRecordedRequest, formatSeconds, type PreflightSession } from "./model";
+import {
+  assessRecordedRequest,
+  assessSubmittedPreviewRequest,
+  formatSeconds,
+  type PreflightSession,
+} from "./model";
 
 import "./preflight.css";
 
@@ -16,10 +22,16 @@ export default function Preflight() {
   const cancel = useStudio((state) => state.cancelPreflight);
   const confirm = useStudio((state) => state.confirmPreflight);
   const useRecorded = useStudio((state) => state.openRecordedPreflight);
+  const previewSession = useStudio((state) => state.previewSession);
 
   const assessment = useMemo(
-    () => (bundle ? assessRecordedRequest(session, bundle, import.meta.env.DEV) : null),
-    [bundle, session],
+    () => {
+      if (!bundle) return null;
+      return previewSession?.resolution
+        ? assessSubmittedPreviewRequest(session, previewSession.resolution.source.durationMs / 1_000)
+        : assessRecordedRequest(session, bundle, import.meta.env.DEV);
+    },
+    [bundle, previewSession, session],
   );
 
   if (session.status === "idle") return null;
@@ -60,14 +72,50 @@ export default function Preflight() {
   const { facts } = session;
 
   return (
-    <section className="preflight" aria-labelledby="preflight-title">
+    <section
+      className="preflight"
+      data-preview-mode={previewSession ? "submitted-source" : "recorded-demo"}
+      aria-labelledby="preflight-title"
+    >
       <header className="preflight-head">
-        <span className="preflight-kicker">Confirm recorded source</span>
-        <h1 id="preflight-title">{facts.title}</h1>
-        <p>{session.message}</p>
+        <span className="preflight-kicker">
+          {previewSession ? "Submitted source · interface preview" : "Confirm recorded source"}
+        </span>
+        <h1 id="preflight-title">
+          {previewSession ? "Set up your processing request" : facts.title}
+        </h1>
+        <p>
+          {previewSession
+            ? "YouTube metadata resolved without downloading the media. Duration now comes from a hashed metadata receipt; content processing has not started."
+            : session.message}
+        </p>
       </header>
 
-      <dl className="preflight-facts">
+      {previewSession && (
+        <div className="preflight-submitted-source" role="note" aria-label="Submitted source preview boundary">
+          <div>
+            <span>Submitted link</span>
+            <SourceDisplay source={previewSession.source} title={previewSession.source.raw} />
+          </div>
+          <dl>
+            <div><dt>Client check</dt><dd>Link format accepted</dd></div>
+            <div><dt>Remote resolution</dt><dd>{previewSession.resolution ? "Resolved" : "Unavailable"}</dd></div>
+            <div>
+              <dt>Full duration</dt>
+              <dd>{previewSession.resolution ? formatSeconds(previewSession.resolution.source.durationMs / 1_000) : "Unavailable"}</dd>
+            </div>
+            <div><dt>Processing</dt><dd>Not started</dd></div>
+          </dl>
+        </div>
+      )}
+
+      <details className="preflight-recorded-facts" open={!previewSession}>
+        <summary className="preflight-facts-intro">
+          <span>{previewSession ? "Recorded fixture facts · not the submitted link" : "Recorded source facts"}</span>
+          {previewSession && <small>Open the demo measurements used by these controls</small>}
+        </summary>
+
+        <dl className="preflight-facts">
         <div>
           <dt>Source receipt</dt>
           <dd>{facts.rights.basis === "ownership_attestation" ? "Owned local bytes receipted" : "Remote source ingested when recorded"}</dd>
@@ -165,7 +213,8 @@ export default function Preflight() {
           <dt>Language pack</dt>
           <dd>{bundle.run.pack} selected for the recorded job · not detector output</dd>
         </div>
-      </dl>
+        </dl>
+      </details>
 
       <ConfirmationForm
         bundle={bundle}
@@ -175,6 +224,8 @@ export default function Preflight() {
         update={update}
         cancel={cancel}
         confirm={confirm}
+        previewMode={previewSession !== null}
+        previewResolution={previewSession?.resolution ?? null}
       />
     </section>
   );

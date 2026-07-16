@@ -1,4 +1,54 @@
+import { createHash } from "node:crypto";
+
 import { expect, test, type Locator, type Page } from "@playwright/test";
+
+import { canonicalJsonLine } from "../../src/studio/runtime/production/observability/hash.ts";
+
+function sourceResolutionReceipt(url: string, durationMs = 83_000) {
+  const payload = {
+    schema: "studio.remote-source-resolution.v1" as const,
+    producer: {
+      id: "studio.youtube-metadata-resolver" as const,
+      version: "1" as const,
+      tool: { id: "yt-dlp" as const, version: "fixture" },
+    },
+    resolvedAt: "2026-07-16T12:00:00.000Z",
+    request: { url: new URL(url).toString() },
+    source: {
+      kind: "youtube" as const,
+      canonicalUrl: "https://www.youtube.com/watch?v=fixturevideo",
+      externalId: "fixturevideo",
+      label: "Resolved browser-test video",
+      creator: "Recorded test producer",
+      durationMs,
+      durationMeasurement: {
+        kind: "provider_metadata" as const,
+        field: "duration" as const,
+        producer: "yt-dlp" as const,
+      },
+    },
+  };
+  const bytes = Buffer.from(canonicalJsonLine(payload), "utf8");
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  return {
+    ...payload,
+    resolutionId: `source-resolution:${digest}`,
+    content: {
+      algorithm: "sha256" as const,
+      digest,
+      contentId: `sha256:${digest}`,
+      bytes: bytes.byteLength,
+    },
+  };
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/studio/source-resolutions", async (route) => {
+    const request = route.request();
+    const body = request.postDataJSON() as { url: string };
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(sourceResolutionReceipt(body.url)) });
+  });
+});
 
 async function openLab(page: Page): Promise<void> {
   await page.goto("/studio/?lab=1");
@@ -17,6 +67,28 @@ function readout(page: Page) {
 function productStudioUrl(): string {
   const runtimeHost = process.env.STUDIO_RUNTIME_HOST_URL;
   return runtimeHost ? `/studio/?runtimeHost=${encodeURIComponent(runtimeHost)}` : "/studio/";
+}
+
+async function finishPreparation(page: Page, previewMode = true): Promise<void> {
+  await page.getByRole("button", { name: "Continue to forecast" }).click();
+  await expect(page.getByRole("heading", { name: "Review what can be known before starting" })).toBeVisible();
+  await page.getByRole("button", { name: "Review request" }).click();
+  await expect(page.getByRole("heading", {
+    name: previewMode ? "Start the recorded processing preview" : "Replay this recorded processing request",
+  })).toBeVisible();
+  await page.getByRole("button", {
+    name: previewMode ? "Preview processing experience" : "Replay recorded analysis",
+  }).click();
+}
+
+async function startSubmittedPreview(
+  page: Page,
+  source = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+): Promise<void> {
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill(source);
+  await page.keyboard.press("Enter");
+  await finishPreparation(page);
 }
 
 function ownedWav(seed: number): Buffer {
@@ -138,7 +210,8 @@ test("the default Studio exposes a separate owned-source operator path", async (
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await expect(productRuntime).toBeVisible();
   await expect(productRuntime.getByText("Local production path · separate from replay")).toBeVisible();
-  await expect(productRuntime.getByText(/does not produce captions, study output, or a multi-agent swarm/)).toBeVisible();
+  await expect(productRuntime.getByText(/a separate private caption job may be explicitly requested/)).toBeVisible();
+  await expect(productRuntime.getByText(/Neither path uploads or publishes/)).toBeVisible();
   await expect(productRuntime.getByText(/Submitted YouTube URLs remain unprocessed recorded previews/)).toBeVisible();
   await productRuntime.getByText("Local host setup and CLI escape hatch").click();
   await expect(productRuntime.getByText(/run-runtime-host\.ts --executor deterministic/)).toBeVisible();
@@ -148,6 +221,52 @@ test("the default Studio exposes a separate owned-source operator path", async (
   await productRuntime.getByRole("button", { name: "Back to source choices" }).click();
   await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run Demo" })).toBeVisible();
+});
+
+test("the development processing fixture exposes honest running state and worker focus", async ({ page }) => {
+  await page.goto("/studio/?processingMock=running");
+
+  const fixture = page.getByRole("region", { name: "Processing contract fixture" });
+  await expect(fixture.getByText("Development contract fixture · no host work")).toBeVisible();
+  await expect(fixture.getByText(/creates no receipt or artifact/)).toBeVisible();
+
+  const canvas = fixture.getByRole("region", { name: "Processing canvas" });
+  await expect(canvas.getByRole("heading", { name: "Running" })).toBeVisible();
+  await expect(canvas.getByText("13 validated events")).toBeVisible();
+  await expect(canvas.getByText("media.operation_started", { exact: true })).toHaveCount(2);
+  await expect(canvas.getByRole("heading", { name: "2 workers are active" })).toBeVisible();
+  await expect(canvas.getByRole("heading", { name: "No usable caption artifact" })).toBeVisible();
+  await expect(canvas.getByRole("button", { name: "Pause" })).toHaveCount(0);
+  await expect(canvas.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  await expect(canvas.getByText(/no pause or cancellation command/)).toHaveCount(1);
+
+  const worker = canvas.getByRole("button", { name: "Inspect bounded-media-child, Working" });
+  await worker.click();
+  const focus = page.getByRole("dialog", { name: "bounded-media-child" });
+  await expect(focus).toBeVisible();
+  await expect(focus.getByText(/not an autonomous playback control/)).toBeVisible();
+  await focus.getByRole("button", { name: "Close" }).press("Escape");
+  await expect(focus).toHaveCount(0);
+  await expect(worker).toBeFocused();
+});
+
+test("the development processing fixture separates a journal connection error from runtime failure", async ({ page }) => {
+  await page.goto("/studio/?processingMock=poll-error");
+
+  const canvas = page.getByRole("region", { name: "Processing canvas" });
+  await expect(canvas.getByRole("heading", { name: "Journal updates paused" })).toBeVisible();
+  await expect(canvas.getByText(/fixture transport is unavailable/)).toBeVisible();
+  const retry = canvas.getByRole("button", { name: "Retry from cursor 13" });
+  await retry.click();
+  await expect(canvas.getByRole("heading", { name: "Running" })).toBeVisible();
+  await expect(canvas.getByText("Healthy at validated journal head 13.")).toBeVisible();
+  await expect(retry).toHaveCount(0);
+
+  await page.goto("/studio/?processingMock=failed");
+  const failed = page.getByRole("region", { name: "Processing canvas" });
+  await expect(failed.getByRole("heading", { name: "Failed" })).toBeVisible();
+  await expect(failed.getByText(/executor closed without a successful terminal result/)).toBeVisible();
+  await expect(failed.getByRole("button", { name: "Prepare another run" })).toBeVisible();
 });
 
 test("owned browser media requires rights, registers, and continues through the existing plan/start flow", async ({ page }, testInfo) => {
@@ -186,7 +305,7 @@ test("owned browser media requires rights, registers, and continues through the 
   await expect(plan).toBeVisible();
   await plan.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
   const status = productRuntime.getByRole("region", { name: "Local runtime status" });
-  await expect(status.getByText(/Terminal/)).toBeVisible({ timeout: 10_000 });
+  await expect(status.getByRole("heading", { name: "Terminal", exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
   await expect(page.locator(".hub")).toHaveCount(0);
 });
@@ -215,18 +334,18 @@ test("the product path reviews and freezes an exact local forecast without enter
 
   await plan.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
   const status = productRuntime.getByRole("region", { name: "Local runtime status" });
-  await expect(status.getByText(/Terminal/)).toBeVisible({ timeout: 10_000 });
+  await expect(status.getByRole("heading", { name: "Terminal", exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(status.getByText(/Closed at validated journal head/)).toBeVisible();
   const production = status.getByRole("region", { name: "Production task and handoff facts" });
   await expect(production).toBeVisible();
   await expect(production.getByText(/recorded production evidence, not a presence signal/)).toBeVisible();
   await expect(production.locator("[data-production-task-id]")).toHaveCount(2);
   await expect(production.locator("[data-production-worker-id]")).toHaveCount(2);
-  await expect(production.locator("[data-production-grant-id]")).toHaveCount(2);
+  await expect(production.locator("[data-production-grant-id]")).toHaveCount(6);
   await expect(production.locator("[data-production-report-id]")).toHaveCount(1);
   await expect(production.locator("[data-production-spawn-request-id]")).toHaveCount(1);
   await expect(production.locator('[data-production-spawn-request-id][data-decision="accepted"]')).toBeVisible();
-  await expect(production.locator("[data-production-output-artifact-id]")).toHaveCount(1);
+  await expect(production.locator("[data-production-output-artifact-id]")).toHaveCount(2);
   await expect(production.locator('[data-production-output-artifact-id][data-origin-kind="worker_output"]')).toBeVisible();
   await expect(production.getByRole("heading", { name: "Production tasks" })).toBeVisible();
   await expect(production.getByRole("heading", { name: "Spawn requests and decisions" })).toBeVisible();
@@ -244,6 +363,9 @@ test("the lab starts and polls an explicitly running deterministic host without 
 
   await openLab(page);
   const localRuntime = page.getByRole("region", { name: "Local runtime host" });
+  if (process.env.STUDIO_RUNTIME_HOST_URL) {
+    await localRuntime.getByLabel("Host origin").fill(process.env.STUDIO_RUNTIME_HOST_URL);
+  }
   await localRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
   await localRuntime.getByRole("button", { name: "Connect to local host" }).click();
   await expect(localRuntime.getByLabel("Registered source")).toBeVisible();
@@ -395,11 +517,45 @@ test("the welcome composition fits every supported viewport", async ({ page }, t
   }
 });
 
-test("a submitted source launches the recorded interface preview", async ({ page }) => {
+test("a submitted source moves through setup and forecast before the recorded interface preview", async ({ page }) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Input Source" }).click();
   await page.getByRole("textbox", { name: "Clip link" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   await page.keyboard.press("Enter");
+
+  await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Set up your processing request" })).toBeVisible();
+  const sourceBoundary = page.getByRole("note", { name: "Submitted source preview boundary" });
+  await expect(sourceBoundary.getByText("Link format accepted", { exact: true })).toBeVisible();
+  await expect(sourceBoundary.getByText("Resolved", { exact: true })).toBeVisible();
+  await expect(sourceBoundary.getByText("1:23", { exact: true })).toBeVisible();
+  await expect(sourceBoundary.getByText("Not started", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Entire video · 0:00–1:23")).toBeChecked();
+  await expect(page.getByLabel("Recorded selection · 0:00–0:40")).toHaveCount(0);
+
+  await page.getByLabel("Custom start and end").check();
+  const rangeEnd = page.getByRole("spinbutton", { name: "End, seconds" });
+  await rangeEnd.fill("90");
+  await expect(page.getByText("Choose a valid range within 0:00–1:23.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue to forecast" })).toBeDisabled();
+  await rangeEnd.fill("60");
+  await expect(page.getByRole("button", { name: "Continue to forecast" })).toBeEnabled();
+  await page.getByLabel("Entire video · 0:00–1:23").check();
+
+  await page.getByRole("button", { name: "Continue to forecast" }).click();
+  const forecast = page.getByRole("heading", { name: "Review what can be known before starting" });
+  await expect(forecast).toBeVisible();
+  await expect(forecast).toBeFocused();
+  await expect(page.getByText("No duration estimate contract is supplied.")).toBeVisible();
+  await expect(page.getByText("No pricing or billing contract is supplied.")).toBeVisible();
+  await expect(page.getByText("No worker-count or execution-plan contract is supplied.")).toBeVisible();
+  await page.getByRole("button", { name: "Back to request" }).click();
+  await expect(page.getByRole("heading", { name: "Choose what Studio should prepare" })).toBeFocused();
+  await page.getByRole("button", { name: "Continue to forecast" }).click();
+  await page.getByRole("button", { name: "Review request" }).click();
+  await expect(page.getByRole("heading", { name: "Start the recorded processing preview" })).toBeFocused();
+  await expect(page.getByText(/submitted link remains untouched/i)).toBeVisible();
+  await page.getByRole("button", { name: "Preview processing experience" }).click();
 
   await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
   await expect(page.locator('.hub [data-agent-identity="orchestrator-root"]')).toBeVisible();
@@ -428,6 +584,62 @@ test("a submitted source launches the recorded interface preview", async ({ page
       return dockBox.x + dockBox.width - (stopBox.x + stopBox.width);
     })
     .toBeLessThanOrEqual(10);
+});
+
+test("a remote metadata failure keeps duration and range controls unavailable", async ({ page }) => {
+  await page.unroute("**/api/studio/source-resolutions");
+  await page.route("**/api/studio/source-resolutions", async (route) => {
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "source_inaccessible", message: "YouTube video metadata is unavailable." } }),
+    });
+  });
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/privatevideo");
+  await page.getByRole("button", { name: "Launch investigation" }).click();
+
+  await expect(page.getByRole("heading", { name: "Source metadata unavailable" })).toBeVisible();
+  await expect(page.getByText("YouTube video metadata is unavailable.")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Analysis range" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Use recorded source" })).toBeVisible();
+});
+
+test("the submitted preparation sequence stays horizontally contained at every supported viewport", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive preparation contract");
+
+  for (const viewport of [
+    { width: 2048, height: 1152 },
+    { width: 1440, height: 900 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+    { width: 320, height: 568 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/studio/");
+    await page.getByRole("button", { name: "Input Source" }).click();
+    await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/dQw4w9WgXcQ");
+    await page.getByRole("button", { name: "Launch investigation" }).click();
+
+    const panel = page.locator(".preflight");
+    await expect(page.getByRole("heading", { name: "Choose what Studio should prepare" })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+    const panelBox = await panel.boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(panelBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect((panelBox?.x ?? 0) + (panelBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
+
+    await page.getByRole("button", { name: "Continue to forecast" }).click();
+    await expect(page.getByRole("heading", { name: "Review what can be known before starting" })).toBeFocused();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+
+    await page.getByRole("button", { name: "Review request" }).click();
+    await expect(page.getByRole("heading", { name: "Start the recorded processing preview" })).toBeFocused();
+    await expect(page.getByRole("button", { name: "Preview processing experience" })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+  }
 });
 
 test("active agent materials visibly change at canvas scale", async ({ page }, testInfo) => {
@@ -461,11 +673,7 @@ test("active agent materials visibly change at canvas scale", async ({ page }, t
 
 test("the public Dock pauses and resumes without stopping the run", async ({ page }, testInfo) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page
-    .getByRole("textbox", { name: "Clip link" })
-    .fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-  await page.keyboard.press("Enter");
+  await startSubmittedPreview(page);
 
   const dock = page.locator(".dock");
   const rail = page.locator(".rail");
@@ -534,11 +742,7 @@ test("the public Dock pauses and resumes without stopping the run", async ({ pag
 
 test("cancelling a run resolves in the dock without replacing the canvas", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page
-    .getByRole("textbox", { name: "Clip link" })
-    .fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-  await page.keyboard.press("Enter");
+  await startSubmittedPreview(page);
   await page.getByRole("button", { name: "Stop" }).click();
 
   await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
@@ -729,6 +933,7 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
     "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   );
   await page.keyboard.press("Enter");
+  await finishPreparation(page);
 
   const orchestrator = page.getByRole("button", { name: /^orchestrator,/ });
   await expect(orchestrator).toBeVisible();
@@ -1002,6 +1207,7 @@ test("the submitted preview fits every supported viewport", async ({ page }, tes
     await page.getByRole("button", { name: "Input Source" }).click();
     await page.getByRole("textbox", { name: "Clip link" }).fill(`https://youtu.be/${longVideoId}`);
     await page.keyboard.press("Enter");
+    await finishPreparation(page);
     await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
 
     const capsule = page.locator(".top-mid");
@@ -1046,6 +1252,7 @@ test("the source capsule sizes to content before applying its maximum", async ({
   await page.getByRole("button", { name: "Input Source" }).click();
   await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/dQw4w9WgXcQ");
   await page.keyboard.press("Enter");
+  await finishPreparation(page);
 
   const capsule = page.locator(".top-mid");
   const label = capsule.locator(".source-display-url");
@@ -1059,6 +1266,7 @@ test("the source capsule sizes to content before applying its maximum", async ({
     .getByRole("textbox", { name: "Clip link" })
     .fill(`https://youtu.be/${"deliberately-long-source-id-".repeat(12)}`);
   await page.keyboard.press("Enter");
+  await finishPreparation(page);
 
   await expect(label).toHaveAttribute("data-overflow", "true");
   const longWidth = await capsule.evaluate((element) => element.getBoundingClientRect().width);
@@ -1069,7 +1277,7 @@ test("the source capsule sizes to content before applying its maximum", async ({
 test("the recorded run uses its receipted source identity", async ({ page }) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Run Demo" }).click();
-  await page.getByRole("button", { name: "Replay recorded analysis" }).click();
+  await finishPreparation(page, false);
 
   const source = page.getByRole("group", {
     name: "Source: YouTube source Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
@@ -1147,9 +1355,7 @@ test("mobile controls remain in the viewport", async ({ page }, testInfo) => {
 test("reduced motion disables decorative animation", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "Clip link" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-  await page.getByRole("button", { name: "Launch investigation" }).click();
+  await startSubmittedPreview(page);
   const thinkingMesh = page.locator('.hub [data-field-motion="thinking"] .agent-mark-mesh');
   await expect(thinkingMesh).toBeVisible();
   await expect(thinkingMesh).toHaveAttribute("data-mesh-motion", "still");

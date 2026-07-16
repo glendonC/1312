@@ -64,17 +64,19 @@ export const MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS = 4;
 
 const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
   orchestrator: new Set(["task.spawn.request", "task.reports.wait"]),
-  media: new Set(["media.extract", "media.seek", "report.submit"]),
+  media: new Set(["media.extract", "media.seek", "speech.transcribe", "report.submit"]),
   analysis: new Set([
     "media.seek",
+    "speech.transcribe",
     "evidence.read",
     "analysis.evidence.assess",
     "analysis.evidence.decide",
     "report.submit",
   ]),
-  translation: new Set(["media.seek", "evidence.read", "report.submit"]),
+  translation: new Set(["media.seek", "speech.transcribe", "evidence.read", "report.submit"]),
   quality: new Set([
     "media.seek",
+    "speech.transcribe",
     "evidence.read",
     "analysis.evidence.assess",
     "analysis.evidence.decide",
@@ -227,10 +229,11 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   const readScope = evidenceScopes(item.evidenceScope, context, `${path}.evidenceScope`);
   const assessScope = assessmentScope(item.assessmentScope, context, `${path}.assessmentScope`);
   const decideScope = decisionScope(item.decisionScope, context, `${path}.decisionScope`);
-  if (capability.startsWith("media.") && mediaScope.length === 0) {
+  const mediaBound = capability.startsWith("media.") || capability === "speech.transcribe";
+  if (mediaBound && mediaScope.length === 0) {
     fail(context, path, "media grants require scope");
   }
-  if (!capability.startsWith("media.") && mediaScope.length !== 0) {
+  if (!mediaBound && mediaScope.length !== 0) {
     fail(context, path, "non-media grants cannot carry scope");
   }
   if (capability === "evidence.read" && readScope.length === 0) {

@@ -464,12 +464,53 @@ export interface ProductionStudioOperationView {
   failure: string | null;
 }
 
+export interface ProductionStudioSemanticEvidenceView {
+  operationId: string;
+  capability: "speech.transcribe";
+  status: "started" | "completed" | "failed";
+  audit: "not_completed" | "verified_at_completion" | "verified_on_reopen" | "absent_or_invalid";
+  producer: {
+    id: string;
+    version: string;
+    model: string | null;
+    runtimeId: string;
+    runtimeVersion: string;
+    configurationId: string;
+    configurationContentId: string;
+    executionScope: "current_run";
+  };
+  executor: { taskId: string; agentId: string; executionId: string; launchClaimId: string; grantId: string };
+  source: {
+    artifactId: string;
+    contentId: string;
+    trackId: string;
+    range: { startMs: number; endMs: number };
+  };
+  returnedRange: { startMs: number; endMs: number } | null;
+  artifact: { artifactId: string; contentId: string } | null;
+  receipt: { receiptId: string; contentId: string } | null;
+  observationCount: number | null;
+  availability: {
+    id: string;
+    state: "available" | "empty" | "unavailable" | "unknown";
+    truncated: boolean;
+  } | null;
+  failure: string | null;
+}
+
 export type ProductionStudioOutputArtifactOrigin =
   | {
       kind: "media_operation" | "media_observation";
       operationId: string;
       receiptId: string;
       receiptContentId: string;
+    }
+  | {
+      kind: "semantic_media_evidence";
+      operationId: string;
+      receiptId: string;
+      receiptContentId: string;
+      availabilityId: string;
     }
   | {
       kind: "worker_output";
@@ -522,6 +563,8 @@ export interface ProductionStudioProjection {
   orchestratorDecisions: ProductionStudioOrchestratorDecisionView[];
   rootOutputDispositions: ProductionStudioRootOutputDispositionView[];
   operations: ProductionStudioOperationView[];
+  /** Present on real production projections; optional only for older typed UI fixtures. */
+  semanticEvidence?: ProductionStudioSemanticEvidenceView[];
   evidenceReads: ProductionStudioEvidenceReadView[];
   evidenceAssessments: ProductionStudioEvidenceAssessmentView[];
   evidenceDecisions: ProductionStudioEvidenceDecisionView[];
@@ -551,6 +594,7 @@ export interface ProductionStudioProjection {
     orchestratorDecisions: number;
     rootOutputDispositions: number;
     operations: number;
+    semanticEvidence?: number;
     evidenceReads: number;
     evidenceAssessments: number;
     evidenceDecisions: number;

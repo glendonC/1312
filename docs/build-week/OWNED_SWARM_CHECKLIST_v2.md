@@ -77,8 +77,7 @@ every media class.
 
 ## 2. Current-run semantic perception evidence
 
-- [ ] Status: blocked on slice 1 for the multi-worker claim; the producer contract may be developed
-  in isolation but is not swarm evidence until a delegated worker consumes it.
+- [x] Status: complete.
 - Real: source bytes and exact ranges are content-bound; `media.seek` proves only audio activity;
   VAD and language receipts are readable under exact task windows; a separate caption executor
   contains a current-run recognizer seam.

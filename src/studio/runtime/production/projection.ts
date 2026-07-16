@@ -5,6 +5,7 @@ import { applyCaptionEvent } from "./projection/captionEvents.ts";
 import { applyEvidenceEvent } from "./projection/evidenceEvents.ts";
 import { applyExecutionMediaEvent } from "./projection/executionMediaEvents.ts";
 import { applyReportEvent } from "./projection/reportEvents.ts";
+import { applySemanticEvidenceEvent } from "./projection/semanticEvidenceEvents.ts";
 import { applyReviewEvent } from "./projection/reviewEvents.ts";
 import { invariant } from "./projection/shared.ts";
 import { applyTaskEvent } from "./projection/taskEvents.ts";
@@ -23,6 +24,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     reportWaits: {},
     orchestratorDecisions: {},
     operations: {},
+    semanticEvidence: {},
     evidenceReads: {},
     evidenceAssessments: {},
     evidenceDecisions: {},
@@ -52,6 +54,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
   if (applyArtifactEvent(next, event)) return next;
   if (applyTaskEvent(next, event)) return next;
   if (applyExecutionMediaEvent(next, event)) return next;
+  if (applySemanticEvidenceEvent(next, event)) return next;
   if (applyEvidenceEvent(next, event)) return next;
   if (applyReviewEvent(next, event)) return next;
   if (applyCaptionEvent(next, event)) return next;

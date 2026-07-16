@@ -17,7 +17,8 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       !next.evidenceReads[request.operationId] &&
         !next.evidenceAssessments[request.operationId] &&
         !next.evidenceDecisions[request.operationId] &&
-        !next.operations[request.operationId],
+        !next.operations[request.operationId] &&
+        !next.semanticEvidence[request.operationId],
       event,
       `operation ${request.operationId} is duplicated`,
     );
@@ -52,6 +53,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
     );
     const calls = [
       ...Object.values(next.operations),
+      ...Object.values(next.semanticEvidence),
       ...Object.values(next.evidenceReads),
       ...Object.values(next.evidenceAssessments),
       ...Object.values(next.evidenceDecisions),
@@ -151,7 +153,8 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       !next.evidenceAssessments[request.operationId] &&
         !next.evidenceDecisions[request.operationId] &&
         !next.evidenceReads[request.operationId] &&
-        !next.operations[request.operationId],
+        !next.operations[request.operationId] &&
+        !next.semanticEvidence[request.operationId],
       event,
       `operation ${request.operationId} is duplicated`,
     );
@@ -205,6 +208,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
     );
     const calls = [
       ...Object.values(next.operations),
+      ...Object.values(next.semanticEvidence),
       ...Object.values(next.evidenceReads),
       ...Object.values(next.evidenceAssessments),
       ...Object.values(next.evidenceDecisions),
@@ -301,7 +305,8 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       !next.evidenceDecisions[request.operationId] &&
         !next.evidenceAssessments[request.operationId] &&
         !next.evidenceReads[request.operationId] &&
-        !next.operations[request.operationId],
+        !next.operations[request.operationId] &&
+        !next.semanticEvidence[request.operationId],
       event,
       `operation ${request.operationId} is duplicated`,
     );
@@ -340,6 +345,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
     );
     const calls = [
       ...Object.values(next.operations),
+      ...Object.values(next.semanticEvidence),
       ...Object.values(next.evidenceReads),
       ...Object.values(next.evidenceAssessments),
       ...Object.values(next.evidenceDecisions),

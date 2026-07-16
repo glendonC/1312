@@ -1,4 +1,4 @@
-import { assertMediaExtractRequest, assertMediaSeekRequest } from "./assertions.ts";
+import { assertMediaExtractRequest, assertMediaSeekRequest, assertSpeechTranscribeRequest } from "./assertions.ts";
 import type {
   Capability,
   CapabilityGrant,
@@ -13,6 +13,7 @@ import type {
   MediaExtractRequest,
   MediaSeekRequest,
   MediaTrackDescriptor,
+  SpeechTranscribeRequest,
   RuntimeArtifact,
   RuntimeProjection,
 } from "./model.ts";
@@ -23,10 +24,70 @@ import { assertEvidenceDecisionRequest } from "./validation/decision.ts";
 function taskCapabilityCalls(state: RuntimeProjection, taskId: string): number {
   return [
     ...Object.values(state.operations),
+    ...Object.values(state.semanticEvidence),
     ...Object.values(state.evidenceReads),
     ...Object.values(state.evidenceAssessments),
     ...Object.values(state.evidenceDecisions),
   ].filter((operation) => operation.taskId === taskId).length;
+}
+
+export interface AuthorizedSpeechTranscribe {
+  request: SpeechTranscribeRequest;
+  grant: CapabilityGrant;
+  artifact: RuntimeArtifact;
+  track: MediaTrackDescriptor;
+  executionId: string;
+  launchClaimId: string;
+}
+
+export function authorizeSpeechTranscribe(
+  state: RuntimeProjection,
+  requestValue: unknown,
+): AuthorizedSpeechTranscribe {
+  assertSpeechTranscribeRequest(requestValue);
+  const request = requestValue;
+  const task = state.tasks[request.taskId];
+  if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
+    throw new Error("Speech transcription requires a working task owned by the requesting agent");
+  }
+  if (
+    state.semanticEvidence[request.operationId] ||
+    state.operations[request.operationId] ||
+    state.evidenceReads[request.operationId] ||
+    state.evidenceAssessments[request.operationId] ||
+    state.evidenceDecisions[request.operationId]
+  ) throw new Error(`Speech transcription operation ${request.operationId} already exists`);
+  const artifact = state.artifacts[request.artifactId];
+  if (!artifact || artifact.runId !== state.runId || artifact.origin.kind !== "ingest") {
+    throw new Error("Speech transcription input must be the registered owned source artifact");
+  }
+  if (
+    task.jobContext.source.artifactId !== artifact.id ||
+    task.jobContext.source.contentId !== artifact.content.contentId
+  ) throw new Error("Speech transcription source changed from the immutable task context");
+  const track = artifact.tracks.find((candidate) => candidate.id === request.trackId);
+  if (!track || track.kind !== "audio") throw new Error("Speech transcription requires one registered audio track");
+  if (request.endMs > (artifact.durationMs ?? 0)) throw new Error("Speech transcription exceeds the measured source duration");
+  const grant = task.grants.find((candidate) =>
+    candidate.capability === "speech.transcribe" &&
+    candidate.mediaScope.some((scope) =>
+      scope.artifactId === request.artifactId &&
+      scope.trackId === request.trackId &&
+      request.startMs >= scope.startMs &&
+      request.endMs <= scope.endMs));
+  if (!grant) throw new Error("Speech transcription is outside the task's authoritative capability grant");
+  if (taskCapabilityCalls(state, task.id) >= task.budget.toolCalls) {
+    throw new Error("Speech transcription exceeds the task tool-call budget");
+  }
+  const executions = Object.values(state.executions).filter((execution) =>
+    execution.taskId === task.id && execution.agentId === request.agentId && execution.status === "active");
+  if (executions.length !== 1) throw new Error("Speech transcription requires one active task executor");
+  const execution = executions[0];
+  const launch = state.taskLaunches[task.id];
+  if (!launch || launch.executionId !== execution.id || launch.agentId !== request.agentId) {
+    throw new Error("Speech transcription executor lost its durable launch lineage");
+  }
+  return { request, grant, artifact, track, executionId: execution.id, launchClaimId: launch.id };
 }
 
 export interface AuthorizedMediaExtract {
@@ -55,6 +116,7 @@ function authorizeMediaRange<Request extends MediaExtractRequest | MediaSeekRequ
   }
   if (
     state.operations[request.operationId] ||
+    state.semanticEvidence[request.operationId] ||
     state.evidenceReads[request.operationId] ||
     state.evidenceAssessments[request.operationId] ||
     state.evidenceDecisions[request.operationId]
@@ -104,7 +166,8 @@ export function authorizeEvidenceRead(
     state.evidenceReads[request.operationId] ||
     state.evidenceAssessments[request.operationId] ||
     state.evidenceDecisions[request.operationId] ||
-    state.operations[request.operationId]
+    state.operations[request.operationId] ||
+    state.semanticEvidence[request.operationId]
   ) {
     throw new Error(`Evidence read operation ${request.operationId} already exists`);
   }
@@ -173,7 +236,8 @@ export function authorizeEvidenceAssessment(
     state.evidenceAssessments[request.operationId] ||
     state.evidenceDecisions[request.operationId] ||
     state.evidenceReads[request.operationId] ||
-    state.operations[request.operationId]
+    state.operations[request.operationId] ||
+    state.semanticEvidence[request.operationId]
   ) throw new Error(`Evidence assessment operation ${request.operationId} already exists`);
   const grant = task.grants.find((candidate) =>
     candidate.capability === "analysis.evidence.assess" && candidate.assessmentScope !== null);
@@ -236,7 +300,8 @@ export function authorizeEvidenceDecision(
     state.evidenceDecisions[request.operationId] ||
     state.evidenceAssessments[request.operationId] ||
     state.evidenceReads[request.operationId] ||
-    state.operations[request.operationId]
+    state.operations[request.operationId] ||
+    state.semanticEvidence[request.operationId]
   ) throw new Error(`Evidence decision operation ${request.operationId} already exists`);
   const grant = task.grants.find((candidate) =>
     candidate.capability === "analysis.evidence.decide" && candidate.decisionScope !== null);

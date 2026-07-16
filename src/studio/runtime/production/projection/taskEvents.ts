@@ -251,6 +251,8 @@ export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): bo
     invariant(requiresReason ? Boolean(event.data.reason?.trim()) : event.data.reason === null, event, `task ${task.id} transition reason is inconsistent`);
     const activeOperation = Object.values(next.operations).some(
       (operation) => operation.taskId === task.id && operation.status === "started",
+    ) || Object.values(next.semanticEvidence).some(
+      (operation) => operation.taskId === task.id && operation.status === "started",
     );
     const activeEvidenceRead = Object.values(next.evidenceReads).some(
       (operation) => operation.taskId === task.id && operation.status === "started",

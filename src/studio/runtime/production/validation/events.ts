@@ -33,6 +33,12 @@ import {
   validateMediaOperationReceipt,
 } from "./media.ts";
 import {
+  assertSpeechTranscribeRequest,
+  validateCurrentRunRecognizerDescriptor,
+  validateSemanticEvidenceLimits,
+  validateSemanticMediaEvidenceReceipt,
+} from "./semanticEvidence.ts";
+import {
   array,
   boolean,
   contentId,
@@ -98,7 +104,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -262,6 +268,26 @@ export function assertRuntimeEvent(
     string(data.outputArtifactId, context, "event.data.outputArtifactId");
     validateMediaOperationReceipt(data.receipt, context, "event.data.receipt");
   } else if (type === "media.operation_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.reason, context, "event.data.reason");
+  } else if (type === "semantic.evidence_started") {
+    exact(data, ["request", "grantId", "executionId", "launchClaimId", "sourceContentId", "producer", "limits"], context, "event.data");
+    assertSpeechTranscribeRequest(data.request, context);
+    string(data.grantId, context, "event.data.grantId");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.launchClaimId, context, "event.data.launchClaimId");
+    contentId(data.sourceContentId, context, "event.data.sourceContentId");
+    validateCurrentRunRecognizerDescriptor(data.producer, context, "event.data.producer");
+    validateSemanticEvidenceLimits(data.limits, context, "event.data.limits");
+  } else if (type === "semantic.evidence_completed") {
+    exact(data, ["operationId", "outputArtifactId", "outputContentId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.outputContentId, context, "event.data.outputContentId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateSemanticMediaEvidenceReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "semantic.evidence_failed") {
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     string(data.reason, context, "event.data.reason");

@@ -9,6 +9,7 @@ import {
   assertSourceArtifactDescriptor,
   assertWorkerOutputEnvelope,
 } from "./assertions.ts";
+import { validateSemanticMediaEvidenceArtifact } from "./validation/semanticEvidence.ts";
 import type {
   ContentIdentity,
   CaptionProductionArtifact,
@@ -24,6 +25,7 @@ import type {
   PublishReviewRevocationReceipt,
   RootOutputDispositionReceipt,
   RuntimeArtifact,
+  SemanticMediaEvidenceArtifact,
   SourceArtifactDescriptor,
   WorkerOutputEnvelope,
 } from "./model.ts";
@@ -287,6 +289,68 @@ export class ContentAddressedArtifactStore {
       envelope,
       ...stored,
     };
+  }
+
+  async prepareSemanticEvidence(runId: string, value: unknown): Promise<{
+    artifactId: string;
+    envelope: SemanticMediaEvidenceArtifact;
+    content: ContentIdentity;
+    storageKey: string;
+  }> {
+    const envelope = validateSemanticMediaEvidenceArtifact(value);
+    if (envelope.runId !== runId) throw new Error("Semantic evidence envelope belongs to another run");
+    const stored = await this.storeJson(envelope);
+    if (stored.content.bytes > envelope.limits.maxArtifactBytes) {
+      throw new Error("Semantic evidence artifact exceeds its byte ceiling");
+    }
+    return {
+      artifactId: `artifact:${canonicalSha256({
+        runId,
+        operationId: envelope.operationId,
+        kind: "studio.semantic-media-evidence.v1",
+        contentId: stored.content.contentId,
+      })}`,
+      envelope,
+      ...stored,
+    };
+  }
+
+  buildSemanticEvidenceArtifact(input: {
+    runId: string;
+    receiptId: string;
+    receiptContentId: string;
+    prepared: {
+      artifactId: string;
+      envelope: SemanticMediaEvidenceArtifact;
+      content: ContentIdentity;
+      storageKey: string;
+    };
+  }): RuntimeArtifact {
+    const envelope = input.prepared.envelope;
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: input.prepared.artifactId,
+      runId: input.runId,
+      kind: "studio.semantic-media-evidence.v1",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.prepared.content,
+      storageKey: input.prepared.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [envelope.source.artifactId],
+      producerTaskId: envelope.authorization.taskId,
+      producerAgentId: envelope.authorization.agentId,
+      origin: {
+        kind: "semantic_media_evidence",
+        operationId: envelope.operationId,
+        receiptId: input.receiptId,
+        receiptContentId: input.receiptContentId,
+        availabilityId: envelope.availability.id,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
   }
 
   buildWorkerOutputArtifact(input: {

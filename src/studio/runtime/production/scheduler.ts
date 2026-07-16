@@ -132,7 +132,9 @@ export class BoundedRuntimeScheduler {
         capability,
         taskId,
         agentId,
-        mediaScope: capability.startsWith("media.") ? structuredClone(input.mediaScope) : [],
+        mediaScope: capability.startsWith("media.") || capability === "speech.transcribe"
+          ? structuredClone(input.mediaScope)
+          : [],
         evidenceScope: capability === "evidence.read"
           ? input.inputArtifactIds
               .map((artifactId) => state.artifacts[artifactId])
@@ -194,7 +196,7 @@ export class BoundedRuntimeScheduler {
       input.requiredCapabilities.length > 0 &&
       input.requiredCapabilities.every((capability) => this.limits.grantableCapabilities.includes(capability)) &&
       roleAllowsCapabilities(input.workerKind, input.requiredCapabilities) &&
-      (!input.requiredCapabilities.some((capability) => capability.startsWith("media.")) || input.mediaScope.length > 0) &&
+      (!input.requiredCapabilities.some((capability) => capability.startsWith("media.") || capability === "speech.transcribe") || input.mediaScope.length > 0) &&
       (!input.requiredCapabilities.includes("evidence.read") ||
         (evidenceArtifacts.length > 0 &&
           evidenceArtifacts.every((artifactId) => evidenceWindow(state, input, artifactId) !== null))) &&

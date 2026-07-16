@@ -7,6 +7,7 @@ import {
   DeterministicRuntimeExecutor,
   OwnedMediaIngestService,
   OpenAiCaptionProductionExecutor,
+  OpenAiCurrentRunSpeechRecognizer,
   RecordedCaptionFixtureExecutor,
   RuntimeSourceRegistry,
   RuntimeStartService,
@@ -66,13 +67,20 @@ if (captionExecutorMode !== "recorded" && captionExecutorMode !== "openai") {
 if (captionExecutorMode === "openai" && !flag("--allow-real-caption-production")) {
   throw new Error("Real caption production requires --allow-real-caption-production");
 }
+const semanticRecognizerMode = value("--semantic-recognizer") ?? "unavailable";
+if (semanticRecognizerMode !== "unavailable" && semanticRecognizerMode !== "openai") {
+  throw new Error("--semantic-recognizer must be unavailable or openai");
+}
+if (semanticRecognizerMode === "openai" && !flag("--allow-real-semantic-evidence")) {
+  throw new Error("Real current-run semantic evidence requires --allow-real-semantic-evidence");
+}
 
 async function openAiKey(): Promise<string> {
   const environmentKey = process.env.OPENAI_API_KEY?.trim();
   if (environmentKey) return environmentKey;
   const contents = await readFile(resolve(REPOSITORY, ".env"), "utf8").catch(() => "");
   const key = (contents.match(/^OPENAI_API_KEY=(.+)$/m) ?? [])[1]?.trim();
-  if (!key) throw new Error("Real caption production requires OPENAI_API_KEY or OPENAI_API_KEY in .env");
+  if (!key) throw new Error("Real OpenAI runtime execution requires OPENAI_API_KEY or OPENAI_API_KEY in .env");
   return key;
 }
 
@@ -101,12 +109,15 @@ const deterministic = executorMode === "deterministic" ? new DeterministicRuntim
 const captionExecutor = captionExecutorMode === "openai"
   ? new OpenAiCaptionProductionExecutor({ apiKey: await openAiKey() })
   : new RecordedCaptionFixtureExecutor();
+const semanticRecognizer = semanticRecognizerMode === "openai"
+  ? new OpenAiCurrentRunSpeechRecognizer({ apiKey: await openAiKey() })
+  : undefined;
 const service = await RuntimeStartService.open({
   store,
   sources,
   launcherFactory: deterministic
     ? deterministic.factory()
-    : codexWorkerLauncherFactory({ model: configuredModel, maximumWallMs: 45_000 }),
+    : codexWorkerLauncherFactory({ model: configuredModel, maximumWallMs: 45_000, semanticRecognizer }),
   ...(deterministic ? {} : {
     orchestratorLauncherFactory: codexOrchestratorLauncherFactory({
       model: configuredModel!,
@@ -139,6 +150,9 @@ process.stdout.write(`${JSON.stringify({
   captionExecutor: captionExecutorMode === "openai"
     ? "real-recognizer-translator-opt-in"
     : "recorded-real-pipeline-fixture-adapter",
+  semanticRecognizer: semanticRecognizerMode === "openai"
+    ? "current-run-openai-opt-in"
+    : "current-run-unavailable-no-fixture-fallback",
   authorizationToken: token,
 }, null, 2)}\n`);
 

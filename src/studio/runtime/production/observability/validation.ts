@@ -194,7 +194,7 @@ export function assertRuntimeObservabilityIndex(
       `index.sources.receipts[${index}]`,
     );
     string(source.receiptId, `index.sources.receipts[${index}].receiptId`);
-    oneOf(source.kind, new Set(["media_operation", "evidence_assessment", "evidence_decision", "publish_review_intake", "publish_review_decision", "publish_review_revocation", "caption_production", "caption_quality_control", "root_output_disposition", "executor_span", "model_usage"]), `index.sources.receipts[${index}].kind`);
+    oneOf(source.kind, new Set(["media_operation", "semantic_media_evidence", "evidence_assessment", "evidence_decision", "publish_review_intake", "publish_review_decision", "publish_review_revocation", "caption_production", "caption_quality_control", "root_output_disposition", "executor_span", "model_usage"]), `index.sources.receipts[${index}].kind`);
     string(source.eventId, `index.sources.receipts[${index}].eventId`);
     contentId(source.contentId, `index.sources.receipts[${index}].contentId`);
     oneOf(source.storage, new Set(["artifact_store", "embedded_event"]), `index.sources.receipts[${index}].storage`);

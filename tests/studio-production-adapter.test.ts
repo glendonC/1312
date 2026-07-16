@@ -518,6 +518,7 @@ test("production adapter projects spawn and output lineage with existing facts o
     orchestratorDecisions: 0,
     rootOutputDispositions: 0,
     operations: 0,
+    semanticEvidence: 0,
     evidenceReads: 0,
     evidenceAssessments: 0,
     evidenceDecisions: 0,

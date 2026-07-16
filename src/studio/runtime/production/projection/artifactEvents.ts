@@ -20,6 +20,15 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         event,
         `artifact ${artifact.id} has the wrong origin for ${operation.capability}`,
       );
+    } else if (artifact.origin.kind === "semantic_media_evidence") {
+      const operation = next.semanticEvidence[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active semantic operation`);
+      invariant(
+        operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId &&
+          artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId,
+        event,
+        `artifact ${artifact.id} changed its semantic producer or source`,
+      );
     } else if (artifact.origin.kind === "worker_output") {
       const execution = next.executions[artifact.origin.executionId];
       invariant(execution?.status === "active", event, `artifact ${artifact.id} has no active worker execution`);

@@ -17,6 +17,9 @@ import type {
   EvidenceReadRequest,
   MediaOperationRequest,
   MediaOperationReceipt,
+  CurrentRunRecognizerDescriptor,
+  SemanticMediaEvidenceReceipt,
+  SpeechTranscribeRequest,
   ModelUsageReceipt,
   OrchestratorDecisionRecord,
   PublishReviewDecisionReceipt,
@@ -40,6 +43,7 @@ export type RuntimeProducerKind =
   | "registry"
   | "artifact_store"
   | "media_host"
+  | "semantic_evidence_host"
   | "evidence_host"
   | "assessment_host"
   | "decision_host"
@@ -187,6 +191,35 @@ export interface MediaOperationCompletedEvent extends RuntimeEventBase {
 
 export interface MediaOperationFailedEvent extends RuntimeEventBase {
   type: "media.operation_failed";
+  data: { operationId: string; reason: string };
+}
+
+export interface SemanticEvidenceStartedEvent extends RuntimeEventBase {
+  type: "semantic.evidence_started";
+  data: {
+    request: SpeechTranscribeRequest;
+    grantId: string;
+    executionId: string;
+    launchClaimId: string;
+    sourceContentId: string;
+    producer: CurrentRunRecognizerDescriptor;
+    limits: SemanticMediaEvidenceReceipt["limits"];
+  };
+}
+
+export interface SemanticEvidenceCompletedEvent extends RuntimeEventBase {
+  type: "semantic.evidence_completed";
+  data: {
+    operationId: string;
+    outputArtifactId: string;
+    outputContentId: string;
+    receiptContentId: string;
+    receipt: SemanticMediaEvidenceReceipt;
+  };
+}
+
+export interface SemanticEvidenceFailedEvent extends RuntimeEventBase {
+  type: "semantic.evidence_failed";
   data: { operationId: string; reason: string };
 }
 
@@ -412,6 +445,9 @@ export type RuntimeEvent =
   | MediaOperationStartedEvent
   | MediaOperationCompletedEvent
   | MediaOperationFailedEvent
+  | SemanticEvidenceStartedEvent
+  | SemanticEvidenceCompletedEvent
+  | SemanticEvidenceFailedEvent
   | EvidenceReadStartedEvent
   | EvidenceReadCompletedEvent
   | EvidenceReadFailedEvent

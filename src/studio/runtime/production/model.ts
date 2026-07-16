@@ -6,5 +6,6 @@ export * from "./model/media.ts";
 export * from "./model/projection.ts";
 export * from "./model/reports.ts";
 export * from "./model/review.ts";
+export * from "./model/semanticEvidence.ts";
 export * from "./model/source.ts";
 export * from "./model/tasks.ts";

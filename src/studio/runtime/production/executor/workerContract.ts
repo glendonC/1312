@@ -1,8 +1,10 @@
-import type { TaskRecord } from "../model.ts";
+import type { SemanticEvidenceCitationInput, TaskRecord } from "../model.ts";
+import { validateSemanticEvidenceCitationInput } from "../validation/semanticEvidence.ts";
 import { LauncherFailure } from "./launcherFailure.ts";
 
 export interface WorkerResult {
   summary: string;
+  semanticEvidenceInputs: SemanticEvidenceCitationInput[];
   outputs: Array<{ name: string; kind: string; content: string }>;
 }
 
@@ -12,9 +14,17 @@ function record(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-export function validateWorkerResult(value: unknown, task: TaskRecord): WorkerResult {
+export function validateWorkerResult(
+  value: unknown,
+  task: TaskRecord,
+  expectedSemanticEvidenceInputs: SemanticEvidenceCitationInput[] = [],
+): WorkerResult {
   const item = record(value);
-  if (!item || Object.keys(item).some((key) => key !== "summary" && key !== "outputs")) {
+  const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
+  const allowedKeys = semanticGranted
+    ? new Set(["summary", "semanticEvidenceInputs", "outputs"])
+    : new Set(["summary", "outputs"]);
+  if (!item || Object.keys(item).some((key) => !allowedKeys.has(key))) {
     throw new LauncherFailure(
       "Worker result must contain only summary and outputs",
       "Codex worker response failed its output contract.",
@@ -34,6 +44,35 @@ export function validateWorkerResult(value: unknown, task: TaskRecord): WorkerRe
     throw new LauncherFailure(
       "Worker outputs must be an array",
       "Codex worker response failed its output contract.",
+    );
+  }
+  let semanticEvidenceInputs: SemanticEvidenceCitationInput[] = [];
+  if (semanticGranted) {
+    if (!Array.isArray(item.semanticEvidenceInputs)) {
+      throw new LauncherFailure(
+        "Semantic-consuming worker omitted its structured evidence input list",
+        "Codex worker response failed its semantic evidence citation contract.",
+      );
+    }
+    try {
+      semanticEvidenceInputs = item.semanticEvidenceInputs.map((input, index) =>
+        validateSemanticEvidenceCitationInput(input, "Worker result", `semanticEvidenceInputs[${index}]`));
+    } catch (error) {
+      throw new LauncherFailure(
+        `Worker semantic evidence citation is invalid: ${error instanceof Error ? error.message : "invalid citation"}`,
+        "Codex worker response failed its semantic evidence citation contract.",
+      );
+    }
+    if (JSON.stringify(semanticEvidenceInputs) !== JSON.stringify(expectedSemanticEvidenceInputs)) {
+      throw new LauncherFailure(
+        "Worker semantic evidence citations do not equal the authenticated current-task observations",
+        "Codex worker response failed its semantic evidence citation contract.",
+      );
+    }
+  } else if (expectedSemanticEvidenceInputs.length !== 0) {
+    throw new LauncherFailure(
+      "Host supplied semantic evidence without a worker grant",
+      "Codex worker response failed its semantic evidence citation contract.",
     );
   }
   const required = task.requiredOutputs.filter((output) => output.required);
@@ -77,16 +116,49 @@ export function validateWorkerResult(value: unknown, task: TaskRecord): WorkerRe
       "Codex worker response failed its output contract.",
     );
   }
-  return { summary: item.summary, outputs };
+  return { summary: item.summary, semanticEvidenceInputs, outputs };
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
   const required = task.requiredOutputs.filter((output) => output.required);
+  const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
+  const semanticEvidenceInputs = {
+    type: "array",
+    minItems: 1,
+    maxItems: 16,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        operationId: { type: "string", minLength: 1 },
+        artifactId: { type: "string", minLength: 1 },
+        contentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        receiptId: { type: "string", minLength: 1 },
+        receiptContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        observations: {
+          type: "array",
+          maxItems: 64,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              observationId: { type: "string", minLength: 1 },
+              startMs: { type: "integer", minimum: 0 },
+              endMs: { type: "integer", minimum: 1 },
+            },
+            required: ["observationId", "startMs", "endMs"],
+          },
+        },
+      },
+      required: ["operationId", "artifactId", "contentId", "receiptId", "receiptContentId", "observations"],
+    },
+  };
   return {
     type: "object",
     additionalProperties: false,
     properties: {
       summary: { type: "string", minLength: 1, maxLength: 2_000 },
+      ...(semanticGranted ? { semanticEvidenceInputs } : {}),
       outputs: {
         type: "array",
         minItems: required.length,
@@ -103,7 +175,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         },
       },
     },
-    required: ["summary", "outputs"],
+    required: semanticGranted ? ["summary", "semanticEvidenceInputs", "outputs"] : ["summary", "outputs"],
   };
 }
 
@@ -114,6 +186,9 @@ export function workerPrompt(task: TaskRecord): string {
       : grant.capability === "media.seek"
         ? ["media_seek"]
         : []);
+  const semanticScope = task.grants
+    .filter((grant) => grant.capability === "speech.transcribe")
+    .flatMap((grant) => grant.mediaScope);
   const contract = {
     taskId: task.id,
     jobContext: task.jobContext,
@@ -124,6 +199,7 @@ export function workerPrompt(task: TaskRecord): string {
     mediaScope: task.mediaScope,
     budget: task.budget,
     grantedMediaTools: mediaTools,
+    grantedSemanticEvidence: semanticScope,
     grantedEvidence: task.grants
       .filter((grant) => grant.capability === "evidence.read")
       .flatMap((grant) => grant.evidenceScope),
@@ -153,6 +229,16 @@ export function workerPrompt(task: TaskRecord): string {
         "Preserve operation, input-artifact, receipt, receipt-content, producer, decision, and preflight-lineage identities in the required worker output.",
         "Do not infer claims beyond the returned facts; unknown, withheld, empty, and truncated remain explicit.",
       ].join(" ");
+  const semanticBoundary = semanticScope.length === 0
+    ? "This executor exposes no speech_transcribe tool and cannot cite current-run semantic media evidence."
+    : [
+        "Invoke speech_transcribe once for the exact granted artifact, track, and half-open range.",
+        "Its timed text is a current-run recognizer hypothesis, not hearing, truth, understanding, agreement, or an accuracy claim.",
+        "Multiple workers reading hypotheses does not establish consensus or quality.",
+        "Copy the returned operation/artifact/content/receipt identities and every exact observation id/range into the top-level semanticEvidenceInputs list.",
+        "A free-text mention of any identity is not a citation and the output validator will reject it.",
+        "Preserve empty, unavailable, unknown, and truncated availability without upgrading it.",
+      ].join(" ");
   const assessmentScope = task.grants
     .find((grant) => grant.capability === "analysis.evidence.assess")?.assessmentScope ?? null;
   const assessmentBoundary = assessmentScope === null
@@ -179,6 +265,7 @@ export function workerPrompt(task: TaskRecord): string {
     "You are one isolated child in the 1321 Studio production runtime.",
     "Complete only the bounded task contract below and return the JSON required by the supplied output schema.",
     mediaBoundary,
+    semanticBoundary,
     evidenceBoundary,
     assessmentBoundary,
     decisionBoundary,

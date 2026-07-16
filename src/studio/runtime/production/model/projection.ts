@@ -13,6 +13,7 @@ import type {
   ModelUsageReceipt,
 } from "./execution.ts";
 import type { OperationRecord } from "./media.ts";
+import type { SemanticEvidenceRecord } from "./semanticEvidence.ts";
 import type {
   ReportRecord,
   RootOutputDispositionRecord,
@@ -44,6 +45,7 @@ export interface RuntimeProjection {
   reportWaits: Record<string, ReportsWaitRecord>;
   orchestratorDecisions: Record<string, OrchestratorDecisionRecord>;
   operations: Record<string, OperationRecord>;
+  semanticEvidence: Record<string, SemanticEvidenceRecord>;
   evidenceReads: Record<string, EvidenceReadRecord>;
   evidenceAssessments: Record<string, EvidenceAssessmentRecord>;
   evidenceDecisions: Record<string, EvidenceDecisionRecord>;

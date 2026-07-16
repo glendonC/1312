@@ -30,11 +30,14 @@ test("production validation facade preserves its exact public export surface", (
     "assertRuntimeLimits",
     "assertSourceArtifactDescriptor",
     "assertSpawnRequestInput",
+    "assertSpeechTranscribeRequest",
     "assertWorkerOutputEnvelope",
     "validateEvidenceAssessmentReceipt",
     "validateEvidenceDecisionReceipt",
     "validateEvidenceReadReceipt",
     "validateRootOutputDispositionReceipt",
+    "validateSemanticMediaEvidenceArtifact",
+    "validateSemanticMediaEvidenceReceipt",
   ]);
 });
 

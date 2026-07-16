@@ -98,6 +98,7 @@ export function applyExecutionMediaEvent(next: RuntimeProjection, event: Runtime
     invariant(task?.status === "working" && task.ownerAgentId === request.agentId, event, `operation ${request.operationId} has no working owner`);
     invariant(
       !next.operations[request.operationId] &&
+        !next.semanticEvidence[request.operationId] &&
         !next.evidenceReads[request.operationId] &&
         !next.evidenceAssessments[request.operationId] &&
         !next.evidenceDecisions[request.operationId],
@@ -135,6 +136,7 @@ export function applyExecutionMediaEvent(next: RuntimeProjection, event: Runtime
     );
     const calls = [
       ...Object.values(next.operations),
+      ...Object.values(next.semanticEvidence),
       ...Object.values(next.evidenceReads),
       ...Object.values(next.evidenceAssessments),
       ...Object.values(next.evidenceDecisions),

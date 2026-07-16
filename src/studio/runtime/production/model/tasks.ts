@@ -4,6 +4,7 @@ export const CAPABILITIES = [
   "report.submit",
   "media.extract",
   "media.seek",
+  "speech.transcribe",
   "evidence.read",
   "analysis.evidence.assess",
   "analysis.evidence.decide",

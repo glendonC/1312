@@ -35,6 +35,11 @@ export {
   assertMediaSeekRequest,
 } from "./validation/media.ts";
 export {
+  assertSpeechTranscribeRequest,
+  validateSemanticMediaEvidenceArtifact,
+  validateSemanticMediaEvidenceReceipt,
+} from "./validation/semanticEvidence.ts";
+export {
   assertRuntimeLimits,
   assertSpawnRequestInput,
 } from "./validation/scheduling.ts";

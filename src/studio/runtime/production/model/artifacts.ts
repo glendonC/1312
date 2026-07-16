@@ -1,5 +1,6 @@
 import type { ContentIdentity, MediaTrackDescriptor } from "./source.ts";
 import type { EvidenceKind } from "./tasks.ts";
+import type { SemanticEvidenceCitationInput } from "./semanticEvidence.ts";
 
 export interface SourceArtifactOrigin {
   kind: "ingest";
@@ -19,6 +20,14 @@ export interface MediaObservationArtifactOrigin {
   operationId: string;
   receiptId: string;
   receiptContentId: string;
+}
+
+export interface SemanticMediaEvidenceArtifactOrigin {
+  kind: "semantic_media_evidence";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  availabilityId: string;
 }
 
 export interface WorkerOutputArtifactOrigin {
@@ -153,6 +162,7 @@ export interface RuntimeArtifact {
     | SourceArtifactOrigin
     | MediaOperationArtifactOrigin
     | MediaObservationArtifactOrigin
+    | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
     | RootOutputDispositionArtifactOrigin
     | PreflightEvidenceArtifactOrigin
@@ -171,6 +181,8 @@ export interface WorkerOutputEnvelope {
   executionId: string;
   taskId: string;
   agentId: string;
+  /** Present and closed whenever this child consumed current-run semantic evidence. */
+  semanticEvidenceInputs?: SemanticEvidenceCitationInput[];
   output: {
     name: string;
     kind: string;

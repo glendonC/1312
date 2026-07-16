@@ -23,6 +23,9 @@ import { FfmpegCapabilityHost } from "./mediaHost.ts";
 import { BoundedEvidenceReadHost } from "./evidenceHost.ts";
 import { BoundedEvidenceAssessmentHost } from "./evidenceAssessmentHost.ts";
 import { BoundedEvidenceDecisionHost } from "./evidenceDecisionHost.ts";
+import { SpeechTranscribeCapabilityHost } from "./semanticEvidenceHost.ts";
+import { reopenSemanticEvidence, semanticEvidenceCitation } from "./semanticEvidenceAudit.ts";
+import type { CurrentRunSpeechRecognizer } from "./currentRunSpeechRecognizer.ts";
 import {
   BoundedChildEvidenceBridge,
   openChildEvidenceBridge,
@@ -47,6 +50,12 @@ import {
   type ChildMediaCapabilityHost,
   type OpenChildMediaBridge,
 } from "./executor/childMediaBridge.ts";
+import {
+  BoundedChildSemanticEvidenceBridge,
+  openChildSemanticEvidenceBridge,
+  type ChildSemanticEvidenceHost,
+  type OpenChildSemanticEvidenceBridge,
+} from "./executor/childSemanticEvidenceBridge.ts";
 import {
   parseCodexEvents,
   type CodexUsageEvent,
@@ -85,14 +94,18 @@ export interface CodexWorkerLauncherOptions {
   nextEvidenceOperationId?: () => string;
   nextAssessmentOperationId?: () => string;
   nextDecisionOperationId?: () => string;
+  nextSemanticEvidenceOperationId?: () => string;
   mediaHost?: ChildMediaCapabilityHost;
   evidenceHost?: ChildEvidenceReadHost;
   assessmentHost?: ChildEvidenceAssessmentHost;
   decisionHost?: ChildEvidenceDecisionHost;
+  semanticEvidenceHost?: ChildSemanticEvidenceHost;
+  semanticRecognizer?: CurrentRunSpeechRecognizer;
   mediaMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
+  semanticEvidenceMcpServerPath?: string;
 }
 
 function tomlString(value: string): string {
@@ -116,13 +129,14 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "mediaMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "mediaMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
   private readonly evidenceHost: ChildEvidenceReadHost;
   private readonly assessmentHost: ChildEvidenceAssessmentHost;
   private readonly decisionHost: ChildEvidenceDecisionHost;
+  private readonly semanticEvidenceHost: ChildSemanticEvidenceHost;
 
   constructor(
     ledger: RuntimeLedger,
@@ -139,6 +153,9 @@ export class CodexExecWorkerLauncher {
     this.evidenceHost = options.evidenceHost ?? new BoundedEvidenceReadHost(ledger, artifacts);
     this.assessmentHost = options.assessmentHost ?? new BoundedEvidenceAssessmentHost(ledger, artifacts);
     this.decisionHost = options.decisionHost ?? new BoundedEvidenceDecisionHost(ledger, artifacts);
+    this.semanticEvidenceHost = options.semanticEvidenceHost ?? new SpeechTranscribeCapabilityHost(ledger, artifacts, {
+      recognizer: options.semanticRecognizer,
+    });
     this.options = {
       executable: options.executable ?? "codex",
       executableArgsPrefix: options.executableArgsPrefix,
@@ -154,10 +171,12 @@ export class CodexExecWorkerLauncher {
       nextEvidenceOperationId: options.nextEvidenceOperationId,
       nextAssessmentOperationId: options.nextAssessmentOperationId,
       nextDecisionOperationId: options.nextDecisionOperationId,
+      nextSemanticEvidenceOperationId: options.nextSemanticEvidenceOperationId,
       mediaMcpServerPath: options.mediaMcpServerPath,
       evidenceMcpServerPath: options.evidenceMcpServerPath,
       assessmentMcpServerPath: options.assessmentMcpServerPath,
       decisionMcpServerPath: options.decisionMcpServerPath,
+      semanticEvidenceMcpServerPath: options.semanticEvidenceMcpServerPath,
     };
   }
 
@@ -288,9 +307,9 @@ export class CodexExecWorkerLauncher {
     }
     if (
       !scheduled.grants.some((grant) => grant.capability === "report.submit") ||
-      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
+      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
     ) {
-      throw new Error("Codex executor supports only report.submit plus scheduler-granted media.extract/media.seek/evidence.read/analysis.evidence.assess/analysis.evidence.decide");
+      throw new Error("Codex executor supports only report.submit plus scheduler-granted media, speech.transcribe, evidence-read, assessment, and decision capabilities");
     }
 
     const claimedAt = this.options.now().toISOString();
@@ -329,6 +348,7 @@ export class CodexExecWorkerLauncher {
     let evidenceBridge: OpenChildEvidenceBridge | null = null;
     let assessmentBridge: OpenChildEvidenceAssessmentBridge | null = null;
     let decisionBridge: OpenChildEvidenceDecisionBridge | null = null;
+    let semanticEvidenceBridge: OpenChildSemanticEvidenceBridge | null = null;
     try {
       const mediaCapabilities = task.grants
         .map((grant) => grant.capability)
@@ -340,6 +360,14 @@ export class CodexExecWorkerLauncher {
         }));
       }
       const evidenceGrant = task.grants.find((grant) => grant.capability === "evidence.read");
+      const semanticEvidenceGrant = task.grants.find((grant) => grant.capability === "speech.transcribe");
+      if (semanticEvidenceGrant) {
+        semanticEvidenceBridge = await openChildSemanticEvidenceBridge(new BoundedChildSemanticEvidenceBridge(
+          task,
+          this.semanticEvidenceHost,
+          { nextOperationId: this.options.nextSemanticEvidenceOperationId },
+        ));
+      }
       if (evidenceGrant) {
         evidenceBridge = await openChildEvidenceBridge(new BoundedChildEvidenceBridge(task, this.evidenceHost, {
           nextOperationId: this.options.nextEvidenceOperationId,
@@ -422,6 +450,30 @@ export class CodexExecWorkerLauncher {
           ])}`,
         );
       }
+      if (semanticEvidenceBridge) {
+        const serverPath = this.options.semanticEvidenceMcpServerPath ?? fileURLToPath(
+          new URL("./executor/semanticEvidenceMcpServer.ts", import.meta.url),
+        );
+        args.push(
+          "-c",
+          `mcp_servers.studio_semantic_evidence.command=${tomlString(process.execPath)}`,
+          "-c",
+          `mcp_servers.studio_semantic_evidence.args=${tomlStrings([serverPath])}`,
+          "-c",
+          "mcp_servers.studio_semantic_evidence.required=true",
+          "-c",
+          `mcp_servers.studio_semantic_evidence.enabled_tools=${tomlStrings([semanticEvidenceBridge.manifest.tool.name])}`,
+          "-c",
+          "mcp_servers.studio_semantic_evidence.startup_timeout_sec=5",
+          "-c",
+          `mcp_servers.studio_semantic_evidence.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
+          "-c",
+          `mcp_servers.studio_semantic_evidence.env_vars=${tomlStrings([
+            "STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_URL",
+            "STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_TOKEN",
+          ])}`,
+        );
+      }
       if (assessmentBridge) {
         const serverPath = this.options.assessmentMcpServerPath ?? fileURLToPath(
           new URL("./executor/evidenceAssessmentMcpServer.ts", import.meta.url),
@@ -478,7 +530,7 @@ export class CodexExecWorkerLauncher {
         args: this.commandArgs(args),
         cwd: directory,
         stdin: workerPrompt(task),
-        env: mediaBridge || evidenceBridge || assessmentBridge || decisionBridge ? {
+        env: mediaBridge || semanticEvidenceBridge || evidenceBridge || assessmentBridge || decisionBridge ? {
           ...process.env,
           ...(mediaBridge ? {
             STUDIO_CHILD_MEDIA_BRIDGE_URL: mediaBridge.endpoint,
@@ -487,6 +539,10 @@ export class CodexExecWorkerLauncher {
           ...(evidenceBridge ? {
             STUDIO_CHILD_EVIDENCE_BRIDGE_URL: evidenceBridge.endpoint,
             STUDIO_CHILD_EVIDENCE_BRIDGE_TOKEN: evidenceBridge.token,
+          } : {}),
+          ...(semanticEvidenceBridge ? {
+            STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_URL: semanticEvidenceBridge.endpoint,
+            STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_TOKEN: semanticEvidenceBridge.token,
           } : {}),
           ...(assessmentBridge ? {
             STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_URL: assessmentBridge.endpoint,
@@ -533,6 +589,20 @@ export class CodexExecWorkerLauncher {
           "Codex child did not complete its required receipted evidence read.",
         );
       }
+      const completedSemantic = Object.values(this.ledger.state().semanticEvidence)
+        .filter((operation) => operation.taskId === task.id && operation.status === "completed")
+        .sort((left, right) => left.id.localeCompare(right.id));
+      if (semanticEvidenceGrant && completedSemantic.length === 0) {
+        throw new LauncherFailure(
+          "Codex child did not complete its granted speech.transcribe operation",
+          "Codex child did not complete its required current-run semantic evidence operation.",
+        );
+      }
+      const semanticEvidenceInputs: ReturnType<typeof semanticEvidenceCitation>[] = [];
+      for (const operation of completedSemantic) {
+        const verified = await reopenSemanticEvidence(this.ledger.state(), this.artifacts, operation.id);
+        semanticEvidenceInputs.push(semanticEvidenceCitation(verified));
+      }
       if (assessmentGrant && !Object.values(this.ledger.state().evidenceAssessments).some((operation) =>
         operation.taskId === task.id && operation.grantId === assessmentGrant.id && operation.status === "completed")) {
         throw new LauncherFailure(
@@ -556,7 +626,7 @@ export class CodexExecWorkerLauncher {
           "Codex worker response failed its output contract.",
         );
       }
-      const worker = validateWorkerResult(workerValue, task);
+      const worker = validateWorkerResult(workerValue, task, semanticEvidenceInputs);
       const prepared = await Promise.all(
         worker.outputs.map((output) => {
           const envelope: WorkerOutputEnvelope = {
@@ -564,6 +634,7 @@ export class CodexExecWorkerLauncher {
             executionId,
             taskId: task.id,
             agentId: task.assignedAgentId,
+            ...(semanticEvidenceGrant ? { semanticEvidenceInputs: worker.semanticEvidenceInputs } : {}),
             output,
           };
           return this.artifacts.prepareWorkerOutput(this.ledger.runId, envelope);
@@ -651,6 +722,7 @@ export class CodexExecWorkerLauncher {
       throw error;
     } finally {
       if (mediaBridge) await mediaBridge.close();
+      if (semanticEvidenceBridge) await semanticEvidenceBridge.close();
       if (evidenceBridge) await evidenceBridge.close();
       if (assessmentBridge) await assessmentBridge.close();
       if (decisionBridge) await decisionBridge.close();

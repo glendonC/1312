@@ -51,9 +51,15 @@ export {
   RecordedCaptionFixtureExecutor,
   type CaptionProductionExecutor,
 } from "../captionProductionExecutor.ts";
+export {
+  OpenAiCurrentRunSpeechRecognizer,
+  UnavailableCurrentRunSpeechRecognizer,
+  type CurrentRunSpeechRecognizer,
+} from "../currentRunSpeechRecognizer.ts";
 export { RuntimeSourceRegistry } from "./sourceRegistry.ts";
 export {
   DEFAULT_OWNED_MEDIA_INGEST_BYTES,
   OwnedMediaIngestService,
 } from "./ownedMediaIngest.ts";
 export { parseRuntimeHostStartRequest } from "./validation.ts";
+export { adaptAuthenticatedProductionRuntime } from "../authenticatedStudioProjection.ts";

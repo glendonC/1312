@@ -34,6 +34,9 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "media.operation_completed") {
     return { kind: "media_operation", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "semantic.evidence_completed") {
+    return { kind: "semantic_media_evidence", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "analysis.evidence.assessment_completed") {
     return { kind: "evidence_assessment", receipt: event.data.receipt, rawReceiptContentId: null };
   }

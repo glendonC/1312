@@ -39,6 +39,7 @@ export function projectOutputArtifacts(state: RuntimeProjection, reports: readon
     .filter((artifact) =>
       artifact.origin.kind === "media_operation" ||
       artifact.origin.kind === "media_observation" ||
+      artifact.origin.kind === "semantic_media_evidence" ||
       artifact.origin.kind === "worker_output")
     .map((artifact): ProductionStudioOutputArtifactView => {
       if (

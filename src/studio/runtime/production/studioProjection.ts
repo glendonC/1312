@@ -15,6 +15,7 @@ import {
   projectEvidenceReads,
 } from "./studioProjection/evidenceMappers.ts";
 import type { ProductionStudioProjection } from "./studioProjection/model.ts";
+import { projectSemanticEvidence } from "./studioProjection/semanticEvidenceMappers.ts";
 import {
   projectCaptionArtifacts,
   projectCaptionProductions,
@@ -51,6 +52,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
   const reportWaits = projectReportWaits(state);
   const orchestratorDecisions = projectOrchestratorDecisions(state);
   const operations = projectOperations(state);
+  const semanticEvidence = projectSemanticEvidence(state);
   const evidenceReads = projectEvidenceReads(state);
   const evidenceAssessments = projectEvidenceAssessments(state);
   const evidenceDecisions = projectEvidenceDecisions(state);
@@ -85,6 +87,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     orchestratorDecisions,
     rootOutputDispositions,
     operations,
+    semanticEvidence,
     evidenceReads,
     evidenceAssessments,
     evidenceDecisions,
@@ -114,6 +117,7 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       orchestratorDecisions: orchestratorDecisions.length,
       rootOutputDispositions: rootOutputDispositions.length,
       operations: operations.length,
+      semanticEvidence: semanticEvidence.length,
       evidenceReads: evidenceReads.length,
       evidenceAssessments: evidenceAssessments.length,
       evidenceDecisions: evidenceDecisions.length,

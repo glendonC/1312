@@ -5,6 +5,7 @@ import type {
   WorkerOutputEnvelope,
 } from "../model.ts";
 import {
+  array,
   contentId,
   exact,
   fail,
@@ -17,6 +18,7 @@ import {
   string,
   uniqueStrings,
 } from "./primitives.ts";
+import { validateSemanticEvidenceCitationInput } from "./semanticEvidence.ts";
 import { validateTracks } from "./scheduling.ts";
 
 export function assertSourceArtifactDescriptor(
@@ -213,6 +215,30 @@ export function validateRuntimeArtifact(
         path,
         "media observation artifacts must be their content-addressed receipt with source lineage and a task producer",
       );
+    }
+  } else if (kind === "semantic_media_evidence") {
+    exact(
+      origin,
+      ["kind", "operationId", "receiptId", "receiptContentId", "availabilityId"],
+      context,
+      `${path}.origin`,
+    );
+    string(origin.operationId, context, `${path}.origin.operationId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    string(origin.availabilityId, context, `${path}.origin.availabilityId`);
+    if (
+      item.kind !== "studio.semantic-media-evidence.v1" ||
+      mediaClass !== "non_media" ||
+      item.publication !== "private" ||
+      item.durationMs !== null ||
+      (item.tracks as unknown[]).length !== 0 ||
+      sources.length !== 1 ||
+      task === null ||
+      agent === null ||
+      (origin.receiptContentId as string) === (item.content as { contentId: string }).contentId
+    ) {
+      fail(context, path, "semantic evidence must be one private content-addressed envelope with separate receipt and exact task/source lineage");
     }
   } else if (kind === "worker_output") {
     exact(
@@ -613,11 +639,30 @@ export function assertWorkerOutputEnvelope(
   context = "Worker output",
 ): asserts value is WorkerOutputEnvelope {
   const item = object(value, context, "envelope");
-  exact(item, ["schema", "executionId", "taskId", "agentId", "output"], context, "envelope");
+  exact(
+    item,
+    item.semanticEvidenceInputs === undefined
+      ? ["schema", "executionId", "taskId", "agentId", "output"]
+      : ["schema", "executionId", "taskId", "agentId", "semanticEvidenceInputs", "output"],
+    context,
+    "envelope",
+  );
   literal(item.schema, "studio.worker-output.v1", context, "envelope.schema");
   string(item.executionId, context, "envelope.executionId");
   string(item.taskId, context, "envelope.taskId");
   string(item.agentId, context, "envelope.agentId");
+  if (item.semanticEvidenceInputs !== undefined) {
+    const inputs = array(item.semanticEvidenceInputs, context, "envelope.semanticEvidenceInputs");
+    if (inputs.length === 0) {
+      fail(context, "envelope.semanticEvidenceInputs", "must name at least one authenticated semantic operation");
+    }
+    inputs.forEach((input, index) =>
+      validateSemanticEvidenceCitationInput(input, context, `envelope.semanticEvidenceInputs[${index}]`));
+    const operationIds = inputs.map((input) => (input as { operationId: string }).operationId);
+    if (new Set(operationIds).size !== operationIds.length) {
+      fail(context, "envelope.semanticEvidenceInputs", "must not repeat operations");
+    }
+  }
   const output = object(item.output, context, "envelope.output");
   exact(output, ["name", "kind", "content"], context, "envelope.output");
   string(output.name, context, "envelope.output.name");

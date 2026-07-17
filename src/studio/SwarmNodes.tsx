@@ -9,7 +9,7 @@
  */
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { memo, useEffect, useState } from "react";
+import { memo } from "react";
 
 import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
@@ -18,9 +18,6 @@ import { agentState, agentTitle } from "./agentPresentation";
 import { useAgent, useStudio } from "./store";
 import type { SwarmNode } from "./swarm";
 import type { Role } from "./types";
-
-/** How long a worker keeps its just-born look before it is simply another worker. */
-const BIRTH_MS = 720;
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
 
@@ -50,24 +47,6 @@ function Pins() {
 }
 
 /**
- * True for the first moments of a worker's life, and never again.
- *
- * A worker that appeared at full strength would be claiming a history it does not have. It
- * arrives as a dashed ghost on top of the parent it divided out of, travels to its own slot,
- * and fills in as it lands.
- */
-function useBorn(): boolean {
-  const [born, setBorn] = useState(true);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setBorn(false), BIRTH_MS);
-    return () => clearTimeout(t);
-  }, []);
-
-  return born;
-}
-
-/**
  * Enter and Space open a worker.
  *
  * The graph engine handles the click, but a node is a div, so the keyboard is ours to wire —
@@ -94,7 +73,6 @@ export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode
   const on = useStudio((s) => s.selected === data.agent);
   const cancelled = useStudio((s) => s.outcome?.kind === "cancelled");
   const paused = useStudio((s) => s.paused);
-  const born = useBorn();
   const open = useOpen(data.agent);
 
   if (!agent) return null;
@@ -108,10 +86,12 @@ export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode
     <div
       className="agent-node worker-node"
       data-role={agent.role}
+      // The forming look is bound to the recorded `spawning` status, never a UI timer: a worker
+      // that mounts already working (a mid-run seek) is settled at once, and one caught mid-birth
+      // by a cursor step stays a dashed ghost until the log itself moves it to working.
       data-status={agent.status}
       data-run-state={cancelled ? "cancelled" : "active"}
       data-on={on}
-      data-born={born}
       data-agent-node={agent.id}
       role="button"
       tabIndex={0}

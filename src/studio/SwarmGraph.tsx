@@ -34,7 +34,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createAgentIdentityMap, ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { Overview } from "./glyphs";
 import { place, type Size, type Spec } from "./layout";
-import { useAgentIds, useBundle, useLayout, useStudio } from "./store";
+import { useAgentIds, useBundle, useLayout, useSpawningIds, useStudio } from "./store";
 import { sideOf, type SwarmNode } from "./swarm";
 import { HubNode, WorkerNode } from "./SwarmNodes";
 
@@ -51,6 +51,12 @@ export default function SwarmGraph() {
 function Swarm() {
   const bundle = useBundle();
   const ids = useAgentIds();
+  const spawning = useSpawningIds();
+  // The layout effect rebuilds edges on structural change only; it reads the live forming set
+  // through this ref so a relayout keeps a forming wire forming, without taking `spawning` as a
+  // dependency (which would relayout — and refit — on every status change).
+  const spawningRef = useRef<Set<string>>(new Set());
+  spawningRef.current = new Set(spawning);
   const reduceMotion = useReducedMotion();
   const layout = useLayout();
   const focused = useStudio((s) => s.selected !== null);
@@ -217,6 +223,7 @@ function Swarm() {
         .map((s) => {
           const side = sideOf(frame.centre[s.parent as string], frame.centre[s.id], layout);
 
+          const base = s.mitosis ? "wire wire-mitosis" : "wire";
           return {
             id: `${s.parent}-${s.id}`,
             source: s.parent as string,
@@ -224,7 +231,7 @@ function Swarm() {
             sourceHandle: side.source,
             targetHandle: `${side.target}-in`,
             type: layout === "radial" ? "default" : "smoothstep",
-            className: s.mitosis ? "wire wire-mitosis" : "wire",
+            className: spawningRef.current.has(s.id) ? `${base} wire-forming` : base,
             focusable: false,
           } satisfies Edge;
         }),
@@ -233,6 +240,26 @@ function Swarm() {
     const t = window.setTimeout(() => void fitSwarm(), 30);
     return () => clearTimeout(t);
   }, [specs, layout, measured, getNodes, fitSwarm, setNodes, setEdges]);
+
+  // The mitosis wire reads as "forming" for exactly as long as its child is in the recorded
+  // `spawning` state — a projection of the log, not a timer. Toggled on the existing edges so a
+  // status change never triggers a relayout, and the wire settles to a static lineage line the
+  // moment the log itself moves the child to working. In wall-clock replay that window is a
+  // single frame; under a cursor step it is held, because the reducer holds it.
+  useEffect(() => {
+    const forming = new Set(spawning);
+    setEdges((prev) => {
+      let changed = false;
+      const next = prev.map((edge) => {
+        const base = (edge.className ?? "").replace(/\s*wire-forming\b/g, "").trim();
+        const want = forming.has(edge.target) ? `${base} wire-forming` : base;
+        if (want === edge.className) return edge;
+        changed = true;
+        return { ...edge, className: want };
+      });
+      return changed ? next : prev;
+    });
+  }, [spawning, setEdges]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: SwarmNode) => {

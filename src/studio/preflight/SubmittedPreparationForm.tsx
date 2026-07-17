@@ -586,14 +586,14 @@ function OutputEditor({
         value="captions"
         checked={session.request.outputDepth === "captions"}
         onChange={() => update({ outputDepth: "captions" })}
-        label="Watch aids"
+        label="Captions"
       />
       <Choice
         name="output"
         value="evidence"
         checked={session.request.outputDepth === "evidence"}
         onChange={() => update({ outputDepth: "evidence" })}
-        label="Watch aids plus evidence and breakdown"
+        label="Captions plus evidence and breakdown"
       />
     </fieldset>
   );
@@ -646,8 +646,8 @@ function stageParameterLabel(
   if (stage === "range") return liveRangeCompactLabel(session, durationSeconds);
   if (stage === "language") return liveLanguageCompactLabel(previewSession, session);
   if (stage === "output") return session.request.outputDepth === "evidence"
-    ? "Watch aids + evidence"
-    : "Watch aids";
+    ? "Captions + evidence"
+    : "Captions";
   return "Current setup";
 }
 
@@ -692,7 +692,7 @@ function liveLanguageCompactLabel(previewSession: StudioPreviewSession, session:
 }
 
 function liveOutputLabel(depth: AnalysisRequest["outputDepth"]): string {
-  return depth === "evidence" ? "watch aids plus evidence and a breakdown" : "watch aids";
+  return depth === "evidence" ? "captions plus evidence and a breakdown" : "captions";
 }
 
 function rangeLabel(request: SubmittedSourcePreparationRequest): string {
@@ -707,5 +707,5 @@ function compactLanguageLabel(request: SubmittedSourcePreparationRequest): strin
 }
 
 function outputLabel(request: SubmittedSourcePreparationRequest): string {
-  return request.output.depth === "evidence" ? "Watch aids plus evidence" : "Watch aids";
+  return request.output.depth === "evidence" ? "Captions plus evidence" : "Captions";
 }

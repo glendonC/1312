@@ -668,6 +668,16 @@ export const useAgent = (id: string): AgentView | undefined =>
 
 export const useAgentIds = (): string[] => useStudio(useShallow((s) => s.state.order));
 
+/**
+ * The ids currently in the recorded `spawning` state — the workers a parent is mid-division of.
+ * Bound to the reducer, so it holds under pause and lasts exactly as long as the log keeps a
+ * worker forming; it never comes from a UI clock.
+ */
+export const useSpawningIds = (): string[] =>
+  useStudio(
+    useShallow((s) => s.state.order.filter((id) => s.state.agents[id]?.status === "spawning")),
+  );
+
 export const useOrchestrator = (): RunState["orchestrator"] =>
   useStudio(useShallow((s) => s.state.orchestrator));
 

@@ -463,14 +463,14 @@ function RecordedOutputEditor({
         value="captions"
         checked={request.outputDepth === "captions"}
         onChange={() => update({ outputDepth: "captions" })}
-        label="Watch aids"
+        label="Captions"
       />
       <Choice
         name="output"
         value="evidence"
         checked={request.outputDepth === "evidence"}
         onChange={() => update({ outputDepth: "evidence" })}
-        label="Watch aids plus evidence and breakdown"
+        label="Captions plus evidence and breakdown"
       />
     </fieldset>
   );
@@ -545,11 +545,11 @@ function recordedLanguageLabel(facts: RecordedPreflightFacts, request: AnalysisR
 }
 
 function recordedOutputLabel(request: AnalysisRequest): string {
-  return request.outputDepth === "evidence" ? "Watch aids + evidence" : "Watch aids";
+  return request.outputDepth === "evidence" ? "Captions + evidence" : "Captions";
 }
 
 function recordedOutputSentence(depth: AnalysisRequest["outputDepth"]): string {
-  return depth === "evidence" ? "watch aids plus evidence and a breakdown" : "watch aids";
+  return depth === "evidence" ? "captions plus evidence and a breakdown" : "captions";
 }
 
 export function AdvancedFields({

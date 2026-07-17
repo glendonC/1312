@@ -13,6 +13,8 @@ import AgentMark from "./AgentMark";
 import { agentIdentityStyle, createAgentIdentityMap } from "./agentIdentity";
 import { isAgentThinking } from "./agentMeshRenderer";
 import { agentRoleRemit, agentState, agentTitle } from "./agentPresentation";
+import { clock } from "./format";
+import { spawnLeadOf } from "./spawnLead";
 import AgentVisualEvidence from "./focus/AgentVisualEvidence";
 import WorkbenchPanel from "./focus/WorkbenchPanel";
 import {
@@ -103,6 +105,45 @@ export default function AgentPanel() {
     || bundle.run.clip.source.label
     || "Recorded source";
 
+  // The lineage header, every row a recorded fact: who this worker came out of, the clip window it
+  // owns, and when the log actually brought it online. It reads the same lineage the canvas draws
+  // (a divided worker's gold mitosis wire) and the same `spawnLeadOf` seam the handoff describes,
+  // so a spawning or divided worker tells one story in both places. Absent facts are simply not
+  // shown — a worker with no window or an orchestrator with no parent narrates nothing.
+  const spec = isOrchestrator
+    ? null
+    : bundle.run.agents.find((candidate) => candidate.id === selected) ?? null;
+  const nameOf = (id: string): string => {
+    if (id === "orchestrator") return "Orchestrator";
+    const parentSpec = bundle.run.agents.find((candidate) => candidate.id === id);
+    return parentSpec ? agentTitle(parentSpec.id, parentSpec.role, parentSpec.label) : id;
+  };
+  const dividedFrom = agent?.dividedFrom ?? spec?.divided_from ?? null;
+  const spawnedBy = dividedFrom ?? spec?.parent ?? (isOrchestrator ? null : "orchestrator");
+  const clipWindow = agent?.window ?? spec?.window ?? null;
+  const birth = isOrchestrator
+    ? ({ kind: "unavailable" } as const)
+    : spawnLeadOf(selected, bundle.run, bundle.traces);
+  const lineage: { label: string; value: string }[] = [];
+  if (!isOrchestrator) {
+    if (dividedFrom) lineage.push({ label: "Lineage", value: `Divided from ${nameOf(dividedFrom)}` });
+    else if (spawnedBy) lineage.push({ label: "Lineage", value: `Spawned by ${nameOf(spawnedBy)}` });
+    if (clipWindow) {
+      lineage.push({
+        label: "Window",
+        value: `${clock(clipWindow[0], true)}–${clock(clipWindow[1], true)}`,
+      });
+    }
+    if (birth.kind === "instant") {
+      lineage.push({ label: "Birth", value: `Joined at ${clock(birth.atS, true)}` });
+    } else if (birth.kind === "intent") {
+      lineage.push({
+        label: "Birth",
+        value: `Announced ${clock(birth.announcedAtS, true)}, joined ${clock(birth.readyAtS, true)}`,
+      });
+    }
+  }
+
   const move = (direction: -1 | 1) => {
     if (inspectableIds.length < 2) return;
     const next = (selectedIndex + direction + inspectableIds.length) % inspectableIds.length;
@@ -186,6 +227,17 @@ export default function AgentPanel() {
                 <span className="agent-focus-visually-hidden">Recorded role remit: </span>
                 {agentRoleRemit(role)}
               </p>
+
+              {lineage.length > 0 && (
+                <dl className="agent-focus-lineage" aria-label="Recorded lineage">
+                  {lineage.map((row) => (
+                    <div className="agent-focus-lineage-row" key={row.label}>
+                      <dt>{row.label}</dt>
+                      <dd>{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </div>
           </motion.section>
 

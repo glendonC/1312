@@ -17,7 +17,7 @@ function ParametersGlyph() {
 }
 
 function outputLabel(depth: OutputDepth): string {
-  return depth === "evidence" ? "Watch aids + evidence" : "Watch aids";
+  return depth === "evidence" ? "Captions + evidence" : "Captions";
 }
 
 /**

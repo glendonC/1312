@@ -206,11 +206,16 @@
   transition: opacity 220ms ease;
 }
 
-/* a worker that divided out of another is bound to it, not to the orchestrator */
+/*
+ * A worker that divided out of another is bound to it, not to the orchestrator — the dotted
+ * gold line IS the mitosis. It draws in once as the child is born: the dots settle into place
+ * from the parent's edge rather than the whole wire blinking on at full strength.
+ */
 .wire-mitosis .react-flow__edge-path {
   stroke: var(--gold-line);
   stroke-width: 1.5;
   stroke-dasharray: 3 3;
+  animation: wire-mitosis-draw 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes wire-in {
@@ -220,6 +225,43 @@
   to {
     opacity: 1;
   }
+}
+
+@keyframes wire-mitosis-draw {
+  from {
+    opacity: 0;
+    stroke-dashoffset: 18;
+  }
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+/*
+ * The forming state, bound to the child's recorded `spawning` status — never a UI clock. The dots
+ * travel from parent toward child while the log holds the child forming, and the wire settles to a
+ * static lineage line the instant the log moves the child to working. Today's recorded runs spawn
+ * in a single frame, so this is seen held only under a deliberate cursor step; it is the seam that
+ * lights up on its own the day a producer emits a real pre-spawn intent window
+ * (docs/local/HANDOFF_spawn_intent.md). It stills whenever the run is paused: a held run shows no
+ * motion, so nothing implies work the clock is not spending.
+ */
+.wire-mitosis.wire-forming .react-flow__edge-path {
+  animation: wire-mitosis-flow 900ms linear infinite;
+}
+
+@keyframes wire-mitosis-flow {
+  from {
+    stroke-dashoffset: 12;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.studio[data-paused="true"] .wire-mitosis.wire-forming .react-flow__edge-path {
+  animation: none;
 }
 
 /* ---------- agent identities ---------- */
@@ -362,10 +404,47 @@
   opacity: 0.32;
 }
 
-/* The field resolves while its node travels out from the parent that created it. */
-.agent-node[data-born="true"] {
-  opacity: 0.58;
-  transform: scale(0.94);
+/*
+ * A worker forms in from the parent it came out of.
+ *
+ * The dashed-ghost look is bound to the recorded `spawning` status — it holds while the log holds
+ * the worker forming and settles the instant the log moves it to working, so it is never on a UI
+ * clock and never advances while the run is paused. A one-shot materialize plays as the identity
+ * first mounts: the reliable birth flourish in wall-clock replay, where the spawning frame is
+ * folded and painted in a single step and so is not itself seen. `backwards` fill applies the
+ * ghost-in start before the first frame and then reverts to the status-declared look, so a worker
+ * caught mid-birth by a cursor step keeps its forming state rather than snapping to full.
+ */
+.agent-node {
+  animation: node-materialize 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.agent-node[data-status="spawning"] {
+  opacity: 0.66;
+}
+
+.agent-node[data-status="spawning"] .agent-node-identity {
+  transform: scale(0.9);
+}
+
+.agent-node[data-status="spawning"] .agent-node-identity::before {
+  position: absolute;
+  inset: -5px;
+  border: 1px dashed var(--gold-line);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+@keyframes node-materialize {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .agent-node,
@@ -386,6 +465,14 @@
   .agent-node,
   .hub {
     transition: none;
+  }
+
+  /* The birth and mitosis motion is a flourish; the forming state itself reads from the dashed
+     ghost and static dotted wire, which stay. */
+  .agent-node,
+  .wire-mitosis .react-flow__edge-path,
+  .wire-mitosis.wire-forming .react-flow__edge-path {
+    animation: none;
   }
 
   .agent-node:hover .agent-mark,

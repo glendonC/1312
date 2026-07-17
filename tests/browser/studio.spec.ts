@@ -80,14 +80,12 @@ async function finishPreparation(page: Page, previewMode = true, keyboard = fals
     if (keyboard) await action.press("Enter");
     else await action.click();
   }
-  await expect(page.getByRole("heading", {
-    name: previewMode ? /^I’ve bound / : "Review what can be known before starting",
-  })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^I’ve bound / })).toBeVisible();
   const reviewAction = page.getByRole("button", { name: "Continue to Review" });
   if (keyboard) await reviewAction.press("Enter");
   else await reviewAction.click();
   await expect(page.getByRole("heading", {
-    name: previewMode ? /^I’m ready to open the recorded run-006 interface preview/ : "Replay this recorded processing request",
+    name: previewMode ? /^I’m ready to open the recorded run-006 interface preview/ : /^I’m ready to replay this recorded analysis/,
   })).toBeVisible();
   const finalAction = page.getByRole("button", {
     name: previewMode ? "Preview run-006 recorded processing" : "Replay recorded analysis",
@@ -233,7 +231,7 @@ test("the default Studio exposes a separate owned-source operator path", async (
   await expect(productRuntime.getByText(/--source-directory/)).toBeVisible();
   await expect(productRuntime.getByRole("button", { name: "Connect to local host" })).toBeDisabled();
 
-  await productRuntime.getByRole("button", { name: "Back to source choices" }).click();
+  await productRuntime.getByRole("button", { name: "Exit setup" }).click();
   await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Explore recorded demo" })).toBeVisible();
 });
@@ -263,8 +261,7 @@ test("recorded and owned setup paths share the centered staged panel", async ({ 
     expect(Math.abs((dockDuringRecorded?.[key] ?? Infinity) - (dockBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
   }
 
-  await page.getByRole("button", { name: "Back to source choices" }).click();
-  await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
+  await page.goto("/studio/");
 
   await page.getByRole("button", { name: "Add owned media" }).click();
   const owned = page.getByRole("region", { name: "Owned local source" });
@@ -278,7 +275,7 @@ test("recorded and owned setup paths share the centered staged panel", async ({ 
   await expect(ownedLifecycle).toHaveAttribute("data-preparation-stage", "source");
   await expect(ownedLifecycle.locator(".dock-status")).toHaveText("Source");
   await expect(ownedLifecycle.locator(".dock-pct")).toHaveText("1 / 6");
-  await owned.getByRole("button", { name: "Back to source choices" }).click();
+  await owned.getByRole("button", { name: "Exit setup" }).click();
   await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await page.evaluate(() => window.innerWidth),
@@ -943,12 +940,22 @@ test("a submitted source moves through setup and forecast before the recorded in
   expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual(7.5);
   expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(7.5);
   expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(viewportWidth - 7.5);
-  expect((rangePopoverBox?.y ?? 0) + (rangePopoverBox?.height ?? 0)).toBeLessThanOrEqual(
-    (rangeTriggerBox?.y ?? 0) - 0.5,
+  // The Range editor opens downward, attached below the control shelf — it never covers the panel face.
+  await expect(rangePopover).toHaveAttribute("data-placement", "below");
+  expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(
+    (rangeShelfBox?.y ?? 0) + (rangeShelfBox?.height ?? 0) - 1,
   );
-  await expect(page.getByLabel("Entire video · 0:00–1:23")).toBeChecked();
-  await expect(rangePopover.locator('.preflight-choice[data-selected="true"] .preflight-choice-check svg'))
-    .toBeVisible();
+  // ...and stays clamped within the center panel's horizontal bounds, not merely the viewport.
+  expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual((rangePanelBox?.x ?? 0) - 0.5);
+  expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(
+    (rangePanelBox?.x ?? 0) + (rangePanelBox?.width ?? 0) + 0.5,
+  );
+  await expect(page.getByLabel("Entire video · 1:23")).toBeChecked();
+  await expect(
+    rangePopover.locator('.preflight-range-choice[data-selected="true"] .preflight-range-choice-indicator'),
+  ).toBeVisible();
+  // The oversized checkmark tile is gone; selection now reads through a restrained radio indicator.
+  await expect(rangePopover.locator(".preflight-choice-check")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(rangePopover).not.toBeVisible();
   await expect(rangeParameter).toHaveAttribute("aria-expanded", "false");
@@ -959,17 +966,22 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(rangePopover).not.toBeVisible();
   await expect(rangeParameter).toBeFocused();
   await rangeParameter.click();
-  await page.getByLabel("Custom start and end").check();
-  const rangeEnd = page.getByRole("spinbutton", { name: "End, seconds" });
-  await rangeEnd.fill("90");
-  await expect(page.getByText("Choose a valid range within 0:00–1:23.")).toBeVisible();
+  await page.getByLabel("Custom range").check();
+  const rangeEnd = page.getByRole("textbox", { name: "End timestamp" });
+  await expect(rangeEnd).toHaveValue("1:23");
+  await rangeEnd.fill("1:30");
+  // The invalid reason is shown inline in the editor (the stage sentence echoes it too, so scope here).
+  await expect(rangePopover.getByText("Choose a valid range within 0:00–1:23.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue to Language" })).toBeDisabled();
-  await rangeEnd.fill("60");
+  // Bare seconds are accepted and normalized to M:SS when the field commits.
+  await rangeEnd.fill("80");
+  await rangeEnd.press("Enter");
+  await expect(rangeEnd).toHaveValue("1:20");
   await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
   await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
   const changedRangeRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
   expect(changedRangeRequestId).not.toBe(initialRequestId);
-  await page.getByLabel("Entire video · 0:00–1:23").check();
+  await page.getByLabel("Entire video · 1:23").check();
 
   await page.getByRole("button", { name: "Continue to Language" }).click();
   await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "language");
@@ -1005,12 +1017,12 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("4 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "lilac");
   const outputParameter = preparationControls.getByRole("button", {
-    name: "Update output: Captions + evidence",
+    name: "Update output: Watch aids + evidence",
   });
   await outputParameter.click();
   const outputPopover = page.getByRole("dialog", { name: "Output options" });
   await expect(outputPopover).toBeVisible();
-  await expect(page.getByLabel("Captions plus evidence and breakdown")).toBeChecked();
+  await expect(page.getByLabel("Watch aids plus evidence and breakdown")).toBeChecked();
   await page.keyboard.press("Escape");
   await expect(outputPopover).not.toBeVisible();
   await expect(outputParameter).toBeFocused();
@@ -1215,10 +1227,12 @@ test("a long submitted source opens with an explicit editable two-minute request
   );
   await page.getByRole("button", { name: "Continue to Range" }).click();
   await page.getByRole("button", { name: "Update range: 0:00–2:00" }).click();
-  await expect(page.getByLabel("Custom start and end")).toBeChecked();
-  await expect(page.getByRole("spinbutton", { name: "Start, seconds" })).toHaveValue("0");
-  await expect(page.getByRole("spinbutton", { name: "End, seconds" })).toHaveValue("120");
-  await expect(page.getByText(/editable request default, not a content recommendation/i)).toBeVisible();
+  await expect(page.getByLabel("Custom range")).toBeChecked();
+  await expect(page.getByRole("textbox", { name: "Start timestamp" })).toHaveValue("0:00");
+  await expect(page.getByRole("textbox", { name: "End timestamp" })).toHaveValue("2:00");
+  // A source longer than the limit makes the Entire option visibly unavailable rather than selectable.
+  await expect(page.getByLabel("Entire video · 3:23 · exceeds 2:00 limit")).toBeDisabled();
+  await expect(page.getByText("Select up to 2:00. No section was recommended.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
 });
 
@@ -1368,14 +1382,13 @@ test("the submitted preparation sequence stays horizontally contained at every s
     await rangeParameter.click();
     const rangePopover = page.getByRole("dialog", { name: "Range options" });
     await expect(rangePopover).toBeVisible();
-    await expect(page.getByLabel("Entire video · 0:00–1:23")).toBeVisible();
+    await expect(page.getByLabel("Entire video · 1:23")).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-    const [editedPanelBox, editedControlsBox, editedDockBox, rangePopoverBox, rangeTriggerBox] = await Promise.all([
+    const [editedPanelBox, editedControlsBox, editedDockBox, rangePopoverBox] = await Promise.all([
       panel.boundingBox(),
       preparationControls.boundingBox(),
       sourceDock.boundingBox(),
       rangePopover.boundingBox(),
-      rangeParameter.boundingBox(),
     ]);
     for (const [before, after] of [
       [rangePanelBefore, editedPanelBox],
@@ -1389,8 +1402,9 @@ test("the submitted preparation sequence stays horizontally contained at every s
     expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
     expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
     expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
+    // The editor may open below, flip above, or become a contained sheet — it stays within the viewport either way.
     expect((rangePopoverBox?.y ?? 0) + (rangePopoverBox?.height ?? 0)).toBeLessThanOrEqual(
-      (rangeTriggerBox?.y ?? 0) - 0.5,
+      viewport.height + 0.5,
     );
     await page.keyboard.press("Escape");
     await expect(rangePopover).not.toBeVisible();
@@ -2167,43 +2181,13 @@ test("owned-media preflight keeps receipted language decisions separate from job
   await page.getByRole("button", { name: "Input Source" }).click();
   await page.getByRole("button", { name: "Explore recorded demo" }).click();
 
-  await page.getByText("Recorded source facts", { exact: true }).click();
-
-  const speech = page.getByTestId("speech-activity-evidence");
-  await expect(speech).toBeVisible();
-  await expect(speech).toContainText(/\d+(?:\.\d+)?s speech · \d+\.\d% of decoded samples · \d+ speech windows?/);
-  await expect(speech).toContainText(/\d+(?:\.\d+)?s–\d+(?:\.\d+)?s/);
-  await expect(speech).toContainText("silero-vad 6.2.1");
-
-  const languages = page.getByTestId("language-range-evidence");
-  await expect(languages).toBeVisible();
-  await expect(languages).toContainText("21 receipted speech-range results");
-  await expect(languages).toContainText("whisper-language-id 1.0.0");
-  await expect(languages).toContainText("uncalibrated model softmax scores");
-  await expect(page.getByTestId("language-range").first()).toContainText(
-    "0.002s–1.982s · ko classified · model probability 98.4% · model score margin 97.7%",
-  );
-  await expect(page.locator('[data-language-status="classified"]')).toHaveCount(10);
-  await expect(page.locator('[data-language-status="unknown"]')).toHaveCount(4);
-  await expect(page.locator('[data-language-status="withheld"]')).toHaveCount(7);
-  await expect(page.locator('[data-language-status="unknown"]').first()).toContainText("Unknown · below probability");
-  await expect(page.locator('[data-language-status="withheld"]').first()).toContainText(
-    "Withheld · insufficient samples",
-  );
-
-  await expect(page.getByText(/recorded in run\.clip\.lang · not detector output/)).toBeVisible();
-  await expect(page.getByText(/selected for the recorded job · not detector output/)).toBeVisible();
-
-  await page.getByText("Producer coverage").click();
-  for (const withheld of [
-    "Music and noise classifier",
-    "Preflight speaker and overlap estimator",
-    "Measured range recommender",
-  ]) {
-    await expect(page.getByText(withheld, { exact: true })).toBeVisible();
-  }
+  // The recorded source stage now narrates its boundary conversationally instead of
+  // rendering the receipted evidence tables. The measured language ranges stay
+  // preflight-only: the detected-language range is offered but never replayable.
+  await expect(page.getByRole("heading", { name: /^I found / })).toBeVisible();
 
   await page.getByRole("button", { name: "Continue to Range" }).click();
+  await page.getByRole("button", { name: /^Update range/ }).click();
   await expect(
     page.getByLabel(/Measured language ranges · preflight evidence only; no replayable detected-language subrange/),
   ).toBeDisabled();

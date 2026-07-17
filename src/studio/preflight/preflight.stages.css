@@ -140,33 +140,17 @@
 }
 
 .preflight[data-preview-mode="submitted-source"] .preflight-stage-panel,
-.preflight[data-preview-mode="submitted-source"] .preflight-stage-body {
+.preflight[data-preview-mode="submitted-source"] .preflight-stage-body,
+.preflight[data-preview-mode="recorded-demo"] .preflight-stage-panel,
+.preflight[data-preview-mode="recorded-demo"] .preflight-stage-body {
   min-height: 0;
 }
 
-.preflight[data-preview-mode="submitted-source"]
-  .preflight-stage-panel {
+.preflight[data-preview-mode="submitted-source"] .preflight-stage-panel,
+.preflight[data-preview-mode="recorded-demo"] .preflight-stage-panel {
   max-height: none;
   padding: clamp(18px, 2.5vw, 24px);
   overflow: visible;
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-stage-head {
-  max-width: 680px;
-  padding-top: 0;
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-stage-head > span {
-  color: var(--palette-ink);
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-stage-head h2 {
-  font-size: clamp(1.2rem, 2.7vw, 1.65rem);
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-stage-head p {
-  max-width: 650px;
-  font-size: 0.74rem;
 }
 
 .preflight-language-stage {
@@ -200,32 +184,6 @@
 
 .preflight-output-stage .preflight-choice {
   padding: 8px 0;
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-forecast-ledger {
-  grid-template-columns: minmax(0, 1.25fr) minmax(210px, 0.75fr);
-  gap: 32px;
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-forecast-ledger > aside {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-forecast-ledger > section,
-.preflight[data-preview-mode="submitted-source"] .preflight-forecast-ledger > aside {
-  padding-block: 12px;
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-forecast-ledger dl div {
-  padding-block: 6px;
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-preview-warning {
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--hold) 28%, var(--line));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--hold-soft) 76%, white);
 }
 
 .preflight-actions .cta:disabled {

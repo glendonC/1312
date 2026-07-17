@@ -3,7 +3,6 @@
   padding: 1px 0 0;
 }
 
-.preflight-coverage,
 .preflight-advanced,
 .preflight-provenance {
   padding: 14px 0;
@@ -35,34 +34,11 @@
   margin-top: 7px;
 }
 
-.preflight-coverage summary,
 .preflight-advanced summary {
   color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: 0.64rem;
   cursor: pointer;
-}
-
-.preflight-coverage ul {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0;
-  padding: 0;
-  list-style: none;
-}
-
-.preflight-coverage li {
-  display: grid;
-  grid-template-columns: 11rem minmax(0, 1fr);
-  gap: 12px;
-  color: var(--ink-muted);
-  font-size: 0.67rem;
-  line-height: 1.45;
-}
-
-.preflight-coverage li b {
-  color: var(--ink-soft);
-  font-weight: var(--weight-regular);
 }
 
 .preflight-advanced[open] {
@@ -89,7 +65,9 @@
   margin-top: 22px;
 }
 
-.preflight[data-preview-mode="submitted-source"] .preflight-stage-panel {
+.preflight[data-preview-mode="submitted-source"] .preflight-stage-panel,
+.preflight[data-preview-mode="recorded-demo"] .preflight-stage-panel,
+.product-runtime[data-runtime="false"] .preflight-stage-panel {
   z-index: 2;
 }
 
@@ -129,6 +107,12 @@
 .preflight-control-shelf:not([data-stage="source"]) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Owned media edits its parameters inline, so its shelf carries only Back and
+   Continue — collapse the missing parameter column so the two align to the edges. */
+.preflight-control-shelf:not([data-stage="source"]):not(:has(.preflight-control-parameter)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .preflight-control {
@@ -296,6 +280,36 @@
   transform: translateY(0) scale(1);
 }
 
+.preflight-stage-popover[data-popover-stage="range"] {
+  padding: 12px 14px 14px;
+  border-color: color-mix(in srgb, var(--palette-color) 20%, var(--glass-border-luminous));
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--glass-highlight) 94%, transparent), rgba(255, 255, 255, 0.26)),
+    color-mix(in srgb, var(--palette-color) 6%, rgba(239, 246, 243, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    0 14px 34px rgba(30, 43, 39, 0.14);
+}
+
+.preflight-stage-popover[data-popover-stage="range"][data-placement="below"] {
+  transform: translateY(4px) scale(0.99);
+  transform-origin: top center;
+}
+
+.preflight-stage-popover[data-popover-stage="range"][data-placement="above"] {
+  transform-origin: bottom center;
+}
+
+.preflight-stage-popover[data-popover-stage="range"][data-placement="sheet"] {
+  transform: translateY(6px) scale(0.99);
+  transform-origin: bottom center;
+}
+
+.preflight-stage-popover[data-popover-stage="range"]:popover-open[data-positioned="true"] {
+  transform: translateY(0) scale(1);
+}
+
 .preflight-stage-popover::backdrop {
   background: transparent;
 }
@@ -327,6 +341,16 @@
   font-weight: var(--weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.preflight-stage-popover[data-popover-stage="range"] .preflight-popover-head {
+  margin-bottom: 5px;
+  padding: 0 2px 5px;
+  border-bottom: 0;
+}
+
+.preflight-stage-popover[data-popover-stage="range"] .preflight-popover-head > span {
+  color: var(--palette-ink);
 }
 
 .preflight-stage-popover .preflight-group legend {
@@ -423,16 +447,163 @@
   background: color-mix(in srgb, var(--palette-color) 30%, rgba(255, 255, 255, 0.72));
 }
 
-.preflight-stage-popover .preflight-range-fields {
-  max-width: none;
-  margin: 3px 0 0;
+.preflight-range-editor {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.preflight-stage-popover .preflight-policy {
-  margin-top: 3px;
-  padding: 0 2px;
-  font-size: 0.63rem;
-  line-height: 1.45;
+.preflight-range-editor > legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.preflight-range-choice {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 38px;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.preflight-range-choice > input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.preflight-range-choice-indicator {
+  position: relative;
+  display: block;
+  width: 13px;
+  height: 13px;
+  border: 1px solid color-mix(in srgb, var(--palette-color) 34%, var(--line-strong));
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.preflight-range-choice-indicator::after {
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  background: var(--palette-ink);
+  content: "";
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 140ms ease, transform 160ms ease;
+}
+
+.preflight-range-choice > strong {
+  min-width: 0;
+  font-size: 0.7rem;
+  font-weight: var(--weight-regular);
+  line-height: 1.3;
+}
+
+.preflight-range-choice > small {
+  min-width: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.preflight-range-choice:not([data-disabled="true"]):hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--palette-color) 8%, rgba(255, 255, 255, 0.4));
+}
+
+.preflight-range-choice[data-selected="true"] {
+  color: var(--palette-ink);
+  background: color-mix(in srgb, var(--palette-color) 15%, rgba(255, 255, 255, 0.52));
+}
+
+.preflight-range-choice[data-selected="true"] .preflight-range-choice-indicator {
+  border-color: color-mix(in srgb, var(--palette-color) 70%, var(--palette-ink));
+}
+
+.preflight-range-choice[data-selected="true"] .preflight-range-choice-indicator::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.preflight-range-choice[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
+.preflight-range-choice:has(input:focus-visible) {
+  outline: 2px solid var(--palette-ink);
+  outline-offset: 2px;
+}
+
+.preflight-range-time-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+  padding: 6px 6px 0 30px;
+}
+
+.preflight-range-time-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.preflight-range-time-field > span {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+}
+
+.preflight-range-time-field > input[type="text"] {
+  height: 35px;
+  border-color: color-mix(in srgb, var(--palette-color) 20%, var(--line-strong));
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.preflight-range-time-field > input[type="text"]:focus-visible {
+  border-color: color-mix(in srgb, var(--palette-color) 72%, var(--palette-ink));
+  outline: 2px solid color-mix(in srgb, var(--palette-color) 28%, transparent);
+  outline-offset: 1px;
+}
+
+.preflight-range-time-field > input[type="text"][aria-invalid="true"] {
+  border-color: color-mix(in srgb, var(--flag) 52%, var(--line-strong));
+}
+
+.preflight-range-feedback {
+  margin: 6px 6px 0 30px;
+  color: var(--ink-muted);
+  font-size: 0.61rem;
+  line-height: 1.42;
+}
+
+.preflight-range-feedback[data-invalid="true"] {
+  color: color-mix(in srgb, var(--flag) 76%, var(--ink));
 }
 
 .preflight-stage-popover .preflight-declared-language {
@@ -441,8 +612,7 @@
 }
 
 .preflight-stage-popover .preflight-target-language > span,
-.preflight-stage-popover .preflight-declared-language > span,
-.preflight-stage-popover .preflight-range-fields label > span {
+.preflight-stage-popover .preflight-declared-language > span {
   font-size: 0.55rem;
 }
 
@@ -507,4 +677,18 @@
 .preflight-current-setup button:focus-visible {
   outline: 2px solid var(--palette-ink);
   outline-offset: 2px;
+}
+
+@media (max-width: 350px) {
+  .preflight-range-time-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preflight-stage-popover,
+  .preflight-range-choice,
+  .preflight-range-choice-indicator::after {
+    transition-duration: 0.01ms;
+  }
 }

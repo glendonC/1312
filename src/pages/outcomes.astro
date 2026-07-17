@@ -1,0 +1,443 @@
+---
+import GlassNav from "../components/GlassNav.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+import OutcomeFigure from "../features/outcomes/OutcomeFigure.astro";
+import { hero, sections } from "../features/outcomes/outcomes";
+---
+
+<SiteLayout
+  title="Outcomes | 1321"
+  description="What 1321 unlocks by understanding real media instead of only converting it: for the autonomous systems that produce the understanding, and the people who learn from it."
+>
+  <GlassNav />
+  <main class="outcomes-page">
+    <div class="outcomes-shell">
+      <header class="outcomes-intro" data-section-title="Outcomes">
+        <h1 id="outcomes-title">{hero.title}</h1>
+        <div class="outcomes-intro-aside">
+          <p class="outcomes-standfirst">{hero.standfirst}</p>
+        </div>
+      </header>
+
+      {sections.map((section) => (
+        <section
+          class="outcomes-section"
+          id={section.id}
+          data-palette={section.palette}
+          data-section-title={section.title}
+          aria-labelledby={`${section.id}-title`}
+        >
+          <div class="outcomes-section-aside">
+            <p class="outcomes-section-index">{section.index}</p>
+            <h2 class="outcomes-section-title" id={`${section.id}-title`}>{section.title}</h2>
+            <OutcomeFigure id={section.id} />
+          </div>
+          <div class="outcomes-section-copy">
+            {section.body.map((paragraph) => (
+              <p class="outcomes-section-body">{paragraph}</p>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+
+    <!-- Reading-progress index: pill shape and size borrowed from the Journey
+         "Build Week" back button; remodeled to a ring + current section +
+         percent, and a chevron that opens a clickable jump list of sections. -->
+    <div class="outcomes-index" data-outcomes-index>
+      <nav class="outcomes-index-menu" data-index-menu hidden aria-label="Sections">
+        <ul>
+          {sections.map((section) => (
+            <li>
+              <a class="outcomes-index-link" href={`#${section.id}`} data-index-jump={section.id}>
+                {section.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <button class="outcomes-index-toggle" type="button" data-index-toggle aria-expanded="false">
+        <svg class="outcomes-index-ring" viewBox="0 0 38 38" aria-hidden="true">
+          <circle class="outcomes-index-track" cx="19" cy="19" r="16"></circle>
+          <circle class="outcomes-index-value" cx="19" cy="19" r="16" data-index-ring></circle>
+        </svg>
+        <span class="outcomes-index-center">
+          <span class="outcomes-index-label" data-index-label>Outcomes</span>
+          <svg class="outcomes-index-chevron" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3.5 10 8 5.5 12.5 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </span>
+        <span class="outcomes-index-percent" data-index-percent>0%</span>
+      </button>
+    </div>
+  </main>
+</SiteLayout>
+
+<script>
+  const setupOutcomesIndex = () => {
+    const root = document.querySelector<HTMLElement>("[data-outcomes-index]");
+    const page = document.querySelector<HTMLElement>(".outcomes-page");
+    if (!root || !page || root.dataset.ready === "true") return;
+
+    const ring = root.querySelector<SVGCircleElement>("[data-index-ring]");
+    const label = root.querySelector<HTMLElement>("[data-index-label]");
+    const percent = root.querySelector<HTMLElement>("[data-index-percent]");
+    const toggle = root.querySelector<HTMLButtonElement>("[data-index-toggle]");
+    const menu = root.querySelector<HTMLElement>("[data-index-menu]");
+    const links = [...root.querySelectorAll<HTMLAnchorElement>("[data-index-jump]")];
+    const sections = [...page.querySelectorAll<HTMLElement>("[data-section-title]")];
+
+    const radius = ring?.r.baseVal.value ?? 16;
+    const circumference = 2 * Math.PI * radius;
+    if (ring) ring.style.strokeDasharray = String(circumference);
+
+    const setOpen = (open: boolean) => {
+      root.classList.toggle("is-open", open);
+      toggle?.setAttribute("aria-expanded", String(open));
+      if (menu) menu.hidden = !open;
+    };
+
+    let frame = 0;
+    const render = () => {
+      frame = 0;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const fraction = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+
+      if (percent) percent.textContent = `${Math.round(fraction * 100)}%`;
+      if (ring) ring.style.strokeDashoffset = String(circumference * (1 - fraction));
+
+      const threshold = window.innerHeight * 0.35;
+      let current = sections[0];
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= threshold) current = section;
+        else break;
+      }
+      const title = current?.getAttribute("data-section-title") ?? "";
+      if (label && label.textContent !== title) label.textContent = title;
+      const currentId = current?.id ?? "";
+      links.forEach((link) =>
+        link.classList.toggle("is-current", link.dataset.indexJump === currentId),
+      );
+
+      root.classList.toggle("is-docked", page.getBoundingClientRect().bottom <= window.innerHeight);
+    };
+
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(render);
+    };
+
+    toggle?.addEventListener("click", () => setOpen(!root.classList.contains("is-open")));
+    links.forEach((link) => link.addEventListener("click", () => setOpen(false)));
+    document.addEventListener("click", (event) => {
+      if (event.target instanceof Node && !root.contains(event.target)) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setOpen(false);
+    });
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    root.dataset.ready = "true";
+    render();
+  };
+
+  document.addEventListener("astro:page-load", setupOutcomesIndex);
+  setupOutcomesIndex();
+</script>
+
+<style>
+  /* Left-aligned editorial layout in the Method register: a giant title, then
+     titled sections with substantial copy. Tokens only, no new palette. */
+  .outcomes-page {
+    position: relative;
+    min-height: 100vh;
+    overflow: clip;
+    color: var(--ink);
+    background: var(--paper);
+  }
+
+  .outcomes-shell {
+    width: min(1500px, 100%);
+    margin-inline: auto;
+    padding: var(--interior-main-start) var(--page-x) clamp(128px, 15vw, 220px);
+  }
+
+  /* Hero: giant title paired with the standfirst across the full width */
+  .outcomes-intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: clamp(32px, 5vw, 96px);
+    align-items: end;
+    padding-bottom: clamp(48px, 7vw, 104px);
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .outcomes-intro h1 {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(3.5rem, 10vw, 10.5rem);
+    font-weight: var(--weight-thin);
+    letter-spacing: -0.06em;
+    line-height: 0.86;
+  }
+
+  .outcomes-intro-aside {
+    padding-bottom: clamp(4px, 1vw, 14px);
+  }
+
+  .outcomes-standfirst {
+    max-width: 30rem;
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: clamp(1.1rem, 1.45vw, 1.5rem);
+    font-weight: var(--weight-regular);
+    letter-spacing: -0.015em;
+    line-height: 1.4;
+  }
+
+  /* Sections: sticky aside (index, title, figure) on the left, copy on the
+     right. Each section carries a palette via data-palette. */
+  .outcomes-section {
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: clamp(28px, 5vw, 96px);
+    margin-top: clamp(60px, 8vw, 128px);
+    scroll-margin-top: calc(var(--interior-main-start) - 24px);
+  }
+
+  .outcomes-section-aside {
+    position: sticky;
+    top: var(--interior-main-start);
+    align-self: start;
+    max-width: 24rem;
+  }
+
+  .outcomes-section-index {
+    margin: 0 0 14px;
+    color: var(--palette-ink);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.14em;
+  }
+
+  .outcomes-section-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(1.6rem, 2.7vw, 2.7rem);
+    font-weight: var(--weight-medium);
+    letter-spacing: -0.04em;
+    line-height: 1.03;
+  }
+
+  .outcomes-section-copy {
+    max-width: 42rem;
+    padding-top: clamp(2px, 0.6vw, 8px);
+  }
+
+  .outcomes-section-body {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: clamp(1.08rem, 1.35vw, 1.28rem);
+    letter-spacing: -0.005em;
+    line-height: 1.6;
+  }
+
+  .outcomes-section-body + .outcomes-section-body {
+    margin-top: clamp(16px, 1.6vw, 22px);
+  }
+
+  /* Reading-progress index: Journey back-button shell, remodeled */
+  .outcomes-index {
+    position: fixed;
+    z-index: 9;
+    bottom: clamp(18px, 2.5vw, 30px);
+    left: 50%;
+    width: min(90vw, 340px);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    transform: translateX(-50%);
+  }
+
+  .outcomes-index.is-docked {
+    position: absolute;
+  }
+
+  .outcomes-index-toggle {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 52px;
+    padding: 7px 10px 7px 8px;
+    border: 1px solid rgba(22, 29, 27, 0.12);
+    border-radius: 999px;
+    background: rgba(247, 250, 248, 0.84);
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, 0.86),
+      0 14px 38px rgba(22, 29, 27, 0.12);
+    backdrop-filter: blur(20px) saturate(1.3);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform 180ms ease, box-shadow 160ms ease;
+  }
+
+  .outcomes-index-center {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .outcomes-index-toggle:hover {
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, 0.86),
+      0 18px 46px rgba(22, 29, 27, 0.18);
+  }
+
+  .outcomes-index-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .outcomes-index-ring {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    display: block;
+  }
+
+  .outcomes-index-track {
+    fill: none;
+    stroke: rgba(22, 29, 27, 0.14);
+    stroke-width: 3;
+  }
+
+  .outcomes-index-value {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 3;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset 120ms linear;
+  }
+
+  .outcomes-index-label {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .outcomes-index-chevron {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 12px;
+    color: var(--ink-muted);
+    transform: rotate(180deg);
+    transition: transform 180ms ease;
+  }
+
+  .outcomes-index.is-open .outcomes-index-chevron {
+    transform: rotate(0deg);
+  }
+
+  .outcomes-index-percent {
+    display: inline-flex;
+    align-items: center;
+    justify-self: end;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(22, 29, 27, 0.06);
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.04em;
+  }
+
+  /* Expanded jump list, above the toggle */
+  .outcomes-index-menu {
+    margin-bottom: 10px;
+    padding: 12px;
+    border: 1px solid rgba(22, 29, 27, 0.12);
+    border-radius: var(--squircle-radius);
+    background: rgba(247, 250, 248, 0.92);
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, 0.86),
+      0 22px 60px rgba(22, 29, 27, 0.18);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  }
+
+  .outcomes-index-menu ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 2px;
+    min-width: 240px;
+  }
+
+  .outcomes-index-link {
+    display: block;
+    padding: 9px 12px;
+    border-radius: 10px;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .outcomes-index-link:hover {
+    background: rgba(22, 29, 27, 0.05);
+    color: var(--ink);
+  }
+
+  .outcomes-index-link.is-current {
+    color: var(--accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .outcomes-index-value,
+    .outcomes-index-chevron,
+    .outcomes-index-toggle {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .outcomes-intro,
+    .outcomes-section {
+      grid-template-columns: 1fr;
+    }
+
+    .outcomes-intro {
+      align-items: start;
+      gap: clamp(20px, 4vw, 32px);
+    }
+
+    .outcomes-section {
+      gap: clamp(18px, 4vw, 28px);
+    }
+
+    .outcomes-section-aside {
+      position: static;
+      max-width: none;
+    }
+  }
+</style>

@@ -1,0 +1,117 @@
+---
+// Small stroke diagrams in the Method diagram idiom, one per Outcomes section.
+// Decorative: they support the title, they do not carry information on their
+// own. Color comes from the section's data-palette via currentColor, so each
+// figure inherits its palette ink without naming a color here.
+interface Props {
+  id: string;
+}
+const { id } = Astro.props;
+
+const figures: Record<string, string> = {
+  // 01 - a source forks: a dashed straight route (convert) and an investigated
+  // route through a lens to a checked result.
+  investigation: `
+    <circle cx="14" cy="70" r="5" />
+    <path d="M19 70h28" />
+    <path d="M47 70c16 0 12-42 34-42" />
+    <path d="M47 70c16 0 12 42 34 42" />
+    <rect x="83" y="16" width="24" height="24" rx="4" stroke-dasharray="3 4" opacity="0.45" />
+    <path d="M111 28h44" stroke-dasharray="3 4" opacity="0.45" />
+    <circle cx="92" cy="112" r="9" />
+    <path d="M99 119l7 7" />
+    <path d="M113 112h18" />
+    <rect x="133" y="97" width="30" height="30" rx="5" />
+    <path d="M140 112l6 6 10-12" />
+  `,
+  // 02 - read up from the media (waveform + frame), not from a crossed-out
+  // transcript line.
+  "media-first": `
+    <rect x="20" y="90" width="70" height="32" rx="5" fill="currentColor" fill-opacity="0.08" />
+    <path d="M30 106h4l3-9 4 16 4-12 3 7h6" />
+    <rect x="72" y="99" width="14" height="14" rx="2" />
+    <path d="M55 90V58" />
+    <path d="M49 66l6-8 6 8" />
+    <circle cx="55" cy="48" r="8" />
+    <path d="M51 48l3 3 5-7" />
+    <path d="M108 52h74" stroke-dasharray="3 4" opacity="0.4" />
+    <path d="M138 44l12 16M150 44l-12 16" opacity="0.4" />
+  `,
+  // 03 - a clear line takes the short route; a hard line earns a longer,
+  // investigated one.
+  "adaptive-effort": `
+    <circle cx="16" cy="70" r="5" />
+    <path d="M21 62c22 0 24-20 44-20" />
+    <path d="M65 42h56" />
+    <path d="M113 36l8 6-8 6" />
+    <path d="M21 78c22 0 20 26 40 26" />
+    <path d="M61 104l10-11 10 11 10-11 10 11" />
+    <circle cx="128" cy="104" r="9" />
+    <path d="M135 111l7 7" />
+  `,
+  // 04 - a claim traced to its evidence: one supported (check), one withheld
+  // (dashed).
+  traceable: `
+    <circle cx="100" cy="26" r="11" />
+    <path d="M92 34L60 80" />
+    <path d="M100 37v42" />
+    <path d="M108 34l32 46" />
+    <path d="M52 74l6 6 9-12" />
+    <rect x="90" y="80" width="20" height="18" rx="3" />
+    <rect x="130" y="70" width="20" height="18" rx="3" stroke-dasharray="3 4" opacity="0.5" />
+  `,
+  // 05 - one checked record leaves as several outputs, and feeds back to
+  // inform later runs.
+  reusable: `
+    <rect x="24" y="54" width="42" height="30" rx="5" />
+    <path d="M32 65h26M32 74h16" />
+    <path d="M66 62c34 0 30-22 52-22" />
+    <path d="M66 69h48" />
+    <path d="M66 76c34 0 30 22 52 22" />
+    <rect x="120" y="30" width="20" height="20" rx="4" />
+    <rect x="116" y="59" width="20" height="20" rx="4" />
+    <rect x="120" y="88" width="20" height="20" rx="4" />
+    <path d="M140 98c26 24-4 44-74 24" stroke-dasharray="3 4" opacity="0.5" />
+    <path d="M70 128l-4-8 9-1" opacity="0.5" />
+  `,
+  // 06 - understanding as a foundation, with learning built on top of it.
+  learning: `
+    <rect x="34" y="94" width="132" height="22" rx="5" fill="currentColor" fill-opacity="0.1" />
+    <rect x="56" y="70" width="88" height="18" rx="4" />
+    <path d="M100 70V52" />
+    <path d="M94 58l6-7 6 7" />
+    <circle cx="100" cy="40" r="8" />
+    <path d="M86 34a14 14 0 0 1 28 0" />
+  `,
+};
+
+const markup = figures[id] ?? "";
+---
+
+<div class="outcomes-figure" aria-hidden="true">
+  <svg viewBox="0 0 200 140" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" set:html={markup}></svg>
+</div>
+
+<style>
+  /* Palette variables inherit from the ancestor section's data-palette. */
+  .outcomes-figure {
+    margin-top: clamp(20px, 2.4vw, 34px);
+    width: min(100%, 16rem);
+    padding: clamp(18px, 2vw, 26px);
+    border-radius: var(--squircle-radius);
+    background: var(--palette-soft);
+    color: var(--palette-ink);
+  }
+
+  .outcomes-figure svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  @media (max-width: 900px) {
+    .outcomes-figure {
+      display: none;
+    }
+  }
+</style>

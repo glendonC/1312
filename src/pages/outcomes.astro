@@ -113,6 +113,9 @@ import { hero, sections } from "../features/outcomes/outcomes";
         if (section.getBoundingClientRect().top <= threshold) current = section;
         else break;
       }
+      // At the very bottom the last section's top may never rise above the
+      // threshold, so pin it as current once scrolling is complete.
+      if (fraction >= 0.999 && sections.length) current = sections[sections.length - 1];
       const title = current?.getAttribute("data-section-title") ?? "";
       if (label && label.textContent !== title) label.textContent = title;
       const currentId = current?.id ?? "";

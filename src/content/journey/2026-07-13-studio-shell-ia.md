@@ -15,6 +15,6 @@ IA panels (scaffold only):
 2. **Org chart** - orchestrator + spawn slots
 3. **Squircles** - isolated live workspaces
 4. **Traces** - per-worker action log rail
-5. **Outputs** - captions / study / score hooks
+5. **Outputs** - Apply hooks (watch aids / understanding / score) — not “caption product” IA
 
 Linked run id: `shell-v0`. No media processed. Open Studio to see the empty instrument; Method still owns the loop explanation.

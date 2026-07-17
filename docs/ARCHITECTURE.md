@@ -7,7 +7,9 @@ Last updated: 2026-07-16
 ## Goals
 
 - Maximize **Codex / GPT-5.6** (computer use, multi-agent, measurable loop).
-- Ship a **complete product experience** (ingest → swarm UI → captions/study → scores).
+- Ship a **complete product experience** for media understanding (ingest → swarm UI → investigated
+  study → reusable Apply outputs → beachhead scores). Captions/timed KO·EN are one Apply branch,
+  not the product category — see [`PRODUCT.md`](./PRODUCT.md).
 - Keep long-term path open for fine-tune + better ASR **without** throwing away schemas.
 
 ## Recommended stack (UI now → agents next)
@@ -378,4 +380,4 @@ This row shape is future fine-tune data.
 
 - Exact computer-use host for squircles (Codex CUA vs embedded browser/player).  
 - Which local service should stream production journals and acknowledged controls to the separate adapter; the static Studio remains an inspector, not the worker host.
-- Public GitHub visibility when Devpost rules require it.
+- Public GitHub visibility when submission rules require it.

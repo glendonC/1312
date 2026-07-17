@@ -1,7 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { WorkerKind } from "../runtime/production/model";
-import { ProductionStudioAdapter, type ProductionStudioProjection } from "../runtime/production/studioProjection";
+// Type-only: the ProductionStudioAdapter *value* pulls the server runtime (node:crypto/node:fs via
+// the artifact store) which cannot load in the browser. This DEV-only fixture imports the adapter
+// lazily (dynamic import below) so it never enters the client's initial graph and StudioApp hydrates.
+import type { ProductionStudioProjection } from "../runtime/production/studioProjection";
 import type {
   RuntimeHostFailureReason,
   RuntimeHostLifecycleState,
@@ -74,8 +77,7 @@ function failureFor(scenario: ProcessingMockScenario): RuntimeHostFailureReason 
   return null;
 }
 
-function activeProjection(): ProductionStudioProjection {
-  const empty = new ProductionStudioAdapter(MOCK_RUNTIME_ID).view();
+function activeProjection(empty: ProductionStudioProjection): ProductionStudioProjection {
   const rootKind: WorkerKind = "orchestrator";
   const childKind: WorkerKind = "media";
   return {
@@ -205,9 +207,12 @@ function activeProjection(): ProductionStudioProjection {
   };
 }
 
-function scenarioProjection(scenario: ProcessingMockScenario): ProductionStudioProjection {
-  if (scenario === "running" || scenario === "poll-error") return activeProjection();
-  return new ProductionStudioAdapter(MOCK_RUNTIME_ID).view();
+function scenarioProjection(
+  scenario: ProcessingMockScenario,
+  empty: ProductionStudioProjection,
+): ProductionStudioProjection {
+  if (scenario === "running" || scenario === "poll-error") return activeProjection(empty);
+  return empty;
 }
 
 function scenarioStatus(scenario: ProcessingMockScenario): RuntimeStatusView {
@@ -245,11 +250,24 @@ export default function ProductionProcessingMock({
 }) {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [pollRecovered, setPollRecovered] = useState(false);
+  const [projection, setProjection] = useState<ProductionStudioProjection | null>(null);
   const evidence = useRef<HTMLDivElement>(null);
   const status = scenarioStatus(scenario);
-  const projection = scenarioProjection(scenario);
   const reason = failureFor(scenario);
   const lifecycle = projectLocalRuntimeLifecycle(status.lifecycle, reason);
+
+  // The projection adapter is server-runtime code; load it lazily so it never enters the client's
+  // initial bundle. This fixture is DEV-only, so an async first paint is fine.
+  useEffect(() => {
+    let alive = true;
+    void import("../runtime/production/studioProjection").then(({ ProductionStudioAdapter }) => {
+      if (!alive) return;
+      setProjection(scenarioProjection(scenario, new ProductionStudioAdapter(MOCK_RUNTIME_ID).view()));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [scenario]);
   const active = scenario === "running" || scenario === "poll-error";
   const pollError = scenario === "poll-error" && !pollRecovered;
 
@@ -272,6 +290,7 @@ export default function ProductionProcessingMock({
         creates no receipt or artifact, and is unavailable in production builds.
       </p>
       <section className="product-runtime-status" aria-label="Local runtime status">
+        {projection ? (
         <ProductionProcessingCanvas
           source={SOURCE}
           lifecycle={lifecycle}
@@ -295,6 +314,9 @@ export default function ProductionProcessingMock({
           onRetryPolling={pollError ? () => setPollRecovered(true) : undefined}
           onPrepareAnotherRun={onClose}
         />
+        ) : (
+          <p className="processing-mock-boundary" role="status">Loading fixture projection…</p>
+        )}
         {evidenceOpen && (
           <div ref={evidence} className="processing-mock-evidence" role="status">
             <b>Fixture evidence boundary</b>

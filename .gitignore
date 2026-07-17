@@ -13,6 +13,9 @@ test-results/
 !.env.example
 .studio/
 
+# Local-only working docs (agent standards, scratch notes). Not public product docs.
+docs/local/
+
 # Human listen worksheets are local drafting inputs, not public bench receipts.
 bench/*_LISTEN_PASS.md
 

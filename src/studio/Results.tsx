@@ -1,44 +1,53 @@
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
-import { clock, rate, signed } from "./format";
+import { clock } from "./format";
 import RecordedEvidence from "./evidence/RecordedEvidence";
 import { RECORDED_RESULTS_ID } from "./resultAccess";
-import { recordedResultView, resultNote } from "./resultView";
 import { useBundle, useStudio } from "./store";
-import type { Cue, View } from "./types";
+import type { Cue } from "./types";
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: "prepped", label: "1321" },
-  { id: "baseline", label: "Cold" },
-  { id: "diff", label: "Diff" },
-];
-
+/**
+ * The result of a run: the media you can watch, and the timed Korean→English transcript it will
+ * stand behind. Lines it cannot stand behind are shown as labelled gaps — withheld with a reason,
+ * or silence — never a guess. Coverage, receipts, and raw files sit under progressive disclosure.
+ *
+ * Deliberately absent: accuracy scores, cold/diff comparison, timing, and agent/worker counts.
+ * None of those are produced for a real request — they belong to the benchmark lane, not here.
+ */
 export default function Results() {
   const bundle = useBundle();
-  const view = useStudio((s) => s.view);
-  const setView = useStudio((s) => s.setView);
   const reset = useStudio((s) => s.reset);
-  const emitted = useStudio((s) => s.state.emitted);
   const outputDepth = useStudio((s) => s.outputDepth);
   const previewSession = useStudio((s) => s.previewSession);
 
   if (!bundle) return null;
 
-  const { run, captions, score } = bundle;
-  const { prep, cold, showEvidence, hasComparison, accuracyMeasured, availableViewIds } =
-    recordedResultView(bundle, outputDepth);
-  const views = VIEWS.filter((candidate) => availableViewIds.includes(candidate.id));
-  const activeView = hasComparison ? view : "prepped";
-  const note = resultNote(activeView, showEvidence, accuracyMeasured);
+  const { run, captions } = bundle;
+  const target = run.pair.target;
+  const showEvidence = outputDepth === "evidence";
+
+  // Real per-line accounting, straight from the recorded cues. A refusal and a silence are
+  // different facts and are counted as different things; neither is an error.
+  const counts = { captioned: 0, withheld: 0, silent: 0 };
+  for (const cue of captions.cues) {
+    if (cue.silence) {
+      counts.silent += 1;
+      continue;
+    }
+    const tgt = cue.targets.find((t) => t.lang === target);
+    if (tgt?.withheld) counts.withheld += 1;
+    else if (tgt?.text) counts.captioned += 1;
+  }
+
+  const licence = run.clip.source.licence;
 
   return (
     <motion.div
       id={RECORDED_RESULTS_ID}
       className="results"
-      data-accuracy={accuracyMeasured ? "measured" : "unscored"}
       role="region"
-      aria-label="Recorded Results"
+      aria-label="Result"
       tabIndex={-1}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -52,111 +61,54 @@ export default function Results() {
         />
       )}
 
-      <Player />
+      <header className="result-head">
+        <span className="result-kicker">Result</span>
+        <h2>{run.clip.title}</h2>
+        <p className="result-request">
+          <b>{run.pair.source.toUpperCase()} → {target.toUpperCase()}</b>
+          <span aria-hidden="true">·</span>
+          {clock(0)}–{clock(run.clip.duration)}
+          <span aria-hidden="true">·</span>
+          recorded evidence
+        </p>
+      </header>
 
-      <div className="result-bar">
-        <div className="seg" role="group" aria-label="Caption view">
-          {views.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              className={`seg-btn${activeView === v.id ? " is-on" : ""}`}
-              onClick={() => setView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
+      <div className="result-main">
+        <Player />
+
+        <div className="cues" aria-label="Korean to English transcript">
+          {captions.cues.length === 0 ? (
+            <p className="cues-empty">No caption cues were recorded. No transcript or result is implied.</p>
+          ) : (
+            captions.cues.map((cue) => <CueRow key={cue.id} cue={cue} target={target} />)
+          )}
         </div>
-        <span className="result-note">{note}</span>
       </div>
 
-      <div className="cues">
-        {captions.cues.length === 0 ? (
-          <p className="cues-empty">No caption cues were recorded. No transcript or result is implied.</p>
-        ) : (
-          captions.cues.map((cue) => (
-            <CueRow key={cue.id} cue={cue} view={activeView} target={run.pair.target} />
-          ))
-        )}
+      <div className="result-completeness">
+        <div className="result-completeness-cell">
+          <b>Coverage</b>
+          <span>{counts.captioned} captioned · {counts.withheld} withheld · {counts.silent} silent</span>
+          <small>of {captions.cues.length} lines in range</small>
+        </div>
+        <div className="result-completeness-cell">
+          <b>Withheld</b>
+          <span>refusals with a reason</span>
+          <small>shown, not errors — and not a translation-quality score</small>
+        </div>
+        <div className="result-completeness-cell">
+          <b>Source</b>
+          <span>{run.clip.source.label}</span>
+          <small>{licence ? `${licence} · recorded` : "recorded evidence"}</small>
+        </div>
       </div>
 
-      {showEvidence && <div className="scores">
-        {/* A null score is not a zero. An unscored run prints "—" and says why: there is no
-            gold for this clip, so a delta against cold is not a number we are entitled to. */}
-        <Score
-          value={rate(prep?.hard_line ?? null)}
-          label="hard lines"
-          sub={
-            prep?.hard_line == null
-              ? "unscored · no gold for this clip"
-              : score.delta_vs_cold == null
-                ? `cold delta unavailable · cold ${rate(cold?.hard_line ?? null)}`
-                : `${signed(score.delta_vs_cold)} vs cold ${rate(cold?.hard_line ?? null)}`
-          }
-          good={prep?.hard_line != null}
-        />
-        <Score
-          value={prep?.hallucinated == null ? "—" : String(prep.hallucinated)}
-          label="fabrications"
-          sub={
-            cold?.hallucinated == null
-              ? "entity gate · not gold-verified"
-              : `cold made ${cold.hallucinated} on the same audio`
-          }
-          good={prep?.hallucinated != null}
-        />
-        {/*
-          Coverage is not a score, and this line exists to stop it being read as one. Both paths
-          can land on the same number for opposite reasons: our gaps are lines we refused and gave
-          a reason for, cold's are lines its recogniser never heard. A refusal and a miss look
-          identical in a ratio and are nothing alike.
-        */}
-        <Score
-          value={rate(prep?.coverage ?? null)}
-          label="coverage"
-          sub={coverageNote(prep?.withheld ?? null, cold?.coverage ?? null)}
-        />
-        <Score
-          value={time(prep?.time_to_usable_s ?? null)}
-          label="time to first usable line"
-          sub={timingNote(prep?.time_to_complete_s ?? null, cold?.time_to_usable_s ?? null)}
-        />
-      </div>}
-
-      {showEvidence && <RecordedEvidence />}
-
-      <footer className="result-foot">
-        <p className="caveat">{score.rubric.note}</p>
-        <div className="foot-actions">
-          <button type="button" className="ghost" onClick={reset}>
-            Run again
-          </button>
-          <a className="cta" href="/benchmarks/">
-            See the full bench &rarr;
-          </a>
-        </div>
-      </footer>
-
-      {showEvidence && <details className="raw">
-        <summary>
-          Raw run — {emitted.length} agent actions, {run.agents.length} workers,{" "}
-          {clock(run.wall_s)} wall
-        </summary>
-        <div className="raw-body">
-          <div className="raw-log">
-            {emitted.map((t, i) => (
-              <div className="raw-row" key={i} data-level={t.level}>
-                <b>{clock(t.t, true)}</b>
-                <b>{t.agent}</b>
-                <i>{t.action}</i>
-                <span>
-                  {t.target} {t.detail ? `— ${t.detail}` : ""}
-                </span>
-              </div>
-            ))}
-          </div>
+      {showEvidence && (
+        <details className="result-provenance">
+          <summary>Evidence &amp; run files</summary>
+          <RecordedEvidence />
           {run.artifacts.length > 0 ? (
-            <p className="raw-links">
+            <p className="result-provenance-links">
               {run.artifacts.map((artifact) => (
                 <a key={artifact} href={`/demo/runs/${run.id}/${artifact}`}>
                   {artifact}
@@ -165,10 +117,16 @@ export default function Results() {
               <a href={`/demo/packs/${run.pack}.json`}>{run.pack}.json</a>
             </p>
           ) : (
-            <p className="raw-empty">No artifact links were declared by this run.</p>
+            <p className="result-provenance-empty">No artifact links were declared by this run.</p>
           )}
-        </div>
-      </details>}
+        </details>
+      )}
+
+      <footer className="result-foot">
+        <button type="button" className="ghost" onClick={reset}>
+          Run again
+        </button>
+      </footer>
     </motion.div>
   );
 }
@@ -214,124 +172,46 @@ function SubmittedSourceResultBoundary({
       </p>
       <p className="submitted-results-demo-boundary" role="note">
         <b>Recorded demo Results below</b>
-        The player, captions, workers, evidence, scores, and timing below belong only to {recordedRunId}: {recordedTitle}.
+        The player, captions, and evidence below belong only to {recordedRunId}: {recordedTitle}.
       </p>
     </section>
   );
 }
 
-function Score({
-  value,
-  label,
-  sub,
-  good,
-}: {
-  value: string;
-  label: string;
-  sub: string;
-  good?: boolean;
-}) {
-  return (
-    <div className="score">
-      <motion.span
-        className={`score-val${good ? " is-good" : ""}`}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      >
-        {value}
-      </motion.span>
-      <span className="score-key">{label}</span>
-      <span className="score-sub">{sub}</span>
-    </div>
-  );
-}
-
-function time(value: number | null): string {
-  return value === null ? "—" : clock(value);
-}
-
-function coverageNote(withheld: number | null, coldCoverage: number | null): string {
-  const withheldText = withheld === null ? "withheld count unavailable" : `${withheld} withheld, each with a reason`;
-  if (coldCoverage === null) return `${withheldText} · comparison coverage unavailable`;
-  return coldCoverage < 1
-    ? `${withheldText} · cold ${rate(coldCoverage)}, but its gaps are lines it never heard`
-    : `${withheldText} · cold ${rate(coldCoverage)} and never refuses anything`;
-}
-
-function timingNote(completed: number | null, coldUsable: number | null): string {
-  const coldText = coldUsable === null ? "comparison timing unavailable" : `cold answered at ${clock(coldUsable)}`;
-  return completed === null ? coldText : `every line by ${clock(completed)} · ${coldText}`;
-}
-
-function CueRow({ cue, view, target }: { cue: Cue; view: View; target: string }) {
+function CueRow({ cue, target }: { cue: Cue; target: string }) {
   const clipT = useStudio((s) => s.clipT);
   const setClipT = useStudio((s) => s.setClipT);
 
   const active = clipT >= cue.t_start && clipT < cue.t_end;
   const tgt = cue.targets.find((t) => t.lang === target);
-  const cold = cue.baseline;
-
-  const tags: { kind: string; text: string }[] = [];
-  if (cue.hard && cue.error_type) tags.push({ kind: "type", text: cue.error_type });
-  if (view !== "baseline" && tgt?.withheld) tags.push({ kind: "withheld", text: "withheld" });
-  if (view !== "baseline" && cue.regression) tags.push({ kind: "regression", text: "regression" });
-  if (view !== "baseline" && cue.recovered && !tgt?.withheld) {
-    tags.push({ kind: "fixed", text: "recovered" });
-  }
 
   return (
     <button
       type="button"
       className={`cue${active ? " is-active" : ""}`}
+      data-withheld={tgt?.withheld ? "true" : undefined}
+      data-silence={cue.silence ? "true" : undefined}
       onClick={() => setClipT(cue.t_start)}
     >
       <span className="cue-t">{clock(cue.t_start, true)}</span>
       <span className="cue-body">
-        {view === "baseline" ? (
-          <>
-            {cold?.source.text && <span className="cue-src">{cold.source.text}</span>}
-            {cold?.target.text && <span className="cue-tgt">{cold.target.text}</span>}
-            {cue.silence && (
-              <span className="cue-withheld">
-                No speech here at all. The cold path captioned it anyway.
-              </span>
-            )}
-          </>
+        {cue.silence ? (
+          <span className="cue-silence">
+            {(cue.t_end - cue.t_start).toFixed(1)}s of silence · no caption emitted
+          </span>
         ) : (
           <>
-            {cue.silence ? (
-              <span className="cue-silence">
-                {(cue.t_end - cue.t_start).toFixed(1)}s of silence · no caption emitted
-              </span>
-            ) : (
-              <span className="cue-src">{cue.source.text}</span>
-            )}
+            <span className="cue-src">{cue.source.text}</span>
 
             {tgt?.withheld ? (
               <span className="cue-withheld">
-                Withheld · {tgt.withheld.gate} gate · {tgt.withheld.reason}
+                <span className="cue-withheld-mark">withheld</span>
+                {tgt.withheld.reason}
               </span>
             ) : (
               tgt?.text && <span className="cue-tgt">{tgt.text}</span>
             )}
-
-            {/* Only the hard lines. Cold paraphrases the easy ones fine, and showing
-                those in red would bury the eight that actually break. */}
-            {view === "diff" && cue.hard && cold?.target.text && (
-              <span className="cue-cold">{cold.target.text}</span>
-            )}
           </>
-        )}
-
-        {tags.length > 0 && (
-          <span className="cue-tags">
-            {tags.map((t) => (
-              <span className="tag" key={t.text} data-kind={t.kind}>
-                {t.text}
-              </span>
-            ))}
-          </span>
         )}
       </span>
     </button>
@@ -342,40 +222,23 @@ function CueRow({ cue, view, target }: { cue: Cue; view: View; target: string })
 const HAS_PICTURE = /\.(mp4|webm|mov|m4v)$/i;
 
 /**
- * The caption on the picture, at this instant of the clip.
- *
- * Which is where the argument gets settled. Everything else in this view is a list you can
- * study at your leisure; this is the thing a viewer actually experiences, and it is the only
- * place the two paths can be compared the way an audience would meet them. On Cold, a line
- * arrives for every window, fluent and certain. On 1321, some windows say we are not putting
- * anything here and why — which looks like less, and is worth more, because the alternative was
- * never silence, it was a confident sentence nobody could check.
+ * The caption on the picture, at this instant of the clip. Where it will not put a line, the
+ * screen says so — withheld, with the reason — instead of showing a guess.
  */
 function Burned() {
   const bundle = useBundle();
-  const view = useStudio((s) => s.view);
   const clipT = useStudio((s) => s.clipT);
 
   const cue = bundle?.captions.cues.find((c) => clipT >= c.t_start && clipT < c.t_end);
-  if (!cue) return null;
+  if (!cue || cue.silence) return null;
 
-  const cold = cue.baseline?.target.text ?? null;
   const tgt = cue.targets.find((target) => target.lang === bundle?.run.pair.target);
-
-  if (view === "baseline") {
-    return cold ? (
-      <figcaption className="burn" data-path="cold">
-        {cold}
-      </figcaption>
-    ) : null;
-  }
 
   if (tgt?.withheld) {
     return (
       <figcaption className="burn" data-path="withheld">
         <span className="burn-mark">withheld</span>
         {tgt.withheld.reason}
-        {view === "diff" && cold && <span className="burn-cold">Cold said: {cold}</span>}
       </figcaption>
     );
   }
@@ -385,7 +248,6 @@ function Burned() {
   return (
     <figcaption className="burn" data-path="prepped">
       {tgt.text}
-      {view === "diff" && cue.hard && cold && <span className="burn-cold">Cold said: {cold}</span>}
     </figcaption>
   );
 }
@@ -459,12 +321,6 @@ function Player() {
     <div className="player">
       {src &&
         (picture ? (
-          /*
-           * The clip plays with the captions burned on, because that is the product — not a
-           * table of lines beside a waveform, but real footage a real person could watch, with
-           * the English this run is prepared to put on screen. And where it is not prepared to
-           * put any, the screen says so instead of showing a guess.
-           */
           <figure className="screen">
             <video
               ref={attach}

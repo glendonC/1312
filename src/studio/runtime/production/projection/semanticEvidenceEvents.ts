@@ -1,16 +1,7 @@
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
+import { capabilityOperationExists, taskCapabilityCallCount } from "../capabilityUsage.ts";
 import { invariant } from "./shared.ts";
-
-function taskCalls(state: RuntimeProjection, taskId: string): number {
-  return [
-    ...Object.values(state.operations),
-    ...Object.values(state.semanticEvidence),
-    ...Object.values(state.evidenceReads),
-    ...Object.values(state.evidenceAssessments),
-    ...Object.values(state.evidenceDecisions),
-  ].filter((operation) => operation.taskId === taskId).length;
-}
 
 export function applySemanticEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
   if (event.type === "semantic.evidence_started") {
@@ -26,11 +17,7 @@ export function applySemanticEvidenceEvent(next: RuntimeProjection, event: Runti
       `semantic operation ${request.operationId} has no active executor lineage`,
     );
     invariant(
-      !next.semanticEvidence[request.operationId] &&
-        !next.operations[request.operationId] &&
-        !next.evidenceReads[request.operationId] &&
-        !next.evidenceAssessments[request.operationId] &&
-        !next.evidenceDecisions[request.operationId],
+      !capabilityOperationExists(next, request.operationId),
       event,
       `semantic operation ${request.operationId} is duplicated`,
     );
@@ -59,7 +46,7 @@ export function applySemanticEvidenceEvent(next: RuntimeProjection, event: Runti
       event,
       `semantic operation ${request.operationId} exceeds its granted range`,
     );
-    invariant(taskCalls(next, task.id) < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
+    invariant(taskCapabilityCallCount(next, task.id) < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.semanticEvidence[request.operationId] = {
       id: request.operationId,
       capability: "speech.transcribe",

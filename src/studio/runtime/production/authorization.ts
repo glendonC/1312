@@ -1,4 +1,9 @@
-import { assertMediaExtractRequest, assertMediaSeekRequest, assertSpeechTranscribeRequest } from "./assertions.ts";
+import {
+  assertFrameSampleRequest,
+  assertMediaExtractRequest,
+  assertMediaSeekRequest,
+  assertSpeechTranscribeRequest,
+} from "./assertions.ts";
 import type {
   Capability,
   CapabilityGrant,
@@ -10,7 +15,10 @@ import type {
   EvidenceReadRecord,
   EvidenceReadRequest,
   EvidenceReadScope,
+  FrameSampleRequest,
+  FrameSamplingGrantScope,
   MediaExtractRequest,
+  MediaScope,
   MediaSeekRequest,
   MediaTrackDescriptor,
   SpeechTranscribeRequest,
@@ -20,15 +28,91 @@ import type {
 import { assertEvidenceReadRequest } from "./validation/evidence.ts";
 import { assertEvidenceAssessmentRequest, countAssessmentTokens } from "./validation/assessment.ts";
 import { assertEvidenceDecisionRequest } from "./validation/decision.ts";
+import { capabilityOperationExists, taskCapabilityCallCount } from "./capabilityUsage.ts";
+import { frameSamplingRequestFingerprint } from "./validation/frames.ts";
 
-function taskCapabilityCalls(state: RuntimeProjection, taskId: string): number {
-  return [
-    ...Object.values(state.operations),
-    ...Object.values(state.semanticEvidence),
-    ...Object.values(state.evidenceReads),
-    ...Object.values(state.evidenceAssessments),
-    ...Object.values(state.evidenceDecisions),
-  ].filter((operation) => operation.taskId === taskId).length;
+export interface AuthorizedFrameSampling {
+  request: FrameSampleRequest;
+  grant: CapabilityGrant & { frameScope: FrameSamplingGrantScope };
+  scope: MediaScope;
+  artifact: RuntimeArtifact;
+  track: MediaTrackDescriptor;
+  executionId: string;
+  launchClaimId: string;
+  requestFingerprint: string;
+}
+
+export function authorizeFrameSampling(
+  state: RuntimeProjection,
+  requestValue: unknown,
+): AuthorizedFrameSampling {
+  assertFrameSampleRequest(requestValue);
+  const request = requestValue;
+  const task = state.tasks[request.taskId];
+  if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
+    throw new Error("Frame sampling requires a working task owned by the requesting agent");
+  }
+  if (capabilityOperationExists(state, request.operationId)) {
+    throw new Error(`Frame sampling operation ${request.operationId} already exists`);
+  }
+  const grant = task.grants.find((candidate) => candidate.id === request.grantId);
+  if (grant?.capability !== "media.frames.sample" || !grant.frameScope || grant.mediaScope.length !== 1) {
+    throw new Error("Frame sampling requires its exact scheduler-issued frame grant");
+  }
+  const scope = grant.mediaScope[0];
+  const artifact = state.artifacts[scope.artifactId];
+  if (
+    !artifact || artifact.runId !== state.runId || artifact.origin.kind !== "ingest" ||
+    task.jobContext.source.artifactId !== artifact.id ||
+    task.jobContext.source.contentId !== artifact.content.contentId
+  ) {
+    throw new Error("Frame sampling source changed from the immutable task context");
+  }
+  const track = artifact.tracks.find((candidate) => candidate.id === scope.trackId);
+  if (!track || track.kind !== "video") throw new Error("Frame sampling requires one registered video track");
+  if (
+    artifact.durationMs === null ||
+    scope.endMs > artifact.durationMs ||
+    scope.endMs - scope.startMs > grant.frameScope.limits.maxDurationMs ||
+    request.requestedTimestampsMs.some((timestamp) => timestamp < scope.startMs || timestamp >= scope.endMs)
+  ) {
+    throw new Error("Frame sampling request is outside its scheduler-granted source and video-track window");
+  }
+  if (taskCapabilityCallCount(state, task.id) >= task.budget.toolCalls) {
+    throw new Error("Frame sampling exceeds the task tool-call budget");
+  }
+  if (Object.values(state.frameSamples).filter((sample) => sample.grantId === grant.id).length >= grant.frameScope.limits.maxCalls) {
+    throw new Error("Frame sampling exceeds the grant call budget");
+  }
+  const requestFingerprint = frameSamplingRequestFingerprint({
+    sourceContentId: artifact.content.contentId,
+    trackId: scope.trackId,
+    startMs: scope.startMs,
+    endMs: scope.endMs,
+    requestedTimestampsMs: request.requestedTimestampsMs,
+  });
+  if (Object.values(state.frameSamples).some((sample) =>
+    sample.taskId === task.id && sample.requestFingerprint === requestFingerprint)) {
+    throw new Error("Frame sampling rejects duplicate canonical work");
+  }
+  const executions = Object.values(state.executions).filter((execution) =>
+    execution.taskId === task.id && execution.agentId === request.agentId && execution.status === "active");
+  if (executions.length !== 1) throw new Error("Frame sampling requires one active task executor");
+  const execution = executions[0];
+  const launch = state.taskLaunches[task.id];
+  if (!launch || launch.executionId !== execution.id || launch.agentId !== request.agentId) {
+    throw new Error("Frame sampling executor lost its durable launch lineage");
+  }
+  return {
+    request,
+    grant: grant as CapabilityGrant & { frameScope: FrameSamplingGrantScope },
+    scope,
+    artifact,
+    track,
+    executionId: execution.id,
+    launchClaimId: launch.id,
+    requestFingerprint,
+  };
 }
 
 export interface AuthorizedSpeechTranscribe {
@@ -50,13 +134,9 @@ export function authorizeSpeechTranscribe(
   if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
     throw new Error("Speech transcription requires a working task owned by the requesting agent");
   }
-  if (
-    state.semanticEvidence[request.operationId] ||
-    state.operations[request.operationId] ||
-    state.evidenceReads[request.operationId] ||
-    state.evidenceAssessments[request.operationId] ||
-    state.evidenceDecisions[request.operationId]
-  ) throw new Error(`Speech transcription operation ${request.operationId} already exists`);
+  if (capabilityOperationExists(state, request.operationId)) {
+    throw new Error(`Speech transcription operation ${request.operationId} already exists`);
+  }
   const artifact = state.artifacts[request.artifactId];
   if (!artifact || artifact.runId !== state.runId || artifact.origin.kind !== "ingest") {
     throw new Error("Speech transcription input must be the registered owned source artifact");
@@ -76,7 +156,7 @@ export function authorizeSpeechTranscribe(
       request.startMs >= scope.startMs &&
       request.endMs <= scope.endMs));
   if (!grant) throw new Error("Speech transcription is outside the task's authoritative capability grant");
-  if (taskCapabilityCalls(state, task.id) >= task.budget.toolCalls) {
+  if (taskCapabilityCallCount(state, task.id) >= task.budget.toolCalls) {
     throw new Error("Speech transcription exceeds the task tool-call budget");
   }
   const executions = Object.values(state.executions).filter((execution) =>
@@ -114,13 +194,9 @@ function authorizeMediaRange<Request extends MediaExtractRequest | MediaSeekRequ
   if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
     throw new Error(`${operation} requires a working task owned by the requesting agent`);
   }
-  if (
-    state.operations[request.operationId] ||
-    state.semanticEvidence[request.operationId] ||
-    state.evidenceReads[request.operationId] ||
-    state.evidenceAssessments[request.operationId] ||
-    state.evidenceDecisions[request.operationId]
-  ) throw new Error(`Media operation ${request.operationId} already exists`);
+  if (capabilityOperationExists(state, request.operationId)) {
+    throw new Error(`Media operation ${request.operationId} already exists`);
+  }
   const artifact = state.artifacts[request.artifactId];
   if (!artifact || artifact.runId !== state.runId) throw new Error(`${operation} input artifact is unavailable`);
   const track = artifact.tracks.find((candidate) => candidate.id === request.trackId);
@@ -138,7 +214,7 @@ function authorizeMediaRange<Request extends MediaExtractRequest | MediaSeekRequ
       ),
   );
   if (!grant) throw new Error(`${operation} is outside the task's authoritative capability grant`);
-  const priorCalls = taskCapabilityCalls(state, task.id);
+  const priorCalls = taskCapabilityCallCount(state, task.id);
   if (priorCalls >= task.budget.toolCalls) throw new Error(`${operation} exceeds the task tool-call budget`);
   return { request, grant, artifact, track };
 }
@@ -162,13 +238,7 @@ export function authorizeEvidenceRead(
   if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
     throw new Error("Evidence read requires a working task owned by the requesting agent");
   }
-  if (
-    state.evidenceReads[request.operationId] ||
-    state.evidenceAssessments[request.operationId] ||
-    state.evidenceDecisions[request.operationId] ||
-    state.operations[request.operationId] ||
-    state.semanticEvidence[request.operationId]
-  ) {
+  if (capabilityOperationExists(state, request.operationId)) {
     throw new Error(`Evidence read operation ${request.operationId} already exists`);
   }
   const artifact = state.artifacts[request.artifactId];
@@ -193,7 +263,7 @@ export function authorizeEvidenceRead(
   ) {
     throw new Error("Evidence read grant is no longer bound to the task's exact source window");
   }
-  const priorCalls = taskCapabilityCalls(state, task.id);
+  const priorCalls = taskCapabilityCallCount(state, task.id);
   if (priorCalls >= task.budget.toolCalls) throw new Error("Evidence read exceeds the task tool-call budget");
   const priorReads = Object.values(state.evidenceReads).filter(
     (operation) =>
@@ -232,18 +302,14 @@ export function authorizeEvidenceAssessment(
   if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
     throw new Error("Evidence assessment requires a working task owned by the requesting agent");
   }
-  if (
-    state.evidenceAssessments[request.operationId] ||
-    state.evidenceDecisions[request.operationId] ||
-    state.evidenceReads[request.operationId] ||
-    state.operations[request.operationId] ||
-    state.semanticEvidence[request.operationId]
-  ) throw new Error(`Evidence assessment operation ${request.operationId} already exists`);
+  if (capabilityOperationExists(state, request.operationId)) {
+    throw new Error(`Evidence assessment operation ${request.operationId} already exists`);
+  }
   const grant = task.grants.find((candidate) =>
     candidate.capability === "analysis.evidence.assess" && candidate.assessmentScope !== null);
   const scope = grant?.assessmentScope;
   if (!grant || !scope) throw new Error("Evidence assessment is outside the task's authoritative grant");
-  if (taskCapabilityCalls(state, task.id) >= task.budget.toolCalls) {
+  if (taskCapabilityCallCount(state, task.id) >= task.budget.toolCalls) {
     throw new Error("Evidence assessment exceeds the task tool-call budget");
   }
   const prior = Object.values(state.evidenceAssessments).filter(
@@ -296,18 +362,14 @@ export function authorizeEvidenceDecision(
   if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
     throw new Error("Evidence decision requires a working task owned by the requesting agent");
   }
-  if (
-    state.evidenceDecisions[request.operationId] ||
-    state.evidenceAssessments[request.operationId] ||
-    state.evidenceReads[request.operationId] ||
-    state.operations[request.operationId] ||
-    state.semanticEvidence[request.operationId]
-  ) throw new Error(`Evidence decision operation ${request.operationId} already exists`);
+  if (capabilityOperationExists(state, request.operationId)) {
+    throw new Error(`Evidence decision operation ${request.operationId} already exists`);
+  }
   const grant = task.grants.find((candidate) =>
     candidate.capability === "analysis.evidence.decide" && candidate.decisionScope !== null);
   const scope = grant?.decisionScope;
   if (!grant || !scope) throw new Error("Evidence decision is outside the task's authoritative grant");
-  if (taskCapabilityCalls(state, task.id) >= task.budget.toolCalls) {
+  if (taskCapabilityCallCount(state, task.id) >= task.budget.toolCalls) {
     throw new Error("Evidence decision exceeds the task tool-call budget");
   }
   const prior = Object.values(state.evidenceDecisions).filter(

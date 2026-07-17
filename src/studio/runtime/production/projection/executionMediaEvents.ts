@@ -1,5 +1,6 @@
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
+import { capabilityOperationExists, taskCapabilityCallCount } from "../capabilityUsage.ts";
 import { invariant } from "./shared.ts";
 
 export function applyExecutionMediaEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
@@ -98,11 +99,7 @@ export function applyExecutionMediaEvent(next: RuntimeProjection, event: Runtime
     const task = next.tasks[request.taskId];
     invariant(task?.status === "working" && task.ownerAgentId === request.agentId, event, `operation ${request.operationId} has no working owner`);
     invariant(
-      !next.operations[request.operationId] &&
-        !next.semanticEvidence[request.operationId] &&
-        !next.evidenceReads[request.operationId] &&
-        !next.evidenceAssessments[request.operationId] &&
-        !next.evidenceDecisions[request.operationId],
+      !capabilityOperationExists(next, request.operationId),
       event,
       `operation ${request.operationId} is duplicated`,
     );
@@ -135,13 +132,7 @@ export function applyExecutionMediaEvent(next: RuntimeProjection, event: Runtime
       event,
       `operation ${request.operationId} exceeds its grant scope`,
     );
-    const calls = [
-      ...Object.values(next.operations),
-      ...Object.values(next.semanticEvidence),
-      ...Object.values(next.evidenceReads),
-      ...Object.values(next.evidenceAssessments),
-      ...Object.values(next.evidenceDecisions),
-    ].filter((operation) => operation.taskId === task.id).length;
+    const calls = taskCapabilityCallCount(next, task.id);
     invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.operations[request.operationId] = {
       id: request.operationId,

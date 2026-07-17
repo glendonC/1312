@@ -1,5 +1,6 @@
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
+import { capabilityOperationExists, taskCapabilityCallCount } from "../capabilityUsage.ts";
 import { countAssessmentTokens } from "../validation/assessment.ts";
 import { invariant } from "./shared.ts";
 
@@ -14,11 +15,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       `evidence read ${request.operationId} has no working owner`,
     );
     invariant(
-      !next.evidenceReads[request.operationId] &&
-        !next.evidenceAssessments[request.operationId] &&
-        !next.evidenceDecisions[request.operationId] &&
-        !next.operations[request.operationId] &&
-        !next.semanticEvidence[request.operationId],
+      !capabilityOperationExists(next, request.operationId),
       event,
       `operation ${request.operationId} is duplicated`,
     );
@@ -51,13 +48,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       event,
       `evidence read ${request.operationId} exceeds its grant budget`,
     );
-    const calls = [
-      ...Object.values(next.operations),
-      ...Object.values(next.semanticEvidence),
-      ...Object.values(next.evidenceReads),
-      ...Object.values(next.evidenceAssessments),
-      ...Object.values(next.evidenceDecisions),
-    ].filter((operation) => operation.taskId === task.id).length;
+    const calls = taskCapabilityCallCount(next, task.id);
     invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.evidenceReads[request.operationId] = {
       id: request.operationId,
@@ -150,11 +141,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       `evidence assessment ${request.operationId} has no working owner`,
     );
     invariant(
-      !next.evidenceAssessments[request.operationId] &&
-        !next.evidenceDecisions[request.operationId] &&
-        !next.evidenceReads[request.operationId] &&
-        !next.operations[request.operationId] &&
-        !next.semanticEvidence[request.operationId],
+      !capabilityOperationExists(next, request.operationId),
       event,
       `operation ${request.operationId} is duplicated`,
     );
@@ -206,13 +193,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       event,
       `evidence assessment ${request.operationId} references an unread or ungranted receipt`,
     );
-    const calls = [
-      ...Object.values(next.operations),
-      ...Object.values(next.semanticEvidence),
-      ...Object.values(next.evidenceReads),
-      ...Object.values(next.evidenceAssessments),
-      ...Object.values(next.evidenceDecisions),
-    ].filter((operation) => operation.taskId === task.id).length;
+    const calls = taskCapabilityCallCount(next, task.id);
     invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.evidenceAssessments[request.operationId] = {
       id: request.operationId,
@@ -302,11 +283,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       `evidence decision ${request.operationId} has no working owner`,
     );
     invariant(
-      !next.evidenceDecisions[request.operationId] &&
-        !next.evidenceAssessments[request.operationId] &&
-        !next.evidenceReads[request.operationId] &&
-        !next.operations[request.operationId] &&
-        !next.semanticEvidence[request.operationId],
+      !capabilityOperationExists(next, request.operationId),
       event,
       `operation ${request.operationId} is duplicated`,
     );
@@ -343,13 +320,7 @@ export function applyEvidenceEvent(next: RuntimeProjection, event: RuntimeEvent)
       event,
       `evidence decision ${request.operationId} references a non-completed assessment identity`,
     );
-    const calls = [
-      ...Object.values(next.operations),
-      ...Object.values(next.semanticEvidence),
-      ...Object.values(next.evidenceReads),
-      ...Object.values(next.evidenceAssessments),
-      ...Object.values(next.evidenceDecisions),
-    ].filter((operation) => operation.taskId === task.id).length;
+    const calls = taskCapabilityCallCount(next, task.id);
     invariant(calls < task.budget.toolCalls, event, `task ${task.id} exhausted its tool-call budget`);
     next.evidenceDecisions[request.operationId] = {
       id: request.operationId,

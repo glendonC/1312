@@ -12,7 +12,16 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
       (artifact.origin.kind === "study_planning_decision" && event.producer.kind === "study_planning_host") ||
       (artifact.origin.kind === "owned_media_study" && event.producer.kind === "study_synthesis_host") ||
       (artifact.origin.kind === "study_readiness" && event.producer.kind === "study_audit_host");
-    invariant(event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt, event, "artifact evidence must come from its bounded storage, admission, planning, synthesis, or audit host");
+    const isAtomicFrameSampling =
+      (artifact.origin.kind === "sampled_frame" ||
+        artifact.origin.kind === "frame_sample_manifest" ||
+        artifact.origin.kind === "frame_sampling_receipt") &&
+      event.producer.kind === "frame_host";
+    invariant(
+      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling,
+      event,
+      "artifact evidence must come from its bounded storage, capability, admission, planning, synthesis, or audit host",
+    );
     invariant(artifact.runId === next.runId, event, `artifact ${artifact.id} belongs to another run`);
     invariant(!next.artifacts[artifact.id], event, `artifact ${artifact.id} is duplicated`);
     invariant(artifact.sourceArtifactIds.every((id) => Boolean(next.artifacts[id])), event, `artifact ${artifact.id} has missing lineage`);
@@ -27,6 +36,21 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         event,
         `artifact ${artifact.id} has the wrong origin for ${operation.capability}`,
       );
+    } else if (artifact.origin.kind === "sampled_frame") {
+      const operation = next.frameSamples[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `frame ${artifact.id} has no active frame operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `frame ${artifact.id} changed its producer`);
+      invariant(artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId, event, `frame ${artifact.id} changed source lineage`);
+    } else if (artifact.origin.kind === "frame_sample_manifest") {
+      const operation = next.frameSamples[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `frame manifest ${artifact.id} has no active frame operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `frame manifest ${artifact.id} changed its producer`);
+      invariant(artifact.sourceArtifactIds[0] === operation.sourceArtifactId && artifact.sourceArtifactIds.slice(1).every((id) => next.artifacts[id]?.origin.kind === "sampled_frame"), event, `frame manifest ${artifact.id} changed frame lineage`);
+    } else if (artifact.origin.kind === "frame_sampling_receipt") {
+      const operation = next.frameSamples[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `frame receipt ${artifact.id} has no active frame operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `frame receipt ${artifact.id} changed its producer`);
+      invariant(artifact.sourceArtifactIds[0] === operation.sourceArtifactId && artifact.sourceArtifactIds[1] === artifact.origin.manifestArtifactId && next.artifacts[artifact.origin.manifestArtifactId]?.origin.kind === "frame_sample_manifest", event, `frame receipt ${artifact.id} changed manifest lineage`);
     } else if (artifact.origin.kind === "semantic_media_evidence") {
       const operation = next.semanticEvidence[artifact.origin.operationId];
       invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active semantic operation`);

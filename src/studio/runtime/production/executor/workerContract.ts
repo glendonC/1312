@@ -1,4 +1,4 @@
-import { STUDY_REPORT_LIMITS } from "../model.ts";
+import { isFrameHostArtifactKind, STUDY_REPORT_LIMITS } from "../model.ts";
 import type {
   SemanticEvidenceCitationInput,
   StudyClaim,
@@ -62,6 +62,12 @@ export function validateWorkerResult(
   expectedSemanticEvidenceInputs: SemanticEvidenceCitationInput[] = [],
 ): WorkerResult {
   const item = record(value);
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind))) {
+    throw new LauncherFailure(
+      "Worker contract requests a host-only frame artifact kind",
+      "Codex worker response failed its output authority contract.",
+    );
+  }
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
   const allowedKeys = semanticGranted
     ? new Set(["summary", "semanticEvidenceInputs", "outputs"])
@@ -193,6 +199,12 @@ export function validateWorkerResult(
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind))) {
+    throw new LauncherFailure(
+      "Worker contract requests a host-only frame artifact kind",
+      "Codex worker output schema cannot impersonate a host frame artifact.",
+    );
+  }
   const required = task.requiredOutputs.filter((output) => output.required);
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
   const semanticEvidenceInputs = {
@@ -302,7 +314,15 @@ export function workerPrompt(task: TaskRecord): string {
       ? ["media_extract"]
       : grant.capability === "media.seek"
         ? ["media_seek"]
+        : grant.capability === "media.frames.sample"
+          ? ["media_frames_sample"]
         : []);
+  const frameSampling = task.grants
+    .filter((grant) => grant.capability === "media.frames.sample")
+    .map((grant) => ({
+      mediaScope: grant.mediaScope,
+      limits: grant.frameScope.limits,
+    }));
   const semanticScope = task.grants
     .filter((grant) => grant.capability === "speech.transcribe")
     .flatMap((grant) => grant.mediaScope);
@@ -316,6 +336,7 @@ export function workerPrompt(task: TaskRecord): string {
     mediaScope: task.mediaScope,
     budget: task.budget,
     grantedMediaTools: mediaTools,
+    grantedFrameSampling: frameSampling,
     grantedSemanticEvidence: semanticScope,
     grantedEvidence: task.grants
       .filter((grant) => grant.capability === "evidence.read")
@@ -330,8 +351,16 @@ export function workerPrompt(task: TaskRecord): string {
     : [
         `This executor exposes only these scheduler-granted media tools: ${mediaTools.join(", ")}.`,
         "Invoke only the tool and exact artifact, track, and half-open millisecond range named by the contract.",
-        "A media operation occurred only when the tool returns a studio.child-media-tool-result.v1 receipt.",
-        "media_seek returns one host-produced audio_activity observation: signal or digital_silence with volume measurements for the exact range. It does not identify speech, words, speakers, music, or meaning. media_extract returns no semantic finding.",
+        ...(mediaTools.some((tool) => tool === "media_extract" || tool === "media_seek") ? [
+          "An extract or seek operation occurred only when the tool returns a studio.child-media-tool-result.v1 receipt.",
+          "media_seek returns one host-produced audio_activity observation: signal or digital_silence with volume measurements for the exact range. It does not identify speech, words, speakers, music, or meaning. media_extract returns no semantic finding.",
+        ] : []),
+        ...(mediaTools.includes("media_frames_sample") ? [
+          "media_frames_sample accepts only one timestampsMs array: 1-8 unique increasing integer presentation times inside the granted half-open range. The task-private host injects source, video track, task, agent, grant, and operation scope; the child never supplies paths or those authorities.",
+          "A frame operation occurred only when the tool returns actual image/png content plus a host-authored studio.frame-sampling.receipt.v1 identity. The host re-hashes the source, owns decode and transformation, and reports requested and actual presentation timestamps.",
+          "That receipt proves bounded sampling and byte delivery only. It does not prove that any model saw or understood a scene, selected the right frame, performed OCR, identified a person, or produced evidence admissible to a study report.",
+          "Do not label worker-authored output as studio.frame-sampling.receipt.v1; that kind belongs only to the host artifact named by the tool result.",
+        ] : []),
         "Include the returned operation, artifact, receipt, and receipt-content identities in the required worker output.",
       ].join(" ");
   const evidenceScope = task.grants

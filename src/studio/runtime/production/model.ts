@@ -2,6 +2,7 @@ export * from "./model/artifacts.ts";
 export * from "./model/captions.ts";
 export * from "./model/evidence.ts";
 export * from "./model/execution.ts";
+export * from "./model/frames.ts";
 export * from "./model/media.ts";
 export * from "./model/projection.ts";
 export * from "./model/reports.ts";

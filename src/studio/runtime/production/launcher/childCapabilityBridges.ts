@@ -20,6 +20,12 @@ import {
   type OpenChildEvidenceDecisionBridge,
 } from "../executor/childEvidenceDecisionBridge.ts";
 import {
+  BoundedChildFrameBridge,
+  openChildFrameBridge,
+  type ChildFrameSamplingHost,
+  type OpenChildFrameBridge,
+} from "../executor/childFrameBridge.ts";
+import {
   BoundedChildMediaBridge,
   openChildMediaBridge,
   type ChildMediaCapabilityHost,
@@ -39,7 +45,9 @@ export interface LauncherChildCapabilityOptions {
   nextAssessmentOperationId?: () => string;
   nextDecisionOperationId?: () => string;
   nextSemanticEvidenceOperationId?: () => string;
+  nextFrameOperationId?: () => string;
   mediaMcpServerPath?: string;
+  frameMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -48,6 +56,7 @@ export interface LauncherChildCapabilityOptions {
 
 export interface LauncherChildCapabilityHosts {
   media: ChildMediaCapabilityHost;
+  frame: ChildFrameSamplingHost;
   evidence: ChildEvidenceReadHost;
   assessment: ChildEvidenceAssessmentHost;
   decision: ChildEvidenceDecisionHost;
@@ -58,9 +67,11 @@ export interface LauncherChildCapabilityContext {
   mediaCapabilities: Array<"media.extract" | "media.seek">;
   evidenceGrant: CapabilityGrant | undefined;
   semanticEvidenceGrant: CapabilityGrant | undefined;
+  frameGrant: CapabilityGrant | undefined;
   assessmentGrant: CapabilityGrant | undefined;
   decisionGrant: CapabilityGrant | undefined;
   mediaBridge: OpenChildMediaBridge | null;
+  frameBridge: OpenChildFrameBridge | null;
   evidenceBridge: OpenChildEvidenceBridge | null;
   assessmentBridge: OpenChildEvidenceAssessmentBridge | null;
   decisionBridge: OpenChildEvidenceDecisionBridge | null;
@@ -75,9 +86,11 @@ export function launcherChildCapabilityContext(task: TaskRecord): LauncherChildC
         capability === "media.extract" || capability === "media.seek"),
     evidenceGrant: task.grants.find((grant) => grant.capability === "evidence.read"),
     semanticEvidenceGrant: task.grants.find((grant) => grant.capability === "speech.transcribe"),
+    frameGrant: task.grants.find((grant) => grant.capability === "media.frames.sample"),
     assessmentGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.assess"),
     decisionGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.decide"),
     mediaBridge: null,
+    frameBridge: null,
     evidenceBridge: null,
     assessmentBridge: null,
     decisionBridge: null,
@@ -94,6 +107,11 @@ export async function openLauncherChildCapabilityBridges(
   if (context.mediaCapabilities.length > 0) {
     context.mediaBridge = await openChildMediaBridge(new BoundedChildMediaBridge(task, hosts.media, {
       nextOperationId: options.nextMediaOperationId,
+    }));
+  }
+  if (context.frameGrant) {
+    context.frameBridge = await openChildFrameBridge(new BoundedChildFrameBridge(task, hosts.frame, {
+      nextOperationId: options.nextFrameOperationId,
     }));
   }
   if (context.semanticEvidenceGrant) {
@@ -160,6 +178,30 @@ export function configureLauncherChildCapabilityMcp(
       `mcp_servers.studio_media.env_vars=${tomlStrings([
         "STUDIO_CHILD_MEDIA_BRIDGE_URL",
         "STUDIO_CHILD_MEDIA_BRIDGE_TOKEN",
+      ])}`,
+    );
+  }
+  if (context.frameBridge) {
+    const serverPath = options.frameMcpServerPath ?? fileURLToPath(
+      new URL("../executor/frameMcpServer.ts", import.meta.url),
+    );
+    args.push(
+      "-c",
+      `mcp_servers.studio_frames.command=${tomlString(process.execPath)}`,
+      "-c",
+      `mcp_servers.studio_frames.args=${tomlStrings([serverPath])}`,
+      "-c",
+      "mcp_servers.studio_frames.required=true",
+      "-c",
+      `mcp_servers.studio_frames.enabled_tools=${tomlStrings([context.frameBridge.manifest.tool.name])}`,
+      "-c",
+      "mcp_servers.studio_frames.startup_timeout_sec=5",
+      "-c",
+      `mcp_servers.studio_frames.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, options.maximumWallMs) / 1_000))}`,
+      "-c",
+      `mcp_servers.studio_frames.env_vars=${tomlStrings([
+        "STUDIO_CHILD_FRAME_BRIDGE_URL",
+        "STUDIO_CHILD_FRAME_BRIDGE_TOKEN",
       ])}`,
     );
   }
@@ -264,11 +306,15 @@ export function configureLauncherChildCapabilityMcp(
 export function launcherChildCapabilityEnvironment(
   context: LauncherChildCapabilityContext,
 ): NodeJS.ProcessEnv {
-  return context.mediaBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
+  return context.mediaBridge || context.frameBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
     ...process.env,
     ...(context.mediaBridge ? {
       STUDIO_CHILD_MEDIA_BRIDGE_URL: context.mediaBridge.endpoint,
       STUDIO_CHILD_MEDIA_BRIDGE_TOKEN: context.mediaBridge.token,
+    } : {}),
+    ...(context.frameBridge ? {
+      STUDIO_CHILD_FRAME_BRIDGE_URL: context.frameBridge.endpoint,
+      STUDIO_CHILD_FRAME_BRIDGE_TOKEN: context.frameBridge.token,
     } : {}),
     ...(context.evidenceBridge ? {
       STUDIO_CHILD_EVIDENCE_BRIDGE_URL: context.evidenceBridge.endpoint,
@@ -293,6 +339,7 @@ export async function closeLauncherChildCapabilityBridges(
   context: LauncherChildCapabilityContext,
 ): Promise<void> {
   if (context.mediaBridge) await context.mediaBridge.close();
+  if (context.frameBridge) await context.frameBridge.close();
   if (context.semanticEvidenceBridge) await context.semanticEvidenceBridge.close();
   if (context.evidenceBridge) await context.evidenceBridge.close();
   if (context.assessmentBridge) await context.assessmentBridge.close();

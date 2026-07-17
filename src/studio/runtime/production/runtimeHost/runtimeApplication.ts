@@ -35,7 +35,7 @@ export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 2,
   maxActiveWorkers: 4,
   runBudget: { wallMs: 240_000, toolCalls: 32 },
-  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.synthesize"],
+  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.synthesize"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {

@@ -2,6 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod/v4";
 
+import { isFrameHostArtifactKind } from "../model.ts";
+
 import {
   ORCHESTRATOR_SPAWN_TOOL,
   ORCHESTRATOR_WAIT_TOOL,
@@ -51,13 +53,17 @@ const spawnInput = z.object({
   inputArtifactIds: z.array(z.string().min(1)).max(16),
   requiredOutputs: z.array(z.object({
     name: z.string().min(1).max(128),
-    artifactKind: z.string().min(1).max(128),
+    artifactKind: z.string().min(1).max(128).refine(
+      (kind) => !isFrameHostArtifactKind(kind),
+      "Host-only frame artifact kinds cannot be worker outputs",
+    ),
     required: z.boolean(),
   }).strict()).min(1).max(8),
   requiredCapabilities: z.array(z.enum([
     "report.submit",
     "media.extract",
     "media.seek",
+    "media.frames.sample",
     "speech.transcribe",
     "evidence.read",
     "analysis.evidence.assess",

@@ -1,4 +1,9 @@
 import type {
+  FrameSamplingCompletedEvent,
+  FrameSamplingFailedEvent,
+  FrameSamplingStartedEvent,
+} from "./protocol/frameEvents.ts";
+import type {
   AgentRegisteredEvent,
   ArtifactRecordedEvent,
   ExecutorFinishedEvent,
@@ -64,6 +69,7 @@ import type {
 export * from "./protocol/base.ts";
 export * from "./protocol/executionEvents.ts";
 export * from "./protocol/evidenceEvents.ts";
+export * from "./protocol/frameEvents.ts";
 export * from "./protocol/reviewEvents.ts";
 export * from "./protocol/studyEvents.ts";
 
@@ -86,6 +92,9 @@ export type RuntimeEvent =
   | MediaOperationStartedEvent
   | MediaOperationCompletedEvent
   | MediaOperationFailedEvent
+  | FrameSamplingStartedEvent
+  | FrameSamplingCompletedEvent
+  | FrameSamplingFailedEvent
   | SemanticEvidenceStartedEvent
   | SemanticEvidenceCompletedEvent
   | SemanticEvidenceFailedEvent

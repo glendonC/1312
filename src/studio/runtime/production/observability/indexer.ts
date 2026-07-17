@@ -34,6 +34,9 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "media.operation_completed") {
     return { kind: "media_operation", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "media.frames_sampling_completed") {
+    return { kind: "frame_sampling", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "semantic.evidence_completed") {
     return { kind: "semantic_media_evidence", receipt: event.data.receipt, rawReceiptContentId: null };
   }
@@ -176,7 +179,9 @@ export async function buildRuntimeObservabilityIndex(
           origin.kind === "preflight_evidence" ||
           (origin.kind === "owned_media_study"
             ? origin.executorReceiptContentId !== content.contentId
-            : origin.receiptContentId !== content.contentId)
+            : origin.kind === "frame_sampling_receipt"
+              ? artifact.content.contentId !== content.contentId
+              : origin.receiptContentId !== content.contentId)
         ) {
           throw new Error(
             `Observability receipt ${found.receipt.receiptId} does not match its artifact-store content link`,

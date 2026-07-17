@@ -13,6 +13,7 @@ import type {
   ModelUsageReceipt,
 } from "./execution.ts";
 import type { OperationRecord } from "./media.ts";
+import type { FrameSampleRecord } from "./frames.ts";
 import type { SemanticEvidenceRecord } from "./semanticEvidence.ts";
 import type {
   ReportRecord,
@@ -56,6 +57,7 @@ export interface RuntimeProjection {
   reportWaits: Record<string, ReportsWaitRecord>;
   orchestratorDecisions: Record<string, OrchestratorDecisionRecord>;
   operations: Record<string, OperationRecord>;
+  frameSamples: Record<string, FrameSampleRecord>;
   semanticEvidence: Record<string, SemanticEvidenceRecord>;
   evidenceReads: Record<string, EvidenceReadRecord>;
   evidenceAssessments: Record<string, EvidenceAssessmentRecord>;

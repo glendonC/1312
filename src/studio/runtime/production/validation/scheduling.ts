@@ -6,6 +6,8 @@ import {
   type EvidenceAssessmentScope,
   type EvidenceDecisionScope,
   type EvidenceReadScope,
+  FRAME_SAMPLING_LIMITS,
+  isFrameHostArtifactKind,
   type MediaScope,
   type OrchestratorSpawnContract,
   type RequiredOutput,
@@ -16,6 +18,7 @@ import {
   type TaskJobContext,
   type WorkerKind,
 } from "../model.ts";
+import { validateFrameSamplingGrantScope } from "./frames.ts";
 import {
   array,
   boolean,
@@ -71,9 +74,10 @@ const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
     "study.plan",
     "study.synthesize",
   ]),
-  media: new Set(["media.extract", "media.seek", "speech.transcribe", "report.submit"]),
+  media: new Set(["media.extract", "media.seek", "media.frames.sample", "speech.transcribe", "report.submit"]),
   analysis: new Set([
     "media.seek",
+    "media.frames.sample",
     "speech.transcribe",
     "evidence.read",
     "analysis.evidence.assess",
@@ -204,7 +208,10 @@ function outputs(value: unknown, context: string, path: string): RequiredOutput[
     const item = object(entry, context, `${path}[${index}]`);
     exact(item, ["name", "artifactKind", "required"], context, `${path}[${index}]`);
     string(item.name, context, `${path}[${index}].name`);
-    string(item.artifactKind, context, `${path}[${index}].artifactKind`);
+    const artifactKind = string(item.artifactKind, context, `${path}[${index}].artifactKind`);
+    if (isFrameHostArtifactKind(artifactKind)) {
+      fail(context, `${path}[${index}].artifactKind`, "is a host-only frame artifact kind");
+    }
     boolean(item.required, context, `${path}[${index}].required`);
   });
   const names = result.map((entry) => (entry as RequiredOutput).name);
@@ -222,20 +229,30 @@ function capabilities(value: unknown, context: string, path: string): Capability
 
 function grant(value: unknown, context: string, path: string): asserts value is CapabilityGrant {
   const item = object(value, context, path);
-  exact(item, ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope"], context, path);
-  string(item.id, context, `${path}.id`);
   const capability = oneOf<Capability>(
     item.capability,
     CAPABILITY_SET,
     context,
     `${path}.capability`,
   );
+  exact(
+    item,
+    capability === "media.frames.sample"
+      ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "frameScope"]
+      : ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope"],
+    context,
+    path,
+  );
+  string(item.id, context, `${path}.id`);
   string(item.taskId, context, `${path}.taskId`);
   string(item.agentId, context, `${path}.agentId`);
   const mediaScope = scopes(item.mediaScope, context, `${path}.mediaScope`);
   const readScope = evidenceScopes(item.evidenceScope, context, `${path}.evidenceScope`);
   const assessScope = assessmentScope(item.assessmentScope, context, `${path}.assessmentScope`);
   const decideScope = decisionScope(item.decisionScope, context, `${path}.decisionScope`);
+  const frameScope = capability === "media.frames.sample"
+    ? validateFrameSamplingGrantScope(item.frameScope, context, `${path}.frameScope`)
+    : null;
   const mediaBound = capability.startsWith("media.") || capability === "speech.transcribe";
   if (mediaBound && mediaScope.length === 0) {
     fail(context, path, "media grants require scope");
@@ -260,6 +277,13 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   }
   if (capability !== "analysis.evidence.decide" && decideScope !== null) {
     fail(context, path, "non-decision grants cannot carry decision scope");
+  }
+  if (capability === "media.frames.sample" && (
+    mediaScope.length !== 1 ||
+    mediaScope[0].endMs - mediaScope[0].startMs > FRAME_SAMPLING_LIMITS.maxDurationMs ||
+    frameScope === null
+  )) {
+    fail(context, path, "media.frames.sample grants require one bounded video scope and frame envelope");
   }
 }
 

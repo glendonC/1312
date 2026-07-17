@@ -1,9 +1,12 @@
+import type { FrameSamplingGrantScope } from "./frames.ts";
+
 export const CAPABILITIES = [
   "task.spawn.request",
   "task.reports.wait",
   "report.submit",
   "media.extract",
   "media.seek",
+  "media.frames.sample",
   "speech.transcribe",
   "evidence.read",
   "analysis.evidence.assess",
@@ -165,9 +168,8 @@ export interface TaskRecord {
   terminalReason: string | null;
 }
 
-export interface CapabilityGrant {
+interface CapabilityGrantBase {
   id: string;
-  capability: Capability;
   taskId: string;
   agentId: string;
   mediaScope: MediaScope[];
@@ -175,6 +177,17 @@ export interface CapabilityGrant {
   assessmentScope: EvidenceAssessmentScope | null;
   decisionScope: EvidenceDecisionScope | null;
 }
+
+/** The frame envelope is structurally impossible on every other capability branch. */
+export type CapabilityGrant =
+  | (CapabilityGrantBase & {
+      capability: "media.frames.sample";
+      frameScope: FrameSamplingGrantScope;
+    })
+  | (CapabilityGrantBase & {
+      capability: Exclude<Capability, "media.frames.sample">;
+      frameScope?: never;
+    });
 
 export interface AgentRecord {
   id: string;

@@ -46,6 +46,17 @@ score.
   lyrics reconciliation is stored in study-readiness V2; only strong non-speech agreement may close
   `not_in_requested_dialogue_scope`, and caption storage/reopening forbids Korean or English text on
   excluded ranges. V1–V3 inputs continue to use their existing path unchanged.
+- **U2 bounded frame sampling and inspection:** `media.frames.sample` is an additive scheduler grant
+  over exactly one owned-source/video-track window with fixed duration, frame-count, dimension,
+  byte, wall, and call ceilings. The host seals and re-hashes a private source snapshot, owns
+  ffprobe/ffmpeg decoding from private executable snapshots, records requested and actual PTS plus
+  transformation and executable lineage, stores private content-addressed per-frame PNGs, a
+  canonical manifest, and a canonical receipt, then atomically records their durable publication.
+  The task-private MCP bridge accepts
+  only timestamp intent and returns verified image blocks to the child. Cold replay and tamper tests
+  reopen the source, receipt, manifest, every frame, and decoder lineage. The default owned audio
+  study plan does not request or admit frames. This proves sampling and authorized byte delivery
+  only; it does not prove scene understanding or admit visual findings.
 
 ## Post-freeze backlog boundary
 
@@ -56,7 +67,8 @@ indefinite deferrals or a one-day implementation claim:
 
 1. U1 acoustic triage and honest non-dialogue coverage — implemented; accuracy evaluation remains
    separate.
-2. U2 bounded frame sampling and inspection.
+2. U2 bounded frame sampling and inspection — implemented; visual interpretation/admission remains
+   U3.
 3. U3 multimodal admission and generalized abstention.
 4. U4 budgeted multi-pass re-study over exact gaps/subranges.
 5. U5 OCR and scene/on-screen context.
@@ -99,6 +111,9 @@ indefinite deferrals or a one-day implementation claim:
 - U1 proves bounded execution, lineage, authorization, full-duration accounting, and abstention. It
   does not prove acoustic classification accuracy, complete speech detection, lyric understanding,
   transcription/translation correctness, or semantic caption QC.
+- U2 proves bounded source/video-track decoding, content-addressed PNG delivery, receipt lineage,
+  and replay/tamper closure. It does not prove that a child selected the right timestamp, saw or
+  understood a scene, recognized text or people, or produced a study-admissible visual claim.
 
 ## Where to read what
 

@@ -9,6 +9,7 @@ import {
   workerPrompt,
 } from "../src/studio/runtime/production/executor/workerContract.ts";
 import type { TaskRecord } from "../src/studio/runtime/production/model.ts";
+import { FRAME_SAMPLING_LIMITS } from "../src/studio/runtime/production/model.ts";
 import { canonicalSha256 } from "../src/studio/runtime/production/artifactStore.ts";
 
 function task(): TaskRecord {
@@ -156,6 +157,52 @@ test("worker contract uses one closed schema, validator, and no-media prompt", (
   assert.match(workerPrompt(mediaContract), /operation occurred only when the tool returns/);
   assert.match(workerPrompt(mediaContract), /audio_activity observation: signal or digital_silence/);
   assert.match(workerPrompt(mediaContract), /does not identify speech, words, speakers, music, or meaning/);
+
+  const frameContract = structuredClone(contract);
+  frameContract.mediaScope = [{ artifactId: "artifact:source", trackId: "stream:0", startMs: 0, endMs: 1_000 }];
+  frameContract.grants.unshift({
+    id: "grant:frames",
+    capability: "media.frames.sample",
+    taskId: frameContract.id,
+    agentId: frameContract.assignedAgentId,
+    mediaScope: structuredClone(frameContract.mediaScope),
+    evidenceScope: [],
+    assessmentScope: null,
+    decisionScope: null,
+    frameScope: {
+      schema: "studio.frame-sampling-grant.v1",
+      limits: structuredClone(FRAME_SAMPLING_LIMITS),
+    },
+  });
+  const framePrompt = workerPrompt(frameContract);
+  assert.doesNotMatch(framePrompt, /exposes no media bytes and no media tools/);
+  assert.match(framePrompt, /scheduler-granted media tools: media_frames_sample/);
+  assert.match(framePrompt, /accepts only one timestampsMs array/);
+  assert.match(framePrompt, /actual image\/png content/);
+  assert.match(framePrompt, /does not prove that any model saw or understood a scene/);
+  assert.match(framePrompt, /Do not label worker-authored output as studio\.frame-sampling\.receipt\.v1/);
+
+  const impersonatingContract = structuredClone(frameContract);
+  impersonatingContract.requiredOutputs = [{
+    name: "forged host receipt",
+    artifactKind: "studio.frame-sampling.receipt.v1",
+    required: true,
+  }];
+  assert.throws(
+    () => workerOutputSchema(impersonatingContract),
+    /host-only frame artifact kind/,
+  );
+  assert.throws(
+    () => validateWorkerResult({
+      summary: "This must not be accepted.",
+      outputs: [{
+        name: "forged host receipt",
+        kind: "studio.frame-sampling.receipt.v1",
+        content: "worker prose",
+      }],
+    }, impersonatingContract),
+    /host-only frame artifact kind/,
+  );
 });
 
 test("bounded process runner reports output overflow without accepting excess bytes", async () => {

@@ -14,6 +14,8 @@ import type {
   MediaTrackDescriptor,
   RuntimeArtifact,
   SemanticMediaEvidenceArtifact,
+  FrameSampleManifest,
+  FrameSamplingReceipt,
   StudyReportArtifact,
   OwnedMediaStudyArtifact,
   WorkerOutputEnvelope,
@@ -23,6 +25,14 @@ import type { PendingRuntimeEvent } from "./protocol.ts";
 import { OWNED_MEDIA_STUDY_LIMITS, STUDY_REPORT_LIMITS } from "./model.ts";
 import { validateStudyReportArtifact } from "./validation/studyReports.ts";
 import { validateOwnedMediaStudyArtifact } from "./validation/studies.ts";
+import {
+  buildFrameManifestArtifact as buildFrameManifestArtifactBuilder,
+  buildFrameReceiptArtifact as buildFrameReceiptArtifactBuilder,
+  buildSampledFrameArtifact as buildSampledFrameArtifactBuilder,
+  frameArtifactId,
+  frameManifestArtifactId,
+  frameReceiptArtifactId,
+} from "./artifactStore/frameArtifacts.ts";
 import {
   buildStudyPlanningDecisionArtifact as buildStudyPlanningDecisionArtifactBuilder,
   buildOwnedMediaStudyArtifact as buildOwnedMediaStudyArtifactBuilder,
@@ -231,6 +241,41 @@ export class ContentAddressedArtifactStore {
     };
   }
 
+  async prepareSampledFrame(
+    path: string,
+    input: { runId: string; operationId: string; index: number },
+  ): Promise<{ artifactId: string; content: ContentIdentity; storageKey: string }> {
+    const stored = await this.storeFile(path);
+    return {
+      artifactId: frameArtifactId(input.runId, input.operationId, input.index, stored.content.contentId),
+      ...stored,
+    };
+  }
+
+  async prepareFrameManifest(
+    runId: string,
+    operationId: string,
+    value: FrameSampleManifest,
+  ): Promise<{ artifactId: string; content: ContentIdentity; storageKey: string }> {
+    const stored = await this.storeJson(value);
+    return {
+      artifactId: frameManifestArtifactId(runId, operationId, stored.content.contentId),
+      ...stored,
+    };
+  }
+
+  async prepareFrameReceipt(
+    runId: string,
+    operationId: string,
+    value: FrameSamplingReceipt,
+  ): Promise<{ artifactId: string; content: ContentIdentity; storageKey: string }> {
+    const stored = await this.storeJson(value);
+    return {
+      artifactId: frameReceiptArtifactId(runId, operationId, stored.content.contentId),
+      ...stored,
+    };
+  }
+
   async storeReceipt(receipt: MediaOperationReceipt): Promise<{ content: ContentIdentity; storageKey: string }> {
     return this.storeJson(receipt);
   }
@@ -431,6 +476,24 @@ export class ContentAddressedArtifactStore {
     input: Parameters<typeof buildPublishReviewIntakeArtifactBuilder>[0],
   ): ReturnType<typeof buildPublishReviewIntakeArtifactBuilder> {
     return buildPublishReviewIntakeArtifactBuilder(input);
+  }
+
+  buildSampledFrameArtifact(
+    input: Parameters<typeof buildSampledFrameArtifactBuilder>[0],
+  ): ReturnType<typeof buildSampledFrameArtifactBuilder> {
+    return buildSampledFrameArtifactBuilder(input);
+  }
+
+  buildFrameManifestArtifact(
+    input: Parameters<typeof buildFrameManifestArtifactBuilder>[0],
+  ): ReturnType<typeof buildFrameManifestArtifactBuilder> {
+    return buildFrameManifestArtifactBuilder(input);
+  }
+
+  buildFrameReceiptArtifact(
+    input: Parameters<typeof buildFrameReceiptArtifactBuilder>[0],
+  ): ReturnType<typeof buildFrameReceiptArtifactBuilder> {
+    return buildFrameReceiptArtifactBuilder(input);
   }
 
   buildPublishReviewDecisionArtifact(

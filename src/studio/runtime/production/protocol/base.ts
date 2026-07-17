@@ -3,6 +3,7 @@ export type RuntimeProducerKind =
   | "registry"
   | "artifact_store"
   | "media_host"
+  | "frame_host"
   | "semantic_evidence_host"
   | "evidence_host"
   | "assessment_host"

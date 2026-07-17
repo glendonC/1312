@@ -1,7 +1,7 @@
 # Capability ladder: media understanding
 
 Status: living **post–Build Week / post-UI-freeze** capability plan
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 This document owns the next media-understanding plan. It does not replace the living Build Week
 status in [`STATUS.md`](./STATUS.md), reopen owned-path v2, or define UI work. The completed v2 spine
@@ -29,18 +29,16 @@ be “more agents” or “faster captions.” It should be more of the source d
 for by evidence that a bounded specialist actually inspected, with weak regions restudied or
 abstained rather than guessed.
 
-The first implementation slice after the UI demo freeze should be a fail-closed **acoustic triage
-and non-dialogue coverage boundary**. It should partition an authorized audio range into bounded
-speech-candidate, music, noise, mixed, and unknown hypotheses; reconcile those observations with the
-existing speech-activity evidence; and make it structurally impossible for a confidently excluded
-noise/non-speech range to acquire invented dialogue. Conflicting or weak evidence must become
-`unknown`, `withheld`, or `unavailable`, not prose.
+The first two implementation slices after the UI demo freeze are now complete: the fail-closed
+**acoustic triage and non-dialogue coverage boundary** and bounded **frame sampling with real child
+image delivery**. Their receipts prove bounded execution and exact byte lineage; they do not prove
+producer accuracy or visual understanding.
 
-Frames remain the next media-native tool because agents cannot understand a video from audio alone.
-Web research follows frame/audio understanding when names, history, or cultural context are outside
-the file. General computer-use is allowed later as a separately granted, isolated, receipted
-capability for dynamic external context; it is not a substitute for decoding and citing the owned
-video.
+U3 multimodal admission remains the next planned media-native boundary because U2 sampling receipts
+cannot yet make a visual finding affect a study. Web research follows admitted frame/audio evidence
+when names, history, or cultural context are outside the file. General computer-use is allowed later
+as a separately granted, isolated, receipted capability for dynamic external context; it is not a
+substitute for decoding and citing the owned video.
 
 The strategy is:
 
@@ -71,8 +69,9 @@ checklist below:
 1. **U1 — acoustic triage and non-dialogue coverage (implemented 2026-07-17):** prevent noise/
    non-speech from becoming fake dialogue while preserving music/lyrics policy and weak-evidence
    abstention. Accuracy evaluation remains separate.
-2. **U2 — bounded frame sampling and inspection:** give a granted specialist actual frame pixels
-   with source/range/decoder receipts.
+2. **U2 — bounded frame sampling and inspection (implemented 2026-07-17):** give a granted
+   specialist actual frame pixels with source/range/decoder receipts. Sampling and byte delivery are
+   implemented; visual interpretation/admission remains U3.
 3. **U3 — multimodal admission and generalized abstention:** carry acoustic, visual, and later
    external evidence through typed citations without upgrading weak/conflicting states.
 4. **U4 — budgeted multi-pass re-study:** request denser evidence, attenuated subranges, changed
@@ -113,12 +112,12 @@ artifact, grant, and audit boundaries are real.
 
 | Area | Real now | Not available today | Evidence |
 |---|---|---|---|
-| Owned ingest and preflight | Content-addressed owned bytes, rights receipt, `ffprobe`, pinned VAD speech windows, pinned speech-window language ranges, and additive preflight V4 with separately sealed acoustic observations/receipt | Acoustic accuracy evaluation, speaker/overlap, scene, OCR, frames, and visual context | [`ARCHITECTURE.md` — source ingest boundary](../ARCHITECTURE.md#source-ingest-boundary) and [`STATUS.md` — backlog boundary](./STATUS.md#post-freeze-backlog-boundary) |
+| Owned ingest and preflight | Content-addressed owned bytes, rights receipt, `ffprobe`, pinned VAD speech windows, pinned speech-window language ranges, and additive preflight V4 with separately sealed acoustic observations/receipt | Acoustic accuracy evaluation, speaker/overlap, scene, OCR, and visual context | [`ARCHITECTURE.md` — source ingest boundary](../ARCHITECTURE.md#source-ingest-boundary) and [`STATUS.md` — backlog boundary](./STATUS.md#post-freeze-backlog-boundary) |
 | Orchestration | A model-executed root can request bounded children; the scheduler derives task/agent/grant identities and enforces scope, depth, concurrency, budgets, dependencies, and required outputs. The study root can disposition/read reports, record exact gaps/conflicts, request a causally linked follow-up, and synthesize | Typed requests for denser evidence, pass ceilings/configuration deltas, the new producers below, and unlimited/distributed execution | [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts), [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts), and the closed v2 exit in [`STATUS.md`](./STATUS.md#done) |
-| Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `speech.transcribe`, exact reads of pinned VAD/language receipts and U1 acoustic observations, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Frames, OCR, scene/shot evidence, speakers/overlap, stems, web research, and computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); current semantic evidence is a timed recognizer-hypothesis artifact in [`model/semanticEvidence.ts`](../../src/studio/runtime/production/model/semanticEvidence.ts) |
+| Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample` over one video scope with real task-private PNG image delivery, `speech.transcribe`, exact reads of pinned VAD/language receipts and U1 acoustic observations, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Visual interpretation/admission, OCR, scene/shot evidence, speakers/overlap, stems, web research, and computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); the U2 contract and host live in [`model/frames.ts`](../../src/studio/runtime/production/model/frames.ts) and [`frameHost.ts`](../../src/studio/runtime/production/frameHost.ts) |
 | Current-run speech evidence | A scoped host and bridge exist. With an explicitly enabled recognizer they can produce current-run timed hypotheses; the default unconfigured recognizer honestly returns unavailable | Semantic accuracy/calibration, a guarantee that every run has a live recognizer, alternative segmentation/recognizer passes, and semantic translation QC | [`currentRunSpeechRecognizer.ts`](../../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts) and [`run-runtime-host.ts`](../../scripts/run-runtime-host.ts) |
 | Coverage and abstention | Typed study reports partition assigned ranges into supported, withheld, unknown, or failed; U1 readiness adds a separately accounted `not_in_requested_dialogue_scope` policy partition and keeps mixed/weak/conflicting evidence abstained | A generalized weak-evidence/admission rule across future modalities and U4 re-study | [`dialogueScopePolicy.ts`](../../src/studio/acoustic/dialogueScopePolicy.ts), [`model/studyReports.ts`](../../src/studio/runtime/production/model/studyReports.ts), and [`model/studies.ts`](../../src/studio/runtime/production/model/studies.ts) |
-| Tool boundary | The launcher exposes only required task-private MCP tools. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Receipted research, frames/vision, and isolated computer-use. These are permitted future capabilities only through new explicit grants | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts) and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
+| Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks only for a frame-granted child. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Receipted research, visual evidence admission/interpretation, and isolated computer-use. These are permitted future capabilities only through new explicit grants | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`frameMcpServer.ts`](../../src/studio/runtime/production/executor/frameMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
 | Owned study spine | Typed coverage/citations, parent admission/read, gap/conflict planning, follow-up causation, model-root synthesis, deterministic readiness, and study-causal caption/QC lineage | Evidence types beyond timed speech hypotheses and semantic correctness/truth arbitration | [`model/studyReports.ts`](../../src/studio/runtime/production/model/studyReports.ts), [`model/studies.ts`](../../src/studio/runtime/production/model/studies.ts), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen and the human-labeled `run-007` Bet G score exists with `judge: null` | Runtime semantic QC, calibrated transcription/translation confidence, additional scored runs and registered ablations, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
@@ -201,12 +200,23 @@ their audits.
   partitions, job `includeLyrics`/speech-scope policy, and gap-directed planning. This adds evidence
   and a state; it does not reopen v2 orchestration.
 
-### U2. Bounded frames that an agent can actually inspect
+### U2. Bounded frames that an agent can actually inspect — implemented
 
-- **Real:** The source is content-addressed; video track dimensions are probed; task media scopes,
-  artifact storage, media-host authorization, launcher bridges, and receipts already exist.
-- **Missing:** No grant samples frames, no child receives frame pixels, and no frame observation can
-  be cited. “Frames” in a prompt or UI is not vision.
+- **Real:** `media.frames.sample` grants carry exactly one bounded owned-source/video-track scope and
+  a fixed v1 limit envelope. The host seals and re-hashes a private source snapshot, owns
+  ffprobe/ffmpeg selection from private executable snapshots and conditional-display-matrix/
+  square-SAR/RGB24 PNG decoding, records requested and actual PTS, dimensions, transformations,
+  executable binary/version/platform lineage, and atomically records private per-frame artifacts,
+  a canonical manifest, and a canonical receipt. The task-private loopback bridge accepts only
+  strictly increasing integer timestamps; its MCP tool returns verified PNG image blocks, not paths,
+  filenames, or identities alone. Cold audit reopens the source, receipt, manifest, every PNG, and
+  current decoder binaries. Tests cover duration, count, input/output dimensions, per-frame and
+  aggregate bytes, wall timeout, absent/non-video tracks, out-of-range requests, duplicate actual
+  PTS, pixel-identical frames at distinct PTS, ungranted calls, source/metadata/frame tamper,
+  temporary-allocation failure, and decoder drift.
+- **Still missing:** U3 typed visual citations/admission and generalized abstention. A child may
+  receive authorized pixels, but no U2 receipt asserts what the pixels mean or allows visual prose
+  to affect study, readiness, captions, or QC.
 - **Done when:** A scheduler-granted frame operation accepts only a source/video-track scope and a
   bounded sampling request; the host re-hashes the source, controls decoding, and enforces maximum
   duration, frame count, dimensions, bytes, and wall time. It stores requested/actual presentation
@@ -273,7 +283,7 @@ their audits.
 
 ### U5. OCR and scene/on-screen context
 
-- **Real:** U2 will provide exact frame bytes; media probe already identifies video tracks and
+- **Real:** U2 provides exact frame bytes; media probe identifies video tracks and
   dimensions.
 - **Missing:** No shot/scene boundary producer, OCR producer, text boxes, script/language confidence,
   or specialist able to cite on-screen evidence.
@@ -408,10 +418,10 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    honest not-in-requested-dialogue-scope/unknown policy. Prove that noise/non-speech cannot acquire
    dialogue or translation text; conflict with VAD becomes unknown/withheld and lyrics policy remains
    explicit. Stop before separation or semantic-quality claims.
-2. **Receipted frame sample + inspect.** Add one bounded source/video-track operation and one
-   task-private tool that gives an authorized child actual image content. Prove source/range/frame
-   lineage, limits, replay, tamper rejection, and an honest unavailable path. Stop before OCR,
-   visual claims, computer-use, or UI work.
+2. **Receipted frame sample + inspect — implemented 2026-07-17.** One bounded source/video-track
+   operation and task-private tool give an authorized child actual PNG image content. Source/range/
+   frame lineage, decoder/runtime identity, limits, replay, tamper rejection, and fail-closed errors
+   are proved without OCR, visual claims, computer-use, or UI work.
 3. **Multimodal admission + abstention v2.** Add typed evidence citations and one visual/acoustic
    report through disposition, admission/read, synthesis, readiness, and cold replay. Preserve every
    weak/conflicting state and all v1 artifacts. Stop before claiming observations are correct.
@@ -469,8 +479,8 @@ It is also honest to say:
 The following sequenced backlog items are not current product claims:
 
 - end-to-end visual/audio understanding of the whole video;
-- acoustic music/noise/mixed classification, honest non-dialogue coverage, dense budgeted re-study,
-  frames/vision, OCR, scene context, speaker/overlap understanding, or source separation;
+- accuracy or semantic-understanding claims for acoustic classification or sampled frames; dense
+  budgeted re-study, OCR, scene context, speaker/overlap understanding, or source separation;
 - web research, historical/cultural grounding, live source citations, or bounded computer-use;
 - semantic per-run QC, calibrated quality, a model judge as truth, or a general “better than cold”
   claim.

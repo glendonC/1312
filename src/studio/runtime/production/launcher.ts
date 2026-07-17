@@ -18,6 +18,7 @@ import type { PendingRuntimeEvent } from "./protocol.ts";
 import { BoundedReportHost } from "./study/reportHost.ts";
 import { BoundedRuntimeScheduler } from "./scheduler.ts";
 import { FfmpegCapabilityHost } from "./mediaHost.ts";
+import { BoundedFrameSamplingHost } from "./frameHost.ts";
 import { BoundedEvidenceReadHost } from "./evidenceHost.ts";
 import { BoundedEvidenceAssessmentHost } from "./evidenceAssessmentHost.ts";
 import { BoundedEvidenceDecisionHost } from "./evidenceDecisionHost.ts";
@@ -28,6 +29,7 @@ import type { ChildEvidenceReadHost } from "./executor/childEvidenceBridge.ts";
 import type { ChildEvidenceAssessmentHost } from "./executor/childEvidenceAssessmentBridge.ts";
 import type { ChildEvidenceDecisionHost } from "./executor/childEvidenceDecisionBridge.ts";
 import type { ChildMediaCapabilityHost } from "./executor/childMediaBridge.ts";
+import type { ChildFrameSamplingHost } from "./executor/childFrameBridge.ts";
 import type { ChildSemanticEvidenceHost } from "./executor/childSemanticEvidenceBridge.ts";
 import { parseCodexEvents } from "./executor/codexEvents.ts";
 import { closedCodexExecArgs } from "./executor/codexInvocation.ts";
@@ -79,13 +81,16 @@ export interface CodexWorkerLauncherOptions {
   nextAssessmentOperationId?: () => string;
   nextDecisionOperationId?: () => string;
   nextSemanticEvidenceOperationId?: () => string;
+  nextFrameOperationId?: () => string;
   mediaHost?: ChildMediaCapabilityHost;
+  frameHost?: ChildFrameSamplingHost;
   evidenceHost?: ChildEvidenceReadHost;
   assessmentHost?: ChildEvidenceAssessmentHost;
   decisionHost?: ChildEvidenceDecisionHost;
   semanticEvidenceHost?: ChildSemanticEvidenceHost;
   semanticRecognizer?: CurrentRunSpeechRecognizer;
   mediaMcpServerPath?: string;
+  frameMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -105,10 +110,11 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "mediaMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
+  private readonly frameHost: ChildFrameSamplingHost;
   private readonly evidenceHost: ChildEvidenceReadHost;
   private readonly assessmentHost: ChildEvidenceAssessmentHost;
   private readonly decisionHost: ChildEvidenceDecisionHost;
@@ -126,6 +132,7 @@ export class CodexExecWorkerLauncher {
     this.artifacts = artifacts;
     this.reports = reports;
     this.mediaHost = options.mediaHost ?? new FfmpegCapabilityHost(ledger, artifacts);
+    this.frameHost = options.frameHost ?? new BoundedFrameSamplingHost(ledger, artifacts);
     this.evidenceHost = options.evidenceHost ?? new BoundedEvidenceReadHost(ledger, artifacts);
     this.assessmentHost = options.assessmentHost ?? new BoundedEvidenceAssessmentHost(ledger, artifacts);
     this.decisionHost = options.decisionHost ?? new BoundedEvidenceDecisionHost(ledger, artifacts);
@@ -148,7 +155,9 @@ export class CodexExecWorkerLauncher {
       nextAssessmentOperationId: options.nextAssessmentOperationId,
       nextDecisionOperationId: options.nextDecisionOperationId,
       nextSemanticEvidenceOperationId: options.nextSemanticEvidenceOperationId,
+      nextFrameOperationId: options.nextFrameOperationId,
       mediaMcpServerPath: options.mediaMcpServerPath,
+      frameMcpServerPath: options.frameMcpServerPath,
       evidenceMcpServerPath: options.evidenceMcpServerPath,
       assessmentMcpServerPath: options.assessmentMcpServerPath,
       decisionMcpServerPath: options.decisionMcpServerPath,
@@ -200,9 +209,9 @@ export class CodexExecWorkerLauncher {
     }
     if (
       !scheduled.grants.some((grant) => grant.capability === "report.submit") ||
-      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
+      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "media.frames.sample", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
     ) {
-      throw new Error("Codex executor supports only report.submit plus scheduler-granted media, speech.transcribe, evidence-read, assessment, and decision capabilities");
+      throw new Error("Codex executor supports only report.submit plus scheduler-granted media, frame, speech.transcribe, evidence-read, assessment, and decision capabilities");
     }
 
     const claimedAt = this.options.now().toISOString();
@@ -243,6 +252,7 @@ export class CodexExecWorkerLauncher {
         task,
         {
           media: this.mediaHost,
+          frame: this.frameHost,
           evidence: this.evidenceHost,
           assessment: this.assessmentHost,
           decision: this.decisionHost,
@@ -255,6 +265,7 @@ export class CodexExecWorkerLauncher {
         mediaCapabilities,
         evidenceGrant,
         semanticEvidenceGrant,
+        frameGrant,
         assessmentGrant,
         decisionGrant,
       } = childCapabilities;
@@ -302,6 +313,13 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete every granted media capability",
           "Codex child did not complete its required receipted media operation.",
+        );
+      }
+      if (frameGrant && !Object.values(this.ledger.state().frameSamples).some((operation) =>
+        operation.taskId === task.id && operation.grantId === frameGrant.id && operation.status === "completed")) {
+        throw new LauncherFailure(
+          "Codex child did not complete its granted frame-sampling operation",
+          "Codex child did not complete its required receipted frame sampling.",
         );
       }
       if (evidenceGrant?.evidenceScope.some((scope) =>

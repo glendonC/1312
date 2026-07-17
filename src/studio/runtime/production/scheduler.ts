@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { assertRuntimeLimits, assertSpawnRequestInput } from "./assertions.ts";
 import { attenuateTaskJobContext } from "./jobContext.ts";
+import { FRAME_SAMPLING_LIMITS } from "./model.ts";
 import type {
   AgentRecord,
   CapabilityGrant,
@@ -127,56 +128,66 @@ export class BoundedRuntimeScheduler {
   ): CapabilityGrant[] {
     return [...input.requiredCapabilities]
       .sort()
-      .map((capability) => ({
-        id: this.identities.next("grant"),
-        capability,
-        taskId,
-        agentId,
-        mediaScope: capability.startsWith("media.") || capability === "speech.transcribe"
-          ? structuredClone(input.mediaScope)
-          : [],
-        evidenceScope: capability === "evidence.read"
-          ? input.inputArtifactIds
-              .map((artifactId) => state.artifacts[artifactId])
-              .filter((artifact) => artifact?.origin.kind === "preflight_evidence")
-              .map((artifact) => {
-                if (artifact.origin.kind !== "preflight_evidence") {
-                  throw new Error("Scheduler evidence scope changed during grant construction");
-                }
-                const window = evidenceWindow(state, input, artifact.id);
-                if (!window) throw new Error("Scheduler evidence scope lost its exact source window");
-                return {
-                  artifactId: artifact.id,
-                  evidenceKind: artifact.origin.evidenceKind,
-                  ...window,
-                  maxBytes: MAX_EVIDENCE_READ_BYTES,
-                  maxItems: MAX_EVIDENCE_READ_ITEMS,
-                };
-              })
-              .sort((left, right) => left.artifactId.localeCompare(right.artifactId))
-          : [],
-        assessmentScope: capability === "analysis.evidence.assess"
-          ? {
-              evidenceArtifactIds: input.inputArtifactIds
-                .filter((artifactId) => {
-                  const artifact = state.artifacts[artifactId];
-                  return artifact?.origin.kind === "preflight_evidence" && artifact.origin.evidenceKind !== "acoustic_ranges";
+      .map((capability): CapabilityGrant => {
+        const common = {
+          id: this.identities.next("grant"),
+          taskId,
+          agentId,
+          mediaScope: capability.startsWith("media.") || capability === "speech.transcribe"
+            ? structuredClone(input.mediaScope)
+            : [],
+          evidenceScope: capability === "evidence.read"
+            ? input.inputArtifactIds
+                .map((artifactId) => state.artifacts[artifactId])
+                .filter((artifact) => artifact?.origin.kind === "preflight_evidence")
+                .map((artifact) => {
+                  if (artifact.origin.kind !== "preflight_evidence") {
+                    throw new Error("Scheduler evidence scope changed during grant construction");
+                  }
+                  const window = evidenceWindow(state, input, artifact.id);
+                  if (!window) throw new Error("Scheduler evidence scope lost its exact source window");
+                  return {
+                    artifactId: artifact.id,
+                    evidenceKind: artifact.origin.evidenceKind,
+                    ...window,
+                    maxBytes: MAX_EVIDENCE_READ_BYTES,
+                    maxItems: MAX_EVIDENCE_READ_ITEMS,
+                  };
                 })
-                .sort(),
-              maxAssessments: MAX_EVIDENCE_ASSESSMENTS,
-              maxReadReceipts: MAX_EVIDENCE_ASSESS_READ_RECEIPTS,
-              maxClaims: MAX_EVIDENCE_ASSESS_CLAIMS,
-              maxCitations: MAX_EVIDENCE_ASSESS_CITATIONS,
-              maxTokens: MAX_EVIDENCE_ASSESS_TOKENS,
-            }
-          : null,
-        decisionScope: capability === "analysis.evidence.decide"
-          ? {
-              maxDecisions: MAX_EVIDENCE_DECISIONS,
-              maxAuditedAssessments: MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS,
-            }
-          : null,
-      }));
+                .sort((left, right) => left.artifactId.localeCompare(right.artifactId))
+            : [],
+          assessmentScope: capability === "analysis.evidence.assess"
+            ? {
+                evidenceArtifactIds: input.inputArtifactIds
+                  .filter((artifactId) => {
+                    const artifact = state.artifacts[artifactId];
+                    return artifact?.origin.kind === "preflight_evidence" && artifact.origin.evidenceKind !== "acoustic_ranges";
+                  })
+                  .sort(),
+                maxAssessments: MAX_EVIDENCE_ASSESSMENTS,
+                maxReadReceipts: MAX_EVIDENCE_ASSESS_READ_RECEIPTS,
+                maxClaims: MAX_EVIDENCE_ASSESS_CLAIMS,
+                maxCitations: MAX_EVIDENCE_ASSESS_CITATIONS,
+                maxTokens: MAX_EVIDENCE_ASSESS_TOKENS,
+              }
+            : null,
+          decisionScope: capability === "analysis.evidence.decide"
+            ? {
+                maxDecisions: MAX_EVIDENCE_DECISIONS,
+                maxAuditedAssessments: MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS,
+              }
+            : null,
+        };
+        if (capability === "media.frames.sample") return {
+          ...common,
+          capability,
+          frameScope: {
+            schema: "studio.frame-sampling-grant.v1" as const,
+            limits: structuredClone(FRAME_SAMPLING_LIMITS),
+          },
+        };
+        return { ...common, capability };
+      });
   }
 
   private scopeValid(state: RuntimeProjection, input: SpawnRequestInput): boolean {
@@ -195,6 +206,11 @@ export class BoundedRuntimeScheduler {
     const evidenceArtifacts = input.inputArtifactIds.filter(
       (artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence",
     );
+    const frameScope = input.requiredCapabilities.includes("media.frames.sample")
+      ? input.mediaScope.length === 1 ? input.mediaScope[0] : null
+      : undefined;
+    const frameArtifact = frameScope ? state.artifacts[frameScope.artifactId] : null;
+    const frameTrack = frameArtifact?.tracks.find((track) => track.id === frameScope?.trackId);
     return (
       input.requiredCapabilities.length > 0 &&
       input.requiredCapabilities.every((capability) => this.limits.grantableCapabilities.includes(capability)) &&
@@ -207,7 +223,13 @@ export class BoundedRuntimeScheduler {
         (input.requiredCapabilities.includes("evidence.read") &&
           input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence"))) &&
       (!input.requiredCapabilities.includes("analysis.evidence.decide") ||
-        input.requiredCapabilities.includes("analysis.evidence.assess"))
+        input.requiredCapabilities.includes("analysis.evidence.assess")) &&
+      (frameScope === undefined || (
+        frameScope !== null &&
+        frameArtifact?.origin.kind === "ingest" &&
+        frameTrack?.kind === "video" &&
+        frameScope.endMs - frameScope.startMs <= FRAME_SAMPLING_LIMITS.maxDurationMs
+      ))
     );
   }
 
@@ -223,6 +245,9 @@ export class BoundedRuntimeScheduler {
       source.content.contentId !== context.source.contentId ||
       !input.inputArtifactIds.includes(source.id)
     ) return false;
+    if (input.requiredCapabilities.includes("media.frames.sample") && (
+      input.mediaScope.length !== 1 || input.mediaScope[0].artifactId !== source.id
+    )) return false;
     if (!input.mediaScope.every((scope) =>
       scope.artifactId !== source.id ||
       (scope.startMs >= context.analysisRequest.taskRange.startMs &&
@@ -334,7 +359,12 @@ export class BoundedRuntimeScheduler {
       !input.inputArtifactIds.every((id) => Boolean(state.artifacts[id])) ||
       !input.inputArtifactIds.every((id) => parent.inputArtifactIds.includes(id)) ||
       !this.scopeValid(state, input) ||
-      !input.mediaScope.every((child) => parent.mediaScope.some((allowed) => scopeContains(allowed, child)))
+      !input.mediaScope.every((child) => parent.mediaScope.some((allowed) => scopeContains(allowed, child))) ||
+      (input.requiredCapabilities.includes("media.frames.sample") && (
+        input.mediaScope.length !== 1 ||
+        input.mediaScope[0].artifactId !== parent.jobContext.source.artifactId ||
+        state.artifacts[input.mediaScope[0].artifactId]?.content.contentId !== parent.jobContext.source.contentId
+      ))
     ) {
       return "scope_violation";
     }

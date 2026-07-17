@@ -22,6 +22,29 @@ export interface MediaObservationArtifactOrigin {
   receiptContentId: string;
 }
 
+export interface SampledFrameArtifactOrigin {
+  kind: "sampled_frame";
+  operationId: string;
+  frameId: string;
+  manifestArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface FrameSampleManifestArtifactOrigin {
+  kind: "frame_sample_manifest";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface FrameSamplingReceiptArtifactOrigin {
+  kind: "frame_sampling_receipt";
+  operationId: string;
+  receiptId: string;
+  manifestArtifactId: string;
+}
+
 export interface SemanticMediaEvidenceArtifactOrigin {
   kind: "semantic_media_evidence";
   operationId: string;
@@ -229,6 +252,9 @@ export interface RuntimeArtifact {
     | SourceArtifactOrigin
     | MediaOperationArtifactOrigin
     | MediaObservationArtifactOrigin
+    | SampledFrameArtifactOrigin
+    | FrameSampleManifestArtifactOrigin
+    | FrameSamplingReceiptArtifactOrigin
     | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
     | StudyReportArtifactOrigin

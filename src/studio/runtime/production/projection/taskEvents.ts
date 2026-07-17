@@ -5,6 +5,7 @@ import type {
 } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { attenuateTaskJobContext } from "../jobContext.ts";
+import { taskHasActiveCapability } from "../capabilityUsage.ts";
 import { invariant, sameGrants } from "./shared.ts";
 
 const TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
@@ -256,22 +257,9 @@ export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): bo
     invariant(TRANSITIONS[task.status].includes(event.data.status), event, `illegal task transition ${task.status} -> ${event.data.status}`);
     const requiresReason = event.data.status === "failed" || event.data.status === "withheld" || event.data.status === "interrupted";
     invariant(requiresReason ? Boolean(event.data.reason?.trim()) : event.data.reason === null, event, `task ${task.id} transition reason is inconsistent`);
-    const activeOperation = Object.values(next.operations).some(
-      (operation) => operation.taskId === task.id && operation.status === "started",
-    ) || Object.values(next.semanticEvidence).some(
-      (operation) => operation.taskId === task.id && operation.status === "started",
-    );
-    const activeEvidenceRead = Object.values(next.evidenceReads).some(
-      (operation) => operation.taskId === task.id && operation.status === "started",
-    );
-    const activeEvidenceAssessment = Object.values(next.evidenceAssessments).some(
-      (operation) => operation.taskId === task.id && operation.status === "started",
-    );
-    const activeEvidenceDecision = Object.values(next.evidenceDecisions).some(
-      (operation) => operation.taskId === task.id && operation.status === "started",
-    );
+    const activeOperation = taskHasActiveCapability(next, task.id);
     invariant(
-      (!activeOperation && !activeEvidenceRead && !activeEvidenceAssessment && !activeEvidenceDecision) || event.data.status === "working",
+      !activeOperation || event.data.status === "working",
       event,
       `task ${task.id} has an active capability operation`,
     );

@@ -31,6 +31,11 @@ export {
   assertProductionSourceSession,
 } from "./validation/language.ts";
 export {
+  assertFrameSampleRequest,
+  validateFrameSampleManifest,
+  validateFrameSamplingReceipt,
+} from "./validation/frames.ts";
+export {
   assertMediaExtractRequest,
   assertMediaSeekRequest,
 } from "./validation/media.ts";

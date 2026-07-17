@@ -26,6 +26,14 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
 - a task-private child bridge that publishes only scheduler-granted `media_extract`/`media_seek`,
   accepts no caller paths or operation ids, and delegates authorization, budget, source, range,
   journal, artifact, and receipt authority to that capability host;
+- a separate task-private `media_frames_sample` bridge that accepts only bounded timestamp intent,
+  injects task/source/video-track/grant/operation authority, and returns verified PNG image blocks
+  plus host-authored manifest/receipt identities rather than paths or filenames;
+- a bounded frame host that seals and re-hashes the registered source into a private decode snapshot,
+  executes private identified ffmpeg/ffprobe snapshots, enforces duration/count/input-output
+  dimension/per-frame and aggregate byte/wall/call ceilings, stores requested and actual PTS plus
+  transformation and decoder lineage, and atomically records content-addressed frame, manifest, and
+  receipt artifacts;
 - an `evidence.read` host plus separate task-private bridge that publishes only `evidence_read`,
   accepts only an exact scheduler-granted artifact id, injects task/agent/operation identity, and
   returns only facts intersecting the scheduler-granted source/window, clipped to that window, from
@@ -112,14 +120,23 @@ validated ingest-origin identity and content facts, and
 artifact references link only when their source/output destination is rendered. The deterministic
 host exercises one real bounded seek plus worker-output receipt/report lineage. No hosted runtime
 service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
-`media_seek`, `evidence_read`, `evidence_assess`, and/or `evidence_decide` only for matching live task grants, in addition to the closed
+`media_seek`, `media_frames_sample`, `evidence_read`, `evidence_assess`, and/or `evidence_decide`
+only for matching live task grants, in addition to the closed
 structured report output. `evidence.read` is not a detector call: it reads registered, immutable
 V2/V3 receipt artifacts or V4 acoustic observations under an exact source/task window, per-artifact 32 KiB/64-fact ceilings, and the shared task tool-call
 budget. `analysis.evidence.assess` adds a separate 1-assessment/4-receipt/8-claim/32-cited-index/
 512-structured-token ceiling and requires exact fact indexes and bounding ranges. V1 and absent
 receipts produce none of those grants. `analysis.evidence.decide` adds a separate one-decision/four-
-audited-assessment ceiling and lets the host, not the caller, derive outcome/reasons. `media.extract`,
-`media.seek`, `evidence.read`, `analysis.evidence.assess`, and `analysis.evidence.decide` are real
+audited-assessment ceiling and lets the host, not the caller, derive outcome/reasons.
+`media.frames.sample` is a real sampling/byte-delivery capability under one exact owned source/video
+scope and the shared task call budget; the child supplies timestamps only. Its receipt proves decode,
+storage, lineage, and authorized PNG delivery, not OCR, scene/person understanding, right-frame
+selection, or visual evidence admission. The default owned audio-study root does not request frames.
+Successful receipts conservatively charge the full authorized wall grant and separately record
+elapsed host work before receipt persistence; the final append-only journal commit is an atomic
+durability boundary, not a preemptible decoder/model interval.
+`media.extract`, `media.seek`, `media.frames.sample`, `evidence.read`,
+`analysis.evidence.assess`, and `analysis.evidence.decide` are real
 scheduler/host/child-bridge capabilities; assessment is opinion over completed reads and decision is
 an audit-state gate, not sensing or publication. Publish-review intake is an application-host
 producer rather than a child capability or MCP tool. It accepts only the exact identity of a

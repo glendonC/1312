@@ -1,5 +1,6 @@
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
+import { canonicalSha256 } from "../artifactStore.ts";
 import { invariant } from "./shared.ts";
 
 export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
@@ -29,26 +30,30 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
       `approval ${approval.id} already has caption-production lineage`,
     );
     const source = next.artifacts[event.data.input.sourceArtifactId];
-    const childOutput = next.artifacts[event.data.input.acceptedChildOutput.artifactId];
-    const promotion = next.rootOutputDispositions[event.data.input.rootPromotion.dispositionId];
-    const promotionArtifact = next.artifacts[event.data.input.rootPromotion.artifactId];
+    const intake = next.publishReviewIntakes[approval.intakeId];
+    const readiness = next.studyReadiness[event.data.input.readiness.readinessId];
+    const study = next.ownedMediaStudies[event.data.input.study.studyId];
     invariant(
       source?.origin.kind === "ingest" && source.content.contentId === event.data.input.sourceContentId,
       event,
       `caption production ${event.data.jobId} has no exact runtime source artifact`,
     );
     invariant(
-      childOutput?.origin.kind === "worker_output" &&
-        childOutput.content.contentId === event.data.input.acceptedChildOutput.contentId &&
-        promotion?.outcome === "promoted_to_root" &&
-        promotion.inputArtifactId === childOutput.id &&
-        promotion.outputArtifactId === promotionArtifact?.id &&
-        promotion.receiptId === event.data.input.rootPromotion.receiptId &&
-        promotion.receiptContentId === event.data.input.rootPromotion.receiptContentId &&
-        promotionArtifact?.origin.kind === "root_output_disposition" &&
-        promotionArtifact.content.contentId === event.data.input.rootPromotion.contentId,
+      intake?.status === "completed" && intake.outcome === "queued" &&
+        intake.readinessId === event.data.input.readiness.readinessId &&
+        intake.readinessArtifactId === event.data.input.readiness.artifactId &&
+        intake.readinessReceiptId === event.data.input.readiness.receiptId &&
+        intake.readinessReceiptContentId === event.data.input.readiness.receiptContentId &&
+        readiness?.outcome === "proceed_to_caption_review" &&
+        readiness.studyId === event.data.input.study.studyId &&
+        readiness.studyArtifactId === event.data.input.study.artifactId &&
+        readiness.studyContentId === event.data.input.study.contentId &&
+        study?.artifactId === event.data.input.study.artifactId &&
+        study.contentId === event.data.input.study.contentId &&
+        study.executorReceiptId === event.data.input.study.executorReceiptId &&
+        study.executorReceiptContentId === event.data.input.study.executorReceiptContentId,
       event,
-      `caption production ${event.data.jobId} has no exact accepted current-run child promotion`,
+      `caption production ${event.data.jobId} has no exact approved study/readiness lineage`,
     );
     next.captionProductions[event.data.jobId] = {
       id: event.data.jobId,
@@ -60,8 +65,8 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
       sourceContentId: source.content.contentId,
       analysisRequestId: event.data.input.analysisRequestId,
       range: structuredClone(event.data.input.range),
-      acceptedChildOutput: structuredClone(event.data.input.acceptedChildOutput),
-      rootPromotion: structuredClone(event.data.input.rootPromotion),
+      study: structuredClone(event.data.input.study),
+      readiness: structuredClone(event.data.input.readiness),
       limits: structuredClone(event.data.limits),
       executor: structuredClone(event.data.executor),
       status: "started",
@@ -76,6 +81,7 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
       targetAvailableCount: null,
       withheldCount: null,
       unavailableCount: null,
+      lines: [],
       failure: null,
     };
     return true;
@@ -109,8 +115,10 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
         receipt.input.sourceContentId === job.sourceContentId &&
         receipt.input.analysisRequestId === job.analysisRequestId &&
         JSON.stringify(receipt.input.range) === JSON.stringify(job.range) &&
-        JSON.stringify(receipt.input.acceptedChildOutput) === JSON.stringify(job.acceptedChildOutput) &&
-        JSON.stringify(receipt.input.rootPromotion) === JSON.stringify(job.rootPromotion) &&
+        JSON.stringify(receipt.input.study) === JSON.stringify(job.study) &&
+        JSON.stringify(receipt.input.readiness) === JSON.stringify(job.readiness) &&
+        JSON.stringify(receipt.authority.verification.study) === JSON.stringify(job.study) &&
+        JSON.stringify(receipt.authority.verification.readiness) === JSON.stringify(job.readiness) &&
         JSON.stringify(receipt.limits) === JSON.stringify(job.limits) &&
         JSON.stringify(receipt.producer.executor) === JSON.stringify(job.executor) &&
         receipt.result.captionArtifactId === captionArtifact.id &&
@@ -130,6 +138,7 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
     job.targetAvailableCount = receipt.result.targetAvailableCount;
     job.withheldCount = receipt.result.withheldCount;
     job.unavailableCount = receipt.result.unavailableCount;
+    job.lines = structuredClone(receipt.result.lines);
     return true;
   }
 
@@ -160,9 +169,12 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
         receipt.input.captionContentId === job.captionContentId &&
         receipt.input.captionReceiptId === job.receiptId &&
         receipt.input.captionReceiptContentId === job.receiptContentId &&
-        JSON.stringify(receipt.lineage.candidateInput.acceptedChildOutput) === JSON.stringify(job.acceptedChildOutput) &&
-        JSON.stringify(receipt.lineage.candidateInput.rootPromotion) === JSON.stringify(job.rootPromotion) &&
-        JSON.stringify(receipt.lineage.executor) === JSON.stringify(job.executor),
+        canonicalSha256(receipt.lineage.candidateInput.study) === canonicalSha256(job.study) &&
+        canonicalSha256(receipt.lineage.candidateInput.readiness) === canonicalSha256(job.readiness) &&
+        canonicalSha256(receipt.lineage.study) === canonicalSha256(job.study) &&
+        canonicalSha256(receipt.lineage.readiness) === canonicalSha256(job.readiness) &&
+        receipt.lineage.approval.reviewId === job.approvalReviewId &&
+        canonicalSha256(receipt.lineage.executor) === canonicalSha256(job.executor),
       event,
       `caption QC ${event.data.qcId} changed its candidate or current-run lineage`,
     );
@@ -172,6 +184,9 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
         artifact.origin.jobId === receipt.input.jobId &&
         artifact.origin.captionArtifactId === receipt.input.captionArtifactId &&
         artifact.origin.captionContentId === receipt.input.captionContentId &&
+        artifact.origin.studyId === receipt.lineage.study.studyId &&
+        artifact.origin.readinessId === receipt.lineage.readiness.readinessId &&
+        artifact.origin.approvalReviewId === receipt.lineage.approval.reviewId &&
         artifact.origin.receiptId === receipt.receiptId &&
         artifact.origin.receiptContentId === event.data.receiptContentId &&
         artifact.origin.outcome === receipt.decision.outcome &&
@@ -191,6 +206,7 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
       receiptContentId: artifact.content.contentId,
       outcome: receipt.decision.outcome,
       reasonCodes: [...receipt.decision.reasonCodes],
+      lines: structuredClone(receipt.decision.lines),
     };
     return true;
   }

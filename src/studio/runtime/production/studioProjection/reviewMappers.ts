@@ -92,8 +92,8 @@ export function projectCaptionProductions(state: RuntimeProjection) {
       sourceContentId: job.sourceContentId,
       analysisRequestId: job.analysisRequestId,
       range: structuredClone(job.range),
-      acceptedChildOutput: structuredClone(job.acceptedChildOutput),
-      rootPromotion: structuredClone(job.rootPromotion),
+      study: structuredClone(job.study),
+      readiness: structuredClone(job.readiness),
       executorClassification: job.executor.classification,
       executorExecutionScope: job.executor.executionScope,
       cognitionClaim: job.executor.cognitionClaim,
@@ -108,6 +108,11 @@ export function projectCaptionProductions(state: RuntimeProjection) {
       targetAvailableCount: job.targetAvailableCount,
       withheldCount: job.withheldCount,
       unavailableCount: job.unavailableCount,
+      lines: structuredClone(job.lines),
+      authorityState: Object.values(state.publishReviewRevocations).some((revocation) =>
+        revocation.reviewId === job.approvalReviewId && revocation.status !== "failed")
+        ? "revocation_started_or_completed"
+        : "unrevoked",
       failure: job.failure,
     }))
     .sort((left, right) => left.jobId.localeCompare(right.jobId));
@@ -129,6 +134,14 @@ export function projectCaptionQualityControls(state: RuntimeProjection) {
       receiptContentId: qc.receiptContentId,
       outcome: qc.outcome,
       reasonCodes: [...qc.reasonCodes],
+      study: structuredClone(state.captionProductions[qc.jobId].study),
+      readiness: structuredClone(state.captionProductions[qc.jobId].readiness),
+      approvalReviewId: state.captionProductions[qc.jobId].approvalReviewId,
+      lines: qc.lines.map((line) => ({
+        ...structuredClone(line),
+        causality: structuredClone(state.captionProductions[qc.jobId].lines.find((candidate) =>
+          candidate.lineId === line.lineId)!),
+      })),
     }))
     .sort((left, right) => left.qcId.localeCompare(right.qcId));
   return qualityControls;
@@ -269,6 +282,10 @@ export function projectCaptionArtifacts(state: RuntimeProjection) {
         jobId: artifact.origin.jobId,
         approvalReviewId: artifact.origin.approvalReviewId,
         approvalArtifactId: artifact.origin.approvalArtifactId,
+        studyId: artifact.origin.studyId,
+        studyArtifactId: artifact.origin.studyArtifactId,
+        readinessId: artifact.origin.readinessId,
+        readinessArtifactId: artifact.origin.readinessArtifactId,
       };
     })
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));

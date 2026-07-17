@@ -49,7 +49,7 @@ function range(value: unknown, context: string, path: string) {
   };
 }
 
-function planningReport(value: unknown, context: string, path: string) {
+export function validateStudyPlanningReportInput(value: unknown, context: string, path: string) {
   const item = object(value, context, path);
   exact(item, [
     "reportId", "childTaskId", "childAgentId", "artifactId", "contentId", "dispositionId",
@@ -85,7 +85,7 @@ export function validateStudyPlanningInput(
   ], context, path);
   literal(item.schema, "studio.study-planning-input.v1", context, `${path}.schema`);
   const reports = array(item.reports, context, `${path}.reports`).map((entry, index) =>
-    planningReport(entry, context, `${path}.reports[${index}]`));
+    validateStudyPlanningReportInput(entry, context, `${path}.reports[${index}]`));
   if (reports.length < 2 || reports.length > OWNED_MEDIA_STUDY_LIMITS.maxPlanningReports ||
       new Set(reports.map((entry) => entry.reportId)).size !== reports.length) {
     fail(context, `${path}.reports`, "must contain at least two unique admitted, read reports within the closed limit");
@@ -324,7 +324,7 @@ export function validateOwnedMediaStudyArtifact(value: unknown): OwnedMediaStudy
     conflicts: item.conflicts,
     limitations: item.limitations,
   }, context, "artifact.modelAuthored");
-  const reports = array(item.reports, context, "artifact.reports").map((entry, index) => planningReport(entry, context, `artifact.reports[${index}]`));
+  const reports = array(item.reports, context, "artifact.reports").map((entry, index) => validateStudyPlanningReportInput(entry, context, `artifact.reports[${index}]`));
   const childDispositions = array(item.childDispositions, context, "artifact.childDispositions").map((entry, index) => {
     const found = object(entry, context, `artifact.childDispositions[${index}]`);
     exact(found, ["childTaskId", "childAgentId", "reportId", "artifactId", "outcome", "reason", "dispositionId", "admissionId"], context, `artifact.childDispositions[${index}]`);

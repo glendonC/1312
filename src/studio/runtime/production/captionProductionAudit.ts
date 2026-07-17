@@ -11,11 +11,19 @@ import type {
   CaptionProductionArtifact,
   CaptionProductionReceipt,
   CaptionProductionStatus,
+  CaptionStudyIdentity,
   RuntimeProjection,
+  StudyReadinessReceiptIdentity,
 } from "./model.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "./model.ts";
 import { reopenPublishReviewDecisions } from "./publishReviewDecisionAudit.ts";
-import { reopenPromotedRootOutputs } from "./rootOutputDispositionAudit.ts";
+import {
+  captionLineReceiptProjection,
+  captionStudyIdentity,
+  deriveCaptionLineStudySupport,
+} from "./captionStudyCausality.ts";
+import { reopenStudyReadiness } from "./studyReadinessAudit.ts";
+import { reopenOwnedMediaStudy } from "./studySynthesisAudit.ts";
 import type { RuntimeEvent } from "./protocol.ts";
 import {
   validateCaptionProductionArtifact,
@@ -31,7 +39,23 @@ export interface CaptionProductionVerification {
     receiptContentId: string;
   };
   authorityState: "unrevoked" | "revoked_after_completion";
-  integrity: "stored_caption_and_receipt_with_verified_approval";
+  integrity: "stored_caption_and_receipt_with_verified_study_readiness_approval";
+  source: {
+    artifactId: string;
+    contentId: string;
+    analysisRequestId: string;
+    range: { startMs: number; endMs: number };
+  };
+  study: CaptionStudyIdentity;
+  readiness: StudyReadinessReceiptIdentity;
+  reopened: {
+    sourceArtifactIds: string[];
+    semanticEvidenceArtifactIds: string[];
+    reportArtifactIds: string[];
+    admissionIds: string[];
+    planningDecisionIds: string[];
+    executorIds: string[];
+  };
   captionArtifactId: string;
   captionContentId: string;
   receiptArtifactId: string;
@@ -98,7 +122,6 @@ export async function reopenCaptionProductionResults(
   artifacts: ContentAddressedArtifactStore,
 ): Promise<VerifiedCaptionProductionResult[]> {
   const reviews = await reopenPublishReviewDecisions(state, events, artifacts);
-  const promotions = await reopenPromotedRootOutputs(state, artifacts);
   const verified: VerifiedCaptionProductionResult[] = [];
   const completed = Object.values(state.captionProductions)
     .filter((job) => job.status === "completed")
@@ -120,6 +143,19 @@ export async function reopenCaptionProductionResults(
     );
     if (!approval || approval.outcome !== "approve_for_caption_production") {
       throw new Error(`Caption production ${job.id} no longer has its exact verified approval`);
+    }
+    const readiness = await reopenStudyReadiness(state, artifacts, approval.readiness.readinessId);
+    if (
+      readiness.readinessId !== approval.readiness.readinessId ||
+      readiness.artifactId !== approval.readiness.artifactId ||
+      readiness.receiptId !== approval.readiness.receiptId ||
+      readiness.receiptContentId !== approval.readiness.receiptContentId ||
+      readiness.receipt.result.outcome !== "proceed_to_caption_review"
+    ) throw new Error(`Caption production ${job.id} lost its exact proceed-to-caption-review authority`);
+    const study = await reopenOwnedMediaStudy(state, artifacts, readiness.receipt.input.studyId);
+    const studyIdentity = captionStudyIdentity(study);
+    if (!sameCanonical(job.study, studyIdentity) || !sameCanonical(job.readiness, approval.readiness)) {
+      throw new Error(`Caption production ${job.id} changed its exact approved study/readiness identity`);
     }
 
     const started = events.find((event) =>
@@ -169,12 +205,14 @@ export async function reopenCaptionProductionResults(
       captionArtifact.origin.approvalReviewId !== approval.reviewId ||
       captionArtifact.origin.approvalArtifactId !== approval.artifactId ||
       captionArtifact.origin.sourceArtifactId !== job.sourceArtifactId ||
-      captionArtifact.origin.acceptedChildArtifactId !== started.data.input.acceptedChildOutput.artifactId ||
-      captionArtifact.origin.rootPromotionArtifactId !== started.data.input.rootPromotion.artifactId ||
+      captionArtifact.origin.studyId !== studyIdentity.studyId ||
+      captionArtifact.origin.studyArtifactId !== studyIdentity.artifactId ||
+      captionArtifact.origin.readinessId !== readiness.readinessId ||
+      captionArtifact.origin.readinessArtifactId !== readiness.artifactId ||
       !sameCanonical(captionArtifact.sourceArtifactIds, [
         job.sourceArtifactId,
-        started.data.input.acceptedChildOutput.artifactId,
-        started.data.input.rootPromotion.artifactId,
+        studyIdentity.artifactId,
+        readiness.artifactId,
         approval.artifactId,
       ]) ||
       receiptArtifact.id !== expectedReceiptArtifactId || receiptArtifact.runId !== state.runId ||
@@ -188,10 +226,14 @@ export async function reopenCaptionProductionResults(
       receiptArtifact.origin.approvalArtifactId !== approval.artifactId ||
       receiptArtifact.origin.captionArtifactId !== captionArtifact.id ||
       receiptArtifact.origin.captionContentId !== captionArtifact.content.contentId ||
-      receiptArtifact.origin.rootPromotionArtifactId !== started.data.input.rootPromotion.artifactId ||
+      receiptArtifact.origin.studyId !== studyIdentity.studyId ||
+      receiptArtifact.origin.studyArtifactId !== studyIdentity.artifactId ||
+      receiptArtifact.origin.readinessId !== readiness.readinessId ||
+      receiptArtifact.origin.readinessArtifactId !== readiness.artifactId ||
       !sameCanonical(receiptArtifact.sourceArtifactIds, [
         captionArtifact.id,
-        started.data.input.rootPromotion.artifactId,
+        studyIdentity.artifactId,
+        readiness.artifactId,
         approval.artifactId,
       ]) ||
       completion.data.captionArtifactId !== captionArtifact.id ||
@@ -214,28 +256,36 @@ export async function reopenCaptionProductionResults(
       "Caption-production verification",
       "receipt",
     );
-    const promotion = promotions.find((candidate) =>
-      candidate.receipt.delegation.grants.some((grant) => grant.capability === "media.seek") &&
-      candidate.evidence.mediaOperationIds.length > 0 &&
-      candidate.receipt.dispositionId === caption.input.rootPromotion.dispositionId &&
-      candidate.receiptArtifactId === caption.input.rootPromotion.artifactId &&
-      candidate.receiptContentId === caption.input.rootPromotion.contentId &&
-      candidate.receipt.receiptId === caption.input.rootPromotion.receiptId &&
-      candidate.receiptContentId === caption.input.rootPromotion.receiptContentId &&
-      candidate.receipt.input.artifactId === caption.input.acceptedChildOutput.artifactId &&
-      candidate.receipt.input.contentId === caption.input.acceptedChildOutput.contentId &&
-      candidate.receipt.delegation.mediaScope.some((scope) =>
-        scope.artifactId === caption.input.sourceArtifactId &&
-        scope.startMs <= caption.input.range.startMs &&
-        scope.endMs >= caption.input.range.endMs
-      )
-    );
+    const invalidLineCausality = caption.lines.some((line) => {
+      const expectedSupport = deriveCaptionLineStudySupport(study, line.startMs, line.endMs);
+      return !sameCanonical(line.lineage.study, { ...studyIdentity, ...expectedSupport }) ||
+        !sameCanonical(line.lineage.readiness, approval.readiness) ||
+        !sameCanonical(line.lineage.approval, {
+          reviewId: approval.reviewId,
+          artifactId: approval.artifactId,
+          receiptId: approval.receiptId,
+          receiptContentId: approval.receiptContentId,
+        }) ||
+        !sameCanonical(line.lineage.captionExecutor, {
+          jobId: job.id,
+          id: caption.executor.id,
+          version: caption.executor.version,
+          executionScope: caption.executor.executionScope,
+          cognitionClaim: caption.executor.cognitionClaim,
+        });
+    });
     if (
-      !promotion ||
+      invalidLineCausality || caption.executor.executionScope !== "current_run" ||
       captionArtifact.content.bytes !== storedCaption.bytes ||
       receiptArtifact.content.bytes !== storedReceipt.bytes ||
       caption.jobId !== job.id || caption.runId !== state.runId ||
       !sameCanonical(caption.input, started.data.input) ||
+      !sameCanonical(caption.input.study, studyIdentity) ||
+      !sameCanonical(caption.input.readiness, approval.readiness) ||
+      study.envelope.root.jobContext.source.artifactId !== caption.input.sourceArtifactId ||
+      study.envelope.root.jobContext.source.contentId !== caption.input.sourceContentId ||
+      study.envelope.root.jobContext.analysisRequest.requestId !== caption.input.analysisRequestId ||
+      !sameCanonical(study.envelope.root.jobContext.analysisRequest.requestedRange, caption.input.range) ||
       !sameCanonical(caption.executor, started.data.executor) ||
       receipt.receiptId !== receiptIdentity(receipt) || receipt.receiptId !== job.receiptId ||
       receipt.jobId !== job.id || !sameCanonical(receipt.authority.approval, started.data.request.approval) ||
@@ -245,12 +295,16 @@ export async function reopenCaptionProductionResults(
         receiptId: approval.receiptId,
         receiptContentId: approval.receiptContentId,
       }) ||
+      !sameCanonical(receipt.authority.verification.readiness, approval.readiness) ||
+      !sameCanonical(receipt.authority.verification.study, studyIdentity) ||
       !sameCanonical(receipt.input, caption.input) ||
       !sameCanonical(receipt.producer.executor, caption.executor) ||
       !sameCanonical(receipt.limits, started.data.limits) ||
       receipt.result.captionArtifactId !== captionArtifact.id ||
       receipt.result.captionContentId !== captionArtifact.content.contentId ||
       receipt.result.captionBytes !== captionArtifact.content.bytes ||
+      !sameCanonical(receipt.result.lines, caption.lines.map(captionLineReceiptProjection)) ||
+      !sameCanonical(receipt.result.lines, job.lines) ||
       !sameCanonical(caption.result, {
         status: receipt.result.status,
         lineCount: receipt.result.lineCount,
@@ -276,8 +330,17 @@ export async function reopenCaptionProductionResults(
           receiptId: approval.receiptId,
           receiptContentId: approval.receiptContentId,
         },
+        source: {
+          artifactId: job.sourceArtifactId,
+          contentId: job.sourceContentId,
+          analysisRequestId: job.analysisRequestId,
+          range: structuredClone(job.range),
+        },
+        study: structuredClone(studyIdentity),
+        readiness: structuredClone(approval.readiness),
+        reopened: structuredClone(study.reopened),
         authorityState,
-        integrity: "stored_caption_and_receipt_with_verified_approval",
+        integrity: "stored_caption_and_receipt_with_verified_study_readiness_approval",
         captionArtifactId: captionArtifact.id,
         captionContentId: captionArtifact.content.contentId,
         receiptArtifactId: receiptArtifact.id,

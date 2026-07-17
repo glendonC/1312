@@ -4,13 +4,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
+import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
+import type { CaptionProductionExecutor } from "../src/studio/runtime/production/captionProductionExecutor.ts";
+import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
+import { CAPTION_PRODUCTION_LIMITS } from "../src/studio/runtime/production/model.ts";
+import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
+import { PublishReviewHost } from "../src/studio/runtime/production/publishReviewHost.ts";
 import {
-  DurableRuntimeCommandStore,
   DeterministicRuntimeExecutor,
+  DurableRuntimeCommandStore,
   RuntimeSourceRegistry,
   RuntimeStartService,
-  type CaptionProductionExecutor,
-  type DeterministicExecutionMode,
+  deterministicOrchestratorLauncherFactory,
 } from "../src/studio/runtime/production/runtimeHost/index.ts";
 import type {
   RuntimeHostCaptionProductionRequest,
@@ -18,10 +23,13 @@ import type {
   RuntimeHostStartRequest,
 } from "../src/studio/runtime/production/runtimeHost/model.ts";
 import { readValidatedRuntimeJournal } from "../src/studio/runtime/production/runtimeHost/journalPolling.ts";
-import { validateCaptionProductionArtifact } from "../src/studio/runtime/production/validation/captionProduction.ts";
-import { LocalRuntimeHostClient } from "../src/studio/localRuntime/client.ts";
+import type { DeterministicOrchestratorMode } from "../src/studio/runtime/production/runtimeHost/deterministicOrchestrator.ts";
 import { adaptProductionRuntime } from "../src/studio/runtime/production/studioProjection.ts";
-import { buildRuntimeObservabilityIndex } from "../src/studio/runtime/production/observability/indexer.ts";
+import {
+  deriveCaptionProductionResult,
+  validateCaptionProductionArtifact,
+} from "../src/studio/runtime/production/validation/captionProduction.ts";
+import { LocalRuntimeHostClient } from "../src/studio/localRuntime/client.ts";
 
 const FIXTURE = resolve("public/demo/runs/run-005");
 
@@ -34,7 +42,8 @@ interface Harness {
 
 async function harness(options: {
   captionExecutor?: CaptionProductionExecutor;
-  executionMode?: DeterministicExecutionMode;
+  executionMode?: "completed" | "failed" | "timed_out" | "interrupted";
+  orchestratorMode?: DeterministicOrchestratorMode;
 } = {}): Promise<Harness> {
   const directory = await mkdtemp(join(tmpdir(), "studio-caption-production-test-"));
   const sources = await RuntimeSourceRegistry.open({ sourceDirectories: [FIXTURE] });
@@ -43,6 +52,7 @@ async function harness(options: {
     store,
     sources,
     launcherFactory: new DeterministicRuntimeExecutor({ mode: options.executionMode }).factory(),
+    orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory({ mode: options.orchestratorMode }),
     captionExecutor: options.captionExecutor,
     recoverOnOpen: false,
   });
@@ -66,9 +76,9 @@ async function harness(options: {
 const currentRunCaptionExecutor: CaptionProductionExecutor = {
   async describe() {
     return {
-      id: "studio.openai-caption-producer",
+      id: "studio.deterministic-current-run-caption-test-seam",
       version: "1",
-      classification: "real_recognizer_translator",
+      classification: "deterministic_current_run_test_seam",
       executionScope: "current_run",
       cognitionClaim: "none",
       recognizer: "test-seam-current-run-recognizer",
@@ -100,8 +110,21 @@ const incompleteCurrentRunCaptionExecutor: CaptionProductionExecutor = {
   },
 };
 
+const uncoveredCurrentRunCaptionExecutor: CaptionProductionExecutor = {
+  describe: currentRunCaptionExecutor.describe,
+  async execute() {
+    return [{
+      id: "line-current-run-uncovered-001",
+      startMs: 23_000,
+      endMs: 24_000,
+      source: { language: "ko", state: "available", text: "경계", reasonCode: null },
+      target: { language: "en", state: "available", text: "Boundary", reasonCode: null },
+    }];
+  },
+};
+
 async function terminal(service: RuntimeStartService, commandId: string): Promise<void> {
-  const deadline = Date.now() + 4_000;
+  const deadline = Date.now() + 8_000;
   while (Date.now() < deadline) {
     if ((await service.statusByCommand(commandId)).terminal) return;
     await new Promise((resolveWait) => setTimeout(resolveWait, 10));
@@ -115,7 +138,8 @@ async function approved(
   const acknowledgement = await runtime.service.start(runtime.request);
   await terminal(runtime.service, acknowledgement.commandId);
   const intake = (await runtime.service.publishReviewIntakes(acknowledgement.runtimeId)).intakes[0];
-  assert.ok(intake);
+  assert.ok(intake, "a proceed study must create one review intake");
+  assert.equal(intake.outcome, "queued");
   const authority = await runtime.service.publishReviewDecisions(acknowledgement.runtimeId);
   const response = await runtime.service.createPublishReviewDecision(acknowledgement.runtimeId, {
     intake: {
@@ -132,6 +156,7 @@ async function approved(
     },
   });
   const approval = response.reviews[0];
+  assert.equal(approval.readiness.readinessId, intake.readiness.readinessId);
   return {
     runtimeId: acknowledgement.runtimeId,
     response,
@@ -146,366 +171,279 @@ async function approved(
   };
 }
 
-test("V1 and an unapproved run expose no captions; raw bytes, paths, and final prose are rejected", async () => {
-  const runtime = await harness();
+function objectPath(runtime: Harness, runtimeId: string, contentId: string): string {
+  const digest = contentId.replace("sha256:", "");
+  return join(runtime.store.paths(runtimeId).artifactStoreRoot, "objects", "sha256", digest.slice(0, 2), digest);
+}
+
+async function journal(runtime: Harness, runtimeId: string) {
+  return readValidatedRuntimeJournal(runtime.store.paths(runtimeId).journalPath, runtimeId);
+}
+
+async function cleanup(runtime: Harness): Promise<void> {
+  await rm(runtime.directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+}
+
+test("child-only or unapproved authority cannot start caption production and callers cannot inject paths or prose", async () => {
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
   try {
     const acknowledgement = await runtime.service.start(runtime.request);
     await terminal(runtime.service, acknowledgement.commandId);
-    assert.deepEqual((await runtime.service.captionProductions(acknowledgement.runtimeId)).captions, []);
-    assert.deepEqual((await runtime.service.captionProductionResults(acknowledgement.runtimeId)).results, []);
-    assert.deepEqual((await runtime.service.captionQualityControls(acknowledgement.runtimeId)).qualityControls, []);
     const fake = {
       approval: {
-        reviewId: "publish-review:unapproved",
-        artifactId: "artifact:unapproved",
-        receiptId: "publish-review-decision-receipt:unapproved",
+        reviewId: "publish-review:child-only",
+        artifactId: "artifact:child-only",
+        receiptId: "publish-review-decision-receipt:child-only",
         receiptContentId: `sha256:${"a".repeat(64)}`,
       },
     };
-    await assert.rejects(
-      runtime.service.createCaptionProduction(acknowledgement.runtimeId, fake),
-      /exact verified current-run promoted child output|exact recursively verified unrevoked approval/,
-    );
+    await assert.rejects(runtime.service.createCaptionProduction(acknowledgement.runtimeId, fake), /exact recursively verified unrevoked approval/);
     for (const open of [
-      { ...fake, reviewBytes: "already reviewed" },
+      { ...fake, childArtifactId: "artifact:worker-output" },
       { ...fake, sourcePath: "/tmp/media" },
       { ...fake, captions: [{ ko: "caller", en: "final" }] },
-    ]) {
-      await assert.rejects(
-        runtime.service.createCaptionProduction(acknowledgement.runtimeId, open),
-        /invalid or contains open fields/,
-      );
-    }
-    const journal = await readValidatedRuntimeJournal(
-      runtime.store.paths(acknowledgement.runtimeId).journalPath,
-      acknowledgement.runtimeId,
-    );
-    assert.equal(Object.keys(journal.state.captionProductions).length, 0);
-    assert.equal(journal.events.some((event) => event.type.startsWith("caption.production_")), false);
+    ]) await assert.rejects(runtime.service.createCaptionProduction(acknowledgement.runtimeId, open), /invalid or contains open fields/);
+    assert.deepEqual((await runtime.service.captionProductions(acknowledgement.runtimeId)).captions, []);
   } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
+    await cleanup(runtime);
   }
 });
 
-// Slice 4 intentionally stops before rebinding caption generation causality to the owned-media study.
-test.skip("exact approval produces immutable timed KO+EN artifacts with honest withheld counts", async () => {
-  const runtime = await harness();
-  try {
-    const approval = await approved(runtime);
-    const result = await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
-    assert.equal(result.schema, "studio.local-runtime-caption-productions.v1");
-    assert.equal(result.captions.length, 1);
-    const caption = result.captions[0];
-    assert.equal(caption.integrity, "stored_caption_and_receipt_with_verified_approval");
-    assert.equal(caption.authorityState, "unrevoked");
-    assert.equal(caption.executor.classification, "recorded_real_pipeline_fixture");
-    assert.equal(caption.executor.executionScope, "test_demo_only");
-    assert.equal(caption.executor.cognitionClaim, "none");
-    assert.deepEqual(caption.result, {
-      status: "partial",
-      lineCount: 16,
-      sourceAvailableCount: 15,
-      targetAvailableCount: 13,
-      withheldCount: 2,
-      unavailableCount: 1,
-    });
-    const productionResults = await runtime.service.captionProductionResults(approval.runtimeId);
-    assert.equal(productionResults.schema, "studio.local-runtime-caption-production-results.v1");
-    assert.equal(productionResults.results.length, 1);
-    assert.deepEqual(productionResults.results[0].verification, caption);
-    assert.equal(productionResults.results[0].artifact.runId, approval.runtimeId);
-    assert.equal(productionResults.results[0].artifact.lines.length, 16);
-    assert.deepEqual(
-      productionResults.results[0].artifact.lines.map((line) => [line.source.language, line.target.language]),
-      Array.from({ length: 16 }, () => ["ko", "en"]),
-    );
-    const digest = caption.captionContentId.replace("sha256:", "");
-    const value = JSON.parse(await readFile(join(
-      runtime.store.paths(approval.runtimeId).artifactStoreRoot,
-      "objects",
-      "sha256",
-      digest.slice(0, 2),
-      digest,
-    ), "utf8")) as unknown;
-    const artifact = validateCaptionProductionArtifact(value);
-    assert.deepEqual(artifact.lines.map((line) => [line.source.language, line.target.language]),
-      Array.from({ length: 16 }, () => ["ko", "en"]));
-    assert.equal(artifact.lines.filter((line) => line.target.state === "withheld").length, 2);
-    assert.ok(artifact.lines.filter((line) => line.target.state === "withheld")
-      .every((line) => line.target.text === null && line.target.reasonCode === "recorded_quality_gate_withheld"));
-    assert.ok(artifact.lines.every((line) =>
-      line.lineage.derivation === "recorded_fixture_test_demo_only" &&
-      line.lineage.source.artifactId === artifact.input.sourceArtifactId &&
-      line.lineage.source.contentId === artifact.input.sourceContentId &&
-      line.lineage.source.window.startMs === line.startMs &&
-      line.lineage.source.window.endMs === line.endMs &&
-      JSON.stringify(line.lineage.acceptedChildOutput) === JSON.stringify(artifact.input.acceptedChildOutput) &&
-      JSON.stringify(line.lineage.rootPromotion) === JSON.stringify(artifact.input.rootPromotion)
-    ));
-    const changedWindow = structuredClone(artifact);
-    changedWindow.lines[0].lineage.source.window.startMs += 1;
-    assert.throws(() => validateCaptionProductionArtifact(changedWindow), /must equal the exact caption line window/);
-    const changedPromotion = structuredClone(artifact);
-    changedPromotion.lines[0].lineage.rootPromotion.dispositionId = "root-output-disposition:forged";
-    assert.throws(() => validateCaptionProductionArtifact(changedPromotion), /does not match the current run input/);
-    const falseLiveFixture = structuredClone(artifact);
-    falseLiveFixture.executor.executionScope = "current_run";
-    assert.throws(() => validateCaptionProductionArtifact(falseLiveFixture), /executor identity, classification, and evidence must agree/);
-    const falseCognition = structuredClone(artifact) as unknown as { executor: { cognitionClaim: string } };
-    falseCognition.executor.cognitionClaim = "live_cognition";
-    assert.throws(() => validateCaptionProductionArtifact(falseCognition), /cognitionClaim must equal none/);
-
-    const qualityControls = await runtime.service.captionQualityControls(approval.runtimeId);
-    assert.equal(qualityControls.schema, "studio.local-runtime-caption-quality-controls.v1");
-    assert.equal(qualityControls.qualityControls.length, 1);
-    assert.equal(qualityControls.qualityControls[0].outcome, "withheld");
-    assert.deepEqual(qualityControls.qualityControls[0].reasonCodes, ["recorded_fixture_test_demo_only"]);
-    assert.deepEqual(qualityControls.qualityControls[0].acceptedLineIds, []);
-    assert.equal(qualityControls.qualityControls[0].withheldLineIds.length, 16);
-
-    const journal = await readValidatedRuntimeJournal(
-      runtime.store.paths(approval.runtimeId).journalPath,
-      approval.runtimeId,
-    );
-    assert.equal(journal.events.filter((event) => event.type === "caption.production_started").length, 1);
-    assert.equal(journal.events.filter((event) => event.type === "caption.production_completed").length, 1);
-    assert.equal(journal.events.filter((event) => event.type === "caption.quality_control_decided").length, 1);
-    assert.equal(Object.values(journal.state.captionProductions)[0].status, "completed");
-    assert.equal(Object.values(journal.state.captionQualityControls)[0].outcome, "withheld");
-    const projection = adaptProductionRuntime(journal.state);
-    assert.equal(projection.rootOutputDispositions.length, 1);
-    assert.equal(projection.rootOutputDispositions[0].outcome, "promoted_to_root");
-    assert.equal(
-      projection.rootOutputDispositions[0].inputArtifactId,
-      projection.captionProductions[0].acceptedChildOutput.artifactId,
-    );
-    assert.equal(projection.captionProductions.length, 1);
-    assert.equal(projection.captionProductions[0].lineCount, 16);
-    assert.equal(projection.captionProductions[0].withheldCount, 2);
-    assert.equal(projection.captionProductions[0].executorExecutionScope, "test_demo_only");
-    assert.equal(projection.captionProductions[0].executorClassification, "recorded_real_pipeline_fixture");
-    assert.equal(projection.captionProductions[0].cognitionClaim, "none");
-    assert.equal(
-      projection.captionProductions[0].rootPromotion.dispositionId,
-      projection.rootOutputDispositions[0].dispositionId,
-    );
-    assert.equal(projection.captionQualityControls.length, 1);
-    assert.equal(projection.captionQualityControls[0].outcome, "withheld");
-    assert.deepEqual(projection.captionQualityControls[0].reasonCodes, ["recorded_fixture_test_demo_only"]);
-    assert.equal(
-      projection.captionQualityControls[0].captionArtifactId,
-      projection.captionProductions[0].captionArtifactId,
-    );
-    assert.equal(projection.captionArtifacts.length, 2);
-    const observability = await buildRuntimeObservabilityIndex(await readFile(
-      runtime.store.paths(approval.runtimeId).journalPath,
-      "utf8",
-    ));
-    assert.equal(observability.sources.receipts.filter((source) =>
-      source.kind === "caption_production").length, 1);
-    assert.equal(observability.sources.receipts.filter((source) =>
-      source.kind === "caption_quality_control").length, 1);
-    assert.equal(observability.sources.artifacts.filter((source) =>
-      source.kind.startsWith("caption-production-")).length, 2);
-
-    let requestedPath = "";
-    let requestedBody = "";
-    const client = new LocalRuntimeHostClient({
-      baseUrl: "http://127.0.0.1:4312",
-      token: "caption-test-token",
-      fetch: async (input, init) => {
-        requestedPath = String(input);
-        requestedBody = String(init?.body ?? "");
-        return new Response(JSON.stringify(result), {
-          status: 201,
-          headers: { "Content-Type": "application/json" },
-        });
-      },
-    });
-    assert.deepEqual(await client.createCaptionProduction(approval.runtimeId, approval.request), result);
-    assert.match(requestedPath, /\/caption-productions$/);
-    assert.deepEqual(JSON.parse(requestedBody), approval.request);
-    const resultsClient = new LocalRuntimeHostClient({
-      baseUrl: "http://127.0.0.1:4312",
-      token: "caption-test-token",
-      fetch: async () => new Response(JSON.stringify(productionResults), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    });
-    assert.deepEqual(await resultsClient.captionProductionResults(approval.runtimeId), productionResults);
-    let qcRequestedPath = "";
-    let qcRequestedBody = "";
-    const qualityControlsClient = new LocalRuntimeHostClient({
-      baseUrl: "http://127.0.0.1:4312",
-      token: "caption-test-token",
-      fetch: async (input, init) => {
-        qcRequestedPath = String(input);
-        qcRequestedBody = String(init?.body ?? "");
-        return new Response(JSON.stringify(qualityControls), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      },
-    });
-    assert.deepEqual(await qualityControlsClient.captionQualityControls(approval.runtimeId), qualityControls);
-    const qcRequest = {
-      candidate: {
-        jobId: caption.jobId,
-        captionArtifactId: caption.captionArtifactId,
-        captionContentId: caption.captionContentId,
-        captionReceiptId: caption.receiptId,
-        captionReceiptContentId: caption.receiptContentId,
-      },
-    };
-    assert.deepEqual(
-      await qualityControlsClient.createCaptionQualityControl(approval.runtimeId, qcRequest),
-      qualityControls,
-    );
-    assert.match(qcRequestedPath, /\/caption-quality-controls$/);
-    assert.deepEqual(JSON.parse(qcRequestedBody), qcRequest);
-    const falseAccept = structuredClone(qualityControls);
-    falseAccept.qualityControls[0].outcome = "accepted";
-    const falseAcceptClient = new LocalRuntimeHostClient({
-      baseUrl: "http://127.0.0.1:4312",
-      token: "caption-test-token",
-      fetch: async () => new Response(JSON.stringify(falseAccept), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    });
-    await assert.rejects(
-      falseAcceptClient.captionQualityControls(approval.runtimeId),
-      /outcome, reason, and line decisions do not agree/,
-    );
-    const mismatchedResults = structuredClone(productionResults);
-    mismatchedResults.results[0].artifact.jobId = "caption-production:mismatched";
-    const mismatchedClient = new LocalRuntimeHostClient({
-      baseUrl: "http://127.0.0.1:4312",
-      token: "caption-test-token",
-      fetch: async () => new Response(JSON.stringify(mismatchedResults), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    });
-    await assert.rejects(
-      mismatchedClient.captionProductionResults(approval.runtimeId),
-      /verified identities, executor, or result counts do not match the artifact/,
-    );
-    const tamperedResults = structuredClone(productionResults);
-    const originalSourceText = tamperedResults.results[0].artifact.lines[0].source.text;
-    assert.notEqual(originalSourceText, null);
-    tamperedResults.results[0].artifact.lines[0].source.text = `${originalSourceText} tampered`;
-    const tamperedClient = new LocalRuntimeHostClient({
-      baseUrl: "http://127.0.0.1:4312",
-      token: "caption-test-token",
-      fetch: async () => new Response(JSON.stringify(tamperedResults), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    });
-    await assert.rejects(
-      tamperedClient.captionProductionResults(approval.runtimeId),
-      /artifact bytes do not match the verified caption content identity/,
-    );
-    const tamperedResponse = structuredClone(result) as unknown as {
-      captions: Array<{ result: { lineCount: number } }>;
-    };
-    tamperedResponse.captions[0].result.lineCount = 65;
-    const rejectingClient = new LocalRuntimeHostClient({
-      baseUrl: "http://127.0.0.1:4312",
-      token: "caption-test-token",
-      fetch: async () => new Response(JSON.stringify(tamperedResponse), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    });
-    await assert.rejects(
-      rejectingClient.captionProductions(approval.runtimeId),
-      /counts exceed the closed line ceiling/,
-    );
-  } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
-  }
-});
-
-test.skip("a current-run complete candidate receives an independent accept receipt", async () => {
-  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
-  try {
-    const approval = await approved(runtime);
-    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
-    const result = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
-    assert.equal(result.artifact.executor.executionScope, "current_run");
-    assert.equal(result.artifact.executor.cognitionClaim, "none");
-    assert.equal(result.artifact.lines.length, 1);
-    assert.equal(result.artifact.lines[0].lineage.derivation, "current_run_source_execution");
-    assert.deepEqual(result.artifact.lines[0].lineage.source.window, {
-      startMs: result.artifact.lines[0].startMs,
-      endMs: result.artifact.lines[0].endMs,
-    });
-    const response = await runtime.service.captionQualityControls(approval.runtimeId);
-    assert.equal(response.qualityControls.length, 1);
-    assert.equal(response.qualityControls[0].outcome, "accepted");
-    assert.deepEqual(response.qualityControls[0].reasonCodes, ["current_run_candidate_structurally_complete"]);
-    assert.deepEqual(response.qualityControls[0].acceptedLineIds, ["line-current-run-001"]);
-    assert.deepEqual(response.qualityControls[0].withheldLineIds, []);
-    assert.equal(response.qualityControls[0].policy, "structural_current_run_gate_without_semantic_quality_score");
-    const journal = await readValidatedRuntimeJournal(
-      runtime.store.paths(approval.runtimeId).journalPath,
-      approval.runtimeId,
-    );
-    const projection = adaptProductionRuntime(journal.state);
-    assert.equal(projection.captionProductions[0].executorExecutionScope, "current_run");
-    assert.equal(projection.captionProductions[0].cognitionClaim, "none");
-    assert.equal(projection.captionQualityControls[0].outcome, "accepted");
-    assert.deepEqual(projection.captionQualityControls[0].reasonCodes, [
-      "current_run_candidate_structurally_complete",
-    ]);
-  } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
-  }
-});
-
-test.skip("an incomplete current-run candidate receives an independent withhold receipt", async () => {
-  const runtime = await harness({ captionExecutor: incompleteCurrentRunCaptionExecutor });
-  try {
-    const approval = await approved(runtime);
-    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
-    const response = await runtime.service.captionQualityControls(approval.runtimeId);
-    assert.equal(response.qualityControls[0].outcome, "withheld");
-    assert.deepEqual(response.qualityControls[0].reasonCodes, ["candidate_has_unavailable_or_withheld_lines"]);
-    assert.deepEqual(response.qualityControls[0].acceptedLineIds, []);
-    assert.deepEqual(response.qualityControls[0].withheldLineIds, ["line-current-run-incomplete-001"]);
-  } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
-  }
-});
-
-test.skip("caption QC rejects forged candidates and duplicate decisions", async () => {
+test("full owned-run current-run captions and independent QC close under cold replay", async () => {
   const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
   try {
     const approval = await approved(runtime);
     const produced = await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    assert.equal(produced.captions.length, 1);
     const caption = produced.captions[0];
-    await assert.rejects(runtime.service.createCaptionQualityControl(approval.runtimeId, {
-      candidate: {
-        jobId: caption.jobId,
-        captionArtifactId: caption.captionArtifactId,
-        captionContentId: `sha256:${"f".repeat(64)}`,
-        captionReceiptId: caption.receiptId,
-        captionReceiptContentId: caption.receiptContentId,
-      },
-    }), /requires one exact recursively verified caption candidate identity/);
-    await assert.rejects(runtime.service.createCaptionQualityControl(approval.runtimeId, {
-      candidate: {
-        jobId: caption.jobId,
-        captionArtifactId: caption.captionArtifactId,
-        captionContentId: caption.captionContentId,
-        captionReceiptId: caption.receiptId,
-        captionReceiptContentId: caption.receiptContentId,
-      },
-      outcome: "accepted",
-    }), /caption QC request is invalid or contains open fields/);
+    assert.equal(caption.integrity, "stored_caption_and_receipt_with_verified_study_readiness_approval");
+    assert.equal(caption.authorityState, "unrevoked");
+    assert.equal(caption.executor.executionScope, "current_run");
+    assert.equal(caption.executor.cognitionClaim, "none");
+    assert.equal(caption.result.status, "completed");
+    assert.equal(caption.result.lineCount, 1);
+    assert.ok(caption.reopened.semanticEvidenceArtifactIds.length >= 2);
+    assert.ok(caption.reopened.reportArtifactIds.length >= 2);
+    assert.ok(caption.reopened.admissionIds.length >= 2);
+    assert.equal(caption.readiness.readinessId, approval.response.reviews[0].readiness.readinessId);
+
+    const results = await runtime.service.captionProductionResults(approval.runtimeId);
+    const line = results.results[0].artifact.lines[0];
+    assert.equal(line.lineage.derivation, "current_run_source_execution");
+    assert.equal(line.lineage.study.studyId, caption.study.studyId);
+    assert.equal(line.lineage.study.coverage.state, "supported");
+    assert.equal(line.lineage.study.coverage.reasonCode, null);
+    assert.equal(line.lineage.study.claimIds.length, 1);
+    assert.equal(line.lineage.study.semanticCitations.length, 1);
+    assert.equal(line.lineage.study.childReports.length, 1);
+    assert.equal(line.lineage.readiness.readinessId, caption.readiness.readinessId);
+    assert.equal(line.lineage.approval.reviewId, caption.approval.reviewId);
+    assert.equal(line.lineage.captionExecutor.jobId, caption.jobId);
+    assert.equal(line.lineage.captionExecutor.cognitionClaim, "none");
+
+    const controls = await runtime.service.captionQualityControls(approval.runtimeId);
+    assert.equal(controls.qualityControls.length, 1);
+    const qc = controls.qualityControls[0];
+    assert.equal(qc.outcome, "accepted");
+    assert.deepEqual(qc.reasonCodes, ["current_run_candidate_structurally_complete"]);
+    assert.deepEqual(qc.acceptedLineIds, [line.id]);
+    assert.equal(qc.candidate.study.studyId, caption.study.studyId);
+    assert.equal(qc.candidate.readiness.readinessId, caption.readiness.readinessId);
+    assert.equal(qc.candidate.source.contentId, caption.source.contentId);
+    assert.equal(qc.candidate.result.lineCount, 1);
+    assert.equal(qc.candidate.authorityState, "unrevoked");
+
+    const loaded = await journal(runtime, approval.runtimeId);
+    assert.deepEqual(projectRuntimeEvents(approval.runtimeId, loaded.events), loaded.state);
+    assert.equal(Object.values(loaded.state.tasks).filter((task) => task.parentTaskId !== null).length, 2);
+    assert.equal(Object.values(loaded.state.semanticEvidence).filter((entry) => entry.status === "completed").length, 2);
+    assert.equal(Object.values(loaded.state.parentArtifactDispositions).filter((entry) => entry.outcome === "accepted").length, 2);
+    assert.equal(Object.keys(loaded.state.ownedMediaStudies).length, 1);
+    assert.equal(Object.values(loaded.state.studyReadiness)[0].outcome, "proceed_to_caption_review");
+    assert.equal(Object.keys(loaded.state.captionProductions).length, 1);
+    assert.equal(Object.keys(loaded.state.captionQualityControls).length, 1);
+
+    const projection = adaptProductionRuntime(loaded.state);
+    assert.equal(projection.captionProductions[0].study.studyId, caption.study.studyId);
+    assert.equal(projection.captionProductions[0].readiness.readinessId, caption.readiness.readinessId);
+    assert.equal(projection.captionProductions[0].approvalReviewId, caption.approval.reviewId);
+    assert.equal(projection.captionProductions[0].lines[0].coverageState, "supported");
+    assert.deepEqual(projection.captionProductions[0].lines[0].claimIds, line.lineage.study.claimIds);
+    assert.equal(projection.captionQualityControls[0].lines[0].causality.lineId, line.id);
+    assert.equal("results" in projection, false);
+    assert.equal("publicationState" in projection, false);
+
+    const client = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "caption-test-token",
+      fetch: async () => new Response(JSON.stringify(results), { status: 200, headers: { "Content-Type": "application/json" } }),
+    });
+    assert.deepEqual(await client.captionProductionResults(approval.runtimeId), results);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("partial coverage and unresolved conflict produce withheld readiness and no approval/caption authority", async (t) => {
+  for (const [mode, reasons] of [
+    ["synthesize_gaps", ["non_supported_root_coverage"]],
+    ["conflict", ["non_supported_root_coverage", "unresolved_conflict"]],
+  ] as const) await t.test(mode, async () => {
+    const runtime = await harness({ captionExecutor: currentRunCaptionExecutor, orchestratorMode: mode });
+    try {
+      const acknowledgement = await runtime.service.start(runtime.request);
+      await terminal(runtime.service, acknowledgement.commandId);
+      const loaded = await journal(runtime, acknowledgement.runtimeId);
+      const readiness = Object.values(loaded.state.studyReadiness)[0];
+      assert.equal(readiness.outcome, "withheld");
+      assert.deepEqual(readiness.reasonCodes, reasons);
+      const intake = (await runtime.service.publishReviewIntakes(acknowledgement.runtimeId)).intakes[0];
+      assert.equal(intake.outcome, "rejected");
+      const authority = await runtime.service.publishReviewDecisions(acknowledgement.runtimeId);
+      await assert.rejects(runtime.service.createPublishReviewDecision(acknowledgement.runtimeId, {
+        intake: { intakeId: intake.intakeId, artifactId: intake.artifactId, receiptId: intake.receiptId, receiptContentId: intake.receiptContentId },
+        reviewer: { id: authority.reviewer.id, attestation: authority.reviewer.decisionAttestation },
+        decision: { outcome: "approve_for_caption_production", reasonCodes: ["reviewer_attested_caption_production_may_proceed"], note: null },
+      }), /verified queued intake/);
+      assert.deepEqual((await runtime.service.captionProductions(acknowledgement.runtimeId)).captions, []);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+});
+
+test("withheld, unknown, failed, conflict, uncovered, and citation-mismatch line identities remain null and closed", async () => {
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const original = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0].artifact;
+    const cases = [
+      ["withheld", "worker_withheld", "study_coverage_withheld"],
+      ["unknown", "unobserved_range", "study_coverage_unknown"],
+      ["failed", "operation_failed", "study_coverage_failed"],
+      ["conflict", "unresolved_conflict", "study_coverage_conflict"],
+      ["uncovered", "uncovered", "study_coverage_uncovered"],
+      ["supported", "citation_mismatch", "study_citation_mismatch"],
+    ] as const;
+    for (const [state, coverageReason, lineReason] of cases) {
+      const artifact = structuredClone(original);
+      const line = artifact.lines[0];
+      line.lineage.study.coverage.state = state;
+      line.lineage.study.coverage.reasonCode = coverageReason;
+      if (state === "uncovered") line.lineage.study.coverage.coverageId = null;
+      line.lineage.study.claimIds = [];
+      line.lineage.study.semanticCitations = [];
+      line.lineage.study.childReports = [];
+      line.source = { language: "ko", state: "withheld", text: null, reasonCode: lineReason };
+      line.target = { language: "en", state: "withheld", text: null, reasonCode: lineReason };
+      artifact.result = deriveCaptionProductionResult(artifact.lines);
+      const validated = validateCaptionProductionArtifact(artifact);
+      assert.equal(validated.lines[0].source.text, null);
+      assert.equal(validated.lines[0].target.text, null);
+      assert.equal(validated.lines[0].target.reasonCode, lineReason);
+    }
+    const mismatched = structuredClone(original);
+    mismatched.lines[0].lineage.study.semanticCitations[0].observations[0].startMs = mismatched.lines[0].endMs;
+    mismatched.lines[0].lineage.study.semanticCitations[0].observations[0].endMs = mismatched.lines[0].endMs + 1;
+    assert.throws(() => validateCaptionProductionArtifact(mismatched), /does not close supported coverage\/citations/);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("executor output outside one supported study range is nulled and independently withheld", async () => {
+  const runtime = await harness({ captionExecutor: uncoveredCurrentRunCaptionExecutor });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const result = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+    const line = result.artifact.lines[0];
+    assert.equal(line.lineage.study.coverage.state, "uncovered");
+    assert.equal(line.source.text, null);
+    assert.equal(line.target.text, null);
+    assert.equal(line.target.reasonCode, "study_coverage_uncovered");
+    const qc = (await runtime.service.captionQualityControls(approval.runtimeId)).qualityControls[0];
+    assert.equal(qc.outcome, "withheld");
+    assert.deepEqual(qc.reasonCodes, ["candidate_has_unavailable_or_withheld_lines"]);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("incomplete current-run translation is retained as unavailable and structurally withheld", async () => {
+  const runtime = await harness({ captionExecutor: incompleteCurrentRunCaptionExecutor });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const qc = (await runtime.service.captionQualityControls(approval.runtimeId)).qualityControls[0];
+    assert.equal(qc.outcome, "withheld");
+    assert.deepEqual(qc.withheldLineIds, ["line-current-run-incomplete-001"]);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("recorded caption fixtures are refused as production and never reach QC acceptance", async () => {
+  const runtime = await harness();
+  try {
+    const approval = await approved(runtime);
+    await assert.rejects(runtime.service.createCaptionProduction(approval.runtimeId, approval.request), /Recorded caption fixtures.*refused/);
+    const loaded = await journal(runtime, approval.runtimeId);
+    assert.equal(loaded.events.some((event) => event.type.startsWith("caption.production_")), false);
+    assert.deepEqual((await runtime.service.captionQualityControls(approval.runtimeId)).qualityControls, []);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("child report, study, readiness, and approval tamper each fail before caption execution", async (t) => {
+  for (const target of ["child", "study", "readiness", "approval"] as const) await t.test(target, async () => {
+    const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
+    try {
+      const approval = await approved(runtime);
+      const loaded = await journal(runtime, approval.runtimeId);
+      const study = Object.values(loaded.state.ownedMediaStudies)[0];
+      const readiness = Object.values(loaded.state.studyReadiness)[0];
+      const review = Object.values(loaded.state.publishReviewDecisions)[0];
+      const child = Object.values(loaded.state.artifacts).find((artifact) => artifact.origin.kind === "study_report")!;
+      const contentId = target === "child" ? child.content.contentId
+        : target === "study" ? study.contentId
+          : target === "readiness" ? readiness.receiptContentId
+            : review.receiptContentId!;
+      await writeFile(objectPath(runtime, approval.runtimeId, contentId), "{}\n", "utf8");
+      await assert.rejects(runtime.service.createCaptionProduction(approval.runtimeId, approval.request), /failed closed|recursive|content|lineage/i);
+      assert.equal((await journal(runtime, approval.runtimeId)).events.some((event) => event.type === "caption.production_started"), false);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+});
+
+test("caption and QC content tamper fail authenticated reads", async (t) => {
+  for (const target of ["caption", "qc"] as const) await t.test(target, async () => {
+    const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
+    try {
+      const approval = await approved(runtime);
+      const produced = await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+      const qc = (await runtime.service.captionQualityControls(approval.runtimeId)).qualityControls[0];
+      const contentId = target === "caption" ? produced.captions[0].captionContentId : qc.receiptContentId;
+      await writeFile(objectPath(runtime, approval.runtimeId, contentId), "{}\n", "utf8");
+      await assert.rejects(runtime.service.captionQualityControls(approval.runtimeId), /failed closed validation/);
+      if (target === "caption") await assert.rejects(runtime.service.captionProductionResults(approval.runtimeId), /failed closed validation/);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+});
+
+test("duplicate caption job and duplicate QC fail closed", async () => {
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
+  try {
+    const approval = await approved(runtime);
+    const produced = await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    await assert.rejects(runtime.service.createCaptionProduction(approval.runtimeId, approval.request), /already has immutable caption-production lineage/);
+    const caption = produced.captions[0];
     await assert.rejects(runtime.service.createCaptionQualityControl(approval.runtimeId, {
       candidate: {
         jobId: caption.jobId,
@@ -516,187 +454,149 @@ test.skip("caption QC rejects forged candidates and duplicate decisions", async 
       },
     }), /already has one immutable independent QC decision/);
   } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
+    await cleanup(runtime);
   }
 });
 
-test.skip("caption production fails closed when the accepted root promotion receipt is tampered", async () => {
-  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
-  try {
-    const approval = await approved(runtime);
-    const journal = await readValidatedRuntimeJournal(
-      runtime.store.paths(approval.runtimeId).journalPath,
-      approval.runtimeId,
-    );
-    const promotion = Object.values(journal.state.rootOutputDispositions)[0];
-    assert.ok(promotion);
-    const digest = promotion.receiptContentId.replace("sha256:", "");
-    await writeFile(join(
-      runtime.store.paths(approval.runtimeId).artifactStoreRoot,
-      "objects",
-      "sha256",
-      digest.slice(0, 2),
-      digest,
-    ), "{}\n", "utf8");
-    await assert.rejects(
-      runtime.service.createCaptionProduction(approval.runtimeId, approval.request),
-      /Stored caption authority or source lineage failed closed verification/,
-    );
-    await assert.rejects(
-      runtime.service.captionProductions(approval.runtimeId),
-      /failed closed validation/,
-    );
-  } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
-  }
-});
-
-test("caption production fails closed when the current run has no promoted child output", async () => {
-  const runtime = await harness({
-    captionExecutor: currentRunCaptionExecutor,
-    executionMode: "failed",
+test("revocation before, during, and after caption execution preserves exact authority state", async (t) => {
+  await t.test("before", async () => {
+    const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
+    try {
+      const approval = await approved(runtime);
+      await runtime.service.createPublishReviewRevocation(approval.runtimeId, {
+        approval: approval.request.approval,
+        reviewer: { id: approval.response.reviewer.id, attestation: approval.response.reviewer.revocationAttestation },
+        revocation: { reasonCodes: ["new_review_required"], note: null },
+      });
+      await assert.rejects(runtime.service.createCaptionProduction(approval.runtimeId, approval.request), /unrevoked approval/);
+    } finally {
+      await cleanup(runtime);
+    }
   });
-  try {
-    const acknowledgement = await runtime.service.start(runtime.request);
-    await terminal(runtime.service, acknowledgement.commandId);
-    await assert.rejects(runtime.service.createCaptionProduction(acknowledgement.runtimeId, {
-      approval: {
-        reviewId: "publish-review:missing-promotion",
-        artifactId: "artifact:missing-promotion",
-        receiptId: "publish-review-decision-receipt:missing-promotion",
-        receiptContentId: `sha256:${"a".repeat(64)}`,
+
+  await t.test("during", async () => {
+    let enteredResolve!: () => void;
+    let releaseResolve!: () => void;
+    const entered = new Promise<void>((resolvePromise) => { enteredResolve = resolvePromise; });
+    const release = new Promise<void>((resolvePromise) => { releaseResolve = resolvePromise; });
+    const gated: CaptionProductionExecutor = {
+      describe: currentRunCaptionExecutor.describe,
+      async execute(input, signal) {
+        enteredResolve();
+        await release;
+        if (signal.aborted) throw new Error("aborted");
+        return currentRunCaptionExecutor.execute(input, signal);
       },
-    }), /require one exact verified current-run promoted child output/);
-    assert.deepEqual((await runtime.service.captionProductions(acknowledgement.runtimeId)).captions, []);
-  } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
-  }
+    };
+    const runtime = await harness({ captionExecutor: gated });
+    try {
+      const approval = await approved(runtime);
+      const producing = runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+      await entered;
+      const paths = runtime.store.paths(approval.runtimeId);
+      const ledger = await RuntimeLedger.open(approval.runtimeId, new FileEventJournal(paths.journalPath));
+      await new PublishReviewHost(
+        ledger,
+        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+        { id: approval.response.reviewer.id, label: approval.response.reviewer.label },
+      ).revoke({
+        approval: approval.request.approval,
+        reviewer: { id: approval.response.reviewer.id, attestation: approval.response.reviewer.revocationAttestation },
+        revocation: { reasonCodes: ["new_review_required"], note: null },
+      });
+      releaseResolve();
+      await assert.rejects(producing, /failed closed verification|changed while caption production was running|revoked/);
+      const loaded = await journal(runtime, approval.runtimeId);
+      assert.equal(Object.values(loaded.state.captionProductions)[0].status, "failed");
+      assert.equal(Object.keys(loaded.state.captionQualityControls).length, 0);
+    } finally {
+      releaseResolve();
+      await cleanup(runtime);
+    }
+  });
+
+  await t.test("after", async () => {
+    const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
+    try {
+      const approval = await approved(runtime);
+      const produced = await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+      await runtime.service.createPublishReviewRevocation(approval.runtimeId, {
+        approval: approval.request.approval,
+        reviewer: { id: approval.response.reviewer.id, attestation: approval.response.reviewer.revocationAttestation },
+        revocation: { reasonCodes: ["new_review_required"], note: null },
+      });
+      const retained = (await runtime.service.captionProductions(approval.runtimeId)).captions[0];
+      const qc = (await runtime.service.captionQualityControls(approval.runtimeId)).qualityControls[0];
+      assert.equal(retained.authorityState, "revoked_after_completion");
+      assert.equal(retained.captionArtifactId, produced.captions[0].captionArtifactId);
+      assert.equal(qc.candidate.authorityState, "revoked_after_completion");
+    } finally {
+      await cleanup(runtime);
+    }
+  });
 });
 
-test.skip("caption production fails closed when the accepted child artifact is tampered", async () => {
-  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
-  try {
-    const approval = await approved(runtime);
-    const journal = await readValidatedRuntimeJournal(
-      runtime.store.paths(approval.runtimeId).journalPath,
-      approval.runtimeId,
-    );
-    const promotion = Object.values(journal.state.rootOutputDispositions)[0];
-    assert.ok(promotion);
-    const child = journal.state.artifacts[promotion.inputArtifactId];
-    assert.ok(child);
-    const digest = child.content.contentId.replace("sha256:", "");
-    await writeFile(join(
-      runtime.store.paths(approval.runtimeId).artifactStoreRoot,
-      "objects",
-      "sha256",
-      digest.slice(0, 2),
-      digest,
-    ), "{}\n", "utf8");
-    await assert.rejects(
-      runtime.service.createCaptionProduction(approval.runtimeId, approval.request),
-      /Stored caption authority or source lineage failed closed verification/,
-    );
-  } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
-  }
+test("caption executor failure and wall timeout record bounded failed jobs without artifacts or QC", async (t) => {
+  await t.test("failure", async () => {
+    const runtime = await harness({
+      captionExecutor: {
+        describe: currentRunCaptionExecutor.describe,
+        async execute() { throw new Error("simulated caption executor failure"); },
+      },
+    });
+    try {
+      const approval = await approved(runtime);
+      await assert.rejects(runtime.service.createCaptionProduction(approval.runtimeId, approval.request), /bounded caption executor/);
+      const loaded = await journal(runtime, approval.runtimeId);
+      assert.equal(Object.values(loaded.state.captionProductions)[0].status, "failed");
+      assert.equal(Object.keys(loaded.state.captionQualityControls).length, 0);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  await t.test("timeout", async () => {
+    const mutableLimits = CAPTION_PRODUCTION_LIMITS as unknown as { maxWallMs: number };
+    const originalWallMs = mutableLimits.maxWallMs;
+    mutableLimits.maxWallMs = 5;
+    const runtime = await harness({
+      captionExecutor: {
+        describe: currentRunCaptionExecutor.describe,
+        async execute(_input, signal) {
+          await new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }));
+          return [];
+        },
+      },
+    });
+    try {
+      const approval = await approved(runtime);
+      await assert.rejects(runtime.service.createCaptionProduction(approval.runtimeId, approval.request), /wall-time ceiling/);
+      const loaded = await journal(runtime, approval.runtimeId);
+      assert.equal(Object.values(loaded.state.captionProductions)[0].status, "failed");
+    } finally {
+      mutableLimits.maxWallMs = originalWallMs;
+      await cleanup(runtime);
+    }
+  });
 });
 
-test.skip("caption QC read fails closed when its receipt bytes are tampered", async () => {
+test("client rejects tampered verified line bytes", async () => {
   const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
   try {
     const approval = await approved(runtime);
     await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
-    const qc = (await runtime.service.captionQualityControls(approval.runtimeId)).qualityControls[0];
-    const digest = qc.receiptContentId.replace("sha256:", "");
-    await writeFile(join(
-      runtime.store.paths(approval.runtimeId).artifactStoreRoot,
-      "objects",
-      "sha256",
-      digest.slice(0, 2),
-      digest,
-    ), "{}\n", "utf8");
-    await assert.rejects(
-      runtime.service.captionQualityControls(approval.runtimeId),
-      /failed closed validation/,
-    );
-  } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
-  }
-});
-
-test.skip("revocation blocks new starts and later revocation supersedes authority without deleting prior artifacts", async () => {
-  const blocked = await harness();
-  try {
-    const approval = await approved(blocked);
-    await blocked.service.createPublishReviewRevocation(approval.runtimeId, {
-      approval: approval.request.approval,
-      reviewer: {
-        id: approval.response.reviewer.id,
-        attestation: approval.response.reviewer.revocationAttestation,
-      },
-      revocation: { reasonCodes: ["new_review_required"], note: null },
+    const results = await runtime.service.captionProductionResults(approval.runtimeId);
+    const tampered = structuredClone(results);
+    tampered.results[0].artifact.lines[0].target.text = "tampered";
+    const client = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "caption-test-token",
+      fetch: async () => new Response(JSON.stringify(tampered), { status: 200, headers: { "Content-Type": "application/json" } }),
     });
-    await assert.rejects(
-      blocked.service.createCaptionProduction(approval.runtimeId, approval.request),
-      /exact recursively verified unrevoked approval/,
-    );
-    assert.deepEqual((await blocked.service.captionProductions(approval.runtimeId)).captions, []);
-    assert.deepEqual((await blocked.service.captionProductionResults(approval.runtimeId)).results, []);
+    await assert.rejects(client.captionProductionResults(approval.runtimeId), /artifact bytes do not match/);
+    const digest = results.results[0].verification.captionContentId.replace("sha256:", "");
+    assert.ok((await readFile(join(runtime.store.paths(approval.runtimeId).artifactStoreRoot, "objects", "sha256", digest.slice(0, 2), digest))).byteLength > 0);
   } finally {
-    await rm(blocked.directory, { recursive: true, force: true });
-  }
-
-  const completed = await harness();
-  try {
-    const approval = await approved(completed);
-    const produced = await completed.service.createCaptionProduction(approval.runtimeId, approval.request);
-    const identities = produced.captions[0];
-    await completed.service.createPublishReviewRevocation(approval.runtimeId, {
-      approval: approval.request.approval,
-      reviewer: {
-        id: approval.response.reviewer.id,
-        attestation: approval.response.reviewer.revocationAttestation,
-      },
-      revocation: { reasonCodes: ["new_review_required"], note: null },
-    });
-    const retained = (await completed.service.captionProductions(approval.runtimeId)).captions[0];
-    const retainedResult = (await completed.service.captionProductionResults(approval.runtimeId)).results[0];
-    assert.equal(retained.authorityState, "revoked_after_completion");
-    assert.equal(retainedResult.verification.authorityState, "revoked_after_completion");
-    assert.equal(retained.captionArtifactId, identities.captionArtifactId);
-    assert.equal(retained.receiptArtifactId, identities.receiptArtifactId);
-  } finally {
-    await rm(completed.directory, { recursive: true, force: true });
-  }
-});
-
-test.skip("caption read fails closed when content-addressed timed output is tampered", async () => {
-  const runtime = await harness();
-  try {
-    const approval = await approved(runtime);
-    const produced = await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
-    const digest = produced.captions[0].captionContentId.replace("sha256:", "");
-    await writeFile(join(
-      runtime.store.paths(approval.runtimeId).artifactStoreRoot,
-      "objects",
-      "sha256",
-      digest.slice(0, 2),
-      digest,
-    ), "{}\n", "utf8");
-    await assert.rejects(
-      runtime.service.captionProductions(approval.runtimeId),
-      /failed closed validation/,
-    );
-    await assert.rejects(
-      runtime.service.captionProductionResults(approval.runtimeId),
-      /failed closed validation/,
-    );
-    await assert.rejects(
-      runtime.service.captionQualityControls(approval.runtimeId),
-      /failed closed validation/,
-    );
-  } finally {
-    await rm(runtime.directory, { recursive: true, force: true });
+    await cleanup(runtime);
   }
 });

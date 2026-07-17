@@ -188,13 +188,15 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
           artifact.origin.approvalReviewId === job.approvalReviewId &&
           artifact.origin.approvalArtifactId === job.approvalArtifactId &&
           artifact.origin.sourceArtifactId === job.sourceArtifactId &&
-          artifact.origin.acceptedChildArtifactId === job.acceptedChildOutput.artifactId &&
-          artifact.origin.rootPromotionArtifactId === job.rootPromotion.artifactId &&
+          artifact.origin.studyId === job.study.studyId &&
+          artifact.origin.studyArtifactId === job.study.artifactId &&
+          artifact.origin.readinessId === job.readiness.readinessId &&
+          artifact.origin.readinessArtifactId === job.readiness.artifactId &&
           artifact.content.contentId !== artifact.origin.receiptContentId &&
           JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([
             job.sourceArtifactId,
-            job.acceptedChildOutput.artifactId,
-            job.rootPromotion.artifactId,
+            job.study.artifactId,
+            job.readiness.artifactId,
             job.approvalArtifactId,
           ]),
         event,
@@ -211,10 +213,14 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
           caption.content.contentId === artifact.origin.captionContentId &&
           artifact.origin.approvalReviewId === job.approvalReviewId &&
           artifact.origin.approvalArtifactId === job.approvalArtifactId &&
-          artifact.origin.rootPromotionArtifactId === job.rootPromotion.artifactId &&
+          artifact.origin.studyId === job.study.studyId &&
+          artifact.origin.studyArtifactId === job.study.artifactId &&
+          artifact.origin.readinessId === job.readiness.readinessId &&
+          artifact.origin.readinessArtifactId === job.readiness.artifactId &&
           JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([
             caption.id,
-            job.rootPromotion.artifactId,
+            job.study.artifactId,
+            job.readiness.artifactId,
             job.approvalArtifactId,
           ]),
         event,
@@ -230,13 +236,18 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
           caption.id === job.captionArtifactId &&
           caption.content.contentId === artifact.origin.captionContentId &&
           artifact.origin.captionContentId === job.captionContentId &&
+          artifact.origin.studyId === job.study.studyId &&
+          artifact.origin.readinessId === job.readiness.readinessId &&
+          artifact.origin.approvalReviewId === job.approvalReviewId &&
           artifact.content.contentId === artifact.origin.receiptContentId &&
           JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([
             caption.id,
-            job.rootPromotion.artifactId,
+            job.study.artifactId,
+            job.readiness.artifactId,
+            job.approvalArtifactId,
           ]),
         event,
-        `artifact ${artifact.id} changed its caption candidate or current-run promotion lineage`,
+        `artifact ${artifact.id} changed its caption candidate or study/approval lineage`,
       );
     }
     next.artifacts[artifact.id] = artifact;

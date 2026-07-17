@@ -15,6 +15,36 @@ import {
   string,
 } from "./responseGuards.ts";
 
+function studyIdentity(value: unknown, path: string) {
+  const item = object(value, path);
+  exact(item, ["studyId", "artifactId", "contentId", "executorReceiptId", "executorReceiptContentId"], path);
+  return {
+    studyId: identity(item.studyId, `${path}.studyId`),
+    artifactId: identity(item.artifactId, `${path}.artifactId`),
+    contentId: contentId(item.contentId, `${path}.contentId`),
+    executorReceiptId: identity(item.executorReceiptId, `${path}.executorReceiptId`),
+    executorReceiptContentId: contentId(item.executorReceiptContentId, `${path}.executorReceiptContentId`),
+  };
+}
+
+function readinessIdentity(value: unknown, path: string) {
+  const item = object(value, path);
+  exact(item, ["readinessId", "artifactId", "receiptId", "receiptContentId"], path);
+  return {
+    readinessId: identity(item.readinessId, `${path}.readinessId`),
+    artifactId: identity(item.artifactId, `${path}.artifactId`),
+    receiptId: identity(item.receiptId, `${path}.receiptId`),
+    receiptContentId: contentId(item.receiptContentId, `${path}.receiptContentId`),
+  };
+}
+
+function identityArray(value: unknown, path: string): string[] {
+  if (!Array.isArray(value)) fail(path, "must be an array.");
+  const ids = value.map((entry, index) => identity(entry, `${path}[${index}]`));
+  if (new Set(ids).size !== ids.length) fail(path, "contains duplicate identities.");
+  return ids;
+}
+
 export function captionProductionResponse(
   value: unknown,
   expectedRuntimeId: string,
@@ -34,6 +64,10 @@ export function captionProductionResponse(
     exact(caption, [
       "jobId",
       "approval",
+      "source",
+      "study",
+      "readiness",
+      "reopened",
       "authorityState",
       "integrity",
       "captionArtifactId",
@@ -60,17 +94,46 @@ export function captionProductionResponse(
     if (caption.authorityState !== "unrevoked" && caption.authorityState !== "revoked_after_completion") {
       fail(`${captionContext}.authorityState`, "is unsupported.");
     }
-    if (caption.integrity !== "stored_caption_and_receipt_with_verified_approval") {
+    if (caption.integrity !== "stored_caption_and_receipt_with_verified_study_readiness_approval") {
       fail(`${captionContext}.integrity`, "does not carry closed caption verification.");
     }
+    const source = object(caption.source, `${captionContext}.source`);
+    exact(source, ["artifactId", "contentId", "analysisRequestId", "range"], `${captionContext}.source`);
+    const sourceRange = object(source.range, `${captionContext}.source.range`);
+    exact(sourceRange, ["startMs", "endMs"], `${captionContext}.source.range`);
+    const sourceValue = {
+      artifactId: identity(source.artifactId, `${captionContext}.source.artifactId`),
+      contentId: contentId(source.contentId, `${captionContext}.source.contentId`),
+      analysisRequestId: identity(source.analysisRequestId, `${captionContext}.source.analysisRequestId`),
+      range: {
+        startMs: integer(sourceRange.startMs, `${captionContext}.source.range.startMs`),
+        endMs: integer(sourceRange.endMs, `${captionContext}.source.range.endMs`),
+      },
+    };
+    if (sourceValue.range.endMs <= sourceValue.range.startMs) fail(`${captionContext}.source.range`, "must be non-empty.");
+    const study = studyIdentity(caption.study, `${captionContext}.study`);
+    const readiness = readinessIdentity(caption.readiness, `${captionContext}.readiness`);
+    const reopened = object(caption.reopened, `${captionContext}.reopened`);
+    exact(reopened, ["sourceArtifactIds", "semanticEvidenceArtifactIds", "reportArtifactIds", "admissionIds", "planningDecisionIds", "executorIds"], `${captionContext}.reopened`);
+    const reopenedValue = {
+      sourceArtifactIds: identityArray(reopened.sourceArtifactIds, `${captionContext}.reopened.sourceArtifactIds`),
+      semanticEvidenceArtifactIds: identityArray(reopened.semanticEvidenceArtifactIds, `${captionContext}.reopened.semanticEvidenceArtifactIds`),
+      reportArtifactIds: identityArray(reopened.reportArtifactIds, `${captionContext}.reopened.reportArtifactIds`),
+      admissionIds: identityArray(reopened.admissionIds, `${captionContext}.reopened.admissionIds`),
+      planningDecisionIds: identityArray(reopened.planningDecisionIds, `${captionContext}.reopened.planningDecisionIds`),
+      executorIds: identityArray(reopened.executorIds, `${captionContext}.reopened.executorIds`),
+    };
+    if (!reopenedValue.sourceArtifactIds.includes(sourceValue.artifactId)) fail(`${captionContext}.reopened`, "omits the caption source.");
     const executor = object(caption.executor, `${captionContext}.executor`);
     exact(executor, ["id", "version", "classification", "executionScope", "cognitionClaim", "recognizer", "translator", "sourceCaptionContentId"], `${captionContext}.executor`);
     if (executor.version !== "1") fail(`${captionContext}.executor.version`, "is unsupported.");
     if (
       (executor.classification === "recorded_real_pipeline_fixture" && executor.id !== "studio.recorded-caption-fixture-adapter") ||
+      (executor.classification === "deterministic_current_run_test_seam" && executor.id !== "studio.deterministic-current-run-caption-test-seam") ||
       (executor.classification === "real_recognizer_translator" && executor.id !== "studio.openai-caption-producer") ||
-      (executor.classification !== "recorded_real_pipeline_fixture" && executor.classification !== "real_recognizer_translator") ||
+      (executor.classification !== "recorded_real_pipeline_fixture" && executor.classification !== "deterministic_current_run_test_seam" && executor.classification !== "real_recognizer_translator") ||
       (executor.classification === "recorded_real_pipeline_fixture" && executor.executionScope !== "test_demo_only") ||
+      (executor.classification === "deterministic_current_run_test_seam" && executor.executionScope !== "current_run") ||
       (executor.classification === "real_recognizer_translator" && executor.executionScope !== "current_run") ||
       executor.cognitionClaim !== "none"
     ) fail(`${captionContext}.executor`, "identity and classification do not agree.");
@@ -103,17 +166,21 @@ export function captionProductionResponse(
     return {
       jobId,
       approval: approvalValue,
+      source: sourceValue,
+      study,
+      readiness,
+      reopened: reopenedValue,
       authorityState: caption.authorityState as "unrevoked" | "revoked_after_completion",
-      integrity: "stored_caption_and_receipt_with_verified_approval" as const,
+      integrity: "stored_caption_and_receipt_with_verified_study_readiness_approval" as const,
       captionArtifactId: identity(caption.captionArtifactId, `${captionContext}.captionArtifactId`),
       captionContentId: contentId(caption.captionContentId, `${captionContext}.captionContentId`),
       receiptArtifactId: identity(caption.receiptArtifactId, `${captionContext}.receiptArtifactId`),
       receiptId: identity(caption.receiptId, `${captionContext}.receiptId`),
       receiptContentId: contentId(caption.receiptContentId, `${captionContext}.receiptContentId`),
       executor: {
-        id: executor.id as "studio.recorded-caption-fixture-adapter" | "studio.openai-caption-producer",
+        id: executor.id as "studio.recorded-caption-fixture-adapter" | "studio.deterministic-current-run-caption-test-seam" | "studio.openai-caption-producer",
         version: "1" as const,
-        classification: executor.classification as "recorded_real_pipeline_fixture" | "real_recognizer_translator",
+        classification: executor.classification as "recorded_real_pipeline_fixture" | "deterministic_current_run_test_seam" | "real_recognizer_translator",
         executionScope: executor.executionScope as "test_demo_only" | "current_run",
         cognitionClaim: "none" as const,
         recognizer,
@@ -177,6 +244,12 @@ export async function captionProductionResultsResponse(
       artifact.runId !== runtimeId ||
       artifact.jobId !== verification.jobId ||
       JSON.stringify(artifact.executor) !== JSON.stringify(verification.executor) ||
+      JSON.stringify(artifact.input.study) !== JSON.stringify(verification.study) ||
+      JSON.stringify(artifact.input.readiness) !== JSON.stringify(verification.readiness) ||
+      artifact.input.sourceArtifactId !== verification.source.artifactId ||
+      artifact.input.sourceContentId !== verification.source.contentId ||
+      artifact.input.analysisRequestId !== verification.source.analysisRequestId ||
+      JSON.stringify(artifact.input.range) !== JSON.stringify(verification.source.range) ||
       JSON.stringify(artifact.result) !== JSON.stringify(verification.result)
     ) {
       fail(resultContext, "verified identities, executor, or result counts do not match the artifact.");
@@ -215,6 +288,7 @@ export function captionQualityControlResponse(
       "qcId", "jobId", "captionArtifactId", "captionContentId", "outputArtifactId",
       "receiptId", "receiptContentId", "integrity", "policy", "outcome", "reasonCodes",
       "acceptedLineIds", "withheldLineIds",
+      "candidate",
     ], qcContext);
     const qcId = identity(qc.qcId, `${qcContext}.qcId`);
     if (qcIds.has(qcId)) fail(`${qcContext}.qcId`, "is duplicated.");
@@ -254,6 +328,18 @@ export function captionQualityControlResponse(
       (qc.outcome === "accepted" && (reasonCode !== "current_run_candidate_structurally_complete" || acceptedLineIds.length === 0 || withheldLineIds.length > 0)) ||
       (qc.outcome === "withheld" && reasonCode === "current_run_candidate_structurally_complete")
     ) fail(qcContext, "outcome, reason, and line decisions do not agree.");
+    const candidateVerification = captionProductionResponse({
+      schema: "studio.local-runtime-caption-productions.v1",
+      commandId: item.commandId,
+      runtimeId,
+      journalHead: item.journalHead,
+      captions: [qc.candidate],
+    }, runtimeId).captions[0];
+    if (
+      candidateVerification.jobId !== qc.jobId ||
+      candidateVerification.captionArtifactId !== qc.captionArtifactId ||
+      candidateVerification.captionContentId !== qc.captionContentId
+    ) fail(`${qcContext}.candidate`, "does not match the QC candidate identity.");
     return {
       qcId,
       jobId: identity(qc.jobId, `${qcContext}.jobId`),
@@ -268,6 +354,7 @@ export function captionQualityControlResponse(
       reasonCodes: [reasonCode as "current_run_candidate_structurally_complete" | "recorded_fixture_test_demo_only" | "candidate_has_unavailable_or_withheld_lines" | "candidate_has_no_lines"],
       acceptedLineIds,
       withheldLineIds,
+      candidate: candidateVerification,
     };
   });
   return {

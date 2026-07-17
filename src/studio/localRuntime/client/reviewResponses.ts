@@ -171,6 +171,7 @@ export function publishReviewDecisionResponse(
       "integrity",
       "producer",
       "intake",
+      "readiness",
       "reviewer",
       "outcome",
       "reasonCodes",
@@ -190,6 +191,14 @@ export function publishReviewDecisionResponse(
     const intakeId = identity(intakeValue.intakeId, `${reviewContext}.intake.intakeId`);
     if (intakeIds.has(intakeId)) fail(`${reviewContext}.intake.intakeId`, "already has a review.");
     intakeIds.add(intakeId);
+    const readinessValue = object(review.readiness, `${reviewContext}.readiness`);
+    exact(readinessValue, ["readinessId", "artifactId", "receiptId", "receiptContentId"], `${reviewContext}.readiness`);
+    const readiness = {
+      readinessId: identity(readinessValue.readinessId, `${reviewContext}.readiness.readinessId`),
+      artifactId: identity(readinessValue.artifactId, `${reviewContext}.readiness.artifactId`),
+      receiptId: identity(readinessValue.receiptId, `${reviewContext}.readiness.receiptId`),
+      receiptContentId: contentId(readinessValue.receiptContentId, `${reviewContext}.readiness.receiptContentId`),
+    };
     const reviewReviewer = object(review.reviewer, `${reviewContext}.reviewer`);
     exact(reviewReviewer, ["id", "label", "attestation"], `${reviewContext}.reviewer`);
     if (
@@ -298,6 +307,7 @@ export function publishReviewDecisionResponse(
         receiptId: identity(intakeValue.receiptId, `${reviewContext}.intake.receiptId`),
         receiptContentId: contentId(intakeValue.receiptContentId, `${reviewContext}.intake.receiptContentId`),
       },
+      readiness,
       reviewer: {
         id: reviewer.id,
         label: reviewer.label,

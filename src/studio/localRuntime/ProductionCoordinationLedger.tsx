@@ -289,8 +289,8 @@ export default function ProductionCoordinationLedger({
                     </p>
                     <div className="processing-caption-lineage" aria-label="Caption candidate receipt lineage">
                       <span><b>Source</b>{identity(caption.sourceArtifactId)}<small>{identity(caption.sourceContentId)}</small></span>
-                      <span><b>Accepted child output</b>{identity(caption.acceptedChildOutput.artifactId)}<small>{identity(caption.acceptedChildOutput.contentId)}</small></span>
-                      <span><b>Root promotion</b>{identity(caption.rootPromotion.dispositionId)}<small>{identity(caption.rootPromotion.receiptId)}</small></span>
+                      <span><b>Owned study</b>{identity(caption.study.studyId)}<small>{identity(caption.study.contentId)}</small></span>
+                      <span><b>Study readiness</b>{identity(caption.readiness.readinessId)}<small>{identity(caption.readiness.receiptId)}</small></span>
                       <span><b>Caption candidate</b>{identity(caption.captionArtifactId)}<small>{identity(caption.captionContentId)}</small></span>
                       <span><b>Independent QC</b>{identity(qc?.receiptId ?? null)}<small>{identity(qc?.receiptContentId ?? null)}</small></span>
                     </div>

@@ -624,7 +624,7 @@ export function validateRuntimeArtifact(
   } else if (kind === "caption_production_output") {
     exact(
       origin,
-      ["kind", "jobId", "receiptId", "receiptContentId", "approvalReviewId", "approvalArtifactId", "sourceArtifactId", "acceptedChildArtifactId", "rootPromotionArtifactId"],
+      ["kind", "jobId", "receiptId", "receiptContentId", "approvalReviewId", "approvalArtifactId", "sourceArtifactId", "studyId", "studyArtifactId", "readinessId", "readinessArtifactId"],
       context,
       `${path}.origin`,
     );
@@ -634,8 +634,10 @@ export function validateRuntimeArtifact(
     string(origin.approvalReviewId, context, `${path}.origin.approvalReviewId`);
     const approvalArtifactId = string(origin.approvalArtifactId, context, `${path}.origin.approvalArtifactId`);
     const sourceArtifactId = string(origin.sourceArtifactId, context, `${path}.origin.sourceArtifactId`);
-    const acceptedChildArtifactId = string(origin.acceptedChildArtifactId, context, `${path}.origin.acceptedChildArtifactId`);
-    const rootPromotionArtifactId = string(origin.rootPromotionArtifactId, context, `${path}.origin.rootPromotionArtifactId`);
+    string(origin.studyId, context, `${path}.origin.studyId`);
+    const studyArtifactId = string(origin.studyArtifactId, context, `${path}.origin.studyArtifactId`);
+    string(origin.readinessId, context, `${path}.origin.readinessId`);
+    const readinessArtifactId = string(origin.readinessArtifactId, context, `${path}.origin.readinessArtifactId`);
     if (
       mediaClass !== "non_media" ||
       item.publication !== "private" ||
@@ -643,14 +645,14 @@ export function validateRuntimeArtifact(
       (item.tracks as unknown[]).length !== 0 ||
       task !== null ||
       agent !== null ||
-      JSON.stringify(sources) !== JSON.stringify([sourceArtifactId, acceptedChildArtifactId, rootPromotionArtifactId, approvalArtifactId])
+      JSON.stringify(sources) !== JSON.stringify([sourceArtifactId, studyArtifactId, readinessArtifactId, approvalArtifactId])
     ) {
       fail(context, path, "caption output must be a private host-produced artifact over exact source and approval lineage");
     }
   } else if (kind === "caption_production_receipt") {
     exact(
       origin,
-      ["kind", "jobId", "receiptId", "receiptContentId", "approvalReviewId", "approvalArtifactId", "captionArtifactId", "captionContentId", "rootPromotionArtifactId"],
+      ["kind", "jobId", "receiptId", "receiptContentId", "approvalReviewId", "approvalArtifactId", "captionArtifactId", "captionContentId", "studyId", "studyArtifactId", "readinessId", "readinessArtifactId"],
       context,
       `${path}.origin`,
     );
@@ -661,7 +663,10 @@ export function validateRuntimeArtifact(
     const approvalArtifactId = string(origin.approvalArtifactId, context, `${path}.origin.approvalArtifactId`);
     const captionArtifactId = string(origin.captionArtifactId, context, `${path}.origin.captionArtifactId`);
     contentId(origin.captionContentId, context, `${path}.origin.captionContentId`);
-    const rootPromotionArtifactId = string(origin.rootPromotionArtifactId, context, `${path}.origin.rootPromotionArtifactId`);
+    string(origin.studyId, context, `${path}.origin.studyId`);
+    const studyArtifactId = string(origin.studyArtifactId, context, `${path}.origin.studyArtifactId`);
+    string(origin.readinessId, context, `${path}.origin.readinessId`);
+    const readinessArtifactId = string(origin.readinessArtifactId, context, `${path}.origin.readinessArtifactId`);
     if (
       mediaClass !== "non_media" ||
       item.publication !== "private" ||
@@ -669,7 +674,7 @@ export function validateRuntimeArtifact(
       (item.tracks as unknown[]).length !== 0 ||
       task !== null ||
       agent !== null ||
-      JSON.stringify(sources) !== JSON.stringify([captionArtifactId, rootPromotionArtifactId, approvalArtifactId]) ||
+      JSON.stringify(sources) !== JSON.stringify([captionArtifactId, studyArtifactId, readinessArtifactId, approvalArtifactId]) ||
       receiptContentId !== (item.content as { contentId: string }).contentId
     ) {
       fail(context, path, "caption receipts must be private content-addressed lineage over caption output and approval");
@@ -677,7 +682,7 @@ export function validateRuntimeArtifact(
   } else if (kind === "caption_quality_control") {
     exact(
       origin,
-      ["kind", "qcId", "jobId", "captionArtifactId", "captionContentId", "receiptId", "receiptContentId", "outcome"],
+      ["kind", "qcId", "jobId", "captionArtifactId", "captionContentId", "studyId", "readinessId", "approvalReviewId", "receiptId", "receiptContentId", "outcome"],
       context,
       `${path}.origin`,
     );
@@ -685,6 +690,9 @@ export function validateRuntimeArtifact(
     string(origin.jobId, context, `${path}.origin.jobId`);
     const captionArtifactId = string(origin.captionArtifactId, context, `${path}.origin.captionArtifactId`);
     contentId(origin.captionContentId, context, `${path}.origin.captionContentId`);
+    string(origin.studyId, context, `${path}.origin.studyId`);
+    string(origin.readinessId, context, `${path}.origin.readinessId`);
+    string(origin.approvalReviewId, context, `${path}.origin.approvalReviewId`);
     string(origin.receiptId, context, `${path}.origin.receiptId`);
     const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
     oneOf(origin.outcome, new Set(["accepted", "withheld"]), context, `${path}.origin.outcome`);
@@ -695,11 +703,11 @@ export function validateRuntimeArtifact(
       (item.tracks as unknown[]).length !== 0 ||
       task !== null ||
       agent !== null ||
-      sources.length !== 2 ||
+      sources.length !== 4 ||
       sources[0] !== captionArtifactId ||
       receiptContentId !== (item.content as { contentId: string }).contentId
     ) {
-      fail(context, path, "caption QC must be a private independent receipt over one caption candidate and its root promotion");
+      fail(context, path, "caption QC must be a private independent receipt over one caption candidate and its study/approval lineage");
     }
   } else {
     fail(context, `${path}.origin.kind`, `has unknown value ${kind}`);

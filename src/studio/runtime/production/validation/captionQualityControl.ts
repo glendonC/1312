@@ -14,9 +14,12 @@ import {
   string,
 } from "./primitives.ts";
 import {
+  validateCaptionStudyIdentity,
   validateCaptionExecutorDescriptor,
   validateCaptionProductionInput,
 } from "./captionProduction.ts";
+import { validatePublishReviewDecisionReceiptIdentity } from "./publishReviewDecision.ts";
+import { validateStudyReadinessReceiptIdentity } from "./publishReview.ts";
 
 const OUTCOMES = new Set(["accepted", "withheld"]);
 const REASONS = new Set<CaptionQualityControlReasonCode>([
@@ -66,7 +69,7 @@ export function validateCaptionQualityControlReceipt(
   exact(item, ["schema", "receiptId", "qcId", "input", "lineage", "producer", "decision"], context, path);
   literal(item.schema, "studio.caption-quality-control.receipt.v1", context, `${path}.schema`);
   const lineage = object(item.lineage, context, `${path}.lineage`);
-  exact(lineage, ["candidateInput", "executor"], context, `${path}.lineage`);
+  exact(lineage, ["candidateInput", "executor", "study", "readiness", "approval"], context, `${path}.lineage`);
   const executor = validateCaptionExecutorDescriptor(lineage.executor, context, `${path}.lineage.executor`);
   const producer = object(item.producer, context, `${path}.producer`);
   exact(producer, ["id", "version", "independence", "policy"], context, `${path}.producer`);
@@ -118,6 +121,9 @@ export function validateCaptionQualityControlReceipt(
     lineage: {
       candidateInput: validateCaptionProductionInput(lineage.candidateInput, context, `${path}.lineage.candidateInput`),
       executor,
+      study: validateCaptionStudyIdentity(lineage.study, context, `${path}.lineage.study`),
+      readiness: validateStudyReadinessReceiptIdentity(lineage.readiness, context, `${path}.lineage.readiness`),
+      approval: validatePublishReviewDecisionReceiptIdentity(lineage.approval, context, `${path}.lineage.approval`),
     },
     producer: {
       id: "studio.host-caption-quality-control",

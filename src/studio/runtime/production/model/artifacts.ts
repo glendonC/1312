@@ -175,8 +175,10 @@ export interface CaptionProductionOutputArtifactOrigin {
   approvalReviewId: string;
   approvalArtifactId: string;
   sourceArtifactId: string;
-  acceptedChildArtifactId: string;
-  rootPromotionArtifactId: string;
+  studyId: string;
+  studyArtifactId: string;
+  readinessId: string;
+  readinessArtifactId: string;
 }
 
 export interface CaptionProductionReceiptArtifactOrigin {
@@ -188,7 +190,10 @@ export interface CaptionProductionReceiptArtifactOrigin {
   approvalArtifactId: string;
   captionArtifactId: string;
   captionContentId: string;
-  rootPromotionArtifactId: string;
+  studyId: string;
+  studyArtifactId: string;
+  readinessId: string;
+  readinessArtifactId: string;
 }
 
 export interface CaptionQualityControlArtifactOrigin {
@@ -197,6 +202,9 @@ export interface CaptionQualityControlArtifactOrigin {
   jobId: string;
   captionArtifactId: string;
   captionContentId: string;
+  studyId: string;
+  readinessId: string;
+  approvalReviewId: string;
   receiptId: string;
   receiptContentId: string;
   outcome: "accepted" | "withheld";

@@ -707,6 +707,12 @@ test("browser client validates the host reviewer, immutable review receipt, and 
           receiptId: "publish-review-intake-receipt:fixture",
           receiptContentId: INTAKE_CONTENT,
         },
+        readiness: {
+          readinessId: "study-readiness:fixture",
+          artifactId: "artifact:study-readiness:fixture",
+          receiptId: "study-readiness-receipt:fixture",
+          receiptContentId: DECISION_CONTENT,
+        },
         reviewer: {
           id: "reviewer:local-fixture",
           label: "Local fixture reviewer",
@@ -767,6 +773,12 @@ test("browser client rejects caller-forged reviewer identity in a purported veri
           artifactId: "artifact:publish-review-intake:fixture",
           receiptId: "publish-review-intake-receipt:fixture",
           receiptContentId: INTAKE_CONTENT,
+        },
+        readiness: {
+          readinessId: "study-readiness:fixture",
+          artifactId: "artifact:study-readiness:fixture",
+          receiptId: "study-readiness-receipt:fixture",
+          receiptContentId: DECISION_CONTENT,
         },
         reviewer: {
           id: "reviewer:forged",

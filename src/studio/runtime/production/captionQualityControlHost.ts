@@ -85,7 +85,13 @@ export class CaptionQualityControlHost {
 
     const testDemoOnly = candidate.artifact.executor.executionScope === "test_demo_only";
     const lines = candidate.artifact.lines.map((line) => {
-      const complete = !testDemoOnly && line.source.state === "available" && line.target.state === "available";
+      const complete = !testDemoOnly &&
+        line.lineage.study.coverage.state === "supported" &&
+        line.lineage.study.coverage.reasonCode === null &&
+        line.lineage.study.claimIds.length > 0 &&
+        line.lineage.study.semanticCitations.length > 0 &&
+        line.lineage.study.childReports.length > 0 &&
+        line.source.state === "available" && line.target.state === "available";
       const reasonCode: CaptionQualityControlReasonCode = testDemoOnly
         ? "recorded_fixture_test_demo_only"
         : complete
@@ -113,6 +119,9 @@ export class CaptionQualityControlHost {
       lineage: {
         candidateInput: structuredClone(candidate.artifact.input),
         executor: structuredClone(candidate.artifact.executor),
+        study: structuredClone(candidate.artifact.input.study),
+        readiness: structuredClone(candidate.artifact.input.readiness),
+        approval: structuredClone(candidate.artifact.lines[0]?.lineage.approval ?? candidate.verification.approval),
       },
       producer: {
         id: "studio.host-caption-quality-control" as const,

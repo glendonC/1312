@@ -157,6 +157,17 @@ export class RuntimeLedger {
     return this.journal.readAll();
   }
 
+  /** Replays journal entries appended by another authenticated host before a long-running job resumes. */
+  async refresh(): Promise<RuntimeProjection> {
+    await this.tail;
+    const events = await this.journal.readAll();
+    this.projection = projectRuntimeEvents(this.runId, events);
+    this.lastRecordedAtMs = events.length > 0
+      ? Date.parse(events[events.length - 1].recordedAt)
+      : Number.NEGATIVE_INFINITY;
+    return this.state();
+  }
+
   transact<T>(
     options: TransactionOptions,
     build: (context: TransactionContext) => { pending: PendingRuntimeEvent[]; result: T },

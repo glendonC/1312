@@ -1025,8 +1025,8 @@ export class ContentAddressedArtifactStore {
       tracks: [],
       sourceArtifactIds: [
         input.caption.input.sourceArtifactId,
-        input.caption.input.acceptedChildOutput.artifactId,
-        input.caption.input.rootPromotion.artifactId,
+        input.caption.input.study.artifactId,
+        input.caption.input.readiness.artifactId,
         approval.artifactId,
       ],
       producerTaskId: null,
@@ -1039,8 +1039,10 @@ export class ContentAddressedArtifactStore {
         approvalReviewId: approval.reviewId,
         approvalArtifactId: approval.artifactId,
         sourceArtifactId: input.caption.input.sourceArtifactId,
-        acceptedChildArtifactId: input.caption.input.acceptedChildOutput.artifactId,
-        rootPromotionArtifactId: input.caption.input.rootPromotion.artifactId,
+        studyId: input.caption.input.study.studyId,
+        studyArtifactId: input.caption.input.study.artifactId,
+        readinessId: input.caption.input.readiness.readinessId,
+        readinessArtifactId: input.caption.input.readiness.artifactId,
       },
     };
     const receiptArtifact: RuntimeArtifact = {
@@ -1059,7 +1061,12 @@ export class ContentAddressedArtifactStore {
       storageKey: input.storedReceipt.storageKey,
       durationMs: null,
       tracks: [],
-      sourceArtifactIds: [captionArtifact.id, input.caption.input.rootPromotion.artifactId, approval.artifactId],
+      sourceArtifactIds: [
+        captionArtifact.id,
+        input.caption.input.study.artifactId,
+        input.caption.input.readiness.artifactId,
+        approval.artifactId,
+      ],
       producerTaskId: null,
       producerAgentId: null,
       origin: {
@@ -1071,7 +1078,10 @@ export class ContentAddressedArtifactStore {
         approvalArtifactId: approval.artifactId,
         captionArtifactId: captionArtifact.id,
         captionContentId: captionArtifact.content.contentId,
-        rootPromotionArtifactId: input.caption.input.rootPromotion.artifactId,
+        studyId: input.caption.input.study.studyId,
+        studyArtifactId: input.caption.input.study.artifactId,
+        readinessId: input.caption.input.readiness.readinessId,
+        readinessArtifactId: input.caption.input.readiness.artifactId,
       },
     };
     assertRuntimeArtifact(captionArtifact);
@@ -1104,7 +1114,9 @@ export class ContentAddressedArtifactStore {
       tracks: [],
       sourceArtifactIds: [
         input.receipt.input.captionArtifactId,
-        input.receipt.lineage.candidateInput.rootPromotion.artifactId,
+        input.receipt.lineage.study.artifactId,
+        input.receipt.lineage.readiness.artifactId,
+        input.receipt.lineage.approval.artifactId,
       ],
       producerTaskId: null,
       producerAgentId: null,
@@ -1114,6 +1126,9 @@ export class ContentAddressedArtifactStore {
         jobId: input.receipt.input.jobId,
         captionArtifactId: input.receipt.input.captionArtifactId,
         captionContentId: input.receipt.input.captionContentId,
+        studyId: input.receipt.lineage.study.studyId,
+        readinessId: input.receipt.lineage.readiness.readinessId,
+        approvalReviewId: input.receipt.lineage.approval.reviewId,
         receiptId: input.receipt.receiptId,
         receiptContentId: input.storedReceipt.content.contentId,
         outcome: input.receipt.decision.outcome,

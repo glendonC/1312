@@ -1440,7 +1440,7 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     assert.equal(createCaptions.status, 409);
     assert.match(
       JSON.stringify(await createCaptions.json()),
-      /verified current-run promoted child output/,
+      /Recorded caption fixtures cannot consume current-run study authority and are refused for production/,
     );
     assert.deepEqual(
       (await (await fetch(

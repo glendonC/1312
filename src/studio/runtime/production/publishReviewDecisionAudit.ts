@@ -14,6 +14,7 @@ import type {
   PublishReviewRevocationReasonCode,
   PublishReviewRevocationReceipt,
   RuntimeProjection,
+  StudyReadinessReceiptIdentity,
 } from "./model.ts";
 import { reopenPublishReviewIntakes } from "./publishReviewIntakeAudit.ts";
 import type { RuntimeEvent } from "./protocol.ts";
@@ -44,6 +45,7 @@ export interface PublishReviewDecisionVerification {
   integrity: "stored_review_and_verified_queued_intake";
   producer: "host_publish_review_v1";
   intake: PublishReviewIntakeReceiptIdentity;
+  readiness: StudyReadinessReceiptIdentity;
   reviewer: PublishReviewOperator & { attestation: string };
   outcome: PublishReviewDecisionOutcome;
   reasonCodes: PublishReviewDecisionReasonCode[];
@@ -192,6 +194,7 @@ export async function reopenPublishReviewDecisions(
       integrity: "stored_review_and_verified_queued_intake",
       producer: "host_publish_review_v1",
       intake: structuredClone(receipt.input.intake),
+      readiness: structuredClone(intake.readiness),
       reviewer: {
         id: receipt.reviewer.id,
         label: receipt.reviewer.label,

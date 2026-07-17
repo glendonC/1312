@@ -1,7 +1,9 @@
 import type {
   Capability,
   CaptionExecutorClassification,
+  CaptionProductionReceipt,
   CaptionProductionStatus,
+  CaptionStudyIdentity,
   CaptionQualityControlReasonCode,
   EvidenceAssessmentScope,
   EvidenceDecisionReasonCode,
@@ -22,6 +24,7 @@ import type {
   StudyPlanningReportInput,
   StudyReadinessOutcome,
   StudyReadinessReasonCode,
+  StudyReadinessReceiptIdentity,
   TaskStatus,
   WorkerKind,
 } from "../model.ts";
@@ -314,17 +317,8 @@ export interface ProductionStudioCaptionProductionView {
   sourceContentId: string;
   analysisRequestId: string;
   range: { startMs: number; endMs: number };
-  acceptedChildOutput: {
-    artifactId: string;
-    contentId: string;
-  };
-  rootPromotion: {
-    dispositionId: string;
-    artifactId: string;
-    contentId: string;
-    receiptId: string;
-    receiptContentId: string;
-  };
+  study: CaptionStudyIdentity;
+  readiness: StudyReadinessReceiptIdentity;
   executorClassification: CaptionExecutorClassification;
   executorExecutionScope: "test_demo_only" | "current_run";
   cognitionClaim: "none";
@@ -339,6 +333,8 @@ export interface ProductionStudioCaptionProductionView {
   targetAvailableCount: number | null;
   withheldCount: number | null;
   unavailableCount: number | null;
+  lines: CaptionProductionReceipt["result"]["lines"];
+  authorityState: "unrevoked" | "revocation_started_or_completed";
   failure: string | null;
 }
 
@@ -354,6 +350,15 @@ export interface ProductionStudioCaptionQualityControlView {
   receiptContentId: string;
   outcome: "accepted" | "withheld";
   reasonCodes: CaptionQualityControlReasonCode[];
+  study: CaptionStudyIdentity;
+  readiness: StudyReadinessReceiptIdentity;
+  approvalReviewId: string;
+  lines: Array<{
+    lineId: string;
+    outcome: "accepted" | "withheld";
+    reasonCode: CaptionQualityControlReasonCode;
+    causality: CaptionProductionReceipt["result"]["lines"][number];
+  }>;
 }
 
 export interface ProductionStudioCaptionArtifactView {
@@ -365,6 +370,10 @@ export interface ProductionStudioCaptionArtifactView {
   jobId: string;
   approvalReviewId: string;
   approvalArtifactId: string;
+  studyId: string;
+  studyArtifactId: string;
+  readinessId: string;
+  readinessArtifactId: string;
 }
 
 export interface ProductionStudioReportView {

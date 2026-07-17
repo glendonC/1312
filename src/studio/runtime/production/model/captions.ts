@@ -1,4 +1,10 @@
 import type { PublishReviewDecisionReceiptIdentity } from "./review.ts";
+import type { SemanticEvidenceCitationInput } from "./semanticEvidence.ts";
+import type {
+  OwnedMediaStudyCoverageReasonCode,
+  StudyPlanningReportInput,
+  StudyReadinessReceiptIdentity,
+} from "./studies.ts";
 
 export const CAPTION_PRODUCTION_LIMITS = {
   maxDurationMs: 120_000,
@@ -21,7 +27,32 @@ export type CaptionLineReasonCode =
   | "recognizer_empty"
   | "translator_unavailable"
   | "translator_missing_line"
-  | "source_unavailable";
+  | "source_unavailable"
+  | "study_coverage_withheld"
+  | "study_coverage_unknown"
+  | "study_coverage_failed"
+  | "study_coverage_conflict"
+  | "study_coverage_uncovered"
+  | "study_citation_mismatch";
+
+export interface CaptionStudyIdentity {
+  studyId: string;
+  artifactId: string;
+  contentId: string;
+  executorReceiptId: string;
+  executorReceiptContentId: string;
+}
+
+export interface CaptionLineStudySupport {
+  coverage: {
+    coverageId: string | null;
+    state: "supported" | "withheld" | "unknown" | "failed" | "uncovered" | "conflict";
+    reasonCode: OwnedMediaStudyCoverageReasonCode | "uncovered" | "citation_mismatch" | null;
+  };
+  claimIds: string[];
+  semanticCitations: SemanticEvidenceCitationInput[];
+  childReports: StudyPlanningReportInput[];
+}
 
 export interface CaptionProductionLine {
   id: string;
@@ -34,23 +65,22 @@ export interface CaptionProductionLine {
       contentId: string;
       window: { startMs: number; endMs: number };
     };
-    acceptedChildOutput: {
-      artifactId: string;
-      contentId: string;
-    };
-    rootPromotion: {
-      dispositionId: string;
-      artifactId: string;
-      contentId: string;
-      receiptId: string;
-      receiptContentId: string;
+    study: CaptionStudyIdentity & CaptionLineStudySupport;
+    readiness: StudyReadinessReceiptIdentity;
+    approval: PublishReviewDecisionReceiptIdentity;
+    captionExecutor: {
+      jobId: string;
+      id: CaptionExecutorDescriptor["id"];
+      version: "1";
+      executionScope: CaptionExecutorDescriptor["executionScope"];
+      cognitionClaim: "none";
     };
   };
   source: {
     language: "ko";
-    state: Extract<CaptionLineState, "available" | "unavailable">;
+    state: CaptionLineState;
     text: string | null;
-    reasonCode: Extract<CaptionLineReasonCode, "recognizer_unavailable" | "recognizer_empty"> | null;
+    reasonCode: CaptionLineReasonCode | null;
   };
   target: {
     language: "en";
@@ -64,10 +94,14 @@ export type CaptionProductionStatus = "completed" | "partial" | "withheld" | "un
 
 export type CaptionExecutorClassification =
   | "recorded_real_pipeline_fixture"
+  | "deterministic_current_run_test_seam"
   | "real_recognizer_translator";
 
 export interface CaptionExecutorDescriptor {
-  id: "studio.recorded-caption-fixture-adapter" | "studio.openai-caption-producer";
+  id:
+    | "studio.recorded-caption-fixture-adapter"
+    | "studio.deterministic-current-run-caption-test-seam"
+    | "studio.openai-caption-producer";
   version: "1";
   classification: CaptionExecutorClassification;
   executionScope: "test_demo_only" | "current_run";
@@ -88,17 +122,8 @@ export interface CaptionProductionArtifact {
     range: { startMs: number; endMs: number };
     sourceLanguage: "ko";
     targetLanguage: "en";
-    acceptedChildOutput: {
-      artifactId: string;
-      contentId: string;
-    };
-    rootPromotion: {
-      dispositionId: string;
-      artifactId: string;
-      contentId: string;
-      receiptId: string;
-      receiptContentId: string;
-    };
+    study: CaptionStudyIdentity;
+    readiness: StudyReadinessReceiptIdentity;
   };
   executor: CaptionExecutorDescriptor;
   lines: CaptionProductionLine[];
@@ -122,6 +147,8 @@ export interface CaptionProductionReceipt {
       integrity: "stored_review_and_verified_queued_intake";
       producer: "host_publish_review_v1";
       outcome: "approve_for_caption_production";
+      readiness: StudyReadinessReceiptIdentity;
+      study: CaptionStudyIdentity;
       unrevokedAtStart: true;
     };
   };
@@ -137,6 +164,19 @@ export interface CaptionProductionReceipt {
     captionArtifactId: string;
     captionContentId: string;
     captionBytes: number;
+    lines: Array<{
+      lineId: string;
+      startMs: number;
+      endMs: number;
+      sourceState: CaptionLineState;
+      targetState: CaptionLineState;
+      reasonCode: CaptionLineReasonCode | null;
+      coverageId: string | null;
+      coverageState: CaptionLineStudySupport["coverage"]["state"];
+      claimIds: string[];
+      semanticEvidenceArtifactIds: string[];
+      reportArtifactIds: string[];
+    }>;
   };
 }
 
@@ -172,6 +212,9 @@ export interface CaptionQualityControlReceipt {
   lineage: {
     candidateInput: CaptionProductionArtifact["input"];
     executor: CaptionExecutorDescriptor;
+    study: CaptionStudyIdentity;
+    readiness: StudyReadinessReceiptIdentity;
+    approval: PublishReviewDecisionReceiptIdentity;
   };
   producer: {
     id: "studio.host-caption-quality-control";
@@ -201,8 +244,8 @@ export interface CaptionProductionRecord {
   sourceContentId: string;
   analysisRequestId: string;
   range: { startMs: number; endMs: number };
-  acceptedChildOutput: CaptionProductionArtifact["input"]["acceptedChildOutput"];
-  rootPromotion: CaptionProductionArtifact["input"]["rootPromotion"];
+  study: CaptionStudyIdentity;
+  readiness: StudyReadinessReceiptIdentity;
   limits: typeof CAPTION_PRODUCTION_LIMITS;
   executor: CaptionExecutorDescriptor;
   status: "started" | "completed" | "failed";
@@ -217,6 +260,7 @@ export interface CaptionProductionRecord {
   targetAvailableCount: number | null;
   withheldCount: number | null;
   unavailableCount: number | null;
+  lines: CaptionProductionReceipt["result"]["lines"];
   failure: string | null;
 }
 
@@ -232,4 +276,5 @@ export interface CaptionQualityControlRecord {
   receiptContentId: string;
   outcome: CaptionQualityControlOutcome;
   reasonCodes: CaptionQualityControlReasonCode[];
+  lines: CaptionQualityControlReceipt["decision"]["lines"];
 }

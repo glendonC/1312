@@ -5,6 +5,11 @@ import {
   createCaptionArtifactId,
 } from "./artifactStore.ts";
 import type { CaptionProductionExecutor, CaptionExecutorInput } from "./captionProductionExecutor.ts";
+import {
+  captionLineReceiptProjection,
+  captionStudyIdentity,
+  closeCaptionLineCausality,
+} from "./captionStudyCausality.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type {
   CaptionProductionArtifact,
@@ -14,7 +19,8 @@ import type {
 } from "./model.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "./model.ts";
 import { reopenPublishReviewDecisions } from "./publishReviewDecisionAudit.ts";
-import { reopenPromotedRootOutputs } from "./rootOutputDispositionAudit.ts";
+import { reopenStudyReadiness } from "./studyReadinessAudit.ts";
+import { reopenOwnedMediaStudy } from "./studySynthesisAudit.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
 import {
   assertCaptionProductionRequest,
@@ -25,7 +31,8 @@ import {
 
 export type CaptionProductionHostErrorCode =
   | "verified_unrevoked_approval_required"
-  | "verified_accepted_child_output_required"
+  | "verified_study_readiness_required"
+  | "current_run_caption_executor_required"
   | "unsupported_caption_language_pair"
   | "caption_limits_exceeded"
   | "illegal_caption_transition"
@@ -117,41 +124,6 @@ export class CaptionProductionHost {
       );
     }
 
-    let promotions;
-    try {
-      promotions = await reopenPromotedRootOutputs(state, this.artifacts);
-    } catch (error) {
-      throw new CaptionProductionHostError(
-        "stored_lineage_invalid",
-        "The accepted child and root-promotion lineage failed closed recursive verification",
-        { cause: error },
-      );
-    }
-    const matchingPromotions = promotions.filter((candidate) =>
-      candidate.receipt.delegation.grants.some((grant) => grant.capability === "media.seek") &&
-      candidate.evidence.mediaOperationIds.length > 0 &&
-      candidate.receipt.delegation.mediaScope.some((scope) =>
-        scope.artifactId === source.id &&
-        scope.startMs <= analysis.range.startMs &&
-        scope.endMs >= analysis.range.endMs
-      )
-    );
-    if (matchingPromotions.length !== 1) {
-      throw new CaptionProductionHostError(
-        "verified_accepted_child_output_required",
-        "Caption candidates require one exact verified current-run promoted child output covering the source window",
-      );
-    }
-    const promotion = matchingPromotions[0];
-    const acceptedChildOutput = state.artifacts[promotion.receipt.input.artifactId];
-    const rootPromotionArtifact = state.artifacts[promotion.receiptArtifactId];
-    if (!acceptedChildOutput || !rootPromotionArtifact) {
-      throw new CaptionProductionHostError(
-        "stored_lineage_invalid",
-        "The verified caption promotion artifacts are missing from the current run",
-      );
-    }
-
     let reviews;
     try {
       reviews = await reopenPublishReviewDecisions(
@@ -181,10 +153,56 @@ export class CaptionProductionHost {
         "Caption production requires one exact recursively verified unrevoked approval identity",
       );
     }
+    let readiness;
+    let study;
+    try {
+      readiness = await reopenStudyReadiness(state, this.artifacts, approval.readiness.readinessId);
+      if (
+        readiness.readinessId !== approval.readiness.readinessId ||
+        readiness.artifactId !== approval.readiness.artifactId ||
+        readiness.receiptId !== approval.readiness.receiptId ||
+        readiness.receiptContentId !== approval.readiness.receiptContentId ||
+        readiness.receipt.result.outcome !== "proceed_to_caption_review"
+      ) throw new Error("The approval does not resolve to one exact proceed-to-caption-review receipt");
+      study = await reopenOwnedMediaStudy(state, this.artifacts, readiness.receipt.input.studyId);
+    } catch (error) {
+      throw new CaptionProductionHostError(
+        "verified_study_readiness_required",
+        "Caption production requires the approval's exact recursively verified proceed-to-caption-review study readiness",
+        { cause: error },
+      );
+    }
+    const studyIdentity = captionStudyIdentity(study);
+    if (
+      readiness.receipt.input.artifactId !== studyIdentity.artifactId ||
+      readiness.receipt.input.contentId !== studyIdentity.contentId ||
+      readiness.receipt.input.executorReceiptId !== studyIdentity.executorReceiptId ||
+      readiness.receipt.input.executorReceiptContentId !== studyIdentity.executorReceiptContentId ||
+      study.envelope.root.jobContext.source.artifactId !== source.id ||
+      study.envelope.root.jobContext.source.contentId !== source.content.contentId ||
+      study.envelope.root.jobContext.analysisRequest.requestId !== analysis.requestId ||
+      study.envelope.root.jobContext.analysisRequest.requestedRange.startMs !== analysis.range.startMs ||
+      study.envelope.root.jobContext.analysisRequest.requestedRange.endMs !== analysis.range.endMs ||
+      !study.envelope.sourceArtifacts.some((candidate) =>
+        candidate.artifactId === source.id && candidate.contentId === source.content.contentId)
+    ) {
+      throw new CaptionProductionHostError(
+        "verified_study_readiness_required",
+        "The approved study/readiness does not match the immutable current-run source and analysis scope",
+      );
+    }
+    if (executor.executionScope !== "current_run") {
+      throw new CaptionProductionHostError(
+        "current_run_caption_executor_required",
+        "Recorded caption fixtures cannot consume current-run study authority and are refused for production",
+      );
+    }
 
     const jobId = `caption-production:${canonicalSha256({
       runId: this.ledger.runId,
       approval: request.approval,
+      readiness: approval.readiness,
+      study: studyIdentity,
     })}`;
     const input: CaptionProductionArtifact["input"] = {
       sourceArtifactId: source.id,
@@ -193,17 +211,8 @@ export class CaptionProductionHost {
       range: structuredClone(analysis.range),
       sourceLanguage: "ko",
       targetLanguage: "en",
-      acceptedChildOutput: {
-        artifactId: acceptedChildOutput.id,
-        contentId: acceptedChildOutput.content.contentId,
-      },
-      rootPromotion: {
-        dispositionId: promotion.receipt.dispositionId,
-        artifactId: rootPromotionArtifact.id,
-        contentId: rootPromotionArtifact.content.contentId,
-        receiptId: promotion.receipt.receiptId,
-        receiptContentId: promotion.receiptContentId,
-      },
+      study: studyIdentity,
+      readiness: structuredClone(approval.readiness),
     };
     let started = false;
     try {
@@ -259,6 +268,7 @@ export class CaptionProductionHost {
       } finally {
         if (timeout !== null) clearTimeout(timeout);
       }
+      await this.ledger.refresh();
       const executorAfter = await this.executor.describe(executorInput);
       if (canonicalSha256(executorAfter) !== canonicalSha256(executor)) {
         throw new CaptionProductionHostError(
@@ -268,37 +278,49 @@ export class CaptionProductionHost {
       }
       try {
         await this.artifacts.resolveVerified(source);
-        const promotionsAfter = await reopenPromotedRootOutputs(this.ledger.state(), this.artifacts);
-        if (!promotionsAfter.some((candidate) =>
-          candidate.receipt.dispositionId === promotion.receipt.dispositionId &&
-          candidate.receiptArtifactId === promotion.receiptArtifactId &&
-          candidate.receiptContentId === promotion.receiptContentId &&
-          candidate.receipt.input.artifactId === promotion.receipt.input.artifactId &&
-          candidate.receipt.input.contentId === promotion.receipt.input.contentId
-        )) throw new Error("The selected root promotion is no longer verified");
+        const currentState = this.ledger.state();
+        const currentEvents = await this.ledger.events();
+        const reviewsAfter = await reopenPublishReviewDecisions(currentState, currentEvents, this.artifacts);
+        const approvalAfter = reviewsAfter.find((candidate) =>
+          candidate.reviewId === request.approval.reviewId &&
+          candidate.artifactId === request.approval.artifactId &&
+          candidate.receiptId === request.approval.receiptId &&
+          candidate.receiptContentId === request.approval.receiptContentId);
+        if (!approvalAfter || approvalAfter.state !== "approved_for_caption_production" || approvalAfter.revocation !== null) {
+          throw new Error("The approval was revoked while caption production was active");
+        }
+        const readinessAfter = await reopenStudyReadiness(currentState, this.artifacts, approval.readiness.readinessId);
+        const studyAfter = await reopenOwnedMediaStudy(currentState, this.artifacts, study.record.id);
+        if (
+          canonicalSha256(approvalAfter.readiness) !== canonicalSha256(approval.readiness) ||
+          canonicalSha256(readinessAfter.receipt) !== canonicalSha256(readiness.receipt) ||
+          canonicalSha256(captionStudyIdentity(studyAfter)) !== canonicalSha256(studyIdentity)
+        ) throw new Error("The approved study/readiness changed while caption production was active");
       } catch (error) {
         throw new CaptionProductionHostError(
           "stored_lineage_invalid",
-          "The current-run source or accepted promotion changed while caption production was running",
+          "The current-run source, study/readiness, or approval authority changed while caption production was running",
           { cause: error },
         );
       }
-      const derivation = executor.executionScope === "test_demo_only"
-        ? "recorded_fixture_test_demo_only" as const
-        : "current_run_source_execution" as const;
-      const captionLines: CaptionProductionArtifact["lines"] = lines.map((line) => ({
-        ...structuredClone(line),
-        lineage: {
-          derivation,
-          source: {
-            artifactId: input.sourceArtifactId,
-            contentId: input.sourceContentId,
-            window: { startMs: line.startMs, endMs: line.endMs },
+      const derivation = "current_run_source_execution" as const;
+      const captionLines: CaptionProductionArtifact["lines"] = lines.map((line) =>
+        closeCaptionLineCausality({
+          line,
+          study,
+          studyIdentity,
+          readiness: approval.readiness,
+          approval: request.approval,
+          source: { artifactId: input.sourceArtifactId, contentId: input.sourceContentId },
+          executor: {
+            jobId,
+            id: executor.id,
+            version: executor.version,
+            executionScope: executor.executionScope,
+            cognitionClaim: executor.cognitionClaim,
           },
-          acceptedChildOutput: structuredClone(input.acceptedChildOutput),
-          rootPromotion: structuredClone(input.rootPromotion),
-        },
-      }));
+          derivation,
+        }));
       const caption: CaptionProductionArtifact = {
         schema: "studio.caption-production.artifact.v1",
         jobId,
@@ -329,6 +351,8 @@ export class CaptionProductionHost {
             integrity: "stored_review_and_verified_queued_intake" as const,
             producer: "host_publish_review_v1" as const,
             outcome: "approve_for_caption_production" as const,
+            readiness: structuredClone(approval.readiness),
+            study: structuredClone(studyIdentity),
             unrevokedAtStart: true as const,
           },
         },
@@ -345,6 +369,7 @@ export class CaptionProductionHost {
           captionArtifactId,
           captionContentId: storedCaption.content.contentId,
           captionBytes: storedCaption.content.bytes,
+          lines: captionLines.map(captionLineReceiptProjection),
         },
       };
       const receipt: CaptionProductionReceipt = {
@@ -374,8 +399,15 @@ export class CaptionProductionHost {
           producer: { kind: "caption_production_host", id: "host-caption-production" },
           causationId: jobId,
         },
-        () => ({
-          pending: [{
+        ({ state: current }) => {
+          if (Object.values(current.publishReviewRevocations).some((revocation) =>
+            revocation.reviewId === approval.reviewId && revocation.status !== "failed")) {
+            throw new CaptionProductionHostError(
+              "verified_unrevoked_approval_required",
+              "Caption production cannot complete after approval revocation has started",
+            );
+          }
+          return { pending: [{
             type: "caption.production_completed",
             data: {
               jobId,
@@ -385,9 +417,8 @@ export class CaptionProductionHost {
               receiptContentId: storedReceipt.content.contentId,
               receipt,
             },
-          }] satisfies PendingRuntimeEvent[],
-          result: undefined,
-        }),
+          }] satisfies PendingRuntimeEvent[], result: undefined };
+        },
       );
       return {
         caption,

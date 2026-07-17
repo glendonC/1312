@@ -187,7 +187,7 @@ every media class.
 
 ## 5. Study-causal captions and independent structural QC
 
-- [ ] Status: blocked on slice 4.
+- [x] Status: complete.
 - Real: caption production already requires one verified same-run promoted child output; every line
   retains source/child/promotion lineage; current-run structural QC is independent; every executor
   declares `cognitionClaim: none`; recorded fixture output is always withheld.

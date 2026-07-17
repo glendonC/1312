@@ -810,7 +810,7 @@ export class RuntimeStartService {
           { cause: error },
         );
       }
-      if (error.code === "verified_accepted_child_output_required") {
+      if (error.code === "verified_study_readiness_required" || error.code === "current_run_caption_executor_required") {
         throw new RuntimeHostError(
           "caption_current_run_causality_required",
           error.message,

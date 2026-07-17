@@ -27,7 +27,8 @@ import type {
 import { BoundedChildSemanticEvidenceBridge } from "../executor/childSemanticEvidenceBridge.ts";
 import { SpeechTranscribeCapabilityHost } from "../semantic/semanticEvidenceHost.ts";
 import { reopenSemanticEvidence, semanticEvidenceCitation } from "../semantic/semanticEvidenceAudit.ts";
-import { buildStudyReportEnvelope, validateWorkerResult } from "../executor/workerContract.ts";
+import { buildStudyReportEnvelope, buildStudyReportEnvelopeV2, validateWorkerResult } from "../executor/workerContract.ts";
+import { deriveTaskDialogueScopePolicy } from "../study/dialogueScopeRuntime.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import {
   RuntimeApplicationInterrupted,
@@ -217,7 +218,7 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       throw new Error(reason);
     }
 
-    const studySlot = task.requiredOutputs.find((output) => output.required && output.artifactKind === "studio.study-report.v1");
+    const studySlot = task.requiredOutputs.find((output) => output.required && (output.artifactKind === "studio.study-report.v1" || output.artifactKind === "studio.study-report.v2"));
     if (studySlot) {
       if (task.workerLabel.includes("study-fail")) {
         const reason = "The deterministic partial-child test seam failed this bounded study worker before producing a report.";
@@ -236,7 +237,8 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       const semanticResult = await new BoundedChildSemanticEvidenceBridge(task, semanticHost, {
         nextOperationId: () => `operation:deterministic-semantic:${canonicalSha256({ runId: ledger.runId, taskId: task.id, scope })}`,
       }).call(scope);
-      const citation = semanticEvidenceCitation(await reopenSemanticEvidence(ledger.state(), artifacts, semanticResult.operationId));
+      const verifiedSemantic = await reopenSemanticEvidence(ledger.state(), artifacts, semanticResult.operationId);
+      const citation = semanticEvidenceCitation(verifiedSemantic);
       const claimId = `claim:deterministic:${canonicalSha256({ taskId: task.id, scope, observationIds: citation.observations.map((entry) => entry.observationId) })}`;
       const preservesGap = task.workerLabel.includes("study-gap");
       const worker = validateWorkerResult({
@@ -244,10 +246,12 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
         semanticEvidenceInputs: [citation],
         outputs: [{
           name: studySlot.name,
-          kind: "studio.study-report.v1",
-          coverage: [preservesGap
-            ? { ...scope, state: "unknown" as const, claimIds: [], reason: { code: "unobserved_range" as const, detail: "The deterministic follow-up test seam preserves this exact range as an explicit gap." } }
-            : { ...scope, state: "supported" as const, claimIds: [claimId], reason: null }],
+          kind: studySlot.artifactKind,
+          coverage: studySlot.artifactKind === "studio.study-report.v2"
+            ? [{ ...scope, claimIds: preservesGap ? [] : [claimId], reason: preservesGap ? { code: "worker_withheld" as const, detail: "The deterministic compatibility seam preserves this exact range without a claim." } : null }]
+            : [preservesGap
+                ? { ...scope, state: "unknown" as const, claimIds: [], reason: { code: "unobserved_range" as const, detail: "The deterministic follow-up test seam preserves this exact range as an explicit gap." } }
+                : { ...scope, state: "supported" as const, claimIds: [claimId], reason: null }],
           claims: preservesGap ? [] : [{
             claimId,
             ...scope,
@@ -257,8 +261,18 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
         }],
       }, task, [citation]);
       const output = worker.outputs[0];
-      if (output.kind !== "studio.study-report.v1" || !("coverage" in output)) throw new Error("Deterministic study worker lost its typed output");
-      const prepared = await artifacts.prepareStudyReport(ledger.runId, buildStudyReportEnvelope(task, output, [citation]));
+      if ((output.kind !== "studio.study-report.v1" && output.kind !== "studio.study-report.v2") || !("coverage" in output)) throw new Error("Deterministic study worker lost its typed output");
+      const reportEnvelope = output.kind === "studio.study-report.v2"
+        ? buildStudyReportEnvelopeV2({
+            task,
+            executionId,
+            output,
+            semanticEvidenceInputs: [citation],
+            verifiedSemanticEvidence: [verifiedSemantic],
+            dialogueScopePolicy: await deriveTaskDialogueScopePolicy(ledger.state(), artifacts, task.id),
+          })
+        : buildStudyReportEnvelope(task, output, [citation]);
+      const prepared = await artifacts.prepareStudyReport(ledger.runId, reportEnvelope, output.name);
       const span = this.span(task, executionId, startedAt, { outcome: "completed", outputArtifactIds: [prepared.artifactId], failure: null });
       const storedSpan = await artifacts.storeJson(span);
       const artifact = artifacts.buildStudyReportArtifact({ runId: ledger.runId, receipt: span, receiptContentId: storedSpan.content.contentId, prepared });

@@ -14,13 +14,18 @@ not reopen that campaign.
 
 ## North stars
 
+Product identity is defined in [`PRODUCT.md`](../PRODUCT.md) and the public site. This file tracks
+engineering status only.
+
+North stars for engineering tracks this week:
+
 - **Evaluation — Bet G / miss-to-gold:** turn run misses into agent-drafted, human-adjudicated,
-  receipt-frozen gold, then score and compare against that fixed evidence. This measures output
-  quality; it does not establish runtime autonomy or swarm completeness.
+  receipt-frozen gold, then score and compare against that fixed evidence. This measures beachhead
+  meaning quality; it does not establish runtime autonomy or swarm completeness.
 - **Runtime — owned-path swarm depth:** execute and replay a bounded, agent-directed owned-media
-  study path with exact source, task, evidence, report, admission, synthesis, approval, caption, and
-  QC lineage. This establishes the implemented runtime path; it does not establish media truth or
-  translation quality.
+  study path with exact source, task, evidence, report, admission, synthesis, approval, post-study
+  text artifact, and QC lineage. This establishes the implemented understanding spine; it does not
+  establish media truth or translation quality.
 
 Keep these tracks separate. A Bet G score is not swarm depth, and runtime depth is not a quality
 score.
@@ -59,14 +64,17 @@ score.
   only; it does not prove scene understanding or admit visual findings.
 - **U3 multimodal admission and generalized abstention:** additive `studio.evidence-citation.v1`,
   `studio.study-report.v2`, parent admission/read v2, `studio.owned-media-study.v2`, readiness v3,
-  and caption-causality v3 form a content-addressed host lane without mutating the closed v1 path.
+  and caption-causality v3 now form the default content-addressed owned-audio study spine without
+  mutating closed v1 receipts. New owned runs select v2 when no contract version is supplied; v1 is
+  retained only through an explicit compatibility selector for historical fixtures and replay.
   Per-kind cold adapters reopen current-run speech, U1 acoustic observation/receipt lineage, and U2
   frame receipt/manifest/PNG/decoder identities. Speech is the only landed claim-support kind and
   must exactly close its claimed range; acoustic citations qualify coverage, while frames remain
   cite-only. Unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states
   deterministically survive admission, synthesis, readiness, and caption causality. Readiness remains
   an integrity/coverage gate, not semantic QC. Future OCR/speaker/document slots fail closed without
-  producers, and the additive lane is not wired into the default owned-audio launcher or UI.
+  producers. The default U3 root has no study-planning or follow-up tool, so this cutover does not
+  start U4. The Studio UI remains unwired and unchanged.
 
 ## Post-freeze backlog boundary
 
@@ -79,7 +87,8 @@ indefinite deferrals or a one-day implementation claim:
    separate.
 2. U2 bounded frame sampling and inspection — implemented; visual interpretation remains a later
    producer rung.
-3. U3 multimodal admission and generalized abstention — implemented; frames remain cite-only.
+3. U3 multimodal admission and generalized abstention — implemented and default-runtime wired;
+   frames remain cite-only.
 4. U4 budgeted multi-pass re-study over exact gaps/subranges.
 5. U5 OCR and scene/on-screen context.
 6. U6 anonymous speaker/overlap evidence.
@@ -133,7 +142,7 @@ indefinite deferrals or a one-day implementation claim:
 
 - [`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md) — post–Build Week media senses, budgeted re-study,
   external context, quality boundaries, and a parked later-learning appendix.
-- [`PRODUCT.md`](../PRODUCT.md) — stable pitch, product loop, Build Week product bar, and route map.
+- [`PRODUCT.md`](../PRODUCT.md) — product identity, loop, Build Week proof bar, and route map.
 - [`ARCHITECTURE.md`](../ARCHITECTURE.md) — structural boundaries, chosen stack, and dependency
   direction; not the current roadmap.
 - [`STUDIO_AUTONOMY.md`](../STUDIO_AUTONOMY.md) — deep runtime design and implementation ledger; use

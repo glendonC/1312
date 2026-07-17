@@ -12,6 +12,11 @@ import type {
   ParentArtifactAdmissionReceipt,
   ParentArtifactReadReceipt,
   OwnedMediaStudyExecutorReceipt,
+  ParentArtifactAdmissionReceiptV2,
+  ParentArtifactReadReceiptV2,
+  OwnedMediaStudyExecutorReceiptV2,
+  OwnedMediaStudyCoverageRangeV2,
+  OwnedMediaStudyClaimV2,
 } from "../model.ts";
 import { canonicalSha256 } from "../artifactStore.ts";
 import type { ParentArtifactAdmissionHost } from "../admission/parentArtifactAdmissionHost.ts";
@@ -22,6 +27,14 @@ import { BoundedParentArtifactReadBridge } from "./parentArtifactReadBridge.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import { BoundedRuntimeScheduler, type SpawnDecision } from "../scheduler.ts";
 import { assertOrchestratorSpawnContract } from "../validation/scheduling.ts";
+import type { ContentAddressedArtifactStore } from "../artifactStore.ts";
+import { BoundedReportHost } from "../study/reportHost.ts";
+import {
+  inspectGeneralizedStudy,
+  recordGeneralizedAdmission,
+  recordGeneralizedRead,
+  recordGeneralizedStudy,
+} from "../study/generalizedStudyRuntime.ts";
 
 export const ORCHESTRATOR_SPAWN_TOOL = "task_spawn_request" as const;
 export const ORCHESTRATOR_WAIT_TOOL = "task_reports_wait" as const;
@@ -52,16 +65,19 @@ export interface SpawnToolResult {
 }
 
 export interface ReportDispositionToolResult {
-  schema: "studio.orchestrator-report-disposition-result.v1";
-  disposition: ParentArtifactDispositionReceipt;
-  admission: ParentArtifactAdmissionReceipt | null;
+  schema: "studio.orchestrator-report-disposition-result.v1" | "studio.orchestrator-report-disposition-result.v2";
+  disposition: ParentArtifactDispositionReceipt | { reportId: string; outcome: "accepted" | "rejected"; reason: string };
+  admission: ParentArtifactAdmissionReceipt | (ParentArtifactAdmissionReceiptV2 & {
+    grant: { id: string; contentScope: Array<{ artifactId: string; contentId: string; schema: "studio.study-report.v2" }> };
+  }) | null;
 }
 
 export interface AdmittedArtifactReadToolResult {
-  schema: "studio.orchestrator-admitted-artifact-read-result.v1";
-  receipt: ParentArtifactReadReceipt;
-  artifacts: Array<{ artifactId: string; contentId: string; schema: "studio.study-report.v1"; content: unknown }>;
+  schema: "studio.orchestrator-admitted-artifact-read-result.v1" | "studio.orchestrator-admitted-artifact-read-result.v2";
+  receipt: ParentArtifactReadReceipt | ParentArtifactReadReceiptV2;
+  artifacts: Array<{ artifactId: string; contentId: string; schema: "studio.study-report.v1" | "studio.study-report.v2"; content: unknown }>;
   planningInput: StudyPlanningInput | null;
+  synthesisInput?: { coverage: OwnedMediaStudyCoverageRangeV2[]; claims: OwnedMediaStudyClaimV2[] } | null;
 }
 
 export interface StudyPlanningToolResult {
@@ -72,12 +88,12 @@ export interface StudyPlanningToolResult {
 }
 
 export interface StudySynthesisToolResult {
-  schema: "studio.orchestrator-study-synthesis-result.v1";
+  schema: "studio.orchestrator-study-synthesis-result.v1" | "studio.orchestrator-study-synthesis-result.v2";
   studyId: string;
   artifactId: string;
   contentId: string;
   executorReceiptContentId: string;
-  executorReceipt: OwnedMediaStudyExecutorReceipt;
+  executorReceipt: OwnedMediaStudyExecutorReceipt | OwnedMediaStudyExecutorReceiptV2;
 }
 
 export interface ReportsWaitToolResult {
@@ -148,6 +164,8 @@ export class BoundedOrchestratorBridge {
   private readonly readHost: ParentArtifactReadHost | null;
   private readonly planningHost: StudyPlanningHost | null;
   private readonly synthesisHost: OwnedMediaStudySynthesisHost | null;
+  private readonly artifacts: ContentAddressedArtifactStore | null;
+  private readonly generalized: boolean;
 
   constructor(input: {
     task: TaskRecord;
@@ -159,6 +177,7 @@ export class BoundedOrchestratorBridge {
     readHost?: ParentArtifactReadHost;
     planningHost?: StudyPlanningHost;
     synthesisHost?: OwnedMediaStudySynthesisHost;
+    artifacts?: ContentAddressedArtifactStore;
     nextCallId?: (tool: OrchestratorToolName) => string;
   }) {
     this.task = structuredClone(input.task);
@@ -170,6 +189,8 @@ export class BoundedOrchestratorBridge {
     this.readHost = input.readHost ?? null;
     this.planningHost = input.planningHost ?? null;
     this.synthesisHost = input.synthesisHost ?? null;
+    this.artifacts = input.artifacts ?? null;
+    this.generalized = this.task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v2");
     this.nextCallId = input.nextCallId ?? ((tool) => `tool-call:${tool}:${randomUUID()}`);
   }
 
@@ -181,10 +202,15 @@ export class BoundedOrchestratorBridge {
         "The root orchestrator requires closed spawn and report-wait authority.",
       );
     }
-    const planningCapabilities = ["report.disposition", "artifact.read", "study.plan", "study.synthesize"] as const;
-    const planningEnabled = planningCapabilities.every((capability) => capabilities.has(capability));
-    if (planningEnabled !== Boolean(this.admissionHost && this.readHost && this.planningHost && this.synthesisHost) ||
-        (!planningEnabled && capabilities.size !== 2) || (planningEnabled && capabilities.size !== 6)) {
+    const legacyCapabilities = ["report.disposition", "artifact.read", "study.plan", "study.synthesize"] as const;
+    const generalizedCapabilities = ["report.disposition", "artifact.read", "study.synthesize"] as const;
+    const planningEnabled = legacyCapabilities.every((capability) => capabilities.has(capability));
+    const generalizedEnabled = this.generalized && generalizedCapabilities.every((capability) => capabilities.has(capability)) && !capabilities.has("study.plan");
+    if ((planningEnabled && generalizedEnabled) ||
+        (planningEnabled !== Boolean(this.admissionHost && this.readHost && this.planningHost && this.synthesisHost)) ||
+        (generalizedEnabled !== Boolean(this.artifacts)) ||
+        (!planningEnabled && !generalizedEnabled && capabilities.size !== 2) ||
+        (planningEnabled && capabilities.size !== 6) || (generalizedEnabled && capabilities.size !== 5)) {
       throw new OrchestratorBridgeError("capability_not_granted", "The root orchestrator planning tool surface is incomplete or broader than its exact grants.");
     }
     return {
@@ -192,10 +218,10 @@ export class BoundedOrchestratorBridge {
       tools: [
         { name: ORCHESTRATOR_SPAWN_TOOL, capability: "task.spawn.request" },
         { name: ORCHESTRATOR_WAIT_TOOL, capability: "task.reports.wait" },
-        ...(planningEnabled ? [
+        ...(planningEnabled || generalizedEnabled ? [
           { name: ORCHESTRATOR_DISPOSITION_TOOL, capability: "report.disposition" as const },
           { name: ORCHESTRATOR_READ_TOOL, capability: "artifact.read" as const },
-          { name: ORCHESTRATOR_PLAN_TOOL, capability: "study.plan" as const },
+          ...(planningEnabled ? [{ name: ORCHESTRATOR_PLAN_TOOL, capability: "study.plan" as const }] : []),
           { name: ORCHESTRATOR_SYNTHESIZE_TOOL, capability: "study.synthesize" as const },
         ] : []),
       ],
@@ -325,7 +351,7 @@ export class BoundedOrchestratorBridge {
 
   async disposition(value: unknown): Promise<ReportDispositionToolResult> {
     this.manifest();
-    if (!this.admissionHost) throw new OrchestratorBridgeError("capability_not_granted", "Report disposition is unavailable.");
+    if (!this.admissionHost && !this.generalized) throw new OrchestratorBridgeError("capability_not_granted", "Report disposition is unavailable.");
     const item = record(value);
     if (!item || !exact(item, ["reportId", "outputArtifactId", "outcome", "reason"]) ||
         typeof item.reportId !== "string" || typeof item.outputArtifactId !== "string" ||
@@ -333,7 +359,37 @@ export class BoundedOrchestratorBridge {
       throw new OrchestratorBridgeError("invalid_request", "report_disposition accepts only one exact child report, output, outcome, and reason.");
     }
     await this.recordCall(this.nextCallId(ORCHESTRATOR_DISPOSITION_TOOL), ORCHESTRATOR_DISPOSITION_TOOL);
-    const result = await this.admissionHost.record({
+    if (this.generalized) {
+      if (!this.artifacts) throw new OrchestratorBridgeError("capability_not_granted", "Generalized report disposition storage is unavailable.");
+      const report = this.ledger.state().reports[item.reportId];
+      if (report?.study?.schema !== "studio.study-report-submission.v2" || !report.outputArtifactIds.includes(item.outputArtifactId)) {
+        throw new OrchestratorBridgeError("invalid_request", "Generalized disposition requires one exact submitted v2 report output.");
+      }
+      await new BoundedReportHost(this.ledger, undefined, this.artifacts).decide({
+        reportId: item.reportId,
+        decidedByTaskId: this.task.id,
+        decidedByAgentId: this.task.assignedAgentId,
+        accepted: item.outcome === "accepted",
+        reason: item.reason,
+      });
+      if (item.outcome === "rejected") {
+        return { schema: "studio.orchestrator-report-disposition-result.v2", disposition: { reportId: item.reportId, outcome: "rejected", reason: item.reason }, admission: null };
+      }
+      const admitted = await recordGeneralizedAdmission({ ledger: this.ledger, artifacts: this.artifacts, reportId: item.reportId, outputArtifactId: item.outputArtifactId });
+      const child = this.ledger.state().tasks[report.taskId];
+      if (child?.status === "completed") {
+        // report.decided already retired the accepted child; no second transition is allowed.
+      }
+      return {
+        schema: "studio.orchestrator-report-disposition-result.v2",
+        disposition: { reportId: item.reportId, outcome: "accepted", reason: item.reason },
+        admission: {
+          ...admitted.admissionReceipt,
+          grant: { id: admitted.admission.admissionId, contentScope: [structuredClone(admitted.report)] },
+        },
+      };
+    }
+    const result = await this.admissionHost!.record({
       reportId: item.reportId,
       parentTaskId: this.task.id,
       parentAgentId: this.task.assignedAgentId,
@@ -350,20 +406,53 @@ export class BoundedOrchestratorBridge {
 
   async readAdmitted(value: unknown): Promise<AdmittedArtifactReadToolResult> {
     this.manifest();
-    if (!this.readHost || !this.planningHost) throw new OrchestratorBridgeError("capability_not_granted", "Admitted artifact read is unavailable.");
+    if ((!this.readHost || !this.planningHost) && !this.generalized) throw new OrchestratorBridgeError("capability_not_granted", "Admitted artifact read is unavailable.");
     const item = record(value);
     if (!item || !exact(item, ["grantId", "contentIds"]) || typeof item.grantId !== "string" || !Array.isArray(item.contentIds)) {
       throw new OrchestratorBridgeError("invalid_request", "artifact_read accepts only an exact admission grant and content id list.");
+    }
+    if (this.generalized) {
+      if (!this.artifacts || item.contentIds.length !== 1 || typeof item.contentIds[0] !== "string") {
+        throw new OrchestratorBridgeError("invalid_request", "Generalized artifact read requires one exact admitted report content identity.");
+      }
+      const admission = this.ledger.state().generalizedParentArtifactAdmissions[item.grantId];
+      if (!admission || admission.contractVersion !== 2 || admission.report.contentId !== item.contentIds[0] ||
+          admission.parentTaskId !== this.task.id || admission.parentAgentId !== this.task.assignedAgentId) {
+        throw new OrchestratorBridgeError("capability_not_granted", "The exact generalized admission authority is unavailable.");
+      }
+      const callId = this.nextCallId(ORCHESTRATOR_READ_TOOL);
+      await this.recordCall(callId, ORCHESTRATOR_READ_TOOL);
+      const operationId = `operation:generalized-parent-artifact-read:${canonicalSha256({ executionId: this.executionId, callId })}`;
+      const result = await recordGeneralizedRead({
+        ledger: this.ledger,
+        artifacts: this.artifacts,
+        admitted: { report: admission.report, admission: { admissionId: admission.admissionId, receiptId: admission.receiptId, receiptContentId: admission.receiptContentId } },
+        operationId,
+        parentTaskId: this.task.id,
+        parentAgentId: this.task.assignedAgentId,
+      });
+      const completedReads = Object.values(this.ledger.state().generalizedParentArtifactReads).filter((entry) =>
+        entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
+      const synthesisInput = completedReads.length >= 2
+        ? await inspectGeneralizedStudy(this.ledger, this.artifacts, this.task.id).then(({ inspected }) => ({ coverage: inspected.coverage, claims: inspected.claims }))
+        : null;
+      return {
+        schema: "studio.orchestrator-admitted-artifact-read-result.v2",
+        receipt: result.receipt,
+        artifacts: [{ artifactId: result.receipt.returned.artifactId, contentId: result.receipt.returned.contentId, schema: "studio.study-report.v2", content: result.report }],
+        planningInput: null,
+        synthesisInput,
+      };
     }
     const grant = this.ledger.state().parentArtifactReadGrants[item.grantId];
     if (!grant) throw new OrchestratorBridgeError("capability_not_granted", "The exact admitted artifact read grant is unavailable.");
     const callId = this.nextCallId(ORCHESTRATOR_READ_TOOL);
     await this.recordCall(callId, ORCHESTRATOR_READ_TOOL);
-    const bridge = new BoundedParentArtifactReadBridge(this.task, grant, this.readHost, () => `operation:parent-artifact-read:${canonicalSha256({ executionId: this.executionId, callId })}`);
+    const bridge = new BoundedParentArtifactReadBridge(this.task, grant, this.readHost!, () => `operation:parent-artifact-read:${canonicalSha256({ executionId: this.executionId, callId })}`);
     const result = await bridge.call({ contentIds: item.contentIds });
     let planningInput: StudyPlanningInput | null = null;
     try {
-      planningInput = await this.planningHost.inspect(this.executionId);
+      planningInput = await this.planningHost!.inspect(this.executionId);
     } catch (error) {
       if (!(error instanceof Error) || !error.message.includes("at least two admitted")) throw error;
     }
@@ -372,7 +461,7 @@ export class BoundedOrchestratorBridge {
 
   async plan(value: unknown): Promise<StudyPlanningToolResult> {
     this.manifest();
-    if (!this.planningHost) throw new OrchestratorBridgeError("capability_not_granted", "Study planning is unavailable.");
+    if (!this.planningHost || this.generalized) throw new OrchestratorBridgeError("capability_not_granted", "Study planning is unavailable.");
     await this.recordCall(this.nextCallId(ORCHESTRATOR_PLAN_TOOL), ORCHESTRATOR_PLAN_TOOL);
     const result = await this.planningHost.record(this.executionId, value);
     return { schema: "studio.orchestrator-study-planning-result.v1", artifactId: result.artifactId, receiptContentId: result.receiptContentId, receipt: result.receipt };
@@ -380,9 +469,28 @@ export class BoundedOrchestratorBridge {
 
   async synthesize(value: unknown): Promise<StudySynthesisToolResult> {
     this.manifest();
-    if (!this.synthesisHost) throw new OrchestratorBridgeError("capability_not_granted", "Study synthesis is unavailable.");
+    if (!this.synthesisHost && !this.generalized) throw new OrchestratorBridgeError("capability_not_granted", "Study synthesis is unavailable.");
     await this.recordCall(this.nextCallId(ORCHESTRATOR_SYNTHESIZE_TOOL), ORCHESTRATOR_SYNTHESIZE_TOOL);
-    const result = await this.synthesisHost.synthesize(this.executionId, value);
+    if (this.generalized) {
+      if (!this.artifacts) throw new OrchestratorBridgeError("capability_not_granted", "Generalized synthesis storage is unavailable.");
+      const admissions = Object.values(this.ledger.state().generalizedParentArtifactAdmissions).filter((entry) =>
+        entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
+      const reads = Object.values(this.ledger.state().generalizedParentArtifactReads).filter((entry) =>
+        entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
+      if (admissions.length < 2 || reads.length < admissions.length) {
+        throw new OrchestratorBridgeError("operation_rejected", "Generalized synthesis requires every admitted report to be read and at least two admitted reports.");
+      }
+      const result = await recordGeneralizedStudy({ ledger: this.ledger, artifacts: this.artifacts, parentTaskId: this.task.id, request: value as Parameters<typeof recordGeneralizedStudy>[0]["request"] });
+      return {
+        schema: "studio.orchestrator-study-synthesis-result.v2",
+        studyId: result.study.studyId,
+        artifactId: result.study.artifactId,
+        contentId: result.study.contentId,
+        executorReceiptContentId: result.executorReceiptContentId,
+        executorReceipt: result.executorReceipt,
+      };
+    }
+    const result = await this.synthesisHost!.synthesize(this.executionId, value);
     return {
       schema: "studio.orchestrator-study-synthesis-result.v1",
       studyId: result.studyId,
@@ -394,7 +502,7 @@ export class BoundedOrchestratorBridge {
   }
 
   synthesizedArtifactIds(): string[] {
-    return Object.values(this.ledger.state().ownedMediaStudies)
+    return [...Object.values(this.ledger.state().ownedMediaStudies), ...Object.values(this.ledger.state().generalizedOwnedMediaStudies)]
       .filter((study) => study.executionId === this.executionId)
       .map((study) => study.artifactId)
       .sort();

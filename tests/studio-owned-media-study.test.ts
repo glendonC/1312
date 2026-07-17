@@ -10,6 +10,9 @@ import { projectRuntimeEvents } from "../src/studio/runtime/production/projectio
 import { reopenStudyPlanningDecision } from "../src/studio/runtime/production/study/studyPlanningAudit.ts";
 import { reopenStudyReadiness } from "../src/studio/runtime/production/study/studyReadinessAudit.ts";
 import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/study/studySynthesisAudit.ts";
+import { GeneralizedCaptionCausalityHost } from "../src/studio/runtime/production/captions/generalizedCaptionCausality.ts";
+import { GeneralizedStudyReadinessHost } from "../src/studio/runtime/production/study/generalizedStudyReadinessHost.ts";
+import { generalizedReadinessReference } from "../src/studio/runtime/production/study/generalizedStudyRuntime.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
 import {
   DeterministicRuntimeExecutor,
@@ -45,6 +48,7 @@ async function run(mode: DeterministicOrchestratorMode = "spawn_one"): Promise<R
     sources,
     launcherFactory: new DeterministicRuntimeExecutor().factory(),
     orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory({ mode }),
+    studyContractVersion: "v1",
     runtimeIdForCommand: () => runtimeId,
     recoverOnOpen: false,
   });
@@ -67,6 +71,39 @@ async function run(mode: DeterministicOrchestratorMode = "spawn_one"): Promise<R
   return { directory, store, service, runtimeId: acknowledgement.runtimeId, lifecycle: status.lifecycle };
 }
 
+async function runDefaultU3(): Promise<RunHarness> {
+  runtimeCount += 1;
+  const directory = await mkdtemp(join(tmpdir(), "studio-owned-media-study-u3-default-"));
+  const store = await DurableRuntimeCommandStore.open(join(directory, "host"));
+  const sources = await RuntimeSourceRegistry.open({ sourceDirectories: [FIXTURE] });
+  const source = sources.list()[0];
+  const runtimeId = `runtime:10000000-0000-4000-8000-${runtimeCount.toString().padStart(12, "0")}`;
+  const service = await RuntimeStartService.open({
+    store,
+    sources,
+    launcherFactory: new DeterministicRuntimeExecutor().factory(),
+    orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory(),
+    runtimeIdForCommand: () => runtimeId,
+    recoverOnOpen: false,
+  });
+  const acknowledgement = await service.start({
+    sourceSessionId: source.sourceSessionId,
+    sourceRevisionId: source.sourceRevisionId,
+    range: { startMs: 0, endMs: 1_000 },
+    requestedSourceLanguage: { mode: "declared", languages: ["ko"], reason: null },
+    targetLanguage: "en",
+    selectedLanguagePackId: "ko-v3",
+    outputDepth: "evidence",
+  });
+  const deadline = Date.now() + 10_000;
+  let status = await service.statusByRuntime(acknowledgement.runtimeId);
+  while (!new Set(["terminal", "failed", "interrupted"]).has(status.lifecycle) && Date.now() < deadline) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
+    status = await service.statusByRuntime(acknowledgement.runtimeId);
+  }
+  return { directory, store, service, runtimeId: acknowledgement.runtimeId, lifecycle: status.lifecycle };
+}
+
 async function journal(runtime: RunHarness) {
   return readValidatedRuntimeJournal(runtime.store.paths(runtime.runtimeId).journalPath, runtime.runtimeId);
 }
@@ -79,6 +116,47 @@ function objectPath(runtime: RunHarness, contentId: string): string {
 async function cleanup(runtime: RunHarness): Promise<void> {
   await rm(runtime.directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
 }
+
+test("default owned path closes U3 report/admission/read/study/readiness and caption causality", async () => {
+  const runtime = await runDefaultU3();
+  try {
+    assert.equal(runtime.lifecycle, "terminal");
+    const loaded = await journal(runtime);
+    const state = loaded.state;
+    assert.equal(Object.keys(state.parentArtifactDispositions).length, 0);
+    assert.equal(Object.keys(state.parentArtifactReadGrants).length, 0);
+    assert.equal(Object.keys(state.studyPlanningDecisions).length, 0);
+    assert.equal(Object.keys(state.ownedMediaStudies).length, 0);
+    assert.equal(Object.values(state.reports).filter((report) => report.study?.schema === "studio.study-report-submission.v2").length, 2);
+    assert.equal(Object.keys(state.generalizedParentArtifactAdmissions).length, 2);
+    assert.equal(Object.keys(state.generalizedParentArtifactReads).length, 2);
+    const study = Object.values(state.generalizedOwnedMediaStudies)[0];
+    const readiness = Object.values(state.generalizedStudyReadiness)[0];
+    assert.equal(study.schema, "studio.owned-media-study.v2");
+    assert.equal(readiness.schema, "studio.study-readiness.receipt.v3");
+    assert.equal(readiness.outcome, "proceed_to_caption_review");
+    assert.equal(Object.values(state.publishReviewIntakes)[0].outcome, "queued");
+    assert.ok(study.evidenceCitations.every((citation) =>
+      citation.evidenceKind === "current_run_speech" && citation.use === "claim_support"));
+
+    const artifacts = new ContentAddressedArtifactStore(runtime.store.paths(runtime.runtimeId).artifactStoreRoot);
+    const reference = generalizedReadinessReference(readiness);
+    await new GeneralizedStudyReadinessHost(state, artifacts).reopen(reference);
+    const coverage = study.coverage[0];
+    const causality = await new GeneralizedCaptionCausalityHost(state, artifacts).close({
+      readiness: reference,
+      range: { artifactId: coverage.artifactId, trackId: coverage.trackId, startMs: coverage.startMs, endMs: coverage.endMs },
+      sourceText: "현재 실행 음성 가설",
+      targetText: "Current-run speech hypothesis",
+    });
+    assert.equal(causality.schema, "studio.caption-line-causality.v3");
+    assert.equal(causality.source.state, "available");
+    assert.equal(causality.target.state, "available");
+    assert.ok(causality.lineage.citationIds.length > 0);
+  } finally {
+    await cleanup(runtime);
+  }
+});
 
 test("model-tool planning, owned study, deterministic readiness, projection, and cold replay close one terminal root", async () => {
   const runtime = await run();

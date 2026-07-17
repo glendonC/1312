@@ -3,7 +3,7 @@ import {
   BoundedOrchestratorBridge,
   type ReportsWaitToolResult,
 } from "../executor/orchestratorBridge.ts";
-import type { ExecutorSpanReceipt, StudyPlanningInput, StudyReportArtifact, TaskRecord } from "../model.ts";
+import type { ExecutorSpanReceipt, OwnedMediaStudyClaimV2, OwnedMediaStudyCoverageRangeV2, StudyPlanningInput, StudyReportArtifact, TaskRecord } from "../model.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import type {
   BoundedOrchestratorLauncher,
@@ -91,6 +91,8 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
     );
     let callIndex = 0;
     const planningEnabled = task.grants.some((grant) => grant.capability === "study.plan");
+    const generalizedEnabled = task.requiredOutputs.some((output) =>
+      output.required && output.artifactKind === "studio.owned-media-study.v2");
     const planningHost = new StudyPlanningHost(ledger, artifacts);
     const bridge = new BoundedOrchestratorBridge({
       task,
@@ -98,6 +100,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       ledger,
       scheduler,
       childLauncher,
+      ...(generalizedEnabled ? { artifacts } : {}),
       ...(planningEnabled ? {
         admissionHost: new ParentArtifactAdmissionHost(ledger, artifacts),
         readHost: new ParentArtifactReadHost(ledger, artifacts),
@@ -111,7 +114,50 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
     });
     let outcome: "completed" | "no_request" | "withheld" = "no_request";
     let reason = "The deterministic test seam deliberately issued no child request.";
-    if (this.mode !== "no_request" && planningEnabled) {
+    if (this.mode !== "no_request" && generalizedEnabled) {
+      const sourceId = task.jobContext.source.artifactId;
+      const rootScope = task.mediaScope[0];
+      if (!rootScope || task.mediaScope.length !== 1) throw new Error("Deterministic generalized root requires one exact media scope");
+      const midpoint = rootScope.startMs + Math.floor((rootScope.endMs - rootScope.startMs) / 2);
+      if (midpoint <= rootScope.startMs || midpoint >= rootScope.endMs) throw new Error("Deterministic generalized root cannot split the bounded scope");
+      const scopes = [{ ...rootScope, endMs: midpoint }, { ...rootScope, startMs: midpoint }];
+      for (const [index, scope] of scopes.entries()) {
+        await bridge.spawn({
+          workloadKey: `deterministic-generalized-study-child:${ledger.runId}:${index}`,
+          objective: "Return one v2 coverage partition from current-run speech. Speech alone may support claims; acoustic evidence is coverage qualification and frames are cite-only.",
+          workerKind: "analysis",
+          workerLabel: `deterministic-generalized-study-worker-${index + 1}`,
+          mediaScope: [scope],
+          inputArtifactIds: [sourceId],
+          requiredOutputs: [{ name: `generalized coverage study ${index + 1}`, artifactKind: "studio.study-report.v2", required: true }],
+          requiredCapabilities: ["speech.transcribe", "report.submit"],
+          dependencyWorkloadKeys: [],
+          budget: { wallMs: 20_000, toolCalls: 2 },
+        });
+      }
+      const waited = await bridge.wait({});
+      if (waited.result !== "all_terminal") throw new Error(`Deterministic generalized fan-out failed as ${waited.failure}`);
+      let synthesisInput: { coverage: OwnedMediaStudyCoverageRangeV2[]; claims: OwnedMediaStudyClaimV2[] } | null = null;
+      for (const child of waited.children) {
+        if (!child.reportId || child.artifactIds.length !== 1) throw new Error("Deterministic generalized child did not return one typed report");
+        const disposition = await bridge.disposition({
+          reportId: child.reportId,
+          outputArtifactId: child.artifactIds[0],
+          outcome: "accepted",
+          reason: "The deterministic seam accepts this structurally audited U3 report for bounded synthesis; no correctness or quality is claimed.",
+        });
+        if (!disposition.admission || !("grant" in disposition.admission)) throw new Error("Deterministic generalized admission did not create exact read authority");
+        const read = await bridge.readAdmitted({
+          grantId: disposition.admission.grant.id,
+          contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
+        });
+        synthesisInput = read.synthesisInput ?? synthesisInput;
+      }
+      if (!synthesisInput) throw new Error("Deterministic generalized root did not receive host-derived synthesis input");
+      const synthesis = await bridge.synthesize(synthesisInput);
+      outcome = "completed";
+      reason = `The deterministic seam copied the host-derived U3 synthesis input into ${synthesis.studyId}; this is wiring evidence, not semantic acceptance.`;
+    } else if (this.mode !== "no_request" && planningEnabled) {
       const sourceId = task.jobContext.source.artifactId;
       const rootScope = task.mediaScope[0];
       if (!rootScope || task.mediaScope.length !== 1) throw new Error("Deterministic synthesis root requires one exact media scope");

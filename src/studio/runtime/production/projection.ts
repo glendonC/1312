@@ -42,12 +42,16 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     reports: {},
     rootOutputDispositions: {},
     parentArtifactDispositions: {},
+    generalizedParentArtifactAdmissions: {},
     parentArtifactReadGrants: {},
     parentArtifactReads: {},
+    generalizedParentArtifactReads: {},
     studyPlanningDecisions: {},
     studyFollowUps: {},
     ownedMediaStudies: {},
+    generalizedOwnedMediaStudies: {},
     studyReadiness: {},
+    generalizedStudyReadiness: {},
   };
 }
 

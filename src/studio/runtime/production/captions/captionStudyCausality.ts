@@ -1,13 +1,16 @@
 import { canonicalSha256 } from "../artifactStore.ts";
 import type { VerifiedOwnedMediaStudy } from "../study/studySynthesisAudit.ts";
 import type {
+  CaptionLineCausalityV3,
   CaptionLineReasonCode,
   CaptionLineStudySupport,
   CaptionProductionLine,
   CaptionStudyIdentity,
   PublishReviewDecisionReceiptIdentity,
   StudyReadinessReceiptIdentity,
+  RuntimeProjection,
 } from "../model.ts";
+import type { GeneralizedStudySynthesisResult } from "../study/generalizedStudySynthesisHost.ts";
 import type { DialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.ts";
 import { rangeOverlapsNonDialogue } from "../../../acoustic/dialogueScopePolicy.ts";
 
@@ -28,6 +31,132 @@ export function captionStudyIdentity(study: VerifiedOwnedMediaStudy): CaptionStu
     contentId: study.artifact.content.contentId,
     executorReceiptId: study.executorReceipt.receiptId,
     executorReceiptContentId: study.record.executorReceiptContentId,
+  };
+}
+
+export function generalizedCaptionStudyIdentity(study: GeneralizedStudySynthesisResult): CaptionStudyIdentity {
+  return {
+    studyId: study.study.studyId,
+    artifactId: study.study.artifactId,
+    contentId: study.study.contentId,
+    executorReceiptId: study.executorReceiptId,
+    executorReceiptContentId: study.executorReceiptContentId,
+  };
+}
+
+function generalizedSupport(
+  state: RuntimeProjection,
+  study: GeneralizedStudySynthesisResult,
+  causality: CaptionLineCausalityV3,
+): CaptionLineStudySupport {
+  const coverage = causality.lineage.coverageId
+    ? study.envelope.coverage.find((entry) => entry.coverageId === causality.lineage.coverageId)
+    : null;
+  const coverageState: CaptionLineStudySupport["coverage"]["state"] = causality.lineage.coverageState === "supported"
+    ? "supported"
+    : causality.lineage.coverageState === "conflicting"
+      ? "conflict"
+      : causality.lineage.coverageState === "failed"
+        ? "failed"
+        : causality.lineage.coverageState === "unknown"
+          ? "unknown"
+          : causality.lineage.coverageState === "uncovered"
+            ? "uncovered"
+            : "withheld";
+  const reasonCode = coverageState === "supported" ? null
+    : coverageState === "conflict" ? "unresolved_conflict" as const
+      : coverageState === "uncovered" ? "uncovered" as const
+        : coverage?.reason?.code ?? "uncovered" as const;
+  const citationIds = new Set(causality.lineage.citationIds);
+  const semanticCitations = study.envelope.evidenceCitations
+    .filter((citation) => citationIds.has(citation.citationId))
+    .map((citation) => {
+      if (citation.evidenceKind !== "current_run_speech" || citation.use !== "claim_support" || !citation.operationId) {
+        throw new Error("Generalized caption text retained a non-speech claim citation");
+      }
+      return {
+        operationId: citation.operationId,
+        artifactId: citation.evidence.artifactId,
+        contentId: citation.evidence.contentId,
+        receiptId: citation.receipt.receiptId,
+        receiptContentId: citation.receipt.contentId,
+        observations: citation.observations.flatMap((observation) =>
+          observation.state === "available" && observation.locator.kind === "temporal_range"
+            ? [{ observationId: observation.observationId, startMs: observation.locator.media.startMs, endMs: observation.locator.media.endMs }]
+            : []),
+      };
+    });
+  const admissionIds = new Set(study.envelope.claims
+    .filter((claim) => causality.lineage.claimIds.includes(claim.claimId))
+    .flatMap((claim) => claim.childClaims.map((child) => child.admissionId)));
+  const childReports = [...admissionIds].map((admissionId) => {
+    const admission = state.generalizedParentArtifactAdmissions[admissionId];
+    const read = Object.values(state.generalizedParentArtifactReads).find((entry) => entry.admissionId === admissionId);
+    if (!admission || !read) throw new Error("Generalized caption causality lost an admitted/read child report");
+    return {
+      reportId: admission.reportId,
+      childTaskId: admission.childTaskId,
+      childAgentId: admission.childAgentId,
+      artifactId: admission.report.artifactId,
+      contentId: admission.report.contentId,
+      dispositionId: admission.admissionId,
+      dispositionReceiptId: admission.receiptId,
+      dispositionReceiptContentId: admission.receiptContentId,
+      admissionId: admission.admissionId,
+      admissionReceiptId: admission.receiptId,
+      admissionReceiptContentId: admission.receiptContentId,
+      readOperationId: read.id,
+      readReceiptId: read.receiptId,
+    };
+  });
+  return {
+    coverage: { coverageId: causality.lineage.coverageId, state: coverageState, reasonCode },
+    claimIds: [...causality.lineage.claimIds],
+    semanticCitations,
+    childReports,
+  };
+}
+
+export function closeGeneralizedCaptionLineCausality(input: {
+  line: Omit<CaptionProductionLine, "lineage">;
+  state: RuntimeProjection;
+  study: GeneralizedStudySynthesisResult;
+  studyIdentity: CaptionStudyIdentity;
+  causality: CaptionLineCausalityV3;
+  readiness: StudyReadinessReceiptIdentity;
+  approval: PublishReviewDecisionReceiptIdentity;
+  source: { artifactId: string; contentId: string };
+  executor: CaptionProductionLine["lineage"]["captionExecutor"];
+  derivation: CaptionProductionLine["lineage"]["derivation"];
+}): CaptionProductionLine {
+  const support = generalizedSupport(input.state, input.study, input.causality);
+  const knownReasons = new Set<CaptionLineReasonCode>([
+    "not_in_requested_dialogue_scope", "study_coverage_conflict", "study_coverage_truncated",
+    "study_coverage_unavailable", "study_coverage_failed", "study_coverage_withheld",
+    "study_coverage_unknown", "study_coverage_uncovered", "study_readiness_withheld",
+  ]);
+  const reasonCode = input.causality.source.reasonCode;
+  if (reasonCode !== null && !knownReasons.has(reasonCode as CaptionLineReasonCode)) {
+    throw new Error("Generalized caption causality returned an unknown closed reason");
+  }
+  const typedReason = reasonCode as CaptionLineReasonCode | null;
+  return {
+    ...structuredClone(input.line),
+    source: { ...structuredClone(input.causality.source), reasonCode: typedReason },
+    target: { ...structuredClone(input.causality.target), reasonCode: typedReason },
+    lineage: {
+      derivation: input.derivation,
+      source: {
+        artifactId: input.source.artifactId,
+        contentId: input.source.contentId,
+        window: { startMs: input.line.startMs, endMs: input.line.endMs },
+      },
+      study: { ...structuredClone(input.studyIdentity), ...support },
+      readiness: structuredClone(input.readiness),
+      approval: structuredClone(input.approval),
+      captionExecutor: structuredClone(input.executor),
+      generalizedCausality: structuredClone(input.causality),
+    },
   };
 }
 
@@ -145,6 +274,9 @@ export function captionLineReceiptProjection(line: CaptionProductionLine) {
     claimIds: [...line.lineage.study.claimIds],
     semanticEvidenceArtifactIds: line.lineage.study.semanticCitations.map((citation) => citation.artifactId),
     reportArtifactIds: line.lineage.study.childReports.map((report) => report.artifactId),
+    ...(line.lineage.generalizedCausality
+      ? { generalizedCausality: structuredClone(line.lineage.generalizedCausality) }
+      : {}),
   };
 }
 

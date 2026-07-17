@@ -5,9 +5,8 @@ import test from "node:test";
 
 import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
-import { reopenStudyPlanningDecision } from "../src/studio/runtime/production/study/studyPlanningAudit.ts";
-import { reopenStudyReadiness } from "../src/studio/runtime/production/study/studyReadinessAudit.ts";
-import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/study/studySynthesisAudit.ts";
+import { GeneralizedStudyReadinessHost } from "../src/studio/runtime/production/study/generalizedStudyReadinessHost.ts";
+import { generalizedReadinessReference } from "../src/studio/runtime/production/study/generalizedStudyRuntime.ts";
 import { createProductionAnalysisRequest } from "../src/studio/runtime/production/runStart/analysisRequest.ts";
 import { loadOwnedSourceSession } from "../src/studio/runtime/production/runStart/sourceSessionLoader.ts";
 import {
@@ -19,7 +18,7 @@ import {
 
 const ENABLED = process.env.STUDIO_RUN_REAL_CODEX_SWARM === "1";
 
-test("guarded real Codex root closes fan-out, admitted reports, model planning, and model-authored study synthesis", {
+test("guarded real Codex root closes the default U3 report-to-readiness spine", {
   skip: !ENABLED,
   timeout: 300_000,
 }, async (context) => {
@@ -78,29 +77,29 @@ test("guarded real Codex root closes fan-out, admitted reports, model planning, 
   assert.ok(Object.values(state.reportWaits).some((wait) =>
     wait.executionId === rootExecution.id && wait.status === "returned"));
   assert.equal(state.taskLaunches[root.id].executionId, rootExecution.id);
-  assert.ok(Object.values(state.reports).filter((report) => report.study?.output.schema === "studio.study-report.v1").length >= 2);
-  assert.ok(Object.values(state.parentArtifactDispositions).filter((disposition) => disposition.outcome === "accepted").length >= 2);
-  assert.ok(Object.values(state.parentArtifactReads).filter((read) => read.status === "completed").length >= 2);
-  const planning = Object.values(state.studyPlanningDecisions);
-  assert.ok(planning.length >= 1);
-  const synthesisDecision = planning.find((decision) => decision.outcome === "synthesize_with_gaps");
-  assert.ok(synthesisDecision, "real Codex root must author an eventual synthesis decision");
-  assert.ok(synthesisDecision.input.reports.length >= 2);
-  const studies = Object.values(state.ownedMediaStudies);
+  assert.ok(Object.values(state.reports).filter((report) => report.study?.output.schema === "studio.study-report.v2").length >= 2);
+  assert.ok(Object.values(state.generalizedParentArtifactAdmissions).length >= 2);
+  assert.ok(Object.values(state.generalizedParentArtifactReads).filter((read) => read.status === "completed").length >= 2);
+  assert.equal(Object.keys(state.parentArtifactDispositions).length, 0);
+  assert.equal(Object.keys(state.parentArtifactReads).length, 0);
+  assert.equal(Object.keys(state.studyPlanningDecisions).length, 0);
+  assert.equal(Object.keys(state.ownedMediaStudies).length, 0);
+  const studies = Object.values(state.generalizedOwnedMediaStudies);
   assert.equal(studies.length, 1);
   const study = studies[0];
-  assert.equal(study.planningDecisionId, synthesisDecision.id);
+  assert.equal(study.schema, "studio.owned-media-study.v2");
+  assert.ok(study.reports.length >= 2);
   assert.ok(rootExecution.receipt.outputArtifactIds.includes(study.artifactId));
-  const readiness = Object.values(state.studyReadiness);
+  const readiness = Object.values(state.generalizedStudyReadiness);
   assert.equal(readiness.length, 1);
   assert.equal(Object.values(state.publishReviewIntakes)[0].readinessId, readiness[0].id);
   const artifacts = new ContentAddressedArtifactStore(initialized.artifactStoreRoot);
-  await reopenStudyPlanningDecision(state, artifacts, synthesisDecision.id);
-  const verifiedStudy = await reopenOwnedMediaStudy(state, artifacts, study.id);
-  assert.equal(verifiedStudy.executorReceipt.producer.authorship, "active_root_executor_tool_call");
-  assert.equal(verifiedStudy.envelope.root.executionId, rootExecution.id);
-  assert.ok(verifiedStudy.envelope.reports.length >= 2);
-  await reopenStudyReadiness(state, artifacts, readiness[0].id);
+  const verifiedReadiness = await new GeneralizedStudyReadinessHost(state, artifacts).reopen(
+    generalizedReadinessReference(readiness[0]),
+  );
+  assert.equal(verifiedReadiness.reopenedStudy?.executorReceipt.producer.id, "studio.generalized-study-synthesis");
+  assert.equal(verifiedReadiness.reopenedStudy?.envelope.root.executionId, rootExecution.id);
+  assert.ok((verifiedReadiness.reopenedStudy?.envelope.reports.length ?? 0) >= 2);
   const replayed = await RuntimeLedger.open(runtimeId, new FileEventJournal(initialized.journalPath));
   assert.deepEqual(replayed.state(), state);
   context.diagnostic(`durable real-Codex proof retained at ${runtimeRoot}`);

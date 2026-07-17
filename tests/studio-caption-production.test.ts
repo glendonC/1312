@@ -44,6 +44,7 @@ async function harness(options: {
   captionExecutor?: CaptionProductionExecutor;
   executionMode?: "completed" | "failed" | "timed_out" | "interrupted";
   orchestratorMode?: DeterministicOrchestratorMode;
+  defaultU3?: boolean;
 } = {}): Promise<Harness> {
   const directory = await mkdtemp(join(tmpdir(), "studio-caption-production-test-"));
   const sources = await RuntimeSourceRegistry.open({ sourceDirectories: [FIXTURE] });
@@ -53,6 +54,7 @@ async function harness(options: {
     sources,
     launcherFactory: new DeterministicRuntimeExecutor({ mode: options.executionMode }).factory(),
     orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory({ mode: options.orchestratorMode }),
+    ...(!options.defaultU3 ? { studyContractVersion: "v1" as const } : {}),
     captionExecutor: options.captionExecutor,
     recoverOnOpen: false,
   });
@@ -279,6 +281,30 @@ test("full owned-run current-run captions and independent QC close under cold re
       fetch: async () => new Response(JSON.stringify(results), { status: 200, headers: { "Content-Type": "application/json" } }),
     });
     assert.deepEqual(await client.captionProductionResults(approval.runtimeId), results);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("default U3 approval produces a v3 caption artifact with durable generalized causality", async () => {
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor, defaultU3: true });
+  try {
+    const approval = await approved(runtime);
+    const produced = await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    assert.equal(produced.captions.length, 1);
+    const results = await runtime.service.captionProductionResults(approval.runtimeId);
+    const artifact = results.results[0].artifact;
+    assert.equal(artifact.schema, "studio.caption-production.artifact.v3");
+    assert.equal(artifact.lines.length, 1);
+    const causality = artifact.lines[0].lineage.generalizedCausality;
+    assert.equal(causality?.schema, "studio.caption-line-causality.v3");
+    assert.equal(causality?.lineage.coverageState, "supported");
+    assert.ok((causality?.lineage.citationIds.length ?? 0) > 0);
+    const loaded = await journal(runtime, approval.runtimeId);
+    assert.equal(Object.keys(loaded.state.ownedMediaStudies).length, 0);
+    assert.equal(Object.keys(loaded.state.generalizedOwnedMediaStudies).length, 1);
+    assert.equal(Object.keys(loaded.state.studyReadiness).length, 0);
+    assert.equal(Object.keys(loaded.state.generalizedStudyReadiness).length, 1);
   } finally {
     await cleanup(runtime);
   }

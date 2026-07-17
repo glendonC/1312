@@ -313,6 +313,8 @@ test("typed coverage report binds submission, admission, path-free least-privile
   const runtime = await harness();
   try {
     const submission = runtime.ledger.state().reports[runtime.reportId].study!;
+    assert.equal(submission.schema, "studio.study-report-submission.v1");
+    if (submission.schema !== "studio.study-report-submission.v1") throw new Error("Legacy admission fixture produced a non-v1 report");
     assert.deepEqual(submission.counts, {
       ranges: { supported: 1, withheld: 0, unknown: 0, failed: 0 },
       durationMs: { supported: 1_000, withheld: 0, unknown: 0, failed: 0 },

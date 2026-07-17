@@ -302,6 +302,7 @@ export interface OwnedMediaStudyExecutorReceipt {
 }
 
 export interface OwnedMediaStudyRecord {
+  schema?: "studio.owned-media-study.v1";
   id: string;
   planningDecisionId: string;
   rootTaskId: string;
@@ -376,6 +377,7 @@ export interface StudyReadinessReceiptIdentity {
 }
 
 export interface StudyReadinessRecord {
+  schema?: "studio.study-readiness.receipt.v1" | "studio.study-readiness.receipt.v2";
   id: string;
   studyId: string;
   studyArtifactId: string;

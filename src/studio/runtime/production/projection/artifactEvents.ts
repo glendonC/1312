@@ -76,7 +76,7 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
       invariant(
         execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId &&
           task?.jobContext.contextId === origin.jobContextId &&
-          task.requiredOutputs.some((slot) => slot.name === origin.outputSlotName && slot.artifactKind === "studio.study-report.v1"),
+          task.requiredOutputs.some((slot) => slot.name === origin.outputSlotName && slot.artifactKind === artifact.kind),
         event,
         `artifact ${artifact.id} changed its study task, context, or output slot`,
       );
@@ -100,6 +100,26 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         event,
         `artifact ${artifact.id} changed its parent admission lineage`,
       );
+    } else if (artifact.origin.kind === "generalized_parent_admission") {
+      const report = next.reports[artifact.origin.reportId];
+      invariant(report?.study?.schema === "studio.study-report-submission.v2" && report.status === "accepted", event, `artifact ${artifact.id} has no accepted v2 report`);
+      invariant(
+        report.parentTaskId === artifact.producerTaskId && report.parentAgentId === artifact.producerAgentId &&
+          report.study.output.artifactId === artifact.origin.reportArtifactId &&
+          artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === artifact.origin.reportArtifactId,
+        event,
+        `artifact ${artifact.id} changed its generalized admission lineage`,
+      );
+    } else if (artifact.origin.kind === "generalized_parent_artifact_read") {
+      const admission = next.generalizedParentArtifactAdmissions[artifact.origin.admissionId];
+      invariant(admission?.contractVersion === 2, event, `artifact ${artifact.id} has no v2 admission authority`);
+      invariant(
+        admission.parentTaskId === artifact.producerTaskId && admission.parentAgentId === artifact.producerAgentId &&
+          admission.inputArtifactId === artifact.origin.reportArtifactId &&
+          artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === artifact.origin.reportArtifactId,
+        event,
+        `artifact ${artifact.id} changed its generalized read lineage`,
+      );
     } else if (artifact.origin.kind === "study_planning_decision") {
       const execution = next.executions[artifact.origin.executionId];
       invariant(execution?.status === "active" && execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId, event, `artifact ${artifact.id} has no active root planning executor`);
@@ -107,9 +127,15 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
       const execution = next.executions[artifact.origin.executionId];
       const planning = next.studyPlanningDecisions[artifact.origin.planningDecisionId];
       invariant(execution?.status === "active" && execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId && planning?.outcome === "synthesize_with_gaps", event, `artifact ${artifact.id} has no active root synthesis executor or planning decision`);
+    } else if (artifact.origin.kind === "generalized_owned_media_study") {
+      const execution = next.executions[artifact.origin.executionId];
+      invariant(execution?.status === "active" && execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId, event, `artifact ${artifact.id} has no active generalized root synthesis executor`);
     } else if (artifact.origin.kind === "study_readiness") {
       const study = next.ownedMediaStudies[artifact.origin.studyId];
       invariant(study?.artifactId === artifact.origin.studyArtifactId && artifact.producerTaskId === null && artifact.producerAgentId === null, event, `artifact ${artifact.id} has no exact owned-media study input`);
+    } else if (artifact.origin.kind === "generalized_study_readiness") {
+      const study = next.generalizedOwnedMediaStudies[artifact.origin.studyId];
+      invariant(study?.artifactId === artifact.origin.studyArtifactId && study.schema === "studio.owned-media-study.v2" && artifact.producerTaskId === null && artifact.producerAgentId === null, event, `artifact ${artifact.id} has no exact generalized study input`);
     } else if (artifact.origin.kind === "root_output_disposition") {
       const report = next.reports[artifact.origin.reportId];
       const expectedStatus = artifact.origin.outcome === "promoted_to_root" ? "accepted" : "rejected";

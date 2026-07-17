@@ -25,6 +25,7 @@ if (args[0] === "--version") {
 let prompt = "";
 for await (const chunk of process.stdin) prompt += chunk;
 const isRoot = Boolean(process.env.STUDIO_ORCHESTRATOR_BRIDGE_URL);
+const generalized = prompt.includes("exactly 5 closed, path-free tools") || prompt.includes("studio.study-report.v2");
 const testMode = ${JSON.stringify(mode)};
 if (isRoot && testMode === "hang-root") await new Promise(() => setInterval(() => {}, 1_000));
 if (isRoot) {
@@ -46,7 +47,7 @@ if (isRoot) {
   }
   const modelIndex = args.indexOf("--model");
   if (args[modelIndex + 1] !== "owned-swarm-test-model") throw new Error("root model was not explicit");
-  if (!prompt.includes("exactly 6 closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext")) {
+  if (!prompt.includes("exactly " + (generalized ? "5" : "6") + " closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext")) {
     throw new Error("closed root prompt contract is missing");
   }
   const root = JSON.parse(prompt.split("\\n\\n").at(-1));
@@ -70,7 +71,7 @@ if (isRoot) {
     workerLabel: "model-" + side,
     mediaScope: [{ ...root.mediaScope[0], startMs, endMs }],
     inputArtifactIds: [root.jobContext.source.artifactId],
-    requiredOutputs: [{ name: "coverage study", artifactKind: "studio.study-report.v1", required: true }],
+    requiredOutputs: [{ name: "coverage study", artifactKind: generalized ? "studio.study-report.v2" : "studio.study-report.v1", required: true }],
     requiredCapabilities: ["speech.transcribe", "report.submit"],
     dependencyWorkloadKeys: [],
     budget: { wallMs: 10000, toolCalls: 2 },
@@ -82,6 +83,7 @@ if (isRoot) {
   const waited = await call("task_reports_wait", {});
   if (waited.result !== "all_terminal" || waited.children.length !== 2) throw new Error("wait did not return two terminal children");
   let planningInput = null;
+  let synthesisInput = null;
   for (const childResult of waited.children) {
     const disposition = await call("report_disposition", {
       reportId: childResult.reportId,
@@ -95,7 +97,13 @@ if (isRoot) {
       contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
     });
     planningInput = read.planningInput || planningInput;
+    synthesisInput = read.synthesisInput || synthesisInput;
   }
+  if (generalized) {
+    if (!synthesisInput) throw new Error("two admitted generalized reads did not expose synthesis input");
+    const synthesis = await call("study_synthesize", synthesisInput);
+    if (!synthesis.studyId || synthesis.executorReceipt.schema !== "studio.owned-media-study.executor-receipt.v2") throw new Error("generalized study synthesis did not close");
+  } else {
   if (!planningInput) throw new Error("two admitted reads did not expose planning input");
   const planning = await call("study_planning_decision", {
     inputId: planningInput.inputId,
@@ -125,10 +133,12 @@ if (isRoot) {
     ],
   });
   if (!synthesis.studyId || synthesis.executorReceipt.producer.authorship !== "active_root_executor_tool_call") throw new Error("study synthesis did not close");
+  }
 }
 let childFinal = null;
 if (!isRoot) {
   const worker = JSON.parse(prompt.split("\\n\\n").at(-1));
+  const workerGeneralized = worker.requiredOutputs[0].artifactKind === "studio.study-report.v2";
   const scope = worker.grantedSemanticEvidence[0];
   const response = await fetch(process.env.STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_URL + "/v1/call", {
     method: "POST",
@@ -163,8 +173,10 @@ if (!isRoot) {
     semanticEvidenceInputs: [input],
     outputs: [{
       name: "coverage study",
-      kind: "studio.study-report.v1",
-      coverage: [{ ...scope, state: "unknown", claimIds: [], reason: { code, detail: "The current-run semantic input did not establish supported coverage." } }],
+      kind: workerGeneralized ? "studio.study-report.v2" : "studio.study-report.v1",
+      coverage: workerGeneralized
+        ? [{ ...scope, claimIds: [], reason: null }]
+        : [{ ...scope, state: "unknown", claimIds: [], reason: { code, detail: "The current-run semantic input did not establish supported coverage." } }],
       claims: [],
     }],
   };
@@ -224,6 +236,7 @@ test("Codex root launcher exposes the closed planning/synthesis tools and receip
         model,
         maximumWallMs: 20_000,
       }),
+      "v1",
     );
     const ledger = await RuntimeLedger.open(
       initialized.runStart.runtimeId,
@@ -252,6 +265,54 @@ test("Codex root launcher exposes the closed planning/synthesis tools and receip
     assert.equal(Object.keys(state.studyReadiness).length, 1);
     assert.equal(Object.values(state.studyReadiness)[0].outcome, "withheld");
     assert.equal(Object.values(state.publishReviewIntakes)[0].outcome, "rejected");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("default Codex launcher closes the five-tool U3 report-to-readiness spine", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "studio-orchestrator-u3-default-"));
+  try {
+    const loadedSource = await loadOwnedSourceSession(resolve("public/demo/runs/run-005"));
+    const analysisRequest = createProductionAnalysisRequest(loadedSource.session, {
+      range: { startMs: 0, endMs: 2_000 },
+      requestedSource: { mode: "declared", languages: ["ko"], reason: null },
+      targetLanguage: "en",
+      selectedLanguagePackId: "ko-v3",
+      outputDepth: "evidence",
+    });
+    const runtimeRoot = join(directory, "runtime");
+    const initialized = await initializeRuntimeApplication({
+      runtimeRoot,
+      journalPath: join(runtimeRoot, "events.ndjson"),
+      artifactStoreRoot: join(runtimeRoot, "artifact-store"),
+      runStartPath: join(runtimeRoot, "run-start.json"),
+      runtimeId: "runtime:orchestrator-u3-default-contract",
+      journalId: "journal:orchestrator-u3-default-contract",
+      acceptedBy: "operator:test",
+      startedAt: "2026-07-16T12:00:00.000Z",
+      loadedSource,
+      analysisRequest,
+    });
+    const fake = await fakeCodex(directory);
+    const model = "owned-swarm-test-model";
+    await runBoundedRuntimeApplication(
+      initialized,
+      codexWorkerLauncherFactory({ executable: fake.executable, executableArgsPrefix: fake.prefix, model, maximumWallMs: 20_000 }),
+      codexOrchestratorLauncherFactory({ executable: fake.executable, executableArgsPrefix: fake.prefix, model, maximumWallMs: 20_000 }),
+    );
+    const state = (await RuntimeLedger.open(initialized.runStart.runtimeId, new FileEventJournal(initialized.journalPath))).state();
+    const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
+    assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v2", required: true }]);
+    assert.equal(root.grants.some((grant) => grant.capability === "study.plan"), false);
+    assert.equal(Object.values(state.reports).filter((report) => report.study?.schema === "studio.study-report-submission.v2").length, 2);
+    assert.equal(Object.keys(state.generalizedParentArtifactAdmissions).length, 2);
+    assert.equal(Object.keys(state.generalizedParentArtifactReads).length, 2);
+    assert.equal(Object.keys(state.generalizedOwnedMediaStudies).length, 1);
+    assert.equal(Object.keys(state.generalizedStudyReadiness).length, 1);
+    assert.equal(Object.keys(state.parentArtifactDispositions).length, 0);
+    assert.equal(Object.keys(state.ownedMediaStudies).length, 0);
+    assert.equal(Object.keys(state.studyPlanningDecisions).length, 0);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -286,6 +347,7 @@ test("model-root timeout records a timed-out executor and creates no planning, s
       initialized,
       codexWorkerLauncherFactory({ executable: fake.executable, executableArgsPrefix: fake.prefix, model: "owned-swarm-test-model", maximumWallMs: 100 }),
       codexOrchestratorLauncherFactory({ executable: fake.executable, executableArgsPrefix: fake.prefix, model: "owned-swarm-test-model", maximumWallMs: 100 }),
+      "v1",
     ), /timed out/i);
     const state = (await RuntimeLedger.open(initialized.runStart.runtimeId, new FileEventJournal(initialized.journalPath))).state();
     const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;

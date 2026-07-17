@@ -25,7 +25,9 @@ const manifest = await fetchOrchestratorManifest(endpoint, token);
 const names = new Set(manifest.tools.map((tool) => tool.name));
 const planningNames = [ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL];
 if (!names.has(ORCHESTRATOR_SPAWN_TOOL) || !names.has(ORCHESTRATOR_WAIT_TOOL) ||
-    (names.size !== 2 && names.size !== 6) || (names.size === 6 && planningNames.some((name) => !names.has(name)))) {
+    (names.size !== 2 && names.size !== 5 && names.size !== 6) ||
+    (names.size === 6 && planningNames.some((name) => !names.has(name))) ||
+    (names.size === 5 && [ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL].some((name) => !names.has(name)))) {
   throw new Error("The bounded orchestrator tool manifest is incomplete or open");
 }
 
@@ -145,10 +147,10 @@ if (names.has(ORCHESTRATOR_DISPOSITION_TOOL)) {
       }).strict(),
       annotations: { title: "Disposition child report", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (args) => {
+    async (args: unknown) => {
       try {
         const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_DISPOSITION_TOOL, args);
-        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
       } catch (error) {
         return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "The report disposition failed closed." }] };
       }
@@ -168,10 +170,10 @@ if (names.has(ORCHESTRATOR_READ_TOOL)) {
       }).strict(),
       annotations: { title: "Read admitted study report", readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (args) => {
+    async (args: unknown) => {
       try {
         const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_READ_TOOL, args);
-        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
       } catch (error) {
         return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "The admitted artifact read failed closed." }] };
       }
@@ -235,51 +237,71 @@ const semanticCitation = z.object({
   }).strict()).min(1).max(256),
 }).strict();
 
+const generalizedRange = {
+  artifactId: z.string().min(1),
+  trackId: z.string().min(1),
+  startMs: z.number().int().nonnegative(),
+  endMs: z.number().int().positive(),
+};
+const generalizedCoverage = z.object({
+  coverageId: z.string().min(1),
+  ...generalizedRange,
+  state: z.enum(["supported", "unknown", "withheld", "unavailable", "truncated", "conflicting", "failed", "not_in_scope"]),
+  preservedStates: z.array(z.enum(["supported", "unknown", "withheld", "unavailable", "truncated", "conflicting", "failed", "not_in_scope"])).min(1).max(8),
+  rawStates: z.array(z.string().min(1)).max(32),
+  claimIds: z.array(z.string().min(1)).max(256),
+  citationIds: z.array(z.string().min(1)).max(512),
+  reason: z.object({
+    code: z.enum(["evidence_unknown", "worker_withheld", "evidence_unavailable", "evidence_truncated", "evidence_conflicting", "operation_failed", "not_in_requested_scope"]),
+    detail: z.string().min(1).max(4_000),
+  }).strict().nullable(),
+}).strict();
+const generalizedClaim = z.object({
+  claimId: z.string().min(1),
+  ...generalizedRange,
+  statement: z.string().min(1).max(8_000),
+  childClaims: z.array(z.object({
+    admissionId: z.string().min(1),
+    reportArtifactId: z.string().min(1),
+    reportContentId: z.string().min(1),
+    claimId: z.string().min(1),
+  }).strict()).min(1).max(512),
+  citationIds: z.array(z.string().min(1)).min(1).max(512),
+}).strict();
+
+const legacySynthesisInput = z.object({
+  planningDecisionId: z.string().min(1),
+  coverage: z.array(studyCoverage).min(1).max(256),
+  claims: z.array(z.object({
+    claimId: z.string().min(1), artifactId: z.string().min(1), trackId: z.string().min(1),
+    startMs: z.number().int().nonnegative(), endMs: z.number().int().positive(), statement: z.string().min(1).max(8_000),
+    childReportCitations: z.array(z.object({ reportId: z.string().min(1), artifactId: z.string().min(1), contentId: z.string().min(1), admissionId: z.string().min(1), claimId: z.string().min(1) }).strict()).min(1).max(512),
+    semanticCitations: z.array(semanticCitation).min(1).max(512),
+  }).strict()).max(256),
+  conflicts: z.array(z.object({ conflictId: z.string().min(1), coverageId: z.string().min(1), status: z.literal("unresolved"), detail: z.string().min(1).max(4_000) }).strict()).max(128),
+  limitations: z.array(z.object({
+    code: z.enum(["explicit_gap", "unresolved_conflict", "partial_child_failure", "rejected_child_input", "recognizer_hypothesis_not_truth", "semantic_quality_not_assessed"]),
+    coverageIds: z.array(z.string().min(1)).max(256), detail: z.string().min(1).max(4_000),
+  }).strict()).max(128),
+}).strict();
+
 if (names.has(ORCHESTRATOR_SYNTHESIZE_TOOL)) {
   server.registerTool(
     ORCHESTRATOR_SYNTHESIZE_TOOL,
     {
       title: "Emit owned-media study",
       description: "Emit model-authored study coverage, claims, conflicts, and limitations. The host injects immutable context, dispositions, and follow-up history and rejects unsupported support.",
-      inputSchema: z.object({
-        planningDecisionId: z.string().min(1),
-        coverage: z.array(studyCoverage).min(1).max(256),
-        claims: z.array(z.object({
-          claimId: z.string().min(1),
-          artifactId: z.string().min(1),
-          trackId: z.string().min(1),
-          startMs: z.number().int().nonnegative(),
-          endMs: z.number().int().positive(),
-          statement: z.string().min(1).max(8_000),
-          childReportCitations: z.array(z.object({
-            reportId: z.string().min(1),
-            artifactId: z.string().min(1),
-            contentId: z.string().min(1),
-            admissionId: z.string().min(1),
-            claimId: z.string().min(1),
-          }).strict()).min(1).max(512),
-          semanticCitations: z.array(semanticCitation).min(1).max(512),
-        }).strict()).max(256),
-        conflicts: z.array(z.object({
-          conflictId: z.string().min(1),
-          coverageId: z.string().min(1),
-          status: z.literal("unresolved"),
-          detail: z.string().min(1).max(4_000),
-        }).strict()).max(128),
-        limitations: z.array(z.object({
-          code: z.enum(["explicit_gap", "unresolved_conflict", "partial_child_failure", "rejected_child_input", "recognizer_hypothesis_not_truth", "semantic_quality_not_assessed"]),
-          coverageIds: z.array(z.string().min(1)).max(256),
-          detail: z.string().min(1).max(4_000),
-        }).strict()).max(128),
-      }).strict(),
+      inputSchema: names.has(ORCHESTRATOR_PLAN_TOOL)
+        ? legacySynthesisInput
+        : z.object({ coverage: z.array(generalizedCoverage).min(1).max(256), claims: z.array(generalizedClaim).max(256) }).strict(),
       annotations: { title: "Emit owned-media study", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (args) => {
+    async (args: unknown) => {
       try {
         const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_SYNTHESIZE_TOOL, args);
-        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "The owned-media study synthesis failed closed." }] };
+        return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : "The owned-media study synthesis failed closed." }] };
       }
     },
   );

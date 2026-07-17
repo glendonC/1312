@@ -31,8 +31,10 @@ export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent):
     );
     const source = next.artifacts[event.data.input.sourceArtifactId];
     const intake = next.publishReviewIntakes[approval.intakeId];
-    const readiness = next.studyReadiness[event.data.input.readiness.readinessId];
-    const study = next.ownedMediaStudies[event.data.input.study.studyId];
+    const readiness = next.studyReadiness[event.data.input.readiness.readinessId] ??
+      next.generalizedStudyReadiness[event.data.input.readiness.readinessId];
+    const study = next.ownedMediaStudies[event.data.input.study.studyId] ??
+      next.generalizedOwnedMediaStudies[event.data.input.study.studyId];
     invariant(
       source?.origin.kind === "ingest" && source.content.contentId === event.data.input.sourceContentId,
       event,

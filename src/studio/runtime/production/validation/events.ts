@@ -39,11 +39,19 @@ import {
   validateParentArtifactReadReceipt,
 } from "./studyReports.ts";
 import {
+  validateParentArtifactAdmissionReceiptV2,
+  validateParentArtifactReadReceiptV2,
+} from "./studyReportsV2.ts";
+import {
   validateOwnedMediaStudyExecutorReceipt,
   validateOwnedMediaStudyProjection,
   validateStudyPlanningDecisionReceipt,
   validateStudyReadinessReceipt,
 } from "./studies.ts";
+import {
+  validateOwnedMediaStudyExecutorReceiptV2,
+  validateStudyReadinessReceiptV3,
+} from "./studiesV2.ts";
 import {
   assertMediaExtractRequest,
   assertMediaSeekRequest,
@@ -546,6 +554,43 @@ export function assertRuntimeEvent(
     string(data.outputArtifactId, context, "event.data.outputArtifactId");
     contentId(data.receiptContentId, context, "event.data.receiptContentId");
     validateStudyReadinessReceipt(data.receipt);
+  } else if (type === "parent.generalized_admission_recorded") {
+    exact(data, ["reportId", "outputArtifactId", "admissionArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.reportId, context, "event.data.reportId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    string(data.admissionArtifactId, context, "event.data.admissionArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateParentArtifactAdmissionReceiptV2(data.receipt);
+  } else if (type === "parent.generalized_artifact_read_completed") {
+    exact(data, ["parentTaskId", "parentAgentId", "receiptArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.parentTaskId, context, "event.data.parentTaskId");
+    string(data.parentAgentId, context, "event.data.parentAgentId");
+    string(data.receiptArtifactId, context, "event.data.receiptArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateParentArtifactReadReceiptV2(data.receipt);
+  } else if (type === "study.generalized_synthesis_completed") {
+    exact(data, ["studyId", "outputArtifactId", "outputContentId", "executorReceiptContentId", "executorReceipt", "projection"], context, "event.data");
+    string(data.studyId, context, "event.data.studyId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.outputContentId, context, "event.data.outputContentId");
+    contentId(data.executorReceiptContentId, context, "event.data.executorReceiptContentId");
+    validateOwnedMediaStudyExecutorReceiptV2(data.executorReceipt);
+    const projection = object(data.projection, context, "event.data.projection");
+    exact(projection, ["reports", "coverage", "claims", "evidenceCitations"], context, "event.data.projection");
+    array(projection.reports, context, "event.data.projection.reports");
+    array(projection.coverage, context, "event.data.projection.coverage");
+    array(projection.claims, context, "event.data.projection.claims");
+    array(projection.evidenceCitations, context, "event.data.projection.evidenceCitations");
+  } else if (type === "study.generalized_readiness_audited") {
+    exact(data, ["studyId", "outputArtifactId", "receiptContentId", "receipt", "study"], context, "event.data");
+    string(data.studyId, context, "event.data.studyId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateStudyReadinessReceiptV3(data.receipt);
+    const study = object(data.study, context, "event.data.study");
+    exact(study, ["study", "executorReceiptId", "executorReceiptContentId"], context, "event.data.study");
+    string(study.executorReceiptId, context, "event.data.study.executorReceiptId");
+    contentId(study.executorReceiptContentId, context, "event.data.study.executorReceiptContentId");
   } else {
     fail(context, "event.type", `has unknown value ${type}`);
   }

@@ -28,7 +28,9 @@ function authorize(state: RuntimeProjection, requestValue: unknown) {
   const request: ParentArtifactDispositionRequest = structuredClone(requestValue);
   const report = state.reports[request.reportId];
   const parent = state.tasks[request.parentTaskId];
-  if (!report?.study) throw new Error("Parent artifact disposition requires one typed study report");
+  if (!report?.study || ("schema" in report.study && report.study.schema === "studio.study-report-submission.v2")) {
+    throw new Error("Legacy parent artifact disposition requires one typed study report v1");
+  }
   if (Object.values(state.parentArtifactDispositions).some((record) =>
     record.reportId === report.id || record.inputArtifactId === request.outputArtifactId)) {
     throw new Error("Parent artifact disposition already exists for this report or study artifact");

@@ -81,7 +81,9 @@ export function applyExecutionMediaEvent(next: RuntimeProjection, event: Runtime
           (((artifact?.origin.kind === "worker_output" || artifact?.origin.kind === "study_report") &&
             artifact.origin.executionId === execution.id && artifact.origin.receiptId === receipt.receiptId) ||
             (artifact?.origin.kind === "owned_media_study" && artifact.origin.executionId === execution.id &&
-              next.ownedMediaStudies[artifact.origin.studyId]?.executorReceiptId === artifact.origin.executorReceiptId))
+              next.ownedMediaStudies[artifact.origin.studyId]?.executorReceiptId === artifact.origin.executorReceiptId) ||
+            (artifact?.origin.kind === "generalized_owned_media_study" && artifact.origin.executionId === execution.id &&
+              next.generalizedOwnedMediaStudies[artifact.origin.studyId]?.executorReceiptId === artifact.origin.executorReceiptId))
         );
       }),
       event,

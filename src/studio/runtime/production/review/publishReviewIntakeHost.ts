@@ -10,6 +10,7 @@ import type {
 } from "../model.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import { reopenStudyReadiness, type VerifiedStudyReadiness } from "../study/studyReadinessAudit.ts";
+import { reopenGeneralizedReadiness } from "../study/generalizedStudyRuntime.ts";
 import {
   assertPublishReviewIntakeRequest,
   validatePublishReviewIntakeReceipt,
@@ -43,12 +44,16 @@ export class PublishReviewIntakeHost {
 
   async create(requestValue: unknown): Promise<PublishReviewIntakeHostResult> {
     const readinessIdentity = assertPublishReviewIntakeRequest(requestValue);
-    const readiness = await reopenStudyReadiness(
-      this.ledger.state(),
-      this.artifacts,
-      readinessIdentity.readinessId,
-    );
-    if (!sameReadiness(readiness, readinessIdentity)) {
+    const generalized = this.ledger.state().generalizedStudyReadiness[readinessIdentity.readinessId];
+    const readiness = generalized
+      ? await reopenGeneralizedReadiness(this.ledger, this.artifacts, readinessIdentity.readinessId)
+      : await reopenStudyReadiness(this.ledger.state(), this.artifacts, readinessIdentity.readinessId);
+    if (
+      readiness.readinessId !== readinessIdentity.readinessId ||
+      (generalized ? generalized.artifactId : (readiness as VerifiedStudyReadiness).artifactId) !== readinessIdentity.artifactId ||
+      readiness.receiptId !== readinessIdentity.receiptId ||
+      readiness.receiptContentId !== readinessIdentity.receiptContentId
+    ) {
       throw new Error("Publish-review intake requires one exact recursively verified study-readiness receipt identity");
     }
 
@@ -85,7 +90,9 @@ export class PublishReviewIntakeHost {
           readiness: structuredClone(readinessIdentity),
           verification: {
             integrity: "stored_study_readiness_and_recursive_inputs_verified" as const,
-            producer: "deterministic_study_readiness_gate_v1" as const,
+            producer: generalized
+              ? "deterministic_study_readiness_gate_v3" as const
+              : "deterministic_study_readiness_gate_v1" as const,
           },
         },
         producer: {

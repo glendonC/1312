@@ -2,6 +2,7 @@ import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { invariant, sameGrants } from "./shared.ts";
 import { deriveStudyReportCounts, validateCoveragePartition } from "../validation/studyReports.ts";
+import { validateGeneralizedCoveragePartition } from "../validation/studyReportsV2.ts";
 
 export function applyReportEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
   if (event.type === "report.submitted") {
@@ -30,17 +31,22 @@ export function applyReportEvent(next: RuntimeProjection, event: RuntimeEvent): 
       `report ${report.id} contains an artifact owned by another task`,
     );
     if (report.study) {
-      validateCoveragePartition(report.study.coverage, task.mediaScope, `Runtime event ${event.eventId}: report ${report.id} coverage`);
-      invariant(
-        JSON.stringify(report.study.counts) === JSON.stringify(deriveStudyReportCounts({ coverage: report.study.coverage, claims: report.study.claims })),
-        event,
-        `report ${report.id} submitted non-derived coverage or citation counts`,
-      );
+      if (report.study.schema === "studio.study-report-submission.v2") {
+        validateGeneralizedCoveragePartition(report.study.coverage, task.mediaScope, `Runtime event ${event.eventId}: report ${report.id} generalized coverage`);
+      } else {
+        validateCoveragePartition(report.study.coverage, task.mediaScope, `Runtime event ${event.eventId}: report ${report.id} coverage`);
+        invariant(
+          JSON.stringify(report.study.counts) === JSON.stringify(deriveStudyReportCounts({ coverage: report.study.coverage, claims: report.study.claims })),
+          event,
+          `report ${report.id} submitted non-derived coverage or citation counts`,
+        );
+      }
       invariant(report.outputArtifactIds.length === 1 && report.outputArtifactIds[0] === report.study.output.artifactId, event, `report ${report.id} changed its typed output binding`);
       invariant(
         report.study.parentEdge.childTaskId === task.id && report.study.parentEdge.childAgentId === report.agentId &&
           report.study.parentEdge.parentTaskId === report.parentTaskId && report.study.parentEdge.parentAgentId === report.parentAgentId &&
-          report.study.jobContextId === task.jobContext.contextId,
+          report.study.jobContextId === task.jobContext.contextId &&
+          JSON.stringify(report.study.schema === "studio.study-report-submission.v2" ? report.study.assignment.mediaScope : task.mediaScope) === JSON.stringify(task.mediaScope),
         event,
         `report ${report.id} changed its task context or parent edge`,
       );
@@ -69,7 +75,7 @@ export function applyReportEvent(next: RuntimeProjection, event: RuntimeEvent): 
   if (event.type === "report.decided") {
     const report = next.reports[event.data.reportId];
     invariant(
-      event.producer.kind === "handoff_host" || (event.producer.kind === "admission_host" && Boolean(report?.study)),
+      event.producer.kind === "handoff_host" || (event.producer.kind === "admission_host" && report?.study?.schema === "studio.study-report-submission.v1"),
       event,
       "report decisions must come from the handoff host or atomic typed admission host",
     );

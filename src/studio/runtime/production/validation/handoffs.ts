@@ -14,6 +14,7 @@ import {
   uniqueStrings,
 } from "./primitives.ts";
 import { validateStudyReportSubmissionBinding } from "./studyReports.ts";
+import { validateStudyReportSubmissionBindingV2 } from "./studyReportsV2.ts";
 
 export function validateReportRecord(
   value: unknown,
@@ -49,7 +50,11 @@ export function validateReportRecord(
   }
   string(item.summary, context, `${path}.summary`);
   if (item.study !== undefined && item.study !== null) {
-    validateStudyReportSubmissionBinding(item.study, context, `${path}.study`);
+    if ((item.study as { schema?: unknown }).schema === "studio.study-report-submission.v2") {
+      validateStudyReportSubmissionBindingV2(item.study, context, `${path}.study`);
+    } else {
+      validateStudyReportSubmissionBinding(item.study, context, `${path}.study`);
+    }
   }
   const status = oneOf<string>(
     item.status,

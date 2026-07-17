@@ -5,6 +5,8 @@ import type {
   StudyPlanningReportInput,
   StudyReadinessReceiptIdentity,
 } from "./studies.ts";
+import type { CaptionLineCausalityV3 } from "./studiesV2.ts";
+import type { GeneralizedCoverageReasonCode } from "./studyReportsV2.ts";
 
 export const CAPTION_PRODUCTION_LIMITS = {
   maxDurationMs: 120_000,
@@ -31,6 +33,9 @@ export type CaptionLineReasonCode =
   | "study_coverage_withheld"
   | "study_coverage_unknown"
   | "study_coverage_failed"
+  | "study_coverage_unavailable"
+  | "study_coverage_truncated"
+  | "study_readiness_withheld"
   | "study_coverage_conflict"
   | "study_coverage_uncovered"
   | "study_citation_mismatch"
@@ -48,7 +53,7 @@ export interface CaptionLineStudySupport {
   coverage: {
     coverageId: string | null;
     state: "supported" | "withheld" | "unknown" | "failed" | "uncovered" | "conflict";
-    reasonCode: OwnedMediaStudyCoverageReasonCode | "uncovered" | "citation_mismatch" | null;
+    reasonCode: OwnedMediaStudyCoverageReasonCode | GeneralizedCoverageReasonCode | "uncovered" | "citation_mismatch" | null;
   };
   claimIds: string[];
   semanticCitations: SemanticEvidenceCitationInput[];
@@ -76,6 +81,8 @@ export interface CaptionProductionLine {
       executionScope: CaptionExecutorDescriptor["executionScope"];
       cognitionClaim: "none";
     };
+    /** Present only on v3 caption artifacts; preserves the exact generalized abstention state. */
+    generalizedCausality?: CaptionLineCausalityV3;
   };
   source: {
     language: "ko";
@@ -113,7 +120,7 @@ export interface CaptionExecutorDescriptor {
 }
 
 export interface CaptionProductionArtifact {
-  schema: "studio.caption-production.artifact.v1" | "studio.caption-production.artifact.v2";
+  schema: "studio.caption-production.artifact.v1" | "studio.caption-production.artifact.v2" | "studio.caption-production.artifact.v3";
   jobId: string;
   runId: string;
   input: {
@@ -139,7 +146,7 @@ export interface CaptionProductionArtifact {
 }
 
 export interface CaptionProductionReceipt {
-  schema: "studio.caption-production.receipt.v1" | "studio.caption-production.receipt.v2";
+  schema: "studio.caption-production.receipt.v1" | "studio.caption-production.receipt.v2" | "studio.caption-production.receipt.v3";
   receiptId: string;
   jobId: string;
   authority: {
@@ -156,8 +163,8 @@ export interface CaptionProductionReceipt {
   input: CaptionProductionArtifact["input"];
   producer: {
     id: "studio.host-caption-production";
-    version: "1" | "2";
-    policy: "verified_unrevoked_approval_only" | "verified_unrevoked_approval_and_dialogue_scope_only";
+    version: "1" | "2" | "3";
+    policy: "verified_unrevoked_approval_only" | "verified_unrevoked_approval_and_dialogue_scope_only" | "verified_unrevoked_approval_and_generalized_causality_v3_only";
     executor: CaptionExecutorDescriptor;
   };
   limits: typeof CAPTION_PRODUCTION_LIMITS;
@@ -177,6 +184,7 @@ export interface CaptionProductionReceipt {
       claimIds: string[];
       semanticEvidenceArtifactIds: string[];
       reportArtifactIds: string[];
+      generalizedCausality?: CaptionLineCausalityV3;
     }>;
   };
 }

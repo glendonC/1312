@@ -9,7 +9,8 @@ export function applyReviewEvent(next: RuntimeProjection, event: RuntimeEvent): 
       event,
       "publish-review intake must come from the intake host",
     );
-    const readiness = next.studyReadiness[event.data.readiness.readinessId];
+    const readiness = next.studyReadiness[event.data.readiness.readinessId] ??
+      next.generalizedStudyReadiness[event.data.readiness.readinessId];
     invariant(
       readiness?.status === "completed" &&
         readiness.artifactId === event.data.readiness.artifactId &&
@@ -70,7 +71,7 @@ export function applyReviewEvent(next: RuntimeProjection, event: RuntimeEvent): 
       event,
       `publish-review intake ${intake.id} receipt changed its verified study-readiness identity`,
     );
-    const readiness = next.studyReadiness[intake.readinessId];
+    const readiness = next.studyReadiness[intake.readinessId] ?? next.generalizedStudyReadiness[intake.readinessId];
     invariant(
       (readiness.outcome === "proceed_to_caption_review" && receipt.result.outcome === "queued") ||
         (readiness.outcome === "withheld" && receipt.result.outcome === "rejected"),

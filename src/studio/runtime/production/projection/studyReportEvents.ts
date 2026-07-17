@@ -7,6 +7,75 @@ function same(left: unknown, right: unknown): boolean {
 }
 
 export function applyStudyReportEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
+  if (event.type === "parent.generalized_admission_recorded") {
+    invariant(event.producer.kind === "admission_host", event, "generalized parent admissions must come from the admission host");
+    const receipt = event.data.receipt;
+    const report = next.reports[event.data.reportId];
+    const output = next.artifacts[event.data.outputArtifactId];
+    const artifact = next.artifacts[event.data.admissionArtifactId];
+    invariant(report?.study?.schema === "studio.study-report-submission.v2" && report.status === "accepted", event, `generalized admission ${receipt.admissionId} has no accepted v2 report`);
+    invariant(!next.generalizedParentArtifactAdmissions[receipt.admissionId], event, `generalized admission ${receipt.admissionId} is duplicated`);
+    invariant(
+      output?.id === report.study.output.artifactId && output.kind === "studio.study-report.v2" &&
+        receipt.report.artifactId === output.id && receipt.report.contentId === output.content.contentId && receipt.report.bytes === output.content.bytes &&
+        receipt.task.taskId === report.taskId && receipt.task.agentId === report.agentId && receipt.task.jobContextId === report.study.jobContextId &&
+        receipt.parent.taskId === report.parentTaskId && receipt.parent.agentId === report.parentAgentId &&
+        artifact?.origin.kind === "generalized_parent_admission" && artifact.origin.admissionId === receipt.admissionId &&
+        artifact.origin.reportId === report.id && artifact.origin.reportArtifactId === output.id &&
+        artifact.origin.receiptId === receipt.receiptId && artifact.content.contentId === event.data.receiptContentId,
+      event,
+      `generalized admission ${receipt.admissionId} changed report, parent, executor, or stored receipt lineage`,
+    );
+    next.generalizedParentArtifactAdmissions[receipt.admissionId] = {
+      contractVersion: 2,
+      admissionId: receipt.admissionId,
+      reportId: report.id,
+      parentTaskId: report.parentTaskId,
+      parentAgentId: report.parentAgentId,
+      childTaskId: report.taskId,
+      childAgentId: report.agentId,
+      inputArtifactId: output.id,
+      receiptId: receipt.receiptId,
+      receiptContentId: event.data.receiptContentId,
+      receiptArtifactId: artifact.id,
+      report: structuredClone(receipt.report),
+    };
+    return true;
+  }
+
+  if (event.type === "parent.generalized_artifact_read_completed") {
+    invariant(event.producer.kind === "artifact_read_host", event, "generalized parent reads must come from the artifact read host");
+    const receipt = event.data.receipt;
+    const admission = next.generalizedParentArtifactAdmissions[receipt.admission.admissionId];
+    const artifact = next.artifacts[event.data.receiptArtifactId];
+    invariant(admission?.contractVersion === 2, event, `generalized read ${receipt.operationId} has no v2 admission`);
+    invariant(!next.generalizedParentArtifactReads[receipt.operationId], event, `generalized read ${receipt.operationId} is duplicated`);
+    invariant(
+      event.data.parentTaskId === admission.parentTaskId && event.data.parentAgentId === admission.parentAgentId &&
+        receipt.runId === next.runId && receipt.admission.receiptId === admission.receiptId && receipt.admission.receiptContentId === admission.receiptContentId &&
+        receipt.returned.artifactId === admission.inputArtifactId && receipt.returned.contentId === admission.report.contentId &&
+        artifact?.origin.kind === "generalized_parent_artifact_read" && artifact.origin.operationId === receipt.operationId &&
+        artifact.origin.admissionId === admission.admissionId && artifact.origin.reportArtifactId === admission.inputArtifactId &&
+        artifact.origin.receiptId === receipt.receiptId && artifact.content.contentId === event.data.receiptContentId,
+      event,
+      `generalized read ${receipt.operationId} changed its admission, parent, report, or stored receipt lineage`,
+    );
+    next.generalizedParentArtifactReads[receipt.operationId] = {
+      contractVersion: 2,
+      id: receipt.operationId,
+      parentTaskId: admission.parentTaskId,
+      parentAgentId: admission.parentAgentId,
+      admissionId: admission.admissionId,
+      reportArtifactId: receipt.returned.artifactId,
+      reportContentId: receipt.returned.contentId,
+      status: "completed",
+      receiptId: receipt.receiptId,
+      receiptContentId: event.data.receiptContentId,
+      receiptArtifactId: artifact.id,
+    };
+    return true;
+  }
+
   if (event.type === "parent.artifact_disposition_recorded") {
     invariant(event.producer.kind === "admission_host", event, "parent dispositions must come from the admission host");
     const receipt = event.data.dispositionReceipt;

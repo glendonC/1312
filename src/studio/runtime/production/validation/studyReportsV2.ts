@@ -11,6 +11,7 @@ import type {
   ParentArtifactReadReceiptV2,
   QualifiedMediaRange,
   StudyReportArtifactV2,
+  StudyReportSubmissionBindingV2,
 } from "../model.ts";
 import { STUDY_REPORT_V2_LIMITS } from "../model.ts";
 import { validateSupportedClaimCitationClosure } from "../evidenceCitations/audit.ts";
@@ -325,5 +326,74 @@ export function validateParentArtifactReadReceiptV2(value: unknown): ParentArtif
     admission: { admissionId: string(admission.admissionId, context, "receipt.admission.admissionId"), receiptId: string(admission.receiptId, context, "receipt.admission.receiptId"), receiptContentId: contentId(admission.receiptContentId, context, "receipt.admission.receiptContentId") },
     returned: studyIdentity(item.returned, context, "receipt.returned"),
     producer: { id: literal(producer.id, "studio.generalized-evidence-read", context, "receipt.producer.id"), version: literal(producer.version, "2", context, "receipt.producer.version"), policy: literal(producer.policy, "content_addressed_admitted_report_only", context, "receipt.producer.policy") },
+  };
+}
+
+export function validateStudyReportSubmissionBindingV2(
+  value: unknown,
+  context: string,
+  path: string,
+): StudyReportSubmissionBindingV2 {
+  const item = object(value, context, path);
+  exact(item, ["schema", "jobContextId", "outputSlot", "assignment", "coverage", "claims", "evidenceCitations", "output", "sourceArtifacts", "executor", "parentEdge"], context, path);
+  literal(item.schema, "studio.study-report-submission.v2", context, `${path}.schema`);
+  const outputSlot = object(item.outputSlot, context, `${path}.outputSlot`);
+  exact(outputSlot, ["name", "artifactKind"], context, `${path}.outputSlot`);
+  const output = object(item.output, context, `${path}.output`);
+  const executor = object(item.executor, context, `${path}.executor`);
+  exact(executor, ["executionId", "receiptId", "receiptContentId"], context, `${path}.executor`);
+  const parentEdge = object(item.parentEdge, context, `${path}.parentEdge`);
+  exact(parentEdge, ["childTaskId", "childAgentId", "parentTaskId", "parentAgentId"], context, `${path}.parentEdge`);
+  const envelope = validateStudyReportArtifactV2({
+    schema: "studio.study-report.v2",
+    runId: "binding-validation",
+    task: {
+      taskId: string(parentEdge.childTaskId, context, `${path}.parentEdge.childTaskId`),
+      agentId: string(parentEdge.childAgentId, context, `${path}.parentEdge.childAgentId`),
+      executionId: string(executor.executionId, context, `${path}.executor.executionId`),
+      jobContextId: string(item.jobContextId, context, `${path}.jobContextId`),
+    },
+    parent: {
+      taskId: string(parentEdge.parentTaskId, context, `${path}.parentEdge.parentTaskId`),
+      agentId: string(parentEdge.parentAgentId, context, `${path}.parentEdge.parentAgentId`),
+    },
+    assignment: item.assignment,
+    coverage: item.coverage,
+    claims: item.claims,
+    evidenceCitations: item.evidenceCitations,
+    sourceArtifacts: item.sourceArtifacts,
+    limits: STUDY_REPORT_V2_LIMITS,
+    nonClaims: { correctness: "not_assessed", completeness: "partition_only", semanticQuality: "not_assessed", modalityReliabilityEquivalence: "not_claimed", independentCorroboration: "not_assessed" },
+  });
+  exact(output, ["artifactId", "contentId", "bytes", "schema"], context, `${path}.output`);
+  return {
+    schema: "studio.study-report-submission.v2",
+    jobContextId: envelope.task.jobContextId,
+    outputSlot: {
+      name: string(outputSlot.name, context, `${path}.outputSlot.name`),
+      artifactKind: literal(outputSlot.artifactKind, "studio.study-report.v2", context, `${path}.outputSlot.artifactKind`),
+    },
+    assignment: envelope.assignment,
+    coverage: envelope.coverage,
+    claims: envelope.claims,
+    evidenceCitations: envelope.evidenceCitations,
+    output: {
+      artifactId: string(output.artifactId, context, `${path}.output.artifactId`),
+      contentId: contentId(output.contentId, context, `${path}.output.contentId`),
+      bytes: integer(output.bytes, context, `${path}.output.bytes`, 1),
+      schema: literal(output.schema, "studio.study-report.v2", context, `${path}.output.schema`),
+    },
+    sourceArtifacts: envelope.sourceArtifacts,
+    executor: {
+      executionId: envelope.task.executionId,
+      receiptId: string(executor.receiptId, context, `${path}.executor.receiptId`),
+      receiptContentId: contentId(executor.receiptContentId, context, `${path}.executor.receiptContentId`),
+    },
+    parentEdge: {
+      childTaskId: envelope.task.taskId,
+      childAgentId: envelope.task.agentId,
+      parentTaskId: envelope.parent.taskId,
+      parentAgentId: envelope.parent.agentId,
+    },
   };
 }

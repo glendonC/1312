@@ -86,11 +86,15 @@ dependency-task, launch, executor, or path fields.
 
 The Codex root is a separate executor role with an explicitly configured model. Ambient Codex
 configuration and the documented shell, web, app, hook, goal, memory, remote-plugin, and built-in
-multi-agent tool families are disabled for that process. Its sole MCP server exposes exactly
-`task_spawn_request` and `task_reports_wait` under matching scheduler grants. Spawn records the root
-execution/tool-call causation, returns one accepted/rejected scheduler decision, and starts accepted
-per-task launch promises without waiting. Wait journals `waiting_for_children` and returns only
-terminal task/report/artifact identities or closed failure states.
+multi-agent tool families are disabled for that process. Its task-private MCP surface is selected
+from the root contract. A new owned run defaults to the U3 v2 contract and exposes exactly
+`task_spawn_request`, `task_reports_wait`, `report_disposition`, `artifact_read`, and
+`study_synthesize`. It has no `study_planning_decision` or follow-up authority. The explicit v1
+compatibility selector retains the closed six-tool planning/synthesis surface for historical
+fixtures. Spawn records the root execution/tool-call causation, returns one accepted/rejected
+scheduler decision, and starts accepted per-task launch promises without waiting. Wait journals
+`waiting_for_children` and returns only terminal task/report/artifact identities or closed failure
+states.
 
 Every executing task now has one durable `task.launch_claimed` event. `executor.started` consumes
 that exact claim and a task cannot acquire a second executor in replay. File-journal appends reject
@@ -203,10 +207,16 @@ text only from range-closing current-run speech citations under supported ready 
 state yields null source and target text.
 
 These U3 objects are stored through the content-addressed artifact store and recursively cold-replayed
-by host adapters. They intentionally sit outside the closed v1 production event union and are not yet
-wired into the default owned-audio launcher or Studio UI. This boundary proves citation integrity,
-coverage policy, and abstention preservation—not multimodal understanding, OCR, scene semantics,
-producer accuracy, independent corroboration, truth arbitration, or caption quality.
+by host adapters. New owned runs default to the version-selected U3 production path: worker report v2,
+parent admission/read v2, owned-media study v2, readiness v3, and, only after a verified human
+approval, caption-production/caption-causality v3. The launcher, worker report union, production-event
+projection, validation union, and artifact kinds carry that chain; there is no orphan additive host.
+The explicit `studyContractVersion: "v1"` path preserves closed historical fixtures and receipts but
+is not the default. Audio-only runs request no frames, and absent acoustic or frame evidence supplies
+no authority; only current-run speech may authorize dialogue text. The U3 root omits U4 planning and
+follow-up tools. Studio UI projection remains outside this cutover. This boundary proves citation
+integrity, coverage policy, and abstention preservation—not multimodal understanding, OCR, scene
+semantics, producer accuracy, independent corroboration, truth arbitration, or caption quality.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

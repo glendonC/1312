@@ -64,6 +64,49 @@ export interface StudyReportV2Identity {
   schema: "studio.study-report.v2";
 }
 
+export interface StudyReportSubmissionBindingV2 {
+  schema: "studio.study-report-submission.v2";
+  jobContextId: string;
+  outputSlot: { name: string; artifactKind: "studio.study-report.v2" };
+  assignment: StudyReportArtifactV2["assignment"];
+  coverage: GeneralizedCoverageRange[];
+  claims: GeneralizedStudyClaim[];
+  evidenceCitations: EvidenceCitationEnvelope[];
+  output: StudyReportV2Identity;
+  sourceArtifacts: Array<{ artifactId: string; contentId: string }>;
+  executor: { executionId: string; receiptId: string; receiptContentId: string };
+  parentEdge: { childTaskId: string; childAgentId: string; parentTaskId: string; parentAgentId: string };
+}
+
+export interface GeneralizedParentAdmissionRecord {
+  contractVersion: 2;
+  admissionId: string;
+  reportId: string;
+  parentTaskId: string;
+  parentAgentId: string;
+  childTaskId: string;
+  childAgentId: string;
+  inputArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+  receiptArtifactId: string;
+  report: StudyReportV2Identity;
+}
+
+export interface GeneralizedParentArtifactReadRecord {
+  contractVersion: 2;
+  id: string;
+  parentTaskId: string;
+  parentAgentId: string;
+  admissionId: string;
+  reportArtifactId: string;
+  reportContentId: string;
+  status: "completed";
+  receiptId: string;
+  receiptContentId: string;
+  receiptArtifactId: string;
+}
+
 export interface ParentArtifactAdmissionReceiptV2 {
   schema: "studio.parent-admission.receipt.v2";
   receiptId: string;

@@ -9,13 +9,18 @@ is a dependency: bounded orchestration → current-run semantic evidence → cov
 admission → gap-directed study planning/synthesis/readiness → study-causal private captions and
 structural QC.
 
-The product goal is:
+The product is **language intelligence / media understanding**, not a caption product. See
+[`PRODUCT.md`](../PRODUCT.md). Captions and timed KO/EN text are downstream artifacts that may be
+appended from a study; they are not the product category.
+
+The understanding goal is:
 
 ```text
 owned video
   → bounded agent team studies the file across as many justified passes as budgets allow
   → evidence-complete study with explicit gaps and abstentions
-  → Korean transcript / English translation / captions appended from that study
+  → beachhead meaning (Korean → English) scored from that understanding
+  → optional private transcript / translation / caption artifacts derived from the study
 ```
 
 This is preprocess-first, not live or low-latency. It is acceptable to spend more time on a hard
@@ -25,9 +30,9 @@ It is not acceptable to turn a weak first pass into fluent dialogue or translati
 ## Executive decision
 
 The primary climb is **understanding the owned media end to end**. The next product claim should not
-be “more agents” or “faster captions.” It should be more of the source duration truthfully accounted
-for by evidence that a bounded specialist actually inspected, with weak regions restudied or
-abstained rather than guessed.
+be “more agents,” “faster captions,” or “we are a caption app.” It should be more of the source
+duration truthfully accounted for by evidence that a bounded specialist actually inspected, with weak
+regions restudied or abstained rather than guessed.
 
 The first three implementation slices after the UI demo freeze are now complete: the fail-closed
 **acoustic triage and non-dialogue coverage boundary**, bounded **frame sampling with real child
@@ -121,7 +126,7 @@ artifact, grant, and audit boundaries are real.
 | Current-run speech evidence | A scoped host and bridge exist. With an explicitly enabled recognizer they can produce current-run timed hypotheses; the default unconfigured recognizer honestly returns unavailable | Semantic accuracy/calibration, a guarantee that every run has a live recognizer, alternative segmentation/recognizer passes, and semantic translation QC | [`currentRunSpeechRecognizer.ts`](../../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts) and [`run-runtime-host.ts`](../../scripts/run-runtime-host.ts) |
 | Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. The deterministic U3 admission policy re-derives U1 dialogue scope and prevents prose or an available second modality from upgrading a weaker state | U4 pass/exhaustion policy and semantic correctness arbitration | [`generalizedCoveragePolicy.ts`](../../src/studio/runtime/production/admission/generalizedCoveragePolicy.ts), [`model/studyReportsV2.ts`](../../src/studio/runtime/production/model/studyReportsV2.ts), and [`model/studiesV2.ts`](../../src/studio/runtime/production/model/studiesV2.ts) |
 | Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks only for a frame-granted child. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Receipted research, visual evidence admission/interpretation, and isolated computer-use. These are permitted future capabilities only through new explicit grants | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`frameMcpServer.ts`](../../src/studio/runtime/production/executor/frameMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
-| Owned study spine | The closed v1 speech spine remains intact. Additive evidence-citation v1, study-report v2, parent admission/read v2, owned-media-study v2, readiness v3, and caption-causality v3 form a content-addressed U3 lane with per-kind cold audit | Default launcher/report wiring for the additive lane, semantic correctness/truth arbitration, and later evidence producers | [`model/evidenceCitations.ts`](../../src/studio/runtime/production/model/evidenceCitations.ts), [`generalizedEvidenceAdmissionHost.ts`](../../src/studio/runtime/production/admission/generalizedEvidenceAdmissionHost.ts), and [`generalizedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/generalizedStudySynthesisHost.ts) |
+| Owned study spine | New owned runs default to the content-addressed U3 spine: evidence-citation v1, study-report v2, parent admission/read v2, owned-media-study v2, readiness v3, and approval-gated caption/caption-causality v3. Closed v1 receipts remain intact behind an explicit compatibility selector | Studio UI projection, semantic correctness/truth arbitration, U4 re-study, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`generalizedEvidenceAdmissionHost.ts`](../../src/studio/runtime/production/admission/generalizedEvidenceAdmissionHost.ts), and [`generalizedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/generalizedStudySynthesisHost.ts) |
 | Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen and the human-labeled `run-007` Bet G score exists with `judge: null` | Runtime semantic QC, calibrated transcription/translation confidence, additional scored runs and registered ablations, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
 
@@ -235,7 +240,7 @@ their audits.
   journal/projection, and tool budgets. A later visual producer must use U3's typed admission seam
   before a visual finding can affect a study.
 
-### U3. Multimodal admission and generalized abstention — implemented
+### U3. Multimodal admission and generalized abstention — implemented and default-runtime wired
 
 - **Real:** `studio.evidence-citation.v1` binds evidence kind, use, exact claim/coverage/context
   target, artifact/content/receipt identities, observation ids, upstream/observation states, and
@@ -248,10 +253,15 @@ their audits.
   `studio.owned-media-study.v2`, and readiness v3 store and cold-replay exact lineage;
   caption-causality v3 derives only from that reopened chain. Every weak/conflict/out-of-scope state
   is preserved. Readiness checks stored integrity, range coverage, and unresolved conflict only; it
-  has no semantic-quality input or score.
+  has no semantic-quality input or score. The owned-run contract selector now defaults to this v2
+  report → admission/read → synthesis → readiness path, and approval-gated caption production stores
+  the resulting line causality as v3. Worker, launcher, production-event projection, and artifact
+  unions carry those identities end to end. Closed v1 fixtures opt into `studyContractVersion: "v1"`;
+  historical v1 receipts are neither rewritten nor silently upgraded.
 - **Still missing:** No visual/OCR/speaker/research producer exists, frames make no semantic claim,
-  and no truth or reliability arbitration is attempted. The additive U3 hosts are not wired into the
-  default owned-audio launcher/report event union or UI; v1 remains that path's closed contract.
+  and no truth or reliability arbitration is attempted. Audio-only runs normally have no frame
+  citation, and missing acoustic/frame evidence grants no text authority. Studio UI projection is
+  still outside this runtime slice.
 - **Implemented proof:** The additive evidence-citation envelope and report/study versions identify evidence
   kind, artifact/receipt/content identities, observation ids, temporal ranges when applicable, and
   document spans for external sources. Each kind has its own audit adapter. Supported media claims
@@ -265,8 +275,9 @@ their audits.
 - **Fake-claim risk:** A generic `sourceIds[]` list can look multimodal while proving nothing about
   which observation supports which claim. “Several agents agree” is not independent evidence when
   they consumed the same hypothesis.
-- **Existing-spine dependency:** The completed report → admission/read → plan/synthesize → readiness →
-  caption lineage. This is additive input and abstention semantics, not a new swarm campaign.
+- **Existing-spine dependency:** The completed report → admission/read → synthesis → readiness →
+  approval-gated caption lineage. The default U3 root intentionally omits planning/follow-up tools;
+  this is a contract cutover, not U4 or a new swarm campaign.
 
 ### U4. Budgeted multi-pass re-study
 
@@ -466,15 +477,20 @@ checklist.
 
 ## What Build Week may honestly say
 
-Recommended README/demo language this week:
+**Product identity:** see [`PRODUCT.md`](../PRODUCT.md). Language intelligence / media understanding.
+Korean→English is the proof case. Learning is a later Apply track. Captions and timed text are
+downstream Apply outputs, not the product category.
 
-> 1321 has a bounded, local study-first path for owned Korean media. An explicitly configured model
-> root can request scoped coverage workers, and the scheduler grants only the tools and media ranges
-> each task needs. When the current-run recognizer is explicitly enabled, workers can cite its timed
-> hypotheses in typed coverage reports; the root can admit reports, plan exact gap/conflict follow-up,
-> and synthesize a study whose verified readiness and human approval gate appended private caption
-> candidates and structural QC. Every stage preserves source, task, evidence, report, study,
-> approval, caption, and QC lineage. This is preprocessing, not a live-caption path.
+**Runtime honesty (what is actually wired):**
+
+> 1321 has a bounded, local study-first path for owned media on the Korean→English beachhead. An
+> explicitly configured model root can request scoped coverage workers; the scheduler grants only the
+> tools and media ranges each task needs. When the current-run recognizer is explicitly enabled,
+> workers can cite its timed hypotheses in typed coverage reports; the root can admit reports, plan
+> exact gap/conflict follow-up, and synthesize a study whose verified readiness and human approval
+> gate private post-study text artifacts and structural QC. Every stage preserves source, task,
+> evidence, report, study, approval, artifact, and QC lineage. This is preprocess understanding, not
+> a live-translate product.
 
 It is also honest to say:
 
@@ -509,9 +525,11 @@ The following are parked or outside this climb, not later rungs in the checklist
   remote workers;
 - UI redesign/projection and hosted product-infrastructure work owned elsewhere.
 
-Short version: **the demo may claim a real bounded study spine, gap-directed orchestration within its
-current grants, receipted tools, private post-study captions, structural QC, and an existing human-
-labeled Bet G baseline. It may not yet claim full media understanding or semantic quality.**
+Short version: **the demo may claim a real bounded study / investigation spine for owned media,
+gap-directed orchestration within its current grants, receipted tools, private post-study text
+artifacts with structural QC, and an existing human-labeled Bet G baseline. The product category is
+media understanding / language intelligence, not captions. It may not yet claim full media
+understanding or semantic quality.**
 
 ## Later appendix: Learning OS and exports
 

@@ -1,16 +1,20 @@
-import type { RuntimeProjection } from "../model.ts";
+import type { ReportRecord, RuntimeProjection, StudyReportSubmissionBinding } from "../model.ts";
 import { deriveStudyReportCounts } from "../validation/studyReports.ts";
 import type {
   ProductionStudioStudyReportStateView,
   ProductionStudioStudyReportView,
 } from "./model.ts";
 
+function isV1StudyReport(report: ReportRecord): report is ReportRecord & { study: StudyReportSubmissionBinding } {
+  return report.study?.schema === "studio.study-report-submission.v1";
+}
+
 export function projectStudyReportStates(state: RuntimeProjection): ProductionStudioStudyReportStateView[] {
   return Object.values(state.tasks).flatMap((task) => task.requiredOutputs
     .filter((slot) => slot.artifactKind === "studio.study-report.v1")
     .map((slot): ProductionStudioStudyReportStateView => {
       const report = Object.values(state.reports).find((candidate) =>
-        candidate.taskId === task.id && candidate.study?.outputSlot.name === slot.name);
+        candidate.taskId === task.id && isV1StudyReport(candidate) && candidate.study.outputSlot.name === slot.name);
       const terminal = task.status === "failed" || task.status === "withheld" || task.status === "interrupted"
         ? task.status
         : "absent";
@@ -31,7 +35,7 @@ export function projectStudyReportStates(state: RuntimeProjection): ProductionSt
 
 export function projectStudyReports(state: RuntimeProjection): ProductionStudioStudyReportView[] {
   return Object.values(state.reports)
-    .filter((report) => report.study !== null && report.study !== undefined)
+    .filter(isV1StudyReport)
     .map((report): ProductionStudioStudyReportView => {
       const study = report.study!;
       const disposition = Object.values(state.parentArtifactDispositions)

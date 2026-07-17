@@ -90,6 +90,24 @@ export interface ParentAdmissionArtifactOrigin {
   receiptContentId: string;
 }
 
+export interface GeneralizedParentAdmissionArtifactOrigin {
+  kind: "generalized_parent_admission";
+  admissionId: string;
+  reportId: string;
+  reportArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface GeneralizedParentArtifactReadArtifactOrigin {
+  kind: "generalized_parent_artifact_read";
+  operationId: string;
+  admissionId: string;
+  reportArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
 export interface StudyPlanningDecisionArtifactOrigin {
   kind: "study_planning_decision";
   decisionId: string;
@@ -108,8 +126,26 @@ export interface OwnedMediaStudyArtifactOrigin {
   executorReceiptContentId: string;
 }
 
+export interface GeneralizedOwnedMediaStudyArtifactOrigin {
+  kind: "generalized_owned_media_study";
+  studyId: string;
+  executionId: string;
+  executorReceiptId: string;
+  executorReceiptContentId: string;
+}
+
 export interface StudyReadinessArtifactOrigin {
   kind: "study_readiness";
+  readinessId: string;
+  studyId: string;
+  studyArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+  outcome: "proceed_to_caption_review" | "withheld";
+}
+
+export interface GeneralizedStudyReadinessArtifactOrigin {
+  kind: "generalized_study_readiness";
   readinessId: string;
   studyId: string;
   studyArtifactId: string;
@@ -260,9 +296,13 @@ export interface RuntimeArtifact {
     | StudyReportArtifactOrigin
     | ParentArtifactDispositionArtifactOrigin
     | ParentAdmissionArtifactOrigin
+    | GeneralizedParentAdmissionArtifactOrigin
+    | GeneralizedParentArtifactReadArtifactOrigin
     | StudyPlanningDecisionArtifactOrigin
     | OwnedMediaStudyArtifactOrigin
+    | GeneralizedOwnedMediaStudyArtifactOrigin
     | StudyReadinessArtifactOrigin
+    | GeneralizedStudyReadinessArtifactOrigin
     | RootOutputDispositionArtifactOrigin
     | PreflightEvidenceArtifactOrigin
     | EvidenceAssessmentArtifactOrigin

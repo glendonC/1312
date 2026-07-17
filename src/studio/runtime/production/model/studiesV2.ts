@@ -137,3 +137,40 @@ export interface CaptionLineCausalityV3 {
     citationIds: string[];
   };
 }
+
+export interface OwnedMediaStudyRecordV2 {
+  schema: "studio.owned-media-study.v2";
+  id: string;
+  rootTaskId: string;
+  rootAgentId: string;
+  executionId: string;
+  artifactId: string;
+  contentId: string;
+  bytes: number;
+  executorReceiptId: string;
+  executorReceiptContentId: string;
+  reports: AdmittedStudyReportV2[];
+  coverage: OwnedMediaStudyCoverageRangeV2[];
+  claims: OwnedMediaStudyClaimV2[];
+  evidenceCitations: EvidenceCitationEnvelope[];
+}
+
+export interface StudyReadinessRecordV3 {
+  schema: "studio.study-readiness.receipt.v3";
+  id: string;
+  studyId: string;
+  studyArtifactId: string;
+  studyContentId: string;
+  status: "completed";
+  artifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+  outcome: "proceed_to_caption_review" | "withheld";
+  reasonCodes: StudyReadinessReceiptV3["result"]["reasonCodes"];
+  states: StudyReadinessReceiptV3["result"]["states"];
+  study: {
+    study: OwnedMediaStudyV2Identity;
+    executorReceiptId: string;
+    executorReceiptContentId: string;
+  };
+}

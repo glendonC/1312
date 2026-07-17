@@ -52,8 +52,20 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "study.synthesis_completed") {
     return { kind: "owned_media_study", receipt: event.data.executorReceipt, rawReceiptContentId: null };
   }
+  if (event.type === "study.generalized_synthesis_completed") {
+    return { kind: "owned_media_study", receipt: event.data.executorReceipt, rawReceiptContentId: null };
+  }
   if (event.type === "study.readiness_audited") {
     return { kind: "study_readiness", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
+  if (event.type === "study.generalized_readiness_audited") {
+    return { kind: "study_readiness", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
+  if (event.type === "parent.generalized_admission_recorded") {
+    return { kind: "parent_admission", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
+  if (event.type === "parent.generalized_artifact_read_completed") {
+    return { kind: "parent_artifact_read", receipt: event.data.receipt, rawReceiptContentId: null };
   }
   if (event.type === "publish.review.intake_completed") {
     return { kind: "publish_review_intake", receipt: event.data.receipt, rawReceiptContentId: null };
@@ -90,7 +102,7 @@ function receiptArtifactLinks(state: RuntimeProjection, receiptId: string): Runt
   return Object.values(state.artifacts).filter((artifact) => {
     const origin = artifact.origin;
     if (origin.kind === "ingest" || origin.kind === "preflight_evidence") return false;
-    return origin.kind === "owned_media_study"
+    return origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
       ? origin.executorReceiptId === receiptId
       : origin.receiptId === receiptId;
   });
@@ -177,7 +189,7 @@ export async function buildRuntimeObservabilityIndex(
         if (
           origin.kind === "ingest" ||
           origin.kind === "preflight_evidence" ||
-          (origin.kind === "owned_media_study"
+          (origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
             ? origin.executorReceiptContentId !== content.contentId
             : origin.kind === "frame_sampling_receipt"
               ? artifact.content.contentId !== content.contentId
@@ -210,7 +222,7 @@ export async function buildRuntimeObservabilityIndex(
         contentId: artifact.content.contentId,
         receiptId: artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence"
           ? null
-          : artifact.origin.kind === "owned_media_study"
+          : artifact.origin.kind === "owned_media_study" || artifact.origin.kind === "generalized_owned_media_study"
             ? artifact.origin.executorReceiptId
             : artifact.origin.receiptId,
       },

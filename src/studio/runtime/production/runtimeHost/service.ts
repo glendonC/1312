@@ -45,6 +45,7 @@ import {
   RuntimeApplicationInterrupted,
   type BoundedOrchestratorLauncherFactory,
   type BoundedWorkerLauncherFactory,
+  type StudyContractVersion,
 } from "./runtimeApplication.ts";
 import { deterministicOrchestratorLauncherFactory } from "./deterministicOrchestrator.ts";
 import { RuntimeSourceRegistry } from "./sourceRegistry.ts";
@@ -65,6 +66,8 @@ export interface RuntimeStartServiceOptions {
   recoverOnOpen?: boolean;
   reviewer?: PublishReviewOperator;
   captionExecutor?: CaptionProductionExecutor;
+  /** Explicit compatibility selector; omitted means the U3 generalized production spine. */
+  studyContractVersion?: StudyContractVersion;
 }
 
 function deterministicRuntimeId(commandId: string): string {
@@ -92,6 +95,7 @@ export class RuntimeStartService {
   private readonly lifecycle: RuntimeHostLifecycleCoordinator;
   private readonly queries: RuntimeHostQueries;
   private readonly reviewCaption: RuntimeReviewCaptionCoordinator;
+  private readonly studyContractVersion: StudyContractVersion;
   private readonly initializing = new Map<string, Promise<RuntimeHostStartAcknowledgement>>();
 
   private constructor(options: RuntimeStartServiceOptions) {
@@ -99,6 +103,7 @@ export class RuntimeStartService {
     this.sources = options.sources;
     this.launcherFactory = options.launcherFactory;
     this.orchestratorLauncherFactory = options.orchestratorLauncherFactory ?? deterministicOrchestratorLauncherFactory();
+    this.studyContractVersion = options.studyContractVersion ?? "v2";
     this.acceptedBy = options.acceptedBy ?? "operator:local-runtime-host";
     this.now = options.now ?? (() => new Date());
     this.runtimeIdForCommand = options.runtimeIdForCommand ?? deterministicRuntimeId;
@@ -337,7 +342,7 @@ export class RuntimeStartService {
     initialized: InitializedRuntimeApplication,
   ): Promise<void> {
     try {
-      await runBoundedRuntimeApplication(initialized, this.launcherFactory, this.orchestratorLauncherFactory);
+      await runBoundedRuntimeApplication(initialized, this.launcherFactory, this.orchestratorLauncherFactory, this.studyContractVersion);
       await this.lifecycle.reconcile(record, false);
     } catch (error) {
       const current = await this.store.read(record.commandId);

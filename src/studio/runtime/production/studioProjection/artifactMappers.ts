@@ -60,6 +60,10 @@ export function projectOutputArtifacts(state: RuntimeProjection, reports: readon
         artifact.origin.kind === "study_planning_decision" ||
         artifact.origin.kind === "owned_media_study" ||
         artifact.origin.kind === "study_readiness" ||
+        artifact.origin.kind === "generalized_parent_admission" ||
+        artifact.origin.kind === "generalized_parent_artifact_read" ||
+        artifact.origin.kind === "generalized_owned_media_study" ||
+        artifact.origin.kind === "generalized_study_readiness" ||
         artifact.origin.kind === "sampled_frame" ||
         artifact.origin.kind === "frame_sample_manifest" ||
         artifact.origin.kind === "frame_sampling_receipt"

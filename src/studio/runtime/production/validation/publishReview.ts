@@ -65,9 +65,9 @@ export function validatePublishReviewIntakeReceipt(
     context,
     `${path}.input.verification.integrity`,
   );
-  literal(
+  oneOf(
     verification.producer,
-    "deterministic_study_readiness_gate_v1",
+    new Set(["deterministic_study_readiness_gate_v1", "deterministic_study_readiness_gate_v3"]),
     context,
     `${path}.input.verification.producer`,
   );

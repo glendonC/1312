@@ -3,6 +3,80 @@ import type { RuntimeEvent } from "../protocol.ts";
 import { invariant } from "./shared.ts";
 
 export function applyStudySynthesisEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
+  if (event.type === "study.generalized_synthesis_completed") {
+    invariant(event.producer.kind === "study_synthesis_host", event, "generalized studies must come from the synthesis host");
+    const receipt = event.data.executorReceipt;
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    const execution = artifact?.origin.kind === "generalized_owned_media_study"
+      ? next.executions[artifact.origin.executionId]
+      : null;
+    invariant(!next.generalizedOwnedMediaStudies[event.data.studyId] && Object.keys(next.generalizedOwnedMediaStudies).length === 0, event, `generalized study ${event.data.studyId} duplicates terminal synthesis`);
+    invariant(
+      receipt.output.studyId === event.data.studyId && receipt.output.artifactId === event.data.outputArtifactId &&
+        receipt.output.contentId === event.data.outputContentId && receipt.output.schema === "studio.owned-media-study.v2" &&
+        execution?.status === "active" && execution.taskId === artifact?.producerTaskId && execution.agentId === artifact.producerAgentId &&
+        artifact?.origin.kind === "generalized_owned_media_study" && artifact.origin.studyId === event.data.studyId &&
+        artifact.origin.executorReceiptId === receipt.receiptId && artifact.origin.executorReceiptContentId === event.data.executorReceiptContentId &&
+        artifact.content.contentId === event.data.outputContentId &&
+        JSON.stringify(receipt.input.reportArtifactIds) === JSON.stringify(event.data.projection.reports.map((entry) => entry.report.artifactId)) &&
+        JSON.stringify(receipt.input.admissionIds) === JSON.stringify(event.data.projection.reports.map((entry) => entry.admission.admissionId)),
+      event,
+      `generalized study ${event.data.studyId} changed its executor, admitted reports, artifact, or receipt lineage`,
+    );
+    next.generalizedOwnedMediaStudies[event.data.studyId] = {
+      schema: "studio.owned-media-study.v2",
+      id: event.data.studyId,
+      rootTaskId: execution.taskId,
+      rootAgentId: execution.agentId,
+      executionId: execution.id,
+      artifactId: artifact.id,
+      contentId: artifact.content.contentId,
+      bytes: artifact.content.bytes,
+      executorReceiptId: receipt.receiptId,
+      executorReceiptContentId: event.data.executorReceiptContentId,
+      reports: structuredClone(event.data.projection.reports),
+      coverage: structuredClone(event.data.projection.coverage),
+      claims: structuredClone(event.data.projection.claims),
+      evidenceCitations: structuredClone(event.data.projection.evidenceCitations),
+    };
+    return true;
+  }
+
+  if (event.type === "study.generalized_readiness_audited") {
+    invariant(event.producer.kind === "study_audit_host", event, "generalized readiness must come from the deterministic audit host");
+    const receipt = event.data.receipt;
+    const study = next.generalizedOwnedMediaStudies[event.data.studyId];
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    invariant(study?.schema === "studio.owned-media-study.v2", event, `generalized readiness ${receipt.readinessId} has no v2 study`);
+    invariant(!next.generalizedStudyReadiness[receipt.readinessId] && !Object.values(next.generalizedStudyReadiness).some((entry) => entry.studyId === study.id), event, `generalized study ${study.id} was audited twice`);
+    invariant(
+      receipt.input.studyId === study.id && receipt.input.artifactId === study.artifactId && receipt.input.contentId === study.contentId &&
+        event.data.study.study.studyId === study.id && event.data.study.study.artifactId === study.artifactId &&
+        event.data.study.executorReceiptId === study.executorReceiptId && event.data.study.executorReceiptContentId === study.executorReceiptContentId &&
+        artifact?.origin.kind === "generalized_study_readiness" && artifact.origin.readinessId === receipt.readinessId &&
+        artifact.origin.studyId === study.id && artifact.origin.studyArtifactId === study.artifactId &&
+        artifact.origin.receiptId === receipt.receiptId && artifact.content.contentId === event.data.receiptContentId,
+      event,
+      `generalized readiness ${receipt.readinessId} changed study, artifact, or receipt lineage`,
+    );
+    next.generalizedStudyReadiness[receipt.readinessId] = {
+      schema: "studio.study-readiness.receipt.v3",
+      id: receipt.readinessId,
+      studyId: study.id,
+      studyArtifactId: study.artifactId,
+      studyContentId: study.contentId,
+      status: "completed",
+      artifactId: artifact.id,
+      receiptId: receipt.receiptId,
+      receiptContentId: artifact.content.contentId,
+      outcome: receipt.result.outcome,
+      reasonCodes: [...receipt.result.reasonCodes],
+      states: [...receipt.result.states],
+      study: structuredClone(event.data.study),
+    };
+    return true;
+  }
+
   if (event.type === "study.planning_decision_recorded") {
     invariant(event.producer.kind === "study_planning_host", event, "study planning decisions must come from the planning host");
     const receipt = event.data.receipt;

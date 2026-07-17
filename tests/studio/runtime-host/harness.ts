@@ -83,7 +83,9 @@ export async function waitForLifecycle(
   commandId: string,
   expected: "terminal" | "failed" | "interrupted" | "running",
 ): Promise<Awaited<ReturnType<RuntimeStartService["statusByCommand"]>>> {
-  const deadline = Date.now() + 3_000;
+  // The default owned path now closes four content-addressed U3 stages after its children.
+  // Keep the polling bound finite while allowing concurrent integration cases to finish under load.
+  const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const status = await service.statusByCommand(commandId);
     if (status.lifecycle === expected) return status;

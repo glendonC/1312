@@ -14,6 +14,8 @@ import type {
 } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { reopenStudyReadiness } from "../study/studyReadinessAudit.ts";
+import { GeneralizedStudyReadinessHost } from "../study/generalizedStudyReadinessHost.ts";
+import { generalizedReadinessReference } from "../study/generalizedStudyRuntime.ts";
 import { validatePublishReviewIntakeReceipt } from "../validation/publishReview.ts";
 
 const MAX_STORED_PUBLISH_REVIEW_INTAKE_BYTES = 64 * 1024;
@@ -135,9 +137,13 @@ export async function reopenPublishReviewIntakes(
       !sameCanonical(artifact.sourceArtifactIds, [identity.artifactId])
     ) throw new Error(`Stored publish-review intake ${receipt.receiptId} changed its study-readiness identity or completion`);
 
-    const readiness = await reopenStudyReadiness(state, artifacts, identity.readinessId);
+    const generalized = state.generalizedStudyReadiness[identity.readinessId];
+    const readiness = generalized
+      ? await new GeneralizedStudyReadinessHost(state, artifacts).reopen(generalizedReadinessReference(generalized))
+      : await reopenStudyReadiness(state, artifacts, identity.readinessId);
+    const readinessArtifactId = generalized ? generalized.artifactId : state.studyReadiness[identity.readinessId]?.artifactId;
     if (
-      readiness.artifactId !== identity.artifactId || readiness.receiptId !== identity.receiptId ||
+      readinessArtifactId !== identity.artifactId || readiness.receiptId !== identity.receiptId ||
       readiness.receiptContentId !== identity.receiptContentId
     ) {
       throw new Error(`Stored publish-review intake ${receipt.receiptId} no longer has a verified study-readiness input`);
@@ -145,7 +151,7 @@ export async function reopenPublishReviewIntakes(
     const expectedOutcome = readiness.receipt.result.outcome === "proceed_to_caption_review" ? "queued" : "rejected";
     if (
       receipt.input.verification.integrity !== "stored_study_readiness_and_recursive_inputs_verified" ||
-      receipt.input.verification.producer !== "deterministic_study_readiness_gate_v1" ||
+      receipt.input.verification.producer !== (generalized ? "deterministic_study_readiness_gate_v3" : "deterministic_study_readiness_gate_v1") ||
       receipt.result.outcome !== expectedOutcome ||
       receipt.result.outcome !== intake.outcome ||
       !sameCanonical(receipt.result.reasonCodes, readiness.receipt.result.reasonCodes) ||

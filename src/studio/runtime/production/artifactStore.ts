@@ -17,13 +17,15 @@ import type {
   FrameSampleManifest,
   FrameSamplingReceipt,
   StudyReportArtifact,
+  StudyReportArtifactV2,
   OwnedMediaStudyArtifact,
   WorkerOutputEnvelope,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
-import { OWNED_MEDIA_STUDY_LIMITS, STUDY_REPORT_LIMITS } from "./model.ts";
+import { OWNED_MEDIA_STUDY_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "./model.ts";
 import { validateStudyReportArtifact } from "./validation/studyReports.ts";
+import { validateStudyReportArtifactV2 } from "./validation/studyReportsV2.ts";
 import { validateOwnedMediaStudyArtifact } from "./validation/studies.ts";
 import {
   buildFrameManifestArtifact as buildFrameManifestArtifactBuilder,
@@ -38,6 +40,10 @@ import {
   buildOwnedMediaStudyArtifact as buildOwnedMediaStudyArtifactBuilder,
   buildStudyReadinessArtifact as buildStudyReadinessArtifactBuilder,
   buildStudyReportArtifact as buildStudyReportArtifactBuilder,
+  buildGeneralizedParentAdmissionArtifact as buildGeneralizedParentAdmissionArtifactBuilder,
+  buildGeneralizedParentReadArtifact as buildGeneralizedParentReadArtifactBuilder,
+  buildOwnedMediaStudyArtifactV2 as buildOwnedMediaStudyArtifactV2Builder,
+  buildStudyReadinessArtifactV3 as buildStudyReadinessArtifactV3Builder,
 } from "./artifactStore/studyArtifacts.ts";
 import {
   buildSemanticEvidenceArtifact as buildSemanticEvidenceArtifactBuilder,
@@ -342,27 +348,34 @@ export class ContentAddressedArtifactStore {
     };
   }
 
-  async prepareStudyReport(runId: string, value: unknown): Promise<{
+  async prepareStudyReport(runId: string, value: unknown, outputSlotName?: string): Promise<{
     artifactId: string;
-    envelope: StudyReportArtifact;
+    envelope: StudyReportArtifact | StudyReportArtifactV2;
+    outputSlotName?: string;
     content: ContentIdentity;
     storageKey: string;
   }> {
-    const envelope = validateStudyReportArtifact(value);
+    const envelope = (value as { schema?: unknown })?.schema === "studio.study-report.v2"
+      ? validateStudyReportArtifactV2(value)
+      : validateStudyReportArtifact(value);
     if (envelope.runId !== runId) throw new Error("Study report belongs to another run");
     const stored = await this.storeJson(envelope);
-    if (stored.content.bytes > STUDY_REPORT_LIMITS.maxArtifactBytes) {
+    const maximumBytes = envelope.schema === "studio.study-report.v2"
+      ? STUDY_REPORT_V2_LIMITS.maxArtifactBytes
+      : STUDY_REPORT_LIMITS.maxArtifactBytes;
+    if (stored.content.bytes > maximumBytes) {
       throw new Error("Study report exceeds its stored-byte ceiling");
     }
     return {
       artifactId: `artifact:${canonicalSha256({
         runId,
         taskId: envelope.task.taskId,
-        outputSlot: envelope.outputSlot,
-        kind: "studio.study-report.v1",
+        ...(envelope.schema === "studio.study-report.v1" ? { outputSlot: envelope.outputSlot } : {}),
+        kind: envelope.schema,
         contentId: stored.content.contentId,
       })}`,
       envelope,
+      ...(envelope.schema === "studio.study-report.v2" ? { outputSlotName } : {}),
       ...stored,
     };
   }
@@ -416,6 +429,30 @@ export class ContentAddressedArtifactStore {
     input: Parameters<typeof buildStudyReportArtifactBuilder>[0],
   ): ReturnType<typeof buildStudyReportArtifactBuilder> {
     return buildStudyReportArtifactBuilder(input);
+  }
+
+  buildGeneralizedParentAdmissionArtifact(
+    input: Parameters<typeof buildGeneralizedParentAdmissionArtifactBuilder>[0],
+  ): ReturnType<typeof buildGeneralizedParentAdmissionArtifactBuilder> {
+    return buildGeneralizedParentAdmissionArtifactBuilder(input);
+  }
+
+  buildGeneralizedParentReadArtifact(
+    input: Parameters<typeof buildGeneralizedParentReadArtifactBuilder>[0],
+  ): ReturnType<typeof buildGeneralizedParentReadArtifactBuilder> {
+    return buildGeneralizedParentReadArtifactBuilder(input);
+  }
+
+  buildOwnedMediaStudyArtifactV2(
+    input: Parameters<typeof buildOwnedMediaStudyArtifactV2Builder>[0],
+  ): ReturnType<typeof buildOwnedMediaStudyArtifactV2Builder> {
+    return buildOwnedMediaStudyArtifactV2Builder(input);
+  }
+
+  buildStudyReadinessArtifactV3(
+    input: Parameters<typeof buildStudyReadinessArtifactV3Builder>[0],
+  ): ReturnType<typeof buildStudyReadinessArtifactV3Builder> {
+    return buildStudyReadinessArtifactV3Builder(input);
   }
 
   buildSemanticEvidenceArtifact(

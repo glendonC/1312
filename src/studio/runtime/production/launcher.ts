@@ -36,10 +36,12 @@ import { closedCodexExecArgs } from "./executor/codexInvocation.ts";
 import { LauncherFailure } from "./executor/launcherFailure.ts";
 import {
   buildStudyReportEnvelope,
+  buildStudyReportEnvelopeV2,
   validateWorkerResult,
   workerOutputSchema,
   workerPrompt,
 } from "./executor/workerContract.ts";
+import { deriveTaskDialogueScopePolicy } from "./study/dialogueScopeRuntime.ts";
 import {
   runBoundedProcess as runProcess,
   type ProcessResult,
@@ -342,8 +344,10 @@ export class CodexExecWorkerLauncher {
         );
       }
       const semanticEvidenceInputs: ReturnType<typeof semanticEvidenceCitation>[] = [];
+      const verifiedSemanticEvidence: Awaited<ReturnType<typeof reopenSemanticEvidence>>[] = [];
       for (const operation of completedSemantic) {
         const verified = await reopenSemanticEvidence(this.ledger.state(), this.artifacts, operation.id);
+        verifiedSemanticEvidence.push(verified);
         semanticEvidenceInputs.push(semanticEvidenceCitation(verified));
       }
       if (assessmentGrant && !Object.values(this.ledger.state().evidenceAssessments).some((operation) =>
@@ -372,12 +376,23 @@ export class CodexExecWorkerLauncher {
       const worker = validateWorkerResult(workerValue, task, semanticEvidenceInputs);
       const prepared = await Promise.all(
         worker.outputs.map(async (output) => {
-          if (output.kind === "studio.study-report.v1" && "coverage" in output) {
+          if ((output.kind === "studio.study-report.v1" || output.kind === "studio.study-report.v2") && "coverage" in output) {
+            const envelope = output.kind === "studio.study-report.v2"
+              ? buildStudyReportEnvelopeV2({
+                  task,
+                  executionId,
+                  output,
+                  semanticEvidenceInputs: worker.semanticEvidenceInputs,
+                  verifiedSemanticEvidence,
+                  dialogueScopePolicy: await deriveTaskDialogueScopePolicy(this.ledger.state(), this.artifacts, task.id),
+                })
+              : buildStudyReportEnvelope(task, output, worker.semanticEvidenceInputs);
             return {
               kind: "study" as const,
               prepared: await this.artifacts.prepareStudyReport(
                 this.ledger.runId,
-                buildStudyReportEnvelope(task, output, worker.semanticEvidenceInputs),
+                envelope,
+                output.name,
               ),
             };
           }

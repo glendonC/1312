@@ -220,6 +220,7 @@ export class CodexExecOrchestratorLauncher {
       scheduled.status !== "scheduled" || scheduled.ownerAgentId !== null ||
       ![
         JSON.stringify(["task.reports.wait", "task.spawn.request"]),
+        JSON.stringify(["artifact.read", "report.disposition", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
         JSON.stringify(["artifact.read", "report.disposition", "study.plan", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
       ].includes(JSON.stringify(scheduled.grants.map((grant) => grant.capability).sort()))
     ) throw new Error("Orchestrator permit does not reference one exact unowned root contract");
@@ -251,6 +252,7 @@ export class CodexExecOrchestratorLauncher {
     const schemaPath = join(directory, "orchestrator-output.schema.json");
     await writeFile(schemaPath, `${JSON.stringify(orchestratorOutputSchema)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
     const planningEnabled = task.grants.some((grant) => grant.capability === "study.plan");
+    const generalizedEnabled = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v2");
     const boundedBridge = new BoundedOrchestratorBridge({
       task,
       executionId,
@@ -263,6 +265,7 @@ export class CodexExecOrchestratorLauncher {
         planningHost: new StudyPlanningHost(this.ledger, this.artifacts),
         synthesisHost: new OwnedMediaStudySynthesisHost(this.ledger, this.artifacts),
       } : {}),
+      ...(generalizedEnabled ? { artifacts: this.artifacts } : {}),
     });
     const bridge = await openOrchestratorBridge(boundedBridge);
     let processResult: ProcessResult | null = null;
@@ -279,7 +282,9 @@ export class CodexExecOrchestratorLauncher {
         "-c", "mcp_servers.studio_orchestrator.required=true",
         "-c", `mcp_servers.studio_orchestrator.enabled_tools=${tomlStrings(planningEnabled
           ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL]
-          : [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL])}`,
+          : generalizedEnabled
+            ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL]
+            : [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL])}`,
         "-c", "mcp_servers.studio_orchestrator.startup_timeout_sec=5",
         "-c", `mcp_servers.studio_orchestrator.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
         "-c", `mcp_servers.studio_orchestrator.env_vars=${tomlStrings(["STUDIO_ORCHESTRATOR_BRIDGE_URL", "STUDIO_ORCHESTRATOR_BRIDGE_TOKEN"])}`,
@@ -333,7 +338,7 @@ export class CodexExecOrchestratorLauncher {
           const outputs = request!.input.requiredOutputs;
           const capabilities = new Set(request!.input.requiredCapabilities);
           if (
-            outputs.length !== 1 || outputs[0].required !== true || outputs[0].artifactKind !== "studio.study-report.v1" ||
+            outputs.length !== 1 || outputs[0].required !== true || outputs[0].artifactKind !== (generalizedEnabled ? "studio.study-report.v2" : "studio.study-report.v1") ||
             !capabilities.has("speech.transcribe") || !capabilities.has("report.submit")
           ) {
             throw new LauncherFailure("Orchestrator changed the coverage-study child contract", "Codex orchestrator returned an accepted child outside the typed coverage-study boundary.");
@@ -358,6 +363,20 @@ export class CodexExecOrchestratorLauncher {
           throw new LauncherFailure(
             "Orchestrator omitted required post-report planning or synthesis",
             "Codex orchestrator did not close two admitted reads, a synthesis decision, and one model-authored owned-media study.",
+          );
+        }
+      }
+      if (generalizedEnabled) {
+        const acceptedAdmissions = Object.values(state.generalizedParentArtifactAdmissions).filter((entry) =>
+          entry.parentTaskId === task.id);
+        const completedReads = Object.values(state.generalizedParentArtifactReads).filter((entry) =>
+          entry.parentTaskId === task.id);
+        const studies = Object.values(state.generalizedOwnedMediaStudies).filter((entry) =>
+          entry.executionId === executionId);
+        if (acceptedAdmissions.length < 2 || completedReads.length < 2 || studies.length !== 1) {
+          throw new LauncherFailure(
+            "Orchestrator omitted required generalized admission, reads, or synthesis",
+            "Codex orchestrator did not close two generalized admitted reads and one v2 owned-media study.",
           );
         }
       }

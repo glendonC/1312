@@ -35,6 +35,12 @@
     bottom: calc(100% + 10px);
     left: auto;
   }
+
+  .dock-parameters {
+    left: 0;
+    bottom: calc(100% + 10px);
+    right: auto;
+  }
 }
 
 @media (max-width: 480px) {

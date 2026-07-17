@@ -21,7 +21,8 @@
   pointer-events: none;
 }
 
-.studio:has(.agent-focus) .dock-layout {
+.studio:has(.agent-focus) .dock-layout,
+.studio:has(.agent-focus) .dock-parameters {
   visibility: hidden;
   pointer-events: none;
 }

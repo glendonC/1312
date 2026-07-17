@@ -6,7 +6,15 @@
   left: calc(100% + 12px);
 }
 
-.dock-layout-trigger {
+/* Its mirror on the left steps back out to the preparation steps. */
+.dock-parameters {
+  position: absolute;
+  bottom: 3px;
+  right: calc(100% + 12px);
+}
+
+.dock-layout-trigger,
+.dock-parameters-trigger {
   display: inline-flex;
   width: 48px;
   height: 48px;
@@ -29,6 +37,7 @@
 }
 
 .dock-layout-trigger svg,
+.dock-parameters-trigger svg,
 .dock-layout-option-icon svg {
   overflow: visible;
   fill: none;
@@ -45,7 +54,9 @@
 }
 
 .dock-layout-trigger:hover,
-.dock-layout-trigger[aria-expanded="true"] {
+.dock-layout-trigger[aria-expanded="true"],
+.dock-parameters-trigger:hover,
+.dock-parameters-trigger:focus-visible {
   border-color: var(--accent-line);
   color: var(--accent);
   background: rgba(255, 255, 255, 0.86);

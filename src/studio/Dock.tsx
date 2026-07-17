@@ -6,6 +6,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import DockTrace from "./DockTrace";
 import { Arrow, Hold, Replay } from "./glyphs";
 import LayoutControl from "./LayoutControl";
+import ReviewSetupControl from "./ReviewSetupControl";
 import { focusResultTarget, RECORDED_RESULTS_ID } from "./resultAccess";
 import { useComplete, usePaused, useProgress, useStudio } from "./store";
 
@@ -159,6 +160,7 @@ export default function Dock() {
         </div>
       </motion.div>
 
+      <ReviewSetupControl />
       <LayoutControl />
     </div>
   );

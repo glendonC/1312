@@ -1,8 +1,9 @@
-import { isFrameHostArtifactKind, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
+import { isFrameHostArtifactKind, isOcrHostArtifactKind, OCR_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
 import type {
   GeneralizedCoverageReasonCode,
   GeneralizedCoverageRange,
   GeneralizedStudyClaim,
+  OcrEvidenceCitationInput,
   SemanticEvidenceCitationInput,
   StudyClaim,
   StudyCoverageRange,
@@ -12,9 +13,11 @@ import type {
 } from "../model.ts";
 import type { DialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.ts";
 import type { VerifiedSemanticEvidence } from "../semantic/semanticEvidenceAudit.ts";
-import { currentRunSpeechCitation } from "../evidenceCitations/audit.ts";
+import type { VerifiedOcrAudit } from "../ocrAudit.ts";
+import { currentRunSpeechCitation, ocrSpanCitation } from "../evidenceCitations/audit.ts";
 import { deriveGeneralizedCoverageDecision } from "../admission/generalizedCoveragePolicy.ts";
 import { validateSemanticEvidenceCitationInput } from "../validation/semanticEvidence.ts";
+import { validateOcrEvidenceCitationInput } from "../validation/ocr.ts";
 import { validateCoveragePartition, validateStudyReportArtifact } from "../validation/studyReports.ts";
 import { validateStudyReportArtifactV2 } from "../validation/studyReportsV2.ts";
 import { LauncherFailure } from "./launcherFailure.ts";
@@ -22,6 +25,7 @@ import { LauncherFailure } from "./launcherFailure.ts";
 export interface WorkerResult {
   summary: string;
   semanticEvidenceInputs: SemanticEvidenceCitationInput[];
+  ocrEvidenceInputs: OcrEvidenceCitationInput[];
   outputs: WorkerResultOutput[];
 }
 
@@ -75,6 +79,8 @@ export function buildStudyReportEnvelopeV2(input: {
   output: Extract<WorkerResultOutput, { kind: "studio.study-report.v2" }>;
   semanticEvidenceInputs: SemanticEvidenceCitationInput[];
   verifiedSemanticEvidence: VerifiedSemanticEvidence[];
+  ocrEvidenceInputs: OcrEvidenceCitationInput[];
+  verifiedOcrEvidence: VerifiedOcrAudit[];
   dialogueScopePolicy: DialogueScopePolicy | null;
 }): StudyReportArtifactV2 {
   const { task, output } = input;
@@ -144,6 +150,31 @@ export function buildStudyReportEnvelopeV2(input: {
     .filter(([claimId]) => retainedClaims.has(claimId))
     .flatMap(([, citations]) => citations)
     .concat(coverageCitations);
+  const verifiedOcrByOperation = new Map(input.verifiedOcrEvidence.map((entry) => [entry.observations.operationId, entry]));
+  const ocrCitations = input.ocrEvidenceInputs.map((citationInput) => {
+    const verified = verifiedOcrByOperation.get(citationInput.operationId);
+    if (!verified || citationInput.artifactId !== verified.observationsArtifact.id ||
+        citationInput.contentId !== verified.observationsArtifact.content.contentId ||
+        citationInput.receiptArtifactId !== verified.receiptArtifact.id ||
+        citationInput.receiptId !== verified.receipt.receiptId ||
+        citationInput.receiptContentId !== verified.receiptArtifact.content.contentId) {
+      throw new Error(`Study report v2 OCR input ${citationInput.operationId} changed authenticated evidence identity`);
+    }
+    return ocrSpanCitation({
+      verified,
+      observationIds: citationInput.observationIds,
+      target: {
+        kind: "media_context",
+        qualifiesMedia: {
+          artifactId: verified.observations.source.artifactId,
+          trackId: verified.observations.source.videoTrackId,
+          startMs: verified.observations.source.grantedRange.startMs,
+          endMs: verified.observations.source.grantedRange.endMs,
+        },
+      },
+    });
+  });
+  evidenceCitations.push(...ocrCitations);
   const sourceMap = new Map<string, string>([[task.jobContext.source.artifactId, task.jobContext.source.contentId]]);
   for (const citation of evidenceCitations) {
     sourceMap.set(citation.evidence.artifactId, citation.evidence.contentId);
@@ -174,18 +205,18 @@ export function validateWorkerResult(
   value: unknown,
   task: TaskRecord,
   expectedSemanticEvidenceInputs: SemanticEvidenceCitationInput[] = [],
+  expectedOcrEvidenceInputs: OcrEvidenceCitationInput[] = [],
 ): WorkerResult {
   const item = record(value);
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker response failed its output authority contract.",
     );
   }
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
-  const allowedKeys = semanticGranted
-    ? new Set(["summary", "semanticEvidenceInputs", "outputs"])
-    : new Set(["summary", "outputs"]);
+  const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
+  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : [])]);
   if (!item || Object.keys(item).some((key) => !allowedKeys.has(key))) {
     throw new LauncherFailure(
       "Worker result must contain only summary and outputs",
@@ -235,6 +266,35 @@ export function validateWorkerResult(
     throw new LauncherFailure(
       "Host supplied semantic evidence without a worker grant",
       "Codex worker response failed its semantic evidence citation contract.",
+    );
+  }
+  let ocrEvidenceInputs: OcrEvidenceCitationInput[] = [];
+  if (ocrGranted) {
+    if (!Array.isArray(item.ocrEvidenceInputs)) {
+      throw new LauncherFailure(
+        "OCR-consuming worker omitted its structured evidence input list",
+        "Codex worker response failed its OCR evidence citation contract.",
+      );
+    }
+    try {
+      ocrEvidenceInputs = item.ocrEvidenceInputs.map((input, index) =>
+        validateOcrEvidenceCitationInput(input, "Worker result", `ocrEvidenceInputs[${index}]`));
+    } catch (error) {
+      throw new LauncherFailure(
+        `Worker OCR evidence citation is invalid: ${error instanceof Error ? error.message : "invalid citation"}`,
+        "Codex worker response failed its OCR evidence citation contract.",
+      );
+    }
+    if (JSON.stringify(ocrEvidenceInputs) !== JSON.stringify(expectedOcrEvidenceInputs)) {
+      throw new LauncherFailure(
+        "Worker OCR evidence citations do not equal the authenticated current-task observations",
+        "Codex worker response failed its OCR evidence citation contract.",
+      );
+    }
+  } else if (expectedOcrEvidenceInputs.length !== 0) {
+    throw new LauncherFailure(
+      "Host supplied OCR evidence without a worker grant",
+      "Codex worker response failed its OCR evidence citation contract.",
     );
   }
   const required = task.requiredOutputs.filter((output) => output.required);
@@ -313,11 +373,11 @@ export function validateWorkerResult(
       "Codex worker response failed its output contract.",
     );
   }
-  return { summary: item.summary, semanticEvidenceInputs, outputs };
+  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, outputs };
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker output schema cannot impersonate a host frame artifact.",
@@ -325,6 +385,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
   }
   const required = task.requiredOutputs.filter((output) => output.required);
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
+  const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
   const semanticEvidenceInputs = {
     type: "array",
     minItems: 1,
@@ -357,6 +418,25 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
     },
   };
   const citation = (semanticEvidenceInputs.items as Record<string, unknown>);
+  const ocrEvidenceInputs = {
+    type: "array",
+    minItems: 0,
+    maxItems: OCR_LIMITS.maxCalls,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        operationId: { type: "string", minLength: 1 },
+        artifactId: { type: "string", minLength: 1 },
+        contentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        receiptArtifactId: { type: "string", minLength: 1 },
+        receiptId: { type: "string", minLength: 1 },
+        receiptContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        observationIds: { type: "array", minItems: 0, maxItems: OCR_LIMITS.maxTotalBoxes, items: { type: "string", minLength: 1 } },
+      },
+      required: ["operationId", "artifactId", "contentId", "receiptArtifactId", "receiptId", "receiptContentId", "observationIds"],
+    },
+  };
   const coverage = {
     type: "array", minItems: 1, maxItems: STUDY_REPORT_LIMITS.maxRanges,
     items: {
@@ -430,6 +510,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
     properties: {
       summary: { type: "string", minLength: 1, maxLength: 2_000 },
       ...(semanticGranted ? { semanticEvidenceInputs } : {}),
+      ...(ocrGranted ? { ocrEvidenceInputs } : {}),
       outputs: {
         type: "array",
         minItems: required.length,
@@ -437,7 +518,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         items: outputItems,
       },
     },
-    required: semanticGranted ? ["summary", "semanticEvidenceInputs", "outputs"] : ["summary", "outputs"],
+    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), "outputs"],
   };
 }
 
@@ -449,6 +530,8 @@ export function workerPrompt(task: TaskRecord): string {
         ? ["media_seek"]
         : grant.capability === "media.frames.sample"
           ? ["media_frames_sample"]
+          : grant.capability === "media.frames.ocr"
+            ? ["media_frames_ocr"]
         : []);
   const frameSampling = task.grants
     .filter((grant) => grant.capability === "media.frames.sample")
@@ -470,6 +553,9 @@ export function workerPrompt(task: TaskRecord): string {
     budget: task.budget,
     grantedMediaTools: mediaTools,
     grantedFrameSampling: frameSampling,
+    grantedOcr: task.grants
+      .filter((grant) => grant.capability === "media.frames.ocr")
+      .map((grant) => ({ mediaScope: grant.mediaScope, limits: grant.ocrScope?.limits ?? null })),
     grantedSemanticEvidence: semanticScope,
     grantedEvidence: task.grants
       .filter((grant) => grant.capability === "evidence.read")
@@ -493,6 +579,13 @@ export function workerPrompt(task: TaskRecord): string {
           "A frame operation occurred only when the tool returns actual image/png content plus a host-authored studio.frame-sampling.receipt.v1 identity. The host re-hashes the source, owns decode and transformation, and reports requested and actual presentation timestamps.",
           "That receipt proves bounded sampling and byte delivery only. It does not prove that any model saw or understood a scene, selected the right frame, performed OCR, identified a person, or produced evidence admissible to a study report.",
           "Do not label worker-authored output as studio.frame-sampling.receipt.v1; that kind belongs only to the host artifact named by the tool result.",
+        ] : []),
+        ...(mediaTools.includes("media_frames_ocr") ? [
+          "Invoke media_frames_ocr only after media_frames_sample, only for an exact relevant on-screen-text gap, and pass only the completed frameSamplingOperationId. Do not run ambient OCR.",
+          "The OCR host injects source, frame bytes, track, range, task, agent, and grant. It uses pinned local models and returns time-bound boxes with confidence/state plus immutable observation and receipt identities.",
+          "OCR text is a visual hypothesis, not dialogue, identity, spelling truth, translation, cultural meaning, or person identification. It cannot replace or overwrite speech evidence; below-threshold text is withheld.",
+          "Copy the returned operation/artifact/content/receipt identities and all returned observation IDs into the top-level ocrEvidenceInputs list. For empty or truncated OCR, echo the same authenticated entry with an empty observationIds list so the host preserves that upstream state.",
+          "Do not label worker-authored output as studio.ocr-observations.v1 or studio.ocr-producer.receipt.v1; those kinds belong only to the host.",
         ] : []),
         "Include the returned operation, artifact, receipt, and receipt-content identities in the required worker output.",
       ].join(" ");
@@ -533,7 +626,7 @@ export function workerPrompt(task: TaskRecord): string {
           "Return studio.study-report.v2 as typed coverage proposals and claims, never as prose-only content.",
           "Partition every assigned artifact/track range in order with no gaps or overlaps. A range may name claims, explicitly worker_withheld, explicitly operation_failed, or leave both absent for host-derived unknown/unavailable policy.",
           "Every proposed claim must cover the exact same range as its coverage cell and cite only authenticated current-run speech observations returned by speech_transcribe. The host reconstructs U3 evidence-citation.v1 identities and deterministically derives final coverage from receipts and acoustic dialogue scope; prose cannot upgrade it.",
-          "Frames, when separately granted, remain cite-only media context and cannot authorize dialogue text. Acoustic evidence can qualify coverage but cannot support transcript claims.",
+          "Frames and OCR hypotheses, when separately granted, remain cite-only media context and cannot authorize dialogue or caption text. Acoustic evidence can qualify coverage but cannot support transcript claims.",
           "Do not submit a coverage percentage or claim semantic quality. Weak, missing, conflicting, failed, truncated, unavailable, or out-of-scope evidence must remain an abstention.",
         ].join(" ")
       : "No typed study report is required by this task.";

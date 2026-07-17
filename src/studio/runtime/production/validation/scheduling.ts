@@ -8,6 +8,8 @@ import {
   type EvidenceReadScope,
   FRAME_SAMPLING_LIMITS,
   isFrameHostArtifactKind,
+  isOcrHostArtifactKind,
+  OCR_LIMITS,
   type MediaScope,
   type OrchestratorSpawnContract,
   type RequiredOutput,
@@ -19,6 +21,7 @@ import {
   type WorkerKind,
 } from "../model.ts";
 import { validateFrameSamplingGrantScope } from "./frames.ts";
+import { validateOcrGrantScope } from "./ocr.ts";
 import {
   array,
   boolean,
@@ -75,10 +78,11 @@ const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
     "study.restudy",
     "study.synthesize",
   ]),
-  media: new Set(["media.extract", "media.seek", "media.frames.sample", "speech.transcribe", "report.submit"]),
+  media: new Set(["media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "speech.transcribe", "report.submit"]),
   analysis: new Set([
     "media.seek",
     "media.frames.sample",
+    "media.frames.ocr",
     "speech.transcribe",
     "evidence.read",
     "analysis.evidence.assess",
@@ -210,8 +214,8 @@ function outputs(value: unknown, context: string, path: string): RequiredOutput[
     exact(item, ["name", "artifactKind", "required"], context, `${path}[${index}]`);
     string(item.name, context, `${path}[${index}].name`);
     const artifactKind = string(item.artifactKind, context, `${path}[${index}].artifactKind`);
-    if (isFrameHostArtifactKind(artifactKind)) {
-      fail(context, `${path}[${index}].artifactKind`, "is a host-only frame artifact kind");
+    if (isFrameHostArtifactKind(artifactKind) || isOcrHostArtifactKind(artifactKind)) {
+      fail(context, `${path}[${index}].artifactKind`, "is a host-only frame artifact kind or OCR artifact kind");
     }
     boolean(item.required, context, `${path}[${index}].required`);
   });
@@ -240,7 +244,9 @@ function grant(value: unknown, context: string, path: string): asserts value is 
     item,
     capability === "media.frames.sample"
       ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "frameScope"]
-      : ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope"],
+      : capability === "media.frames.ocr"
+        ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "ocrScope"]
+        : ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope"],
     context,
     path,
   );
@@ -253,6 +259,9 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   const decideScope = decisionScope(item.decisionScope, context, `${path}.decisionScope`);
   const frameScope = capability === "media.frames.sample"
     ? validateFrameSamplingGrantScope(item.frameScope, context, `${path}.frameScope`)
+    : null;
+  const ocrScope = capability === "media.frames.ocr"
+    ? validateOcrGrantScope(item.ocrScope, context, `${path}.ocrScope`)
     : null;
   const mediaBound = capability.startsWith("media.") || capability === "speech.transcribe";
   if (mediaBound && mediaScope.length === 0) {
@@ -285,6 +294,13 @@ function grant(value: unknown, context: string, path: string): asserts value is 
     frameScope === null
   )) {
     fail(context, path, "media.frames.sample grants require one bounded video scope and frame envelope");
+  }
+  if (capability === "media.frames.ocr" && (
+    mediaScope.length !== 1 ||
+    mediaScope[0].endMs - mediaScope[0].startMs > FRAME_SAMPLING_LIMITS.maxDurationMs ||
+    ocrScope === null || ocrScope.limits.maxFrames > OCR_LIMITS.maxFrames
+  )) {
+    fail(context, path, "media.frames.ocr grants require one bounded video scope and OCR envelope");
   }
 }
 

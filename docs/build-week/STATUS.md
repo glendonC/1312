@@ -72,8 +72,9 @@ score.
   must exactly close its claimed range; acoustic citations qualify coverage, while frames remain
   cite-only. Unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states
   deterministically survive admission, synthesis, readiness, and caption causality. Readiness remains
-  an integrity/coverage gate, not semantic QC. Future OCR/speaker/document slots fail closed without
-  producers. U4 extends this evidence layer additively rather than reopening v1 planning. The Studio
+  an integrity/coverage gate, not semantic QC. The U5 OCR slot now has a cite-only producer/audit;
+  speaker/document slots still fail closed without producers. U4 extends this evidence layer
+  additively rather than reopening v1 planning. The Studio
   UI remains unwired and unchanged.
 - **U4 budgeted re-study — attenuated current-run speech vertical slice:** the default generalized
   root now exposes `study_restudy_request` beside the five U3 tools and closes terminal
@@ -89,6 +90,22 @@ score.
   unrelated supported ranges continue. Padded audio, denser frames, alternate recognizer/
   segmentation configuration, and specialist deltas are typed but fail closed until a producer and
   grant are registered. No UI, U5/OCR, semantic-quality, improvement, or Bet G claim is included.
+- **U5 on-screen OCR — cite-only vertical slice:** `media.frames.ocr` is now an explicit scheduler
+  grant and task-private launcher/MCP bridge that accepts only a completed same-task U2 frame
+  operation identity. The host cold-audits U2 source/manifest/receipt/PNG/decoder lineage, then runs
+  local Tesseract.js/core 7.0.0 with vendored `tessdata_fast` 4.1.0 Korean+English models at pinned
+  commit `65727574dfcd264acbb0c3e07860e4e9e9b22185`; model/runtime/configuration files are hashed,
+  network model fetch and cache are disabled, and the decoder seam is replaceable. Separate private
+  content-addressed observation and receipt artifacts retain exact frame ids/timestamps, boxes,
+  NFC-normalized text, confidence/state, model/runtime/config identity, and hard count/byte/text/wall
+  limits. Below-70 confidence and overlapping contradictory hypotheses store null text as unknown;
+  overflow stores truncated with no partial text. Missing grant/frame/model, out-of-range U2 input,
+  tamper, and drift fail closed. U3 now cold-audits `ocr_span` only as `cite_only` media context in
+  report/admission v2; OCR does not enter claim or coverage citation ids and cannot authorize KO/EN
+  caption text or overwrite speech evidence. Scene/shot production, script/language inference,
+  subtitle-perfect aggregation, default visual-specialist/root routing, and U4 denser-frame or
+  specialist wiring remain. No UI, face/biometric/person-id, publication, U6, semantic-quality, or
+  Bet G claim is included.
 
 ## Post-freeze backlog boundary
 
@@ -105,7 +122,8 @@ indefinite deferrals or a one-day implementation claim:
    frames remain cite-only.
 4. U4 budgeted multi-pass re-study — one attenuated current-run speech pass implemented and
    default-runtime wired; additional delta producers remain closed.
-5. U5 OCR and scene/on-screen context.
+5. U5 OCR and scene/on-screen context — OCR cite-only vertical slice implemented; scene/shot,
+   default specialist routing, and U4 denser-frame/specialist wiring remain.
 6. U6 anonymous speaker/overlap evidence.
 7. U7 conditional separation and raw/stem comparison.
 8. R1 bounded receipted web research.
@@ -151,11 +169,16 @@ indefinite deferrals or a one-day implementation claim:
 - U3 proves typed observation-to-target association, per-kind cold audit, range closure, generalized
   abstention preservation, and content-addressed replay. It does not prove multimodal understanding,
   evidence accuracy, independent corroboration, reliability equivalence, truth arbitration,
-  transcription/translation quality, OCR, or scene understanding.
+  transcription/translation quality, OCR accuracy, or scene understanding.
 - U4 proves exact weak-range/cause selection, one bounded delta-bearing pass, scheduler caps/dedupe,
   durable pass history/disagreement, citation-only support upgrades, terminal weakness, and replay.
   A pass count, token count, agent count, role label, or successful citation does not prove
   understanding, semantic correctness, accuracy, quality, or improvement.
+- U5 proves one bounded local OCR execution path, exact U2 frame lineage, immutable hypotheses,
+  cold audit/tamper closure, cite-only U3 association, and fail-closed limits/abstention. It does not
+  prove displayed text is correct, identify a person/place/object, infer script/language,
+  translate/culturally interpret text, understand a scene, select the right frame, or improve a
+  transcript/caption.
 
 ## Where to read what
 

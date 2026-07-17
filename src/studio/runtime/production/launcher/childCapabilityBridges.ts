@@ -26,6 +26,12 @@ import {
   type OpenChildFrameBridge,
 } from "../executor/childFrameBridge.ts";
 import {
+  BoundedChildOcrBridge,
+  openChildOcrBridge,
+  type ChildOcrHost,
+  type OpenChildOcrBridge,
+} from "../executor/childOcrBridge.ts";
+import {
   BoundedChildMediaBridge,
   openChildMediaBridge,
   type ChildMediaCapabilityHost,
@@ -46,8 +52,10 @@ export interface LauncherChildCapabilityOptions {
   nextDecisionOperationId?: () => string;
   nextSemanticEvidenceOperationId?: () => string;
   nextFrameOperationId?: () => string;
+  nextOcrOperationId?: () => string;
   mediaMcpServerPath?: string;
   frameMcpServerPath?: string;
+  ocrMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -57,6 +65,7 @@ export interface LauncherChildCapabilityOptions {
 export interface LauncherChildCapabilityHosts {
   media: ChildMediaCapabilityHost;
   frame: ChildFrameSamplingHost;
+  ocr: ChildOcrHost;
   evidence: ChildEvidenceReadHost;
   assessment: ChildEvidenceAssessmentHost;
   decision: ChildEvidenceDecisionHost;
@@ -68,10 +77,12 @@ export interface LauncherChildCapabilityContext {
   evidenceGrant: CapabilityGrant | undefined;
   semanticEvidenceGrant: CapabilityGrant | undefined;
   frameGrant: CapabilityGrant | undefined;
+  ocrGrant: CapabilityGrant | undefined;
   assessmentGrant: CapabilityGrant | undefined;
   decisionGrant: CapabilityGrant | undefined;
   mediaBridge: OpenChildMediaBridge | null;
   frameBridge: OpenChildFrameBridge | null;
+  ocrBridge: OpenChildOcrBridge | null;
   evidenceBridge: OpenChildEvidenceBridge | null;
   assessmentBridge: OpenChildEvidenceAssessmentBridge | null;
   decisionBridge: OpenChildEvidenceDecisionBridge | null;
@@ -87,10 +98,12 @@ export function launcherChildCapabilityContext(task: TaskRecord): LauncherChildC
     evidenceGrant: task.grants.find((grant) => grant.capability === "evidence.read"),
     semanticEvidenceGrant: task.grants.find((grant) => grant.capability === "speech.transcribe"),
     frameGrant: task.grants.find((grant) => grant.capability === "media.frames.sample"),
+    ocrGrant: task.grants.find((grant) => grant.capability === "media.frames.ocr"),
     assessmentGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.assess"),
     decisionGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.decide"),
     mediaBridge: null,
     frameBridge: null,
+    ocrBridge: null,
     evidenceBridge: null,
     assessmentBridge: null,
     decisionBridge: null,
@@ -112,6 +125,11 @@ export async function openLauncherChildCapabilityBridges(
   if (context.frameGrant) {
     context.frameBridge = await openChildFrameBridge(new BoundedChildFrameBridge(task, hosts.frame, {
       nextOperationId: options.nextFrameOperationId,
+    }));
+  }
+  if (context.ocrGrant) {
+    context.ocrBridge = await openChildOcrBridge(new BoundedChildOcrBridge(task, hosts.ocr, {
+      nextOperationId: options.nextOcrOperationId,
     }));
   }
   if (context.semanticEvidenceGrant) {
@@ -203,6 +221,27 @@ export function configureLauncherChildCapabilityMcp(
         "STUDIO_CHILD_FRAME_BRIDGE_URL",
         "STUDIO_CHILD_FRAME_BRIDGE_TOKEN",
       ])}`,
+    );
+  }
+  if (context.ocrBridge) {
+    const serverPath = options.ocrMcpServerPath ?? fileURLToPath(
+      new URL("../executor/ocrMcpServer.ts", import.meta.url),
+    );
+    args.push(
+      "-c",
+      `mcp_servers.studio_ocr.command=${tomlString(process.execPath)}`,
+      "-c",
+      `mcp_servers.studio_ocr.args=${tomlStrings([serverPath])}`,
+      "-c",
+      "mcp_servers.studio_ocr.required=true",
+      "-c",
+      `mcp_servers.studio_ocr.enabled_tools=${tomlStrings([context.ocrBridge.manifest.tool.name])}`,
+      "-c",
+      "mcp_servers.studio_ocr.startup_timeout_sec=5",
+      "-c",
+      `mcp_servers.studio_ocr.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, options.maximumWallMs) / 1_000))}`,
+      "-c",
+      `mcp_servers.studio_ocr.env_vars=${tomlStrings(["STUDIO_CHILD_OCR_BRIDGE_URL", "STUDIO_CHILD_OCR_BRIDGE_TOKEN"])}`,
     );
   }
   if (context.evidenceBridge) {
@@ -306,7 +345,7 @@ export function configureLauncherChildCapabilityMcp(
 export function launcherChildCapabilityEnvironment(
   context: LauncherChildCapabilityContext,
 ): NodeJS.ProcessEnv {
-  return context.mediaBridge || context.frameBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
+  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
     ...process.env,
     ...(context.mediaBridge ? {
       STUDIO_CHILD_MEDIA_BRIDGE_URL: context.mediaBridge.endpoint,
@@ -315,6 +354,10 @@ export function launcherChildCapabilityEnvironment(
     ...(context.frameBridge ? {
       STUDIO_CHILD_FRAME_BRIDGE_URL: context.frameBridge.endpoint,
       STUDIO_CHILD_FRAME_BRIDGE_TOKEN: context.frameBridge.token,
+    } : {}),
+    ...(context.ocrBridge ? {
+      STUDIO_CHILD_OCR_BRIDGE_URL: context.ocrBridge.endpoint,
+      STUDIO_CHILD_OCR_BRIDGE_TOKEN: context.ocrBridge.token,
     } : {}),
     ...(context.evidenceBridge ? {
       STUDIO_CHILD_EVIDENCE_BRIDGE_URL: context.evidenceBridge.endpoint,
@@ -340,6 +383,7 @@ export async function closeLauncherChildCapabilityBridges(
 ): Promise<void> {
   if (context.mediaBridge) await context.mediaBridge.close();
   if (context.frameBridge) await context.frameBridge.close();
+  if (context.ocrBridge) await context.ocrBridge.close();
   if (context.semanticEvidenceBridge) await context.semanticEvidenceBridge.close();
   if (context.evidenceBridge) await context.evidenceBridge.close();
   if (context.assessmentBridge) await context.assessmentBridge.close();

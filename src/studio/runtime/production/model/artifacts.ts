@@ -45,6 +45,22 @@ export interface FrameSamplingReceiptArtifactOrigin {
   manifestArtifactId: string;
 }
 
+export interface OcrObservationsArtifactOrigin {
+  kind: "ocr_observations";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  frameSamplingOperationId: string;
+}
+
+export interface OcrReceiptArtifactOrigin {
+  kind: "ocr_receipt";
+  operationId: string;
+  receiptId: string;
+  observationsArtifactId: string;
+  frameSamplingOperationId: string;
+}
+
 export interface SemanticMediaEvidenceArtifactOrigin {
   kind: "semantic_media_evidence";
   operationId: string;
@@ -291,6 +307,8 @@ export interface RuntimeArtifact {
     | SampledFrameArtifactOrigin
     | FrameSampleManifestArtifactOrigin
     | FrameSamplingReceiptArtifactOrigin
+    | OcrObservationsArtifactOrigin
+    | OcrReceiptArtifactOrigin
     | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
     | StudyReportArtifactOrigin

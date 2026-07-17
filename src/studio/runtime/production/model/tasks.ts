@@ -1,4 +1,5 @@
 import type { FrameSamplingGrantScope } from "./frames.ts";
+import type { OcrGrantScope } from "./ocr.ts";
 
 export const CAPABILITIES = [
   "task.spawn.request",
@@ -7,6 +8,7 @@ export const CAPABILITIES = [
   "media.extract",
   "media.seek",
   "media.frames.sample",
+  "media.frames.ocr",
   "speech.transcribe",
   "evidence.read",
   "analysis.evidence.assess",
@@ -184,10 +186,17 @@ export type CapabilityGrant =
   | (CapabilityGrantBase & {
       capability: "media.frames.sample";
       frameScope: FrameSamplingGrantScope;
+      ocrScope?: never;
     })
   | (CapabilityGrantBase & {
-      capability: Exclude<Capability, "media.frames.sample">;
+      capability: "media.frames.ocr";
+      ocrScope: OcrGrantScope;
       frameScope?: never;
+    })
+  | (CapabilityGrantBase & {
+      capability: Exclude<Capability, "media.frames.sample" | "media.frames.ocr">;
+      frameScope?: never;
+      ocrScope?: never;
     });
 
 export interface AgentRecord {

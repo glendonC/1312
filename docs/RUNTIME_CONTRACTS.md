@@ -34,10 +34,16 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   dimension/per-frame and aggregate byte/wall/call ceilings, stores requested and actual PTS plus
   transformation and decoder lineage, and atomically records content-addressed frame, manifest, and
   receipt artifacts;
+- a separate path-free `media_frames_ocr` bridge and bounded OCR host that accept only one completed
+  same-task U2 frame operation identity, cold-audit its source/manifest/receipt/PNG/decoder lineage,
+  run pinned local Tesseract.js/core 7.0.0 over the real PNG bytes with vendored Korean+English
+  `tessdata_fast` 4.1.0 models, and atomically store private content-addressed observation/receipt
+  artifacts under fixed count/byte/text/wall/call ceilings;
 - an additive host-owned U3 citation/admission lane that cold-audits current-run speech, U1 acoustic
-  observation/receipt lineage, and U2 frame receipt/manifest/PNG/decoder identities before storing
-  content-addressed report, admission/read, study, and readiness contracts and deriving caption
-  causality from their recursively reopened lineage;
+  observation/receipt lineage, U2 frame receipt/manifest/PNG/decoder identities, and U5 OCR
+  observation/receipt/model/runtime lineage before storing content-addressed report, admission/read,
+  study, and readiness contracts and deriving caption causality from their recursively reopened
+  lineage. Frame and OCR evidence remain cite-only; speech remains the only claim-support kind;
 - an additive U4 range-pass host and scheduler lane on the default generalized root: it derives exact
   weak-range/cause/prior-evidence inputs, accepts only a strict attenuated current-run speech
   subrange, fixes producer/configuration/budget/child scope, records request and terminal spend/
@@ -136,7 +142,7 @@ validated ingest-origin identity and content facts, and
 artifact references link only when their source/output destination is rendered. The deterministic
 host exercises one real bounded seek plus worker-output receipt/report lineage. No hosted runtime
 service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
-`media_seek`, `media_frames_sample`, `evidence_read`, `evidence_assess`, and/or `evidence_decide`
+`media_seek`, `media_frames_sample`, `media_frames_ocr`, `evidence_read`, `evidence_assess`, and/or `evidence_decide`
 only for matching live task grants, in addition to the closed
 structured report output. `evidence.read` is not a detector call: it reads registered, immutable
 V2/V3 receipt artifacts or V4 acoustic observations under an exact source/task window, per-artifact 32 KiB/64-fact ceilings, and the shared task tool-call
@@ -148,10 +154,14 @@ audited-assessment ceiling and lets the host, not the caller, derive outcome/rea
 scope and the shared task call budget; the child supplies timestamps only. Its receipt proves decode,
 storage, lineage, and authorized PNG delivery, not OCR, scene/person understanding, right-frame
 selection, or visual evidence admission. The default owned audio-study root does not request frames.
+`media.frames.ocr` is a separate one-call capability over an already completed same-task frame
+operation; the child supplies no paths, bytes, source, track, range, grant, or model configuration.
+Its receipt proves which pinned local producer ran over which verified frame identities. It does not
+prove text truth, identity, spelling, translation, cultural meaning, dialogue, or person identity.
 Successful receipts conservatively charge the full authorized wall grant and separately record
 elapsed host work before receipt persistence; the final append-only journal commit is an atomic
 durability boundary, not a preemptible decoder/model interval.
-`media.extract`, `media.seek`, `media.frames.sample`, `evidence.read`,
+`media.extract`, `media.seek`, `media.frames.sample`, `media.frames.ocr`, `evidence.read`,
 `analysis.evidence.assess`, and `analysis.evidence.decide` are real
 scheduler/host/child-bridge capabilities; assessment is opinion over completed reads and decision is
 an audit-state gate, not sensing or publication. Publish-review intake is an application-host
@@ -200,8 +210,9 @@ Current-run speech delegates to semantic-evidence reopening and is the only land
 kind; available temporal observations must exactly tile the claim. U1 acoustic citations reopen the
 separate observation and producer-receipt bytes, derive content-bound observation ids, and may qualify
 coverage but never transcript text. U2 frame citations delegate to complete frame sampling audit and
-remain cite-only point identities. Typed OCR, speaker-turn, and external-document slots have no
-producer adapter and therefore fail closed.
+remain cite-only point identities. U5 OCR citations reopen the OCR observation/receipt artifacts,
+current pinned runtime/model/config identities, and complete U2 lineage, and remain cite-only media
+points. Speaker-turn and external-document slots have no producer adapter and therefore fail closed.
 
 `studio.study-report.v2` and `studio.parent-admission.receipt.v2` re-derive the U1
 `studio.dialogue-scope-policy.v1` for the exact task. Deterministic precedence preserves conflicting,
@@ -221,10 +232,10 @@ approval, caption-production/caption-causality v4. The launcher, worker report u
 projection, validation union, artifact kinds, and observability index carry that chain; there is no
 orphan additive host.
 The explicit `studyContractVersion: "v1"` path preserves closed historical fixtures and receipts but
-is not the default. Audio-only runs request no frames, and absent acoustic or frame evidence supplies
-no authority; only current-run speech may authorize dialogue text. Studio UI projection remains
+is not the default. Audio-only runs request no frames/OCR, and absent acoustic, frame, or OCR evidence
+supplies no authority; only current-run speech may authorize dialogue text. Studio UI projection remains
 outside this cutover. This boundary proves citation
-integrity, coverage policy, and abstention preservation—not multimodal understanding, OCR, scene
+integrity, coverage policy, and abstention preservation—not multimodal understanding, OCR accuracy, scene
 semantics, producer accuracy, independent corroboration, truth arbitration, or caption quality.
 
 U4 does not reuse or mutate v1 planning/follow-up events. `studio.study-restudy-input.v1` is a
@@ -258,6 +269,44 @@ global blocker, while unresolved conflict or stored-integrity failure still with
 causality v4 authorizes text only on supported cells and retains `passIds`/preserved states; weak cells
 remain locally null/withheld. Pass count, tokens, agents, labels, citation closure, and scheduler
 success are not understanding, correctness, accuracy, quality, improvement, or publication evidence.
+
+U5 adds `media.frames.ocr` without changing the U2 receipt or the speech/caption authorization
+rules. The scheduler issues it only with `media.frames.sample` over the same single owned-source/
+video-track/range. The task-private bridge accepts exactly `{ frameSamplingOperationId }`; the host
+injects operation/task/agent/grant/source/track/range and requires that U2 operation to be completed
+by the same task, agent, execution, and immutable scope. Duplicate work and calls beyond the single
+grant call are rejected. The launcher requires a completed OCR operation before accepting output
+from an OCR-granted child.
+
+The producer seam is `OcrRecognizer`. Production uses Tesseract.js 7.0.0,
+`tesseract.js-core` 7.0.0, and `wasm-feature-detect` 1.8.0, with vendored
+`tessdata_fast` 4.1.0 `kor` and `eng` integer-LSTM data at commit
+`65727574dfcd264acbb0c3e07860e4e9e9b22185` under Apache-2.0. The fixed configuration is
+LSTM-only, automatic page segmentation, preserved inter-word spaces, NFC plus whitespace-collapse
+normalization, local language data, no network fetch, and no trained-data cache. The receipt hashes
+the package/core/feature files actually eligible for execution plus both model files and records the
+Node platform. Cold audit recomputes those identities and reopens the source, U2 manifest/receipt,
+every input PNG, the canonical OCR observations, and the OCR receipt; content, runtime, model,
+configuration, or frame-lineage drift fails closed.
+
+The fixed envelope is one call, at most 4 frames, 64 boxes/frame, 128 boxes total, 2 MiB/frame,
+8 MiB aggregate input, 256 Unicode code points/box, 4,096 code points total, 256 KiB each for
+observations and receipt, and 45,000 ms wall, with a minimum confidence of 70. Available hypotheses
+store exact frame id/content/timestamp, a frame-bounded box, normalized text, integer confidence,
+state, and reason. Below-threshold text and overlapping different hypotheses store
+`normalizedText: null` as unknown; output-limit overflow stores a truncated frame with no partial
+observations. Missing grant/frame/model, out-of-range U2 requests, oversized input, timeout,
+recognizer failure, runtime drift, and artifact overflow create no usable output/receipt authority.
+
+`ocr_span` is admitted only as `cite_only` `media_context` with `media_point` locators. The worker
+must echo exact authenticated OCR artifact/content/receipt/observation identities; the host rebuilds
+the citation and adds only its observation/receipt artifacts to report-v2 source lineage. OCR
+citations never enter coverage or claim citation ids. The existing claim-support validator and every
+caption causality version continue to accept only range-closing `current_run_speech`, so OCR cannot
+replace or overwrite spoken evidence or authorize Korean/English caption text. Scene/shot
+boundaries, script/language inference, subtitle-perfect aggregation, root-selected visual
+specialists, U4 denser-frame/specialist deltas, UI, face/biometric/person identification, and frame
+publication are not implemented by this slice.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

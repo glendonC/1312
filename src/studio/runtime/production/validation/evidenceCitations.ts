@@ -227,6 +227,12 @@ export function validateEvidenceCitationEnvelope(
        observations.length === 0 || observations.some((entry) => entry.locator.kind !== "media_point"))) {
     fail(context, path, "frame samples are audited point identities and remain cite-only");
   }
+  if (evidenceKind === "ocr_span" &&
+      (use !== "cite_only" || foundTarget.kind !== "media_context" || operationId === null ||
+       envelope.receipt.artifactId === null ||
+       observations.some((entry) => entry.locator.kind !== "media_point"))) {
+    fail(context, path, "OCR hypotheses are audited point identities and remain cite-only media context");
+  }
   if (evidenceKind === "acoustic_range" && (use !== "coverage_qualification" || operationId !== null || envelope.receipt.artifactId !== null)) {
     fail(context, path, "acoustic observations may qualify coverage but cannot support transcript claims");
   }

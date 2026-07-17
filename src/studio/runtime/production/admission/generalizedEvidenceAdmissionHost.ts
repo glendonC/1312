@@ -4,6 +4,7 @@ import {
   ContentAddressedArtifactStore,
 } from "../artifactStore.ts";
 import type { FrameDecoder } from "../frames/decoder.ts";
+import type { OcrRecognizer } from "../ocr/recognizer.ts";
 import type {
   AdmittedStudyReportV2,
   EvidenceCitationEnvelope,
@@ -62,6 +63,7 @@ export interface GeneralizedAdmissionResult extends AdmittedStudyReportV2 {
 
 export interface GeneralizedEvidenceAdmissionOptions {
   frameDecoder?: FrameDecoder;
+  ocrRecognizer?: OcrRecognizer;
   /** Host-owned replaceable seam; production composition uses cold U1 receipt derivation. */
   dialogueScopePolicyResolver?: typeof deriveTaskDialogueScopePolicy;
 }
@@ -75,6 +77,7 @@ export class GeneralizedEvidenceAdmissionHost {
   private readonly state: RuntimeProjection;
   private readonly artifacts: ContentAddressedArtifactStore;
   private readonly frameDecoder: FrameDecoder | undefined;
+  private readonly ocrRecognizer: OcrRecognizer | undefined;
   private readonly dialogueScopePolicyResolver: typeof deriveTaskDialogueScopePolicy;
 
   constructor(
@@ -85,6 +88,7 @@ export class GeneralizedEvidenceAdmissionHost {
     this.state = state;
     this.artifacts = artifacts;
     this.frameDecoder = options.frameDecoder;
+    this.ocrRecognizer = options.ocrRecognizer;
     this.dialogueScopePolicyResolver = options.dialogueScopePolicyResolver ?? deriveTaskDialogueScopePolicy;
   }
 
@@ -105,7 +109,10 @@ export class GeneralizedEvidenceAdmissionHost {
     await this.artifacts.resolveVerified(source);
     const audited: EvidenceCitationEnvelope[] = [];
     for (const citation of report.evidenceCitations) {
-      const verified = await auditEvidenceCitation(this.state, this.artifacts, citation, { frameDecoder: this.frameDecoder });
+      const verified = await auditEvidenceCitation(this.state, this.artifacts, citation, {
+        frameDecoder: this.frameDecoder,
+        ocrRecognizer: this.ocrRecognizer,
+      });
       if (verified.source.artifactId !== source.id || verified.source.contentId !== source.content.contentId) {
         throw new Error(`Evidence citation ${verified.citationId} belongs to another source`);
       }
@@ -118,6 +125,11 @@ export class GeneralizedEvidenceAdmissionHost {
         const operation = this.state.frameSamples[verified.operationId!];
         if (!operation || operation.taskId !== task.id || operation.agentId !== task.assignedAgentId || operation.executionId !== execution.id) {
           throw new Error(`Frame citation ${verified.citationId} is cross-task or cross-executor`);
+        }
+      } else if (verified.evidenceKind === "ocr_span") {
+        const operation = this.state.ocrOperations[verified.operationId!];
+        if (!operation || operation.taskId !== task.id || operation.agentId !== task.assignedAgentId || operation.executionId !== execution.id) {
+          throw new Error(`OCR citation ${verified.citationId} is cross-task or cross-executor`);
         }
       } else if (!task.jobContext.detectorEvidence.some((identity) => identity.artifactId === verified.evidence.artifactId && identity.contentId === verified.evidence.contentId)) {
         throw new Error(`Acoustic citation ${verified.citationId} is outside the task's immutable detector evidence`);

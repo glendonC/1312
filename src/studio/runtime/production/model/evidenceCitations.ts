@@ -19,7 +19,8 @@ export type EvidenceCitationKind =
 export type LandedEvidenceCitationKind =
   | "current_run_speech"
   | "acoustic_range"
-  | "frame_sample";
+  | "frame_sample"
+  | "ocr_span";
 
 export type EvidenceCitationState =
   | "available"

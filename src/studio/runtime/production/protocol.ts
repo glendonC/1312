@@ -3,6 +3,7 @@ import type {
   FrameSamplingFailedEvent,
   FrameSamplingStartedEvent,
 } from "./protocol/frameEvents.ts";
+import type { OcrCompletedEvent, OcrFailedEvent, OcrStartedEvent } from "./protocol/ocrEvents.ts";
 import type {
   AgentRegisteredEvent,
   ArtifactRecordedEvent,
@@ -79,6 +80,7 @@ export * from "./protocol/base.ts";
 export * from "./protocol/executionEvents.ts";
 export * from "./protocol/evidenceEvents.ts";
 export * from "./protocol/frameEvents.ts";
+export * from "./protocol/ocrEvents.ts";
 export * from "./protocol/reviewEvents.ts";
 export * from "./protocol/studyEvents.ts";
 
@@ -104,6 +106,9 @@ export type RuntimeEvent =
   | FrameSamplingStartedEvent
   | FrameSamplingCompletedEvent
   | FrameSamplingFailedEvent
+  | OcrStartedEvent
+  | OcrCompletedEvent
+  | OcrFailedEvent
   | SemanticEvidenceStartedEvent
   | SemanticEvidenceCompletedEvent
   | SemanticEvidenceFailedEvent

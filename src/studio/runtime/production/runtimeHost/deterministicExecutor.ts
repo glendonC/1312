@@ -271,6 +271,8 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
             output,
             semanticEvidenceInputs: [citation],
             verifiedSemanticEvidence: [verifiedSemantic],
+            ocrEvidenceInputs: [],
+            verifiedOcrEvidence: [],
             dialogueScopePolicy: await deriveTaskDialogueScopePolicy(ledger.state(), artifacts, task.id),
           })
         : buildStudyReportEnvelope(task, output, [citation]);

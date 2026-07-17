@@ -17,6 +17,8 @@ import type {
   EvidenceReadScope,
   FrameSampleRequest,
   FrameSamplingGrantScope,
+  OcrGrantScope,
+  OcrRequest,
   MediaExtractRequest,
   MediaScope,
   MediaSeekRequest,
@@ -30,6 +32,7 @@ import { assertEvidenceAssessmentRequest, countAssessmentTokens } from "./valida
 import { assertEvidenceDecisionRequest } from "./validation/decision.ts";
 import { capabilityOperationExists, taskCapabilityCallCount } from "./capabilityUsage.ts";
 import { frameSamplingRequestFingerprint } from "./validation/frames.ts";
+import { assertOcrRequest, ocrRequestFingerprint } from "./validation/ocr.ts";
 
 export interface AuthorizedFrameSampling {
   request: FrameSampleRequest;
@@ -109,6 +112,100 @@ export function authorizeFrameSampling(
     scope,
     artifact,
     track,
+    executionId: execution.id,
+    launchClaimId: launch.id,
+    requestFingerprint,
+  };
+}
+
+export interface AuthorizedOcr {
+  request: OcrRequest;
+  grant: CapabilityGrant & { ocrScope: OcrGrantScope };
+  scope: MediaScope;
+  artifact: RuntimeArtifact;
+  track: MediaTrackDescriptor;
+  frameOperation: RuntimeProjection["frameSamples"][string];
+  executionId: string;
+  launchClaimId: string;
+  requestFingerprint: string;
+}
+
+export function authorizeOcr(state: RuntimeProjection, requestValue: unknown): AuthorizedOcr {
+  assertOcrRequest(requestValue);
+  const request = requestValue;
+  const task = state.tasks[request.taskId];
+  if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
+    throw new Error("OCR requires a working task owned by the requesting agent");
+  }
+  if (capabilityOperationExists(state, request.operationId)) {
+    throw new Error(`OCR operation ${request.operationId} already exists`);
+  }
+  const grant = task.grants.find((candidate) => candidate.id === request.grantId);
+  if (grant?.capability !== "media.frames.ocr" || !grant.ocrScope || grant.mediaScope.length !== 1) {
+    throw new Error("OCR requires its exact scheduler-issued grant");
+  }
+  const frameOperation = state.frameSamples[request.frameSamplingOperationId];
+  if (
+    !frameOperation || frameOperation.status !== "completed" ||
+    frameOperation.taskId !== task.id || frameOperation.agentId !== request.agentId ||
+    frameOperation.frameArtifactIds.length < 1 ||
+    frameOperation.frameArtifactIds.length > grant.ocrScope.limits.maxFrames
+  ) {
+    throw new Error("OCR requires one completed same-task U2 frame sample inside its frame limit");
+  }
+  const scope = grant.mediaScope[0];
+  if (
+    frameOperation.sourceArtifactId !== scope.artifactId || frameOperation.trackId !== scope.trackId ||
+    frameOperation.startMs !== scope.startMs || frameOperation.endMs !== scope.endMs
+  ) throw new Error("OCR frame lineage changed from its scheduler-injected media scope");
+  const artifact = state.artifacts[scope.artifactId];
+  if (
+    !artifact || artifact.origin.kind !== "ingest" || artifact.runId !== state.runId ||
+    task.jobContext.source.artifactId !== artifact.id || task.jobContext.source.contentId !== artifact.content.contentId
+  ) throw new Error("OCR source changed from the immutable task context");
+  const track = artifact.tracks.find((candidate) => candidate.id === scope.trackId);
+  if (!track || track.kind !== "video") throw new Error("OCR requires one registered video track");
+  if (taskCapabilityCallCount(state, task.id) >= task.budget.toolCalls) {
+    throw new Error("OCR exceeds the task tool-call budget");
+  }
+  if (Object.values(state.ocrOperations).filter((operation) => operation.grantId === grant.id).length >= grant.ocrScope.limits.maxCalls) {
+    throw new Error("OCR exceeds the grant call budget");
+  }
+  const frameIds = frameOperation.frameArtifactIds.map((artifactId) => {
+    const frame = state.artifacts[artifactId];
+    if (!frame || frame.origin.kind !== "sampled_frame" || frame.origin.operationId !== frameOperation.id) {
+      throw new Error("OCR frame sampling operation has incomplete projected frame lineage");
+    }
+    return frame.origin.frameId;
+  });
+  const requestFingerprint = ocrRequestFingerprint({
+    sourceContentId: artifact.content.contentId,
+    trackId: scope.trackId,
+    startMs: scope.startMs,
+    endMs: scope.endMs,
+    frameSamplingOperationId: frameOperation.id,
+    frameIds,
+  });
+  if (Object.values(state.ocrOperations).some((operation) =>
+    operation.taskId === task.id && operation.requestFingerprint === requestFingerprint)) {
+    throw new Error("OCR rejects duplicate canonical work");
+  }
+  const executions = Object.values(state.executions).filter((execution) =>
+    execution.taskId === task.id && execution.agentId === request.agentId && execution.status === "active");
+  if (executions.length !== 1) throw new Error("OCR requires one active task executor");
+  const execution = executions[0];
+  const launch = state.taskLaunches[task.id];
+  if (!launch || launch.executionId !== execution.id || launch.agentId !== request.agentId ||
+      frameOperation.executionId !== execution.id || frameOperation.launchClaimId !== launch.id) {
+    throw new Error("OCR executor lost its durable launch lineage");
+  }
+  return {
+    request,
+    grant: grant as CapabilityGrant & { ocrScope: OcrGrantScope },
+    scope,
+    artifact,
+    track,
+    frameOperation,
     executionId: execution.id,
     launchClaimId: launch.id,
     requestFingerprint,

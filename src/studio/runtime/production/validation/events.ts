@@ -8,6 +8,7 @@ import {
   validateFrameSamplingLimits,
   validateFrameSamplingReceipt,
 } from "./frames.ts";
+import { assertOcrRequest, validateOcrLimits, validateOcrReceipt } from "./ocr.ts";
 import {
   validatePublishReviewIntakeReceipt,
   validateStudyReadinessReceiptIdentity,
@@ -138,7 +139,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -333,6 +334,32 @@ export function assertRuntimeEvent(
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     oneOf(data.reason, new Set(["source_drift", "video_track_unavailable", "frame_unavailable", "duplicate_actual_frame", "decoded_frame_oversized", "decoder_timeout", "decoder_failed"]), context, "event.data.reason");
+  } else if (type === "media.frames_ocr_started") {
+    exact(data, ["request", "scope", "sourceContentId", "executionId", "launchClaimId", "requestFingerprint", "limits"], context, "event.data");
+    assertOcrRequest(data.request, context);
+    const scope = object(data.scope, context, "event.data.scope");
+    exact(scope, ["artifactId", "trackId", "startMs", "endMs"], context, "event.data.scope");
+    string(scope.artifactId, context, "event.data.scope.artifactId");
+    string(scope.trackId, context, "event.data.scope.trackId");
+    const startMs = integer(scope.startMs, context, "event.data.scope.startMs");
+    const endMs = integer(scope.endMs, context, "event.data.scope.endMs", 1);
+    if (endMs <= startMs) fail(context, "event.data.scope", "must be a non-empty range");
+    contentId(data.sourceContentId, context, "event.data.sourceContentId");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.launchClaimId, context, "event.data.launchClaimId");
+    string(data.requestFingerprint, context, "event.data.requestFingerprint");
+    validateOcrLimits(data.limits, context, "event.data.limits");
+  } else if (type === "media.frames_ocr_completed") {
+    exact(data, ["operationId", "outputArtifactId", "receiptArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    string(data.receiptArtifactId, context, "event.data.receiptArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateOcrReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "media.frames_ocr_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    oneOf(data.reason, new Set(["frame_lineage_unavailable", "input_oversized", "model_unavailable", "runtime_drift", "recognizer_timeout", "recognizer_failed", "artifact_oversized"]), context, "event.data.reason");
   } else if (type === "semantic.evidence_started") {
     exact(data, ["request", "grantId", "executionId", "launchClaimId", "sourceContentId", "producer", "limits"], context, "event.data");
     assertSpeechTranscribeRequest(data.request, context);

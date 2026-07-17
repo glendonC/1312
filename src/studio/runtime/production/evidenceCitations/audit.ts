@@ -6,6 +6,8 @@ import { canonicalSha256, ContentAddressedArtifactStore } from "../artifactStore
 import { auditFrameSampling, type VerifiedFrameSampling } from "../frameAudit.ts";
 import type { FrameDecoder } from "../frames/decoder.ts";
 import { FfmpegFrameDecoder } from "../frames/ffmpegDecoder.ts";
+import { auditOcr, type VerifiedOcrAudit } from "../ocrAudit.ts";
+import type { OcrRecognizer } from "../ocr/recognizer.ts";
 import type {
   EvidenceCitationEnvelope,
   EvidenceCitationObservation,
@@ -253,8 +255,66 @@ export function frameSampleCitation(input: {
   });
 }
 
+function ocrUpstreamState(verified: VerifiedOcrAudit): EvidenceCitationState {
+  if (verified.observations.state === "available") return "available";
+  if (verified.observations.state === "truncated") return "truncated";
+  return "unknown";
+}
+
+export function ocrSpanCitation(input: {
+  verified: VerifiedOcrAudit;
+  observationIds: string[];
+  target: Extract<EvidenceCitationTarget, { kind: "media_context" }>;
+}): EvidenceCitationEnvelope {
+  const byId = new Map(input.verified.observations.frames.flatMap((frame) =>
+    frame.observations.map((observation) => [observation.observationId, { frame, observation }] as const)));
+  const observations = input.observationIds.map((observationId): EvidenceCitationObservation => {
+    const found = byId.get(observationId);
+    if (!found) throw new Error(`OCR citation names absent observation ${observationId}`);
+    return {
+      observationId,
+      state: found.observation.state,
+      rawState: `ocr:${found.observation.reason}:${found.observation.confidence}`,
+      locator: {
+        kind: "media_point",
+        media: {
+          artifactId: input.verified.observations.source.artifactId,
+          trackId: input.verified.observations.source.videoTrackId,
+          timestampUs: found.frame.actualTimestampUs,
+          qualifiesRange: structuredClone(input.verified.observations.source.grantedRange),
+        },
+      },
+    };
+  });
+  return makeCitation({
+    evidenceKind: "ocr_span",
+    use: "cite_only",
+    target: structuredClone(input.target),
+    operationId: input.verified.observations.operationId,
+    evidence: {
+      artifactId: input.verified.observationsArtifact.id,
+      contentId: input.verified.observationsArtifact.content.contentId,
+    },
+    receipt: {
+      receiptId: input.verified.receipt.receiptId,
+      contentId: input.verified.receiptArtifact.content.contentId,
+      artifactId: input.verified.receiptArtifact.id,
+    },
+    source: {
+      artifactId: input.verified.observations.source.artifactId,
+      contentId: input.verified.observations.source.contentId,
+      trackId: input.verified.observations.source.videoTrackId,
+    },
+    upstreamState: ocrUpstreamState(input.verified),
+    upstreamReason: input.verified.observations.reason,
+    observations,
+    nonClaims: { semanticCorrectness: "not_assessed", truthArbitration: "not_performed" },
+  });
+}
+
 export interface EvidenceCitationAuditOptions {
   frameDecoder?: FrameDecoder;
+  ocrRecognizer?: OcrRecognizer;
 }
 
 /** Producer-specific cold audit dispatch. Future typed kinds have no adapter and fail closed. */
@@ -297,6 +357,16 @@ export async function auditEvidenceCitation(
     expected = frameSampleCitation({
       verified,
       frameIndex,
+      target: citation.target as Extract<EvidenceCitationTarget, { kind: "media_context" }>,
+    });
+  } else if (citation.evidenceKind === "ocr_span") {
+    const verified = await auditOcr(state, artifacts, citation.operationId!, {
+      frameDecoder: options.frameDecoder,
+      recognizer: options.ocrRecognizer,
+    });
+    expected = ocrSpanCitation({
+      verified,
+      observationIds: citation.observations.map((entry) => entry.observationId),
       target: citation.target as Extract<EvidenceCitationTarget, { kind: "media_context" }>,
     });
   } else {

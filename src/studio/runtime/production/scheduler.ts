@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { assertRuntimeLimits, assertSpawnRequestInput } from "./assertions.ts";
 import { attenuateTaskJobContext } from "./jobContext.ts";
-import { FRAME_SAMPLING_LIMITS } from "./model.ts";
+import { FRAME_SAMPLING_LIMITS, OCR_LIMITS } from "./model.ts";
 import type {
   AgentRecord,
   CapabilityGrant,
@@ -188,6 +188,14 @@ export class BoundedRuntimeScheduler {
             limits: structuredClone(FRAME_SAMPLING_LIMITS),
           },
         };
+        if (capability === "media.frames.ocr") return {
+          ...common,
+          capability,
+          ocrScope: {
+            schema: "studio.ocr-grant.v1" as const,
+            limits: structuredClone(OCR_LIMITS),
+          },
+        };
         return { ...common, capability };
       });
   }
@@ -226,6 +234,8 @@ export class BoundedRuntimeScheduler {
           input.inputArtifactIds.some((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence"))) &&
       (!input.requiredCapabilities.includes("analysis.evidence.decide") ||
         input.requiredCapabilities.includes("analysis.evidence.assess")) &&
+      (!input.requiredCapabilities.includes("media.frames.ocr") ||
+        input.requiredCapabilities.includes("media.frames.sample")) &&
       (frameScope === undefined || (
         frameScope !== null &&
         frameArtifact?.origin.kind === "ingest" &&
@@ -247,7 +257,7 @@ export class BoundedRuntimeScheduler {
       source.content.contentId !== context.source.contentId ||
       !input.inputArtifactIds.includes(source.id)
     ) return false;
-    if (input.requiredCapabilities.includes("media.frames.sample") && (
+    if ((input.requiredCapabilities.includes("media.frames.sample") || input.requiredCapabilities.includes("media.frames.ocr")) && (
       input.mediaScope.length !== 1 || input.mediaScope[0].artifactId !== source.id
     )) return false;
     if (!input.mediaScope.every((scope) =>

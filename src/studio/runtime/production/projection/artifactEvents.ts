@@ -17,8 +17,11 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         artifact.origin.kind === "frame_sample_manifest" ||
         artifact.origin.kind === "frame_sampling_receipt") &&
       event.producer.kind === "frame_host";
+    const isAtomicOcr =
+      (artifact.origin.kind === "ocr_observations" || artifact.origin.kind === "ocr_receipt") &&
+      event.producer.kind === "ocr_host";
     invariant(
-      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling,
+      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr,
       event,
       "artifact evidence must come from its bounded storage, capability, admission, planning, synthesis, or audit host",
     );
@@ -51,6 +54,32 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
       invariant(operation?.status === "started", event, `frame receipt ${artifact.id} has no active frame operation`);
       invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `frame receipt ${artifact.id} changed its producer`);
       invariant(artifact.sourceArtifactIds[0] === operation.sourceArtifactId && artifact.sourceArtifactIds[1] === artifact.origin.manifestArtifactId && next.artifacts[artifact.origin.manifestArtifactId]?.origin.kind === "frame_sample_manifest", event, `frame receipt ${artifact.id} changed manifest lineage`);
+    } else if (artifact.origin.kind === "ocr_observations") {
+      const operation = next.ocrOperations[artifact.origin.operationId];
+      const frameOperation = next.frameSamples[artifact.origin.frameSamplingOperationId];
+      invariant(operation?.status === "started" && frameOperation?.status === "completed", event, `OCR observations ${artifact.id} have no active OCR or completed frame input`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `OCR observations ${artifact.id} changed producer`);
+      invariant(
+        artifact.sourceArtifactIds[0] === operation.sourceArtifactId &&
+          artifact.sourceArtifactIds[1] === frameOperation.manifestArtifactId &&
+          artifact.sourceArtifactIds[2] === frameOperation.receiptArtifactId &&
+          JSON.stringify(artifact.sourceArtifactIds.slice(3)) === JSON.stringify(frameOperation.frameArtifactIds),
+        event,
+        `OCR observations ${artifact.id} changed U2 lineage`,
+      );
+    } else if (artifact.origin.kind === "ocr_receipt") {
+      const operation = next.ocrOperations[artifact.origin.operationId];
+      const frameOperation = next.frameSamples[artifact.origin.frameSamplingOperationId];
+      invariant(operation?.status === "started" && frameOperation?.status === "completed", event, `OCR receipt ${artifact.id} has no active OCR or completed frame input`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `OCR receipt ${artifact.id} changed producer`);
+      invariant(
+        artifact.sourceArtifactIds[0] === operation.sourceArtifactId &&
+          artifact.sourceArtifactIds[1] === artifact.origin.observationsArtifactId && next.artifacts[artifact.origin.observationsArtifactId]?.origin.kind === "ocr_observations" &&
+          artifact.sourceArtifactIds[2] === frameOperation.manifestArtifactId && artifact.sourceArtifactIds[3] === frameOperation.receiptArtifactId &&
+          JSON.stringify(artifact.sourceArtifactIds.slice(4)) === JSON.stringify(frameOperation.frameArtifactIds),
+        event,
+        `OCR receipt ${artifact.id} changed observations or U2 lineage`,
+      );
     } else if (artifact.origin.kind === "semantic_media_evidence") {
       const operation = next.semanticEvidence[artifact.origin.operationId];
       invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active semantic operation`);

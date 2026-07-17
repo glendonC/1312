@@ -66,7 +66,9 @@ export function projectOutputArtifacts(state: RuntimeProjection, reports: readon
         artifact.origin.kind === "generalized_study_readiness" ||
         artifact.origin.kind === "sampled_frame" ||
         artifact.origin.kind === "frame_sample_manifest" ||
-        artifact.origin.kind === "frame_sampling_receipt"
+        artifact.origin.kind === "frame_sampling_receipt" ||
+        artifact.origin.kind === "ocr_observations" ||
+        artifact.origin.kind === "ocr_receipt"
       ) {
         throw new Error(`Production Studio projection: output artifact ${artifact.id} has an ingest origin`);
       }

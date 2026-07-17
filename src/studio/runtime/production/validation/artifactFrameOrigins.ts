@@ -44,5 +44,31 @@ export function validateFrameArtifactOrigin(
     ) fail(context, path, "frame receipts must be private canonical metadata with complete source/manifest/frame lineage");
     return true;
   }
+  if (kind === "ocr_observations") {
+    exact(origin, ["kind", "operationId", "receiptId", "receiptContentId", "frameSamplingOperationId"], context, `${path}.origin`);
+    string(origin.operationId, context, `${path}.origin.operationId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    string(origin.frameSamplingOperationId, context, `${path}.origin.frameSamplingOperationId`);
+    if (
+      item.kind !== "studio.ocr-observations.v1" || mediaClass !== "non_media" || item.publication !== "private" ||
+      item.durationMs !== null || (item.tracks as unknown[]).length !== 0 || sources.length < 4 ||
+      task === null || agent === null
+    ) fail(context, path, "OCR observations must be private canonical metadata with complete U2 frame lineage");
+    return true;
+  }
+  if (kind === "ocr_receipt") {
+    exact(origin, ["kind", "operationId", "receiptId", "observationsArtifactId", "frameSamplingOperationId"], context, `${path}.origin`);
+    string(origin.operationId, context, `${path}.origin.operationId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    string(origin.observationsArtifactId, context, `${path}.origin.observationsArtifactId`);
+    string(origin.frameSamplingOperationId, context, `${path}.origin.frameSamplingOperationId`);
+    if (
+      item.kind !== "studio.ocr-producer.receipt.v1" || mediaClass !== "non_media" || item.publication !== "private" ||
+      item.durationMs !== null || (item.tracks as unknown[]).length !== 0 || sources.length < 5 ||
+      task === null || agent === null
+    ) fail(context, path, "OCR receipts must be private canonical metadata with observations and U2 frame lineage");
+    return true;
+  }
   return false;
 }

@@ -17,7 +17,10 @@ import {
   type ProcessingMockScenario,
 } from "./localRuntime/ProductionProcessingMock";
 import Preflight from "./preflight/Preflight";
-import { PREPARATION_STAGES, preparationStageIndex } from "./preflight/PreparationStages";
+import {
+  PREPARATION_STAGES,
+  preparationStageIndex,
+} from "./preflight/PreparationStages";
 import SourceEntry from "./SourceEntry";
 import { useBundle, useStudio } from "./store";
 
@@ -112,16 +115,20 @@ function StudioWelcome({ openOwnedMedia, selectSample }: StudioWelcomeProps) {
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <strong>Source guide</strong>
-                  <span role="status" aria-live="polite">
-                  {sourceGuideState === "resolving"
-                    ? "Resolving provider metadata…"
-                    : sourceGuideState === "recorded"
-                      ? "Recorded source ready"
-                    : sourceGuideState === "resolved"
-                        ? "Metadata resolved"
-                        : sourceGuideState === "cancelled"
-                          ? "Request closed"
-                          : "Metadata unavailable"}
+                  <span
+                    className={sourceGuideState === "resolving" ? "text-shimmer" : undefined}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {sourceGuideState === "resolving"
+                      ? "Resolving provider metadata…"
+                      : sourceGuideState === "recorded"
+                        ? "Recorded source ready"
+                        : sourceGuideState === "resolved"
+                          ? "Metadata resolved"
+                          : sourceGuideState === "cancelled"
+                            ? "Request closed"
+                            : "Metadata unavailable"}
                   </span>
                 </motion.div>
               )}
@@ -164,10 +171,14 @@ function StudioWelcome({ openOwnedMedia, selectSample }: StudioWelcomeProps) {
               )}
             </AnimatePresence>
 
-            <StudioSourceOptions
-              openOwnedMedia={openOwnedMedia}
-              selectSample={selectSample}
-            />
+            <AnimatePresence initial={false}>
+              {!sourceGuideActive && (
+                <StudioSourceOptions
+                  openOwnedMedia={openOwnedMedia}
+                  selectSample={selectSample}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         </motion.div>
       </LayoutGroup>
@@ -385,6 +396,7 @@ function StudioSourceOptions({ openOwnedMedia, selectSample }: StudioWelcomeProp
       className="studio-source-options"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 4 }}
       transition={{ duration: 0.32, delay: 0.34, ease: [0.22, 1, 0.36, 1] }}
       layout="position"
     >

@@ -53,7 +53,6 @@ export default function Preflight() {
           assessment={assessment}
           update={update}
           updateSourceLanguage={updateSubmittedSourceLanguage}
-          cancel={dismiss}
           confirm={confirm}
         />
       </section>

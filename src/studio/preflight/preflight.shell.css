@@ -138,20 +138,6 @@
   line-height: 1.55;
 }
 
-.preflight-submitted-source {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px 22px;
-  padding: 12px 0;
-  border-top: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
-  border-bottom: 1px solid var(--line);
-}
-
-.preflight-submitted-source-copy {
-  min-width: 0;
-}
-
-.preflight-submitted-source-copy > span,
 .preflight-facts-intro > span,
 .preflight-stage-head > span,
 .preflight-forecast-fact > span,
@@ -165,85 +151,78 @@
   text-transform: uppercase;
 }
 
-.preflight-submitted-source h2,
-.preflight-submitted-source small {
-  display: block;
+.preflight-source-stage {
+  min-height: 0;
 }
 
-.preflight-submitted-source h2 {
-  margin-top: 7px;
-  margin-bottom: 0;
+.preflight-source-conversation,
+.preflight-stage-conversation {
+  width: min(640px, 100%);
+}
+
+.preflight-source-conversation h2,
+.preflight-stage-conversation h2 {
+  margin: 0;
   color: var(--ink);
-  font-size: clamp(0.86rem, 1.5vw, 1.05rem);
-  font-weight: var(--weight-medium);
+  font-size: clamp(0.98rem, 1.8vw, 1.22rem);
+  font-weight: var(--weight-regular);
   letter-spacing: -0.015em;
-  line-height: 1.35;
+  line-height: 1.55;
+  outline: none;
 }
 
-.preflight-submitted-source small {
-  margin-top: 5px;
-  color: var(--ink-muted);
-  font-size: 0.68rem;
-  line-height: 1.4;
+.preflight-conversation-value {
+  display: inline;
+  padding: 0.1em 0.34em 0.14em;
+  border: 1px solid color-mix(in srgb, var(--palette-color) 26%, var(--glass-border));
+  border-radius: 0.52em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: var(--palette-ink);
+  background: color-mix(in srgb, var(--palette-color) 15%, rgba(255, 255, 255, 0.54));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
-.preflight-submitted-boundary {
-  align-self: center;
-  margin: 0;
-  padding: 7px 10px;
-  border: 1px solid var(--accent-line);
-  border-radius: 999px;
-  color: var(--accent);
-  background: var(--accent-soft);
-  font-size: 0.62rem;
-  line-height: 1.35;
-  white-space: nowrap;
+.preflight-source-link {
+  display: inline;
+  padding: 0.1em 0.34em 0.14em;
+  border: 1px solid color-mix(in srgb, var(--palette-color) 30%, var(--glass-border));
+  border-radius: 0.52em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: var(--palette-ink);
+  background: color-mix(in srgb, var(--palette-color) 17%, rgba(255, 255, 255, 0.58));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 180ms ease;
 }
 
-.preflight-submitted-details {
-  grid-column: 1 / -1;
-  padding-top: 2px;
-}
-
-.preflight-submitted-details summary {
-  width: fit-content;
-  color: var(--ink-muted);
+.preflight-source-link::after {
+  content: "↗";
+  display: inline-block;
+  margin-left: 0.3em;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
-  cursor: pointer;
+  font-size: 0.58em;
+  opacity: 0.58;
+  transform: translateY(-0.4em);
 }
 
-.preflight-submitted-details dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 26px;
-  margin: 12px 0 0;
-  border-top: 1px solid var(--line);
+.preflight-source-link:hover {
+  border-color: color-mix(in srgb, var(--palette-color) 55%, var(--glass-border-luminous));
+  color: color-mix(in srgb, var(--palette-ink) 86%, var(--ink));
+  background: color-mix(in srgb, var(--palette-color) 31%, rgba(255, 255, 255, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 5px 16px color-mix(in srgb, var(--palette-color) 18%, transparent);
 }
 
-.preflight-submitted-details dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.preflight-submitted-details dt,
-.preflight-submitted-details dd {
-  margin: 0;
-  font-size: 0.64rem;
-  line-height: 1.35;
-}
-
-.preflight-submitted-details dt {
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-}
-
-.preflight-submitted-details dd {
-  color: var(--ink-soft);
-  text-align: right;
+.preflight-source-link:focus-visible {
+  outline: 2px solid var(--palette-ink);
+  outline-offset: 3px;
 }
 
 .preflight-recorded-facts {

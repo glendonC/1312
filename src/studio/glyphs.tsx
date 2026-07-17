@@ -45,6 +45,51 @@ export function Arrow() {
   );
 }
 
+export function CornerDownRight() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M3.4 2.7v3.4a3.9 3.9 0 0 0 3.9 3.9h5.4m-3.1-3.1 3.2 3.1-3.2 3.1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function CornerDownLeft() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M12.6 2.7v3.4A3.9 3.9 0 0 1 8.7 10H3.3m3.1-3.1L3.2 10l3.2 3.1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function Check() {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+      <path
+        d="m3.2 8.2 3 3 6.6-6.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function Replay() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">

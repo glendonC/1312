@@ -63,25 +63,6 @@
     border-left: 0;
   }
 
-  .preflight-submitted-source {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .preflight-submitted-boundary {
-    width: fit-content;
-    justify-self: start;
-    white-space: normal;
-  }
-
-  .preflight-submitted-details {
-    grid-column: 1;
-  }
-
-  .preflight-submitted-details dl {
-    grid-template-columns: 1fr;
-  }
-
   .preflight-facts div {
     grid-template-columns: 7rem minmax(0, 1fr);
   }
@@ -103,6 +84,11 @@
   .preflight-actions button {
     width: 100%;
   }
+
+  .preflight-current-setup {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 @media (max-height: 520px) and (min-width: 721px) {

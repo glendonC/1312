@@ -139,6 +139,18 @@
   min-height: 275px;
 }
 
+.preflight[data-preview-mode="submitted-source"] .preflight-stage-panel,
+.preflight[data-preview-mode="submitted-source"] .preflight-stage-body {
+  min-height: 0;
+}
+
+.preflight[data-preview-mode="submitted-source"]
+  .preflight-stage-panel {
+  max-height: none;
+  padding: clamp(18px, 2.5vw, 24px);
+  overflow: visible;
+}
+
 .preflight[data-preview-mode="submitted-source"] .preflight-stage-head {
   max-width: 680px;
   padding-top: 0;
@@ -155,11 +167,6 @@
 .preflight[data-preview-mode="submitted-source"] .preflight-stage-head p {
   max-width: 650px;
   font-size: 0.74rem;
-}
-
-.preflight[data-preview-mode="submitted-source"] .preflight-submitted-source {
-  margin-top: 4px;
-  padding: 15px 0 4px;
 }
 
 .preflight-language-stage {

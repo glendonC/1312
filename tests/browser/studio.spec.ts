@@ -802,6 +802,8 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(page.locator(".preflight-stage-panel .preflight-actions")).toHaveCount(0);
   const preparationControls = page.getByRole("group", { name: "Preparation controls" });
   await expect(preparationControls).toBeVisible();
+  await expect(page.locator(".preflight-stage-panel")).toHaveCSS("z-index", "2");
+  await expect(preparationControls).toHaveCSS("z-index", "1");
   await expect(preparationControls.getByRole("button", { name: /Back to/ })).toHaveCount(0);
   const continueToRange = preparationControls.getByRole("button", { name: "Continue to Range" });
   await expect(continueToRange).toBeVisible();
@@ -824,7 +826,7 @@ test("a submitted source moves through setup and forecast before the recorded in
   )).toBeLessThanOrEqual(1);
   expect(Math.abs(
     (preparationControlsBox?.y ?? 0) -
-    ((welcomePanelAfter?.y ?? 0) + (welcomePanelAfter?.height ?? 0) - 9),
+    ((welcomePanelAfter?.y ?? 0) + (welcomePanelAfter?.height ?? 0) - 1),
   )).toBeLessThanOrEqual(2.5);
   expect((preparationControlsBox?.y ?? 0) + (preparationControlsBox?.height ?? 0))
     .toBeLessThan((lifecycleBarBox?.y ?? 0) - 8);
@@ -898,6 +900,16 @@ test("a submitted source moves through setup and forecast before the recorded in
     expect(await navigationAction.evaluate((element) => getComputedStyle(element, "::before").content)).toBe("none");
     expect(await navigationAction.evaluate((element) => getComputedStyle(element, "::after").content)).toBe("none");
   }
+  const [rangePanelBox, rangeShelfBox, backIconBox] = await Promise.all([
+    page.locator(".preflight-stage-panel").boundingBox(),
+    preparationControls.boundingBox(),
+    backToSource.locator(".preflight-control-icon").boundingBox(),
+  ]);
+  const visibleTopSpace = (backIconBox?.y ?? Infinity) -
+    ((rangePanelBox?.y ?? 0) + (rangePanelBox?.height ?? 0));
+  const visibleBottomSpace = ((rangeShelfBox?.y ?? 0) + (rangeShelfBox?.height ?? 0)) -
+    ((backIconBox?.y ?? Infinity) + (backIconBox?.height ?? 0));
+  expect(Math.abs(visibleTopSpace - visibleBottomSpace)).toBeLessThanOrEqual(1.5);
   await expect(rangeParameter).toHaveAttribute("aria-expanded", "false");
   const geometryBeforeRangePopover = await Promise.all([
     page.locator(".preflight-stage-panel").boundingBox(),
@@ -943,7 +955,7 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(rangeParameter).toBeFocused();
   await rangeParameter.click();
   await expect(rangePopover).toBeVisible();
-  await page.locator(".preflight-stage-panel").click({ position: { x: 5, y: 5 } });
+  await lifecycleBar.locator(".dock-status").click();
   await expect(rangePopover).not.toBeVisible();
   await expect(rangeParameter).toBeFocused();
   await rangeParameter.click();
@@ -992,12 +1004,16 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(lifecycleBar.locator(".dock-status")).toHaveText("Output");
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("4 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "lilac");
-  await preparationControls.getByRole("button", {
+  const outputParameter = preparationControls.getByRole("button", {
     name: "Update output: Captions + evidence",
-  }).click();
+  });
+  await outputParameter.click();
   const outputPopover = page.getByRole("dialog", { name: "Output options" });
   await expect(outputPopover).toBeVisible();
   await expect(page.getByLabel("Captions plus evidence and breakdown")).toBeChecked();
+  await page.keyboard.press("Escape");
+  await expect(outputPopover).not.toBeVisible();
+  await expect(outputParameter).toBeFocused();
   await page.getByRole("button", { name: "Continue to Forecast" }).click();
   await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "forecast");
   await expect(lifecycleBar.locator(".dock-status")).toHaveText("Forecast");
@@ -1333,7 +1349,7 @@ test("the submitted preparation sequence stays horizontally contained at every s
     expect(panelBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
     expect((panelBox?.x ?? 0) + (panelBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
     expect(Math.abs(
-      (preparationControlsBox?.y ?? 0) - ((panelBox?.y ?? 0) + (panelBox?.height ?? 0) - 9),
+      (preparationControlsBox?.y ?? 0) - ((panelBox?.y ?? 0) + (panelBox?.height ?? 0) - 1),
     )).toBeLessThanOrEqual(2.5);
     expect((preparationControlsBox?.y ?? 0) + (preparationControlsBox?.height ?? 0))
       .toBeLessThanOrEqual((sourceDockBox?.y ?? 0) - 8);
@@ -1370,9 +1386,9 @@ test("the submitted preparation sequence stays horizontally contained at every s
         expect(Math.abs((after?.[key] ?? Infinity) - (before?.[key] ?? -Infinity))).toBeLessThanOrEqual(1);
       }
     }
-    expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual(7.5);
-    expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(7.5);
-    expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width - 7.5);
+    expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
     expect((rangePopoverBox?.y ?? 0) + (rangePopoverBox?.height ?? 0)).toBeLessThanOrEqual(
       (rangeTriggerBox?.y ?? 0) - 0.5,
     );
@@ -1390,7 +1406,7 @@ test("the submitted preparation sequence stays horizontally contained at every s
     const forecastControlsBox = await preparationControls.boundingBox();
     expect(Math.abs(
       (forecastControlsBox?.y ?? 0) -
-      ((forecastPanelBox?.y ?? 0) + (forecastPanelBox?.height ?? 0) - 9),
+      ((forecastPanelBox?.y ?? 0) + (forecastPanelBox?.height ?? 0) - 1),
     )).toBeLessThanOrEqual(2.5);
     expect((forecastControlsBox?.y ?? 0) + (forecastControlsBox?.height ?? 0))
       .toBeLessThanOrEqual((forecastDockBox?.y ?? 0) - 8);

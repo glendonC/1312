@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { clock, rate, signed } from "./format";
 import RecordedEvidence from "./evidence/RecordedEvidence";
 import { RECORDED_RESULTS_ID } from "./resultAccess";
+import { recordedResultView, resultNote } from "./resultView";
 import { useBundle, useStudio } from "./store";
 import type { Cue, View } from "./types";
 
@@ -25,28 +26,11 @@ export default function Results() {
   if (!bundle) return null;
 
   const { run, captions, score } = bundle;
-  const prep = score.paths[run.id];
-  const cold = score.paths["cold"];
-  const showEvidence = outputDepth === "evidence";
-  const hasComparison = showEvidence && Boolean(cold && captions.cues.some((cue) => cue.baseline));
-  const accuracyMeasured = Boolean(
-    score.status !== "unscored" && prep?.hard_line != null && cold?.hard_line != null,
-  );
-  const views = hasComparison ? VIEWS : VIEWS.filter((candidate) => candidate.id === "prepped");
+  const { prep, cold, showEvidence, hasComparison, accuracyMeasured, availableViewIds } =
+    recordedResultView(bundle, outputDepth);
+  const views = VIEWS.filter((candidate) => availableViewIds.includes(candidate.id));
   const activeView = hasComparison ? view : "prepped";
-
-  const note =
-    activeView === "prepped"
-      ? showEvidence
-        ? "What 1321 will stand behind. Lines it cannot are withheld, not guessed."
-        : "Caption result only. Withheld lines remain visible because absence is part of the result."
-      : activeView === "baseline"
-        ? accuracyMeasured
-          ? "One-shot ASR into MT. No glossary and no gates. Accuracy is measured against this fixture's reference."
-          : "Recorded comparison output. Accuracy is unscored because this clip has no reference."
-        : accuracyMeasured
-          ? "Same audio and measured reference, with comparison differences marked."
-          : "Same audio and two recorded outputs. Differences are visible, but neither is marked right or wrong.";
+  const note = resultNote(activeView, showEvidence, accuracyMeasured);
 
   return (
     <motion.div

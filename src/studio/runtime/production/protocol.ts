@@ -11,7 +11,6 @@ import type {
   EvidenceAssessmentRequest,
   EvidenceDecisionReceipt,
   EvidenceDecisionRequest,
-  EvidenceDecisionReceiptIdentity,
   ExecutorSpanReceipt,
   EvidenceReadReceipt,
   EvidenceReadRequest,
@@ -33,6 +32,13 @@ import type {
   ParentArtifactDispositionReceipt,
   ParentArtifactReadReceipt,
   ParentArtifactReadRequest,
+  StudyPlanningDecisionReceipt,
+  StudyFollowUpRecord,
+  OwnedMediaStudyConflict,
+  OwnedMediaStudyCoverageRange,
+  OwnedMediaStudyExecutorReceipt,
+  StudyReadinessReceipt,
+  StudyReadinessReceiptIdentity,
   RuntimeArtifact,
   SpawnRejection,
   SpawnRequestInput,
@@ -58,6 +64,9 @@ export type RuntimeProducerKind =
   | "handoff_host"
   | "admission_host"
   | "artifact_read_host"
+  | "study_planning_host"
+  | "study_synthesis_host"
+  | "study_audit_host"
   | "launcher"
   | "recovery_host";
 
@@ -122,7 +131,13 @@ export interface OrchestratorToolCalledEvent extends RuntimeEventBase {
     callId: string;
     executionId: string;
     taskId: string;
-    tool: "task_spawn_request" | "task_reports_wait";
+    tool:
+      | "task_spawn_request"
+      | "task_reports_wait"
+      | "report_disposition"
+      | "artifact_read"
+      | "study_planning_decision"
+      | "study_synthesize";
   };
 }
 
@@ -302,7 +317,7 @@ export interface EvidenceDecisionFailedEvent extends RuntimeEventBase {
 
 export interface PublishReviewIntakeStartedEvent extends RuntimeEventBase {
   type: "publish.review.intake_started";
-  data: { intakeId: string; decision: EvidenceDecisionReceiptIdentity };
+  data: { intakeId: string; readiness: StudyReadinessReceiptIdentity };
 }
 
 export interface PublishReviewIntakeCompletedEvent extends RuntimeEventBase {
@@ -459,6 +474,45 @@ export interface ParentArtifactReadFailedEvent extends RuntimeEventBase {
   data: { operationId: string; reason: string };
 }
 
+export interface StudyPlanningDecisionRecordedEvent extends RuntimeEventBase {
+  type: "study.planning_decision_recorded";
+  data: {
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: StudyPlanningDecisionReceipt;
+  };
+}
+
+export interface StudyFollowUpLinkedEvent extends RuntimeEventBase {
+  type: "study.follow_up_linked";
+  data: { followUp: StudyFollowUpRecord };
+}
+
+export interface OwnedMediaStudyCompletedEvent extends RuntimeEventBase {
+  type: "study.synthesis_completed";
+  data: {
+    studyId: string;
+    outputArtifactId: string;
+    outputContentId: string;
+    executorReceiptContentId: string;
+    executorReceipt: OwnedMediaStudyExecutorReceipt;
+    projection: {
+      coverage: OwnedMediaStudyCoverageRange[];
+      conflicts: OwnedMediaStudyConflict[];
+    };
+  };
+}
+
+export interface StudyReadinessAuditedEvent extends RuntimeEventBase {
+  type: "study.readiness_audited";
+  data: {
+    studyId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: StudyReadinessReceipt;
+  };
+}
+
 export type RuntimeEvent =
   | ArtifactRecordedEvent
   | TaskCreatedEvent
@@ -509,7 +563,11 @@ export type RuntimeEvent =
   | ParentArtifactDispositionRecordedEvent
   | ParentArtifactReadStartedEvent
   | ParentArtifactReadCompletedEvent
-  | ParentArtifactReadFailedEvent;
+  | ParentArtifactReadFailedEvent
+  | StudyPlanningDecisionRecordedEvent
+  | StudyFollowUpLinkedEvent
+  | OwnedMediaStudyCompletedEvent
+  | StudyReadinessAuditedEvent;
 
 export type PendingRuntimeEvent = RuntimeEvent extends infer Event
   ? Event extends RuntimeEvent

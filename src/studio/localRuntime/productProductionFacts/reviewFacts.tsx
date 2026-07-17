@@ -10,7 +10,6 @@ import {
 } from "./reviewControls";
 import {
   ProductionArtifactReference,
-  ProductionIdentityLink,
   productionIdentityTarget,
 } from "./shared";
 
@@ -29,7 +28,7 @@ export function ProductionReviewFacts({
   onPublishReviewDecision: (request: RuntimeHostPublishReviewDecisionRequest) => Promise<void>;
   onPublishReviewRevocation: (request: RuntimeHostPublishReviewRevocationRequest) => Promise<void>;
 }) {
-  const { projection, renderedArtifactIds, operationIds, visiblePublishReviewIntakes, visiblePublishReviewDecisions, verifiedQueuedIntakes, verifiedRejectedIntakes, unreviewedQueuedIntakes, hasUnverifiedQueuedProjection } = context;
+  const { projection, renderedArtifactIds, visiblePublishReviewIntakes, visiblePublishReviewDecisions, verifiedQueuedIntakes, verifiedRejectedIntakes, unreviewedQueuedIntakes, hasUnverifiedQueuedProjection } = context;
   return (
     <>
       <section
@@ -38,13 +37,13 @@ export function ProductionReviewFacts({
       >
         <h4 id="product-runtime-publish-review-intakes-title">Publish-review intake lineage</h4>
         <p>
-          Host-produced queue or rejection lineage over one verified decision receipt. Queued means
+          Host-produced queue or rejection lineage over one verified study-readiness receipt. Queued means
           awaiting review only; it does not mean reviewed, captioned, uploaded, published, or public.
         </p>
         {projection.publishReviewIntakes.length === 0 ? (
           <p className="product-runtime-unavailable" data-production-empty="publish-review-intakes">
-            Unavailable until the host verifies a completed decision receipt and records a closed
-            publish-review intake. V1 and absent, failed, or tampered decision paths stay unavailable.
+            Unavailable until the host verifies an exact study-readiness receipt and records a closed
+            publish-review intake. Absent, failed, or tampered readiness paths stay unavailable.
           </p>
         ) : (
           <div className="product-runtime-fact-list">
@@ -60,22 +59,18 @@ export function ProductionReviewFacts({
                 <dl>
                   <div><dt>Intake</dt><dd>{intake.intakeId}</dd></div>
                   <div>
-                    <dt>Verified decision operation</dt>
-                    <dd>
-                      {operationIds.has(intake.decisionOperationId)
-                        ? <ProductionIdentityLink kind="operation" identity={intake.decisionOperationId} />
-                        : intake.decisionOperationId}
-                    </dd>
+                    <dt>Verified study readiness</dt>
+                    <dd>{intake.readinessId}</dd>
                   </div>
                   <div>
-                    <dt>Verified decision artifact</dt>
-                    <dd><ProductionArtifactReference identity={intake.decisionArtifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
+                    <dt>Verified readiness artifact</dt>
+                    <dd><ProductionArtifactReference identity={intake.readinessArtifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
                   </div>
-                  <div><dt>Verified decision receipt</dt><dd>{intake.decisionReceiptId}</dd></div>
-                  <div><dt>Decision receipt content</dt><dd>{intake.decisionReceiptContentId}</dd></div>
+                  <div><dt>Verified readiness receipt</dt><dd>{intake.readinessReceiptId}</dd></div>
+                  <div><dt>Readiness receipt content</dt><dd>{intake.readinessReceiptContentId}</dd></div>
                   <div><dt>Outcome</dt><dd>{intake.outcome ?? "Unavailable until intake completion"}</dd></div>
                   <div>
-                    <dt>Decision reason codes</dt>
+                    <dt>Readiness reason codes</dt>
                     <dd>
                       {intake.reasonCodes.length === 0
                         ? "Unavailable until intake completion"
@@ -129,19 +124,15 @@ export function ProductionReviewFacts({
                   <div><dt>Receipt</dt><dd>{artifact.receiptId}</dd></div>
                   <div><dt>Receipt content</dt><dd>{artifact.receiptContentId}</dd></div>
                   <div>
-                    <dt>Decision operation</dt>
-                    <dd>
-                      {operationIds.has(artifact.decisionOperationId)
-                        ? <ProductionIdentityLink kind="operation" identity={artifact.decisionOperationId} />
-                        : artifact.decisionOperationId}
-                    </dd>
+                    <dt>Study readiness</dt>
+                    <dd>{artifact.readinessId}</dd>
                   </div>
                   <div>
-                    <dt>Decision artifact</dt>
-                    <dd><ProductionArtifactReference identity={artifact.decisionArtifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
+                    <dt>Readiness artifact</dt>
+                    <dd><ProductionArtifactReference identity={artifact.readinessArtifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
                   </div>
-                  <div><dt>Decision receipt</dt><dd>{artifact.decisionReceiptId}</dd></div>
-                  <div><dt>Decision receipt content</dt><dd>{artifact.decisionReceiptContentId}</dd></div>
+                  <div><dt>Readiness receipt</dt><dd>{artifact.readinessReceiptId}</dd></div>
+                  <div><dt>Readiness receipt content</dt><dd>{artifact.readinessReceiptContentId}</dd></div>
                 </dl>
               </article>
             ))}
@@ -194,20 +185,16 @@ export function ProductionReviewFacts({
                     </dd>
                   </div>
                   <div>
-                    <dt>Decision operation</dt>
-                    <dd>
-                      {operationIds.has(intake.decision.operationId)
-                        ? <ProductionIdentityLink kind="operation" identity={intake.decision.operationId} />
-                        : intake.decision.operationId}
-                    </dd>
+                    <dt>Study readiness</dt>
+                    <dd>{intake.readiness.readinessId}</dd>
                   </div>
                   <div>
-                    <dt>Decision artifact</dt>
-                    <dd><ProductionArtifactReference identity={intake.decision.artifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
+                    <dt>Readiness artifact</dt>
+                    <dd><ProductionArtifactReference identity={intake.readiness.artifactId} renderedArtifactIds={renderedArtifactIds} /></dd>
                   </div>
-                  <div><dt>Decision receipt</dt><dd>{intake.decision.receiptId}</dd></div>
-                  <div><dt>Decision receipt content</dt><dd>{intake.decision.receiptContentId}</dd></div>
-                  <div><dt>Validation</dt><dd>Intake bytes rehashed; decision and all audited inputs reverified</dd></div>
+                  <div><dt>Readiness receipt</dt><dd>{intake.readiness.receiptId}</dd></div>
+                  <div><dt>Readiness receipt content</dt><dd>{intake.readiness.receiptContentId}</dd></div>
+                  <div><dt>Validation</dt><dd>Intake bytes rehashed; study readiness and every recursive input reverified</dd></div>
                 </dl>
               </article>
             ))}

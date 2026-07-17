@@ -3,7 +3,11 @@ import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
+import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
+import { reopenStudyPlanningDecision } from "../src/studio/runtime/production/studyPlanningAudit.ts";
+import { reopenStudyReadiness } from "../src/studio/runtime/production/studyReadinessAudit.ts";
+import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/studySynthesisAudit.ts";
 import { createProductionAnalysisRequest } from "../src/studio/runtime/production/runStart/analysisRequest.ts";
 import { loadOwnedSourceSession } from "../src/studio/runtime/production/runStart/sourceSessionLoader.ts";
 import {
@@ -15,7 +19,7 @@ import {
 
 const ENABLED = process.env.STUDIO_RUN_REAL_CODEX_SWARM === "1";
 
-test("guarded real Codex root records configured model, measured usage, executor receipt, and root-authored spawn", {
+test("guarded real Codex root closes fan-out, admitted reports, model planning, and model-authored study synthesis", {
   skip: !ENABLED,
   timeout: 300_000,
 }, async (context) => {
@@ -70,11 +74,33 @@ test("guarded real Codex root records configured model, measured usage, executor
   );
   const rootSpawns = Object.values(state.spawnRequests).filter((request) =>
     request.authoredByExecutionId === rootExecution.id && request.toolCallId !== null);
-  assert.ok(rootSpawns.length >= 1, "real Codex root must author at least one spawn tool call");
-  assert.ok(rootSpawns.some((request) => request.accepted));
+  assert.ok(rootSpawns.filter((request) => request.accepted).length >= 2, "real Codex root must author at least two accepted child contracts");
   assert.ok(Object.values(state.reportWaits).some((wait) =>
     wait.executionId === rootExecution.id && wait.status === "returned"));
   assert.equal(state.taskLaunches[root.id].executionId, rootExecution.id);
+  assert.ok(Object.values(state.reports).filter((report) => report.study?.output.schema === "studio.study-report.v1").length >= 2);
+  assert.ok(Object.values(state.parentArtifactDispositions).filter((disposition) => disposition.outcome === "accepted").length >= 2);
+  assert.ok(Object.values(state.parentArtifactReads).filter((read) => read.status === "completed").length >= 2);
+  const planning = Object.values(state.studyPlanningDecisions);
+  assert.ok(planning.length >= 1);
+  const synthesisDecision = planning.find((decision) => decision.outcome === "synthesize_with_gaps");
+  assert.ok(synthesisDecision, "real Codex root must author an eventual synthesis decision");
+  assert.ok(synthesisDecision.input.reports.length >= 2);
+  const studies = Object.values(state.ownedMediaStudies);
+  assert.equal(studies.length, 1);
+  const study = studies[0];
+  assert.equal(study.planningDecisionId, synthesisDecision.id);
+  assert.ok(rootExecution.receipt.outputArtifactIds.includes(study.artifactId));
+  const readiness = Object.values(state.studyReadiness);
+  assert.equal(readiness.length, 1);
+  assert.equal(Object.values(state.publishReviewIntakes)[0].readinessId, readiness[0].id);
+  const artifacts = new ContentAddressedArtifactStore(initialized.artifactStoreRoot);
+  await reopenStudyPlanningDecision(state, artifacts, synthesisDecision.id);
+  const verifiedStudy = await reopenOwnedMediaStudy(state, artifacts, study.id);
+  assert.equal(verifiedStudy.executorReceipt.producer.authorship, "active_root_executor_tool_call");
+  assert.equal(verifiedStudy.envelope.root.executionId, rootExecution.id);
+  assert.ok(verifiedStudy.envelope.reports.length >= 2);
+  await reopenStudyReadiness(state, artifacts, readiness[0].id);
   const replayed = await RuntimeLedger.open(runtimeId, new FileEventJournal(initialized.journalPath));
   assert.deepEqual(replayed.state(), state);
   context.diagnostic(`durable real-Codex proof retained at ${runtimeRoot}`);

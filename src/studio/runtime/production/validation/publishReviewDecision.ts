@@ -238,7 +238,7 @@ export function validatePublishReviewDecisionReceipt(
   validatePublishReviewIntakeReceiptIdentity(input.intake, context, `${path}.input.intake`);
   const verification = object(input.verification, context, `${path}.input.verification`);
   exact(verification, ["integrity", "producer", "outcome"], context, `${path}.input.verification`);
-  literal(verification.integrity, "stored_intake_and_verified_decision_receipt", context, `${path}.input.verification.integrity`);
+  literal(verification.integrity, "stored_intake_and_verified_study_readiness", context, `${path}.input.verification.integrity`);
   literal(verification.producer, "host_publish_review_intake_v1", context, `${path}.input.verification.producer`);
   literal(verification.outcome, "queued", context, `${path}.input.verification.outcome`);
   validateReceiptedReviewer(item.reviewer, context, `${path}.reviewer`, PUBLISH_REVIEW_DECISION_ATTESTATION);

@@ -1,7 +1,7 @@
 import type {
-  EvidenceDecisionReasonCode,
-  EvidenceDecisionReceiptIdentity,
-} from "./evidence.ts";
+  StudyReadinessReasonCode,
+  StudyReadinessReceiptIdentity,
+} from "./studies.ts";
 
 export type PublishReviewIntakeOutcome = "queued" | "rejected";
 
@@ -10,20 +10,20 @@ export interface PublishReviewIntakeReceipt {
   receiptId: string;
   intakeId: string;
   input: {
-    decision: EvidenceDecisionReceiptIdentity;
+    readiness: StudyReadinessReceiptIdentity;
     verification: {
-      integrity: "stored_decision_and_audited_inputs_verified";
-      producer: "deterministic_audit_state_gate_v1";
+      integrity: "stored_study_readiness_and_recursive_inputs_verified";
+      producer: "deterministic_study_readiness_gate_v1";
     };
   };
   producer: {
     id: "studio.host-publish-review-intake";
     version: "1";
-    policy: "queue_verified_proceed_reject_verified_withheld";
+    policy: "queue_exact_verified_study_readiness_only";
   };
   result: {
     outcome: PublishReviewIntakeOutcome;
-    reasonCodes: EvidenceDecisionReasonCode[];
+    reasonCodes: StudyReadinessReasonCode[];
   };
 }
 
@@ -83,7 +83,7 @@ export interface PublishReviewDecisionReceipt {
   input: {
     intake: PublishReviewIntakeReceiptIdentity;
     verification: {
-      integrity: "stored_intake_and_verified_decision_receipt";
+      integrity: "stored_intake_and_verified_study_readiness";
       producer: "host_publish_review_intake_v1";
       outcome: "queued";
     };
@@ -160,16 +160,16 @@ export interface PublishReviewRevocationReceipt {
 
 export interface PublishReviewIntakeRecord {
   id: string;
-  decisionOperationId: string;
-  decisionArtifactId: string;
-  decisionReceiptId: string;
-  decisionReceiptContentId: string;
+  readinessId: string;
+  readinessArtifactId: string;
+  readinessReceiptId: string;
+  readinessReceiptContentId: string;
   status: "started" | "completed" | "failed";
   artifactId: string | null;
   receiptId: string | null;
   receiptContentId: string | null;
   outcome: PublishReviewIntakeOutcome | null;
-  reasonCodes: EvidenceDecisionReasonCode[];
+  reasonCodes: StudyReadinessReasonCode[];
   failure: string | null;
 }
 

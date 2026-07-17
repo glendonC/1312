@@ -40,6 +40,12 @@ import {
   projectWorkers,
 } from "./studioProjection/workMappers.ts";
 import { projectStudyReports, projectStudyReportStates } from "./studioProjection/studyReportMappers.ts";
+import {
+  projectOwnedMediaStudies,
+  projectStudyFollowUps,
+  projectStudyPlanningDecisions,
+  projectStudyReadiness,
+} from "./studioProjection/studySynthesisMappers.ts";
 
 export * from "./studioProjection/model.ts";
 
@@ -59,6 +65,10 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
   const evidenceReads = projectEvidenceReads(state);
   const evidenceAssessments = projectEvidenceAssessments(state);
   const evidenceDecisions = projectEvidenceDecisions(state);
+  const studyPlanningDecisions = projectStudyPlanningDecisions(state);
+  const studyFollowUps = projectStudyFollowUps(state);
+  const ownedMediaStudies = projectOwnedMediaStudies(state);
+  const studyReadiness = projectStudyReadiness(state);
   const publishReviewIntakes = projectPublishReviewIntakes(state);
   const publishReviewDecisions = projectPublishReviewDecisions(state);
   const publishReviewRevocations = projectPublishReviewRevocations(state);
@@ -96,6 +106,10 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     evidenceReads,
     evidenceAssessments,
     evidenceDecisions,
+    studyPlanningDecisions,
+    studyFollowUps,
+    ownedMediaStudies,
+    studyReadiness,
     publishReviewIntakes,
     publishReviewDecisions,
     publishReviewRevocations,
@@ -128,6 +142,10 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       evidenceReads: evidenceReads.length,
       evidenceAssessments: evidenceAssessments.length,
       evidenceDecisions: evidenceDecisions.length,
+      studyPlanningDecisions: studyPlanningDecisions.length,
+      studyFollowUps: studyFollowUps.length,
+      ownedMediaStudies: ownedMediaStudies.length,
+      studyReadiness: studyReadiness.length,
       publishReviewIntakes: publishReviewIntakes.length,
       publishReviewDecisions: publishReviewDecisions.length,
       publishReviewRevocations: publishReviewRevocations.length,

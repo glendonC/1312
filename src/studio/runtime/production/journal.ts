@@ -118,17 +118,20 @@ export class RuntimeLedger {
   readonly runId: string;
   private readonly journal: EventJournal;
   private readonly now: () => Date;
+  private lastRecordedAtMs: number;
 
   private constructor(
     runId: string,
     journal: EventJournal,
     initial: RuntimeProjection,
     now: () => Date,
+    lastRecordedAtMs: number,
   ) {
     this.runId = runId;
     this.journal = journal;
     this.projection = initial;
     this.now = now;
+    this.lastRecordedAtMs = lastRecordedAtMs;
   }
 
   static async open(
@@ -137,7 +140,13 @@ export class RuntimeLedger {
     options: { now?: () => Date } = {},
   ): Promise<RuntimeLedger> {
     const events = await journal.readAll();
-    return new RuntimeLedger(runId, journal, projectRuntimeEvents(runId, events), options.now ?? (() => new Date()));
+    return new RuntimeLedger(
+      runId,
+      journal,
+      projectRuntimeEvents(runId, events),
+      options.now ?? (() => new Date()),
+      events.length > 0 ? Date.parse(events[events.length - 1].recordedAt) : Number.NEGATIVE_INFINITY,
+    );
   }
 
   state(): RuntimeProjection {
@@ -163,14 +172,17 @@ export class RuntimeLedger {
       try {
         const built = build({ state: structuredClone(this.projection), nextSeq: this.projection.lastSeq + 1 });
         let next = this.projection;
+        let lastRecordedAtMs = this.lastRecordedAtMs;
         const events = built.pending.map((pending, index) => {
           const seq = this.projection.lastSeq + index + 1;
+          const recordedAtMs = Math.max(this.now().getTime(), lastRecordedAtMs + 1);
+          lastRecordedAtMs = recordedAtMs;
           const event = {
             schema: "studio.runtime.event.v1",
             runId: this.runId,
             seq,
             eventId: `event:${this.runId}:${seq}`,
-            recordedAt: this.now().toISOString(),
+            recordedAt: new Date(recordedAtMs).toISOString(),
             producer: options.producer,
             causationId: options.causationId ?? null,
             correlationId: options.correlationId ?? null,
@@ -182,6 +194,7 @@ export class RuntimeLedger {
         });
         await this.journal.appendBatch(events);
         this.projection = next;
+        this.lastRecordedAtMs = lastRecordedAtMs;
         resolveResult({ events, result: built.result });
       } catch (error) {
         rejectResult(error);

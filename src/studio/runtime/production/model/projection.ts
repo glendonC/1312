@@ -37,6 +37,12 @@ import type {
   TaskLaunchRecord,
   TaskRecord,
 } from "./tasks.ts";
+import type {
+  OwnedMediaStudyRecord,
+  StudyFollowUpRecord,
+  StudyPlanningDecisionRecord,
+  StudyReadinessRecord,
+} from "./studies.ts";
 
 export interface RuntimeProjection {
   runId: string;
@@ -66,4 +72,8 @@ export interface RuntimeProjection {
   parentArtifactDispositions: Record<string, ParentArtifactDispositionRecord>;
   parentArtifactReadGrants: Record<string, ParentArtifactReadGrant>;
   parentArtifactReads: Record<string, ParentArtifactReadRecord>;
+  studyPlanningDecisions: Record<string, StudyPlanningDecisionRecord>;
+  studyFollowUps: Record<string, StudyFollowUpRecord>;
+  ownedMediaStudies: Record<string, OwnedMediaStudyRecord>;
+  studyReadiness: Record<string, StudyReadinessRecord>;
 }

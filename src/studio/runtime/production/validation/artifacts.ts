@@ -304,6 +304,45 @@ export function validateRuntimeArtifact(
       (item.tracks as unknown[]).length !== 0 || sources.length !== 1 || sources[0] !== inputArtifactId ||
       task === null || agent === null || receiptContentId !== (item.content as { contentId: string }).contentId
     ) fail(context, path, "parent admissions must be private content-addressed receipts over one accepted study artifact");
+  } else if (kind === "study_planning_decision") {
+    exact(origin, ["kind", "decisionId", "inputId", "executionId", "receiptId", "receiptContentId"], context, `${path}.origin`);
+    string(origin.decisionId, context, `${path}.origin.decisionId`);
+    string(origin.inputId, context, `${path}.origin.inputId`);
+    string(origin.executionId, context, `${path}.origin.executionId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    if (
+      item.kind !== "studio.study-planning-decision.receipt.v1" || mediaClass !== "non_media" ||
+      item.publication !== "private" || item.durationMs !== null || (item.tracks as unknown[]).length !== 0 ||
+      sources.length < 2 || task === null || agent === null ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) fail(context, path, "study planning decisions must be private root-produced receipts over at least two admitted reports");
+  } else if (kind === "owned_media_study") {
+    exact(origin, ["kind", "studyId", "planningDecisionId", "executionId", "executorReceiptId", "executorReceiptContentId"], context, `${path}.origin`);
+    string(origin.studyId, context, `${path}.origin.studyId`);
+    string(origin.planningDecisionId, context, `${path}.origin.planningDecisionId`);
+    string(origin.executionId, context, `${path}.origin.executionId`);
+    string(origin.executorReceiptId, context, `${path}.origin.executorReceiptId`);
+    contentId(origin.executorReceiptContentId, context, `${path}.origin.executorReceiptContentId`);
+    if (
+      item.kind !== "studio.owned-media-study.v1" || mediaClass !== "non_media" || item.publication !== "private" ||
+      item.durationMs !== null || (item.tracks as unknown[]).length !== 0 || sources.length === 0 ||
+      task === null || agent === null
+    ) fail(context, path, "owned-media studies must be private root-produced typed artifacts with source lineage");
+  } else if (kind === "study_readiness") {
+    exact(origin, ["kind", "readinessId", "studyId", "studyArtifactId", "receiptId", "receiptContentId", "outcome"], context, `${path}.origin`);
+    string(origin.readinessId, context, `${path}.origin.readinessId`);
+    string(origin.studyId, context, `${path}.origin.studyId`);
+    const studyArtifactId = string(origin.studyArtifactId, context, `${path}.origin.studyArtifactId`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
+    oneOf(origin.outcome, new Set(["proceed_to_caption_review", "withheld"]), context, `${path}.origin.outcome`);
+    if (
+      item.kind !== "studio.study-readiness.receipt.v1" || mediaClass !== "non_media" || item.publication !== "private" ||
+      item.durationMs !== null || (item.tracks as unknown[]).length !== 0 || task !== null || agent !== null ||
+      JSON.stringify(sources) !== JSON.stringify([studyArtifactId]) ||
+      receiptContentId !== (item.content as { contentId: string }).contentId
+    ) fail(context, path, "study readiness must be a private deterministic receipt over one exact owned-media study");
   } else if (kind === "root_output_disposition") {
     exact(
       origin,
@@ -481,10 +520,10 @@ export function validateRuntimeArtifact(
         "intakeId",
         "receiptId",
         "receiptContentId",
-        "decisionOperationId",
-        "decisionArtifactId",
-        "decisionReceiptId",
-        "decisionReceiptContentId",
+        "readinessId",
+        "readinessArtifactId",
+        "readinessReceiptId",
+        "readinessReceiptContentId",
       ],
       context,
       `${path}.origin`,
@@ -492,10 +531,10 @@ export function validateRuntimeArtifact(
     string(origin.intakeId, context, `${path}.origin.intakeId`);
     string(origin.receiptId, context, `${path}.origin.receiptId`);
     const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
-    string(origin.decisionOperationId, context, `${path}.origin.decisionOperationId`);
-    const decisionArtifactId = string(origin.decisionArtifactId, context, `${path}.origin.decisionArtifactId`);
-    string(origin.decisionReceiptId, context, `${path}.origin.decisionReceiptId`);
-    contentId(origin.decisionReceiptContentId, context, `${path}.origin.decisionReceiptContentId`);
+    string(origin.readinessId, context, `${path}.origin.readinessId`);
+    const readinessArtifactId = string(origin.readinessArtifactId, context, `${path}.origin.readinessArtifactId`);
+    string(origin.readinessReceiptId, context, `${path}.origin.readinessReceiptId`);
+    contentId(origin.readinessReceiptContentId, context, `${path}.origin.readinessReceiptContentId`);
     if (
       mediaClass !== "non_media" ||
       item.publication !== "private" ||
@@ -503,13 +542,13 @@ export function validateRuntimeArtifact(
       (item.tracks as unknown[]).length !== 0 ||
       task !== null ||
       agent !== null ||
-      JSON.stringify(sources) !== JSON.stringify([decisionArtifactId]) ||
+      JSON.stringify(sources) !== JSON.stringify([readinessArtifactId]) ||
       receiptContentId !== (item.content as { contentId: string }).contentId
     ) {
       fail(
         context,
         path,
-        "publish-review intake artifacts must be private host-produced receipt lineage over one verified decision artifact",
+        "publish-review intake artifacts must be private host-produced receipt lineage over one verified study-readiness artifact",
       );
     }
   } else if (kind === "publish_review_decision") {

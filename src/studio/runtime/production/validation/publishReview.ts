@@ -1,6 +1,6 @@
 import type {
-  EvidenceDecisionReceiptIdentity,
   PublishReviewIntakeReceipt,
+  StudyReadinessReceiptIdentity,
 } from "../model.ts";
 import {
   contentId,
@@ -13,33 +13,34 @@ import {
   uniqueStrings,
 } from "./primitives.ts";
 
-const DECISION_REASON_ORDER = [
-  "audited_claim_withheld",
-  "audited_claim_unknown",
-  "audited_claim_truncated",
-  "all_audited_claims_supported",
+const READINESS_REASON_ORDER = [
+  "hidden_gap",
+  "non_supported_root_coverage",
+  "stored_content_integrity_failed",
+  "unresolved_conflict",
+  "unsupported_synthesized_claim",
 ] as const;
 
-export function validateEvidenceDecisionReceiptIdentity(
+export function validateStudyReadinessReceiptIdentity(
   value: unknown,
   context: string,
   path: string,
-): EvidenceDecisionReceiptIdentity {
+): StudyReadinessReceiptIdentity {
   const item = object(value, context, path);
-  exact(item, ["operationId", "artifactId", "receiptId", "receiptContentId"], context, path);
+  exact(item, ["readinessId", "artifactId", "receiptId", "receiptContentId"], context, path);
   return {
-    operationId: string(item.operationId, context, `${path}.operationId`),
+    readinessId: string(item.readinessId, context, `${path}.readinessId`),
     artifactId: string(item.artifactId, context, `${path}.artifactId`),
     receiptId: string(item.receiptId, context, `${path}.receiptId`),
     receiptContentId: contentId(item.receiptContentId, context, `${path}.receiptContentId`),
   };
 }
 
-export function assertPublishReviewIntakeRequest(value: unknown): EvidenceDecisionReceiptIdentity {
+export function assertPublishReviewIntakeRequest(value: unknown): StudyReadinessReceiptIdentity {
   const context = "Publish-review intake request";
   const item = object(value, context, "request");
-  exact(item, ["decision"], context, "request");
-  return validateEvidenceDecisionReceiptIdentity(item.decision, context, "request.decision");
+  exact(item, ["readiness"], context, "request");
+  return validateStudyReadinessReceiptIdentity(item.readiness, context, "request.readiness");
 }
 
 export function validatePublishReviewIntakeReceipt(
@@ -54,19 +55,19 @@ export function validatePublishReviewIntakeReceipt(
   string(item.intakeId, context, `${path}.intakeId`);
 
   const input = object(item.input, context, `${path}.input`);
-  exact(input, ["decision", "verification"], context, `${path}.input`);
-  validateEvidenceDecisionReceiptIdentity(input.decision, context, `${path}.input.decision`);
+  exact(input, ["readiness", "verification"], context, `${path}.input`);
+  validateStudyReadinessReceiptIdentity(input.readiness, context, `${path}.input.readiness`);
   const verification = object(input.verification, context, `${path}.input.verification`);
   exact(verification, ["integrity", "producer"], context, `${path}.input.verification`);
   literal(
     verification.integrity,
-    "stored_decision_and_audited_inputs_verified",
+    "stored_study_readiness_and_recursive_inputs_verified",
     context,
     `${path}.input.verification.integrity`,
   );
   literal(
     verification.producer,
-    "deterministic_audit_state_gate_v1",
+    "deterministic_study_readiness_gate_v1",
     context,
     `${path}.input.verification.producer`,
   );
@@ -77,7 +78,7 @@ export function validatePublishReviewIntakeReceipt(
   literal(producer.version, "1", context, `${path}.producer.version`);
   literal(
     producer.policy,
-    "queue_verified_proceed_reject_verified_withheld",
+    "queue_exact_verified_study_readiness_only",
     context,
     `${path}.producer.policy`,
   );
@@ -87,12 +88,11 @@ export function validatePublishReviewIntakeReceipt(
   const outcome = oneOf(result.outcome, new Set(["queued", "rejected"]), context, `${path}.result.outcome`);
   const reasons = uniqueStrings(result.reasonCodes, context, `${path}.result.reasonCodes`);
   if (
-    reasons.length === 0 ||
-    JSON.stringify(reasons) !== JSON.stringify(DECISION_REASON_ORDER.filter((reason) => reasons.includes(reason))) ||
-    reasons.some((reason) => !DECISION_REASON_ORDER.includes(reason as (typeof DECISION_REASON_ORDER)[number])) ||
-    (outcome === "queued" && (reasons.length !== 1 || reasons[0] !== "all_audited_claims_supported")) ||
-    (outcome === "rejected" && reasons.includes("all_audited_claims_supported"))
+    JSON.stringify(reasons) !== JSON.stringify(READINESS_REASON_ORDER.filter((reason) => reasons.includes(reason))) ||
+    reasons.some((reason) => !READINESS_REASON_ORDER.includes(reason as (typeof READINESS_REASON_ORDER)[number])) ||
+    (outcome === "queued" && reasons.length !== 0) ||
+    (outcome === "rejected" && reasons.length === 0)
   ) {
-    fail(context, `${path}.result.reasonCodes`, "must be canonical decision reasons for the closed intake outcome");
+    fail(context, `${path}.result.reasonCodes`, "must be canonical study-readiness reasons for the closed intake outcome");
   }
 }

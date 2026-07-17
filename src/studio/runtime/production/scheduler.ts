@@ -450,7 +450,7 @@ export class BoundedRuntimeScheduler {
       const matches = Object.values(state.tasks).filter((task) => task.workloadKey === workloadKey);
       return matches.length === 1 ? matches[0].id : `unresolved-workload:${workloadKey}`;
     });
-    const { dependencyWorkloadKeys: _dependencyWorkloadKeys, ...input } = contract;
+    const { dependencyWorkloadKeys: _dependencyWorkloadKeys, followUpCause: _followUpCause, ...input } = contract;
     return this.requestSpawn(
       requestedByTaskId,
       requestedByAgentId,

@@ -63,7 +63,14 @@ export const MAX_EVIDENCE_DECISIONS = 1;
 export const MAX_EVIDENCE_DECISION_AUDITED_ASSESSMENTS = 4;
 
 const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
-  orchestrator: new Set(["task.spawn.request", "task.reports.wait"]),
+  orchestrator: new Set([
+    "task.spawn.request",
+    "task.reports.wait",
+    "report.disposition",
+    "artifact.read",
+    "study.plan",
+    "study.synthesize",
+  ]),
   media: new Set(["media.extract", "media.seek", "speech.transcribe", "report.submit"]),
   analysis: new Set([
     "media.seek",
@@ -359,6 +366,7 @@ export function assertOrchestratorSpawnContract(
       "requiredCapabilities",
       "dependencyWorkloadKeys",
       "budget",
+      ...(Object.hasOwn(item, "followUpCause") ? ["followUpCause"] : []),
     ],
     context,
     "input",
@@ -373,6 +381,13 @@ export function assertOrchestratorSpawnContract(
   capabilities(item.requiredCapabilities, context, "input.requiredCapabilities");
   uniqueStrings(item.dependencyWorkloadKeys, context, "input.dependencyWorkloadKeys");
   budget(item.budget, context, "input.budget");
+  if (Object.hasOwn(item, "followUpCause") && item.followUpCause !== null) {
+    const cause = object(item.followUpCause, context, "input.followUpCause");
+    exact(cause, ["planningDecisionId", "kind", "causeId"], context, "input.followUpCause");
+    string(cause.planningDecisionId, context, "input.followUpCause.planningDecisionId");
+    oneOf(cause.kind, new Set(["gap", "conflict"]), context, "input.followUpCause.kind");
+    string(cause.causeId, context, "input.followUpCause.causeId");
+  }
 }
 
 function languageTag(value: unknown, context: string, path: string): string {

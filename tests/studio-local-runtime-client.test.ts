@@ -323,16 +323,16 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
           artifactId: "artifact:publish-review-intake:fixture",
           receiptId: "publish-review-intake-receipt:fixture",
           receiptContentId: INTAKE_CONTENT,
-          integrity: "stored_intake_and_verified_decision_receipt",
+          integrity: "stored_intake_and_verified_study_readiness",
           producer: "host_publish_review_intake_v1",
-          decision: {
-            operationId: "operation:decision:fixture",
-            artifactId: "artifact:decision:fixture",
-            receiptId: "evidence-decision:fixture",
+          readiness: {
+            readinessId: "study-readiness:fixture",
+            artifactId: "artifact:study-readiness:fixture",
+            receiptId: "study-readiness-receipt:fixture",
             receiptContentId: DECISION_CONTENT,
           },
           outcome: "rejected",
-          reasonCodes: ["audited_claim_unknown", "audited_claim_truncated"],
+          reasonCodes: ["non_supported_root_coverage"],
         }],
       });
     }
@@ -396,11 +396,8 @@ test("browser client sends bearer auth, parses durable acknowledgement identitie
   ]);
   assert.equal(publishReviewIntakes.intakes.length, 1);
   assert.equal(publishReviewIntakes.intakes[0].outcome, "rejected");
-  assert.equal(publishReviewIntakes.intakes[0].decision.operationId, "operation:decision:fixture");
-  assert.deepEqual(publishReviewIntakes.intakes[0].reasonCodes, [
-    "audited_claim_unknown",
-    "audited_claim_truncated",
-  ]);
+  assert.equal(publishReviewIntakes.intakes[0].readiness.readinessId, "study-readiness:fixture");
+  assert.deepEqual(publishReviewIntakes.intakes[0].reasonCodes, ["non_supported_root_coverage"]);
   assert.equal(publishReviewDecisions.reviewer.id, "reviewer:local-fixture");
   assert.deepEqual(publishReviewDecisions.reviews, []);
   assert.equal(calls.length, 9);
@@ -663,14 +660,14 @@ test("browser client rejects an unverified publish-review intake instead of expo
         receiptContentId: INTAKE_CONTENT,
         integrity: "best_effort",
         producer: "host_publish_review_intake_v1",
-        decision: {
-          operationId: "operation:decision:fixture",
-          artifactId: "artifact:decision:fixture",
-          receiptId: "evidence-decision:fixture",
+        readiness: {
+          readinessId: "study-readiness:fixture",
+          artifactId: "artifact:study-readiness:fixture",
+          receiptId: "study-readiness-receipt:fixture",
           receiptContentId: DECISION_CONTENT,
         },
         outcome: "queued",
-        reasonCodes: ["all_audited_claims_supported"],
+        reasonCodes: [],
       }],
     }),
   });

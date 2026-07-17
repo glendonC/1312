@@ -3,15 +3,29 @@ import {
   BoundedOrchestratorBridge,
   type ReportsWaitToolResult,
 } from "../executor/orchestratorBridge.ts";
-import type { ExecutorSpanReceipt, TaskRecord } from "../model.ts";
+import type { ExecutorSpanReceipt, StudyPlanningInput, StudyReportArtifact, TaskRecord } from "../model.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import type {
   BoundedOrchestratorLauncher,
   BoundedOrchestratorLauncherContext,
   BoundedOrchestratorLauncherFactory,
 } from "./runtimeApplication.ts";
+import { ParentArtifactAdmissionHost } from "../parentArtifactAdmissionHost.ts";
+import { ParentArtifactReadHost } from "../parentArtifactReadHost.ts";
+import { StudyPlanningHost } from "../studyPlanningHost.ts";
+import { OwnedMediaStudySynthesisHost } from "../studySynthesisHost.ts";
 
-export type DeterministicOrchestratorMode = "spawn_one" | "no_request";
+export type DeterministicOrchestratorMode =
+  | "spawn_one"
+  | "follow_up"
+  | "synthesize_gaps"
+  | "conflict"
+  | "partial_failure"
+  | "rejected_input"
+  | "unsupported_claim"
+  | "hidden_gap"
+  | "duplicate_synthesis"
+  | "no_request";
 
 export interface DeterministicOrchestratorOptions {
   mode?: DeterministicOrchestratorMode;
@@ -29,7 +43,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
     this.now = options.now ?? (() => new Date());
   }
 
-  private span(task: TaskRecord, executionId: string, startedAt: string): ExecutorSpanReceipt {
+  private span(task: TaskRecord, executionId: string, startedAt: string, outputArtifactIds: string[] = []): ExecutorSpanReceipt {
     const body = {
       executionId,
       taskId: task.id,
@@ -46,7 +60,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       monotonicDurationMs: 0,
       outcome: "completed" as const,
       process: { exitCode: 0, signal: null },
-      outputArtifactIds: [],
+      outputArtifactIds,
       modelUsageReceiptId: null,
       failure: null,
     };
@@ -75,17 +89,206 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
         result: undefined,
       }),
     );
+    let callIndex = 0;
+    const planningEnabled = task.grants.some((grant) => grant.capability === "study.plan");
+    const planningHost = new StudyPlanningHost(ledger, artifacts);
     const bridge = new BoundedOrchestratorBridge({
       task,
       executionId,
       ledger,
       scheduler,
       childLauncher,
-      nextCallId: (tool) => `tool-call:deterministic:${tool}:${canonicalSha256({ executionId, tool })}`,
+      ...(planningEnabled ? {
+        admissionHost: new ParentArtifactAdmissionHost(ledger, artifacts),
+        readHost: new ParentArtifactReadHost(ledger, artifacts),
+        planningHost,
+        synthesisHost: new OwnedMediaStudySynthesisHost(ledger, artifacts),
+      } : {}),
+      nextCallId: (tool) => {
+        callIndex += 1;
+        return `tool-call:deterministic:${tool}:${canonicalSha256({ executionId, tool, callIndex })}`;
+      },
     });
     let outcome: "completed" | "no_request" | "withheld" = "no_request";
     let reason = "The deterministic test seam deliberately issued no child request.";
-    if (this.mode === "spawn_one") {
+    if (this.mode !== "no_request" && planningEnabled) {
+      const sourceId = task.jobContext.source.artifactId;
+      const rootScope = task.mediaScope[0];
+      if (!rootScope || task.mediaScope.length !== 1) throw new Error("Deterministic synthesis root requires one exact media scope");
+      const midpoint = rootScope.startMs + Math.floor((rootScope.endMs - rootScope.startMs) / 2);
+      const partition = [{ ...rootScope, endMs: midpoint }, { ...rootScope, startMs: midpoint }];
+      const scopes = this.mode === "conflict" ? [rootScope, rootScope]
+        : this.mode === "partial_failure" || this.mode === "rejected_input" ? [...partition, rootScope]
+          : partition;
+      for (const [index, scope] of scopes.entries()) {
+        await bridge.spawn({
+          workloadKey: `deterministic-study-child:${ledger.runId}:${index}`,
+          objective: "Return one coverage-complete typed study report from a current-run test recognizer hypothesis without correctness or quality claims.",
+          workerKind: "analysis",
+          workerLabel: (this.mode === "follow_up" || this.mode === "synthesize_gaps") && index === 0
+            ? "deterministic-study-gap-worker"
+            : this.mode === "conflict"
+              ? `deterministic-study-conflict-${index + 1}`
+              : this.mode === "partial_failure" && index === 2
+                ? "deterministic-study-fail-worker"
+            : `deterministic-study-worker-${index + 1}`,
+          mediaScope: [scope],
+          inputArtifactIds: [sourceId],
+          requiredOutputs: [{ name: `coverage study ${index + 1}`, artifactKind: "studio.study-report.v1", required: true }],
+          requiredCapabilities: ["speech.transcribe", "report.submit"],
+          dependencyWorkloadKeys: [],
+          budget: { wallMs: 20_000, toolCalls: 2 },
+        });
+      }
+      const waited = await bridge.wait({});
+      if (waited.result !== "all_terminal" && !(this.mode === "partial_failure" && waited.failure === "child_failed")) {
+        throw new Error(`Deterministic study fan-out failed as ${waited.failure}`);
+      }
+      let planningInput: StudyPlanningInput | null = null;
+      const admittedReports = new Map<string, StudyReportArtifact>();
+      for (const child of waited.children) {
+        if (!child.reportId) {
+          if (this.mode === "partial_failure" && child.status === "failed") continue;
+          throw new Error("Deterministic study child did not return one typed report");
+        }
+        if (child.artifactIds.length !== 1) throw new Error("Deterministic study child did not return one typed report");
+        const childTask = ledger.state().tasks[child.taskId];
+        const reject = this.mode === "rejected_input" && childTask?.workerLabel === "deterministic-study-worker-3";
+        const disposition = await bridge.disposition({
+          reportId: child.reportId,
+          outputArtifactId: child.artifactIds[0],
+          outcome: reject ? "rejected" : "accepted",
+          reason: reject
+            ? "The deterministic test root rejected this exact child input while preserving its disposition; no read authority was created."
+            : "The deterministic test root accepted the structurally audited report for bounded planning input; this is not semantic agreement or quality judgment.",
+        });
+        if (reject) continue;
+        if (!disposition.admission) throw new Error("Deterministic study admission did not create a read grant");
+        const read = await bridge.readAdmitted({
+          grantId: disposition.admission.grant.id,
+          contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
+        });
+        for (const returned of read.artifacts) admittedReports.set(child.reportId, returned.content as StudyReportArtifact);
+        planningInput = read.planningInput ?? planningInput;
+      }
+      planningInput ??= await planningHost.inspect(executionId);
+      if (this.mode === "follow_up") {
+        const gap = planningInput.gaps[0];
+        if (!gap) throw new Error("Deterministic useful-follow-up proof requires one explicit initial gap");
+        const followUpPlanning = await bridge.plan({
+          inputId: planningInput.inputId,
+          coverageIds: planningInput.coverage.map((entry) => entry.coverageId),
+          gapIds: planningInput.gaps.map((entry) => entry.gapId),
+          conflictIds: planningInput.conflicts.map((entry) => entry.conflictId),
+          outcome: "request_follow_up",
+          citedGapIds: [gap.gapId],
+          citedConflictIds: [],
+          reason: "The deterministic test root requests one bounded follow-up for the exact cited gap; this is contract evidence, not a semantic-quality claim.",
+        });
+        await bridge.spawn({
+          workloadKey: `deterministic-study-follow-up:${ledger.runId}`,
+          objective: "Re-observe only the exact cited planning gap and return a typed current-run study report without correctness or quality claims.",
+          workerKind: "analysis",
+          workerLabel: "deterministic-study-follow-up-worker",
+          mediaScope: [gap.range],
+          inputArtifactIds: [sourceId],
+          requiredOutputs: [{ name: "coverage study follow-up", artifactKind: "studio.study-report.v1", required: true }],
+          requiredCapabilities: ["speech.transcribe", "report.submit"],
+          dependencyWorkloadKeys: [],
+          budget: { wallMs: 20_000, toolCalls: 2 },
+          followUpCause: { planningDecisionId: followUpPlanning.receipt.decisionId, kind: "gap", causeId: gap.gapId },
+        });
+        const followed = await bridge.wait({});
+        if (followed.result !== "all_terminal") throw new Error(`Deterministic study follow-up failed as ${followed.failure}`);
+        const child = followed.children.find((candidate) => candidate.reportId && !admittedReports.has(candidate.reportId));
+        if (!child?.reportId || child.artifactIds.length !== 1) throw new Error("Deterministic follow-up did not return one new typed report");
+        const disposition = await bridge.disposition({
+          reportId: child.reportId,
+          outputArtifactId: child.artifactIds[0],
+          outcome: "accepted",
+          reason: "The deterministic test root accepted the exact follow-up report for planning input; this is not agreement or quality judgment.",
+        });
+        if (!disposition.admission) throw new Error("Deterministic follow-up admission did not create a read grant");
+        const read = await bridge.readAdmitted({
+          grantId: disposition.admission.grant.id,
+          contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
+        });
+        for (const returned of read.artifacts) admittedReports.set(child.reportId, returned.content as StudyReportArtifact);
+        planningInput = read.planningInput ?? await planningHost.inspect(executionId);
+      }
+      const planning = await bridge.plan({
+        inputId: planningInput.inputId,
+        coverageIds: planningInput.coverage.map((entry) => entry.coverageId),
+        gapIds: planningInput.gaps.map((entry) => entry.gapId),
+        conflictIds: planningInput.conflicts.map((entry) => entry.conflictId),
+        outcome: "synthesize_with_gaps",
+        citedGapIds: planningInput.gaps.map((entry) => entry.gapId),
+        citedConflictIds: planningInput.conflicts.map((entry) => entry.conflictId),
+        reason: "The deterministic test seam selected synthesis only to exercise the contract; it is not model-planning acceptance evidence.",
+      });
+      const claims = planningInput.coverage.flatMap((entry, index) => {
+        if (entry.aggregate !== "supported_candidate") return [];
+        const childRange = entry.childRanges.find((candidate) => candidate.state === "supported" && candidate.claimIds.length > 0);
+        const reportInput = childRange ? planningInput.reports.find((candidate) => candidate.reportId === childRange.reportId) : null;
+        const childClaim = childRange ? admittedReports.get(childRange.reportId)?.claims.find((candidate) => candidate.claimId === childRange.claimIds[0]) : null;
+        if (!childRange || !reportInput || !childClaim) throw new Error("Deterministic study synthesis lost a supported child claim");
+        return [{
+          claimId: `owned-study-claim:deterministic:${index}`,
+          ...entry.range,
+          statement: `The cited child report records one current-run recognizer hypothesis for ${entry.range.startMs}-${entry.range.endMs}; correctness is not assessed.`,
+          childReportCitations: [{
+            reportId: reportInput.reportId,
+            artifactId: reportInput.artifactId,
+            contentId: reportInput.contentId,
+            admissionId: reportInput.admissionId,
+            claimId: childClaim.claimId,
+          }],
+          semanticCitations: childClaim.citations,
+        }];
+      });
+      const synthesisRequest = {
+        planningDecisionId: planning.receipt.decisionId,
+        coverage: planningInput.coverage.map((entry) => {
+          const claim = claims.find((candidate) => candidate.artifactId === entry.range.artifactId && candidate.trackId === entry.range.trackId && candidate.startMs === entry.range.startMs && candidate.endMs === entry.range.endMs);
+          return claim
+            ? { coverageId: entry.coverageId, ...entry.range, state: "supported", claimIds: [claim.claimId], reason: null }
+            : { coverageId: entry.coverageId, ...entry.range, state: entry.aggregate === "gap" ? "unknown" : "withheld", claimIds: [], reason: { code: entry.aggregate === "conflict" ? "unresolved_conflict" : "explicit_study_gap", detail: "The deterministic test study preserves the planning gap or conflict without support." } };
+        }),
+        claims,
+        conflicts: planningInput.conflicts.map((entry) => ({ conflictId: entry.conflictId, coverageId: entry.coverageId, status: "unresolved", detail: "The deterministic test study lists but does not arbitrate this child conflict." })),
+        limitations: [
+          { code: "recognizer_hypothesis_not_truth", coverageIds: planningInput.coverage.map((entry) => entry.coverageId), detail: "Current-run recognizer hypotheses are not ground truth." },
+          { code: "semantic_quality_not_assessed", coverageIds: planningInput.coverage.map((entry) => entry.coverageId), detail: "No semantic or translation quality was assessed." },
+          ...planningInput.gaps.map((entry) => ({ code: "explicit_gap" as const, coverageIds: [entry.coverageId], detail: "The exact planning gap remains non-supported." })),
+          ...planningInput.conflicts.map((entry) => ({ code: "unresolved_conflict" as const, coverageIds: [entry.coverageId], detail: "The exact planning conflict remains unresolved." })),
+          ...(this.mode === "partial_failure" ? [{ code: "partial_child_failure" as const, coverageIds: planningInput.coverage.map((entry) => entry.coverageId), detail: "One bounded child failed and contributed no report; the complete root partition is supported only by the other admitted reports." }] : []),
+          ...(this.mode === "rejected_input" ? [{ code: "rejected_child_input" as const, coverageIds: planningInput.coverage.map((entry) => entry.coverageId), detail: "One exact child report was rejected and was not admitted as planning input." }] : []),
+        ],
+      };
+      if (this.mode === "unsupported_claim" && synthesisRequest.claims[0]?.semanticCitations[0]) {
+        synthesisRequest.claims[0].semanticCitations[0].operationId = "operation:unsupported-model-authored-citation";
+      }
+      if (this.mode === "hidden_gap") synthesisRequest.coverage = synthesisRequest.coverage.slice(1);
+      let synthesis: Awaited<ReturnType<BoundedOrchestratorBridge["synthesize"]>> | null = null;
+      try {
+        synthesis = await bridge.synthesize(synthesisRequest);
+      } catch (error) {
+        if (this.mode !== "unsupported_claim" && this.mode !== "hidden_gap") throw error;
+      }
+      if (this.mode === "duplicate_synthesis" && synthesis) {
+        let rejected = false;
+        try {
+          await bridge.synthesize(synthesisRequest);
+        } catch {
+          rejected = true;
+        }
+        if (!rejected) throw new Error("The deterministic duplicate-synthesis contract test did not fail closed");
+      }
+      outcome = synthesis ? "completed" : "withheld";
+      reason = synthesis
+        ? `The deterministic test seam exercised bounded reports, model-tool-shaped planning, and study ${synthesis.studyId}; it is not real-model acceptance evidence.`
+        : "The deterministic adversarial seam confirmed that unsupported or hidden model synthesis failed before study authority was recorded.";
+    } else if (this.mode === "spawn_one") {
       const evidenceIds = task.jobContext.detectorEvidence.map((evidence) => evidence.artifactId);
       await bridge.spawn({
         workloadKey: `deterministic-child:${ledger.runId}`,
@@ -119,7 +322,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
         result: undefined,
       }),
     );
-    const span = this.span(task, executionId, startedAt);
+    const span = this.span(task, executionId, startedAt, bridge.synthesizedArtifactIds());
     await artifacts.storeJson(span);
     await ledger.transact(
       { producer: { kind: "launcher", id: "deterministic-test-orchestrator" }, causationId: executionId },

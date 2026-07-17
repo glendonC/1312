@@ -136,7 +136,14 @@ export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): bo
     invariant(event.producer.kind === "launcher", event, "orchestrator tool evidence must come from the launcher");
     const execution = next.executions[event.data.executionId];
     const task = next.tasks[event.data.taskId];
-    const capability = event.data.tool === "task_spawn_request" ? "task.spawn.request" : "task.reports.wait";
+    const capability = {
+      task_spawn_request: "task.spawn.request",
+      task_reports_wait: "task.reports.wait",
+      report_disposition: "report.disposition",
+      artifact_read: "artifact.read",
+      study_planning_decision: "study.plan",
+      study_synthesize: "study.synthesize",
+    }[event.data.tool];
     invariant(execution?.status === "active" && execution.taskId === task?.id, event, `tool call ${event.data.callId} has no active root executor`);
     invariant(task.ownerAgentId === execution.agentId && task.workerKind === "orchestrator", event, `tool call ${event.data.callId} changed orchestrator ownership`);
     invariant(task.grants.some((grant) => grant.capability === capability), event, `tool call ${event.data.callId} lacks its exact grant`);

@@ -60,6 +60,7 @@ import {
   parseCodexEvents,
   type CodexUsageEvent,
 } from "./executor/codexEvents.ts";
+import { closedCodexExecArgs } from "./executor/codexInvocation.ts";
 import { LauncherFailure } from "./executor/launcherFailure.ts";
 import {
   buildStudyReportEnvelope,
@@ -115,6 +116,29 @@ function tomlString(value: string): string {
 
 function tomlStrings(values: readonly string[]): string {
   return `[${values.map(tomlString).join(",")}]`;
+}
+
+function closedProcessExitReason(result: ProcessResult): string {
+  const diagnostic = `${result.stderr}\n${result.stdout}`.toLowerCase();
+  if (diagnostic.includes("mcp") || diagnostic.includes("model context protocol")) {
+    return "Codex executor could not start its required closed MCP tool surface.";
+  }
+  if (diagnostic.includes("429") || diagnostic.includes("rate limit") || diagnostic.includes("too many requests")) {
+    return "Codex executor was rejected by the model service rate limit before a completed turn.";
+  }
+  if (diagnostic.includes("401") || diagnostic.includes("403") || diagnostic.includes("unauthorized") || diagnostic.includes("authentication")) {
+    return "Codex executor lacked model-service authorization before a completed turn.";
+  }
+  if (diagnostic.includes("model") && (diagnostic.includes("not found") || diagnostic.includes("unsupported") || diagnostic.includes("invalid"))) {
+    return "Codex executor model configuration was rejected before a completed turn.";
+  }
+  if (diagnostic.includes("stream") || diagnostic.includes("connection") || diagnostic.includes("transport")) {
+    return "Codex executor transport closed before a completed turn.";
+  }
+  if (diagnostic.includes("schema")) {
+    return "Codex executor output-schema configuration was rejected before a completed turn.";
+  }
+  return "Codex executor exited without a completed turn.";
 }
 
 export class CodexExecWorkerLauncher {
@@ -390,18 +414,7 @@ export class CodexExecWorkerLauncher {
           { nextOperationId: this.options.nextDecisionOperationId },
         ));
       }
-      const args = [
-        "exec",
-        "--json",
-        "--ephemeral",
-        "--ignore-user-config",
-        "--ignore-rules",
-        "--sandbox",
-        "read-only",
-        "--skip-git-repo-check",
-        "-c",
-        "shell_environment_policy.inherit=none",
-      ];
+      const args = closedCodexExecArgs();
       if (mediaBridge) {
         const toolNames = mediaBridge.manifest.tools.map((tool) => tool.name);
         const serverPath = this.options.mediaMcpServerPath ?? fileURLToPath(
@@ -567,7 +580,7 @@ export class CodexExecWorkerLauncher {
       if (processResult.exitCode !== 0) {
         throw new LauncherFailure(
           `Codex worker exited ${processResult.exitCode ?? processResult.signal ?? "without status"}`,
-          "Codex executor exited without a completed turn.",
+          closedProcessExitReason(processResult),
         );
       }
       const parsed = parseCodexEvents(processResult.stdout);

@@ -5,10 +5,19 @@ import {
   BoundedOrchestratorBridge,
   ORCHESTRATOR_SPAWN_TOOL,
   ORCHESTRATOR_WAIT_TOOL,
+  ORCHESTRATOR_DISPOSITION_TOOL,
+  ORCHESTRATOR_READ_TOOL,
+  ORCHESTRATOR_PLAN_TOOL,
+  ORCHESTRATOR_SYNTHESIZE_TOOL,
   OrchestratorBridgeError,
   type OrchestratorToolManifest,
   type ReportsWaitToolResult,
   type SpawnToolResult,
+  type OrchestratorToolName,
+  type ReportDispositionToolResult,
+  type AdmittedArtifactReadToolResult,
+  type StudyPlanningToolResult,
+  type StudySynthesisToolResult,
 } from "./orchestratorBridge.ts";
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -78,6 +87,10 @@ export async function openOrchestratorBridge(bridge: BoundedOrchestratorBridge):
         if (!body || !exact(body, ["name", "arguments"])) throw new OrchestratorBridgeError("invalid_request", "The orchestrator bridge call shape is invalid.");
         if (body.name === ORCHESTRATOR_SPAWN_TOOL) json(response, 200, { ok: true, result: await bridge.spawn(body.arguments) });
         else if (body.name === ORCHESTRATOR_WAIT_TOOL) json(response, 200, { ok: true, result: await bridge.wait(body.arguments) });
+        else if (body.name === ORCHESTRATOR_DISPOSITION_TOOL) json(response, 200, { ok: true, result: await bridge.disposition(body.arguments) });
+        else if (body.name === ORCHESTRATOR_READ_TOOL) json(response, 200, { ok: true, result: await bridge.readAdmitted(body.arguments) });
+        else if (body.name === ORCHESTRATOR_PLAN_TOOL) json(response, 200, { ok: true, result: await bridge.plan(body.arguments) });
+        else if (body.name === ORCHESTRATOR_SYNTHESIZE_TOOL) json(response, 200, { ok: true, result: await bridge.synthesize(body.arguments) });
         else throw new OrchestratorBridgeError("invalid_request", "The orchestrator tool name is unavailable.");
         return;
       }
@@ -138,12 +151,12 @@ export async function fetchOrchestratorManifest(endpoint: string, token: string)
 export async function callOrchestratorBridge(
   endpoint: string,
   token: string,
-  name: typeof ORCHESTRATOR_SPAWN_TOOL | typeof ORCHESTRATOR_WAIT_TOOL,
+  name: OrchestratorToolName,
   args: unknown,
-): Promise<SpawnToolResult | ReportsWaitToolResult> {
+): Promise<SpawnToolResult | ReportsWaitToolResult | ReportDispositionToolResult | AdmittedArtifactReadToolResult | StudyPlanningToolResult | StudySynthesisToolResult> {
   const value = await remoteJson(endpoint, token, "/v1/call", {
     method: "POST",
     body: JSON.stringify({ name, arguments: args }),
   });
-  return value.result as SpawnToolResult | ReportsWaitToolResult;
+  return value.result as SpawnToolResult | ReportsWaitToolResult | ReportDispositionToolResult | AdmittedArtifactReadToolResult | StudyPlanningToolResult | StudySynthesisToolResult;
 }

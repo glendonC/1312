@@ -3,6 +3,9 @@ import type { RuntimeProjection } from "./model.ts";
 import { reopenSemanticEvidence } from "./semanticEvidenceAudit.ts";
 import { reopenStudyReport } from "./studyReportAudit.ts";
 import { reopenParentArtifactDisposition } from "./parentArtifactAdmissionAudit.ts";
+import { reopenStudyPlanningDecision } from "./studyPlanningAudit.ts";
+import { reopenOwnedMediaStudy } from "./studySynthesisAudit.ts";
+import { reopenStudyReadiness } from "./studyReadinessAudit.ts";
 import { adaptProductionRuntime, type ProductionStudioProjection } from "./studioProjection.ts";
 
 /** Storage-aware projection: invalid/absent semantic bytes never expose availability identities. */
@@ -48,6 +51,15 @@ export async function adaptAuthenticatedProductionRuntime(
       };
       view.admission = { state: "absent", admissionId: null, receiptId: null, receiptContentId: null, grant: null };
     }
+  }
+  for (const view of projection.studyPlanningDecisions) {
+    await reopenStudyPlanningDecision(state, artifacts, view.decisionId);
+  }
+  for (const view of projection.ownedMediaStudies) {
+    await reopenOwnedMediaStudy(state, artifacts, view.studyId);
+  }
+  for (const view of projection.studyReadiness) {
+    await reopenStudyReadiness(state, artifacts, view.readinessId);
   }
   return projection;
 }

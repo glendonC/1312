@@ -48,29 +48,43 @@ export const orchestratorOutputSchema = {
 export function orchestratorPrompt(task: TaskRecord): string {
   const requiresDelegation = task.objective.startsWith("Delegate at least");
   const requiresCoverageStudyDelegation = task.objective.startsWith("Delegate at least two bounded coverage-study tasks");
+  const requiresStudySynthesis = task.grants.some((grant) => grant.capability === "study.synthesize");
+  const exactTools = requiresStudySynthesis
+    ? ["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_synthesize"]
+    : ["task_spawn_request", "task_reports_wait"];
   const contract = {
     objective: task.objective,
     jobContext: task.jobContext,
     mediaScope: task.mediaScope,
     inputArtifactIds: task.inputArtifactIds,
     budget: task.budget,
-    exactTools: ["task_spawn_request", "task_reports_wait"],
+    exactTools,
     requiresDelegation,
     requiresCoverageStudyDelegation,
+    requiresStudySynthesis,
   };
   return [
     "You are the model-executed root orchestrator in the 1321 Studio durable runtime.",
-    "You receive exactly two closed, path-free tools. task_spawn_request accepts a bounded child contract and the host derives every request, task, agent, grant, dependency-task, context, and launch identity. task_reports_wait accepts an empty object and returns only terminal direct-child task/report/artifact identities or closed failure states.",
+    `You receive exactly ${exactTools.length} closed, path-free tools. task_spawn_request accepts a bounded child contract and the host derives every request, task, agent, grant, dependency-task, context, and launch identity. task_reports_wait accepts an empty object and returns only terminal direct-child task/report/artifact identities or closed failure states.`,
     "Choose whether and how to decompose the objective. You may issue multiple spawn requests before the first wait. The host validates and launches accepted contracts but does not choose the decomposition for you.",
     requiresDelegation
       ? "This task contract explicitly requires delegation. You must call task_spawn_request at least once with a child contract you author, and if one is accepted you must call task_reports_wait. Returning completed or no_request without a spawn call violates the contract."
       : "When the task contract does not require delegation, a deliberate no-request decision remains available.",
     ...(requiresCoverageStudyDelegation ? [
-      "This slice-3 task requires at least two accepted child contracts. Every accepted contract must require exactly one studio.study-report.v1 output and must request both speech.transcribe and report.submit. The launcher verifies these model-authored contracts; a rejected request does not count.",
+      "This slice-4 task requires at least two accepted child contracts. Every accepted contract must require exactly one studio.study-report.v1 output and must request both speech.transcribe and report.submit. The launcher verifies these model-authored contracts; a rejected request does not count.",
+    ] : []),
+    ...(requiresStudySynthesis ? [
+      "After the first wait, use report_disposition for every returned typed study report. Accept or reject each one yourself with a reason. The host validates structural lineage but does not choose the disposition. At least two accepted reports are required by this task.",
+      "For each accepted disposition, use its returned admission grant and exact admitted content id with artifact_read. Read at least two admitted structured reports. Paths and prose identifiers are never authority. After the second read, artifact_read returns the deterministic planningInput containing the exact current coverage, gap, and conflict identities.",
+      "Call study_planning_decision with every planningInput coverageId, gapId, and conflictId exactly as returned. You choose request_follow_up, synthesize_with_gaps, or withhold. If you request follow-up, cite at least one exact gap/conflict, then call task_spawn_request with followUpCause naming that planning decision and cause. The scheduler applies the same scope, depth, capability, dependency, concurrency, and run-budget policy. Wait, disposition/read any accepted follow-up report, and make a new decision over the new planningInput.",
+      "This root contract requires eventual synthesize_with_gaps and one study_synthesize call. The synthesis must copy every exact coverage identity/range, keep gaps and conflicts non-supported, keep every conflict unresolved, and author range-bound claims only when exact child-report claims and their semantic observation citations support the same range. The host injects immutable job context, accepted/rejected/failed dispositions, and exact follow-up history; you author coverage states, synthesis prose, claims, conflict descriptions, and limitations.",
+      "Do not infer that citation closure, coverage, agreement, or readiness proves truth, semantic correctness, transcription quality, or translation quality. The deterministic readiness audit runs only after your executor receipt closes; you do not choose readiness.",
     ] : []),
     "If any spawn is accepted, call task_reports_wait before returning. Do not treat scheduler acceptance, worker count, signal, VAD, language ID, or a report identity as semantic understanding, transcription, translation, or quality.",
     "Only when requiresDelegation is false and no child request is warranted, make no spawn call and return outcome no_request with a deliberate reason. If a child fails or is interrupted, preserve that state and normally return withheld.",
-    "Return only the JSON required by the supplied output schema. No synthesis, captions, publication, or UI action is authorized.",
+    requiresStudySynthesis
+      ? "Return only the JSON required by the supplied output schema after the study_synthesize call. No captions, publication, quality score, truth arbitration, or UI action is authorized."
+      : "Return only the JSON required by the supplied output schema. No synthesis, captions, publication, or UI action is authorized.",
     JSON.stringify(contract),
   ].join("\n\n");
 }

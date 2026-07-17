@@ -8,6 +8,10 @@ export const CAPABILITIES = [
   "evidence.read",
   "analysis.evidence.assess",
   "analysis.evidence.decide",
+  "report.disposition",
+  "artifact.read",
+  "study.plan",
+  "study.synthesize",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -203,6 +207,12 @@ export interface SpawnRequestInput {
  */
 export interface OrchestratorSpawnContract extends Omit<SpawnRequestInput, "dependencies"> {
   dependencyWorkloadKeys: string[];
+  /** Null for initial fan-out; exact planning causation is required for post-report follow-up. */
+  followUpCause?: null | {
+    planningDecisionId: string;
+    kind: "gap" | "conflict";
+    causeId: string;
+  };
 }
 
 export type SpawnRejection =
@@ -270,7 +280,13 @@ export interface OrchestratorToolCallRecord {
   id: string;
   executionId: string;
   taskId: string;
-  tool: "task_spawn_request" | "task_reports_wait";
+  tool:
+    | "task_spawn_request"
+    | "task_reports_wait"
+    | "report_disposition"
+    | "artifact_read"
+    | "study_planning_decision"
+    | "study_synthesize";
   spawnRequestId: string | null;
 }
 

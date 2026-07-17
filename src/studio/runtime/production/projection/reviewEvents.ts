@@ -9,28 +9,28 @@ export function applyReviewEvent(next: RuntimeProjection, event: RuntimeEvent): 
       event,
       "publish-review intake must come from the intake host",
     );
-    const decision = next.evidenceDecisions[event.data.decision.operationId];
+    const readiness = next.studyReadiness[event.data.readiness.readinessId];
     invariant(
-      decision?.status === "completed" &&
-        decision.artifactId === event.data.decision.artifactId &&
-        decision.receiptId === event.data.decision.receiptId &&
-        decision.receiptContentId === event.data.decision.receiptContentId,
+      readiness?.status === "completed" &&
+        readiness.artifactId === event.data.readiness.artifactId &&
+        readiness.receiptId === event.data.readiness.receiptId &&
+        readiness.receiptContentId === event.data.readiness.receiptContentId,
       event,
-      `publish-review intake ${event.data.intakeId} has no completed exact decision identity`,
+      `publish-review intake ${event.data.intakeId} has no completed exact study-readiness identity`,
     );
     invariant(!next.publishReviewIntakes[event.data.intakeId], event, `publish-review intake ${event.data.intakeId} is duplicated`);
     invariant(
       !Object.values(next.publishReviewIntakes).some((intake) =>
-        intake.decisionOperationId === event.data.decision.operationId),
+        intake.readinessId === event.data.readiness.readinessId),
       event,
-      `decision ${event.data.decision.operationId} already has publish-review intake lineage`,
+      `study readiness ${event.data.readiness.readinessId} already has publish-review intake lineage`,
     );
     next.publishReviewIntakes[event.data.intakeId] = {
       id: event.data.intakeId,
-      decisionOperationId: event.data.decision.operationId,
-      decisionArtifactId: event.data.decision.artifactId,
-      decisionReceiptId: event.data.decision.receiptId,
-      decisionReceiptContentId: event.data.decision.receiptContentId,
+      readinessId: event.data.readiness.readinessId,
+      readinessArtifactId: event.data.readiness.artifactId,
+      readinessReceiptId: event.data.readiness.receiptId,
+      readinessReceiptContentId: event.data.readiness.receiptContentId,
       status: "started",
       artifactId: null,
       receiptId: null,
@@ -63,24 +63,24 @@ export function applyReviewEvent(next: RuntimeProjection, event: RuntimeEvent): 
     );
     invariant(
       receipt.intakeId === intake.id &&
-        receipt.input.decision.operationId === intake.decisionOperationId &&
-        receipt.input.decision.artifactId === intake.decisionArtifactId &&
-        receipt.input.decision.receiptId === intake.decisionReceiptId &&
-        receipt.input.decision.receiptContentId === intake.decisionReceiptContentId,
+        receipt.input.readiness.readinessId === intake.readinessId &&
+        receipt.input.readiness.artifactId === intake.readinessArtifactId &&
+        receipt.input.readiness.receiptId === intake.readinessReceiptId &&
+        receipt.input.readiness.receiptContentId === intake.readinessReceiptContentId,
       event,
-      `publish-review intake ${intake.id} receipt changed its verified decision identity`,
+      `publish-review intake ${intake.id} receipt changed its verified study-readiness identity`,
     );
-    const decision = next.evidenceDecisions[intake.decisionOperationId];
+    const readiness = next.studyReadiness[intake.readinessId];
     invariant(
-      (decision.outcome === "proceed_to_publish_review" && receipt.result.outcome === "queued") ||
-        (decision.outcome === "withheld" && receipt.result.outcome === "rejected"),
+      (readiness.outcome === "proceed_to_caption_review" && receipt.result.outcome === "queued") ||
+        (readiness.outcome === "withheld" && receipt.result.outcome === "rejected"),
       event,
-      `publish-review intake ${intake.id} outcome does not follow the decision outcome`,
+      `publish-review intake ${intake.id} outcome does not follow the study-readiness outcome`,
     );
     invariant(
-      JSON.stringify(receipt.result.reasonCodes) === JSON.stringify(decision.reasonCodes),
+      JSON.stringify(receipt.result.reasonCodes) === JSON.stringify(readiness.reasonCodes),
       event,
-      `publish-review intake ${intake.id} changed the decision reason codes`,
+      `publish-review intake ${intake.id} changed the study-readiness reason codes`,
     );
     intake.status = "completed";
     intake.artifactId = artifact.id;

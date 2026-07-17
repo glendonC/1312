@@ -14,7 +14,7 @@ import {
   runBoundedRuntimeApplication,
 } from "../src/studio/runtime/production/runtimeHost/runtimeApplication.ts";
 
-async function fakeCodex(directory: string): Promise<{ executable: string; prefix: string[] }> {
+async function fakeCodex(directory: string, mode: "normal" | "hang-root" = "normal"): Promise<{ executable: string; prefix: string[] }> {
   const script = join(directory, "fake-owned-swarm-codex.mjs");
   await writeFile(script, `
 const args = process.argv.slice(2);
@@ -25,6 +25,8 @@ if (args[0] === "--version") {
 let prompt = "";
 for await (const chunk of process.stdin) prompt += chunk;
 const isRoot = Boolean(process.env.STUDIO_ORCHESTRATOR_BRIDGE_URL);
+const testMode = ${JSON.stringify(mode)};
+if (isRoot && testMode === "hang-root") await new Promise(() => setInterval(() => {}, 1_000));
 if (isRoot) {
   const required = [
     "--strict-config",
@@ -44,7 +46,7 @@ if (isRoot) {
   }
   const modelIndex = args.indexOf("--model");
   if (args[modelIndex + 1] !== "owned-swarm-test-model") throw new Error("root model was not explicit");
-  if (!prompt.includes("exactly two closed, path-free tools") || !prompt.includes("jobContext")) {
+  if (!prompt.includes("exactly 6 closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext")) {
     throw new Error("closed root prompt contract is missing");
   }
   const root = JSON.parse(prompt.split("\\n\\n").at(-1));
@@ -79,6 +81,50 @@ if (isRoot) {
   if (left.decision !== "accepted" || right.decision !== "accepted") throw new Error("fan-out was not accepted");
   const waited = await call("task_reports_wait", {});
   if (waited.result !== "all_terminal" || waited.children.length !== 2) throw new Error("wait did not return two terminal children");
+  let planningInput = null;
+  for (const childResult of waited.children) {
+    const disposition = await call("report_disposition", {
+      reportId: childResult.reportId,
+      outputArtifactId: childResult.artifactIds[0],
+      outcome: "accepted",
+      reason: "The fake model root accepts this structurally audited report for contract planning only.",
+    });
+    if (!disposition.admission) throw new Error("accepted report had no admission");
+    const read = await call("artifact_read", {
+      grantId: disposition.admission.grant.id,
+      contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
+    });
+    planningInput = read.planningInput || planningInput;
+  }
+  if (!planningInput) throw new Error("two admitted reads did not expose planning input");
+  const planning = await call("study_planning_decision", {
+    inputId: planningInput.inputId,
+    coverageIds: planningInput.coverage.map((entry) => entry.coverageId),
+    gapIds: planningInput.gaps.map((entry) => entry.gapId),
+    conflictIds: planningInput.conflicts.map((entry) => entry.conflictId),
+    outcome: "synthesize_with_gaps",
+    citedGapIds: planningInput.gaps.map((entry) => entry.gapId),
+    citedConflictIds: planningInput.conflicts.map((entry) => entry.conflictId),
+    reason: "The fake model root explicitly preserves every structural gap and conflict.",
+  });
+  const synthesis = await call("study_synthesize", {
+    planningDecisionId: planning.receipt.decisionId,
+    coverage: planningInput.coverage.map((entry) => ({
+      coverageId: entry.coverageId,
+      ...entry.range,
+      state: entry.aggregate === "gap" ? "unknown" : "withheld",
+      claimIds: [],
+      reason: { code: entry.aggregate === "conflict" ? "unresolved_conflict" : "explicit_study_gap", detail: "The fake model preserves this range as non-supported." },
+    })),
+    claims: [],
+    conflicts: planningInput.conflicts.map((entry) => ({ conflictId: entry.conflictId, coverageId: entry.coverageId, status: "unresolved", detail: "The fake model lists but does not arbitrate this conflict." })),
+    limitations: [
+      { code: "semantic_quality_not_assessed", coverageIds: planningInput.coverage.map((entry) => entry.coverageId), detail: "This contract fixture does not assess semantic quality." },
+      ...planningInput.gaps.map((entry) => ({ code: "explicit_gap", coverageIds: [entry.coverageId], detail: "The exact planning gap remains non-supported." })),
+      ...planningInput.conflicts.map((entry) => ({ code: "unresolved_conflict", coverageIds: [entry.coverageId], detail: "The exact planning conflict remains unresolved." })),
+    ],
+  });
+  if (!synthesis.studyId || synthesis.executorReceipt.producer.authorship !== "active_root_executor_tool_call") throw new Error("study synthesis did not close");
 }
 let childFinal = null;
 if (!isRoot) {
@@ -137,7 +183,7 @@ process.stdout.write(JSON.stringify({
   return { executable: process.execPath, prefix: [script] };
 }
 
-test("Codex root launcher exposes only two closed tools and receipts model-authored fan-out with explicit model usage", async () => {
+test("Codex root launcher exposes the closed planning/synthesis tools and receipts model-authored fan-out through study synthesis", async () => {
   const directory = await mkdtemp(join(tmpdir(), "studio-orchestrator-executor-"));
   try {
     const loadedSource = await loadOwnedSourceSession(resolve("public/demo/runs/run-005"));
@@ -201,6 +247,54 @@ test("Codex root launcher exposes only two closed tools and receipts model-autho
     assert.ok(Object.values(state.reports).every((report) => report.study?.output.schema === "studio.study-report.v1"));
     assert.equal(Object.keys(state.parentArtifactDispositions).length, 2);
     assert.equal(Object.keys(state.parentArtifactReadGrants).length, 2);
+    assert.equal(Object.keys(state.studyPlanningDecisions).length, 1);
+    assert.equal(Object.keys(state.ownedMediaStudies).length, 1);
+    assert.equal(Object.keys(state.studyReadiness).length, 1);
+    assert.equal(Object.values(state.studyReadiness)[0].outcome, "withheld");
+    assert.equal(Object.values(state.publishReviewIntakes)[0].outcome, "rejected");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("model-root timeout records a timed-out executor and creates no planning, study, or readiness authority", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "studio-orchestrator-timeout-"));
+  try {
+    const loadedSource = await loadOwnedSourceSession(resolve("public/demo/runs/run-005"));
+    const analysisRequest = createProductionAnalysisRequest(loadedSource.session, {
+      range: { startMs: 0, endMs: 1_000 },
+      requestedSource: { mode: "declared", languages: ["ko"], reason: null },
+      targetLanguage: "en",
+      selectedLanguagePackId: "ko-v3",
+      outputDepth: "evidence",
+    });
+    const runtimeRoot = join(directory, "runtime");
+    const initialized = await initializeRuntimeApplication({
+      runtimeRoot,
+      journalPath: join(runtimeRoot, "events.ndjson"),
+      artifactStoreRoot: join(runtimeRoot, "artifact-store"),
+      runStartPath: join(runtimeRoot, "run-start.json"),
+      runtimeId: "runtime:orchestrator-model-timeout-contract",
+      journalId: "journal:orchestrator-model-timeout-contract",
+      acceptedBy: "operator:test",
+      startedAt: "2026-07-16T12:00:00.000Z",
+      loadedSource,
+      analysisRequest,
+    });
+    const fake = await fakeCodex(directory, "hang-root");
+    await assert.rejects(runBoundedRuntimeApplication(
+      initialized,
+      codexWorkerLauncherFactory({ executable: fake.executable, executableArgsPrefix: fake.prefix, model: "owned-swarm-test-model", maximumWallMs: 100 }),
+      codexOrchestratorLauncherFactory({ executable: fake.executable, executableArgsPrefix: fake.prefix, model: "owned-swarm-test-model", maximumWallMs: 100 }),
+    ), /timed out/i);
+    const state = (await RuntimeLedger.open(initialized.runStart.runtimeId, new FileEventJournal(initialized.journalPath))).state();
+    const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
+    const execution = Object.values(state.executions).find((candidate) => candidate.taskId === root.id)!;
+    assert.equal(execution.status, "timed_out");
+    assert.equal(root.status, "failed");
+    assert.equal(Object.keys(state.studyPlanningDecisions).length, 0);
+    assert.equal(Object.keys(state.ownedMediaStudies).length, 0);
+    assert.equal(Object.keys(state.studyReadiness).length, 0);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

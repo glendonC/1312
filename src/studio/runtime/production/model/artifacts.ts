@@ -67,6 +67,34 @@ export interface ParentAdmissionArtifactOrigin {
   receiptContentId: string;
 }
 
+export interface StudyPlanningDecisionArtifactOrigin {
+  kind: "study_planning_decision";
+  decisionId: string;
+  inputId: string;
+  executionId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface OwnedMediaStudyArtifactOrigin {
+  kind: "owned_media_study";
+  studyId: string;
+  planningDecisionId: string;
+  executionId: string;
+  executorReceiptId: string;
+  executorReceiptContentId: string;
+}
+
+export interface StudyReadinessArtifactOrigin {
+  kind: "study_readiness";
+  readinessId: string;
+  studyId: string;
+  studyArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+  outcome: "proceed_to_caption_review" | "withheld";
+}
+
 export interface RootOutputDispositionArtifactOrigin {
   kind: "root_output_disposition";
   dispositionId: string;
@@ -111,10 +139,10 @@ export interface PublishReviewIntakeArtifactOrigin {
   intakeId: string;
   receiptId: string;
   receiptContentId: string;
-  decisionOperationId: string;
-  decisionArtifactId: string;
-  decisionReceiptId: string;
-  decisionReceiptContentId: string;
+  readinessId: string;
+  readinessArtifactId: string;
+  readinessReceiptId: string;
+  readinessReceiptContentId: string;
 }
 
 export interface PublishReviewDecisionArtifactOrigin {
@@ -197,6 +225,9 @@ export interface RuntimeArtifact {
     | StudyReportArtifactOrigin
     | ParentArtifactDispositionArtifactOrigin
     | ParentAdmissionArtifactOrigin
+    | StudyPlanningDecisionArtifactOrigin
+    | OwnedMediaStudyArtifactOrigin
+    | StudyReadinessArtifactOrigin
     | RootOutputDispositionArtifactOrigin
     | PreflightEvidenceArtifactOrigin
     | EvidenceAssessmentArtifactOrigin

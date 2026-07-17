@@ -30,12 +30,17 @@ import type {
   SemanticMediaEvidenceArtifact,
   SourceArtifactDescriptor,
   StudyReportArtifact,
+  StudyPlanningDecisionReceipt,
+  OwnedMediaStudyArtifact,
+  OwnedMediaStudyExecutorReceipt,
+  StudyReadinessReceipt,
   WorkerOutputEnvelope,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
-import { STUDY_REPORT_LIMITS } from "./model.ts";
+import { OWNED_MEDIA_STUDY_LIMITS, STUDY_REPORT_LIMITS } from "./model.ts";
 import { validateStudyReportArtifact } from "./validation/studyReports.ts";
+import { validateOwnedMediaStudyArtifact } from "./validation/studies.ts";
 
 function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -343,6 +348,138 @@ export class ContentAddressedArtifactStore {
       envelope,
       ...stored,
     };
+  }
+
+  async prepareOwnedMediaStudy(runId: string, value: unknown): Promise<{
+    artifactId: string;
+    studyId: string;
+    envelope: OwnedMediaStudyArtifact;
+    content: ContentIdentity;
+    storageKey: string;
+  }> {
+    const envelope = validateOwnedMediaStudyArtifact(value);
+    if (envelope.runId !== runId) throw new Error("Owned-media study belongs to another run");
+    const stored = await this.storeJson(envelope);
+    if (stored.content.bytes > OWNED_MEDIA_STUDY_LIMITS.maxArtifactBytes) {
+      throw new Error("Owned-media study exceeds its stored-byte ceiling");
+    }
+    const studyId = `owned-media-study:${canonicalSha256({
+      runId,
+      planningDecisionId: envelope.planning.decisionId,
+      executionId: envelope.root.executionId,
+      contentId: stored.content.contentId,
+    })}`;
+    return {
+      artifactId: `artifact:${canonicalSha256({ runId, studyId, kind: "studio.owned-media-study.v1", contentId: stored.content.contentId })}`,
+      studyId,
+      envelope,
+      ...stored,
+    };
+  }
+
+  buildStudyPlanningDecisionArtifact(input: {
+    runId: string;
+    receipt: StudyPlanningDecisionReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({ runId: input.runId, decisionId: input.receipt.decisionId, kind: "study-planning-decision", contentId: input.storedReceipt.content.contentId })}`,
+      runId: input.runId,
+      kind: "studio.study-planning-decision.receipt.v1",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: input.receipt.input.reports.map((report) => report.artifactId),
+      producerTaskId: input.receipt.modelExecutor.taskId,
+      producerAgentId: input.receipt.modelExecutor.agentId,
+      origin: {
+        kind: "study_planning_decision",
+        decisionId: input.receipt.decisionId,
+        inputId: input.receipt.input.inputId,
+        executionId: input.receipt.modelExecutor.executionId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildOwnedMediaStudyArtifact(input: {
+    runId: string;
+    receipt: OwnedMediaStudyExecutorReceipt;
+    receiptContentId: string;
+    prepared: {
+      artifactId: string;
+      studyId: string;
+      envelope: OwnedMediaStudyArtifact;
+      content: ContentIdentity;
+      storageKey: string;
+    };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: input.prepared.artifactId,
+      runId: input.runId,
+      kind: "studio.owned-media-study.v1",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.prepared.content,
+      storageKey: input.prepared.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: input.prepared.envelope.sourceArtifacts.map((source) => source.artifactId),
+      producerTaskId: input.prepared.envelope.root.taskId,
+      producerAgentId: input.prepared.envelope.root.agentId,
+      origin: {
+        kind: "owned_media_study",
+        studyId: input.prepared.studyId,
+        planningDecisionId: input.prepared.envelope.planning.decisionId,
+        executionId: input.prepared.envelope.root.executionId,
+        executorReceiptId: input.receipt.receiptId,
+        executorReceiptContentId: input.receiptContentId,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
+  }
+
+  buildStudyReadinessArtifact(input: {
+    runId: string;
+    studyId: string;
+    receipt: StudyReadinessReceipt;
+    storedReceipt: { content: ContentIdentity; storageKey: string };
+  }): RuntimeArtifact {
+    const artifact: RuntimeArtifact = {
+      schema: "studio.runtime.artifact.v1",
+      id: `artifact:${canonicalSha256({ runId: input.runId, readinessId: input.receipt.readinessId, kind: "study-readiness", contentId: input.storedReceipt.content.contentId })}`,
+      runId: input.runId,
+      kind: "studio.study-readiness.receipt.v1",
+      mediaClass: "non_media",
+      publication: "private",
+      content: input.storedReceipt.content,
+      storageKey: input.storedReceipt.storageKey,
+      durationMs: null,
+      tracks: [],
+      sourceArtifactIds: [input.receipt.input.artifactId],
+      producerTaskId: null,
+      producerAgentId: null,
+      origin: {
+        kind: "study_readiness",
+        readinessId: input.receipt.readinessId,
+        studyId: input.studyId,
+        studyArtifactId: input.receipt.input.artifactId,
+        receiptId: input.receipt.receiptId,
+        receiptContentId: input.storedReceipt.content.contentId,
+        outcome: input.receipt.result.outcome,
+      },
+    };
+    assertRuntimeArtifact(artifact);
+    return artifact;
   }
 
   buildSemanticEvidenceArtifact(input: {
@@ -741,7 +878,7 @@ export class ContentAddressedArtifactStore {
     receipt: PublishReviewIntakeReceipt;
     storedReceipt: { content: ContentIdentity; storageKey: string };
   }): RuntimeArtifact {
-    const decision = input.receipt.input.decision;
+    const readiness = input.receipt.input.readiness;
     const artifact: RuntimeArtifact = {
       schema: "studio.runtime.artifact.v1",
       id: `artifact:${canonicalSha256({
@@ -758,7 +895,7 @@ export class ContentAddressedArtifactStore {
       storageKey: input.storedReceipt.storageKey,
       durationMs: null,
       tracks: [],
-      sourceArtifactIds: [decision.artifactId],
+      sourceArtifactIds: [readiness.artifactId],
       producerTaskId: null,
       producerAgentId: null,
       origin: {
@@ -766,10 +903,10 @@ export class ContentAddressedArtifactStore {
         intakeId: input.receipt.intakeId,
         receiptId: input.receipt.receiptId,
         receiptContentId: input.storedReceipt.content.contentId,
-        decisionOperationId: decision.operationId,
-        decisionArtifactId: decision.artifactId,
-        decisionReceiptId: decision.receiptId,
-        decisionReceiptContentId: decision.receiptContentId,
+        readinessId: readiness.readinessId,
+        readinessArtifactId: readiness.artifactId,
+        readinessReceiptId: readiness.receiptId,
+        readinessReceiptContentId: readiness.receiptContentId,
       },
     };
     assertRuntimeArtifact(artifact);

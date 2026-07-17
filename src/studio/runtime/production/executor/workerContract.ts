@@ -235,8 +235,8 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         artifactId: { type: "string", minLength: 1 }, trackId: { type: "string", minLength: 1 },
         startMs: { type: "integer", minimum: 0 }, endMs: { type: "integer", minimum: 1 },
         state: { type: "string", enum: ["supported", "withheld", "unknown", "failed"] },
-        claimIds: { type: "array", maxItems: STUDY_REPORT_LIMITS.maxClaims, items: { type: "string", minLength: 1 }, uniqueItems: true },
-        reason: { oneOf: [
+        claimIds: { type: "array", maxItems: STUDY_REPORT_LIMITS.maxClaims, items: { type: "string", minLength: 1 } },
+        reason: { anyOf: [
           { type: "null" },
           { type: "object", additionalProperties: false, properties: {
             code: { type: "string", enum: ["semantic_evidence_unavailable", "semantic_evidence_empty", "insufficient_semantic_evidence", "worker_withheld", "operation_failed", "unobserved_range"] },
@@ -260,14 +260,15 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
       required: ["claimId", "artifactId", "trackId", "startMs", "endMs", "statement", "citations"],
     },
   };
-  const outputItems = required.some((output) => output.artifactKind === "studio.study-report.v1")
-    ? { oneOf: required.map((output) => output.artifactKind === "studio.study-report.v1"
+  const requiredOutputSchemas = required.map((output) => output.artifactKind === "studio.study-report.v1"
         ? { type: "object", additionalProperties: false, properties: {
             name: { type: "string", const: output.name }, kind: { type: "string", const: "studio.study-report.v1" }, coverage, claims,
           }, required: ["name", "kind", "coverage", "claims"] }
         : { type: "object", additionalProperties: false, properties: {
             name: { type: "string", const: output.name }, kind: { type: "string", const: output.artifactKind }, content: { type: "string", minLength: 1, maxLength: 8_000 },
-          }, required: ["name", "kind", "content"] }) }
+          }, required: ["name", "kind", "content"] });
+  const outputItems = required.some((output) => output.artifactKind === "studio.study-report.v1")
+    ? requiredOutputSchemas.length === 1 ? requiredOutputSchemas[0] : { anyOf: requiredOutputSchemas }
     : {
         type: "object",
         additionalProperties: false,

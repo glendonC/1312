@@ -24,7 +24,7 @@ export function publishReviewIntakeResponse(
   if (runtimeId !== expectedRuntimeId) fail(context, "runtime identity changed.");
   if (!Array.isArray(item.intakes)) fail(`${context}.intakes`, "must be an array.");
   const intakeIds = new Set<string>();
-  const decisionOperationIds = new Set<string>();
+  const readinessIds = new Set<string>();
   const intakes = item.intakes.map((candidate, intakeIndex) => {
     const intakeContext = `${context}.intakes[${intakeIndex}]`;
     const intake = object(candidate, intakeContext);
@@ -35,36 +35,35 @@ export function publishReviewIntakeResponse(
       "receiptContentId",
       "integrity",
       "producer",
-      "decision",
+      "readiness",
       "outcome",
       "reasonCodes",
     ], intakeContext);
     const intakeId = identity(intake.intakeId, `${intakeContext}.intakeId`);
     if (intakeIds.has(intakeId)) fail(`${intakeContext}.intakeId`, "is duplicated.");
     intakeIds.add(intakeId);
-    if (intake.integrity !== "stored_intake_and_verified_decision_receipt") {
+    if (intake.integrity !== "stored_intake_and_verified_study_readiness") {
       fail(`${intakeContext}.integrity`, "does not carry the closed intake verification result.");
     }
     if (intake.producer !== "host_publish_review_intake_v1") {
       fail(`${intakeContext}.producer`, "is unsupported.");
     }
-    const decision = object(intake.decision, `${intakeContext}.decision`);
-    exact(decision, ["operationId", "artifactId", "receiptId", "receiptContentId"], `${intakeContext}.decision`);
-    const decisionOperationId = identity(decision.operationId, `${intakeContext}.decision.operationId`);
-    if (decisionOperationIds.has(decisionOperationId)) {
-      fail(`${intakeContext}.decision.operationId`, "already has an intake.");
+    const readiness = object(intake.readiness, `${intakeContext}.readiness`);
+    exact(readiness, ["readinessId", "artifactId", "receiptId", "receiptContentId"], `${intakeContext}.readiness`);
+    const readinessId = identity(readiness.readinessId, `${intakeContext}.readiness.readinessId`);
+    if (readinessIds.has(readinessId)) {
+      fail(`${intakeContext}.readiness.readinessId`, "already has an intake.");
     }
-    decisionOperationIds.add(decisionOperationId);
+    readinessIds.add(readinessId);
     const outcome = intake.outcome;
     if (outcome !== "queued" && outcome !== "rejected") fail(`${intakeContext}.outcome`, "is unsupported.");
-    if (!Array.isArray(intake.reasonCodes) || intake.reasonCodes.length === 0) {
-      fail(`${intakeContext}.reasonCodes`, "must contain closed decision reason codes.");
-    }
+    if (!Array.isArray(intake.reasonCodes)) fail(`${intakeContext}.reasonCodes`, "must be an array.");
     const reasonOrder = [
-      "audited_claim_withheld",
-      "audited_claim_unknown",
-      "audited_claim_truncated",
-      "all_audited_claims_supported",
+      "hidden_gap",
+      "non_supported_root_coverage",
+      "stored_content_integrity_failed",
+      "unresolved_conflict",
+      "unsupported_synthesized_claim",
     ] as const;
     const reasonCodes = intake.reasonCodes.map((reason, reasonIndex) => {
       if (!reasonOrder.includes(reason as (typeof reasonOrder)[number])) {
@@ -75,21 +74,21 @@ export function publishReviewIntakeResponse(
     if (
       new Set(reasonCodes).size !== reasonCodes.length ||
       JSON.stringify(reasonCodes) !== JSON.stringify(reasonOrder.filter((reason) => reasonCodes.includes(reason))) ||
-      (outcome === "queued" && (reasonCodes.length !== 1 || reasonCodes[0] !== "all_audited_claims_supported")) ||
-      (outcome === "rejected" && reasonCodes.includes("all_audited_claims_supported"))
+      (outcome === "queued" && reasonCodes.length !== 0) ||
+      (outcome === "rejected" && reasonCodes.length === 0)
     ) fail(`${intakeContext}.reasonCodes`, "do not agree with the closed intake outcome.");
     return {
       intakeId,
       artifactId: identity(intake.artifactId, `${intakeContext}.artifactId`),
       receiptId: identity(intake.receiptId, `${intakeContext}.receiptId`),
       receiptContentId: contentId(intake.receiptContentId, `${intakeContext}.receiptContentId`),
-      integrity: "stored_intake_and_verified_decision_receipt" as const,
+      integrity: "stored_intake_and_verified_study_readiness" as const,
       producer: "host_publish_review_intake_v1" as const,
-      decision: {
-        operationId: decisionOperationId,
-        artifactId: identity(decision.artifactId, `${intakeContext}.decision.artifactId`),
-        receiptId: identity(decision.receiptId, `${intakeContext}.decision.receiptId`),
-        receiptContentId: contentId(decision.receiptContentId, `${intakeContext}.decision.receiptContentId`),
+      readiness: {
+        readinessId,
+        artifactId: identity(readiness.artifactId, `${intakeContext}.readiness.artifactId`),
+        receiptId: identity(readiness.receiptId, `${intakeContext}.readiness.receiptId`),
+        receiptContentId: contentId(readiness.receiptContentId, `${intakeContext}.readiness.receiptContentId`),
       },
       outcome: outcome as "queued" | "rejected",
       reasonCodes,

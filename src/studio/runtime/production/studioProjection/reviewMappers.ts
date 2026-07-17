@@ -16,10 +16,10 @@ export function projectPublishReviewIntakes(state: RuntimeProjection) {
     .map((intake): ProductionStudioPublishReviewIntakeView => ({
       intakeId: intake.id,
       status: intake.status,
-      decisionOperationId: intake.decisionOperationId,
-      decisionArtifactId: intake.decisionArtifactId,
-      decisionReceiptId: intake.decisionReceiptId,
-      decisionReceiptContentId: intake.decisionReceiptContentId,
+      readinessId: intake.readinessId,
+      readinessArtifactId: intake.readinessArtifactId,
+      readinessReceiptId: intake.readinessReceiptId,
+      readinessReceiptContentId: intake.readinessReceiptContentId,
       outputArtifactId: intake.artifactId,
       receiptId: intake.receiptId,
       receiptContentId: intake.receiptContentId,
@@ -161,10 +161,10 @@ export function projectPublishReviewIntakeArtifacts(state: RuntimeProjection) {
         intakeId: artifact.origin.intakeId,
         receiptId: artifact.origin.receiptId,
         receiptContentId: artifact.origin.receiptContentId,
-        decisionOperationId: artifact.origin.decisionOperationId,
-        decisionArtifactId: artifact.origin.decisionArtifactId,
-        decisionReceiptId: artifact.origin.decisionReceiptId,
-        decisionReceiptContentId: artifact.origin.decisionReceiptContentId,
+        readinessId: artifact.origin.readinessId,
+        readinessArtifactId: artifact.origin.readinessArtifactId,
+        readinessReceiptId: artifact.origin.readinessReceiptId,
+        readinessReceiptContentId: artifact.origin.readinessReceiptContentId,
       };
     })
     .sort((left, right) => left.artifactId.localeCompare(right.artifactId));

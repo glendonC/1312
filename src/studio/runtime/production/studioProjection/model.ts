@@ -12,7 +12,16 @@ import type {
   PublishReviewDecisionReasonCode,
   PublishReviewRevocationReasonCode,
   RequiredOutput,
+  OwnedMediaStudyConflict,
+  OwnedMediaStudyCoverageRange,
   SpawnRejection,
+  StudyPlanningConflictIdentity,
+  StudyPlanningCoverageIdentity,
+  StudyPlanningGapIdentity,
+  StudyPlanningOutcome,
+  StudyPlanningReportInput,
+  StudyReadinessOutcome,
+  StudyReadinessReasonCode,
   TaskStatus,
   WorkerKind,
 } from "../model.ts";
@@ -205,15 +214,15 @@ export interface ProductionStudioEvidenceDecisionArtifactView {
 export interface ProductionStudioPublishReviewIntakeView {
   intakeId: string;
   status: "started" | "completed" | "failed";
-  decisionOperationId: string;
-  decisionArtifactId: string;
-  decisionReceiptId: string;
-  decisionReceiptContentId: string;
+  readinessId: string;
+  readinessArtifactId: string;
+  readinessReceiptId: string;
+  readinessReceiptContentId: string;
   outputArtifactId: string | null;
   receiptId: string | null;
   receiptContentId: string | null;
   outcome: "queued" | "rejected" | null;
-  reasonCodes: EvidenceDecisionReasonCode[];
+  reasonCodes: StudyReadinessReasonCode[];
   failure: string | null;
 }
 
@@ -225,10 +234,10 @@ export interface ProductionStudioPublishReviewIntakeArtifactView {
   intakeId: string;
   receiptId: string;
   receiptContentId: string;
-  decisionOperationId: string;
-  decisionArtifactId: string;
-  decisionReceiptId: string;
-  decisionReceiptContentId: string;
+  readinessId: string;
+  readinessArtifactId: string;
+  readinessReceiptId: string;
+  readinessReceiptContentId: string;
 }
 
 export interface ProductionStudioPublishReviewDecisionView {
@@ -592,6 +601,62 @@ export interface ProductionStudioOutputArtifactView {
   reportIds: string[];
 }
 
+export interface ProductionStudioStudyPlanningDecisionView {
+  decisionId: string;
+  inputId: string;
+  rootTaskId: string;
+  rootAgentId: string;
+  executionId: string;
+  artifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+  outcome: StudyPlanningOutcome;
+  reason: string;
+  reports: StudyPlanningReportInput[];
+  coverage: StudyPlanningCoverageIdentity[];
+  gaps: StudyPlanningGapIdentity[];
+  conflicts: StudyPlanningConflictIdentity[];
+  citedGapIds: string[];
+  citedConflictIds: string[];
+}
+
+export interface ProductionStudioStudyFollowUpView {
+  followUpId: string;
+  planningDecisionId: string;
+  cause: { kind: "gap" | "conflict"; id: string };
+  spawnRequestId: string;
+  accepted: boolean;
+  rejection: SpawnRejection | null;
+  taskId: string | null;
+  agentId: string | null;
+}
+
+export interface ProductionStudioOwnedMediaStudyView {
+  studyId: string;
+  planningDecisionId: string;
+  rootTaskId: string;
+  rootAgentId: string;
+  executionId: string;
+  artifactId: string;
+  contentId: string;
+  executorReceiptId: string;
+  executorReceiptContentId: string;
+  coverage: OwnedMediaStudyCoverageRange[];
+  conflicts: OwnedMediaStudyConflict[];
+}
+
+export interface ProductionStudioStudyReadinessView {
+  readinessId: string;
+  studyId: string;
+  studyArtifactId: string;
+  studyContentId: string;
+  artifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+  outcome: StudyReadinessOutcome;
+  reasonCodes: StudyReadinessReasonCode[];
+}
+
 export interface ProductionStudioProjection {
   schema: "studio.production-projection.v1";
   source: {
@@ -617,6 +682,10 @@ export interface ProductionStudioProjection {
   evidenceReads: ProductionStudioEvidenceReadView[];
   evidenceAssessments: ProductionStudioEvidenceAssessmentView[];
   evidenceDecisions: ProductionStudioEvidenceDecisionView[];
+  studyPlanningDecisions: ProductionStudioStudyPlanningDecisionView[];
+  studyFollowUps: ProductionStudioStudyFollowUpView[];
+  ownedMediaStudies: ProductionStudioOwnedMediaStudyView[];
+  studyReadiness: ProductionStudioStudyReadinessView[];
   publishReviewIntakes: ProductionStudioPublishReviewIntakeView[];
   publishReviewDecisions: ProductionStudioPublishReviewDecisionView[];
   publishReviewRevocations: ProductionStudioPublishReviewRevocationView[];
@@ -649,6 +718,10 @@ export interface ProductionStudioProjection {
     evidenceReads: number;
     evidenceAssessments: number;
     evidenceDecisions: number;
+    studyPlanningDecisions: number;
+    studyFollowUps: number;
+    ownedMediaStudies: number;
+    studyReadiness: number;
     publishReviewIntakes: number;
     publishReviewDecisions: number;
     publishReviewRevocations: number;

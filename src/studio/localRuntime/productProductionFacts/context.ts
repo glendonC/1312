@@ -66,10 +66,10 @@ export function buildProductionFactsContext({
       projected.outputArtifactId === intake.artifactId &&
       projected.receiptId === intake.receiptId &&
       projected.receiptContentId === intake.receiptContentId &&
-      projected.decisionOperationId === intake.decision.operationId &&
-      projected.decisionArtifactId === intake.decision.artifactId &&
-      projected.decisionReceiptId === intake.decision.receiptId &&
-      projected.decisionReceiptContentId === intake.decision.receiptContentId &&
+      projected.readinessId === intake.readiness.readinessId &&
+      projected.readinessArtifactId === intake.readiness.artifactId &&
+      projected.readinessReceiptId === intake.readiness.receiptId &&
+      projected.readinessReceiptContentId === intake.readiness.receiptContentId &&
       projected.outcome === intake.outcome) &&
     renderedArtifactIds.has(intake.artifactId));
   const visiblePublishReviewDecisions = publishReviewDecisions.filter((review) =>

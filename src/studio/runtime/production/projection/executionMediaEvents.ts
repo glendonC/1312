@@ -77,9 +77,10 @@ export function applyExecutionMediaEvent(next: RuntimeProjection, event: Runtime
       receipt.outputArtifactIds.every((id) => {
         const artifact = next.artifacts[id];
         return (
-          (artifact?.origin.kind === "worker_output" || artifact?.origin.kind === "study_report") &&
-          artifact.origin.executionId === execution.id &&
-          artifact.origin.receiptId === receipt.receiptId
+          (((artifact?.origin.kind === "worker_output" || artifact?.origin.kind === "study_report") &&
+            artifact.origin.executionId === execution.id && artifact.origin.receiptId === receipt.receiptId) ||
+            (artifact?.origin.kind === "owned_media_study" && artifact.origin.executionId === execution.id &&
+              next.ownedMediaStudies[artifact.origin.studyId]?.executorReceiptId === artifact.origin.executorReceiptId))
         );
       }),
       event,

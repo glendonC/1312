@@ -107,14 +107,15 @@ export async function readValidatedRuntimeJournal(
 export function lifecycleFromRuntimeEvidence(state: RuntimeProjection): RuntimeEvidenceLifecycle {
   const tasks = Object.values(state.tasks);
   const executions = Object.values(state.executions);
+  const roots = tasks.filter((task) => task.parentTaskId === null);
+  const rootTaskIds = new Set(roots.map((task) => task.id));
+  const rootExecutions = executions.filter((execution) => rootTaskIds.has(execution.taskId));
   const activeExecution = executions.some((execution) => execution.status === "active");
-  const terminalTasks = tasks.length > 0 && tasks.every((task) =>
-    task.status === "completed" || task.status === "failed" || task.status === "withheld" || task.status === "interrupted"
-  );
-  const interruptedEvidence = tasks.some((task) => task.status === "interrupted") ||
-    executions.some((execution) => execution.status === "interrupted");
+  const terminalRoots = roots.length > 0 && roots.every((task) => task.status === "completed");
+  const interruptedEvidence = roots.some((task) => task.status === "interrupted") ||
+    rootExecutions.some((execution) => execution.status === "interrupted");
   if (interruptedEvidence && !activeExecution) {
-    const recoveredRestart = tasks.some((task) =>
+    const recoveredRestart = roots.some((task) =>
       task.status === "interrupted" && task.terminalReason?.startsWith("The runtime host restarted"));
     return {
       lifecycle: "interrupted",
@@ -126,8 +127,8 @@ export function lifecycleFromRuntimeEvidence(state: RuntimeProjection): RuntimeE
       },
     };
   }
-  const failedEvidence = tasks.some((task) => task.status === "failed") ||
-    executions.some((execution) => execution.status === "failed" || execution.status === "timed_out");
+  const failedEvidence = roots.some((task) => task.status === "failed" || task.status === "withheld") ||
+    rootExecutions.some((execution) => execution.status === "failed" || execution.status === "timed_out");
   if (failedEvidence && !activeExecution) {
     return {
       lifecycle: "failed",
@@ -137,7 +138,7 @@ export function lifecycleFromRuntimeEvidence(state: RuntimeProjection): RuntimeE
       },
     };
   }
-  if (terminalTasks && !activeExecution) {
+  if (terminalRoots && !activeExecution) {
     return { lifecycle: "terminal", reason: null };
   }
   if (executions.length > 0) return { lifecycle: "running", reason: null };

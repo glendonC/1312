@@ -10,6 +10,7 @@ import { applyReviewEvent } from "./projection/reviewEvents.ts";
 import { invariant } from "./projection/shared.ts";
 import { applyTaskEvent } from "./projection/taskEvents.ts";
 import { applyStudyReportEvent } from "./projection/studyReportEvents.ts";
+import { applyStudySynthesisEvent } from "./projection/studySynthesisEvents.ts";
 
 export function initialRuntimeProjection(runId: string): RuntimeProjection {
   if (!runId.trim()) throw new Error("Runtime projection requires a run id");
@@ -41,6 +42,10 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     parentArtifactDispositions: {},
     parentArtifactReadGrants: {},
     parentArtifactReads: {},
+    studyPlanningDecisions: {},
+    studyFollowUps: {},
+    ownedMediaStudies: {},
+    studyReadiness: {},
   };
 }
 
@@ -64,6 +69,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
   if (applyCaptionEvent(next, event)) return next;
   if (applyReportEvent(next, event)) return next;
   if (applyStudyReportEvent(next, event)) return next;
+  if (applyStudySynthesisEvent(next, event)) return next;
 
   invariant(false, event, "unknown runtime event");
 }

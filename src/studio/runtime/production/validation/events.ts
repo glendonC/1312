@@ -4,8 +4,8 @@ import { assertEvidenceReadRequest, validateEvidenceReadReceipt } from "./eviden
 import { assertEvidenceAssessmentRequest, validateEvidenceAssessmentReceipt } from "./assessment.ts";
 import { assertEvidenceDecisionRequest, validateEvidenceDecisionReceipt } from "./decision.ts";
 import {
-  validateEvidenceDecisionReceiptIdentity,
   validatePublishReviewIntakeReceipt,
+  validateStudyReadinessReceiptIdentity,
 } from "./publishReview.ts";
 import {
   assertPublishReviewDecisionRequest,
@@ -33,6 +33,12 @@ import {
   validateParentArtifactDispositionReceipt,
   validateParentArtifactReadReceipt,
 } from "./studyReports.ts";
+import {
+  validateOwnedMediaStudyExecutorReceipt,
+  validateOwnedMediaStudyProjection,
+  validateStudyPlanningDecisionReceipt,
+  validateStudyReadinessReceipt,
+} from "./studies.ts";
 import {
   assertMediaExtractRequest,
   assertMediaSeekRequest,
@@ -110,7 +116,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -192,7 +198,7 @@ export function assertRuntimeEvent(
     string(data.callId, context, "event.data.callId");
     string(data.executionId, context, "event.data.executionId");
     string(data.taskId, context, "event.data.taskId");
-    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait"]), context, "event.data.tool");
+    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_synthesize"]), context, "event.data.tool");
   } else if (type === "reports.wait_started") {
     exact(data, ["waitId", "executionId", "parentTaskId"], context, "event.data");
     string(data.waitId, context, "event.data.waitId");
@@ -356,9 +362,9 @@ export function assertRuntimeEvent(
     string(data.operationId, context, "event.data.operationId");
     string(data.reason, context, "event.data.reason");
   } else if (type === "publish.review.intake_started") {
-    exact(data, ["intakeId", "decision"], context, "event.data");
+    exact(data, ["intakeId", "readiness"], context, "event.data");
     string(data.intakeId, context, "event.data.intakeId");
-    validateEvidenceDecisionReceiptIdentity(data.decision, context, "event.data.decision");
+    validateStudyReadinessReceiptIdentity(data.readiness, context, "event.data.readiness");
   } else if (type === "publish.review.intake_completed") {
     exact(data, ["intakeId", "outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
     string(data.intakeId, context, "event.data.intakeId");
@@ -473,6 +479,40 @@ export function assertRuntimeEvent(
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     string(data.reason, context, "event.data.reason");
+  } else if (type === "study.planning_decision_recorded") {
+    exact(data, ["outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateStudyPlanningDecisionReceipt(data.receipt);
+  } else if (type === "study.follow_up_linked") {
+    exact(data, ["followUp"], context, "event.data");
+    const followUp = object(data.followUp, context, "event.data.followUp");
+    exact(followUp, ["id", "planningDecisionId", "cause", "spawnRequestId", "accepted", "rejection", "taskId", "agentId"], context, "event.data.followUp");
+    string(followUp.id, context, "event.data.followUp.id");
+    string(followUp.planningDecisionId, context, "event.data.followUp.planningDecisionId");
+    const cause = object(followUp.cause, context, "event.data.followUp.cause");
+    exact(cause, ["kind", "id"], context, "event.data.followUp.cause");
+    oneOf(cause.kind, new Set(["gap", "conflict"]), context, "event.data.followUp.cause.kind");
+    string(cause.id, context, "event.data.followUp.cause.id");
+    string(followUp.spawnRequestId, context, "event.data.followUp.spawnRequestId");
+    boolean(followUp.accepted, context, "event.data.followUp.accepted");
+    if (followUp.rejection !== null) oneOf(followUp.rejection, REJECTIONS, context, "event.data.followUp.rejection");
+    nullableString(followUp.taskId, context, "event.data.followUp.taskId");
+    nullableString(followUp.agentId, context, "event.data.followUp.agentId");
+  } else if (type === "study.synthesis_completed") {
+    exact(data, ["studyId", "outputArtifactId", "outputContentId", "executorReceiptContentId", "executorReceipt", "projection"], context, "event.data");
+    string(data.studyId, context, "event.data.studyId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.outputContentId, context, "event.data.outputContentId");
+    contentId(data.executorReceiptContentId, context, "event.data.executorReceiptContentId");
+    validateOwnedMediaStudyExecutorReceipt(data.executorReceipt);
+    validateOwnedMediaStudyProjection(data.projection);
+  } else if (type === "study.readiness_audited") {
+    exact(data, ["studyId", "outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.studyId, context, "event.data.studyId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateStudyReadinessReceipt(data.receipt);
   } else {
     fail(context, "event.type", `has unknown value ${type}`);
   }

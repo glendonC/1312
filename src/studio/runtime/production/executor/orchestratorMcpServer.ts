@@ -5,6 +5,10 @@ import { z } from "zod/v4";
 import {
   ORCHESTRATOR_SPAWN_TOOL,
   ORCHESTRATOR_WAIT_TOOL,
+  ORCHESTRATOR_DISPOSITION_TOOL,
+  ORCHESTRATOR_READ_TOOL,
+  ORCHESTRATOR_PLAN_TOOL,
+  ORCHESTRATOR_SYNTHESIZE_TOOL,
 } from "./orchestratorBridge.ts";
 import {
   callOrchestratorBridge,
@@ -17,15 +21,17 @@ if (!endpoint || !token) throw new Error("The bounded orchestrator bridge enviro
 
 const manifest = await fetchOrchestratorManifest(endpoint, token);
 const names = new Set(manifest.tools.map((tool) => tool.name));
-if (!names.has(ORCHESTRATOR_SPAWN_TOOL) || !names.has(ORCHESTRATOR_WAIT_TOOL) || names.size !== 2) {
-  throw new Error("The bounded orchestrator requires exactly two tools");
+const planningNames = [ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL];
+if (!names.has(ORCHESTRATOR_SPAWN_TOOL) || !names.has(ORCHESTRATOR_WAIT_TOOL) ||
+    (names.size !== 2 && names.size !== 6) || (names.size === 6 && planningNames.some((name) => !names.has(name)))) {
+  throw new Error("The bounded orchestrator tool manifest is incomplete or open");
 }
 
 const server = new McpServer(
   { name: "studio-owned-swarm-orchestrator", version: "1" },
   {
     instructions:
-      "Use only task_spawn_request and task_reports_wait. The scheduler injects every task, agent, grant, dependency-task, context, and launch identity. Multiple spawn requests may be issued before waiting.",
+      "Use only the exact manifest tools. The host injects task, agent, grant, context, path, and executor authority. Multiple initial spawn requests may be issued before waiting; post-report spawns require exact planning causation.",
   },
 );
 
@@ -52,6 +58,7 @@ const spawnInput = z.object({
     "report.submit",
     "media.extract",
     "media.seek",
+    "speech.transcribe",
     "evidence.read",
     "analysis.evidence.assess",
     "analysis.evidence.decide",
@@ -61,6 +68,11 @@ const spawnInput = z.object({
     wallMs: z.number().int().positive().max(120_000),
     toolCalls: z.number().int().positive().max(16),
   }).strict(),
+  followUpCause: z.object({
+    planningDecisionId: z.string().min(1),
+    kind: z.enum(["gap", "conflict"]),
+    causeId: z.string().min(1),
+  }).strict().nullable().optional(),
 }).strict();
 
 server.registerTool(
@@ -112,5 +124,159 @@ server.registerTool(
     }
   },
 );
+
+if (names.has(ORCHESTRATOR_DISPOSITION_TOOL)) {
+  server.registerTool(
+    ORCHESTRATOR_DISPOSITION_TOOL,
+    {
+      title: "Disposition one child study report",
+      description: "Accept or reject one exact terminal child study-report artifact. Acceptance alone creates one bounded path-free read grant.",
+      inputSchema: z.object({
+        reportId: z.string().min(1),
+        outputArtifactId: z.string().min(1),
+        outcome: z.enum(["accepted", "rejected"]),
+        reason: z.string().min(1).max(2_000),
+      }).strict(),
+      annotations: { title: "Disposition child report", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (args) => {
+      try {
+        const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_DISPOSITION_TOOL, args);
+        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "The report disposition failed closed." }] };
+      }
+    },
+  );
+}
+
+if (names.has(ORCHESTRATOR_READ_TOOL)) {
+  server.registerTool(
+    ORCHESTRATOR_READ_TOOL,
+    {
+      title: "Read one admitted child study report",
+      description: "Read structured content only through one exact parent-admission grant. Paths and prose identifiers confer no authority.",
+      inputSchema: z.object({
+        grantId: z.string().min(1),
+        contentIds: z.array(z.string().min(1)).min(1).max(1),
+      }).strict(),
+      annotations: { title: "Read admitted study report", readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (args) => {
+      try {
+        const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_READ_TOOL, args);
+        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "The admitted artifact read failed closed." }] };
+      }
+    },
+  );
+}
+
+if (names.has(ORCHESTRATOR_PLAN_TOOL)) {
+  server.registerTool(
+    ORCHESTRATOR_PLAN_TOOL,
+    {
+      title: "Record post-report planning decision",
+      description: "Record the model-selected request_follow_up, synthesize_with_gaps, or withhold decision over every exact current coverage, gap, and conflict identity.",
+      inputSchema: z.object({
+        inputId: z.string().min(1),
+        coverageIds: z.array(z.string().min(1)).min(1).max(256),
+        gapIds: z.array(z.string().min(1)).max(256),
+        conflictIds: z.array(z.string().min(1)).max(128),
+        outcome: z.enum(["request_follow_up", "synthesize_with_gaps", "withhold"]),
+        citedGapIds: z.array(z.string().min(1)).max(256),
+        citedConflictIds: z.array(z.string().min(1)).max(128),
+        reason: z.string().min(1).max(4_000),
+      }).strict(),
+      annotations: { title: "Record study planning decision", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (args) => {
+      try {
+        const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_PLAN_TOOL, args);
+        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "The planning decision failed closed." }] };
+      }
+    },
+  );
+}
+
+const studyCoverage = z.object({
+  coverageId: z.string().min(1),
+  artifactId: z.string().min(1),
+  trackId: z.string().min(1),
+  startMs: z.number().int().nonnegative(),
+  endMs: z.number().int().positive(),
+  state: z.enum(["supported", "withheld", "unknown", "failed"]),
+  claimIds: z.array(z.string().min(1)).max(256),
+  reason: z.object({
+    code: z.enum(["semantic_evidence_unavailable", "semantic_evidence_empty", "insufficient_semantic_evidence", "worker_withheld", "operation_failed", "unobserved_range", "explicit_study_gap", "unresolved_conflict", "child_failure", "rejected_input"]),
+    detail: z.string().min(1).max(4_000),
+  }).strict().nullable(),
+}).strict();
+
+const semanticCitation = z.object({
+  operationId: z.string().min(1),
+  artifactId: z.string().min(1),
+  contentId: z.string().min(1),
+  receiptId: z.string().min(1),
+  receiptContentId: z.string().min(1),
+  observations: z.array(z.object({
+    observationId: z.string().min(1),
+    startMs: z.number().int().nonnegative(),
+    endMs: z.number().int().positive(),
+  }).strict()).min(1).max(256),
+}).strict();
+
+if (names.has(ORCHESTRATOR_SYNTHESIZE_TOOL)) {
+  server.registerTool(
+    ORCHESTRATOR_SYNTHESIZE_TOOL,
+    {
+      title: "Emit owned-media study",
+      description: "Emit model-authored study coverage, claims, conflicts, and limitations. The host injects immutable context, dispositions, and follow-up history and rejects unsupported support.",
+      inputSchema: z.object({
+        planningDecisionId: z.string().min(1),
+        coverage: z.array(studyCoverage).min(1).max(256),
+        claims: z.array(z.object({
+          claimId: z.string().min(1),
+          artifactId: z.string().min(1),
+          trackId: z.string().min(1),
+          startMs: z.number().int().nonnegative(),
+          endMs: z.number().int().positive(),
+          statement: z.string().min(1).max(8_000),
+          childReportCitations: z.array(z.object({
+            reportId: z.string().min(1),
+            artifactId: z.string().min(1),
+            contentId: z.string().min(1),
+            admissionId: z.string().min(1),
+            claimId: z.string().min(1),
+          }).strict()).min(1).max(512),
+          semanticCitations: z.array(semanticCitation).min(1).max(512),
+        }).strict()).max(256),
+        conflicts: z.array(z.object({
+          conflictId: z.string().min(1),
+          coverageId: z.string().min(1),
+          status: z.literal("unresolved"),
+          detail: z.string().min(1).max(4_000),
+        }).strict()).max(128),
+        limitations: z.array(z.object({
+          code: z.enum(["explicit_gap", "unresolved_conflict", "partial_child_failure", "rejected_child_input", "recognizer_hypothesis_not_truth", "semantic_quality_not_assessed"]),
+          coverageIds: z.array(z.string().min(1)).max(256),
+          detail: z.string().min(1).max(4_000),
+        }).strict()).max(128),
+      }).strict(),
+      annotations: { title: "Emit owned-media study", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (args) => {
+      try {
+        const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_SYNTHESIZE_TOOL, args);
+        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "The owned-media study synthesis failed closed." }] };
+      }
+    },
+  );
+}
 
 await server.connect(new StdioServerTransport());

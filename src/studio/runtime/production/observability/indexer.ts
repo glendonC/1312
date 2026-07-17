@@ -43,6 +43,15 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "analysis.evidence.decision_completed") {
     return { kind: "evidence_decision", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "study.planning_decision_recorded") {
+    return { kind: "study_planning_decision", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
+  if (event.type === "study.synthesis_completed") {
+    return { kind: "owned_media_study", receipt: event.data.executorReceipt, rawReceiptContentId: null };
+  }
+  if (event.type === "study.readiness_audited") {
+    return { kind: "study_readiness", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "publish.review.intake_completed") {
     return { kind: "publish_review_intake", receipt: event.data.receipt, rawReceiptContentId: null };
   }
@@ -77,7 +86,10 @@ function receiptValue(event: RuntimeEvent): {
 function receiptArtifactLinks(state: RuntimeProjection, receiptId: string): RuntimeArtifact[] {
   return Object.values(state.artifacts).filter((artifact) => {
     const origin = artifact.origin;
-    return origin.kind !== "ingest" && origin.kind !== "preflight_evidence" && origin.receiptId === receiptId;
+    if (origin.kind === "ingest" || origin.kind === "preflight_evidence") return false;
+    return origin.kind === "owned_media_study"
+      ? origin.executorReceiptId === receiptId
+      : origin.receiptId === receiptId;
   });
 }
 
@@ -162,7 +174,9 @@ export async function buildRuntimeObservabilityIndex(
         if (
           origin.kind === "ingest" ||
           origin.kind === "preflight_evidence" ||
-          origin.receiptContentId !== content.contentId
+          (origin.kind === "owned_media_study"
+            ? origin.executorReceiptContentId !== content.contentId
+            : origin.receiptContentId !== content.contentId)
         ) {
           throw new Error(
             `Observability receipt ${found.receipt.receiptId} does not match its artifact-store content link`,
@@ -189,9 +203,10 @@ export async function buildRuntimeObservabilityIndex(
         kind: artifact.kind,
         eventId: event.eventId,
         contentId: artifact.content.contentId,
-        receiptId:
-          artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence"
-            ? null
+        receiptId: artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence"
+          ? null
+          : artifact.origin.kind === "owned_media_study"
+            ? artifact.origin.executorReceiptId
             : artifact.origin.receiptId,
       },
     ];

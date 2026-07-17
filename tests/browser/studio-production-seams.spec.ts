@@ -327,7 +327,7 @@ test("receipted child media/evidence operations and artifact identity hooks proj
   await expect(verifiedReviewIntakes.locator('[data-production-empty="publish-review-intake-receipts"]')).toHaveCount(0);
   const verifiedReviewIntake = verifiedReviewIntakes.locator('[data-production-publish-review-intake-receipt-id]');
   await expect(verifiedReviewIntake).toHaveCount(1);
-  await expect(verifiedReviewIntake).toHaveAttribute("data-integrity", "stored_intake_and_verified_decision_receipt");
+  await expect(verifiedReviewIntake).toHaveAttribute("data-integrity", "stored_intake_and_verified_study_readiness");
   await expect(verifiedReviewIntake).toHaveAttribute("data-intake-outcome", "queued");
   await expect(verifiedReviewIntake).toHaveAttribute("data-intake-producer", "host_publish_review_intake_v1");
   await expect(verifiedReviewIntake.locator('[data-production-verified-intake-reason-code="all_audited_claims_supported"]')).toHaveCount(1);

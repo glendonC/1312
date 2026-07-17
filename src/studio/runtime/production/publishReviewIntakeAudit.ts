@@ -5,15 +5,15 @@ import {
   canonicalSha256,
   ContentAddressedArtifactStore,
 } from "./artifactStore.ts";
-import { reopenEvidenceDecisionReceipts } from "./decisionReceiptAudit.ts";
 import type {
-  EvidenceDecisionReasonCode,
-  EvidenceDecisionReceiptIdentity,
   PublishReviewIntakeOutcome,
   PublishReviewIntakeReceipt,
   RuntimeProjection,
+  StudyReadinessReasonCode,
+  StudyReadinessReceiptIdentity,
 } from "./model.ts";
 import type { RuntimeEvent } from "./protocol.ts";
+import { reopenStudyReadiness } from "./studyReadinessAudit.ts";
 import { validatePublishReviewIntakeReceipt } from "./validation/publishReview.ts";
 
 const MAX_STORED_PUBLISH_REVIEW_INTAKE_BYTES = 64 * 1024;
@@ -23,11 +23,11 @@ export interface PublishReviewIntakeVerification {
   artifactId: string;
   receiptId: string;
   receiptContentId: string;
-  integrity: "stored_intake_and_verified_decision_receipt";
+  integrity: "stored_intake_and_verified_study_readiness";
   producer: "host_publish_review_intake_v1";
-  decision: EvidenceDecisionReceiptIdentity;
+  readiness: StudyReadinessReceiptIdentity;
   outcome: PublishReviewIntakeOutcome;
-  reasonCodes: EvidenceDecisionReasonCode[];
+  reasonCodes: StudyReadinessReasonCode[];
 }
 
 function expectedStorageKey(contentId: string): string {
@@ -69,13 +69,12 @@ async function storedReceipt(
   return { receipt: value, bytes: bytes.byteLength };
 }
 
-/** Reopens intake bytes and re-verifies the exact underlying decision and all of its audits. */
+/** Reopens intake bytes and recursively re-verifies its exact deterministic study-readiness input. */
 export async function reopenPublishReviewIntakes(
   state: RuntimeProjection,
   events: readonly RuntimeEvent[],
   artifacts: ContentAddressedArtifactStore,
 ): Promise<PublishReviewIntakeVerification[]> {
-  const decisions = await reopenEvidenceDecisionReceipts(state, events, artifacts);
   const verified: PublishReviewIntakeVerification[] = [];
   const completed = Object.values(state.publishReviewIntakes)
     .filter((intake) => intake.status === "completed")
@@ -121,47 +120,46 @@ export async function reopenPublishReviewIntakes(
 
     const stored = await storedReceipt(artifacts, intake.receiptContentId);
     const receipt = stored.receipt;
-    const identity = receipt.input.decision;
+    const identity = receipt.input.readiness;
     if (
       artifact.content.bytes !== stored.bytes ||
       receipt.receiptId !== intakeReceiptId(receipt) ||
       receipt.receiptId !== intake.receiptId ||
       receipt.intakeId !== intake.id ||
-      !sameCanonical(started.data.decision, identity) ||
+      !sameCanonical(started.data.readiness, identity) ||
       !sameCanonical(completion.data.receipt, receipt) ||
-      artifact.origin.decisionOperationId !== identity.operationId ||
-      artifact.origin.decisionArtifactId !== identity.artifactId ||
-      artifact.origin.decisionReceiptId !== identity.receiptId ||
-      artifact.origin.decisionReceiptContentId !== identity.receiptContentId ||
+      artifact.origin.readinessId !== identity.readinessId ||
+      artifact.origin.readinessArtifactId !== identity.artifactId ||
+      artifact.origin.readinessReceiptId !== identity.receiptId ||
+      artifact.origin.readinessReceiptContentId !== identity.receiptContentId ||
       !sameCanonical(artifact.sourceArtifactIds, [identity.artifactId])
-    ) throw new Error(`Stored publish-review intake ${receipt.receiptId} changed its decision identity or completion`);
+    ) throw new Error(`Stored publish-review intake ${receipt.receiptId} changed its study-readiness identity or completion`);
 
-    const decision = decisions.find((candidate) =>
-      candidate.operationId === identity.operationId &&
-      candidate.artifactId === identity.artifactId &&
-      candidate.receiptId === identity.receiptId &&
-      candidate.receiptContentId === identity.receiptContentId);
-    if (!decision) {
-      throw new Error(`Stored publish-review intake ${receipt.receiptId} no longer has a verified decision input`);
-    }
-    const expectedOutcome = decision.outcome === "proceed_to_publish_review" ? "queued" : "rejected";
+    const readiness = await reopenStudyReadiness(state, artifacts, identity.readinessId);
     if (
-      receipt.input.verification.integrity !== decision.integrity ||
-      receipt.input.verification.producer !== decision.producer ||
+      readiness.artifactId !== identity.artifactId || readiness.receiptId !== identity.receiptId ||
+      readiness.receiptContentId !== identity.receiptContentId
+    ) {
+      throw new Error(`Stored publish-review intake ${receipt.receiptId} no longer has a verified study-readiness input`);
+    }
+    const expectedOutcome = readiness.receipt.result.outcome === "proceed_to_caption_review" ? "queued" : "rejected";
+    if (
+      receipt.input.verification.integrity !== "stored_study_readiness_and_recursive_inputs_verified" ||
+      receipt.input.verification.producer !== "deterministic_study_readiness_gate_v1" ||
       receipt.result.outcome !== expectedOutcome ||
       receipt.result.outcome !== intake.outcome ||
-      !sameCanonical(receipt.result.reasonCodes, decision.reasonCodes) ||
+      !sameCanonical(receipt.result.reasonCodes, readiness.receipt.result.reasonCodes) ||
       !sameCanonical(receipt.result.reasonCodes, intake.reasonCodes)
-    ) throw new Error(`Stored publish-review intake ${receipt.receiptId} no longer matches verified decision policy`);
+    ) throw new Error(`Stored publish-review intake ${receipt.receiptId} no longer matches verified study-readiness policy`);
 
     verified.push({
       intakeId: intake.id,
       artifactId: artifact.id,
       receiptId: receipt.receiptId,
       receiptContentId: intake.receiptContentId,
-      integrity: "stored_intake_and_verified_decision_receipt",
+      integrity: "stored_intake_and_verified_study_readiness",
       producer: "host_publish_review_intake_v1",
-      decision: structuredClone(identity),
+      readiness: structuredClone(identity),
       outcome: receipt.result.outcome,
       reasonCodes: [...receipt.result.reasonCodes],
     });

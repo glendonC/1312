@@ -13,11 +13,21 @@ import {
   type ChildEvidenceDecisionToolResult,
 } from "../executor/childEvidenceDecisionBridge.ts";
 import type {
+  CurrentRunRecognizerDescriptor,
   ExecutorSpanReceipt,
   LaunchPermit,
   TaskRecord,
   WorkerOutputEnvelope,
 } from "../model.ts";
+import type {
+  CurrentRunRecognizerInput,
+  CurrentRunRecognizerResult,
+  CurrentRunSpeechRecognizer,
+} from "../currentRunSpeechRecognizer.ts";
+import { BoundedChildSemanticEvidenceBridge } from "../executor/childSemanticEvidenceBridge.ts";
+import { SpeechTranscribeCapabilityHost } from "../semanticEvidenceHost.ts";
+import { reopenSemanticEvidence, semanticEvidenceCitation } from "../semanticEvidenceAudit.ts";
+import { buildStudyReportEnvelope, validateWorkerResult } from "../executor/workerContract.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import {
   RuntimeApplicationInterrupted,
@@ -29,6 +39,38 @@ import {
 interface Gate {
   promise: Promise<void>;
   release(): void;
+}
+
+class DeterministicCurrentRunRecognizer implements CurrentRunSpeechRecognizer {
+  async describe(): Promise<CurrentRunRecognizerDescriptor> {
+    const configuration = {
+      id: "studio.deterministic-runtime-test-recognizer.v1",
+      language: null,
+      timestampMode: "segment" as const,
+      segmentation: "producer_defined" as const,
+    };
+    return {
+      id: "studio.deterministic-runtime-test-recognizer",
+      version: "1",
+      model: "deterministic-current-run-test-model",
+      runtime: { id: "studio.deterministic-test-executor", version: "1" },
+      configuration: { ...configuration, contentId: `sha256:${canonicalSha256(configuration)}` },
+      executionScope: "current_run",
+      fixtureContentId: null,
+    };
+  }
+  async recognize(input: CurrentRunRecognizerInput): Promise<CurrentRunRecognizerResult> {
+    return {
+      availability: "available",
+      reason: "current_run_hypotheses_returned",
+      segments: [{
+        startMs: input.range.startMs,
+        endMs: input.range.endMs,
+        state: "available",
+        text: `Deterministic current-run test hypothesis for ${input.range.startMs}-${input.range.endMs}; correctness is not assessed.`,
+      }],
+    };
+  }
 }
 
 function gate(paused: boolean): Gate {
@@ -173,6 +215,65 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       );
       await scheduler.transitionTask(task.id, task.assignedAgentId, "failed", reason);
       throw new Error(reason);
+    }
+
+    const studySlot = task.requiredOutputs.find((output) => output.required && output.artifactKind === "studio.study-report.v1");
+    if (studySlot) {
+      if (task.workerLabel.includes("study-fail")) {
+        const reason = "The deterministic partial-child test seam failed this bounded study worker before producing a report.";
+        const span = this.span(task, executionId, startedAt, { outcome: "failed", outputArtifactIds: [], failure: reason });
+        await artifacts.storeJson(span);
+        await ledger.transact(
+          { producer: { kind: "launcher", id: "deterministic-test-executor" }, causationId: executionId },
+          () => ({ pending: [{ type: "executor.finished", data: { receipt: span } }] satisfies PendingRuntimeEvent[], result: undefined }),
+        );
+        await scheduler.transitionTask(task.id, task.assignedAgentId, "failed", reason);
+        throw new Error(reason);
+      }
+      const scope = task.mediaScope[0];
+      if (!scope || task.mediaScope.length !== 1) throw new Error("Deterministic study worker requires one exact scope");
+      const semanticHost = new SpeechTranscribeCapabilityHost(ledger, artifacts, { recognizer: new DeterministicCurrentRunRecognizer() });
+      const semanticResult = await new BoundedChildSemanticEvidenceBridge(task, semanticHost, {
+        nextOperationId: () => `operation:deterministic-semantic:${canonicalSha256({ runId: ledger.runId, taskId: task.id, scope })}`,
+      }).call(scope);
+      const citation = semanticEvidenceCitation(await reopenSemanticEvidence(ledger.state(), artifacts, semanticResult.operationId));
+      const claimId = `claim:deterministic:${canonicalSha256({ taskId: task.id, scope, observationIds: citation.observations.map((entry) => entry.observationId) })}`;
+      const preservesGap = task.workerLabel.includes("study-gap");
+      const worker = validateWorkerResult({
+        summary: "Deterministic test seam returned one typed current-run hypothesis report; correctness and quality were not assessed.",
+        semanticEvidenceInputs: [citation],
+        outputs: [{
+          name: studySlot.name,
+          kind: "studio.study-report.v1",
+          coverage: [preservesGap
+            ? { ...scope, state: "unknown" as const, claimIds: [], reason: { code: "unobserved_range" as const, detail: "The deterministic follow-up test seam preserves this exact range as an explicit gap." } }
+            : { ...scope, state: "supported" as const, claimIds: [claimId], reason: null }],
+          claims: preservesGap ? [] : [{
+            claimId,
+            ...scope,
+            statement: `The current-run test recognizer returned an available timed hypothesis for ${scope.startMs}-${scope.endMs}${task.workerLabel.includes("study-conflict") ? ` from ${task.workerLabel}` : ""}.`,
+            citations: [citation],
+          }],
+        }],
+      }, task, [citation]);
+      const output = worker.outputs[0];
+      if (output.kind !== "studio.study-report.v1" || !("coverage" in output)) throw new Error("Deterministic study worker lost its typed output");
+      const prepared = await artifacts.prepareStudyReport(ledger.runId, buildStudyReportEnvelope(task, output, [citation]));
+      const span = this.span(task, executionId, startedAt, { outcome: "completed", outputArtifactIds: [prepared.artifactId], failure: null });
+      const storedSpan = await artifacts.storeJson(span);
+      const artifact = artifacts.buildStudyReportArtifact({ runId: ledger.runId, receipt: span, receiptContentId: storedSpan.content.contentId, prepared });
+      await artifacts.record(ledger, artifact, executionId);
+      await ledger.transact(
+        { producer: { kind: "launcher", id: "deterministic-test-executor" }, causationId: executionId },
+        () => ({ pending: [{ type: "executor.finished", data: { receipt: span } }] satisfies PendingRuntimeEvent[], result: undefined }),
+      );
+      const report = await reports.submit({
+        taskId: task.id,
+        agentId: task.assignedAgentId,
+        outputArtifactIds: [artifact.id],
+        summary: "Deterministic test seam submitted one coverage-complete study report over a current-run recognizer hypothesis; this is not model or quality evidence.",
+      });
+      return { report };
     }
 
     let mediaResult: ChildMediaToolResult;

@@ -9,4 +9,5 @@ export * from "./model/review.ts";
 export * from "./model/semanticEvidence.ts";
 export * from "./model/source.ts";
 export * from "./model/studyReports.ts";
+export * from "./model/studies.ts";
 export * from "./model/tasks.ts";

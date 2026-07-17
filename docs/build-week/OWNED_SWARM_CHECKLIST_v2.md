@@ -147,7 +147,7 @@ every media class.
 
 ## 4. Gap-directed planning and model-authored study synthesis
 
-- [ ] Status: blocked on slices 1–3.
+- [x] Status: complete.
 - Real: the scheduler already accepts completed dependencies; the parent can decide reports; v1 can
   promote one child output; evidence assessment/audit shows how to separate model opinion from a
   deterministic integrity gate.

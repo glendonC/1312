@@ -8,7 +8,11 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
     const isAtomicParentReceipt =
       (artifact.origin.kind === "parent_admission" || artifact.origin.kind === "parent_artifact_disposition") &&
       event.producer.kind === "admission_host";
-    invariant(event.producer.kind === "artifact_store" || isAtomicParentReceipt, event, "artifact evidence must come from its bounded storage or admission host");
+    const isAtomicStudyReceipt =
+      (artifact.origin.kind === "study_planning_decision" && event.producer.kind === "study_planning_host") ||
+      (artifact.origin.kind === "owned_media_study" && event.producer.kind === "study_synthesis_host") ||
+      (artifact.origin.kind === "study_readiness" && event.producer.kind === "study_audit_host");
+    invariant(event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt, event, "artifact evidence must come from its bounded storage, admission, planning, synthesis, or audit host");
     invariant(artifact.runId === next.runId, event, `artifact ${artifact.id} belongs to another run`);
     invariant(!next.artifacts[artifact.id], event, `artifact ${artifact.id} is duplicated`);
     invariant(artifact.sourceArtifactIds.every((id) => Boolean(next.artifacts[id])), event, `artifact ${artifact.id} has missing lineage`);
@@ -72,6 +76,16 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         event,
         `artifact ${artifact.id} changed its parent admission lineage`,
       );
+    } else if (artifact.origin.kind === "study_planning_decision") {
+      const execution = next.executions[artifact.origin.executionId];
+      invariant(execution?.status === "active" && execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId, event, `artifact ${artifact.id} has no active root planning executor`);
+    } else if (artifact.origin.kind === "owned_media_study") {
+      const execution = next.executions[artifact.origin.executionId];
+      const planning = next.studyPlanningDecisions[artifact.origin.planningDecisionId];
+      invariant(execution?.status === "active" && execution.taskId === artifact.producerTaskId && execution.agentId === artifact.producerAgentId && planning?.outcome === "synthesize_with_gaps", event, `artifact ${artifact.id} has no active root synthesis executor or planning decision`);
+    } else if (artifact.origin.kind === "study_readiness") {
+      const study = next.ownedMediaStudies[artifact.origin.studyId];
+      invariant(study?.artifactId === artifact.origin.studyArtifactId && artifact.producerTaskId === null && artifact.producerAgentId === null, event, `artifact ${artifact.id} has no exact owned-media study input`);
     } else if (artifact.origin.kind === "root_output_disposition") {
       const report = next.reports[artifact.origin.reportId];
       const expectedStatus = artifact.origin.outcome === "promoted_to_root" ? "accepted" : "rejected";
@@ -124,13 +138,13 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         `artifact ${artifact.id} incorrectly claims a task producer`,
       );
       invariant(
-        artifact.origin.decisionOperationId === intake.decisionOperationId &&
-          artifact.origin.decisionArtifactId === intake.decisionArtifactId &&
-          artifact.origin.decisionReceiptId === intake.decisionReceiptId &&
-          artifact.origin.decisionReceiptContentId === intake.decisionReceiptContentId &&
-          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([intake.decisionArtifactId]),
+        artifact.origin.readinessId === intake.readinessId &&
+          artifact.origin.readinessArtifactId === intake.readinessArtifactId &&
+          artifact.origin.readinessReceiptId === intake.readinessReceiptId &&
+          artifact.origin.readinessReceiptContentId === intake.readinessReceiptContentId &&
+          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([intake.readinessArtifactId]),
         event,
-        `artifact ${artifact.id} changed its verified decision input`,
+        `artifact ${artifact.id} changed its verified study-readiness input`,
       );
     } else if (artifact.origin.kind === "publish_review_decision") {
       const review = next.publishReviewDecisions[artifact.origin.reviewId];

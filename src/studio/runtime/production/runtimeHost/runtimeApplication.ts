@@ -6,7 +6,7 @@ import { FfmpegCapabilityHost } from "../mediaHost.ts";
 import { BoundedEvidenceReadHost } from "../evidenceHost.ts";
 import { BoundedEvidenceAssessmentHost } from "../evidenceAssessmentHost.ts";
 import { BoundedEvidenceDecisionHost } from "../evidenceDecisionHost.ts";
-import { PublishReviewIntakeHost } from "../publishReviewIntakeHost.ts";
+import { SpeechTranscribeCapabilityHost } from "../semanticEvidenceHost.ts";
 import {
   CodexExecWorkerLauncher,
   type CodexWorkerLauncherOptions,
@@ -22,8 +22,8 @@ import type {
   RuntimeLimits,
 } from "../model.ts";
 import { BoundedReportHost } from "../reportHost.ts";
-import { RootOutputDispositionHost } from "../rootOutputDispositionHost.ts";
-import { ParentArtifactAdmissionHost } from "../parentArtifactAdmissionHost.ts";
+import { PublishReviewIntakeHost } from "../publishReviewIntakeHost.ts";
+import { StudyReadinessHost } from "../studyReadinessHost.ts";
 import { createRuntimeStart } from "../runStart/runtimeStart.ts";
 import { writeRuntimeStartReceipt } from "../runStart/receiptWriter.ts";
 import { BoundedRuntimeScheduler } from "../scheduler.ts";
@@ -33,9 +33,9 @@ import type { InitializedRuntimeApplication } from "./model.ts";
 
 export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 2,
-  maxActiveWorkers: 3,
+  maxActiveWorkers: 4,
   runBudget: { wallMs: 240_000, toolCalls: 32 },
-  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"],
+  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.synthesize"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {
@@ -58,6 +58,7 @@ export interface BoundedWorkerLauncherContext {
   evidenceHost: BoundedEvidenceReadHost;
   assessmentHost: BoundedEvidenceAssessmentHost;
   decisionHost: BoundedEvidenceDecisionHost;
+  semanticEvidenceHost: SpeechTranscribeCapabilityHost;
   plannedMediaOperationId: string;
 }
 
@@ -80,13 +81,14 @@ export type BoundedOrchestratorLauncherFactory = (
 export function codexWorkerLauncherFactory(
   options: CodexWorkerLauncherOptions = {},
 ): BoundedWorkerLauncherFactory {
-  return ({ ledger, scheduler, artifacts, reports, mediaHost, evidenceHost, assessmentHost, decisionHost, plannedMediaOperationId }) =>
+  return ({ ledger, scheduler, artifacts, reports, mediaHost, evidenceHost, assessmentHost, decisionHost, semanticEvidenceHost, plannedMediaOperationId }) =>
     new CodexExecWorkerLauncher(ledger, scheduler, artifacts, reports, {
       ...options,
       mediaHost: options.mediaHost ?? mediaHost,
       evidenceHost: options.evidenceHost ?? evidenceHost,
       assessmentHost: options.assessmentHost ?? assessmentHost,
       decisionHost: options.decisionHost ?? decisionHost,
+      semanticEvidenceHost: options.semanticEvidenceHost ?? semanticEvidenceHost,
       nextMediaOperationId: options.nextMediaOperationId ?? (() => plannedMediaOperationId),
     });
 }
@@ -186,15 +188,17 @@ export async function runBoundedRuntimeApplication(
     workloadKey: `root:${initialized.runStart.runtimeId}`,
     objective:
       `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing disjoint or overlapping authorized ranges yourself, then wait for every accepted child. ` +
-      "Each accepted child contract must request speech.transcribe and report.submit, require exactly one studio.study-report.v1 output, partition its entire assigned scope with closed supported/withheld/unknown/failed states, and cite only current-run semantic observations for supported claims. Coverage and citation closure are structural facts, not correctness, understanding, agreement, or a complete study. Do not synthesize, caption, judge quality, or publish.",
+      "Each accepted child contract must request speech.transcribe and report.submit, require exactly one studio.study-report.v1 output, partition its entire assigned scope with closed supported/withheld/unknown/failed states, and cite only current-run semantic observations for supported claims. After reading at least two model-dispositioned admissions, choose a closed plan, request causally named bounded follow-up when useful, and eventually emit one model-authored studio.owned-media-study.v1 with exact report/semantic citations and every gap/conflict preserved. Coverage and citation closure are structural facts, not correctness, understanding, agreement, truth arbitration, readiness, caption authority, quality, or publication.",
     workerKind: "orchestrator",
     workerLabel: "local-orchestrator",
     mediaScope,
     inputArtifactIds: [initialized.sourceArtifact.id, ...initialized.evidenceArtifacts.map((artifact) => artifact.id)],
-    requiredOutputs: [{ name: "run report", artifactKind: "run-report", required: true }],
-    requiredCapabilities: ["task.spawn.request", "task.reports.wait"],
+    requiredOutputs: [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v1", required: true }],
+    requiredCapabilities: ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.plan", "study.synthesize"],
     dependencies: [],
-    budget: { wallMs: 60_000, toolCalls: 8 },
+    // Nine calls close the minimum two-child study path; reserve bounded headroom for
+    // planning/follow-up while leaving two 8-call child allocations inside the 32-call run cap.
+    budget: { wallMs: 120_000, toolCalls: 16 },
   }, createRootTaskJobContext({
     sourceArtifact: initialized.sourceArtifact,
     evidenceArtifacts: initialized.evidenceArtifacts,
@@ -205,6 +209,7 @@ export async function runBoundedRuntimeApplication(
   const evidenceHost = new BoundedEvidenceReadHost(ledger, artifacts);
   const assessmentHost = new BoundedEvidenceAssessmentHost(ledger, artifacts);
   const decisionHost = new BoundedEvidenceDecisionHost(ledger, artifacts);
+  const semanticEvidenceHost = new SpeechTranscribeCapabilityHost(ledger, artifacts);
   const plannedOperation = initialized.runStart.workPlan.operations[0];
   if (
     initialized.runStart.workPlan.operations.length !== 1 ||
@@ -223,75 +228,25 @@ export async function runBoundedRuntimeApplication(
     evidenceHost,
     assessmentHost,
     decisionHost,
+    semanticEvidenceHost,
     plannedMediaOperationId: plannedOperation.operationId,
   };
   const childLauncher = workerLauncherFactory(launcherContext);
   const orchestratorLauncher = orchestratorLauncherFactory({ ...launcherContext, childLauncher });
   try {
     await orchestratorLauncher.launch(rootPermit);
-    const completedDecisions = Object.values(ledger.state().evidenceDecisions).filter((operation) =>
-      operation.status === "completed");
-    for (const completedDecision of completedDecisions) {
-      if (
-        !completedDecision.artifactId ||
-        !completedDecision.receiptId ||
-        !completedDecision.receiptContentId
-      ) {
-        throw new Error("Completed evidence decision is missing its exact receipt identity");
-      }
-      await new PublishReviewIntakeHost(ledger, artifacts).create({
-        decision: {
-          operationId: completedDecision.id,
-          artifactId: completedDecision.artifactId,
-          receiptId: completedDecision.receiptId,
-          receiptContentId: completedDecision.receiptContentId,
-        },
-      });
-    }
-    const childReports = Object.values(ledger.state().reports)
-      .filter((report) => report.parentTaskId === rootPermit.taskId && report.status === "submitted")
-      .sort((left, right) => left.id.localeCompare(right.id));
-    for (const report of childReports) {
-      if (report.study) {
-        for (const outputArtifactId of report.outputArtifactIds) {
-          await new ParentArtifactAdmissionHost(ledger, artifacts).record({
-            reportId: report.id,
-            parentTaskId: rootPermit.taskId,
-            parentAgentId: rootPermit.agentId,
-            outputArtifactId,
-            outcome: "accepted",
-            reason:
-              "The host accepted the structurally audited coverage report and granted only a bounded read of its exact content; this is not semantic quality judgment or parent agreement.",
-          });
-        }
-      } else {
-        await reports.decide({
-          reportId: report.id,
-          decidedByTaskId: rootPermit.taskId,
-          decidedByAgentId: rootPermit.agentId,
-          accepted: true,
-          reason:
-            "The existing host policy accepted the exact structurally valid child report; this is host-owned admission, not model synthesis or semantic quality judgment.",
-        });
-        for (const outputArtifactId of report.outputArtifactIds) {
-          await new RootOutputDispositionHost(ledger, artifacts).record({
-            reportId: report.id,
-            rootTaskId: rootPermit.taskId,
-            rootAgentId: rootPermit.agentId,
-            outputArtifactId,
-            outcome: "promoted_to_root",
-            reason:
-              "The existing v1 host policy promoted the exact accepted child output with spawn, context, grant, executor, report, artifact, and receipt lineage intact.",
-          });
-        }
-      }
-    }
-    await scheduler.transitionTask(
-      rootPermit.taskId,
-      rootPermit.agentId,
-      "withheld",
-      "The model-orchestrated slice ended after closed spawn decisions and terminal coverage-report/failure identities. Host-owned disposition/admission may have run afterward; no semantic correctness, parent synthesis, captions, quality judgment, or publication was produced by this slice.",
-    );
+    const studies = Object.values(ledger.state().ownedMediaStudies).filter((study) => study.rootTaskId === rootPermit.taskId);
+    if (studies.length !== 1) throw new Error("The model root did not close exactly one owned-media study");
+    const readiness = await new StudyReadinessHost(ledger, artifacts).audit(studies[0].id);
+    await new PublishReviewIntakeHost(ledger, artifacts).create({
+      readiness: {
+        readinessId: readiness.readinessId,
+        artifactId: readiness.artifactId,
+        receiptId: readiness.receiptId,
+        receiptContentId: readiness.receiptContentId,
+      },
+    });
+    await scheduler.transitionTask(rootPermit.taskId, rootPermit.agentId, "completed");
   } catch (error) {
     if (error instanceof RuntimeApplicationInterrupted) throw error;
     const root = ledger.state().tasks[rootPermit.taskId];

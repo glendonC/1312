@@ -29,13 +29,15 @@ be “more agents” or “faster captions.” It should be more of the source d
 for by evidence that a bounded specialist actually inspected, with weak regions restudied or
 abstained rather than guessed.
 
-The first two implementation slices after the UI demo freeze are now complete: the fail-closed
-**acoustic triage and non-dialogue coverage boundary** and bounded **frame sampling with real child
-image delivery**. Their receipts prove bounded execution and exact byte lineage; they do not prove
-producer accuracy or visual understanding.
+The first three implementation slices after the UI demo freeze are now complete: the fail-closed
+**acoustic triage and non-dialogue coverage boundary**, bounded **frame sampling with real child
+image delivery**, and additive **multimodal admission with generalized abstention**. Their receipts
+prove bounded execution, exact byte lineage, citation association, and state preservation; they do
+not prove producer accuracy, visual understanding, or semantic quality.
 
-U3 multimodal admission remains the next planned media-native boundary because U2 sampling receipts
-cannot yet make a visual finding affect a study. Web research follows admitted frame/audio evidence
+U4 budgeted re-study is the next planned media-native boundary. U3 deliberately keeps U2 frame
+identities cite-only, so no visual finding can affect a study until a later receipted producer exists.
+Web research follows admitted frame/audio evidence
 when names, history, or cultural context are outside the file. General computer-use is allowed later
 as a separately granted, isolated, receipted capability for dynamic external context; it is not a
 substitute for decoding and citing the owned video.
@@ -71,9 +73,10 @@ checklist below:
    abstention. Accuracy evaluation remains separate.
 2. **U2 — bounded frame sampling and inspection (implemented 2026-07-17):** give a granted
    specialist actual frame pixels with source/range/decoder receipts. Sampling and byte delivery are
-   implemented; visual interpretation/admission remains U3.
-3. **U3 — multimodal admission and generalized abstention:** carry acoustic, visual, and later
-   external evidence through typed citations without upgrading weak/conflicting states.
+   implemented; visual interpretation remains a later producer rung.
+3. **U3 — multimodal admission and generalized abstention (implemented 2026-07-17):** carry speech,
+   acoustic coverage, frame sample identities, and later typed evidence slots through exact citations
+   without upgrading weak/conflicting states. Frames remain cite-only.
 4. **U4 — budgeted multi-pass re-study:** request denser evidence, attenuated subranges, changed
    producer configurations, or follow-up specialists for exact gaps within pass/run budgets.
 5. **U5 — OCR and scene context:** derive and cite provisional on-screen text/scene evidence from U2
@@ -116,9 +119,9 @@ artifact, grant, and audit boundaries are real.
 | Orchestration | A model-executed root can request bounded children; the scheduler derives task/agent/grant identities and enforces scope, depth, concurrency, budgets, dependencies, and required outputs. The study root can disposition/read reports, record exact gaps/conflicts, request a causally linked follow-up, and synthesize | Typed requests for denser evidence, pass ceilings/configuration deltas, the new producers below, and unlimited/distributed execution | [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts), [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts), and the closed v2 exit in [`STATUS.md`](./STATUS.md#done) |
 | Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample` over one video scope with real task-private PNG image delivery, `speech.transcribe`, exact reads of pinned VAD/language receipts and U1 acoustic observations, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Visual interpretation/admission, OCR, scene/shot evidence, speakers/overlap, stems, web research, and computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); the U2 contract and host live in [`model/frames.ts`](../../src/studio/runtime/production/model/frames.ts) and [`frameHost.ts`](../../src/studio/runtime/production/frameHost.ts) |
 | Current-run speech evidence | A scoped host and bridge exist. With an explicitly enabled recognizer they can produce current-run timed hypotheses; the default unconfigured recognizer honestly returns unavailable | Semantic accuracy/calibration, a guarantee that every run has a live recognizer, alternative segmentation/recognizer passes, and semantic translation QC | [`currentRunSpeechRecognizer.ts`](../../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts) and [`run-runtime-host.ts`](../../scripts/run-runtime-host.ts) |
-| Coverage and abstention | Typed study reports partition assigned ranges into supported, withheld, unknown, or failed; U1 readiness adds a separately accounted `not_in_requested_dialogue_scope` policy partition and keeps mixed/weak/conflicting evidence abstained | A generalized weak-evidence/admission rule across future modalities and U4 re-study | [`dialogueScopePolicy.ts`](../../src/studio/acoustic/dialogueScopePolicy.ts), [`model/studyReports.ts`](../../src/studio/runtime/production/model/studyReports.ts), and [`model/studies.ts`](../../src/studio/runtime/production/model/studies.ts) |
+| Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. The deterministic U3 admission policy re-derives U1 dialogue scope and prevents prose or an available second modality from upgrading a weaker state | U4 pass/exhaustion policy and semantic correctness arbitration | [`generalizedCoveragePolicy.ts`](../../src/studio/runtime/production/admission/generalizedCoveragePolicy.ts), [`model/studyReportsV2.ts`](../../src/studio/runtime/production/model/studyReportsV2.ts), and [`model/studiesV2.ts`](../../src/studio/runtime/production/model/studiesV2.ts) |
 | Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks only for a frame-granted child. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Receipted research, visual evidence admission/interpretation, and isolated computer-use. These are permitted future capabilities only through new explicit grants | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`frameMcpServer.ts`](../../src/studio/runtime/production/executor/frameMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
-| Owned study spine | Typed coverage/citations, parent admission/read, gap/conflict planning, follow-up causation, model-root synthesis, deterministic readiness, and study-causal caption/QC lineage | Evidence types beyond timed speech hypotheses and semantic correctness/truth arbitration | [`model/studyReports.ts`](../../src/studio/runtime/production/model/studyReports.ts), [`model/studies.ts`](../../src/studio/runtime/production/model/studies.ts), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
+| Owned study spine | The closed v1 speech spine remains intact. Additive evidence-citation v1, study-report v2, parent admission/read v2, owned-media-study v2, readiness v3, and caption-causality v3 form a content-addressed U3 lane with per-kind cold audit | Default launcher/report wiring for the additive lane, semantic correctness/truth arbitration, and later evidence producers | [`model/evidenceCitations.ts`](../../src/studio/runtime/production/model/evidenceCitations.ts), [`generalizedEvidenceAdmissionHost.ts`](../../src/studio/runtime/production/admission/generalizedEvidenceAdmissionHost.ts), and [`generalizedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/generalizedStudySynthesisHost.ts) |
 | Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen and the human-labeled `run-007` Bet G score exists with `judge: null` | Runtime semantic QC, calibrated transcription/translation confidence, additional scored runs and registered ablations, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
 
@@ -214,9 +217,9 @@ their audits.
   aggregate bytes, wall timeout, absent/non-video tracks, out-of-range requests, duplicate actual
   PTS, pixel-identical frames at distinct PTS, ungranted calls, source/metadata/frame tamper,
   temporary-allocation failure, and decoder drift.
-- **Still missing:** U3 typed visual citations/admission and generalized abstention. A child may
-  receive authorized pixels, but no U2 receipt asserts what the pixels mean or allows visual prose
-  to affect study, readiness, captions, or QC.
+- **Still missing:** A child may receive authorized pixels and U3 may cite the cold-audited sample
+  identity as media context, but no U2 receipt asserts what the pixels mean. There is no visual
+  observation producer, so visual prose cannot affect study, readiness, captions, or QC.
 - **Done when:** A scheduler-granted frame operation accepts only a source/video-track scope and a
   bounded sampling request; the host re-hashes the source, controls decoding, and enforces maximum
   duration, frame count, dimensions, bytes, and wall time. It stores requested/actual presentation
@@ -229,17 +232,27 @@ their audits.
 - **Fake-claim risk:** Returning hashes or filenames while the model never receives pixels is
   spawn-without-tools theater. A frame receipt proves sampling, not seeing or understanding.
 - **Existing-spine dependency:** Scheduler grants, task media scope, artifact store, launcher bridge,
-  journal/projection, and tool budgets. U3 is required before a visual finding affects a study.
+  journal/projection, and tool budgets. A later visual producer must use U3's typed admission seam
+  before a visual finding can affect a study.
 
-### U3. Multimodal admission and generalized abstention
+### U3. Multimodal admission and generalized abstention — implemented
 
-- **Real:** `studio.study-report.v1` closes supported ranges and claims to exact current-run speech
-  observations; parent disposition/admission/read and study/readiness audits are implemented. The
-  existing availability and coverage states already demonstrate fail-closed abstention patterns.
-- **Missing:** The citation shape is speech-specific. There is no cross-modal evidence-strength rule,
-  no typed conflict between modalities/passes, and no way for frames, OCR, acoustic observations,
-  speaker turns, stems, or documents to become first-class study inputs.
-- **Done when:** An additive evidence-citation envelope and report/study versions identify evidence
+- **Real:** `studio.evidence-citation.v1` binds evidence kind, use, exact claim/coverage/context
+  target, artifact/content/receipt identities, observation ids, upstream/observation states, and
+  temporal point/range or future document-span locators. Separate cold adapters reopen current-run
+  speech, U1 acoustic observations/receipt, and U2 frame receipt/manifest/PNG/decoder lineage.
+  Current-run speech is the only landed claim-support kind and must exactly tile its claimed range;
+  acoustic facts qualify coverage only, and frames remain cite-only media identities. Future OCR,
+  speaker-turn, and external-document kinds are typed slots but fail admission because no producer
+  adapter is registered. Additive `studio.study-report.v2`, parent admission/read v2,
+  `studio.owned-media-study.v2`, and readiness v3 store and cold-replay exact lineage;
+  caption-causality v3 derives only from that reopened chain. Every weak/conflict/out-of-scope state
+  is preserved. Readiness checks stored integrity, range coverage, and unresolved conflict only; it
+  has no semantic-quality input or score.
+- **Still missing:** No visual/OCR/speaker/research producer exists, frames make no semantic claim,
+  and no truth or reliability arbitration is attempted. The additive U3 hosts are not wired into the
+  default owned-audio launcher/report event union or UI; v1 remains that path's closed contract.
+- **Implemented proof:** The additive evidence-citation envelope and report/study versions identify evidence
   kind, artifact/receipt/content identities, observation ids, temporal ranges when applicable, and
   document spans for external sources. Each kind has its own audit adapter. Supported media claims
   require observations that close the claimed range; non-temporal context must name the media entity/
@@ -422,9 +435,10 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    operation and task-private tool give an authorized child actual PNG image content. Source/range/
    frame lineage, decoder/runtime identity, limits, replay, tamper rejection, and fail-closed errors
    are proved without OCR, visual claims, computer-use, or UI work.
-3. **Multimodal admission + abstention v2.** Add typed evidence citations and one visual/acoustic
-   report through disposition, admission/read, synthesis, readiness, and cold replay. Preserve every
-   weak/conflicting state and all v1 artifacts. Stop before claiming observations are correct.
+3. **Multimodal admission + abstention v2 — implemented 2026-07-17.** Typed speech, acoustic, and
+   cite-only frame identities pass through report admission/read, synthesis, readiness, caption
+   causality, and cold replay. Every weak/conflicting/out-of-scope state and all v1 artifacts are
+   preserved. No observation-correctness or visual-understanding claim is made.
 4. **Budgeted multi-pass re-study.** Add one exact gap-to-next-pass contract, per-range pass ledger,
    configuration-delta/dedupe rule, and terminal abstention on budget exhaustion. Prove one hard range
    can narrow into subranges or denser evidence without widening scope or repeating identical work.

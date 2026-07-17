@@ -34,6 +34,10 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   dimension/per-frame and aggregate byte/wall/call ceilings, stores requested and actual PTS plus
   transformation and decoder lineage, and atomically records content-addressed frame, manifest, and
   receipt artifacts;
+- an additive host-owned U3 citation/admission lane that cold-audits current-run speech, U1 acoustic
+  observation/receipt lineage, and U2 frame receipt/manifest/PNG/decoder identities before storing
+  content-addressed report, admission/read, study, and readiness contracts and deriving caption
+  causality from their recursively reopened lineage;
 - an `evidence.read` host plus separate task-private bridge that publishes only `evidence_read`,
   accepts only an exact scheduler-granted artifact id, injects task/agent/operation identity, and
   returns only facts intersecting the scheduler-granted source/window, clipped to that window, from
@@ -170,6 +174,39 @@ over an excluded range, and additive `studio.caption-production.artifact.v2` plu
 English text for every excluded overlap. Caption V1 remains closed for runs without acoustic policy.
 This is lineage and abstention authority, not acoustic accuracy,
 speech absence, lyric understanding, transcription/translation truth, or semantic caption QC.
+
+U3 leaves every closed v1 producer and receipt unchanged. `studio.evidence-citation.v1` binds one
+typed evidence kind and use to an exact claim, coverage range, or media-context target. It carries
+evidence artifact/content, producer receipt/content, source artifact/content/track, observation ids,
+upstream and observation states, and temporal range, sampled media point, or future document-span
+locators. A document span has no ambient authority: it must name the exact media entity/range it
+qualifies. `sourceArtifacts` is exact lineage accounting only; it cannot substitute for the typed
+observation-to-target association.
+
+Admission dispatches by evidence kind and reconstructs the citation from cold producer bytes.
+Current-run speech delegates to semantic-evidence reopening and is the only landed claim-support
+kind; available temporal observations must exactly tile the claim. U1 acoustic citations reopen the
+separate observation and producer-receipt bytes, derive content-bound observation ids, and may qualify
+coverage but never transcript text. U2 frame citations delegate to complete frame sampling audit and
+remain cite-only point identities. Typed OCR, speaker-turn, and external-document slots have no
+producer adapter and therefore fail closed.
+
+`studio.study-report.v2` and `studio.parent-admission.receipt.v2` re-derive the U1
+`studio.dialogue-scope-policy.v1` for the exact task. Deterministic precedence preserves conflicting,
+failed, truncated, unavailable, withheld, unknown, and not-in-scope evidence over otherwise available
+claims; worker-withheld and operation-failed are explicit abstention inputs. Prose is not an input to
+that policy. `studio.owned-media-study.v2` copies only admitted citations and aggregates every child
+state without truth arbitration. `studio.study-readiness.receipt.v3` reopens the complete chain and
+checks only stored integrity, full range coverage, and unresolved conflict. It contains explicit
+semantic/translation/truth non-claims and no quality score. `studio.caption-line-causality.v3` permits
+text only from range-closing current-run speech citations under supported ready coverage; every other
+state yields null source and target text.
+
+These U3 objects are stored through the content-addressed artifact store and recursively cold-replayed
+by host adapters. They intentionally sit outside the closed v1 production event union and are not yet
+wired into the default owned-audio launcher or Studio UI. This boundary proves citation integrity,
+coverage policy, and abstention preservation—not multimodal understanding, OCR, scene semantics,
+producer accuracy, independent corroboration, truth arbitration, or caption quality.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

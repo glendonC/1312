@@ -57,6 +57,16 @@ score.
   reopen the source, receipt, manifest, every frame, and decoder lineage. The default owned audio
   study plan does not request or admit frames. This proves sampling and authorized byte delivery
   only; it does not prove scene understanding or admit visual findings.
+- **U3 multimodal admission and generalized abstention:** additive `studio.evidence-citation.v1`,
+  `studio.study-report.v2`, parent admission/read v2, `studio.owned-media-study.v2`, readiness v3,
+  and caption-causality v3 form a content-addressed host lane without mutating the closed v1 path.
+  Per-kind cold adapters reopen current-run speech, U1 acoustic observation/receipt lineage, and U2
+  frame receipt/manifest/PNG/decoder identities. Speech is the only landed claim-support kind and
+  must exactly close its claimed range; acoustic citations qualify coverage, while frames remain
+  cite-only. Unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states
+  deterministically survive admission, synthesis, readiness, and caption causality. Readiness remains
+  an integrity/coverage gate, not semantic QC. Future OCR/speaker/document slots fail closed without
+  producers, and the additive lane is not wired into the default owned-audio launcher or UI.
 
 ## Post-freeze backlog boundary
 
@@ -67,9 +77,9 @@ indefinite deferrals or a one-day implementation claim:
 
 1. U1 acoustic triage and honest non-dialogue coverage — implemented; accuracy evaluation remains
    separate.
-2. U2 bounded frame sampling and inspection — implemented; visual interpretation/admission remains
-   U3.
-3. U3 multimodal admission and generalized abstention.
+2. U2 bounded frame sampling and inspection — implemented; visual interpretation remains a later
+   producer rung.
+3. U3 multimodal admission and generalized abstention — implemented; frames remain cite-only.
 4. U4 budgeted multi-pass re-study over exact gaps/subranges.
 5. U5 OCR and scene/on-screen context.
 6. U6 anonymous speaker/overlap evidence.
@@ -114,6 +124,10 @@ indefinite deferrals or a one-day implementation claim:
 - U2 proves bounded source/video-track decoding, content-addressed PNG delivery, receipt lineage,
   and replay/tamper closure. It does not prove that a child selected the right timestamp, saw or
   understood a scene, recognized text or people, or produced a study-admissible visual claim.
+- U3 proves typed observation-to-target association, per-kind cold audit, range closure, generalized
+  abstention preservation, and content-addressed replay. It does not prove multimodal understanding,
+  evidence accuracy, independent corroboration, reliability equivalence, truth arbitration,
+  transcription/translation quality, OCR, or scene understanding.
 
 ## Where to read what
 

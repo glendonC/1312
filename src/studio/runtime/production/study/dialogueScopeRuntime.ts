@@ -12,14 +12,13 @@ async function jsonFile(path: string, label: string, maxBytes: number): Promise<
   try { return JSON.parse(bytes.toString("utf8")); } catch { throw new Error(`${label} is no longer valid JSON`); }
 }
 
-/** Reopens both producer bodies plus the separate acoustic receipt and derives policy from bytes. */
-export async function deriveRuntimeDialogueScopePolicy(
+/** Additive consumer seam for U3 report admission; U1 producer/receipt behavior remains closed. */
+export async function deriveTaskDialogueScopePolicy(
   state: RuntimeProjection,
   artifacts: ContentAddressedArtifactStore,
-  studyId: string,
+  taskId: string,
 ): Promise<DialogueScopePolicy | null> {
-  const study = state.ownedMediaStudies[studyId]; if (!study) throw new Error(`Owned-media study ${studyId} is absent`);
-  const root = state.tasks[study.rootTaskId]; if (!root) throw new Error("Dialogue-scope policy lost its root task context");
+  const root = state.tasks[taskId]; if (!root) throw new Error("Dialogue-scope policy lost its task context");
   const source = state.artifacts[root.jobContext.source.artifactId];
   if (!source || source.origin.kind !== "ingest" || source.content.contentId !== root.jobContext.source.contentId) throw new Error("Dialogue-scope policy lost its exact source artifact");
   await artifacts.resolveVerified(source);
@@ -42,4 +41,14 @@ export async function deriveRuntimeDialogueScopePolicy(
   const track = source.tracks.find((candidate) => candidate.kind === "audio" && candidate.index === (receiptValue as AcousticTriageReceipt).input.media.trackIndex);
   if (!track) throw new Error("Acoustic evidence selected an unsupported or changed audio track");
   return validateDialogueScopePolicy(deriveDialogueScopePolicy({ sourceArtifactId: source.id, sourceContentId: source.content.contentId, trackId: track.id, includeLyrics: root.jobContext.analysisRequest.options.includeLyrics, requestedRange: root.jobContext.analysisRequest.requestedRange, speechEvidence: { artifactId: speechArtifact.id, contentId: speechArtifact.content.contentId, value: speech }, acousticEvidence: { artifactId: acousticArtifact.id, contentId: acousticArtifact.content.contentId, producerReceiptContentId: acousticArtifact.origin.producerReceiptContentId, value: observations } }));
+}
+
+/** Reopens both producer bodies plus the separate acoustic receipt and derives policy from bytes. */
+export async function deriveRuntimeDialogueScopePolicy(
+  state: RuntimeProjection,
+  artifacts: ContentAddressedArtifactStore,
+  studyId: string,
+): Promise<DialogueScopePolicy | null> {
+  const study = state.ownedMediaStudies[studyId]; if (!study) throw new Error(`Owned-media study ${studyId} is absent`);
+  return deriveTaskDialogueScopePolicy(state, artifacts, study.rootTaskId);
 }

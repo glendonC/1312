@@ -4,6 +4,8 @@ import { useCallback, useRef, useState, type RefObject } from "react";
 import { Edit } from "../glyphs";
 import { useStudio } from "../store";
 import type { RunBundle } from "../transport";
+import type { ForecastArtifact } from "../runtime/production/forecast/model.ts";
+import { projectRecordedForecast } from "./recordedForecast.ts";
 import {
   formatSeconds,
   type AnalysisRequest,
@@ -37,6 +39,7 @@ interface ConfirmationFormProps {
 }
 
 export default function ConfirmationForm({
+  bundle,
   session,
   facts,
   assessment,
@@ -160,6 +163,7 @@ export default function ConfirmationForm({
                 headingRef={stageHeading}
                 facts={facts}
                 request={request}
+                forecast={bundle.forecast ?? null}
                 selectStage={selectStage}
               />
             )}
@@ -328,13 +332,17 @@ function RecordedForecast({
   headingRef,
   facts,
   request,
+  forecast,
   selectStage,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   facts: RecordedPreflightFacts;
   request: AnalysisRequest;
+  forecast: ForecastArtifact | null;
   selectStage: (stage: PreparationStage) => void;
 }) {
+  const view = projectRecordedForecast(forecast);
+
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
@@ -348,11 +356,21 @@ function RecordedForecast({
         <ConversationValue onEdit={() => selectStage("output")} editLabel={`Edit output: ${recordedOutputLabel(request)}`}>
           {recordedOutputLabel(request)}
         </ConversationValue>{" "}
-        to the recorded clip. Processing time, cost, and runtime scale stay unavailable until a versioned backend
-        estimate exists.
+        to the recorded clip.{" "}
+        {view.kind === "floor"
+          ? `A deterministic workload floor covers ${recordedForecastFloorLabel(view)} — that is workload volume, not elapsed time, which stays unavailable along with cost and runtime scale until a versioned backend estimate exists.`
+          : "Processing time, cost, and runtime scale stay unavailable until a versioned backend estimate exists."}
       </StageConversation>
     </section>
   );
+}
+
+function recordedForecastFloorLabel(view: {
+  operationCount: number;
+  requestedOperationMediaDurationMs: number;
+}): string {
+  const operations = `${view.operationCount} ${view.operationCount === 1 ? "operation" : "operations"}`;
+  return `${formatSeconds(view.requestedOperationMediaDurationMs / 1000)} of requested media across ${operations}`;
 }
 
 function RecordedConfirmation({

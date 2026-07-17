@@ -26,6 +26,8 @@ import type {
 } from "./types";
 import type { RecordedEvidenceIndex } from "./evidence/types";
 import type { LanguageRangesReceipt, PreflightBundle, SpeechActivityReceipt } from "./preflight/contracts";
+import type { ForecastArtifact } from "./runtime/production/forecast/model.ts";
+import { readForecastArtifact } from "./preflight/recordedForecast.ts";
 import { assertPreflightEvidence } from "./preflight/evidenceValidation";
 import { assertRunBundle } from "./bundle";
 import { assertTrace } from "./traceValidation";
@@ -50,6 +52,8 @@ export interface RunBundle {
   languageRanges?: LanguageRangesReceipt | null;
   /** Optional deterministic post-run index. It is not original runtime provenance. */
   evidence?: RecordedEvidenceIndex | null;
+  /** Optional deterministic pre-run workload floor. Absent/off-contract → the honest unavailable line. */
+  forecast?: ForecastArtifact | null;
 }
 
 export interface StreamOptions {
@@ -134,6 +138,7 @@ export class ReplayTransport implements RunTransport {
       speechActivity,
       languageRanges,
       evidence,
+      forecastRaw,
     ] = await Promise.all([
       json<RunManifest>(`${base}/run.json`),
       json<CaptionsFile>(`${base}/captions.json`),
@@ -150,6 +155,7 @@ export class ReplayTransport implements RunTransport {
       optionalJson<SpeechActivityReceipt>(`${base}/speech-activity.json`),
       optionalJson<LanguageRangesReceipt>(`${base}/language-ranges.json`),
       optionalJson<RecordedEvidenceIndex>(`${base}/evidence.json`),
+      optionalJson<unknown>(`${base}/forecast.json`),
     ]);
 
     // The language pack is cross-run memory, so it lives outside the run folder.
@@ -171,6 +177,7 @@ export class ReplayTransport implements RunTransport {
       speechActivity,
       languageRanges,
       evidence,
+      forecast: readForecastArtifact(forecastRaw),
     };
     assertRunBundle(bundle, `Studio run ${this.runId}`);
     assertPreflightEvidence(bundle, `Studio run ${this.runId} preflight evidence`);

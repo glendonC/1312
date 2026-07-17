@@ -10,6 +10,10 @@ import PreparationStageNavigation, {
   preparationStageIndex,
   type PreparationStage,
 } from "../preflight/PreparationStages";
+import {
+  focusResultTarget,
+  PRODUCTION_CAPTION_RESULTS_ID,
+} from "../resultAccess";
 import type { EvidenceAssessmentAudit } from "../runtime/production/assessmentAudit";
 import type { EvidenceDecisionReceiptVerification } from "../runtime/production/decisionReceiptAudit";
 import type { PublishReviewIntakeVerification } from "../runtime/production/publishReviewIntakeAudit";
@@ -633,7 +637,11 @@ export default function ProductLocalRuntime({
     const details = evidenceDetails.current;
     if (!details) return;
     details.open = true;
-    window.requestAnimationFrame(() => details.scrollIntoView({ block: "start", behavior: "smooth" }));
+    const hasCaptionResults = (runtime?.captionResults.length ?? 0) > 0;
+    window.requestAnimationFrame(() => {
+      if (hasCaptionResults && focusResultTarget(PRODUCTION_CAPTION_RESULTS_ID)) return;
+      details.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
   }
 
   const currentSetupStageIndex = preparationStageIndex(setupStage);

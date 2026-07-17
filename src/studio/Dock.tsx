@@ -4,8 +4,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import DockTrace from "./DockTrace";
-import { Hold, Replay } from "./glyphs";
+import { Arrow, Hold, Replay } from "./glyphs";
 import LayoutControl from "./LayoutControl";
+import { focusResultTarget, RECORDED_RESULTS_ID } from "./resultAccess";
 import { useComplete, usePaused, useProgress, useStudio } from "./store";
 
 const SPRING = { type: "spring", stiffness: 280, damping: 32, mass: 0.7 } as const;
@@ -74,6 +75,17 @@ export default function Dock() {
                 </span>
                 <span>{pausePending ? "Pausing" : paused ? "Resume" : "Pause"}</span>
                 <kbd aria-hidden="true">space</kbd>
+              </button>
+            ) : complete ? (
+              <button
+                type="button"
+                className="rail-btn"
+                onClick={() => focusResultTarget(RECORDED_RESULTS_ID)}
+              >
+                <span className="rail-glyph">
+                  <Arrow />
+                </span>
+                <span>Open Results</span>
               </button>
             ) : (
               <button type="button" className="rail-btn" onClick={start}>

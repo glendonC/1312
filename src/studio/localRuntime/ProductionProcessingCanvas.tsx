@@ -543,7 +543,9 @@ export default function ProductionProcessingCanvas({
           </span>
           <span className="processing-dock-evidence">Cursor {cursor} · head {status.journalHead}</span>
           <div className="processing-dock-actions">
-            <button type="button" onClick={onOpenEvidence}>Evidence</button>
+            <button type="button" onClick={onOpenEvidence}>
+              {captionResultCount > 0 ? "Results" : "Evidence"}
+            </button>
             {lifecycle.closed && (
               <button type="button" onClick={onPrepareAnotherRun}>Prepare another run</button>
             )}

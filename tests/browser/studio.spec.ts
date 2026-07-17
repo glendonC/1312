@@ -81,13 +81,13 @@ async function finishPreparation(page: Page, previewMode = true, keyboard = fals
     else await action.click();
   }
   await expect(page.getByRole("heading", {
-    name: previewMode ? "Here’s what Studio knows so far" : "Review what can be known before starting",
+    name: previewMode ? /^I’ve bound / : "Review what can be known before starting",
   })).toBeVisible();
   const reviewAction = page.getByRole("button", { name: "Continue to Review" });
   if (keyboard) await reviewAction.press("Enter");
   else await reviewAction.click();
   await expect(page.getByRole("heading", {
-    name: previewMode ? "Preview the interface with a recorded run" : "Replay this recorded processing request",
+    name: previewMode ? /^I’m ready to open the recorded run-006 interface preview/ : "Replay this recorded processing request",
   })).toBeVisible();
   const finalAction = page.getByRole("button", {
     name: previewMode ? "Preview run-006 recorded processing" : "Replay recorded analysis",
@@ -303,7 +303,7 @@ test("the development processing fixture exposes honest running state and worker
   await expect(canvas.getByText(/no pause or cancellation command/)).toHaveCount(1);
 
   const worker = canvas.getByRole("button", { name: "Inspect bounded-media-child, Working" });
-  await expect(worker.locator("small")).toHaveClass(/text-shimmer/);
+  await expect(worker.locator("small.text-shimmer")).toHaveClass(/text-shimmer/);
   await worker.click();
   const focus = page.getByRole("dialog", { name: "bounded-media-child" });
   await expect(focus).toBeVisible();
@@ -748,11 +748,7 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
   await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Metadata resolved" })).toBeVisible();
-  await expect(page.getByRole("heading", {
-    name: "I found the source. It’s 1:23 long.",
-  })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
-  await expect(page.getByText("Recorded test producer", { exact: true })).toBeVisible();
   await expect(clipField).toHaveCount(0);
   const lifecycleBar = page.getByLabel("Studio lifecycle");
   await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
@@ -761,9 +757,7 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("1 / 6");
   await expect(lifecycleBar.getByRole("button", { name: "Exit setup" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Explore recorded demo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add owned media" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Korean samples" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "More source options" })).toHaveCount(0);
   await page.waitForTimeout(420);
   const welcomeLockupAfter = await page.locator(".welcome-lockup").boundingBox();
   const welcomeOrbAfter = await page.locator(".welcome-orchestrator-anchor").boundingBox();
@@ -788,10 +782,57 @@ test("a submitted source moves through setup and forecast before the recorded in
     expect(Math.abs(welcomePanelCenterAfter - welcomePanelCenterBefore)).toBeLessThanOrEqual(1);
   }
   const sourceBoundary = page.getByRole("note", { name: "Submitted source metadata boundary" });
-  await sourceBoundary.getByText("Source details", { exact: true }).click();
-  await expect(sourceBoundary.getByText("1:23", { exact: true })).toBeVisible();
-  await expect(sourceBoundary.getByText("Provider metadata", { exact: true })).toBeVisible();
-  await expect(sourceBoundary.getByText("Not started", { exact: true })).toBeVisible();
+  await expect(sourceBoundary).toContainText(
+    "I found Resolved browser-test video by Recorded test producer. It’s 1:23 long. I haven’t downloaded or processed the media.",
+  );
+  const sourceLink = sourceBoundary.getByRole("link", {
+    name: "Resolved browser-test video",
+  });
+  await expect(sourceLink).toHaveAttribute("href", "https://www.youtube.com/watch?v=fixturevideo");
+  await expect(sourceLink).toHaveAttribute("target", "_blank");
+  await expect(sourceLink).toHaveAttribute("rel", "noreferrer");
+  await expect(sourceLink).toHaveAttribute("title", "Open on YouTube in a new tab");
+  const sourceLinkIdleBackground = await sourceLink.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await sourceLink.hover();
+  await expect.poll(() => sourceLink.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(sourceLinkIdleBackground);
+  await expect(sourceBoundary).toHaveCSS("border-top-width", "0px");
+  await expect(page.locator(".preflight-stage-panel")).toHaveCSS("min-height", "0px");
+  await expect(page.locator(".preflight-stage-panel")).toHaveCSS("max-height", "none");
+  await expect(page.locator(".preflight-stage-panel .preflight-actions")).toHaveCount(0);
+  const preparationControls = page.getByRole("group", { name: "Preparation controls" });
+  await expect(preparationControls).toBeVisible();
+  await expect(preparationControls.getByRole("button", { name: /Back to/ })).toHaveCount(0);
+  const continueToRange = preparationControls.getByRole("button", { name: "Continue to Range" });
+  await expect(continueToRange).toBeVisible();
+  await expect(continueToRange.locator("svg")).toHaveCount(1);
+  expect(await continueToRange.evaluate((element) => getComputedStyle(element, "::before").content)).toBe("none");
+  expect(await continueToRange.evaluate((element) => getComputedStyle(element, "::after").content)).toBe("none");
+  await expect(continueToRange).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(continueToRange.locator(".preflight-control-label")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  const preparationControlsBox = await preparationControls.boundingBox();
+  const continueToRangeBox = await continueToRange.boundingBox();
+  expect(preparationControlsBox).not.toBeNull();
+  expect(continueToRangeBox).not.toBeNull();
+  expect(preparationControlsBox?.width ?? Infinity).toBeLessThan(welcomePanelAfter?.width ?? 0);
+  expect(Math.abs(
+    (continueToRangeBox?.x ?? 0) + (continueToRangeBox?.width ?? 0) / 2 -
+    ((preparationControlsBox?.x ?? 0) + (preparationControlsBox?.width ?? 0) / 2),
+  )).toBeLessThanOrEqual(1);
+  expect(Math.abs(
+    (preparationControlsBox?.y ?? 0) -
+    ((welcomePanelAfter?.y ?? 0) + (welcomePanelAfter?.height ?? 0) - 9),
+  )).toBeLessThanOrEqual(2.5);
+  expect((preparationControlsBox?.y ?? 0) + (preparationControlsBox?.height ?? 0))
+    .toBeLessThan((lifecycleBarBox?.y ?? 0) - 8);
+  await expect(page.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Source ready", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Resolved source", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Source details", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Provider metadata only/i)).toHaveCount(0);
   await expect(page.getByLabel("Recorded selection · 0:00–0:40")).toHaveCount(0);
   await expect(page.getByText("Recorded fixture facts · not the submitted link")).toHaveCount(0);
   await expect(page.getByText("Didi's Korean Culture Podcast")).toHaveCount(0);
@@ -838,12 +879,74 @@ test("a submitted source moves through setup and forecast before the recorded in
   expect(initialRequestId).toMatch(/^submitted-preparation:/);
 
   await page.getByRole("button", { name: "Continue to Range" }).click();
+  await expect(preparationControls.getByRole("button", { name: "Back to Source" })).toBeVisible();
   await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "range");
   await expect(lifecycleBar.locator(".dock-status")).toHaveText("Range");
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("2 / 6");
-  await expect(page.getByRole("heading", { name: "Choose the section to prepare" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: /^I’ll prepare / })).toBeFocused();
   await expect(requestForm).toHaveAttribute("data-palette", "citron");
+  const rangeParameter = preparationControls.getByRole("button", { name: "Update range: 0:00–1:23" });
+  const backToSource = preparationControls.getByRole("button", { name: "Back to Source" });
+  const continueToLanguage = preparationControls.getByRole("button", { name: "Continue to Language" });
+  for (const navigationAction of [backToSource, continueToLanguage]) {
+    await expect(navigationAction.locator("svg")).toHaveCount(1);
+    await expect(navigationAction).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(navigationAction.locator(".preflight-control-label")).toHaveCSS(
+      "background-color",
+      "rgba(0, 0, 0, 0)",
+    );
+    expect(await navigationAction.evaluate((element) => getComputedStyle(element, "::before").content)).toBe("none");
+    expect(await navigationAction.evaluate((element) => getComputedStyle(element, "::after").content)).toBe("none");
+  }
+  await expect(rangeParameter).toHaveAttribute("aria-expanded", "false");
+  const geometryBeforeRangePopover = await Promise.all([
+    page.locator(".preflight-stage-panel").boundingBox(),
+    preparationControls.boundingBox(),
+    lifecycleBar.boundingBox(),
+  ]);
+  await rangeParameter.click();
+  await expect(rangeParameter).toHaveAttribute("aria-expanded", "true");
+  const rangePopover = page.getByRole("dialog", { name: "Range options" });
+  await expect(rangePopover).toBeVisible();
+  await expect(rangePopover).toHaveAttribute("popover", "auto");
+  const geometryWithRangePopover = await Promise.all([
+    page.locator(".preflight-stage-panel").boundingBox(),
+    preparationControls.boundingBox(),
+    lifecycleBar.boundingBox(),
+  ]);
+  for (let index = 0; index < geometryBeforeRangePopover.length; index += 1) {
+    for (const key of ["x", "y", "width", "height"] as const) {
+      expect(Math.abs(
+        (geometryWithRangePopover[index]?.[key] ?? Infinity) -
+        (geometryBeforeRangePopover[index]?.[key] ?? -Infinity),
+      )).toBeLessThanOrEqual(1);
+    }
+  }
+  const [rangePopoverBox, rangeTriggerBox] = await Promise.all([
+    rangePopover.boundingBox(),
+    rangeParameter.boundingBox(),
+  ]);
+  expect(rangePopoverBox).not.toBeNull();
+  expect(rangeTriggerBox).not.toBeNull();
+  expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual(7.5);
+  expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(7.5);
+  expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(viewportWidth - 7.5);
+  expect((rangePopoverBox?.y ?? 0) + (rangePopoverBox?.height ?? 0)).toBeLessThanOrEqual(
+    (rangeTriggerBox?.y ?? 0) - 0.5,
+  );
   await expect(page.getByLabel("Entire video · 0:00–1:23")).toBeChecked();
+  await expect(rangePopover.locator('.preflight-choice[data-selected="true"] .preflight-choice-check svg'))
+    .toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(rangePopover).not.toBeVisible();
+  await expect(rangeParameter).toHaveAttribute("aria-expanded", "false");
+  await expect(rangeParameter).toBeFocused();
+  await rangeParameter.click();
+  await expect(rangePopover).toBeVisible();
+  await page.locator(".preflight-stage-panel").click({ position: { x: 5, y: 5 } });
+  await expect(rangePopover).not.toBeVisible();
+  await expect(rangeParameter).toBeFocused();
+  await rangeParameter.click();
   await page.getByLabel("Custom start and end").check();
   const rangeEnd = page.getByRole("spinbutton", { name: "End, seconds" });
   await rangeEnd.fill("90");
@@ -861,34 +964,62 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(lifecycleBar.locator(".dock-status")).toHaveText("Language");
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("3 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "blue");
-  await expect(page.getByLabel("Automatic · request detection later")).toBeChecked();
-  await page.getByLabel("Declare the source language").check();
+  const languageParameter = preparationControls.getByRole("button", {
+    name: "Update language: Detect later → English",
+  });
+  await expect(languageParameter).toHaveAttribute("aria-expanded", "false");
+  await languageParameter.click();
+  const languagePopover = page.getByRole("dialog", { name: "Language options" });
+  await expect(languagePopover).toBeVisible();
+  const automaticLanguage = page.getByLabel("Automatic · request detection later");
+  const declaredLanguage = page.getByLabel("Declare the source language");
+  await expect(automaticLanguage).toBeChecked();
+  await expect(automaticLanguage).toBeFocused();
+  await automaticLanguage.press("ArrowDown");
+  await expect(declaredLanguage).toBeChecked();
   await page.getByRole("textbox", { name: "Declared BCP-47 language" }).fill("ko");
   await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
   const changedLanguageRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
   expect(changedLanguageRequestId).not.toBe(changedRangeRequestId);
+  await page.keyboard.press("Escape");
+  await expect(languagePopover).not.toBeVisible();
+  await expect(preparationControls.getByRole("button", {
+    name: "Update language: Korean → English",
+  })).toBeFocused();
 
   await page.getByRole("button", { name: "Continue to Output" }).click();
   await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "output");
   await expect(lifecycleBar.locator(".dock-status")).toHaveText("Output");
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("4 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "lilac");
+  await preparationControls.getByRole("button", {
+    name: "Update output: Captions + evidence",
+  }).click();
+  const outputPopover = page.getByRole("dialog", { name: "Output options" });
+  await expect(outputPopover).toBeVisible();
   await expect(page.getByLabel("Captions plus evidence and breakdown")).toBeChecked();
   await page.getByRole("button", { name: "Continue to Forecast" }).click();
   await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "forecast");
   await expect(lifecycleBar.locator(".dock-status")).toHaveText("Forecast");
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("5 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "peach");
-  const forecast = page.getByRole("heading", { name: "Here’s what Studio knows so far" });
+  const forecast = page.getByRole("heading", { name: /^I’ve bound / });
   await expect(forecast).toBeVisible();
   await expect(forecast).toBeFocused();
-  await expect(page.getByText("Processing time")).toBeVisible();
-  await expect(page.getByText("Estimated cost")).toBeVisible();
-  await expect(page.getByText("Runtime scale")).toBeVisible();
-  await expect(page.getByText("Korean · user declared")).toBeVisible();
+  await expect(forecast).toContainText("I still can’t forecast processing time, cost, scale, or workload");
+  const currentSetup = preparationControls.getByRole("button", { name: "Review current setup" });
+  await currentSetup.click();
+  const forecastPopover = page.getByRole("dialog", { name: "Forecast options" });
+  await expect(forecastPopover).toBeVisible();
+  await expect(page.getByRole("group", { name: "Current setup parameters" })).toBeVisible();
+  const rangeSetupRow = page.getByRole("button", { name: /Edit range:/ });
+  const languageSetupRow = page.getByRole("button", { name: /Edit language: Korean → English/ });
+  await expect(rangeSetupRow).toBeFocused();
+  await rangeSetupRow.press("ArrowDown");
+  await expect(languageSetupRow).toBeFocused();
   await expect(page.locator("[data-submitted-preparation-request-id]")).toHaveCount(1);
-  await page.getByRole("button", { name: "02 Range" }).click();
-  await expect(page.getByRole("heading", { name: "Choose the section to prepare" })).toBeFocused();
+  await languageSetupRow.click();
+  await expect(page.getByRole("heading", { name: /^I’ll / })).toBeFocused();
   await page.getByRole("button", { name: "05 Forecast" }).click();
   await expect(forecast).toBeFocused();
   await page.getByRole("button", { name: "Continue to Review" }).click();
@@ -896,22 +1027,33 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(lifecycleBar.locator(".dock-status")).toHaveText("Review");
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("6 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "teal");
-  await expect(page.getByRole("heading", { name: "Preview the interface with a recorded run" })).toBeFocused();
-  await expect(page.getByText(/submitted link remains untouched/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^I’m ready to open the recorded run-006 interface preview/ }))
+    .toBeFocused();
+  await expect(page.getByRole("heading", { name: /won’t download or process Resolved browser-test video/i })).toBeVisible();
   await expect(page.getByText(/does not submit a runtime command/i)).toBeVisible();
+  const reviewSetup = preparationControls.getByRole("button", { name: "Review current setup" });
+  await reviewSetup.click();
+  const reviewPopover = page.getByRole("dialog", { name: "Review options" });
+  await expect(reviewPopover).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(reviewPopover).not.toBeVisible();
+  await expect(reviewSetup).toBeFocused();
   await page.getByRole("button", { name: "Preview run-006 recorded processing" }).click();
 
   await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "initializing");
   await expect(lifecycleBar).toContainText("Initializing recorded preview");
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("");
   await expect(lifecycleBar.locator(".dock-pct")).toHaveAttribute("aria-hidden", "true");
+  await expect(preparationControls).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
   await lifecycleBar.getByRole("button", { name: "Cancel start" }).click();
   await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
   await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "confirm");
+  await expect(preparationControls).toBeVisible();
   await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
   await page.getByRole("button", { name: "Preview run-006 recorded processing" }).click();
   await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "initializing");
+  await expect(preparationControls).toHaveCount(0);
 
   await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
   await expect(lifecycleBar).toHaveCount(0);
@@ -966,6 +1108,11 @@ test("submitted metadata resolution stays in the welcome composition", async ({ 
   await page.keyboard.press("Enter");
 
   await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
+  const sourceGuideStatus = page.locator('.welcome-guide-copy [role="status"]');
+  await expect(sourceGuideStatus).toHaveText("Resolving provider metadata…");
+  await expect(sourceGuideStatus).toHaveClass(/text-shimmer/);
+  await expect(sourceGuideStatus).toHaveCSS("color", "rgba(0, 0, 0, 0)");
+  await expect(sourceGuideStatus).toHaveCSS("animation-name", "text-shimmer-sweep");
   const lifecycleBar = page.getByLabel("Studio lifecycle");
   await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "resolving");
   await expect(lifecycleBar.locator(".dock-status")).toHaveText("Resolving metadata…");
@@ -983,11 +1130,13 @@ test("submitted metadata resolution stays in the welcome composition", async ({ 
     name: "One moment—I’m asking YouTube for the title, creator, and duration. The media itself remains untouched.",
   })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Clip link" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "More source options" })).toHaveCount(0);
   await expect(page.locator(".preflight")).toHaveCount(0);
 
   releaseResolution();
-  await expect(page.getByRole("status").filter({ hasText: "Metadata resolved" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "I found the source. It’s 1:23 long." })).toBeVisible();
+  await expect(sourceGuideStatus).toHaveText("Metadata resolved");
+  await expect(sourceGuideStatus).not.toHaveClass(/text-shimmer/);
+  await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
 });
 
 test("metadata resolution can be cancelled without implying a pausable operation", async ({ page }) => {
@@ -1045,10 +1194,11 @@ test("a long submitted source opens with an explicit editable two-minute request
   await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/longfixture");
   await page.keyboard.press("Enter");
 
-  await expect(page.getByRole("heading", {
-    name: "I found the source. It’s 3:23 long.",
-  })).toBeVisible();
+  await expect(page.getByRole("note", { name: "Submitted source metadata boundary" })).toContainText(
+    "It’s 3:23 long",
+  );
   await page.getByRole("button", { name: "Continue to Range" }).click();
+  await page.getByRole("button", { name: "Update range: 0:00–2:00" }).click();
   await expect(page.getByLabel("Custom start and end")).toBeChecked();
   await expect(page.getByRole("spinbutton", { name: "Start, seconds" })).toHaveValue("0");
   await expect(page.getByRole("spinbutton", { name: "End, seconds" })).toHaveValue("120");
@@ -1075,6 +1225,25 @@ test("submitted preview Results reports no submitted artifact before recorded de
   await expect(page.locator('.dock[data-outcome="complete"]')).toBeVisible();
   await expect(page.locator(".dock-status")).toHaveText("Done");
   await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
+});
+
+test("completed recorded runs expose Results from the terminal dock", async ({ page }) => {
+  await openLab(page);
+  await scenario(page).selectOption("unscored-complete");
+  await page.locator(".studio-lab").evaluate((element) => element.remove());
+
+  const results = page.getByRole("region", { name: "Recorded Results" });
+  await expect(results).toBeVisible();
+  const openResults = page.getByRole("button", { name: "Open Results" });
+  await expect(openResults).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run again", exact: true })).toBeVisible();
+
+  await openResults.click();
+  await expect(results).toBeFocused();
+  await expect.poll(() => results.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.top >= 0 && bounds.top < window.innerHeight;
+  })).toBe(true);
 });
 
 test("a remote metadata failure keeps duration and range controls unavailable", async ({ page }) => {
@@ -1135,15 +1304,16 @@ test("the submitted preparation sequence stays horizontally contained at every s
     await page.getByRole("button", { name: "Resolve source metadata" }).click();
 
     const panel = page.locator(".preflight-stage-panel");
-    await expect(page.getByRole("heading", { name: "I found the source. It’s 1:23 long." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
     await expect(page.locator('.studio-welcome[data-source-guide="true"]')).toBeVisible();
     await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
     await expect(panel).toHaveCSS("position", "relative");
-    await expect(panel).toHaveCSS("overflow-y", "auto");
+    await expect(panel).toHaveCSS("overflow-y", "visible");
     const lifecycleBar = page.getByLabel("Studio lifecycle");
     await expect(page.getByRole("textbox", { name: "Clip link" })).toHaveCount(0);
     await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
     await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "source");
+    await page.waitForTimeout(360);
     const sourceDock = page.locator(".studio-source-dock");
     const sourceDockBox = await sourceDock.boundingBox();
     expect(sourceDockBox).not.toBeNull();
@@ -1156,21 +1326,79 @@ test("the submitted preparation sequence stays horizontally contained at every s
     ).toBeLessThanOrEqual(0.6);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
     const panelBox = await panel.boundingBox();
+    const preparationControls = page.getByRole("group", { name: "Preparation controls" });
+    const preparationControlsBox = await preparationControls.boundingBox();
     expect(panelBox).not.toBeNull();
+    expect(preparationControlsBox).not.toBeNull();
     expect(panelBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
     expect((panelBox?.x ?? 0) + (panelBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
+    expect(Math.abs(
+      (preparationControlsBox?.y ?? 0) - ((panelBox?.y ?? 0) + (panelBox?.height ?? 0) - 9),
+    )).toBeLessThanOrEqual(2.5);
+    expect((preparationControlsBox?.y ?? 0) + (preparationControlsBox?.height ?? 0))
+      .toBeLessThanOrEqual((sourceDockBox?.y ?? 0) - 8);
 
     await page.getByRole("button", { name: "Continue to Range" }).click();
+    const rangeHeading = page.getByRole("heading", { name: /^I’ll prepare / });
+    await expect(rangeHeading).toBeFocused();
+    const rangeParameter = preparationControls.getByRole("button", { name: "Update range: 0:00–1:23" });
+    const [rangePanelBefore, rangeControlsBefore, rangeDockBefore, rangeHeadingBox] = await Promise.all([
+      panel.boundingBox(),
+      preparationControls.boundingBox(),
+      sourceDock.boundingBox(),
+      rangeHeading.boundingBox(),
+    ]);
+    expect((rangePanelBefore?.height ?? Infinity) - (rangeHeadingBox?.height ?? 0)).toBeLessThanOrEqual(60);
+    await rangeParameter.click();
+    const rangePopover = page.getByRole("dialog", { name: "Range options" });
+    await expect(rangePopover).toBeVisible();
+    await expect(page.getByLabel("Entire video · 0:00–1:23")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+    const [editedPanelBox, editedControlsBox, editedDockBox, rangePopoverBox, rangeTriggerBox] = await Promise.all([
+      panel.boundingBox(),
+      preparationControls.boundingBox(),
+      sourceDock.boundingBox(),
+      rangePopover.boundingBox(),
+      rangeParameter.boundingBox(),
+    ]);
+    for (const [before, after] of [
+      [rangePanelBefore, editedPanelBox],
+      [rangeControlsBefore, editedControlsBox],
+      [rangeDockBefore, editedDockBox],
+    ] as const) {
+      for (const key of ["x", "y", "width", "height"] as const) {
+        expect(Math.abs((after?.[key] ?? Infinity) - (before?.[key] ?? -Infinity))).toBeLessThanOrEqual(1);
+      }
+    }
+    expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual(7.5);
+    expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(7.5);
+    expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width - 7.5);
+    expect((rangePopoverBox?.y ?? 0) + (rangePopoverBox?.height ?? 0)).toBeLessThanOrEqual(
+      (rangeTriggerBox?.y ?? 0) - 0.5,
+    );
+    await page.keyboard.press("Escape");
+    await expect(rangePopover).not.toBeVisible();
+    await expect(rangeParameter).toBeFocused();
     await page.getByRole("button", { name: "Continue to Language" }).click();
     await page.getByRole("button", { name: "Continue to Output" }).click();
     await page.getByRole("button", { name: "Continue to Forecast" }).click();
     await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "forecast");
-    await expect(page.getByRole("heading", { name: "Here’s what Studio knows so far" })).toBeFocused();
+    await expect(page.getByRole("heading", { name: /^I’ve bound / })).toBeFocused();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+    const forecastPanelBox = await panel.boundingBox();
+    const forecastDockBox = await sourceDock.boundingBox();
+    const forecastControlsBox = await preparationControls.boundingBox();
+    expect(Math.abs(
+      (forecastControlsBox?.y ?? 0) -
+      ((forecastPanelBox?.y ?? 0) + (forecastPanelBox?.height ?? 0) - 9),
+    )).toBeLessThanOrEqual(2.5);
+    expect((forecastControlsBox?.y ?? 0) + (forecastControlsBox?.height ?? 0))
+      .toBeLessThanOrEqual((forecastDockBox?.y ?? 0) - 8);
 
     await page.getByRole("button", { name: "Continue to Review" }).click();
     await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "confirm");
-    await expect(page.getByRole("heading", { name: "Preview the interface with a recorded run" })).toBeFocused();
+    await expect(page.getByRole("heading", { name: /^I’m ready to open the recorded run-006 interface preview/ }))
+      .toBeFocused();
     await expect(page.getByRole("button", { name: "Preview run-006 recorded processing" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   }

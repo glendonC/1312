@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { clock, rate, signed } from "./format";
 import RecordedEvidence from "./evidence/RecordedEvidence";
+import { RECORDED_RESULTS_ID } from "./resultAccess";
 import { useBundle, useStudio } from "./store";
 import type { Cue, View } from "./types";
 
@@ -49,8 +50,12 @@ export default function Results() {
 
   return (
     <motion.div
+      id={RECORDED_RESULTS_ID}
       className="results"
       data-accuracy={accuracyMeasured ? "measured" : "unscored"}
+      role="region"
+      aria-label="Recorded Results"
+      tabIndex={-1}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}

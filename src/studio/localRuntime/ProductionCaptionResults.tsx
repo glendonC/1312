@@ -1,4 +1,5 @@
 import type { VerifiedCaptionProductionResult } from "../runtime/production/captionProductionAudit";
+import { PRODUCTION_CAPTION_RESULTS_ID } from "../resultAccess";
 import { seconds } from "./productLocalRuntimeShared";
 
 export default function ProductionCaptionResults({
@@ -10,9 +11,11 @@ export default function ProductionCaptionResults({
 }) {
   return (
     <section
+      id={PRODUCTION_CAPTION_RESULTS_ID}
       className="product-runtime-caption-results"
       data-production-results-region="caption-lineage"
       aria-labelledby="product-runtime-caption-results-title"
+      tabIndex={-1}
     >
       <header>
         <span>Host-verified private artifacts</span>

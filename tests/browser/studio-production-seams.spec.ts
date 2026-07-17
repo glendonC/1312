@@ -47,6 +47,8 @@ test("owned processing canvas exposes projection facts and explicit missing rece
   await expect(operation.getByText("No perception observation recorded for this operation")).toBeVisible();
   await expect(coordination.locator('[data-production-live-empty="caption-lineage"]')).toBeVisible();
   await expect(coordination.getByText(/No caption-production start receipt/)).toBeVisible();
+  await expect(canvas.getByRole("button", { name: "Evidence", exact: true })).toBeVisible();
+  await expect(canvas.getByRole("button", { name: "Results", exact: true })).toHaveCount(0);
 });
 
 test("attested approval explicitly produces private bounded captions without publication", async ({ page }, testInfo) => {

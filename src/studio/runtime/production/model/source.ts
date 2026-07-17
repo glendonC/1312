@@ -37,12 +37,14 @@ export interface SourceArtifactDescriptor {
 
 /** Host-only descriptor for producer-validated evidence that existed before runtime start. */
 export interface PreflightEvidenceArtifactDescriptor {
-  schema: "studio.preflight-evidence-artifact.v1";
+  schema: "studio.preflight-evidence-artifact.v1" | "studio.preflight-evidence-artifact.v2";
   evidenceKind: EvidenceKind;
-  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
-  producerId: "silero-vad" | "whisper-language-id";
+  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1" | "studio.acoustic-observations.v1";
+  producerId: "silero-vad" | "whisper-language-id" | "yamnet-acoustic-triage";
   path: string;
   content: ContentIdentity;
+  producerReceiptPath?: string;
+  producerReceiptContent?: ContentIdentity;
   preflightId: string;
   preflightContentId: string;
 }
@@ -69,7 +71,7 @@ export interface ProductionSourceSession {
     contentId: string;
   };
   preflight: {
-    schema: "studio.preflight-bundle.v1" | "studio.preflight-bundle.v2" | "studio.preflight-bundle.v3";
+      schema: "studio.preflight-bundle.v1" | "studio.preflight-bundle.v2" | "studio.preflight-bundle.v3" | "studio.preflight-bundle.v4";
     preflightId: string;
     contentId: string;
   };

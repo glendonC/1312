@@ -26,7 +26,20 @@ export interface LanguageRangeEvidenceFact {
   };
 }
 
-export type EvidenceFact = SpeechWindowEvidenceFact | LanguageRangeEvidenceFact;
+export interface AcousticRangeEvidenceFact {
+  kind: "acoustic_range";
+  index: number;
+  startSample: number;
+  endSample: number;
+  startMs: number;
+  endMs: number;
+  classification: "speech_candidate" | "music" | "noise" | "mixed" | "unknown";
+  certainty: "strong" | "weak";
+  confidence: { speechCandidate: number; music: number; noise: number; winningScore: number; margin: number };
+  reason: string;
+}
+
+export type EvidenceFact = SpeechWindowEvidenceFact | LanguageRangeEvidenceFact | AcousticRangeEvidenceFact;
 
 export interface EvidenceReadRequest {
   operationId: string;
@@ -36,7 +49,7 @@ export interface EvidenceReadRequest {
 }
 
 export interface EvidenceReadReceipt {
-  schema: "studio.evidence-read.receipt.v2";
+  schema: "studio.evidence-read.receipt.v2" | "studio.evidence-read.receipt.v3";
   receiptId: string;
   operationId: string;
   capability: "evidence.read";
@@ -55,11 +68,11 @@ export interface EvidenceReadReceipt {
     contentId: string;
     bytes: number;
     evidenceKind: EvidenceKind;
-    receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
+    receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1" | "studio.acoustic-observations.v1";
   };
   producer: {
     id: "studio.bounded-evidence-read";
-    version: "2";
+    version: "2" | "3";
     rangePolicy: "intersect_and_clip_to_authorized_window";
   };
   facts: EvidenceFact[];
@@ -73,6 +86,7 @@ export interface EvidenceReadReceipt {
     preflightId: string;
     preflightContentId: string;
     sourceArtifactIds: string[];
+    producerReceiptContentId?: string;
   };
 }
 

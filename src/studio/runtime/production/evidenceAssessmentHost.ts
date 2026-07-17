@@ -68,6 +68,9 @@ async function loadReadReceipts(
     }
     validateEvidenceReadReceipt(value, "Evidence assessment input", "receipt");
     const receipt = value;
+    if (receipt.schema !== "studio.evidence-read.receipt.v2" || receipt.input.evidenceKind === "acoustic_ranges") {
+      throw new Error("Acoustic evidence is not a speech-specific assessment claim input");
+    }
     if (
       !readReceiptIdentityMatches(receipt, identity.receiptContentId) ||
       receipt.operationId !== operation.id ||

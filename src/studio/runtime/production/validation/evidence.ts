@@ -19,8 +19,8 @@ import {
 } from "./primitives.ts";
 import { MAX_EVIDENCE_READ_BYTES, MAX_EVIDENCE_READ_ITEMS } from "./scheduling.ts";
 
-const EVIDENCE_KINDS = new Set(["speech_activity", "language_ranges"]);
-const FACT_KINDS = new Set(["speech_window", "non_speech_window", "language_range"]);
+const EVIDENCE_KINDS = new Set(["speech_activity", "language_ranges", "acoustic_ranges"]);
+const FACT_KINDS = new Set(["speech_window", "non_speech_window", "language_range", "acoustic_range"]);
 const DECISION_STATUSES = new Set(["classified", "unknown", "withheld"]);
 
 export function assertEvidenceReadRequest(
@@ -47,7 +47,7 @@ function fact(value: unknown, context: string, path: string): asserts value is E
   if (kind === "speech_window" || kind === "non_speech_window") {
     exact(item, ["kind", "index", "startSample", "endSample", "startMs", "endMs"], context, path);
     integer(item.index, context, `${path}.index`);
-  } else {
+  } else if (kind === "language_range") {
     exact(
       item,
       ["kind", "speechWindowIndex", "chunkIndex", "startSample", "endSample", "startMs", "endMs", "decision"],
@@ -63,6 +63,16 @@ function fact(value: unknown, context: string, path: string): asserts value is E
     optionalFinite(decision.probability, context, `${path}.decision.probability`);
     optionalFinite(decision.margin, context, `${path}.decision.margin`);
     nullableString(decision.reason, context, `${path}.decision.reason`);
+  } else {
+    exact(item, ["kind", "index", "startSample", "endSample", "startMs", "endMs", "classification", "certainty", "confidence", "reason"], context, path);
+    integer(item.index, context, `${path}.index`);
+    oneOf(item.classification, new Set(["speech_candidate", "music", "noise", "mixed", "unknown"]), context, `${path}.classification`);
+    oneOf(item.certainty, new Set(["strong", "weak"]), context, `${path}.certainty`);
+    string(item.reason, context, `${path}.reason`);
+    const confidence = object(item.confidence, context, `${path}.confidence`);
+    exact(confidence, ["speechCandidate", "music", "noise", "winningScore", "margin"], context, `${path}.confidence`);
+    for (const key of ["speechCandidate", "music", "noise", "winningScore", "margin"]) optionalFinite(confidence[key], context, `${path}.confidence.${key}`);
+    if (item.certainty === "weak" && item.classification !== "unknown") fail(context, path, "cannot upgrade weak acoustic confidence to a definite class");
   }
   const startSample = integer(item.startSample, context, `${path}.startSample`);
   const endSample = integer(item.endSample, context, `${path}.endSample`, 1);
@@ -83,7 +93,7 @@ export function validateEvidenceReadReceipt(
     context,
     path,
   );
-  literal(item.schema, "studio.evidence-read.receipt.v2", context, `${path}.schema`);
+  const schema = oneOf(item.schema, new Set(["studio.evidence-read.receipt.v2", "studio.evidence-read.receipt.v3"]), context, `${path}.schema`);
   string(item.receiptId, context, `${path}.receiptId`);
   string(item.operationId, context, `${path}.operationId`);
   literal(item.capability, "evidence.read", context, `${path}.capability`);
@@ -120,13 +130,15 @@ export function validateEvidenceReadReceipt(
   const evidenceKind = oneOf(input.evidenceKind, EVIDENCE_KINDS, context, `${path}.input.evidenceKind`);
   const receiptSchema = oneOf(
     input.receiptSchema,
-    new Set(["studio.speech-activity.v1", "studio.language-ranges.v1"]),
+    new Set(["studio.speech-activity.v1", "studio.language-ranges.v1", "studio.acoustic-observations.v1"]),
     context,
     `${path}.input.receiptSchema`,
   );
   if (
     (evidenceKind === "speech_activity" && receiptSchema !== "studio.speech-activity.v1") ||
-    (evidenceKind === "language_ranges" && receiptSchema !== "studio.language-ranges.v1")
+    (evidenceKind === "language_ranges" && receiptSchema !== "studio.language-ranges.v1") ||
+    (evidenceKind === "acoustic_ranges" && (schema !== "studio.evidence-read.receipt.v3" || receiptSchema !== "studio.acoustic-observations.v1")) ||
+    (schema === "studio.evidence-read.receipt.v3" && evidenceKind !== "acoustic_ranges")
   ) {
     fail(context, `${path}.input`, "evidence kind and receipt schema must agree");
   }
@@ -134,7 +146,7 @@ export function validateEvidenceReadReceipt(
   const producer = object(item.producer, context, `${path}.producer`);
   exact(producer, ["id", "version", "rangePolicy"], context, `${path}.producer`);
   literal(producer.id, "studio.bounded-evidence-read", context, `${path}.producer.id`);
-  literal(producer.version, "2", context, `${path}.producer.version`);
+  literal(producer.version, schema === "studio.evidence-read.receipt.v3" ? "3" : "2", context, `${path}.producer.version`);
   literal(
     producer.rangePolicy,
     "intersect_and_clip_to_authorized_window",
@@ -166,9 +178,10 @@ export function validateEvidenceReadReceipt(
   }
 
   const lineage = object(item.lineage, context, `${path}.lineage`);
-  exact(lineage, ["preflightId", "preflightContentId", "sourceArtifactIds"], context, `${path}.lineage`);
+  exact(lineage, schema === "studio.evidence-read.receipt.v3" ? ["preflightId", "preflightContentId", "sourceArtifactIds", "producerReceiptContentId"] : ["preflightId", "preflightContentId", "sourceArtifactIds"], context, `${path}.lineage`);
   string(lineage.preflightId, context, `${path}.lineage.preflightId`);
   contentId(lineage.preflightContentId, context, `${path}.lineage.preflightContentId`);
+  if (schema === "studio.evidence-read.receipt.v3") contentId(lineage.producerReceiptContentId, context, `${path}.lineage.producerReceiptContentId`);
   const sources = uniqueStrings(lineage.sourceArtifactIds, context, `${path}.lineage.sourceArtifactIds`);
   if (sources.length !== 1) fail(context, `${path}.lineage.sourceArtifactIds`, "must name one runtime source artifact");
   if (sources[0] !== sourceArtifactId) {

@@ -45,9 +45,12 @@ export function assertPreflightEvidenceArtifactDescriptor(
   context = "Preflight evidence artifact descriptor",
 ): asserts value is PreflightEvidenceArtifactDescriptor {
   const item = object(value, context, "evidence");
+  const descriptorSchema = oneOf(item.schema, new Set(["studio.preflight-evidence-artifact.v1", "studio.preflight-evidence-artifact.v2"]), context, "evidence.schema");
   exact(
     item,
-    [
+    descriptorSchema === "studio.preflight-evidence-artifact.v2" ? [
+      "schema", "evidenceKind", "receiptSchema", "producerId", "path", "content", "producerReceiptPath", "producerReceiptContent", "preflightId", "preflightContentId",
+    ] : [
       "schema",
       "evidenceKind",
       "receiptSchema",
@@ -60,22 +63,21 @@ export function assertPreflightEvidenceArtifactDescriptor(
     context,
     "evidence",
   );
-  literal(item.schema, "studio.preflight-evidence-artifact.v1", context, "evidence.schema");
   const evidenceKind = oneOf(
     item.evidenceKind,
-    new Set(["speech_activity", "language_ranges"]),
+    new Set(["speech_activity", "language_ranges", "acoustic_ranges"]),
     context,
     "evidence.evidenceKind",
   );
   const receiptSchema = oneOf(
     item.receiptSchema,
-    new Set(["studio.speech-activity.v1", "studio.language-ranges.v1"]),
+    new Set(["studio.speech-activity.v1", "studio.language-ranges.v1", "studio.acoustic-observations.v1"]),
     context,
     "evidence.receiptSchema",
   );
   const producerId = oneOf(
     item.producerId,
-    new Set(["silero-vad", "whisper-language-id"]),
+    new Set(["silero-vad", "whisper-language-id", "yamnet-acoustic-triage"]),
     context,
     "evidence.producerId",
   );
@@ -83,12 +85,19 @@ export function assertPreflightEvidenceArtifactDescriptor(
     (evidenceKind === "speech_activity" &&
       (receiptSchema !== "studio.speech-activity.v1" || producerId !== "silero-vad")) ||
     (evidenceKind === "language_ranges" &&
-      (receiptSchema !== "studio.language-ranges.v1" || producerId !== "whisper-language-id"))
+      (receiptSchema !== "studio.language-ranges.v1" || producerId !== "whisper-language-id")) ||
+    (evidenceKind === "acoustic_ranges" &&
+      (descriptorSchema !== "studio.preflight-evidence-artifact.v2" || receiptSchema !== "studio.acoustic-observations.v1" || producerId !== "yamnet-acoustic-triage")) ||
+    (descriptorSchema === "studio.preflight-evidence-artifact.v2" && evidenceKind !== "acoustic_ranges")
   ) {
     fail(context, "evidence", "kind, receipt schema, and pinned producer must agree");
   }
   string(item.path, context, "evidence.path");
   hash(item.content, context, "evidence.content");
+  if (descriptorSchema === "studio.preflight-evidence-artifact.v2") {
+    string(item.producerReceiptPath, context, "evidence.producerReceiptPath");
+    hash(item.producerReceiptContent, context, "evidence.producerReceiptContent");
+  }
   string(item.preflightId, context, "evidence.preflightId");
   contentId(item.preflightContentId, context, "evidence.preflightContentId");
 }

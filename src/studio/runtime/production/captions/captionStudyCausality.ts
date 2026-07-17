@@ -8,6 +8,8 @@ import type {
   PublishReviewDecisionReceiptIdentity,
   StudyReadinessReceiptIdentity,
 } from "../model.ts";
+import type { DialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.ts";
+import { rangeOverlapsNonDialogue } from "../../../acoustic/dialogueScopePolicy.ts";
 
 function uniqueByIdentity<T>(values: readonly T[], identity: (value: T) => string): T[] {
   const seen = new Set<string>();
@@ -143,5 +145,15 @@ export function captionLineReceiptProjection(line: CaptionProductionLine) {
     claimIds: [...line.lineage.study.claimIds],
     semanticEvidenceArtifactIds: line.lineage.study.semanticCitations.map((citation) => citation.artifactId),
     reportArtifactIds: line.lineage.study.childReports.map((report) => report.artifactId),
+  };
+}
+
+/** Authoritative post-executor text boundary; any overlap with excluded scope withholds the whole line. */
+export function enforceCaptionDialogueScope(line: CaptionProductionLine, policy: DialogueScopePolicy | undefined): CaptionProductionLine {
+  if (!policy || !rangeOverlapsNonDialogue(policy, line.startMs, line.endMs)) return structuredClone(line);
+  return {
+    ...structuredClone(line),
+    source: { language: "ko", state: "withheld", text: null, reasonCode: "not_in_requested_dialogue_scope" },
+    target: { language: "en", state: "withheld", text: null, reasonCode: "not_in_requested_dialogue_scope" },
   };
 }

@@ -80,7 +80,7 @@ export function validateStudyArtifactOrigin(
     const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
     oneOf(origin.outcome, new Set(["proceed_to_caption_review", "withheld"]), context, `${path}.origin.outcome`);
     if (
-      item.kind !== "studio.study-readiness.receipt.v1" || mediaClass !== "non_media" || item.publication !== "private" ||
+      (item.kind !== "studio.study-readiness.receipt.v1" && item.kind !== "studio.study-readiness.receipt.v2") || mediaClass !== "non_media" || item.publication !== "private" ||
       item.durationMs !== null || (item.tracks as unknown[]).length !== 0 || task !== null || agent !== null ||
       JSON.stringify(sources) !== JSON.stringify([studyArtifactId]) ||
       receiptContentId !== (item.content as { contentId: string }).contentId

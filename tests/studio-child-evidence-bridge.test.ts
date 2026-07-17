@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { promisify } from "node:util";
 import test from "node:test";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -26,6 +28,7 @@ import { projectProductionRuntimeJournal } from "../src/studio/runtime/productio
 
 const FIXTURE = resolve("public/demo/runs/run-005");
 const MCP_SERVER = resolve("src/studio/runtime/production/executor/evidenceMcpServer.ts");
+const run = promisify(execFile);
 
 class SequenceIdentities implements RuntimeIdentityFactory {
   private value = 0;
@@ -41,14 +44,14 @@ class SequenceIdentities implements RuntimeIdentityFactory {
   }
 }
 
-async function evidenceHarness(registerChild = true) {
+async function evidenceHarness(registerChild = true, fixture = FIXTURE, expectedEvidence = 2) {
   const directory = await mkdtemp(join(tmpdir(), "studio-child-evidence-bridge-"));
-  const loaded = await loadOwnedSourceSession(FIXTURE);
+  const loaded = await loadOwnedSourceSession(fixture);
   const artifacts = new ContentAddressedArtifactStore(join(directory, "artifacts"));
   const source = await artifacts.registerSource("runtime:child-evidence-bridge", loaded.descriptor);
   const evidence = await Promise.all(loaded.evidenceDescriptors.map((descriptor) =>
     artifacts.registerPreflightEvidence("runtime:child-evidence-bridge", source.id, descriptor)));
-  assert.equal(evidence.length, 2);
+  assert.equal(evidence.length, expectedEvidence);
   const ledger = await RuntimeLedger.open("runtime:child-evidence-bridge", new MemoryEventJournal(), {
     now: () => new Date("2026-07-15T12:00:00.000Z"),
   });
@@ -57,7 +60,7 @@ async function evidenceHarness(registerChild = true) {
   const scheduler = new BoundedRuntimeScheduler(ledger, {
     maxDepth: 1,
     maxActiveWorkers: 2,
-    runBudget: { wallMs: 30_000, toolCalls: 4 },
+    runBudget: { wallMs: 30_000, toolCalls: expectedEvidence + 2 },
     grantableCapabilities: ["task.spawn.request", "report.submit", "evidence.read"],
   }, new SequenceIdentities());
   const inputArtifactIds = [source.id, ...evidence.map((artifact) => artifact.id)];
@@ -87,7 +90,7 @@ async function evidenceHarness(registerChild = true) {
     requiredOutputs: [{ name: "evidence report", artifactKind: "worker-execution-report", required: true }],
     requiredCapabilities: ["evidence.read", "report.submit"],
     dependencies: [],
-    budget: { wallMs: 20_000, toolCalls: 2 },
+    budget: { wallMs: 20_000, toolCalls: expectedEvidence },
   };
   const decision = await scheduler.requestSpawn(root.taskId, root.agentId, child);
   assert.ok(decision.permit);
@@ -263,6 +266,31 @@ test("stdio MCP reads real pinned VAD/language evidence under grant, item, byte,
     assert.equal((await runtime.ledger.events()).length, beforeRejected);
   } finally {
     await client.close().catch(() => undefined);
+    await runtime.opened!.close();
+    await rm(runtime.directory, { recursive: true, force: true });
+  }
+});
+
+test("spawned child reads actual V4 acoustic cells through an exact granted content-addressed path", async (suite) => {
+  const fixture = await mkdtemp(join(tmpdir(), "studio-child-acoustic-v4-"));
+  suite.after(() => rm(fixture, { recursive: true, force: true }));
+  await cp(FIXTURE, fixture, { recursive: true });
+  await run(process.execPath, [resolve("scripts/detect-acoustics.mjs"), "--directory", fixture, "--start-ms", "0", "--end-ms", "1920"], { timeout: 10_000 });
+  await run(process.execPath, [resolve("scripts/seal-acoustic-preflight.mjs"), "--run", "run-005", "--directory", fixture], { timeout: 10_000 });
+  const runtime = await evidenceHarness(true, fixture, 3);
+  try {
+    const acoustic = runtime.evidence.find((artifact) => artifact.origin.kind === "preflight_evidence" && artifact.origin.evidenceKind === "acoustic_ranges");
+    assert.ok(acoustic);
+    const result = await runtime.bridge.call({ artifactId: acoustic.id });
+    assert.equal(result.receipt.schema, "studio.evidence-read.receipt.v3");
+    assert.equal(result.receipt.input.evidenceKind, "acoustic_ranges");
+    assert.ok(result.receipt.facts.length > 0);
+    assert.ok(result.receipt.facts.every((fact) => fact.kind === "acoustic_range"));
+    assert.equal(result.receipt.lineage.producerReceiptContentId, acoustic.origin.kind === "preflight_evidence" ? acoustic.origin.producerReceiptContentId : null);
+    const replay = projectProductionRuntimeJournal(await runtime.ledger.events());
+    assert.equal(replay.evidenceArtifacts.some((artifact) => artifact.evidenceKind === "acoustic_ranges"), true);
+    assert.equal(replay.evidenceReads.some((read) => read.evidenceKind === "acoustic_ranges" && read.status === "completed"), true);
+  } finally {
     await runtime.opened!.close();
     await rm(runtime.directory, { recursive: true, force: true });
   }

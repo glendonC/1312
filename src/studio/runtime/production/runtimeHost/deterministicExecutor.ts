@@ -300,7 +300,8 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       }
       const assessmentGrant = task.grants.find((grant) => grant.capability === "analysis.evidence.assess");
       if (assessmentGrant) {
-        const claims = evidenceResults.map((result) => {
+        const assessableEvidenceResults = evidenceResults.filter((result) => result.receipt.input.evidenceKind !== "acoustic_ranges");
+        const claims = assessableEvidenceResults.map((result) => {
           const fact = result.receipt.facts[0];
           if (!fact) throw new Error("The deterministic assessment proof requires one returned fact per read receipt");
           const citation = [{
@@ -328,11 +329,11 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
           nextOperationId: () => `operation:evidence-assess:${canonicalSha256({
             runId: ledger.runId,
             taskId: task.id,
-            readReceiptIds: evidenceResults.map((result) => result.receiptId),
+            readReceiptIds: assessableEvidenceResults.map((result) => result.receiptId),
           })}`,
         });
         assessmentResult = await assessmentBridge.call({
-          readReceipts: evidenceResults.map((result) => ({
+          readReceipts: assessableEvidenceResults.map((result) => ({
             receiptId: result.receiptId,
             receiptContentId: result.receiptContentId,
           })),

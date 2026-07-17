@@ -8,6 +8,7 @@ import type {
   SpawnRejection,
   TaskJobContext,
 } from "./tasks.ts";
+import type { DialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.ts";
 
 export const OWNED_MEDIA_STUDY_LIMITS = {
   maxArtifactBytes: 512 * 1024,
@@ -323,10 +324,11 @@ export type StudyReadinessReasonCode =
   | "unresolved_conflict"
   | "hidden_gap"
   | "unsupported_synthesized_claim"
+  | "dialogue_text_in_non_dialogue_range"
   | "stored_content_integrity_failed";
 
 export interface StudyReadinessReceipt {
-  schema: "studio.study-readiness.receipt.v1";
+  schema: "studio.study-readiness.receipt.v1" | "studio.study-readiness.receipt.v2";
   receiptId: string;
   readinessId: string;
   input: {
@@ -349,9 +351,10 @@ export interface StudyReadinessReceipt {
   };
   producer: {
     id: "studio.deterministic-study-readiness-audit";
-    version: "1";
-    policy: "closed_gap_and_integrity_gate_no_quality_score";
+    version: "1" | "2";
+    policy: "closed_gap_and_integrity_gate_no_quality_score" | "closed_gap_integrity_and_dialogue_scope_gate_no_quality_score";
   };
+  dialogueScopePolicy?: DialogueScopePolicy;
   result: {
     outcome: StudyReadinessOutcome;
     reasonCodes: StudyReadinessReasonCode[];

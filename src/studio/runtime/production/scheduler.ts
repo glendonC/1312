@@ -158,7 +158,10 @@ export class BoundedRuntimeScheduler {
         assessmentScope: capability === "analysis.evidence.assess"
           ? {
               evidenceArtifactIds: input.inputArtifactIds
-                .filter((artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence")
+                .filter((artifactId) => {
+                  const artifact = state.artifacts[artifactId];
+                  return artifact?.origin.kind === "preflight_evidence" && artifact.origin.evidenceKind !== "acoustic_ranges";
+                })
                 .sort(),
               maxAssessments: MAX_EVIDENCE_ASSESSMENTS,
               maxReadReceipts: MAX_EVIDENCE_ASSESS_READ_RECEIPTS,

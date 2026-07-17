@@ -19,7 +19,8 @@ export type PreflightArtifactKindV2 =
   | "detector_audio"
   | "speech_activity_receipt";
 export type PreflightArtifactKindV3 = PreflightArtifactKindV2 | "language_ranges_receipt";
-export type PreflightArtifactKind = PreflightArtifactKindV3;
+export type PreflightArtifactKindV4 = PreflightArtifactKindV3 | "acoustic_observations" | "acoustic_triage_receipt";
+export type PreflightArtifactKind = PreflightArtifactKindV4;
 export type PreflightArtifactClassV1 = "raw" | "receipt";
 export type PreflightArtifactClassV2 = PreflightArtifactClassV1 | "derived";
 export type PreflightArtifactClass = PreflightArtifactClassV2;
@@ -50,7 +51,12 @@ export type PreflightArtifactV3 =
   | PreflightArtifactV2
   | PreflightArtifactBase<"language_ranges_receipt", "receipt">;
 
-export type PreflightArtifact = PreflightArtifactV3;
+export type PreflightArtifactV4 =
+  | PreflightArtifactV3
+  | PreflightArtifactBase<"acoustic_observations", "derived">
+  | PreflightArtifactBase<"acoustic_triage_receipt", "receipt">;
+
+export type PreflightArtifact = PreflightArtifactV4;
 
 export interface PreflightFindingsV1 {
   container_tracks: string;
@@ -79,7 +85,16 @@ export interface PreflightFindingsV3 {
   complexity: null;
 }
 
-export type PreflightFindings = PreflightFindingsV1 | PreflightFindingsV2 | PreflightFindingsV3;
+export interface PreflightFindingsV4 {
+  container_tracks: string;
+  speech_activity: string;
+  language_ranges: string;
+  acoustic_ranges: string;
+  speaker_overlap: null;
+  complexity: null;
+}
+
+export type PreflightFindings = PreflightFindingsV1 | PreflightFindingsV2 | PreflightFindingsV3 | PreflightFindingsV4;
 
 interface PreflightSourceReference {
   receipt_id: string;
@@ -117,7 +132,17 @@ export interface PreflightBundleV3 {
   note: string;
 }
 
-export type PreflightBundle = PreflightBundleV1 | PreflightBundleV2 | PreflightBundleV3;
+export interface PreflightBundleV4 {
+  schema: "studio.preflight-bundle.v4";
+  producer: "scripts/seal-acoustic-preflight.mjs";
+  preflight_id: string;
+  source: PreflightSourceReference;
+  artifacts: PreflightArtifactV4[];
+  findings: PreflightFindingsV4;
+  note: string;
+}
+
+export type PreflightBundle = PreflightBundleV1 | PreflightBundleV2 | PreflightBundleV3 | PreflightBundleV4;
 
 export interface SpeechActivityReceipt {
   schema: "studio.speech-activity.v1";

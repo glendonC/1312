@@ -51,7 +51,7 @@ export const WORKER_KINDS = new Set([
   "quality",
 ]);
 const TRACK_KINDS = new Set(["audio", "video", "subtitle", "data", "attachment"]);
-const EVIDENCE_KINDS = new Set(["speech_activity", "language_ranges"]);
+const EVIDENCE_KINDS = new Set(["speech_activity", "language_ranges", "acoustic_ranges"]);
 export const MAX_EVIDENCE_READ_BYTES = 32 * 1024;
 export const MAX_EVIDENCE_READ_ITEMS = 64;
 export const MAX_EVIDENCE_ASSESSMENTS = 1;

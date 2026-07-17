@@ -327,7 +327,7 @@ function validateManifest(value: unknown): ChildEvidenceToolManifest {
         "maxItems",
       ]) ||
       typeof scope.artifactId !== "string" || !scope.artifactId ||
-      (scope.evidenceKind !== "speech_activity" && scope.evidenceKind !== "language_ranges") ||
+      (scope.evidenceKind !== "speech_activity" && scope.evidenceKind !== "language_ranges" && scope.evidenceKind !== "acoustic_ranges") ||
       typeof scope.sourceArtifactId !== "string" || !scope.sourceArtifactId ||
       !Number.isSafeInteger(scope.startMs) || (scope.startMs as number) < 0 ||
       !Number.isSafeInteger(scope.endMs) || (scope.endMs as number) <= (scope.startMs as number) ||

@@ -4,8 +4,8 @@ export interface ProductionStudioEvidenceArtifactView {
   artifactId: string;
   kind: string;
   evidenceKind: EvidenceKind;
-  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
-  producerId: "silero-vad" | "whisper-language-id";
+  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1" | "studio.acoustic-observations.v1";
+  producerId: "silero-vad" | "whisper-language-id" | "yamnet-acoustic-triage";
   contentId: string;
   bytes: number;
   sourceArtifactIds: string[];

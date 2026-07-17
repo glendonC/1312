@@ -23,6 +23,7 @@ import {
   string,
   uniqueStrings,
 } from "./primitives.ts";
+import { validateDialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.ts";
 
 const COVERAGE_STATES = new Set(["supported", "withheld", "unknown", "failed"]);
 const COVERAGE_REASONS = new Set([
@@ -393,8 +394,8 @@ export function validateOwnedMediaStudyExecutorReceipt(value: unknown): asserts 
 export function validateStudyReadinessReceipt(value: unknown): asserts value is StudyReadinessReceipt {
   const context = "Study readiness receipt";
   const item = object(value, context, "receipt");
-  exact(item, ["schema", "receiptId", "readinessId", "input", "reopened", "producer", "result", "nonClaims"], context, "receipt");
-  literal(item.schema, "studio.study-readiness.receipt.v1", context, "receipt.schema");
+  const schema = oneOf(item.schema, new Set(["studio.study-readiness.receipt.v1", "studio.study-readiness.receipt.v2"]), context, "receipt.schema");
+  exact(item, schema === "studio.study-readiness.receipt.v2" ? ["schema", "receiptId", "readinessId", "input", "reopened", "producer", "dialogueScopePolicy", "result", "nonClaims"] : ["schema", "receiptId", "readinessId", "input", "reopened", "producer", "result", "nonClaims"], context, "receipt");
   string(item.receiptId, context, "receipt.receiptId");
   string(item.readinessId, context, "receipt.readinessId");
   const input = object(item.input, context, "receipt.input");
@@ -413,12 +414,16 @@ export function validateStudyReadinessReceipt(value: unknown): asserts value is 
   const producer = object(item.producer, context, "receipt.producer");
   exact(producer, ["id", "version", "policy"], context, "receipt.producer");
   literal(producer.id, "studio.deterministic-study-readiness-audit", context, "receipt.producer.id");
-  literal(producer.version, "1", context, "receipt.producer.version");
-  literal(producer.policy, "closed_gap_and_integrity_gate_no_quality_score", context, "receipt.producer.policy");
+  literal(producer.version, schema === "studio.study-readiness.receipt.v2" ? "2" : "1", context, "receipt.producer.version");
+  literal(producer.policy, schema === "studio.study-readiness.receipt.v2" ? "closed_gap_integrity_and_dialogue_scope_gate_no_quality_score" : "closed_gap_and_integrity_gate_no_quality_score", context, "receipt.producer.policy");
+  if (schema === "studio.study-readiness.receipt.v2") validateDialogueScopePolicy(item.dialogueScopePolicy);
   const result = object(item.result, context, "receipt.result");
   exact(result, ["outcome", "reasonCodes", "coverageIds", "conflictIds"], context, "receipt.result");
   oneOf(result.outcome, new Set(["proceed_to_caption_review", "withheld"]), context, "receipt.result.outcome");
-  uniqueStrings(result.reasonCodes, context, "receipt.result.reasonCodes").forEach((code) => oneOf(code, new Set(["non_supported_root_coverage", "unresolved_conflict", "hidden_gap", "unsupported_synthesized_claim", "stored_content_integrity_failed"]), context, "receipt.result.reasonCodes"));
+  const reasonCodes = schema === "studio.study-readiness.receipt.v2"
+    ? new Set(["non_supported_root_coverage", "unresolved_conflict", "hidden_gap", "unsupported_synthesized_claim", "dialogue_text_in_non_dialogue_range", "stored_content_integrity_failed"])
+    : new Set(["non_supported_root_coverage", "unresolved_conflict", "hidden_gap", "unsupported_synthesized_claim", "stored_content_integrity_failed"]);
+  uniqueStrings(result.reasonCodes, context, "receipt.result.reasonCodes").forEach((code) => oneOf(code, reasonCodes, context, "receipt.result.reasonCodes"));
   uniqueStrings(result.coverageIds, context, "receipt.result.coverageIds");
   uniqueStrings(result.conflictIds, context, "receipt.result.conflictIds");
   const nonClaims = object(item.nonClaims, context, "receipt.nonClaims");

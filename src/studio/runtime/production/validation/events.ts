@@ -312,7 +312,7 @@ export function assertRuntimeEvent(
     );
     assertEvidenceReadRequest(data.request, context);
     string(data.grantId, context, "event.data.grantId");
-    oneOf(data.evidenceKind, new Set(["speech_activity", "language_ranges"]), context, "event.data.evidenceKind");
+    oneOf(data.evidenceKind, new Set(["speech_activity", "language_ranges", "acoustic_ranges"]), context, "event.data.evidenceKind");
     string(data.sourceArtifactId, context, "event.data.sourceArtifactId");
     const startMs = integer(data.startMs, context, "event.data.startMs");
     const endMs = integer(data.endMs, context, "event.data.endMs", 1);

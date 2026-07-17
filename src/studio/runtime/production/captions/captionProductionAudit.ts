@@ -22,6 +22,7 @@ import {
   captionStudyIdentity,
   deriveCaptionLineStudySupport,
 } from "./captionStudyCausality.ts";
+import { rangeOverlapsNonDialogue } from "../../../acoustic/dialogueScopePolicy.ts";
 import { reopenStudyReadiness } from "../study/studyReadinessAudit.ts";
 import { reopenOwnedMediaStudy } from "../study/studySynthesisAudit.ts";
 import type { RuntimeEvent } from "../protocol.ts";
@@ -256,9 +257,22 @@ export async function reopenCaptionProductionResults(
       "Caption-production verification",
       "receipt",
     );
+    const expectsDialogueScopeVersion = Boolean(readiness.receipt.dialogueScopePolicy);
+    if (
+      (caption.schema === "studio.caption-production.artifact.v2") !== expectsDialogueScopeVersion ||
+      (receipt.schema === "studio.caption-production.receipt.v2") !== expectsDialogueScopeVersion
+    ) throw new Error(`Caption production ${job.id} does not use the contract version required by its readiness policy`);
     const invalidLineCausality = caption.lines.some((line) => {
       const expectedSupport = deriveCaptionLineStudySupport(study, line.startMs, line.endMs);
-      return !sameCanonical(line.lineage.study, { ...studyIdentity, ...expectedSupport }) ||
+      const excluded = readiness.receipt.dialogueScopePolicy
+        ? rangeOverlapsNonDialogue(readiness.receipt.dialogueScopePolicy, line.startMs, line.endMs)
+        : false;
+      const claimsExcluded = line.source.reasonCode === "not_in_requested_dialogue_scope" || line.target.reasonCode === "not_in_requested_dialogue_scope";
+      return (excluded && (
+          line.source.state !== "withheld" || line.target.state !== "withheld" || line.source.text !== null || line.target.text !== null ||
+          line.source.reasonCode !== "not_in_requested_dialogue_scope" || line.target.reasonCode !== "not_in_requested_dialogue_scope"
+        )) || (!excluded && claimsExcluded) ||
+        !sameCanonical(line.lineage.study, { ...studyIdentity, ...expectedSupport }) ||
         !sameCanonical(line.lineage.readiness, approval.readiness) ||
         !sameCanonical(line.lineage.approval, {
           reviewId: approval.reviewId,

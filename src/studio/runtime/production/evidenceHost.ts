@@ -4,6 +4,8 @@ import type {
   LanguageRangesReceipt,
   SpeechActivityReceipt,
 } from "../../preflight/contracts.ts";
+import type { AcousticObservations } from "../../acoustic/contracts.ts";
+import { validateAcousticObservations, validateAcousticReceipt } from "../../acoustic/validation.ts";
 import { authorizeEvidenceRead, type AuthorizedEvidenceRead } from "./authorization.ts";
 import { canonicalSha256, ContentAddressedArtifactStore } from "./artifactStore.ts";
 import type { RuntimeLedger } from "./journal.ts";
@@ -13,6 +15,7 @@ import type {
   EvidenceReadRequest,
   LanguageRangeEvidenceFact,
   SpeechWindowEvidenceFact,
+  AcousticRangeEvidenceFact,
 } from "./model.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
 import { validateEvidenceReadReceipt } from "./validation/evidence.ts";
@@ -125,13 +128,32 @@ function languageFacts(value: unknown): LanguageRangeEvidenceFact[] {
   });
 }
 
+function acousticFacts(value: unknown): AcousticRangeEvidenceFact[] {
+  const observations = validateAcousticObservations(value);
+  if (observations.status !== "complete") throw new Error("Acoustic evidence is not a complete partition");
+  return observations.observations.map((observation) => ({
+    kind: "acoustic_range",
+    index: observation.index,
+    startSample: observation.startSample,
+    endSample: observation.endSample,
+    startMs: observation.startMs,
+    endMs: observation.endMs,
+    classification: observation.classification,
+    certainty: observation.certainty,
+    confidence: structuredClone(observation.confidence),
+    reason: observation.reason,
+  }));
+}
+
 function allFacts(authorized: AuthorizedEvidenceRead, value: unknown): EvidenceFact[] {
   if (authorized.artifact.origin.kind !== "preflight_evidence") {
     throw new Error("Evidence read artifact origin changed after authorization");
   }
   return authorized.artifact.origin.evidenceKind === "speech_activity"
     ? speechFacts(value as SpeechActivityReceipt)
-    : languageFacts(value as LanguageRangesReceipt);
+    : authorized.artifact.origin.evidenceKind === "language_ranges"
+      ? languageFacts(value as LanguageRangesReceipt)
+      : acousticFacts(value as AcousticObservations);
 }
 
 function factsInAuthorizedWindow(
@@ -228,11 +250,20 @@ export class BoundedEvidenceReadHost {
       } catch {
         throw new Error("Registered evidence is no longer valid JSON");
       }
+      if (authorized.artifact.origin.kind === "preflight_evidence" && authorized.artifact.origin.evidenceKind === "acoustic_ranges") {
+        const receiptContentId = authorized.artifact.origin.producerReceiptContentId;
+        if (!receiptContentId) throw new Error("Acoustic evidence lost its separate producer receipt identity");
+        const receiptBytes = await this.artifacts.receiptBytes(receiptContentId);
+        let producerReceipt: unknown;
+        try { producerReceipt = JSON.parse(receiptBytes.toString("utf8")); } catch { throw new Error("Acoustic producer receipt is no longer valid JSON"); }
+        validateAcousticReceipt(producerReceipt, validateAcousticObservations(value));
+      }
       const available = factsInAuthorizedWindow(allFacts(authorized, value), authorized.scope);
       const projected = boundedFacts(available, authorized.remainingItems, authorized.remainingBytes);
       if (authorized.artifact.origin.kind !== "preflight_evidence") {
         throw new Error("Evidence read artifact origin changed after content verification");
       }
+      const acoustic = authorized.artifact.origin.evidenceKind === "acoustic_ranges";
       const body = {
         operationId: authorized.request.operationId,
         capability: "evidence.read" as const,
@@ -255,7 +286,7 @@ export class BoundedEvidenceReadHost {
         },
         producer: {
           id: "studio.bounded-evidence-read" as const,
-          version: "2" as const,
+          version: acoustic ? "3" as const : "2" as const,
           rangePolicy: "intersect_and_clip_to_authorized_window" as const,
         },
         facts: projected.facts,
@@ -269,10 +300,11 @@ export class BoundedEvidenceReadHost {
           preflightId: authorized.artifact.origin.preflightId,
           preflightContentId: authorized.artifact.origin.preflightContentId,
           sourceArtifactIds: [...authorized.artifact.sourceArtifactIds],
+          ...(acoustic ? { producerReceiptContentId: authorized.artifact.origin.producerReceiptContentId! } : {}),
         },
       };
       const receipt: EvidenceReadReceipt = {
-        schema: "studio.evidence-read.receipt.v2",
+        schema: acoustic ? "studio.evidence-read.receipt.v3" : "studio.evidence-read.receipt.v2",
         receiptId: `evidence-read:${canonicalSha256(body)}`,
         ...body,
       };

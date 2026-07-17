@@ -25,7 +25,7 @@ import {
 } from "./primitives.ts";
 
 const LINE_STATES = new Set(["available", "withheld", "unavailable"]);
-const REASON_CODES = new Set([
+const V1_REASON_CODES = new Set([
   "recorded_quality_gate_withheld",
   "recognizer_unavailable",
   "recognizer_empty",
@@ -39,6 +39,7 @@ const REASON_CODES = new Set([
   "study_coverage_uncovered",
   "study_citation_mismatch",
 ]);
+const V2_REASON_CODES = new Set([...V1_REASON_CODES, "not_in_requested_dialogue_scope"]);
 const OUTPUT_STATUSES = new Set(["completed", "partial", "withheld", "unavailable"]);
 
 function stableIdentity(value: unknown, context: string, path: string): string {
@@ -153,7 +154,7 @@ export function validateCaptionProductionInput(value: unknown, context: string, 
   };
 }
 
-function validateLine(value: unknown, context: string, path: string): CaptionProductionLine {
+function validateLine(value: unknown, context: string, path: string, allowDialogueScopeReason: boolean): CaptionProductionLine {
   const item = object(value, context, path);
   exact(item, ["id", "startMs", "endMs", "lineage", "source", "target"], context, path);
   const lineage = object(item.lineage, context, `${path}.lineage`);
@@ -184,7 +185,7 @@ function validateLine(value: unknown, context: string, path: string): CaptionPro
     ? null
     : oneOf<CaptionProductionLine["source"]["reasonCode"] & string>(
       source.reasonCode,
-      REASON_CODES,
+      allowDialogueScopeReason ? V2_REASON_CODES : V1_REASON_CODES,
       context,
       `${path}.source.reasonCode`,
     );
@@ -192,7 +193,7 @@ function validateLine(value: unknown, context: string, path: string): CaptionPro
     ? null
     : oneOf<CaptionProductionLine["target"]["reasonCode"] & string>(
       target.reasonCode,
-      REASON_CODES,
+      allowDialogueScopeReason ? V2_REASON_CODES : V1_REASON_CODES,
       context,
       `${path}.target.reasonCode`,
     );
@@ -270,7 +271,9 @@ function validateLine(value: unknown, context: string, path: string): CaptionPro
     (coverageState === "supported" && coverageReason !== null && coverageReason !== "citation_mismatch") ||
     (coverageState !== "supported" && coverageReason === null) ||
     (expectedStudyReason !== null &&
-      (sourceState !== "withheld" || targetState !== "withheld" || sourceReason !== expectedStudyReason || targetReason !== expectedStudyReason ||
+      (sourceState !== "withheld" || targetState !== "withheld" ||
+        (sourceReason !== expectedStudyReason && (!allowDialogueScopeReason || sourceReason !== "not_in_requested_dialogue_scope")) ||
+        (targetReason !== expectedStudyReason && (!allowDialogueScopeReason || targetReason !== "not_in_requested_dialogue_scope")) || sourceReason !== targetReason ||
         claimIds.length !== 0 || semanticCitations.length !== 0 || childReports.length !== 0))
   ) fail(context, `${path}.lineage.study`, "does not close supported coverage/citations or a null withheld range");
   const captionExecutor = object(lineage.captionExecutor, context, `${path}.lineage.captionExecutor`);
@@ -363,11 +366,11 @@ export function validateCaptionProductionArtifact(
 ): CaptionProductionArtifact {
   const item = object(value, context, path);
   exact(item, ["schema", "jobId", "runId", "input", "executor", "lines", "result"], context, path);
-  literal(item.schema, "studio.caption-production.artifact.v1", context, `${path}.schema`);
+  const schema = oneOf<CaptionProductionArtifact["schema"]>(item.schema, new Set(["studio.caption-production.artifact.v1", "studio.caption-production.artifact.v2"]), context, `${path}.schema`);
   const input = validateCaptionProductionInput(item.input, context, `${path}.input`);
   const executor = validateCaptionExecutorDescriptor(item.executor, context, `${path}.executor`);
   const lines = array(item.lines, context, `${path}.lines`).map((line, index) =>
-    validateLine(line, context, `${path}.lines[${index}]`));
+    validateLine(line, context, `${path}.lines[${index}]`, schema === "studio.caption-production.artifact.v2"));
   if (lines.length > CAPTION_PRODUCTION_LIMITS.maxLines || new Set(lines.map((line) => line.id)).size !== lines.length) {
     fail(context, `${path}.lines`, "exceed the line ceiling or contain duplicate identities");
   }
@@ -410,7 +413,7 @@ export function validateCaptionProductionArtifact(
     fail(context, `${path}.result`, "does not match the timed line states");
   }
   return {
-    schema: "studio.caption-production.artifact.v1",
+    schema,
     jobId: stableIdentity(item.jobId, context, `${path}.jobId`),
     runId: stableIdentity(item.runId, context, `${path}.runId`),
     input,
@@ -436,7 +439,7 @@ export function validateCaptionProductionReceipt(
 ): CaptionProductionReceipt {
   const item = object(value, context, path);
   exact(item, ["schema", "receiptId", "jobId", "authority", "input", "producer", "limits", "result"], context, path);
-  literal(item.schema, "studio.caption-production.receipt.v1", context, `${path}.schema`);
+  const schema = oneOf<CaptionProductionReceipt["schema"]>(item.schema, new Set(["studio.caption-production.receipt.v1", "studio.caption-production.receipt.v2"]), context, `${path}.schema`);
   const authority = object(item.authority, context, `${path}.authority`);
   exact(authority, ["approval", "verification"], context, `${path}.authority`);
   const verification = object(authority.verification, context, `${path}.authority.verification`);
@@ -448,8 +451,8 @@ export function validateCaptionProductionReceipt(
   const producer = object(item.producer, context, `${path}.producer`);
   exact(producer, ["id", "version", "policy", "executor"], context, `${path}.producer`);
   literal(producer.id, "studio.host-caption-production", context, `${path}.producer.id`);
-  literal(producer.version, "1", context, `${path}.producer.version`);
-  literal(producer.policy, "verified_unrevoked_approval_only", context, `${path}.producer.policy`);
+  literal(producer.version, schema === "studio.caption-production.receipt.v2" ? "2" : "1", context, `${path}.producer.version`);
+  literal(producer.policy, schema === "studio.caption-production.receipt.v2" ? "verified_unrevoked_approval_and_dialogue_scope_only" : "verified_unrevoked_approval_only", context, `${path}.producer.policy`);
   const result = object(item.result, context, `${path}.result`);
   exact(result, ["status", "lineCount", "sourceAvailableCount", "targetAvailableCount", "withheldCount", "unavailableCount", "captionArtifactId", "captionContentId", "captionBytes", "lines"], context, `${path}.result`);
   const counts = validateResult({
@@ -480,7 +483,7 @@ export function validateCaptionProductionReceipt(
       endMs,
       sourceState: oneOf<CaptionProductionLine["source"]["state"]>(line.sourceState, LINE_STATES, context, `${linePath}.sourceState`),
       targetState: oneOf<CaptionProductionLine["target"]["state"]>(line.targetState, LINE_STATES, context, `${linePath}.targetState`),
-      reasonCode: line.reasonCode === null ? null : oneOf<NonNullable<CaptionProductionLine["target"]["reasonCode"]>>(line.reasonCode, REASON_CODES, context, `${linePath}.reasonCode`),
+      reasonCode: line.reasonCode === null ? null : oneOf<NonNullable<CaptionProductionLine["target"]["reasonCode"]>>(line.reasonCode, schema === "studio.caption-production.receipt.v2" ? V2_REASON_CODES : V1_REASON_CODES, context, `${linePath}.reasonCode`),
       coverageId: line.coverageId === null ? null : stableIdentity(line.coverageId, context, `${linePath}.coverageId`),
       coverageState: oneOf<CaptionProductionLine["lineage"]["study"]["coverage"]["state"]>(line.coverageState, new Set(["supported", "withheld", "unknown", "failed", "uncovered", "conflict"]), context, `${linePath}.coverageState`),
       claimIds: array(line.claimIds, context, `${linePath}.claimIds`).map((id, claimIndex) => stableIdentity(id, context, `${linePath}.claimIds[${claimIndex}]`)),
@@ -498,7 +501,7 @@ export function validateCaptionProductionReceipt(
     fail(context, `${path}.authority.verification`, "must bind the exact caption study and readiness input");
   }
   return {
-    schema: "studio.caption-production.receipt.v1",
+    schema,
     receiptId: stableIdentity(item.receiptId, context, `${path}.receiptId`),
     jobId: stableIdentity(item.jobId, context, `${path}.jobId`),
     authority: {
@@ -515,8 +518,8 @@ export function validateCaptionProductionReceipt(
     input,
     producer: {
       id: "studio.host-caption-production",
-      version: "1",
-      policy: "verified_unrevoked_approval_only",
+      version: schema === "studio.caption-production.receipt.v2" ? "2" : "1",
+      policy: schema === "studio.caption-production.receipt.v2" ? "verified_unrevoked_approval_and_dialogue_scope_only" : "verified_unrevoked_approval_only",
       executor: validateCaptionExecutorDescriptor(producer.executor, context, `${path}.producer.executor`),
     },
     limits: validateCaptionProductionLimits(item.limits, context, `${path}.limits`),

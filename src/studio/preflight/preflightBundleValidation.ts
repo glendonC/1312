@@ -7,6 +7,9 @@ import type {
   PreflightSourceBinding,
   SpeechActivityReceipt,
 } from "./contracts";
+import type { AcousticObservations, AcousticTriageReceipt } from "../acoustic/contracts.ts";
+import { validateAcousticObservations, validateAcousticReceipt } from "../acoustic/validation.ts";
+import { ACOUSTIC_LIMITS } from "../acoustic/contracts.ts";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const ARTIFACT_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -82,7 +85,7 @@ function relativeArtifactPath(value: unknown, context: string, path: string): st
 
 function artifact(
   value: unknown,
-  version: "v1" | "v2" | "v3",
+  version: "v1" | "v2" | "v3" | "v4",
   context: string,
   path: string,
 ): PreflightArtifact {
@@ -98,12 +101,13 @@ function artifact(
   const v1Kinds: PreflightArtifactKind[] = ["raw_media", "source_receipt", "media_probe_receipt"];
   const v2Kinds: PreflightArtifactKind[] = [...v1Kinds, "detector_audio", "speech_activity_receipt"];
   const v3Kinds: PreflightArtifactKind[] = [...v2Kinds, "language_ranges_receipt"];
-  const registeredKinds = version === "v1" ? v1Kinds : version === "v2" ? v2Kinds : v3Kinds;
+  const v4Kinds: PreflightArtifactKind[] = [...v3Kinds, "acoustic_observations", "acoustic_triage_receipt"];
+  const registeredKinds = version === "v1" ? v1Kinds : version === "v2" ? v2Kinds : version === "v3" ? v3Kinds : v4Kinds;
   if (!registeredKinds.includes(kind)) {
     fail(context, `${path}.kind`, `has no registered ${version} artifact kind ${kind}`);
   }
   const artifactClass = text(item.class, context, `${path}.class`);
-  const expectedClass = kind === "raw_media" ? "raw" : kind === "detector_audio" ? "derived" : "receipt";
+  const expectedClass = kind === "raw_media" ? "raw" : kind === "detector_audio" || kind === "acoustic_observations" ? "derived" : "receipt";
   if (artifactClass !== expectedClass) {
     fail(context, `${path}.class`, `must equal ${expectedClass} for artifact kind ${kind}`);
   }
@@ -159,7 +163,7 @@ function exactSources(
 function commonArtifacts(
   bundle: Record<string, unknown>,
   binding: PreflightSourceBinding,
-  version: "v1" | "v2" | "v3",
+  version: "v1" | "v2" | "v3" | "v4",
   expectedCount: number,
   context: string,
 ): { artifacts: Map<string, PreflightArtifact>; findings: Record<string, unknown> } {
@@ -174,7 +178,9 @@ function commonArtifacts(
         ? "must contain the exact raw, source, and media-probe artifacts"
         : version === "v2"
           ? "must contain the exact raw, source, media-probe, detector-audio, and speech-activity artifacts"
-          : "must contain the exact raw, source, media-probe, detector-audio, speech-activity, and language-ranges artifacts",
+          : version === "v3"
+            ? "must contain the exact raw, source, media-probe, detector-audio, speech-activity, and language-ranges artifacts"
+            : "must contain the exact v3 artifacts plus acoustic observations and their producer receipt",
     );
   }
   const artifacts = new Map(entries.map((entry) => [entry.artifact_id, entry]));
@@ -235,17 +241,19 @@ function validateSpeechArtifacts(
   findings: Record<string, unknown>,
   binding: PreflightSourceBinding,
   speechActivity: SpeechActivityReceipt,
-  version: "v2" | "v3",
+  version: "v2" | "v3" | "v4",
   context: string,
 ): { normalized: PreflightArtifact; speechReceipt: PreflightArtifact } {
   const expectedIds = version === "v2"
     ? ["raw-media", "source-receipt", "container-probe", "speech-detector-audio", "speech-activity"]
-    : ["raw-media", "source-receipt", "container-probe", "speech-detector-audio", "speech-activity", "language-ranges"];
+    : version === "v3"
+      ? ["raw-media", "source-receipt", "container-probe", "speech-detector-audio", "speech-activity", "language-ranges"]
+      : ["raw-media", "source-receipt", "container-probe", "speech-detector-audio", "speech-activity", "language-ranges", "acoustic-observations", "acoustic-triage"];
   if (expectedIds.some((id) => !artifacts.has(id))) {
     fail(context, "bundle.artifacts", `must use the exact ${version} artifact ids ${expectedIds.join(", ")}`);
   }
-  if (version === "v3" && Array.from(artifacts.keys()).some((id, index) => id !== expectedIds[index])) {
-    fail(context, "bundle.artifacts", `must use the exact ordered v3 artifact ids ${expectedIds.join(", ")}`);
+  if (version !== "v2" && Array.from(artifacts.keys()).some((id, index) => id !== expectedIds[index])) {
+    fail(context, "bundle.artifacts", `must use the exact ordered ${version} artifact ids ${expectedIds.join(", ")}`);
   }
   exact(findings.speech_activity, "speech-activity", context, "bundle.findings.speech_activity");
   const normalized = oneArtifact(
@@ -283,6 +291,59 @@ function validateSpeechArtifacts(
     "bundle.findings.speech_activity.source_content_ids",
   );
   return { normalized, speechReceipt };
+}
+
+function validateV4(
+  bundle: Record<string, unknown>,
+  binding: PreflightSourceBinding,
+  speechActivity: SpeechActivityReceipt | null | undefined,
+  languageRanges: LanguageRangesReceipt | null | undefined,
+  acousticObservationsValue: AcousticObservations | null | undefined,
+  acousticReceiptValue: AcousticTriageReceipt | null | undefined,
+  context: string,
+): void {
+  exact(bundle.producer, "scripts/seal-acoustic-preflight.mjs", context, "bundle.producer");
+  exact(bundle.preflight_id, `preflight:${binding.raw.contentId}:speech-v1:language-v1:acoustic-v1`, context, "bundle.preflight_id");
+  if (!speechActivity || !languageRanges || !acousticObservationsValue || !acousticReceiptValue) fail(context, "acousticReceipts", "are required to validate a v4 preflight bundle");
+  const acousticObservations = validateAcousticObservations(acousticObservationsValue);
+  const acousticReceipt = validateAcousticReceipt(acousticReceiptValue, acousticObservations);
+  validateV3({
+    schema: "studio.preflight-bundle.v3",
+    producer: "scripts/seal-language-preflight.mjs",
+    preflight_id: `preflight:${binding.raw.contentId}:speech-v1:language-v1`,
+    source: bundle.source,
+    artifacts: list(bundle.artifacts, context, "bundle.artifacts").slice(0, 6),
+    findings: { ...(bundle.findings as Record<string, unknown>), acoustic_ranges: null },
+    note: bundle.note,
+  }, binding, speechActivity, languageRanges, `${context} inherited V3`);
+  const { artifacts, findings } = commonArtifacts(bundle, binding, "v4", 8, context);
+  const { normalized, speechReceipt } = validateSpeechArtifacts(artifacts, findings, binding, speechActivity, "v4", context);
+  exact(findings.language_ranges, "language-ranges", context, "bundle.findings.language_ranges");
+  const languageReceipt = oneArtifact(artifacts, findings.language_ranges, "language_ranges_receipt", context, "bundle.findings.language_ranges");
+  if (
+    languageReceipt.path !== "language-ranges.json" ||
+    languageRanges.input.normalized_audio.content.id !== normalized.content.id ||
+    languageRanges.input.speech_activity.content.id !== speechReceipt.content.id
+  ) fail(context, "languageRanges.input", "does not match the indexed v4 speech lineage");
+  exact(findings.acoustic_ranges, "acoustic-observations", context, "bundle.findings.acoustic_ranges");
+  const observationsArtifact = oneArtifact(artifacts, findings.acoustic_ranges, "acoustic_observations", context, "bundle.findings.acoustic_ranges");
+  const acousticReceiptArtifact = oneArtifact(artifacts, "acoustic-triage", "acoustic_triage_receipt", context, "bundle.artifacts.acoustic-triage");
+  if (observationsArtifact.content.bytes > ACOUSTIC_LIMITS.maxObservationBytes || acousticReceiptArtifact.content.bytes > ACOUSTIC_LIMITS.maxReceiptBytes) {
+    fail(context, "bundle.findings.acoustic_ranges", "exceeds the registered acoustic artifact byte limits");
+  }
+  if (
+    observationsArtifact.path !== "acoustic-observations.json" || observationsArtifact.producer !== "scripts/detect-acoustics.mjs" ||
+    acousticReceiptArtifact.path !== "acoustic-triage.json" || acousticReceiptArtifact.producer !== "scripts/detect-acoustics.mjs" ||
+    acousticReceipt.output.content.id !== observationsArtifact.content.id ||
+    acousticReceipt.input.media.content.id !== binding.raw.contentId ||
+    acousticReceipt.input.normalizedAudio.content.id !== normalized.content.id ||
+    acousticReceipt.input.speechActivity.content.id !== speechReceipt.content.id ||
+    acousticObservations.source.contentId !== binding.raw.contentId
+  ) fail(context, "bundle.findings.acoustic_ranges", "does not close over its source, normalized audio, observations, and separate receipt");
+  const modelLineage = acousticReceipt.producer.model.files.map((file) => file.content.id);
+  exactSources(observationsArtifact, [binding.raw.contentId, normalized.content.id, ...modelLineage], context, "bundle.findings.acoustic_ranges.source_content_ids");
+  exactSources(acousticReceiptArtifact, [binding.raw.contentId, speechReceipt.content.id, normalized.content.id, observationsArtifact.content.id, ...modelLineage], context, "bundle.artifacts.acoustic-triage.source_content_ids");
+  for (const key of ["speaker_overlap", "complexity"] as const) if (findings[key] !== null) fail(context, `bundle.findings.${key}`, "has no registered deterministic producer");
 }
 
 function validateV1(
@@ -425,6 +486,8 @@ export function assertPreflightBundle(
   context?: string,
   speechActivity?: SpeechActivityReceipt | null,
   languageRanges?: LanguageRangesReceipt | null,
+  acousticObservations?: AcousticObservations | null,
+  acousticReceipt?: AcousticTriageReceipt | null,
 ): asserts value is PreflightBundle {
   const label = context ?? "Studio preflight bundle";
   const bundle = record(value, label, "bundle");
@@ -442,7 +505,12 @@ export function assertPreflightBundle(
     return;
   }
   if (schema === "studio.preflight-bundle.v3") {
+    if (acousticObservations || acousticReceipt) fail(label, "acousticReceipts", "require studio.preflight-bundle.v4");
     validateV3(bundle, binding, speechActivity, languageRanges, label);
+    return;
+  }
+  if (schema === "studio.preflight-bundle.v4") {
+    validateV4(bundle, binding, speechActivity, languageRanges, acousticObservations, acousticReceipt, label);
     return;
   }
   fail(label, "bundle.schema", `has no registered preflight schema ${schema}`);

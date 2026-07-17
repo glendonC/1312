@@ -165,6 +165,13 @@ export class ContentAddressedArtifactStore {
       throw new Error("Validated preflight evidence no longer matches its content identity");
     }
     const stored = await this.storeFile(descriptor.path);
+    const producerReceipt = descriptor.schema === "studio.preflight-evidence-artifact.v2"
+      ? await this.storeFile(descriptor.producerReceiptPath!)
+      : null;
+    if (producerReceipt && (
+      producerReceipt.content.contentId !== descriptor.producerReceiptContent?.contentId ||
+      producerReceipt.content.bytes !== descriptor.producerReceiptContent?.bytes
+    )) throw new Error("Validated acoustic producer receipt no longer matches its content identity");
     const artifact: RuntimeArtifact = {
       schema: "studio.runtime.artifact.v1",
       id: `artifact:${canonicalSha256({
@@ -172,9 +179,12 @@ export class ContentAddressedArtifactStore {
         evidenceKind: descriptor.evidenceKind,
         contentId: stored.content.contentId,
         preflightContentId: descriptor.preflightContentId,
+        ...(producerReceipt ? { producerReceiptContentId: producerReceipt.content.contentId } : {}),
       })}`,
       runId,
-      kind: `${descriptor.evidenceKind.replaceAll("_", "-")}-receipt`,
+      kind: descriptor.evidenceKind === "acoustic_ranges"
+        ? "acoustic-ranges-evidence"
+        : `${descriptor.evidenceKind.replaceAll("_", "-")}-receipt`,
       mediaClass: "non_media",
       publication: "private",
       content: stored.content,
@@ -191,6 +201,7 @@ export class ContentAddressedArtifactStore {
         producerId: descriptor.producerId,
         preflightId: descriptor.preflightId,
         preflightContentId: descriptor.preflightContentId,
+        ...(producerReceipt ? { producerReceiptContentId: producerReceipt.content.contentId } : {}),
       },
     };
     assertRuntimeArtifact(artifact);

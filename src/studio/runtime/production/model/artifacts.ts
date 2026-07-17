@@ -108,10 +108,11 @@ export interface RootOutputDispositionArtifactOrigin {
 export interface PreflightEvidenceArtifactOrigin {
   kind: "preflight_evidence";
   evidenceKind: EvidenceKind;
-  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1";
-  producerId: "silero-vad" | "whisper-language-id";
+  receiptSchema: "studio.speech-activity.v1" | "studio.language-ranges.v1" | "studio.acoustic-observations.v1";
+  producerId: "silero-vad" | "whisper-language-id" | "yamnet-acoustic-triage";
   preflightId: string;
   preflightContentId: string;
+  producerReceiptContentId?: string;
 }
 
 export interface EvidenceAssessmentArtifactOrigin {

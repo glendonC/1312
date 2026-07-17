@@ -33,7 +33,8 @@ export type CaptionLineReasonCode =
   | "study_coverage_failed"
   | "study_coverage_conflict"
   | "study_coverage_uncovered"
-  | "study_citation_mismatch";
+  | "study_citation_mismatch"
+  | "not_in_requested_dialogue_scope";
 
 export interface CaptionStudyIdentity {
   studyId: string;
@@ -112,7 +113,7 @@ export interface CaptionExecutorDescriptor {
 }
 
 export interface CaptionProductionArtifact {
-  schema: "studio.caption-production.artifact.v1";
+  schema: "studio.caption-production.artifact.v1" | "studio.caption-production.artifact.v2";
   jobId: string;
   runId: string;
   input: {
@@ -138,7 +139,7 @@ export interface CaptionProductionArtifact {
 }
 
 export interface CaptionProductionReceipt {
-  schema: "studio.caption-production.receipt.v1";
+  schema: "studio.caption-production.receipt.v1" | "studio.caption-production.receipt.v2";
   receiptId: string;
   jobId: string;
   authority: {
@@ -155,8 +156,8 @@ export interface CaptionProductionReceipt {
   input: CaptionProductionArtifact["input"];
   producer: {
     id: "studio.host-caption-production";
-    version: "1";
-    policy: "verified_unrevoked_approval_only";
+    version: "1" | "2";
+    policy: "verified_unrevoked_approval_only" | "verified_unrevoked_approval_and_dialogue_scope_only";
     executor: CaptionExecutorDescriptor;
   };
   limits: typeof CAPTION_PRODUCTION_LIMITS;

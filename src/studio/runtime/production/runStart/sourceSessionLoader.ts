@@ -6,6 +6,7 @@ import type {
   PreflightBundle,
   SpeechActivityReceipt,
 } from "../../../preflight/contracts.ts";
+import type { AcousticObservations, AcousticTriageReceipt } from "../../../acoustic/contracts.ts";
 import { assertPreflightBundle } from "../../../preflight/preflightBundleValidation.ts";
 import { assertSourceReceipts } from "../../../preflight/receiptValidation.ts";
 import { preflightSourceBinding } from "../../../preflight/sourceAdapters.ts";
@@ -22,7 +23,7 @@ import type {
   SourceArtifactDescriptor,
 } from "../model.ts";
 
-const PREFLIGHT_FILES = ["preflight-v3.json", "preflight-v2.json", "preflight.json"] as const;
+const PREFLIGHT_FILES = ["preflight-v4.json", "preflight-v3.json", "preflight-v2.json", "preflight.json"] as const;
 const TRACK_KINDS = new Set(["audio", "video", "subtitle", "data", "attachment"]);
 
 export interface LoadedOwnedSourceSession {
@@ -130,11 +131,17 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
   if (!binding) throw new Error("Local source session: owned receipt has no normalized source binding");
 
   const preflightSchema = (preflightValue as { schema?: unknown }).schema;
-  const speechValue = preflightSchema === "studio.preflight-bundle.v2" || preflightSchema === "studio.preflight-bundle.v3"
+  const speechValue = preflightSchema === "studio.preflight-bundle.v2" || preflightSchema === "studio.preflight-bundle.v3" || preflightSchema === "studio.preflight-bundle.v4"
     ? await readJson(await containedFile(directory, "speech-activity.json", "speech-activity.json"), "speech-activity.json")
     : null;
-  const languageValue = preflightSchema === "studio.preflight-bundle.v3"
+  const languageValue = preflightSchema === "studio.preflight-bundle.v3" || preflightSchema === "studio.preflight-bundle.v4"
     ? await readJson(await containedFile(directory, "language-ranges.json", "language-ranges.json"), "language-ranges.json")
+    : null;
+  const acousticValue = preflightSchema === "studio.preflight-bundle.v4"
+    ? await readJson(await containedFile(directory, "acoustic-observations.json", "acoustic-observations.json"), "acoustic-observations.json")
+    : null;
+  const acousticReceiptValue = preflightSchema === "studio.preflight-bundle.v4"
+    ? await readJson(await containedFile(directory, "acoustic-triage.json", "acoustic-triage.json"), "acoustic-triage.json")
     : null;
   assertPreflightBundle(
     preflightValue,
@@ -142,6 +149,8 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
     "Local source session preflight",
     speechValue as SpeechActivityReceipt | null,
     languageValue as LanguageRangesReceipt | null,
+    acousticValue as AcousticObservations | null,
+    acousticReceiptValue as AcousticTriageReceipt | null,
   );
   const preflight = preflightValue as PreflightBundle;
 
@@ -184,25 +193,37 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
     }
     const expectedKind = evidenceKind === "speech_activity"
       ? "speech_activity_receipt"
-      : "language_ranges_receipt";
-    if (artifact.kind !== expectedKind || artifact.class !== "receipt") {
+      : evidenceKind === "language_ranges" ? "language_ranges_receipt" : "acoustic_observations";
+    if (artifact.kind !== expectedKind || artifact.class !== (evidenceKind === "acoustic_ranges" ? "derived" : "receipt")) {
       throw new Error(`Local source session: ${evidenceKind} finding is not its producer receipt`);
     }
+    const acousticReceiptArtifact = evidenceKind === "acoustic_ranges"
+      ? preflight.artifacts.find((candidate) => candidate.kind === "acoustic_triage_receipt")
+      : null;
+    const acousticReceiptMeasured = acousticReceiptArtifact ? measuredArtifacts.get(acousticReceiptArtifact.artifact_id) : null;
+    if (evidenceKind === "acoustic_ranges" && (!acousticReceiptArtifact || !acousticReceiptMeasured)) {
+      throw new Error("Local source session: acoustic evidence lost its separate producer receipt");
+    }
     evidenceDescriptors.push({
-      schema: "studio.preflight-evidence-artifact.v1",
+      schema: evidenceKind === "acoustic_ranges" ? "studio.preflight-evidence-artifact.v2" : "studio.preflight-evidence-artifact.v1",
       evidenceKind,
       receiptSchema: evidenceKind === "speech_activity"
         ? "studio.speech-activity.v1"
-        : "studio.language-ranges.v1",
-      producerId: evidenceKind === "speech_activity" ? "silero-vad" : "whisper-language-id",
+        : evidenceKind === "language_ranges" ? "studio.language-ranges.v1" : "studio.acoustic-observations.v1",
+      producerId: evidenceKind === "speech_activity" ? "silero-vad" : evidenceKind === "language_ranges" ? "whisper-language-id" : "yamnet-acoustic-triage",
       path: await containedFile(directory, artifact.path, `${evidenceKind} evidence`),
       content: measured,
+      ...(acousticReceiptArtifact && acousticReceiptMeasured ? {
+        producerReceiptPath: await containedFile(directory, acousticReceiptArtifact.path, "acoustic producer receipt"),
+        producerReceiptContent: acousticReceiptMeasured,
+      } : {}),
       preflightId: preflight.preflight_id,
       preflightContentId: preflightContent.contentId,
     });
   };
   await appendEvidence(preflight.findings.speech_activity, "speech_activity");
   await appendEvidence(preflight.findings.language_ranges, "language_ranges");
+  await appendEvidence(preflight.findings.acoustic_ranges, "acoustic_ranges");
 
   const languageEvidence = preflight.findings.language_ranges === null
     ? []

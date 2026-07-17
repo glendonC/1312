@@ -10,6 +10,8 @@ import type {
 } from "../model.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import { reopenOwnedMediaStudy } from "./studySynthesisAudit.ts";
+import { deriveRuntimeDialogueScopePolicy } from "./dialogueScopeRuntime.ts";
+import { rangeIsEntirelyNonDialogue, rangeOverlapsNonDialogue, type DialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.ts";
 
 function receiptId(receipt: StudyReadinessReceipt): string {
   const body = structuredClone(receipt) as unknown as Record<string, unknown>;
@@ -54,12 +56,15 @@ export class StudyReadinessHost {
     const reasons = new Set<StudyReadinessReasonCode>();
     let coverageIds = [...study.coverageIds];
     let conflictIds = [...study.conflictIds];
+    let dialogueScopePolicy: DialogueScopePolicy | null = null;
     try {
       const verified = await reopenOwnedMediaStudy(state, this.artifacts, studyId);
+      dialogueScopePolicy = await deriveRuntimeDialogueScopePolicy(state, this.artifacts, studyId);
       reopened = verified.reopened;
       coverageIds = verified.envelope.coverage.map((entry) => entry.coverageId);
       conflictIds = verified.envelope.conflicts.map((entry) => entry.conflictId);
-      if (verified.envelope.coverage.some((entry) => entry.state !== "supported")) reasons.add("non_supported_root_coverage");
+      if (verified.envelope.coverage.some((entry) => entry.state !== "supported" && !(dialogueScopePolicy && rangeIsEntirelyNonDialogue(dialogueScopePolicy, entry.startMs, entry.endMs)))) reasons.add("non_supported_root_coverage");
+      if (dialogueScopePolicy && verified.envelope.coverage.some((entry) => entry.state === "supported" && rangeOverlapsNonDialogue(dialogueScopePolicy!, entry.startMs, entry.endMs))) reasons.add("dialogue_text_in_non_dialogue_range");
       if (verified.envelope.conflicts.length > 0) reasons.add("unresolved_conflict");
       if (coverageIds.length !== planning.coverageIds.length || planning.coverageIds.some((id) => !coverageIds.includes(id))) {
         reasons.add("hidden_gap");
@@ -76,9 +81,10 @@ export class StudyReadinessHost {
       studyContentId: study.contentId,
       outcome,
       reasonCodes,
+      ...(dialogueScopePolicy ? { dialogueScopePolicy } : {}),
     })}`;
     const receipt: StudyReadinessReceipt = {
-      schema: "studio.study-readiness.receipt.v1",
+      schema: dialogueScopePolicy ? "studio.study-readiness.receipt.v2" : "studio.study-readiness.receipt.v1",
       receiptId: "pending",
       readinessId,
       input: {
@@ -92,7 +98,10 @@ export class StudyReadinessHost {
         planningReceiptContentId: planning.receiptContentId,
       },
       reopened,
-      producer: { id: "studio.deterministic-study-readiness-audit", version: "1", policy: "closed_gap_and_integrity_gate_no_quality_score" },
+      producer: dialogueScopePolicy
+        ? { id: "studio.deterministic-study-readiness-audit", version: "2", policy: "closed_gap_integrity_and_dialogue_scope_gate_no_quality_score" }
+        : { id: "studio.deterministic-study-readiness-audit", version: "1", policy: "closed_gap_and_integrity_gate_no_quality_score" },
+      ...(dialogueScopePolicy ? { dialogueScopePolicy } : {}),
       result: { outcome, reasonCodes, coverageIds, conflictIds },
       nonClaims: { semanticCorrectness: "not_assessed", translationQuality: "not_assessed", truthArbitration: "not_performed" },
     };

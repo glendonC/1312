@@ -114,7 +114,7 @@ host exercises one real bounded seek plus worker-output receipt/report lineage. 
 service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
 `media_seek`, `evidence_read`, `evidence_assess`, and/or `evidence_decide` only for matching live task grants, in addition to the closed
 structured report output. `evidence.read` is not a detector call: it reads registered, immutable
-V2/V3 receipt artifacts under an exact source/task window, per-artifact 32 KiB/64-fact ceilings, and the shared task tool-call
+V2/V3 receipt artifacts or V4 acoustic observations under an exact source/task window, per-artifact 32 KiB/64-fact ceilings, and the shared task tool-call
 budget. `analysis.evidence.assess` adds a separate 1-assessment/4-receipt/8-claim/32-cited-index/
 512-structured-token ceiling and requires exact fact indexes and bounding ranges. V1 and absent
 receipts produce none of those grants. `analysis.evidence.decide` adds a separate one-decision/four-
@@ -134,6 +134,25 @@ range, path, bytes, or prose, and cannot upload or publish. The other media oper
 detector/model calls in this proposal remain unavailable. The tables below
 continue to document the fixture contract itself and should not be read as the production wire
 schema.
+
+U1 adds `studio.preflight-bundle.v4` without rewriting V1–V3. It indexes a private
+`studio.acoustic-observations.v1` complete range partition and a separate
+`studio.acoustic-triage.receipt.v1` that closes the exact source, selected audio track, sealed
+mono-16 kHz PCM, VAD receipt, model/runtime/configuration identities, limits, and observation
+content. A V4 descriptor stores both objects content-addressed; `studio.evidence-read.receipt.v3`
+exposes only clipped observation facts and carries the producer-receipt content identity. Acoustic
+facts are not accepted as speech-specific evidence-assessment or `studio.study-report.v1`
+citations. When V4 is present, `studio.study-readiness.receipt.v2` stores a deterministic
+`studio.dialogue-scope-policy.v1` partition derived from VAD, acoustic uncertainty, and
+`includeLyrics`. Only strong VAD non-speech plus strong noise, or strong music when lyrics are not
+requested, becomes `not_in_requested_dialogue_scope`; mixed, weak, missing, truncated, failed, or
+disagreeing evidence abstains. Excluded samples remain in full-duration accounting but are removed
+from a separately reported semantic-coverage denominator. Readiness rejects supported study text
+over an excluded range, and additive `studio.caption-production.artifact.v2` plus
+`studio.caption-production.receipt.v2` storage and recursive reopening require null Korean and
+English text for every excluded overlap. Caption V1 remains closed for runs without acoustic policy.
+This is lineage and abstention authority, not acoustic accuracy,
+speech absence, lyric understanding, transcription/translation truth, or semantic caption QC.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

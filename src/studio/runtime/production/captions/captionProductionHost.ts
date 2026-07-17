@@ -9,6 +9,7 @@ import {
   captionLineReceiptProjection,
   captionStudyIdentity,
   closeCaptionLineCausality,
+  enforceCaptionDialogueScope,
 } from "./captionStudyCausality.ts";
 import type { RuntimeLedger } from "../journal.ts";
 import type {
@@ -305,7 +306,7 @@ export class CaptionProductionHost {
       }
       const derivation = "current_run_source_execution" as const;
       const captionLines: CaptionProductionArtifact["lines"] = lines.map((line) =>
-        closeCaptionLineCausality({
+        enforceCaptionDialogueScope(closeCaptionLineCausality({
           line,
           study,
           studyIdentity,
@@ -320,9 +321,11 @@ export class CaptionProductionHost {
             cognitionClaim: executor.cognitionClaim,
           },
           derivation,
-        }));
+        }), readiness.receipt.dialogueScopePolicy));
       const caption: CaptionProductionArtifact = {
-        schema: "studio.caption-production.artifact.v1",
+        schema: readiness.receipt.dialogueScopePolicy
+          ? "studio.caption-production.artifact.v2"
+          : "studio.caption-production.artifact.v1",
         jobId,
         runId: this.ledger.runId,
         input,
@@ -359,8 +362,10 @@ export class CaptionProductionHost {
         input: structuredClone(input),
         producer: {
           id: "studio.host-caption-production" as const,
-          version: "1" as const,
-          policy: "verified_unrevoked_approval_only" as const,
+          version: readiness.receipt.dialogueScopePolicy ? "2" as const : "1" as const,
+          policy: readiness.receipt.dialogueScopePolicy
+            ? "verified_unrevoked_approval_and_dialogue_scope_only" as const
+            : "verified_unrevoked_approval_only" as const,
           executor: structuredClone(executor),
         },
         limits: structuredClone(CAPTION_PRODUCTION_LIMITS),
@@ -373,7 +378,9 @@ export class CaptionProductionHost {
         },
       };
       const receipt: CaptionProductionReceipt = {
-        schema: "studio.caption-production.receipt.v1",
+        schema: readiness.receipt.dialogueScopePolicy
+          ? "studio.caption-production.receipt.v2"
+          : "studio.caption-production.receipt.v1",
         receiptId: `caption-production-receipt:${canonicalSha256(receiptBody)}`,
         ...receiptBody,
       };

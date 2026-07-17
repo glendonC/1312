@@ -159,9 +159,12 @@ export function validateExecutionArtifactOrigin(
       );
     }
   } else if (kind === "preflight_evidence") {
+    const hasProducerReceipt = origin.evidenceKind === "acoustic_ranges";
     exact(
       origin,
-      [
+      hasProducerReceipt ? [
+        "kind", "evidenceKind", "receiptSchema", "producerId", "preflightId", "preflightContentId", "producerReceiptContentId",
+      ] : [
         "kind",
         "evidenceKind",
         "receiptSchema",
@@ -174,24 +177,25 @@ export function validateExecutionArtifactOrigin(
     );
     const evidenceKind = oneOf(
       origin.evidenceKind,
-      new Set(["speech_activity", "language_ranges"]),
+      new Set(["speech_activity", "language_ranges", "acoustic_ranges"]),
       context,
       `${path}.origin.evidenceKind`,
     );
     const receiptSchema = oneOf(
       origin.receiptSchema,
-      new Set(["studio.speech-activity.v1", "studio.language-ranges.v1"]),
+      new Set(["studio.speech-activity.v1", "studio.language-ranges.v1", "studio.acoustic-observations.v1"]),
       context,
       `${path}.origin.receiptSchema`,
     );
     const producerId = oneOf(
       origin.producerId,
-      new Set(["silero-vad", "whisper-language-id"]),
+      new Set(["silero-vad", "whisper-language-id", "yamnet-acoustic-triage"]),
       context,
       `${path}.origin.producerId`,
     );
     string(origin.preflightId, context, `${path}.origin.preflightId`);
     contentId(origin.preflightContentId, context, `${path}.origin.preflightContentId`);
+    if (hasProducerReceipt) contentId(origin.producerReceiptContentId, context, `${path}.origin.producerReceiptContentId`);
     if (
       mediaClass !== "non_media" ||
       item.durationMs !== null ||
@@ -202,7 +206,9 @@ export function validateExecutionArtifactOrigin(
       (evidenceKind === "speech_activity" &&
         (receiptSchema !== "studio.speech-activity.v1" || producerId !== "silero-vad")) ||
       (evidenceKind === "language_ranges" &&
-        (receiptSchema !== "studio.language-ranges.v1" || producerId !== "whisper-language-id"))
+        (receiptSchema !== "studio.language-ranges.v1" || producerId !== "whisper-language-id")) ||
+      (evidenceKind === "acoustic_ranges" &&
+        (receiptSchema !== "studio.acoustic-observations.v1" || producerId !== "yamnet-acoustic-triage"))
     ) {
       fail(
         context,

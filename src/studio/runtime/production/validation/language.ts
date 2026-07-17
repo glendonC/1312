@@ -155,7 +155,7 @@ export function assertProductionSourceSession(
   exact(preflight, ["schema", "preflightId", "contentId"], context, "session.preflight");
   oneOf(
     preflight.schema,
-    new Set(["studio.preflight-bundle.v1", "studio.preflight-bundle.v2", "studio.preflight-bundle.v3"]),
+    new Set(["studio.preflight-bundle.v1", "studio.preflight-bundle.v2", "studio.preflight-bundle.v3", "studio.preflight-bundle.v4"]),
     context,
     "session.preflight.schema",
   );
@@ -170,7 +170,7 @@ export function assertProductionSourceSession(
   evidence.forEach((id, index) =>
     contentId(id, context, `session.detectedLanguageEvidenceContentIds[${index}]`),
   );
-  if (preflight.schema !== "studio.preflight-bundle.v3" && evidence.length !== 0) {
+  if (preflight.schema !== "studio.preflight-bundle.v3" && preflight.schema !== "studio.preflight-bundle.v4" && evidence.length !== 0) {
     fail(
       context,
       "session.detectedLanguageEvidenceContentIds",

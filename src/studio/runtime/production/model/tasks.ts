@@ -38,7 +38,7 @@ export interface MediaScope {
   endMs: number;
 }
 
-export type EvidenceKind = "speech_activity" | "language_ranges";
+export type EvidenceKind = "speech_activity" | "language_ranges" | "acoustic_ranges";
 
 /** Scheduler-issued, artifact-exact response budget for one existing evidence receipt. */
 export interface EvidenceReadScope {

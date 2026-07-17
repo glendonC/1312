@@ -343,6 +343,13 @@ test("withheld, unknown, failed, conflict, uncovered, and citation-mismatch line
       assert.equal(validated.lines[0].target.text, null);
       assert.equal(validated.lines[0].target.reasonCode, lineReason);
     }
+    const dialogueScoped = structuredClone(original);
+    dialogueScoped.lines[0].source = { language: "ko", state: "withheld", text: null, reasonCode: "not_in_requested_dialogue_scope" };
+    dialogueScoped.lines[0].target = { language: "en", state: "withheld", text: null, reasonCode: "not_in_requested_dialogue_scope" };
+    dialogueScoped.result = deriveCaptionProductionResult(dialogueScoped.lines);
+    assert.throws(() => validateCaptionProductionArtifact(dialogueScoped), /reasonCode/);
+    dialogueScoped.schema = "studio.caption-production.artifact.v2";
+    assert.equal(validateCaptionProductionArtifact(dialogueScoped).schema, "studio.caption-production.artifact.v2");
     const mismatched = structuredClone(original);
     mismatched.lines[0].lineage.study.semanticCitations[0].observations[0].startMs = mismatched.lines[0].endMs;
     mismatched.lines[0].lineage.study.semanticCitations[0].observations[0].endMs = mismatched.lines[0].endMs + 1;

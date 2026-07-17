@@ -51,8 +51,10 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   lineage. Frame and OCR evidence remain cite-only; anonymous speaker/overlap may qualify coverage
   only; speech remains the only claim-support kind;
 - an additive U4 range-pass host and scheduler lane on the default generalized root: it derives exact
-  weak-range/cause/prior-evidence inputs, accepts only a strict attenuated current-run speech
-  subrange, fixes producer/configuration/budget/child scope, records request and terminal spend/
+  weak-range/cause/prior-evidence inputs, including a closed receipt-backed `speaker_overlap` cause
+  whose execution range is one exact audited U6 accounting cell; it accepts only that exact cell or a
+  strict attenuated current-run speech subrange for other causes, fixes producer/configuration/budget/
+  child scope, records request and terminal spend/
   evidence receipts, dedupes identical work, and projects ordered pass/disagreement history into
   study v3 and readiness/caption causality v4;
 - an `evidence.read` host plus separate task-private bridge that publishes only `evidence_read`,
@@ -108,8 +110,9 @@ from the root contract. A new owned run keeps U3 report/admission v2 but closes 
 study-v3 path and exposes exactly `task_spawn_request`, `task_reports_wait`, `report_disposition`,
 `artifact_read`, `study_restudy_request`, and `study_synthesize`. It has no
 `study_planning_decision` or ambient follow-up authority. `study_restudy_request` accepts only one
-exact host-derived weak range/cause and a registered delta; the current slice registers a strict
-attenuated current-run speech subrange only. The explicit v1
+exact host-derived weak range/cause and a registered delta; the current slice registers attenuated
+current-run speech only. A `speaker_overlap` cause must copy its exact host-derived U6 cell; other
+causes require a strict weak-range subrange. The explicit v1
 compatibility selector retains the closed six-tool planning/synthesis surface for historical
 fixtures. Spawn records the root execution/tool-call causation, returns one accepted/rejected
 scheduler decision, and starts accepted per-task launch promises without waiting. Wait journals
@@ -262,15 +265,27 @@ exact `coverageId`/`causeId`, and one typed delta. Padded audio, denser frame ti
 receipted configuration, and granted-specialist members are reserved union shapes and fail closed in
 this slice because they have no registered producer/grant.
 
-The registered `attenuated_subrange` producer requires a strict contained range previously covered
-by broader current-run speech work. The host fixes pass number 2, the runtime-injected current-run
+For `speaker_overlap`, the host classifies only a cold-audited `speaker_turn` /
+`coverage_qualification` temporal observation whose state/raw tuple is exactly `conflicting` /
+`speaker:overlap:overlap_hypothesis_requires_speech_restudy`, lies inside the synthesized conflicting
+cell, and is backed by strictly broader current-run speech. Raw aggregate text alone, rapid turns,
+no-hypothesis cells, truncation, and missing speaker grants do not qualify. The host deterministically
+chooses at most one overlap cell for a weak coverage cell and binds its report/citation/observation
+identities into the cause. A request must echo that exact cause range; it cannot widen, narrow, or
+rename it `recognizer_disagreement`.
+
+The registered `attenuated_subrange` producer requires either that exact overlap range or, for other
+causes, a strict contained weak range, always previously covered by broader current-run speech work.
+The host fixes pass number 2, the runtime-injected current-run
 recognizer configuration scope, a 20,000 ms/one-call reservation, and a single v2 report child with
 attenuated immutable task context. `studio.study-range-pass-request.receipt.v1` retains the prior
 evidence, cause, delta, producer/configuration, pass number, reservation, caps, and explicit
 understanding/improvement/semantic-correctness non-claims. The scheduler admits at most one pass per
 range and four per producer, rejects an already accepted work/configuration fingerprint—including a
 concurrent identical request—and applies the ordinary scope, depth, concurrency, dependency, and run
-budget checks. An unchanged/full weak range is not an attenuation and is rejected before scheduling.
+budget checks. An unchanged/full weak range is not an attenuation for ordinary causes and is rejected
+before scheduling. The overlap exception changes only range selection; caps, producer, configuration,
+normalization, work fingerprint, reservation, and dedupe remain identical.
 
 `studio.study-range-pass-terminal.receipt.v1` retains the scheduler task identity, complete optional
 report/admission/read lineage, cited/new/disagreement citation sets, executor active time, capability
@@ -371,11 +386,11 @@ cell boundaries; the host reconstructs every cell needed to tile it. Overlap rem
 rapid/no-hypothesis remains unknown, and truncation remains truncated under existing precedence.
 `claim_support` validation and every caption-causality version still accept only range-closing
 `current_run_speech`, so speaker labels, turn splits, and overlap cannot create, replace, or upgrade
-Korean/English text. U4 v1 has no honest speaker-overlap cause code: speaker-only conflict is
-therefore excluded from attenuated-speech candidates rather than relabeled
-`recognizer_disagreement`. An exact typed overlap/weak-range U4 trigger, named/cross-run identity,
-accuracy evaluation, alternate models/platform pins, ambient always-diarize policy, U7 separation,
-and all UI work remain outside this slice.
+Korean/English text. U6.1 adds the closed `speaker_overlap` U4 cause and exact range rule described
+above. It can schedule one bounded speech restudy but does not resolve the preserved conflict, create
+transcript truth, or authorize captions. Named/cross-run identity, a fit-for-purpose diarization
+quality bench, alternate models, non-darwin native platform pins, ambient always-diarize policy, U7
+separation, and all UI work remain outside this slice.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

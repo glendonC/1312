@@ -6,13 +6,13 @@ import {
 import { taskCapabilityCallCount } from "../capabilityUsage.ts";
 import type { RuntimeLedger } from "../journal.ts";
 import type {
+  EvidenceCitationEnvelope,
   GeneralizedCoverageState,
   QualifiedMediaRange,
   RangePassRecord,
   RangePassRequestReceipt,
   RangePassTerminalOutcome,
   RangePassTerminalReceipt,
-  RuntimeProjection,
   SpawnRequestInput,
   StudyRestudyCandidate,
   StudyRestudyCauseKind,
@@ -49,16 +49,55 @@ function causeKind(state: StudyRestudyCandidate["state"], rawStates: readonly st
   return "failed_range";
 }
 
-/** U4 v1 has no honest speaker-overlap cause; do not relabel that state as recognizer disagreement. */
-export function defersSpeakerOverlapRestudy(
-  citations: readonly { evidenceKind: string; observations: readonly { state: string; rawState: string }[] }[],
+const SPEAKER_OVERLAP_RAW_STATE = "speaker:overlap:overlap_hypothesis_requires_speech_restudy";
+
+export interface SpeakerOverlapRestudyTrigger {
+  range: QualifiedMediaRange;
+  citationIds: string[];
+  observationIds: string[];
+  rawStates: string[];
+}
+
+/** Selects one deterministic exact U6 accounting cell; raw aggregate text alone is never authority. */
+export function deriveSpeakerOverlapRestudyTrigger(
+  citations: readonly EvidenceCitationEnvelope[],
+  weakRange: QualifiedMediaRange,
   rawStates: readonly string[],
-): boolean {
-  const hasSpeakerOverlap = citations.some((citation) => citation.evidenceKind === "speaker_turn" &&
-    citation.observations.some((observation) => observation.state === "conflicting" && observation.rawState.startsWith("speaker:overlap:")));
-  const hasOtherConflict = rawStates.some((raw) =>
-    raw.includes(":conflicting:") && !raw.includes(":speaker:overlap:"));
-  return hasSpeakerOverlap && !hasOtherConflict;
+): SpeakerOverlapRestudyTrigger | null {
+  const cells = citations.flatMap((citation) => {
+    if (citation.evidenceKind !== "speaker_turn" || citation.use !== "coverage_qualification") return [];
+    return citation.observations.flatMap((observation) => {
+      if (observation.state !== "conflicting" || observation.rawState !== SPEAKER_OVERLAP_RAW_STATE ||
+          observation.locator.kind !== "temporal_range") return [];
+      const range = observation.locator.media;
+      const aggregatedRawState = `${observation.observationId}:conflicting:${SPEAKER_OVERLAP_RAW_STATE}`;
+      if (range.artifactId !== weakRange.artifactId || range.trackId !== weakRange.trackId ||
+          range.startMs < weakRange.startMs || range.endMs > weakRange.endMs ||
+          !rawStates.includes(aggregatedRawState)) return [];
+      return [{ range, citationId: citation.citationId, observationId: observation.observationId, rawState: aggregatedRawState }];
+    });
+  }).sort((left, right) => left.range.startMs - right.range.startMs || left.range.endMs - right.range.endMs ||
+    left.observationId.localeCompare(right.observationId) || left.citationId.localeCompare(right.citationId));
+  const first = cells[0];
+  if (!first) return null;
+  const exact = cells.filter((cell) => sameRange(cell.range, first.range));
+  return {
+    range: structuredClone(first.range),
+    citationIds: [...new Set(exact.map((cell) => cell.citationId))].sort(),
+    observationIds: [...new Set(exact.map((cell) => cell.observationId))].sort(),
+    rawStates: [...new Set(exact.map((cell) => cell.rawState))].sort(),
+  };
+}
+
+function hasNonSpeakerConflict(rawStates: readonly string[]): boolean {
+  return rawStates.some((raw) => raw.includes(":conflicting:") &&
+    !raw.includes(":conflicting:speaker:overlap:"));
+}
+
+function hasSpeakerOverlapConflict(citations: readonly EvidenceCitationEnvelope[], rawStates: readonly string[]): boolean {
+  return rawStates.some((raw) => raw.includes(":conflicting:speaker:overlap:")) || citations.some((citation) =>
+    citation.evidenceKind === "speaker_turn" && citation.observations.some((observation) =>
+      observation.state === "conflicting" && observation.rawState.startsWith("speaker:overlap:")));
 }
 
 function terminalOutcome(state: GeneralizedCoverageState | null, taskStatus: string): RangePassTerminalOutcome {
@@ -103,7 +142,7 @@ export async function reopenRangePass(
   return { ...structuredClone(pass), request, terminal };
 }
 
-/** Host-owned U4 policy. The model selects only an exact host-derived cause and strict subrange. */
+/** Host-owned U4 policy. The model selects an exact cause and only the host-permitted execution range. */
 export class RangePassHost {
   private readonly ledger: RuntimeLedger;
   private readonly artifacts: ContentAddressedArtifactStore;
@@ -132,9 +171,6 @@ export class RangePassHost {
     const alreadyPassedRanges = Object.values(state.rangePasses).filter((entry) => entry.accepted).map((entry) => entry.request.weakRange);
     const candidates: StudyRestudyCandidate[] = inspected.coverage
       .filter((entry): entry is typeof entry & { state: StudyRestudyCandidate["state"] } => entry.state !== "supported" && entry.state !== "not_in_scope")
-      .filter((entry) => !alreadyPassedRanges.some((range) =>
-        range.artifactId === entry.artifactId && range.trackId === entry.trackId &&
-        range.startMs <= entry.startMs && range.endMs >= entry.endMs))
       .flatMap((entry) => {
         const matchingReports = inspected.reports.filter((report) => report.reportEnvelope.coverage.some((covered) => overlaps(covered, entry)));
         const reportArtifactIds = matchingReports.map((report) => report.report.artifactId).sort();
@@ -157,16 +193,46 @@ export class RangePassHost {
         };
         const observationIds = [...new Set(citations.flatMap((citation) => citation.observations.map((observation) => observation.observationId)))].sort();
         const rawStates = [...new Set(matchingReports.flatMap((report) => report.reportEnvelope.coverage.filter((covered) => overlaps(covered, entry)).flatMap((covered) => covered.rawStates)))].sort();
-        if (entry.state === "conflicting" && defersSpeakerOverlapRestudy(citations, rawStates)) return [];
-        const causeBody = { kind: causeKind(entry.state, rawStates), coverageId: entry.coverageId, range: { artifactId: entry.artifactId, trackId: entry.trackId, startMs: entry.startMs, endMs: entry.endMs }, priorState: entry.state, reportArtifactIds, citationIds, observationIds, rawStates };
+        const weakRange = { artifactId: entry.artifactId, trackId: entry.trackId, startMs: entry.startMs, endMs: entry.endMs };
+        const speakerOnlyConflict = entry.state === "conflicting" && hasSpeakerOverlapConflict(citations, rawStates) &&
+          !hasNonSpeakerConflict(rawStates);
+        const speakerTrigger = speakerOnlyConflict
+          ? deriveSpeakerOverlapRestudyTrigger(citations, weakRange, rawStates)
+          : null;
+        const speakerTriggerHasDelta = speakerTrigger && speechExecutionRanges.some((range) =>
+          range.artifactId === speakerTrigger.range.artifactId && range.trackId === speakerTrigger.range.trackId &&
+          range.startMs <= speakerTrigger.range.startMs && range.endMs >= speakerTrigger.range.endMs &&
+          (range.startMs < speakerTrigger.range.startMs || range.endMs > speakerTrigger.range.endMs));
+        if (speakerOnlyConflict && (!speakerTrigger || !speakerTriggerHasDelta)) return [];
+        const causeCitationIds = speakerTrigger?.citationIds ?? citationIds;
+        const causeReportArtifactIds = speakerTrigger
+          ? matchingReports.filter((report) => report.reportEnvelope.evidenceCitations.some((citation) =>
+              speakerTrigger.citationIds.includes(citation.citationId))).map((report) => report.report.artifactId).sort()
+          : reportArtifactIds;
+        const causeBody = speakerTrigger ? {
+          kind: "speaker_overlap" as const,
+          coverageId: entry.coverageId,
+          range: speakerTrigger.range,
+          priorState: entry.state,
+          reportArtifactIds: causeReportArtifactIds,
+          citationIds: causeCitationIds,
+          observationIds: speakerTrigger.observationIds,
+          rawStates: speakerTrigger.rawStates,
+        } : {
+          kind: causeKind(entry.state, rawStates), coverageId: entry.coverageId, range: weakRange,
+          priorState: entry.state, reportArtifactIds, citationIds, observationIds, rawStates,
+        };
         return [{
           coverageId: entry.coverageId,
-          range: { artifactId: entry.artifactId, trackId: entry.trackId, startMs: entry.startMs, endMs: entry.endMs },
+          range: weakRange,
           state: entry.state,
           priorEvidence,
           cause: { causeId: `study-restudy-cause:${canonicalSha256(causeBody)}`, ...causeBody },
         }];
-      });
+      })
+      .filter((entry) => !alreadyPassedRanges.some((range) =>
+        range.artifactId === entry.range.artifactId && range.trackId === entry.range.trackId &&
+        range.startMs <= entry.range.startMs && range.endMs >= entry.range.endMs));
     const body = { schema: "studio.study-restudy-input.v1" as const, runId: state.runId, rootTaskId: root.id, rootAgentId: root.ownerAgentId, rootExecutionId: execution.id, candidates };
     return { ...body, inputId: `study-restudy-input:${canonicalSha256(body)}` };
   }
@@ -179,9 +245,13 @@ export class RangePassHost {
     const candidate = input.candidates.find((entry) => entry.coverageId === request.coverageId && entry.cause.causeId === request.causeId);
     if (!candidate) throw new Error("Study re-study request does not name one exact current weak range and cause");
     const executionRange = request.delta.executionRange;
-    if (executionRange.artifactId !== candidate.range.artifactId || executionRange.trackId !== candidate.range.trackId ||
-        executionRange.startMs < candidate.range.startMs || executionRange.endMs > candidate.range.endMs ||
-        (executionRange.startMs === candidate.range.startMs && executionRange.endMs === candidate.range.endMs)) {
+    const executionInsideWeak = executionRange.artifactId === candidate.range.artifactId && executionRange.trackId === candidate.range.trackId &&
+      executionRange.startMs >= candidate.range.startMs && executionRange.endMs <= candidate.range.endMs;
+    if (candidate.cause.kind === "speaker_overlap") {
+      if (!executionInsideWeak || !sameRange(executionRange, candidate.cause.range)) {
+        throw new Error("Speaker-overlap re-study must use the exact host-derived overlap range");
+      }
+    } else if (!executionInsideWeak || sameRange(executionRange, candidate.range)) {
       throw new Error("Attenuated re-study must be one strict subrange of the exact weak range");
     }
     if (!candidate.priorEvidence.speechExecutionRanges.some((range) =>

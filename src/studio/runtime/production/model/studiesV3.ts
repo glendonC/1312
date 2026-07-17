@@ -19,6 +19,7 @@ export type StudyRestudyCauseKind =
   | "withheld_evidence"
   | "unavailable_evidence"
   | "truncated_evidence"
+  | "speaker_overlap"
   | "recognizer_disagreement"
   | "failed_range";
 
@@ -26,6 +27,7 @@ export interface StudyRestudyCause {
   causeId: string;
   kind: StudyRestudyCauseKind;
   coverageId: string;
+  /** Exact causal range; for speaker_overlap this may be narrower than the baseline weak cell. */
   range: QualifiedMediaRange;
   priorState: Exclude<GeneralizedCoverageState, "supported" | "not_in_scope">;
   reportArtifactIds: string[];
@@ -36,6 +38,7 @@ export interface StudyRestudyCause {
 
 export interface StudyRestudyCandidate {
   coverageId: string;
+  /** Baseline synthesized weak cell retained for pass caps and v3 projection. */
   range: QualifiedMediaRange;
   state: Exclude<GeneralizedCoverageState, "supported" | "not_in_scope">;
   priorEvidence: {

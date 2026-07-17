@@ -38,7 +38,7 @@ The first six implementation slices after the UI demo freeze now include: the fa
 **acoustic triage and non-dialogue coverage boundary**, bounded **frame sampling with real child
 image delivery**, additive **multimodal admission with generalized abstention**, and one
 **attenuated current-run speech re-study** vertical slice, a thin **on-screen OCR citation** slice,
-and a bounded **anonymous speaker/overlap coverage** slice. Their receipts prove bounded execution, exact byte lineage, citation association, state
+and bounded **anonymous speaker/overlap coverage plus an exact overlap-to-U4 trigger**. Their receipts prove bounded execution, exact byte lineage, citation association, state
 preservation, and pass accounting; they do not prove producer accuracy, visual/scene understanding,
 improvement, or semantic quality.
 
@@ -48,8 +48,9 @@ deliberately keeps U2 frame
 identities cite-only, so no visual finding can affect a study until a later receipted producer exists.
 U5 now has one OCR-only vertical slice; scene/shot boundaries, visual-context specialist routing,
 and denser-frame U4 wiring remain the next parts of that rung. U6 now has one anonymous
-speaker/overlap producer and U3 coverage-qualification slice; the overlap-specific U4 cause/trigger
-remains closed rather than being mislabeled as recognizer disagreement. Web research follows admitted frame/audio evidence
+speaker/overlap producer, U3 coverage-qualification slice, and closed `speaker_overlap` U4 cause: one
+audited overlap cell may trigger an exact attenuated-speech pass without being mislabeled as recognizer
+disagreement. Web research follows admitted frame/audio evidence
 when names, history, or cultural context are outside the file. General computer-use is allowed later
 as a separately granted, isolated, receipted capability for dynamic external context; it is not a
 substitute for decoding and citing the owned video.
@@ -89,13 +90,15 @@ checklist below:
 3. **U3 — multimodal admission and generalized abstention (implemented 2026-07-17):** carry speech,
    acoustic coverage, frame sample identities, and later typed evidence slots through exact citations
    without upgrading weak/conflicting states. Frames remain cite-only.
-4. **U4 — budgeted multi-pass re-study (attenuated-speech slice implemented 2026-07-17):** the
-   default root can request one strict current-run speech subrange for an exact weak range/cause;
-   other typed delta producers fail closed.
+4. **U4 — budgeted multi-pass re-study (attenuated-speech + U6.1 trigger slices implemented 2026-07-17):**
+   the default root can request one strict current-run speech subrange for an exact weak range/cause,
+   or copy one exact host-derived `speaker_overlap` cell inside prior broader speech work; other typed
+   delta producers fail closed.
 5. **U5 — OCR and scene context (OCR citation slice implemented 2026-07-17):** derive and cite
    provisional on-screen text from U2 frames; scene boundaries and specialist routing remain.
-6. **U6 — speaker/overlap evidence (coverage slice implemented 2026-07-17):** preserve anonymous
-   turn/overlap hypotheses in U3 coverage/conflicts; an overlap-specific U4 trigger remains.
+6. **U6 — speaker/overlap evidence (coverage + typed U4 trigger slices implemented 2026-07-17):**
+   preserve anonymous turn/overlap hypotheses in U3 coverage/conflicts and let one exact audited
+   overlap cell request bounded attenuated speech without granting transcript truth.
 7. **U7 — conditional separation and comparison:** preserve raw media, receipt derived stems, and
    compare raw/stem evidence only for triggered ranges.
 8. **R1 — bounded web research:** add safe search plus document snapshot/span citations for exact
@@ -129,7 +132,7 @@ artifact, grant, and audit boundaries are real.
 | Area | Real now | Not available today | Evidence |
 |---|---|---|---|
 | Owned ingest and preflight | Content-addressed owned bytes, rights receipt, `ffprobe`, pinned VAD speech windows, pinned speech-window language ranges, and additive preflight V4 with separately sealed acoustic observations/receipt | Acoustic/diarization accuracy evaluation, scene, and visual context | [`ARCHITECTURE.md` — source ingest boundary](../ARCHITECTURE.md#source-ingest-boundary) and [`STATUS.md` — backlog boundary](./STATUS.md#post-freeze-backlog-boundary) |
-| Orchestration | A model-executed default root can request bounded children and one host-normalized attenuated-speech re-study for an exact weak range/cause. The scheduler derives identities, attenuates context, enforces scope/budgets/pass caps, and dedupes completed work/configuration | Padded audio, denser frames, alternate recognizer/segmentation configurations, specialist re-study, and unlimited/distributed execution | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`scheduler.ts`](../../src/studio/runtime/production/scheduler.ts), and [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts) |
+| Orchestration | A model-executed default root can request bounded children and one host-normalized attenuated-speech re-study for an exact weak range/cause, including an exact receipt-backed U6 `speaker_overlap` cell. The scheduler derives identities, attenuates context, enforces scope/budgets/pass caps, and dedupes completed work/configuration | Padded audio, denser frames, alternate recognizer/segmentation configurations, specialist re-study, and unlimited/distributed execution | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`scheduler.ts`](../../src/studio/runtime/production/scheduler.ts), and [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts) |
 | Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample`, `media.frames.ocr`, one path-free `media.speakers.analyze` call over an injected audio range, `speech.transcribe`, exact reads of pinned VAD/language/U1 evidence, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Scene/shot interpretation, default visual-specialist routing, named/cross-run speakers, stems, web research, and computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); U6 lives in [`model/speakers.ts`](../../src/studio/runtime/production/model/speakers.ts) and [`speakerHost.ts`](../../src/studio/runtime/production/speakerHost.ts) |
 | Current-run speech evidence | A scoped host and bridge exist. With an explicitly enabled recognizer they can produce current-run timed hypotheses; the default unconfigured recognizer honestly returns unavailable | Semantic accuracy/calibration, a guarantee that every run has a live recognizer, alternative segmentation/recognizer passes, and semantic translation QC | [`currentRunSpeechRecognizer.ts`](../../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts) and [`run-runtime-host.ts`](../../scripts/run-runtime-host.ts) |
 | Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. U4 study v3 retains ordered pass history/disagreement; only pass-new exact speech citations support the executed subrange, and exhaustion stays weak without globally blocking unrelated ranges | Semantic correctness/truth arbitration and additional re-study producers | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`restudiedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/restudiedStudySynthesisHost.ts), and [`restudiedStudyReadinessHost.ts`](../../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts) |
@@ -288,15 +291,17 @@ their audits.
   approval-gated caption lineage. U4 reuses report/admission v2 additively; it does not revive or
   mutate the non-default v1 planning/follow-up events.
 
-### U4. Budgeted multi-pass re-study — attenuated current-run speech slice implemented
+### U4. Budgeted multi-pass re-study — attenuated speech + U6.1 trigger slices implemented
 
 - **Real:** `study_restudy_request` is an additive sixth tool on the default generalized root. Its
   host-derived input contains exact weak coverage, prior report/admission/citation/speech identities,
-  raw states, and an evidence-tied cause. The landed producer accepts only a strict attenuated
-  subrange already covered by broader current-run speech work; the host fixes pass 2, configuration
+  raw states, and an evidence-tied cause. The closed `speaker_overlap` cause is derived only from one
+  cold-audited conflicting U6 overlap accounting cell inside the weak coverage; its exact temporal
+  locator is the execution range, and the caller may only copy it. Other causes accept only a strict
+  attenuated subrange. Both paths require prior broader current-run speech work; the host fixes pass 2, configuration
   scope, a 20 s/one-call reservation, and the v2 child contract. The scheduler caps accepted passes
   at one per range and four per producer, rejects a concurrent identical fingerprint, prevents scope
-  broadening, and attenuates task context. Request/terminal receipts and the projection retain prior
+  changes, and attenuates task context. Request/terminal receipts and the projection retain prior
   evidence, cause, delta, pass number, reserved/measured spend, terminal outcome, and disagreement.
   `studio.owned-media-study.v3` retains every admitted report and accepted terminal pass in order.
   Only pass-new range-closing current-run speech citations may support the executed cell; residual or
@@ -307,7 +312,8 @@ their audits.
   segmentation/recognizer configurations, and acoustic/visual/context specialists have typed
   request members but no registered U4 producer/grant, so they fail closed. Pass 3+, semantic
   correctness arbitration, visual findings, and UI projection are not implemented.
-- **Implemented proof:** Default-path tests cover exact cause/range selection, unregistered-delta and
+- **Implemented proof:** Default-path tests cover exact cause/range selection, audited overlap-to-
+  `speaker_overlap` classification, exact overlap-range echo, fake-recognizer-cause rejection, unregistered-delta and
   unchanged-range rejection, concurrent fingerprint dedupe, fixed reservation plus measured spend,
   citation-only subrange support with weak residuals, terminal exhaustion that does not block an
   unrelated supported range, ordered pass/report replay, and disagreement retained without support.
@@ -352,7 +358,7 @@ their audits.
 - **Existing-spine dependency:** U2 frames, U3 citations, U4 re-study, specialist routing, and study
   conflict/limitation handling.
 
-### U6. Speakers, overlap, and anonymous turns — coverage slice implemented
+### U6. Speakers, overlap, and anonymous turns — coverage + typed U4 trigger slices implemented
 
 - **Real:** `media.speakers.analyze` is one exact audio-scope scheduler grant with one task-private
   child tool whose request is `{}`. The host seals mono-16 kHz PCM and uses a replaceable diarizer
@@ -365,15 +371,19 @@ their audits.
   reopens source/artifacts, re-derives identities, and re-hashes current lineage without rerunning
   inference. U3 admits `speaker_turn` only as exact temporal `coverage_qualification`; it reconstructs
   every cell in the target range, so overlap/uncertainty cannot be cherry-picked away. Claim support
-  and KO/EN caption authority remain exclusively current-run speech.
-- **Still missing:** U4 v1 has no speaker-overlap cause taxonomy. Speaker-only overlap therefore
-  produces no attenuated-restudy candidate rather than being falsely called recognizer disagreement.
-  The exact overlap/weak-range trigger, named/cross-run identity, accuracy evaluation, alternate
-  models, non-darwin platform pins, ambient always-diarize policy, and U7 separation remain open.
+  and KO/EN caption authority remain exclusively current-run speech. U6.1 adds the closed
+  `speaker_overlap` cause: one exact conflicting overlap cell, its citation/observation identities,
+  and its baseline weak coverage are host-derived from cold-audited U3 evidence. If prior speech is
+  strictly broader, that exact cell may request the existing attenuated-speech pass once. It is never
+  relabeled `recognizer_disagreement`, and a completed pass does not itself resolve overlap.
+- **Still missing:** Named/cross-run identity, a fit-for-purpose diarization quality/accuracy bench,
+  alternate models, non-darwin native platform pins, ambient always-diarize policy, and U7 separation
+  remain open.
 - **Slice done-when:** The pinned producer, real owned-audio smoke, closed request/grant, immutable
   artifacts/receipts, complete accounting, local-label policy, cold replay/tamper checks, U3
-  coverage/conflict adapter, and missing-grant/model/source/oversize failure boundaries are
-  implemented and tested. The full U6 rung remains open for the typed U4 overlap trigger.
+  coverage/conflict adapter, typed U4 overlap trigger, exact-range/fake-cause rejection, and missing-
+  grant/model/source/oversize failure boundaries are implemented and tested. The full U6 rung remains
+  open for the quality/platform work above; U7 is a separate next rung.
 - **Non-goals:** Naming people, cross-video biometric identity, perfect diarization, or treating a
   speaker-count estimate as transcript correctness.
 - **Fake-claim risk:** Stable-looking labels such as `speaker_1` are clustering hypotheses, not
@@ -498,10 +508,11 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    producer over U2 frames now enters U3 only as cite-only media context and abstains on weak,
    conflicting, truncated, or invalid input. Scene/shot production, one genuinely visual specialist
    route, and U4 denser-frame/specialist wiring remain.
-6. **Speaker/overlap evidence — coverage slice implemented 2026-07-17.** Pinned local anonymous
+6. **Speaker/overlap evidence — coverage + typed U4 trigger slices implemented 2026-07-17.** Pinned local anonymous
    diarization now has path-free grants, immutable complete-range artifacts/receipts, cold audit, and
-   U3 coverage/conflict admission. The typed overlap-driven U4 re-study path remains; no person
-   identity and no automatic transcript truth comes from speaker labels.
+   U3 coverage/conflict admission. One exact audited overlap cell can now request the existing bounded
+   attenuated-speech pass under the closed `speaker_overlap` cause; no person identity and no automatic
+   transcript truth comes from speaker labels.
 7. **Conditional separation + comparison.** Grant separation only for exact U1/U6-triggered ranges;
    preserve raw audio, receipt stems, compare raw/stem evidence, and withhold when inconclusive. Run
    a registered Bet G ablation before any improvement claim.
@@ -532,7 +543,8 @@ downstream Apply outputs, not the product category.
 > explicitly configured model root can request scoped coverage workers; the scheduler grants only the
 > tools and media ranges each task needs. When the current-run recognizer is explicitly enabled,
 > workers can cite its timed hypotheses in typed coverage reports; the default root can admit reports,
-> request one bounded attenuated speech pass for an exact weak range/cause, and synthesize a study
+> request one bounded attenuated speech pass for an exact weak range/cause—including one exact
+> receipt-backed `speaker_overlap` cell—and synthesize a study
 > that retains pass history and terminal weakness. Verified readiness and human approval
 > gate private post-study text artifacts and structural QC. Every stage preserves source, task,
 > evidence, report, study, approval, artifact, and QC lineage. This is preprocess understanding, not
@@ -543,8 +555,9 @@ It is also honest to say:
 - the owned-path v2 runtime campaign is implemented and closed;
 - the default orchestrator chooses bounded decomposition; the explicit v1 compatibility root retains
   its closed gap-driven follow-up path;
-- the default root can request one host-normalized attenuated current-run speech pass; identical
-  work/configuration, unchanged/broadened scope, and unregistered delta producers fail closed;
+- the default root can request one host-normalized attenuated current-run speech pass; a
+  `speaker_overlap` request must echo its exact host-derived cell, while identical work/configuration,
+  invalid scope changes, forged causes, and unregistered delta producers fail closed;
 - workers use real receipted operations when those operations are granted and configured;
 - a missing/unconfigured recognizer is recorded as unavailable rather than replaced by fixture
   evidence;
@@ -559,7 +572,8 @@ The following sequenced backlog items are not current product claims:
 - end-to-end visual/audio understanding of the whole video;
 - accuracy or semantic-understanding claims for acoustic classification, sampled frames, OCR
   hypotheses, or the U4 speech pass; padded/denser/alternate/specialist re-study, scene context,
-  speaker/overlap understanding, or source separation;
+  diarization quality, speaker/overlap understanding, non-darwin speaker runtime support, or source
+  separation;
 - web research, historical/cultural grounding, live source citations, or bounded computer-use;
 - semantic per-run QC, calibrated quality, a model judge as truth, or a general “better than cold”
   claim.

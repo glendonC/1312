@@ -225,7 +225,7 @@ if (names.has(ORCHESTRATOR_RESTUDY_TOOL)) {
     ORCHESTRATOR_RESTUDY_TOOL,
     {
       title: "Request one bounded range pass",
-      description: "Name one exact host-derived weak coverage/cause and one required evidence or configuration delta. Only strict attenuated current-run speech subranges are registered in this slice; all other typed deltas fail closed.",
+      description: "Name one exact host-derived weak coverage/cause and one required evidence or configuration delta. Only attenuated current-run speech is registered: speaker_overlap must copy the host-derived overlap range exactly; other causes require a strict weak-range subrange.",
       inputSchema: z.object({
         inputId: z.string().min(1),
         coverageId: z.string().min(1),

@@ -16,6 +16,7 @@ import type {
   CurrentRunRecognizerDescriptor,
   ExecutorSpanReceipt,
   LaunchPermit,
+  SpeakerOverlapEvidenceCitationInput,
   TaskRecord,
   WorkerOutputEnvelope,
 } from "../model.ts";
@@ -25,10 +26,14 @@ import type {
   CurrentRunSpeechRecognizer,
 } from "../semantic/currentRunSpeechRecognizer.ts";
 import { BoundedChildSemanticEvidenceBridge } from "../executor/childSemanticEvidenceBridge.ts";
+import { BoundedChildSpeakerBridge } from "../executor/childSpeakerBridge.ts";
 import { SpeechTranscribeCapabilityHost } from "../semantic/semanticEvidenceHost.ts";
 import { reopenSemanticEvidence, semanticEvidenceCitation } from "../semantic/semanticEvidenceAudit.ts";
 import { buildStudyReportEnvelope, buildStudyReportEnvelopeV2, validateWorkerResult } from "../executor/workerContract.ts";
 import { deriveTaskDialogueScopePolicy } from "../study/dialogueScopeRuntime.ts";
+import type { SpeakerDiarizer } from "../speaker/diarizer.ts";
+import { auditSpeakerOverlap, type VerifiedSpeakerOverlapAudit } from "../speakerAudit.ts";
+import { BoundedSpeakerOverlapHost } from "../speakerHost.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import {
   RuntimeApplicationInterrupted,
@@ -116,6 +121,7 @@ export interface DeterministicExecutorOptions {
   control?: DeterministicExecutionControl;
   now?: () => Date;
   restudyPassResult?: "supported" | "withheld";
+  speakerDiarizer?: SpeakerDiarizer;
 }
 
 class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
@@ -240,12 +246,34 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       }).call(scope);
       const verifiedSemantic = await reopenSemanticEvidence(ledger.state(), artifacts, semanticResult.operationId);
       const citation = semanticEvidenceCitation(verifiedSemantic);
+      const speakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [];
+      const verifiedSpeakerEvidence: VerifiedSpeakerOverlapAudit[] = [];
+      if (task.grants.some((grant) => grant.capability === "media.speakers.analyze")) {
+        const speakerResult = await new BoundedChildSpeakerBridge(
+          task,
+          new BoundedSpeakerOverlapHost(ledger, artifacts, { diarizer: this.owner.speakerDiarizer }),
+          { nextOperationId: () => `operation:deterministic-speaker:${canonicalSha256({ runId: ledger.runId, taskId: task.id, scope })}` },
+        ).call({});
+        const verifiedSpeaker = await auditSpeakerOverlap(ledger.state(), artifacts, speakerResult.operationId, {
+          diarizer: this.owner.speakerDiarizer,
+        });
+        speakerEvidenceInputs.push({
+          operationId: speakerResult.operationId,
+          artifactId: speakerResult.observationsArtifactId,
+          contentId: speakerResult.observationsContentId,
+          receiptArtifactId: speakerResult.receiptArtifactId,
+          receiptId: speakerResult.receipt.receiptId,
+          receiptContentId: speakerResult.receiptContentId,
+        });
+        verifiedSpeakerEvidence.push(verifiedSpeaker);
+      }
       const claimId = `claim:deterministic:${canonicalSha256({ taskId: task.id, scope, observationIds: citation.observations.map((entry) => entry.observationId) })}`;
       const preservesGap = task.workerLabel.includes("study-gap") ||
         (task.workerLabel === "attenuated-current-run-speech-pass-2" && this.owner.restudyPassResult === "withheld");
       const worker = validateWorkerResult({
         summary: "Deterministic test seam returned one typed current-run hypothesis report; correctness and quality were not assessed.",
         semanticEvidenceInputs: [citation],
+        ...(speakerEvidenceInputs.length > 0 ? { speakerEvidenceInputs } : {}),
         outputs: [{
           name: studySlot.name,
           kind: studySlot.artifactKind,
@@ -261,7 +289,7 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
             citations: [citation],
           }],
         }],
-      }, task, [citation]);
+      }, task, [citation], [], speakerEvidenceInputs);
       const output = worker.outputs[0];
       if ((output.kind !== "studio.study-report.v1" && output.kind !== "studio.study-report.v2") || !("coverage" in output)) throw new Error("Deterministic study worker lost its typed output");
       const reportEnvelope = output.kind === "studio.study-report.v2"
@@ -273,6 +301,8 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
             verifiedSemanticEvidence: [verifiedSemantic],
             ocrEvidenceInputs: [],
             verifiedOcrEvidence: [],
+            speakerEvidenceInputs,
+            verifiedSpeakerEvidence,
             dialogueScopePolicy: await deriveTaskDialogueScopePolicy(ledger.state(), artifacts, task.id),
           })
         : buildStudyReportEnvelope(task, output, [citation]);
@@ -461,6 +491,7 @@ export class DeterministicRuntimeExecutor {
   readonly control: DeterministicExecutionControl;
   readonly now: () => Date;
   readonly restudyPassResult: "supported" | "withheld";
+  readonly speakerDiarizer: SpeakerDiarizer | undefined;
   launchInvocations = 0;
 
   constructor(options: DeterministicExecutorOptions = {}) {
@@ -468,6 +499,7 @@ export class DeterministicRuntimeExecutor {
     this.control = options.control ?? new DeterministicExecutionControl();
     this.now = options.now ?? (() => new Date());
     this.restudyPassResult = options.restudyPassResult ?? "supported";
+    this.speakerDiarizer = options.speakerDiarizer;
   }
 
   factory(): BoundedWorkerLauncherFactory {

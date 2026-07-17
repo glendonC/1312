@@ -32,7 +32,7 @@ import { SpeakerDiarizerFailure } from "../src/studio/runtime/production/speaker
 import { SherpaOnnxSpeakerDiarizer } from "../src/studio/runtime/production/speaker/sherpaOnnxDiarizer.ts";
 import { auditSpeakerOverlap } from "../src/studio/runtime/production/speakerAudit.ts";
 import { BoundedSpeakerOverlapHost } from "../src/studio/runtime/production/speakerHost.ts";
-import { defersSpeakerOverlapRestudy } from "../src/studio/runtime/production/study/rangePassHost.ts";
+import { deriveSpeakerOverlapRestudyTrigger } from "../src/studio/runtime/production/study/rangePassHost.ts";
 import { evidenceCitationId, validateEvidenceCitationEnvelope } from "../src/studio/runtime/production/validation/evidenceCitations.ts";
 import { runtimeTestJobContext } from "./runtime-test-job-context.ts";
 
@@ -252,12 +252,23 @@ test("U6 producer closes real owned audio bytes, immutable receipts, cold audit,
     });
     assert.equal(fullCitation.use, "coverage_qualification");
     assert.equal(fullCitation.observations.length, produced.observations.accounting.length);
-    assert.equal(deriveGeneralizedCoverageDecision({ claimCount: 0, citations: [fullCitation], dialogueScopePolicy: null, range: fullCitation.target.kind === "coverage" ? fullCitation.target.range : runtime.scope, declaredReasonCode: null }).state, "conflicting");
+    const fullDecision = deriveGeneralizedCoverageDecision({ claimCount: 0, citations: [fullCitation], dialogueScopePolicy: null, range: fullCitation.target.kind === "coverage" ? fullCitation.target.range : runtime.scope, declaredReasonCode: null });
+    assert.equal(fullDecision.state, "conflicting");
+    const trigger = deriveSpeakerOverlapRestudyTrigger(
+      [fullCitation],
+      fullCitation.target.kind === "coverage" ? fullCitation.target.range : runtime.scope,
+      fullDecision.rawStates,
+    );
+    assert.deepEqual(trigger?.range, { artifactId: runtime.source.id, trackId: runtime.scope.trackId, startMs: 12_500, endMs: 13_000 });
+    assert.deepEqual(trigger?.observationIds, [produced.observations.accounting[1].observationId]);
+    assert.equal(deriveSpeakerOverlapRestudyTrigger([], runtime.scope, fullDecision.rawStates), null, "raw state without its audited U6 citation is not authority");
     const rapidCitation = speakerTurnCitation({
       verified,
       target: { kind: "coverage", range: { artifactId: runtime.source.id, trackId: runtime.scope.trackId, startMs: 14_500, endMs: 14_700 } },
     });
-    assert.equal(deriveGeneralizedCoverageDecision({ claimCount: 0, citations: [rapidCitation], dialogueScopePolicy: null, range: rapidCitation.target.kind === "coverage" ? rapidCitation.target.range : runtime.scope, declaredReasonCode: null }).state, "unknown");
+    const rapidDecision = deriveGeneralizedCoverageDecision({ claimCount: 0, citations: [rapidCitation], dialogueScopePolicy: null, range: rapidCitation.target.kind === "coverage" ? rapidCitation.target.range : runtime.scope, declaredReasonCode: null });
+    assert.equal(rapidDecision.state, "unknown");
+    assert.equal(deriveSpeakerOverlapRestudyTrigger([rapidCitation], runtime.scope, rapidDecision.rawStates), null);
     await auditEvidenceCitation(replay.state(), runtime.artifacts, fullCitation, { speakerDiarizer: diarizer });
 
     const speakerEvidenceInput = {
@@ -400,13 +411,4 @@ test("U6 fails closed for no grant, missing audio/model, oversized normalized by
     await writeFile(path, "{}\n");
     await assert.rejects(auditSpeakerOverlap(tampered.ledger.state(), tampered.artifacts, produced.observations.operationId, { diarizer }), /content|bytes|verification|canonical/i);
   } finally { await rm(tampered.directory, { recursive: true, force: true }); }
-});
-
-test("U4 v1 defers speaker-only overlap instead of inventing recognizer disagreement", () => {
-  const citation = [{ evidenceKind: "speaker_turn", observations: [{ state: "conflicting", rawState: "speaker:overlap:overlap_hypothesis_requires_speech_restudy" }] }];
-  assert.equal(defersSpeakerOverlapRestudy(citation, ["observation:1:conflicting:speaker:overlap:overlap_hypothesis_requires_speech_restudy"]), true);
-  assert.equal(defersSpeakerOverlapRestudy(citation, [
-    "observation:1:conflicting:speaker:overlap:overlap_hypothesis_requires_speech_restudy",
-    "observation:2:conflicting:speech:recognizer_disagreement",
-  ]), false);
 });

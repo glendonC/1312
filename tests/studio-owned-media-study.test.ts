@@ -14,8 +14,10 @@ import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/study/st
 import { RestudiedCaptionCausalityHost } from "../src/studio/runtime/production/captions/restudiedCaptionCausality.ts";
 import { RestudiedStudyReadinessHost } from "../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts";
 import { restudiedReadinessReference } from "../src/studio/runtime/production/study/restudiedStudyRuntime.ts";
-import { validateStudyRestudyRequest } from "../src/studio/runtime/production/validation/studiesV3.ts";
+import { validateRangePassRequestReceipt, validateStudyRestudyRequest } from "../src/studio/runtime/production/validation/studiesV3.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
+import type { SpeakerDiarizer, SpeakerDiarizerResult } from "../src/studio/runtime/production/speaker/diarizer.ts";
+import { SherpaOnnxSpeakerDiarizer } from "../src/studio/runtime/production/speaker/sherpaOnnxDiarizer.ts";
 import {
   DeterministicRuntimeExecutor,
   DurableRuntimeCommandStore,
@@ -37,6 +39,25 @@ interface RunHarness {
 }
 
 let runtimeCount = 0;
+
+class DeterministicOverlapDiarizer implements SpeakerDiarizer {
+  private lineage: Promise<SpeakerDiarizerResult["lineage"]> | null = null;
+
+  currentLineage(deadlineAtMs: number): Promise<SpeakerDiarizerResult["lineage"]> {
+    this.lineage ??= new SherpaOnnxSpeakerDiarizer().currentLineage(deadlineAtMs);
+    return this.lineage.then((lineage) => structuredClone(lineage));
+  }
+
+  async diarize(_input: Parameters<SpeakerDiarizer["diarize"]>[0], deadlineAtMs: number): Promise<SpeakerDiarizerResult> {
+    return {
+      lineage: await this.currentLineage(deadlineAtMs),
+      segments: [
+        { startMs: 0, endMs: 500, speakerCluster: 1 },
+        { startMs: 150, endMs: 350, speakerCluster: 2 },
+      ],
+    };
+  }
+}
 
 async function run(mode: DeterministicOrchestratorMode = "spawn_one"): Promise<RunHarness> {
   runtimeCount += 1;
@@ -83,7 +104,10 @@ async function runDefaultU4(mode: DeterministicOrchestratorMode = "spawn_one"): 
   const service = await RuntimeStartService.open({
     store,
     sources,
-    launcherFactory: new DeterministicRuntimeExecutor({ restudyPassResult: mode === "restudy_exhausted" ? "withheld" : "supported" }).factory(),
+    launcherFactory: new DeterministicRuntimeExecutor({
+      restudyPassResult: mode === "restudy_exhausted" ? "withheld" : "supported",
+      ...(mode === "restudy_speaker_overlap" ? { speakerDiarizer: new DeterministicOverlapDiarizer() } : {}),
+    }).factory(),
     orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory({ mode }),
     runtimeIdForCommand: () => runtimeId,
     recoverOnOpen: false,
@@ -132,6 +156,8 @@ test("default owned path exposes U4 while preserving v2 report/admission and clo
     const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
     assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v3", required: true }]);
     assert.equal(root.grants.some((grant) => grant.capability === "study.restudy"), true);
+    assert.equal(Object.keys(state.rangePasses).length, 0);
+    assert.equal(Object.keys(state.speakerOverlapOperations).length, 0);
     assert.equal(Object.values(state.reports).filter((report) => report.study?.schema === "studio.study-report-submission.v2").length, 2);
     assert.equal(Object.keys(state.generalizedParentArtifactAdmissions).length, 2);
     assert.equal(Object.keys(state.generalizedParentArtifactReads).length, 2);
@@ -278,6 +304,76 @@ test("default U4 retains conflicting prior evidence and pass disagreement withou
     const readiness = Object.values(state.generalizedStudyReadiness)[0];
     assert.equal(readiness.outcome, "withheld");
     assert.ok(readiness.reasonCodes.includes("unresolved_conflict"));
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("default U6.1 maps one authenticated overlap cell to one exact attenuated speech pass without caption authority", async () => {
+  const runtime = await runDefaultU4("restudy_speaker_overlap");
+  try {
+    const loaded = await journal(runtime);
+    const state = loaded.state;
+    assert.equal(runtime.lifecycle, "terminal");
+    const passes = Object.values(state.rangePasses);
+    assert.equal(passes.length, 1);
+    const pass = passes[0];
+    assert.equal(pass.accepted, true);
+    assert.equal(pass.request.cause.kind, "speaker_overlap");
+    assert.notEqual(pass.request.cause.kind, "recognizer_disagreement");
+    assert.equal(pass.request.priorState, "conflicting");
+    assert.deepEqual(pass.request.weakRange, { ...pass.request.weakRange, startMs: 0, endMs: 500 });
+    assert.deepEqual(pass.request.cause.range, { ...pass.request.cause.range, startMs: 150, endMs: 350 });
+    assert.deepEqual(pass.request.delta, { kind: "attenuated_subrange", executionRange: pass.request.cause.range });
+    assert.ok(pass.request.priorEvidence.speechExecutionRanges.some((range) =>
+      range.artifactId === pass.request.cause.range.artifactId && range.trackId === pass.request.cause.range.trackId &&
+      range.startMs < pass.request.cause.range.startMs && range.endMs > pass.request.cause.range.endMs));
+    assert.ok(pass.request.cause.rawStates.every((raw) =>
+      raw.endsWith(":conflicting:speaker:overlap:overlap_hypothesis_requires_speech_restudy")));
+    assert.equal(pass.request.passNumber, 2);
+    assert.equal(pass.request.producer.kind, "current_run_speech");
+    assert.deepEqual(pass.request.reservedSpend, { wallMs: 20_000, toolCalls: 1 });
+    const narrowed = structuredClone(pass.request);
+    narrowed.delta.executionRange.endMs -= 1;
+    assert.throws(() => validateRangePassRequestReceipt(narrowed), /exact host-derived speaker overlap range/);
+    assert.equal(pass.terminal?.outcome, "unavailable_exhausted");
+    assert.equal(pass.terminal?.exhausted, true);
+
+    const study = Object.values(state.generalizedOwnedMediaStudies)[0];
+    if (study.schema !== "studio.owned-media-study.v3") assert.fail("U6.1 did not record study v3");
+    const speakerCitations = study.evidenceCitations.filter((citation) => citation.evidenceKind === "speaker_turn");
+    assert.ok(speakerCitations.length > 0);
+    assert.ok(speakerCitations.every((citation) => citation.use === "coverage_qualification"));
+    const citationById = new Map(study.evidenceCitations.map((citation) => [citation.citationId, citation]));
+    assert.ok(pass.request.cause.citationIds.every((id) => citationById.get(id)?.evidenceKind === "speaker_turn"));
+    assert.deepEqual(
+      pass.request.cause.observationIds,
+      [...new Set(pass.request.cause.citationIds.flatMap((id) =>
+        citationById.get(id)?.observations.filter((observation) =>
+          observation.rawState === "speaker:overlap:overlap_hypothesis_requires_speech_restudy" &&
+          observation.state === "conflicting").map((observation) => observation.observationId) ?? []))].sort(),
+    );
+    assert.ok(study.claims.every((claim) => claim.citationIds.every((id) => {
+      const citation = citationById.get(id);
+      return citation?.evidenceKind === "current_run_speech" && citation.use === "claim_support";
+    })));
+    const readiness = Object.values(state.generalizedStudyReadiness)[0];
+    if (readiness.schema !== "studio.study-readiness.receipt.v4") assert.fail("U6.1 did not record readiness v4");
+    assert.equal(readiness.outcome, "withheld");
+    assert.ok(readiness.reasonCodes.includes("unresolved_conflict"));
+    const artifacts = new ContentAddressedArtifactStore(runtime.store.paths(runtime.runtimeId).artifactStoreRoot);
+    const causality = await new RestudiedCaptionCausalityHost(state, artifacts).close({
+      readiness: restudiedReadinessReference(readiness),
+      range: structuredClone(pass.request.cause.range),
+      sourceText: "겹친 음성 가설",
+      targetText: "Overlapping speech hypothesis",
+    });
+    assert.deepEqual(causality.source, { language: "ko", state: "withheld", text: null, reasonCode: "study_readiness_withheld" });
+    assert.deepEqual(causality.target, { language: "en", state: "withheld", text: null, reasonCode: "study_readiness_withheld" });
+    assert.deepEqual(causality.lineage.citationIds, []);
+    assert.equal(Object.values(state.spawnRequests).filter((entry) =>
+      entry.input.workloadKey === `restudy:${pass.request.workFingerprint}` && entry.accepted).length, 1);
+    assert.deepEqual(projectRuntimeEvents(runtime.runtimeId, loaded.events), state);
   } finally {
     await cleanup(runtime);
   }

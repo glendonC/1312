@@ -45,7 +45,7 @@ const WEAK_STATES = new Set<Exclude<GeneralizedCoverageState, "supported" | "not
   "unknown", "withheld", "unavailable", "truncated", "conflicting", "failed",
 ]);
 const CAUSES = new Set([
-  "unobserved_range", "unknown_evidence", "withheld_evidence", "unavailable_evidence", "truncated_evidence", "recognizer_disagreement", "failed_range",
+  "unobserved_range", "unknown_evidence", "withheld_evidence", "unavailable_evidence", "truncated_evidence", "speaker_overlap", "recognizer_disagreement", "failed_range",
 ]);
 const REASON_CODES = new Set([
   "evidence_unknown", "worker_withheld", "evidence_unavailable", "evidence_truncated", "evidence_conflicting",
@@ -119,7 +119,7 @@ export function validateStudyRestudyRequest(value: unknown): StudyRestudyRequest
 function cause(value: unknown, context: string, path: string): StudyRestudyCause {
   const item = object(value, context, path);
   exact(item, ["causeId", "kind", "coverageId", "range", "priorState", "reportArtifactIds", "citationIds", "observationIds", "rawStates"], context, path);
-  return {
+  const result: StudyRestudyCause = {
     causeId: string(item.causeId, context, `${path}.causeId`),
     kind: oneOf<StudyRestudyCause["kind"]>(item.kind, CAUSES, context, `${path}.kind`),
     coverageId: string(item.coverageId, context, `${path}.coverageId`),
@@ -130,6 +130,14 @@ function cause(value: unknown, context: string, path: string): StudyRestudyCause
     observationIds: uniqueStrings(item.observationIds, context, `${path}.observationIds`),
     rawStates: uniqueStrings(item.rawStates, context, `${path}.rawStates`),
   };
+  if (result.kind === "speaker_overlap" && (
+    result.priorState !== "conflicting" || result.reportArtifactIds.length === 0 ||
+    result.citationIds.length === 0 || result.observationIds.length === 0 ||
+    result.rawStates.length !== result.observationIds.length ||
+    result.observationIds.some((observationId) => !result.rawStates.includes(
+      `${observationId}:conflicting:speaker:overlap:overlap_hypothesis_requires_speech_restudy`))
+  )) fail(context, path, "speaker_overlap must bind exact conflicting U6 overlap observations");
+  return result;
 }
 
 export function validateRangePassRequestReceipt(value: unknown): RangePassRequestReceipt {
@@ -142,10 +150,15 @@ export function validateRangePassRequestReceipt(value: unknown): RangePassReques
   const parsedDelta = delta(item.delta, context, "receipt.delta");
   if (parsedDelta.kind !== "attenuated_subrange") fail(context, "receipt.delta.kind", "is not registered in this runtime slice");
   const weakRange = range(item.weakRange, context, "receipt.weakRange");
-  if (!sameRange(weakRange, parsedCause.range) || parsedDelta.executionRange.artifactId !== weakRange.artifactId || parsedDelta.executionRange.trackId !== weakRange.trackId ||
-      parsedDelta.executionRange.startMs < weakRange.startMs || parsedDelta.executionRange.endMs > weakRange.endMs ||
-      (parsedDelta.executionRange.startMs === weakRange.startMs && parsedDelta.executionRange.endMs === weakRange.endMs)) {
-    fail(context, "receipt", "must bind one exact weak range and a strict contained execution subrange");
+  const executionInsideWeak = parsedDelta.executionRange.artifactId === weakRange.artifactId &&
+    parsedDelta.executionRange.trackId === weakRange.trackId && parsedDelta.executionRange.startMs >= weakRange.startMs &&
+    parsedDelta.executionRange.endMs <= weakRange.endMs;
+  const validSpeakerOverlap = parsedCause.kind === "speaker_overlap" && executionInsideWeak &&
+    sameRange(parsedDelta.executionRange, parsedCause.range);
+  const validExistingCause = parsedCause.kind !== "speaker_overlap" && sameRange(weakRange, parsedCause.range) &&
+    executionInsideWeak && !sameRange(parsedDelta.executionRange, weakRange);
+  if (!validSpeakerOverlap && !validExistingCause) {
+    fail(context, "receipt", "must bind the exact host-derived speaker overlap range or one strict weak-range subrange");
   }
   const producer = object(item.producer, context, "receipt.producer"); exact(producer, ["kind", "capability", "configurationScope"], context, "receipt.producer");
   literal(producer.kind, "current_run_speech", context, "receipt.producer.kind"); literal(producer.capability, "speech.transcribe", context, "receipt.producer.capability"); literal(producer.configurationScope, "runtime_injected_current_run_recognizer", context, "receipt.producer.configurationScope");

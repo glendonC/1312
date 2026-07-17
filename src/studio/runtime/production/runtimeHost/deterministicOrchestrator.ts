@@ -29,6 +29,7 @@ export type DeterministicOrchestratorMode =
   | "restudy_support"
   | "restudy_exhausted"
   | "restudy_disagreement"
+  | "restudy_speaker_overlap"
   | "no_request";
 
 export interface DeterministicOrchestratorOptions {
@@ -129,6 +130,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       if (midpoint <= rootScope.startMs || midpoint >= rootScope.endMs) throw new Error("Deterministic generalized root cannot split the bounded scope");
       const restudyDisagreement = this.mode === "restudy_disagreement";
       const restudyWeak = this.mode === "restudy_support" || this.mode === "restudy_exhausted";
+      const restudySpeakerOverlap = this.mode === "restudy_speaker_overlap";
       const scopes = restudyDisagreement
         ? [rootScope, rootScope]
         : [{ ...rootScope, endMs: midpoint }, { ...rootScope, startMs: midpoint }];
@@ -139,13 +141,19 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
           workerKind: "analysis",
           workerLabel: restudyDisagreement
             ? `deterministic-study-conflict-${index + 1}`
-            : restudyWeak && index === 0
-              ? "deterministic-study-gap-worker"
-              : `deterministic-generalized-study-worker-${index + 1}`,
+            : restudySpeakerOverlap && index === 0
+              ? "deterministic-study-speaker-overlap-worker"
+              : restudyWeak && index === 0
+                ? "deterministic-study-gap-worker"
+                : `deterministic-generalized-study-worker-${index + 1}`,
           mediaScope: [scope],
           inputArtifactIds: [sourceId],
           requiredOutputs: [{ name: `generalized coverage study ${index + 1}`, artifactKind: "studio.study-report.v2", required: true }],
-          requiredCapabilities: ["speech.transcribe", "report.submit"],
+          requiredCapabilities: [
+            "speech.transcribe",
+            ...(restudySpeakerOverlap && index === 0 ? ["media.speakers.analyze" as const] : []),
+            "report.submit",
+          ],
           dependencyWorkloadKeys: [],
           budget: { wallMs: 20_000, toolCalls: 2 },
         });
@@ -170,17 +178,34 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
         synthesisInput = read.synthesisInput ?? synthesisInput;
         restudyInput = read.restudyInput ?? restudyInput;
       }
-      if (restudyWeak || restudyDisagreement) {
+      if (restudyWeak || restudyDisagreement || restudySpeakerOverlap) {
         const candidate = restudyInput?.candidates[0];
         if (!candidate) throw new Error("Deterministic U4 proof requires one exact evidence-derived weak candidate");
         const width = candidate.range.endMs - candidate.range.startMs;
         const inset = Math.max(1, Math.floor(width / 4));
-        const executionRange = {
-          ...candidate.range,
-          startMs: candidate.range.startMs + inset,
-          endMs: candidate.range.endMs - inset,
-        };
+        const executionRange = restudySpeakerOverlap
+          ? structuredClone(candidate.cause.range)
+          : {
+              ...candidate.range,
+              startMs: candidate.range.startMs + inset,
+              endMs: candidate.range.endMs - inset,
+            };
         if (executionRange.startMs >= executionRange.endMs) throw new Error("Deterministic U4 candidate is too narrow for a strict attenuated subrange");
+
+        if (restudySpeakerOverlap) {
+          let forgedCauseRejected = false;
+          try {
+            await bridge.restudy({
+              inputId: restudyInput!.inputId,
+              coverageId: candidate.coverageId,
+              causeId: `${candidate.cause.causeId}:recognizer_disagreement`,
+              delta: { kind: "attenuated_subrange", executionRange },
+            });
+          } catch {
+            forgedCauseRejected = true;
+          }
+          if (!forgedCauseRejected) throw new Error("Deterministic U6.1 proof accepted a forged recognizer-disagreement cause");
+        }
 
         let unregisteredRejected = false;
         try {
@@ -239,18 +264,20 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
         });
         synthesisInput = read.synthesisInput ?? synthesisInput;
 
-        let duplicateRejected = false;
-        try {
-          await bridge.restudy({
-            inputId: restudyInput!.inputId,
-            coverageId: candidate.coverageId,
-            causeId: candidate.cause.causeId,
-            delta: { kind: "attenuated_subrange", executionRange },
-          });
-        } catch {
-          duplicateRejected = true;
+        if (!restudySpeakerOverlap) {
+          let duplicateRejected = false;
+          try {
+            await bridge.restudy({
+              inputId: restudyInput!.inputId,
+              coverageId: candidate.coverageId,
+              causeId: candidate.cause.causeId,
+              delta: { kind: "attenuated_subrange", executionRange },
+            });
+          } catch {
+            duplicateRejected = true;
+          }
+          if (!duplicateRejected) throw new Error("Deterministic U4 proof did not reject identical completed work/configuration");
         }
-        if (!duplicateRejected) throw new Error("Deterministic U4 proof did not reject identical completed work/configuration");
       }
       if (!synthesisInput) throw new Error("Deterministic generalized root did not receive host-derived synthesis input");
       const synthesis = await bridge.synthesize(synthesisInput);

@@ -300,7 +300,7 @@ function StudioSourceDock({
               title={preparationItem.label}
               stage={preparationStage}
               busy={previewSession?.preparation.status === "building"}
-              primaryAction={{ label: "Exit setup", onClick: returnToSource }}
+              primaryAction={{ label: "Exit setup", emphasis: "danger", onClick: returnToSource }}
             />
           ) : failed ? (
             <LifecycleBottomBar

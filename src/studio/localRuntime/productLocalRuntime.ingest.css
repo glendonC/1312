@@ -1,7 +1,5 @@
 
-.product-runtime-connect,
-.product-runtime-range,
-.product-runtime-language {
+.product-runtime-connect {
   display: flex;
   align-items: end;
   gap: 12px;
@@ -21,14 +19,12 @@
   font-weight: var(--weight-medium);
 }
 
-.product-runtime-ingest,
-.product-runtime-request {
+.product-runtime-ingest {
   display: grid;
   gap: 14px;
 }
 
 .product-runtime-ingest > p,
-.product-runtime-request > p,
 .product-runtime-empty-source {
   color: var(--ink-muted);
   font-size: 0.72rem;

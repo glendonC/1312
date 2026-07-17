@@ -1,10 +1,18 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import AgentMark from "../AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "../agentIdentity";
 import LifecycleBottomBar from "../LifecycleBottomBar";
 import { initialRequest, type AnalysisRequest } from "../preflight/model";
+import {
+  ConversationValue,
+  PreparationControlShelf,
+  StageConversation,
+  TimestampField,
+  continueActionLabel,
+  formatTimestamp,
+} from "../preflight/preparationKit";
 import PreparationStageNavigation, {
   PREPARATION_STAGES,
   preparationStageIndex,
@@ -32,9 +40,12 @@ import type {
   RuntimeHostSourceSummary,
   RuntimeHostStartRequest,
 } from "../runtime/production/runtimeHost/model";
-import {
+// Type-only: the ProductionStudioAdapter *value* pulls the server runtime (node:crypto via the
+// artifact store) which cannot load in the browser. It is instantiated behind a dynamic import at
+// its single call site so it never enters the client's initial bundle and StudioApp can hydrate.
+import type {
   ProductionStudioAdapter,
-  type ProductionStudioProjection,
+  ProductionStudioProjection,
 } from "../runtime/production/studioProjection";
 import { LocalRuntimeHostClient } from "./client";
 import ProductionProcessingCanvas from "./ProductionProcessingCanvas";
@@ -522,6 +533,7 @@ export default function ProductLocalRuntime({
       ) {
         throw new Error("The frozen runtime forecast does not match the reviewed forecast content.");
       }
+      const { ProductionStudioAdapter } = await import("../runtime/production/studioProjection");
       const adapter = new ProductionStudioAdapter(acknowledgement.runtimeId);
       const nextRuntime: RuntimeView = {
         status: statusView(acknowledgement),
@@ -686,11 +698,6 @@ export default function ProductLocalRuntime({
     (setupStage === "forecast" && !reviewed) ||
     (setupStage === "confirm" && busy !== null);
 
-  const setupAdvanceLabel = setupStage === "confirm"
-    ? busy === "start" ? "Accepting and starting local runtime…" : "Accept forecast and start local runtime"
-    : setupStage === "output" && busy === "plan"
-      ? "Reviewing local plan…"
-      : `Continue to ${PREPARATION_STAGES[currentSetupStageIndex + 1].label}`;
   const setupBusyCopy = busy === "connect"
     ? "Connecting local host"
     : busy === "ingest"
@@ -839,8 +846,17 @@ export default function ProductLocalRuntime({
                   onAnimationComplete={() => setupHeading.current?.focus({ preventScroll: true })}
                 >
                   {setupStage === "source" && (
-                    <section className="preflight-preparation">
-                      <OwnedSetupHeading headingRef={setupHeading} kicker="Local production path · separate from replay" title={client ? "Add or choose owned media" : "Connect the local source host"} detail={client ? "Register media you own or control, then choose its receipted source session." : "The owned-media path uses a local host and a paste-once bearer token. Nothing is uploaded to a remote service."} />
+                    <section className="preflight-preparation preflight-source-stage product-runtime-source">
+                      <div className="preflight-source-conversation" role="note" aria-label="Owned local source boundary">
+                        <span className="product-runtime-source-kicker">Local production path · separate from replay</span>
+                        <h2 ref={setupHeading} id="preflight-stage-title" tabIndex={-1}>
+                          {client
+                            ? selectedSource
+                              ? <>I’ve registered <ConversationValue>{selectedSource.label}</ConversationValue>. Choose or replace the owned source, or continue.</>
+                              : "Register media you own or control, then choose its receipted source session."
+                            : "Connect the local source host with a paste-once bearer token to register media you own. Nothing is uploaded to a remote service."}
+                        </h2>
+                      </div>
                       <p className="product-runtime-boundary" role="note">
                         This path registers receipted local media, reviews a real workload-floor forecast, and starts a bounded local runtime. After an exact verified human approval, a separate private caption job may be explicitly requested. Neither path uploads or publishes. Submitted YouTube URLs remain unprocessed recorded previews.
                       </p>
@@ -891,30 +907,62 @@ export default function ProductLocalRuntime({
 
                   {setupStage === "range" && selectedSource && (
                     <section className="preflight-preparation">
-                      <OwnedSetupHeading headingRef={setupHeading} kicker="Analysis range" title="Choose the owned-media section" detail="The requested range must stay inside the host-measured source duration." />
-                      <fieldset className="product-runtime-request"><legend>Requested section</legend><div className="product-runtime-range"><label><span>Start, seconds</span><input type="number" min={0} max={selectedSource.durationMs / 1_000} step={0.1} value={analysisRequest.start} onChange={(event) => updateRequest({ rangeMode: "custom", start: event.currentTarget.valueAsNumber })} /></label><label><span>End, seconds</span><input type="number" min={0} max={selectedSource.durationMs / 1_000} step={0.1} value={analysisRequest.end} onChange={(event) => updateRequest({ rangeMode: "custom", end: event.currentTarget.valueAsNumber })} /></label></div>{!rangeValid && <p role="status">Choose a non-empty range inside {seconds(selectedSource.durationMs)}.</p>}</fieldset>
+                      <StageConversation headingRef={setupHeading}>
+                        I’ll process <ConversationValue>{formatTimestamp(analysisRequest.start)}–{formatTimestamp(analysisRequest.end)}</ConversationValue> of{" "}
+                        <ConversationValue>{selectedSource.label}</ConversationValue>. Stay inside the measured {seconds(selectedSource.durationMs)}; I haven’t inspected the content to choose a section.
+                      </StageConversation>
+                      <div className="preflight-range-time-fields">
+                        <TimestampField
+                          label="Start"
+                          value={analysisRequest.start}
+                          max={selectedSource.durationMs / 1_000}
+                          invalid={!rangeValid}
+                          onChange={(start) => updateRequest({ rangeMode: "custom", start })}
+                        />
+                        <TimestampField
+                          label="End"
+                          value={analysisRequest.end}
+                          max={selectedSource.durationMs / 1_000}
+                          invalid={!rangeValid}
+                          onChange={(end) => updateRequest({ rangeMode: "custom", end })}
+                        />
+                      </div>
+                      {!rangeValid && <p className="preflight-range-feedback" data-invalid="true" role="status">Choose a non-empty range inside {seconds(selectedSource.durationMs)}.</p>}
                     </section>
                   )}
 
                   {setupStage === "language" && (
                     <section className="preflight-preparation">
-                      <OwnedSetupHeading headingRef={setupHeading} kicker="Language direction" title="Declare the language request" detail="Use explicit BCP-47 language tags. The optional pack identity remains part of the reviewed local request." />
-                      <div className="product-runtime-language"><label><span>Declared source language</span><input type="text" placeholder="ko" value={sourceLanguage} onChange={(event) => { clearReviewedState(); setSourceLanguage(event.currentTarget.value.trim()); }} /></label><label><span>Target language</span><input type="text" value={analysisRequest.targetLanguage} onChange={(event) => updateRequest({ targetLanguage: event.currentTarget.value.trim() })} /></label></div>
-                      <label><span>Language-pack identity (optional)</span><input type="text" placeholder="ko-v3" value={languagePackId} onChange={(event) => { clearReviewedState(); setLanguagePackId(event.currentTarget.value); }} /></label>
+                      <StageConversation headingRef={setupHeading}>
+                        I’ll treat the source as <ConversationValue>{sourceLanguage || "a language you declare"}</ConversationValue> and request{" "}
+                        <ConversationValue>{analysisRequest.targetLanguage || "a target"}</ConversationValue> output. Use explicit BCP-47 tags.
+                      </StageConversation>
+                      <div className="product-runtime-language-fields">
+                        <label className="preflight-declared-language"><span>Declared source language</span><input type="text" placeholder="ko" value={sourceLanguage} onChange={(event) => { clearReviewedState(); setSourceLanguage(event.currentTarget.value.trim()); }} /></label>
+                        <label className="preflight-target-language"><span>Target language</span><input type="text" value={analysisRequest.targetLanguage} onChange={(event) => updateRequest({ targetLanguage: event.currentTarget.value.trim() })} /></label>
+                        <label className="preflight-declared-language"><span>Language-pack identity (optional)</span><input type="text" placeholder="ko-v3" value={languagePackId} onChange={(event) => { clearReviewedState(); setLanguagePackId(event.currentTarget.value); }} /></label>
+                      </div>
                       {!languageValid && <p className="preflight-block" role="status">Enter explicit BCP-47 language tags such as <code>ko</code> and <code>en</code>.</p>}
                     </section>
                   )}
 
                   {setupStage === "output" && (
                     <section className="preflight-preparation">
-                      <OwnedSetupHeading headingRef={setupHeading} kicker="Requested output" title="Choose the local output contract" detail="The evidence contract runs the bounded proof. Caption production still requires its separate verified review." />
+                      <StageConversation headingRef={setupHeading}>
+                        I’ll request the <ConversationValue>{analysisRequest.outputDepth === "evidence" ? "evidence contract" : "caption request contract"}</ConversationValue>. Caption production still needs its separate verified review.
+                      </StageConversation>
                       <label className="product-runtime-output"><span>Requested output contract</span><select value={analysisRequest.outputDepth} onChange={(event) => updateRequest({ outputDepth: event.currentTarget.value as AnalysisRequest["outputDepth"] })}><option value="evidence">Evidence contract</option><option value="captions">Caption request contract (production requires verified review)</option></select></label>
                     </section>
                   )}
 
                   {setupStage === "forecast" && reviewed && workload && (
-                    <section className="preflight-preparation product-runtime-plan" aria-labelledby="preflight-stage-title">
-                      <OwnedSetupHeading headingRef={setupHeading} kicker="studio.forecast.v1 · not started or frozen" title="Review the local runtime plan" detail="Measured workload facts are shown; elapsed time, model usage, and cost remain unavailable rather than invented." />
+                    <section className="preflight-preparation product-runtime-plan" aria-label="Review the local runtime plan">
+                      <StageConversation headingRef={setupHeading}>
+                        I’ve reviewed a <ConversationValue>studio.forecast.v1</ConversationValue> workload floor of{" "}
+                        <ConversationValue>{seconds(workload.requestedOperationMediaDurationMs)} across {workload.operationCount} {workload.operationCount === 1 ? "operation" : "operations"}</ConversationValue> for{" "}
+                        <ConversationValue>{selectedSource?.label ?? "the owned source"}</ConversationValue>. Elapsed time, model usage, and cost stay unavailable rather than invented.
+                      </StageConversation>
+                      <p className="product-runtime-forecast-kicker">studio.forecast.v1 · not started or frozen</p>
                       <dl><div><dt>Selected range</dt><dd>{seconds(reviewed.response.forecast.inputs.selectedRange.startMs)}–{seconds(reviewed.response.forecast.inputs.selectedRange.endMs)} · {seconds(workload.selectedMediaDurationMs)}</dd></div><div><dt>Workload floor</dt><dd>{seconds(workload.requestedOperationMediaDurationMs)} across {workload.operationCount} explicit {workload.operationCount === 1 ? "operation" : "operations"}</dd></div><div><dt>Elapsed time</dt><dd>Unavailable</dd></div><div><dt>Model usage</dt><dd>Unavailable</dd></div><div><dt>Estimated API cost</dt><dd>Unavailable · amount and currency are null</dd></div><div><dt>Forecast content</dt><dd>{reviewed.response.forecast.content.contentId}</dd></div></dl>
                       <details><summary>Forecast assumptions and explicit work</summary><ul>{workload.operations.map((operation) => <li key={operation.operationId}><code>{operation.kind}</code> · {seconds(operation.requestedMediaDurationMs)}</li>)}{reviewed.response.forecast.assumptions.map((assumption) => <li key={assumption.code}>{assumption.statement}</li>)}</ul></details>
                     </section>
@@ -922,20 +970,33 @@ export default function ProductLocalRuntime({
 
                   {setupStage === "confirm" && reviewed && workload && selectedSource && (
                     <section className="preflight-preparation">
-                      <OwnedSetupHeading headingRef={setupHeading} kicker="Final review" title="Start the bounded local runtime" detail="This final action accepts the exact reviewed forecast and creates the local runtime start receipt." />
+                      <StageConversation headingRef={setupHeading}>
+                        I’m ready to start the bounded local runtime with <ConversationValue>{selectedSource.label}</ConversationValue>,{" "}
+                        <ConversationValue>{seconds(reviewed.response.forecast.inputs.selectedRange.startMs)}–{seconds(reviewed.response.forecast.inputs.selectedRange.endMs)}</ConversationValue>,{" "}
+                        <ConversationValue>{sourceLanguage} → {analysisRequest.targetLanguage}</ConversationValue>, and{" "}
+                        <ConversationValue>{analysisRequest.outputDepth === "evidence" ? "the evidence contract" : "the caption request contract"}</ConversationValue>. The host keeps this copy private; starting won’t upload or publish.
+                      </StageConversation>
                       <dl className="preflight-confirmation-summary"><div><dt>Source</dt><dd>{selectedSource.label}</dd></div><div><dt>Range</dt><dd>{seconds(reviewed.response.forecast.inputs.selectedRange.startMs)}–{seconds(reviewed.response.forecast.inputs.selectedRange.endMs)}</dd></div><div><dt>Language</dt><dd>{sourceLanguage} → {analysisRequest.targetLanguage}</dd></div><div><dt>Output</dt><dd>{analysisRequest.outputDepth === "evidence" ? "Evidence contract" : "Caption request contract"}</dd></div></dl>
-                      <p className="preflight-preview-warning" role="note"><b>Local runtime boundary</b>The host preserves this copy privately. Starting does not upload or publish the media.</p>
                     </section>
                   )}
                 </motion.div>
               </AnimatePresence>
 
               {error && <p className="product-runtime-error" role="alert">{error}</p>}
-              <div className="preflight-actions" data-stage={setupStage}>
-                <button type="button" className="ghost" onClick={previousSetupStage}>{setupStage === "source" ? "Back to source choices" : `Back to ${PREPARATION_STAGES[currentSetupStageIndex - 1].label}`}</button>
-                <button type="submit" className="cta" disabled={setupAdvanceDisabled}>{setupAdvanceLabel}</button>
-              </div>
             </motion.section>
+
+            <PreparationControlShelf
+              visible={busy === null}
+              stage={setupStage}
+              back={setupStage !== "source"
+                ? { label: `Back to ${PREPARATION_STAGES[currentSetupStageIndex - 1].label}`, onClick: previousSetupStage }
+                : undefined}
+              next={{
+                label: setupStage === "confirm" ? "Start" : "Continue",
+                actionLabel: setupStage === "confirm" ? "Accept forecast and start local runtime" : continueActionLabel(setupStage),
+                disabled: setupAdvanceDisabled,
+              }}
+            />
           </form>
 
           <div className="studio-source-dock product-runtime-setup-dock">
@@ -949,14 +1010,14 @@ export default function ProductLocalRuntime({
               <LifecycleBottomBar
                 mode="failed"
                 title="Local setup needs attention"
-                primaryAction={{ label: "Exit setup", onClick: onClose }}
+                primaryAction={{ label: "Exit setup", emphasis: "danger", onClick: onClose }}
               />
             ) : (
               <LifecycleBottomBar
                 mode="preparation"
                 title={PREPARATION_STAGES[currentSetupStageIndex].label}
                 stage={setupStage}
-                primaryAction={{ label: "Exit setup", onClick: onClose }}
+                primaryAction={{ label: "Exit setup", emphasis: "danger", onClick: onClose }}
               />
             )}
           </div>
@@ -966,22 +1027,3 @@ export default function ProductLocalRuntime({
   );
 }
 
-function OwnedSetupHeading({
-  headingRef,
-  kicker,
-  title,
-  detail,
-}: {
-  headingRef: RefObject<HTMLHeadingElement | null>;
-  kicker: string;
-  title: string;
-  detail: string;
-}) {
-  return (
-    <header className="preflight-stage-head">
-      <span>{kicker}</span>
-      <h2 ref={headingRef} id="preflight-stage-title" tabIndex={-1}>{title}</h2>
-      <p>{detail}</p>
-    </header>
-  );
-}

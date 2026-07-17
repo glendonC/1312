@@ -96,8 +96,6 @@
 
   .product-runtime-header,
   .product-runtime-connect,
-  .product-runtime-range,
-  .product-runtime-language,
   .product-runtime-caption-result-list > article > header {
     align-items: stretch;
     flex-direction: column;

@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -8,41 +7,31 @@ import {
   createSourceArtifactId,
   identifyFile,
 } from "../artifactStore.ts";
-import { reopenEvidenceAssessmentAudits } from "../assessmentAudit.ts";
-import { reopenEvidenceDecisionReceipts } from "../decisionReceiptAudit.ts";
-import { reopenPublishReviewIntakes } from "../publishReviewIntakeAudit.ts";
-import { reopenPublishReviewDecisions } from "../publishReviewDecisionAudit.ts";
-import {
-  reopenCaptionProductionResults,
-  reopenCaptionProductions,
-} from "../captionProductionAudit.ts";
 import {
   CaptionProductionHost,
   CaptionProductionHostError,
-} from "../captionProductionHost.ts";
+} from "../captions/captionProductionHost.ts";
 import {
   CaptionQualityControlHost,
   CaptionQualityControlHostError,
-} from "../captionQualityControlHost.ts";
-import { reopenCaptionQualityControls } from "../captionQualityControlAudit.ts";
+} from "../captions/captionQualityControlHost.ts";
 import {
   RecordedCaptionFixtureExecutor,
   type CaptionProductionExecutor,
-} from "../captionProductionExecutor.ts";
+} from "../captions/captionProductionExecutor.ts";
 import {
   PublishReviewHost,
   PublishReviewHostError,
-} from "../publishReviewHost.ts";
+} from "../review/publishReviewHost.ts";
 import { FileEventJournal, RuntimeJournalConflict, RuntimeLedger } from "../journal.ts";
-import { interruptAmbiguousRuntime } from "../recovery.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
 import {
   createRuntimePlan,
   createRuntimeStartCommand,
 } from "../runStart/runtimeStart.ts";
-import { assertRuntimeStartRecord } from "../runStartValidation.ts";
-import type { RuntimeStartRecord } from "../model.ts";
 import { DurableRuntimeCommandStore } from "./commandStore.ts";
+import { RuntimeHostLifecycleCoordinator, terminal } from "./lifecycleCoordinator.ts";
+import { RuntimeHostQueries } from "./runtimeQueries.ts";
 import { RuntimeHostError } from "./errors.ts";
 import {
   lifecycleFromRuntimeEvidence,
@@ -56,7 +45,6 @@ import type {
   RuntimeHostCaptionProductionResponse,
   RuntimeHostCaptionQualityControlResponse,
   RuntimeHostDecisionReceiptResponse,
-  RuntimeHostFailureReason,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewIntakeResponse,
@@ -78,8 +66,6 @@ import { parseRuntimeHostStartRequest } from "./validation.ts";
 import {
   assertPublishReviewDecisionRequest,
   assertPublishReviewRevocationRequest,
-  PUBLISH_REVIEW_DECISION_ATTESTATION,
-  PUBLISH_REVIEW_REVOCATION_ATTESTATION,
   validatePublishReviewOperator,
 } from "../validation/publishReviewDecision.ts";
 import type { PublishReviewOperator } from "../model.ts";
@@ -100,10 +86,6 @@ export interface RuntimeStartServiceOptions {
   captionExecutor?: CaptionProductionExecutor;
 }
 
-function terminal(lifecycle: RuntimeHostCommandRecord["lifecycle"]): boolean {
-  return lifecycle === "terminal" || lifecycle === "failed" || lifecycle === "interrupted";
-}
-
 function deterministicRuntimeId(commandId: string): string {
   const digest = canonicalSha256({ allocator: "studio.local-runtime-host.v1", commandId });
   const uuid = [
@@ -114,15 +96,6 @@ function deterministicRuntimeId(commandId: string): string {
     digest.slice(20, 32),
   ].join("-");
   return `runtime:${uuid}`;
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isFile();
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-    throw error;
-  }
 }
 
 /** Transport-independent validated start, lookup, recovery, and journal polling service. */
@@ -137,8 +110,9 @@ export class RuntimeStartService {
   private readonly hostInstanceId: string;
   private readonly reviewer: PublishReviewOperator;
   private readonly captionExecutor: CaptionProductionExecutor;
+  private readonly lifecycle: RuntimeHostLifecycleCoordinator;
+  private readonly queries: RuntimeHostQueries;
   private readonly initializing = new Map<string, Promise<RuntimeHostStartAcknowledgement>>();
-  private readonly transitionTails = new Map<string, Promise<RuntimeHostCommandRecord>>();
   private readonly reviewMutationTails = new Map<string, Promise<unknown>>();
 
   private constructor(options: RuntimeStartServiceOptions) {
@@ -154,6 +128,12 @@ export class RuntimeStartService {
       options.reviewer ?? { id: "reviewer:local-operator", label: "Local review operator" },
     );
     this.captionExecutor = options.captionExecutor ?? new RecordedCaptionFixtureExecutor();
+    this.lifecycle = new RuntimeHostLifecycleCoordinator(this.store, this.now);
+    this.queries = new RuntimeHostQueries(
+      this.store,
+      this.reviewer,
+      (record, recovery) => this.lifecycle.reconcile(record, recovery),
+    );
   }
 
   static async open(options: RuntimeStartServiceOptions): Promise<RuntimeStartService> {
@@ -164,44 +144,6 @@ export class RuntimeStartService {
 
   listSources(): RuntimeHostSourceSummary[] {
     return this.sources.list();
-  }
-
-  private async replaceLifecycle(
-    record: RuntimeHostCommandRecord,
-    lifecycle: RuntimeHostCommandRecord["lifecycle"],
-    reason: RuntimeHostFailureReason | null,
-    journalHead = record.journalHead,
-    receipt?: RuntimeStartRecord,
-    receiptContentId?: string,
-  ): Promise<RuntimeHostCommandRecord> {
-    const previous = this.transitionTails.get(record.commandId) ?? Promise.resolve(record);
-    const transition = previous.catch(() => record).then(async () => {
-      const latest = (await this.store.read(record.commandId)) ?? record;
-      if (terminal(latest.lifecycle) && (lifecycle === "accepted" || lifecycle === "initializing" || lifecycle === "running")) {
-        return latest;
-      }
-      const next: RuntimeHostCommandRecord = {
-        ...latest,
-        lifecycle,
-        lastTransitionAt: this.now().toISOString(),
-        reason,
-        journalHead: Math.max(latest.journalHead, journalHead),
-        ...(receipt && receiptContentId
-          ? {
-              runStartReceiptContentId: receiptContentId,
-              forecastContentId: receipt.forecast.content.contentId,
-              frozenForecastId: receipt.frozenForecast.freezeId,
-            }
-          : {}),
-      };
-      return this.store.replace(next);
-    });
-    this.transitionTails.set(record.commandId, transition);
-    try {
-      return await transition;
-    } finally {
-      if (this.transitionTails.get(record.commandId) === transition) this.transitionTails.delete(record.commandId);
-    }
   }
 
   private ensureSameAcceptedCommand(
@@ -341,15 +283,15 @@ export class RuntimeStartService {
     if (!claim.won) {
       let existingRecord = claim.record;
       for (let attempt = 0; attempt < 200; attempt += 1) {
-        const status = await this.statusFromRecord(existingRecord);
+        const status = await this.lifecycle.statusFromRecord(existingRecord);
         if (status.runStartReceipt !== null || status.terminal) return this.acknowledgement(status);
         await new Promise((resolve) => setTimeout(resolve, 10));
         existingRecord = (await this.store.read(plan.commandId)) ?? existingRecord;
       }
-      return this.acknowledgement(await this.statusFromRecord(existingRecord));
+      return this.acknowledgement(await this.lifecycle.statusFromRecord(existingRecord));
     }
 
-    let record = await this.replaceLifecycle(claim.record, "initializing", null);
+    let record = await this.lifecycle.replaceLifecycle(claim.record, "initializing", null);
     let initialized: InitializedRuntimeApplication;
     try {
       const paths = await this.store.createRuntimeDirectory(record.runtimeId);
@@ -369,7 +311,7 @@ export class RuntimeStartService {
         throw new Error("The initialized runtime does not match its reviewed source artifact and forecast.");
       }
       const receiptContent = await identifyFile(paths.runStartPath);
-      record = await this.replaceLifecycle(
+      record = await this.lifecycle.replaceLifecycle(
         record,
         "initializing",
         null,
@@ -378,11 +320,11 @@ export class RuntimeStartService {
         receiptContent.contentId,
       );
     } catch (error) {
-      record = await this.replaceLifecycle(record, "failed", {
+      record = await this.lifecycle.replaceLifecycle(record, "failed", {
         code: "initialization_failed",
         message: "The host could not durably initialize the accepted runtime.",
       });
-      return this.acknowledgement(await this.statusFromRecord(record));
+      return this.acknowledgement(await this.lifecycle.statusFromRecord(record));
     }
 
     const launchWon = await this.store.claimLaunch(plan.commandId, {
@@ -392,15 +334,15 @@ export class RuntimeStartService {
       claimedAt: this.now().toISOString(),
     });
     if (!launchWon) {
-      record = await this.replaceLifecycle(record, "interrupted", {
+      record = await this.lifecycle.replaceLifecycle(record, "interrupted", {
         code: "executor_launch_unconfirmed",
         message: "A launch claim already exists and the host will not start another executor.",
       });
-      return this.acknowledgement(await this.statusFromRecord(record));
+      return this.acknowledgement(await this.lifecycle.statusFromRecord(record));
     }
 
     void this.execute(record, initialized).catch(() => undefined);
-    return this.acknowledgement(await this.statusFromRecord(record));
+    return this.acknowledgement(await this.lifecycle.statusFromRecord(record));
   }
 
   private async execute(
@@ -409,7 +351,7 @@ export class RuntimeStartService {
   ): Promise<void> {
     try {
       await runBoundedRuntimeApplication(initialized, this.launcherFactory, this.orchestratorLauncherFactory);
-      await this.reconcile(record, false);
+      await this.lifecycle.reconcile(record, false);
     } catch (error) {
       const current = await this.store.read(record.commandId);
       if (!current) return;
@@ -423,7 +365,7 @@ export class RuntimeStartService {
           this.store.paths(current.runtimeId).journalPath,
           current.runtimeId,
         );
-        await this.replaceLifecycle(current, "interrupted", {
+        await this.lifecycle.replaceLifecycle(current, "interrupted", {
           code: "executor_interrupted",
           message: "The executor stopped without terminal runtime evidence and will not be relaunched automatically.",
         }, journal.head);
@@ -433,7 +375,7 @@ export class RuntimeStartService {
           current.runtimeId,
         ).catch(() => null);
         const evidence = journal ? lifecycleFromRuntimeEvidence(journal.state) : null;
-        await this.replaceLifecycle(
+        await this.lifecycle.replaceLifecycle(
           current,
           "failed",
           evidence?.reason ?? {
@@ -446,172 +388,6 @@ export class RuntimeStartService {
     }
   }
 
-  private async readStartReceipt(record: RuntimeHostCommandRecord): Promise<{
-    record: RuntimeStartRecord;
-    contentId: string;
-  } | null> {
-    const path = this.store.paths(record.runtimeId).runStartPath;
-    if (!(await exists(path))) {
-      if (record.runStartReceiptContentId === null) return null;
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "The durable command references a missing run-start receipt.",
-        409,
-      );
-    }
-    let value: unknown;
-    try {
-      value = JSON.parse(await readFile(path, "utf8")) as unknown;
-      assertRuntimeStartRecord(value, "Runtime host run-start receipt");
-    } catch (error) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "The stored run-start receipt is malformed or inconsistent.",
-        409,
-        { cause: error },
-      );
-    }
-    const start = value;
-    const content = await identifyFile(path);
-    if (
-      start.commandId !== record.commandId ||
-      start.runtimeId !== record.runtimeId ||
-      start.journalId !== record.journalId ||
-      start.sourceSession.sessionId !== record.sourceSessionId ||
-      start.sourceSession.revisionId !== record.sourceRevisionId ||
-      start.analysisRequest.requestId !== record.analysisRequestId ||
-      (record.runStartReceiptContentId !== null && record.runStartReceiptContentId !== content.contentId)
-    ) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "The stored run-start receipt does not match its durable command mapping.",
-        409,
-      );
-    }
-    return { record: start, contentId: content.contentId };
-  }
-
-  private async reconcile(
-    recordValue: RuntimeHostCommandRecord,
-    recovery: boolean,
-  ): Promise<RuntimeHostCommandRecord> {
-    let record = (await this.store.read(recordValue.commandId)) ?? recordValue;
-    const paths = this.store.paths(record.runtimeId);
-    const receipt = await this.readStartReceipt(record);
-    if (!receipt) {
-      if (recovery && !terminal(record.lifecycle)) {
-        record = await this.replaceLifecycle(record, "interrupted", {
-          code: "host_stopped_before_start_receipt",
-          message: "The host stopped after command claim but before an immutable start receipt was proven.",
-        });
-      }
-      return record;
-    }
-    if (record.runStartReceiptContentId === null) {
-      record = await this.replaceLifecycle(
-        record,
-        record.lifecycle,
-        record.reason,
-        record.journalHead,
-        receipt.record,
-        receipt.contentId,
-      );
-    }
-    if (!(await exists(paths.journalPath))) {
-      if (recovery && !terminal(record.lifecycle)) {
-        record = await this.replaceLifecycle(record, "interrupted", {
-          code: "host_stopped_before_journal",
-          message: "The immutable start receipt exists, but the production journal was not created.",
-        });
-      }
-      return record;
-    }
-    let journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
-    if (journal.head === 0) {
-      if (recovery && !terminal(record.lifecycle)) {
-        const launched = await this.store.hasLaunchClaim(record.commandId);
-        record = await this.replaceLifecycle(record, "interrupted", launched
-          ? {
-              code: "executor_launch_unconfirmed",
-              message: "The executor launch was claimed, but no runtime event proves execution began.",
-            }
-          : {
-              code: "host_stopped_before_executor_launch",
-              message: "The journal was initialized, but no executor launch was claimed.",
-            });
-      }
-      return record;
-    }
-    const evidence = lifecycleFromRuntimeEvidence(journal.state);
-    if (evidence.lifecycle === "terminal" || evidence.lifecycle === "failed" || evidence.lifecycle === "interrupted") {
-      if (
-        record.lifecycle !== evidence.lifecycle ||
-        record.journalHead !== journal.head ||
-        JSON.stringify(record.reason) !== JSON.stringify(evidence.reason)
-      ) {
-        record = await this.replaceLifecycle(record, evidence.lifecycle, evidence.reason, journal.head);
-      }
-      return record;
-    }
-    if (recovery && !terminal(record.lifecycle)) {
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const ledger = await RuntimeLedger.open(record.runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
-        try {
-          await interruptAmbiguousRuntime(
-            ledger,
-            "The runtime host restarted while accepted task launch or model execution state remained ambiguous; no executor was relaunched and no report was invented.",
-          );
-          break;
-        } catch (error) {
-          if (!(error instanceof RuntimeJournalConflict) || attempt === 2) throw error;
-        }
-      }
-      journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
-      return this.replaceLifecycle(record, "interrupted", {
-        code: "nonterminal_journal_after_restart",
-        message: "The recovered journal records explicit interruption; this host will not launch a replacement model turn or child.",
-      }, journal.head);
-    }
-    if (!terminal(record.lifecycle) && record.lifecycle !== evidence.lifecycle) {
-      return this.replaceLifecycle(record, evidence.lifecycle, null, journal.head);
-    }
-    if (record.journalHead !== journal.head) {
-      return this.replaceLifecycle(record, record.lifecycle, record.reason, journal.head);
-    }
-    return record;
-  }
-
-  private async statusFromRecord(recordValue: RuntimeHostCommandRecord): Promise<RuntimeHostStatus> {
-    const record = await this.reconcile(recordValue, false);
-    const receipt = await this.readStartReceipt(record);
-    return {
-      schema: "studio.local-runtime-status.v1",
-      commandId: record.commandId,
-      runtimeId: record.runtimeId,
-      journalId: record.journalId,
-      lifecycle: record.lifecycle,
-      acceptedAt: record.acceptedAt,
-      lastTransitionAt: record.lastTransitionAt,
-      reason: structuredClone(record.reason),
-      sourceSessionId: record.sourceSessionId,
-      sourceRevisionId: record.sourceRevisionId,
-      analysisRequestId: record.analysisRequestId,
-      forecast: receipt
-        ? {
-            forecastId: receipt.record.forecast.forecastId,
-            contentId: receipt.record.forecast.content.contentId,
-            frozenForecastId: receipt.record.frozenForecast.freezeId,
-            baselineStatus: "floor_only",
-          }
-        : null,
-      runStartReceipt: receipt
-        ? { contentId: receipt.contentId, record: structuredClone(receipt.record) }
-        : null,
-      journalHead: record.journalHead,
-      terminal: terminal(record.lifecycle),
-    };
-  }
-
   private acknowledgement(status: RuntimeHostStatus): RuntimeHostStartAcknowledgement {
     return { ...status, schema: "studio.local-runtime-start-ack.v1" };
   }
@@ -619,19 +395,19 @@ export class RuntimeStartService {
   async statusByCommand(commandId: string): Promise<RuntimeHostStatus> {
     const record = await this.store.read(commandId);
     if (!record) throw new RuntimeHostError("unknown_command", "The runtime command is unknown.", 404);
-    return this.statusFromRecord(record);
+    return this.lifecycle.statusFromRecord(record);
   }
 
   async statusByRuntime(runtimeId: string): Promise<RuntimeHostStatus> {
     const record = await this.store.findByRuntimeId(runtimeId);
     if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    return this.statusFromRecord(record);
+    return this.lifecycle.statusFromRecord(record);
   }
 
   async poll(runtimeId: string, after: number, limit: number): Promise<RuntimeHostPollResponse> {
     const record = await this.store.findByRuntimeId(runtimeId);
     if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    const reconciled = await this.reconcile(record, false);
+    const reconciled = await this.lifecycle.reconcile(record, false);
     const journal = await readValidatedRuntimeJournal(this.store.paths(runtimeId).journalPath, runtimeId);
     if (after > journal.head) {
       throw new RuntimeHostError(
@@ -658,93 +434,15 @@ export class RuntimeStartService {
   }
 
   async assessmentAudits(runtimeId: string): Promise<RuntimeHostAssessmentAuditResponse> {
-    const record = await this.store.findByRuntimeId(runtimeId);
-    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    const reconciled = await this.reconcile(record, false);
-    const paths = this.store.paths(runtimeId);
-    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
-    let audits;
-    try {
-      audits = await reopenEvidenceAssessmentAudits(
-        journal.state,
-        journal.events,
-        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-      );
-    } catch (error) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "A stored assessment receipt or its cited read lineage failed closed audit validation.",
-        409,
-        { cause: error },
-      );
-    }
-    return {
-      schema: "studio.local-runtime-assessment-audits.v1",
-      commandId: reconciled.commandId,
-      runtimeId,
-      journalHead: journal.head,
-      audits,
-    };
+    return this.queries.assessmentAudits(runtimeId);
   }
 
   async decisionReceipts(runtimeId: string): Promise<RuntimeHostDecisionReceiptResponse> {
-    const record = await this.store.findByRuntimeId(runtimeId);
-    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    const reconciled = await this.reconcile(record, false);
-    const paths = this.store.paths(runtimeId);
-    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
-    let decisions;
-    try {
-      decisions = await reopenEvidenceDecisionReceipts(
-        journal.state,
-        journal.events,
-        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-      );
-    } catch (error) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "A stored evidence decision or its audited assessment lineage failed closed validation.",
-        409,
-        { cause: error },
-      );
-    }
-    return {
-      schema: "studio.local-runtime-decision-receipts.v1",
-      commandId: reconciled.commandId,
-      runtimeId,
-      journalHead: journal.head,
-      decisions,
-    };
+    return this.queries.decisionReceipts(runtimeId);
   }
 
   async publishReviewIntakes(runtimeId: string): Promise<RuntimeHostPublishReviewIntakeResponse> {
-    const record = await this.store.findByRuntimeId(runtimeId);
-    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    const reconciled = await this.reconcile(record, false);
-    const paths = this.store.paths(runtimeId);
-    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
-    let intakes;
-    try {
-      intakes = await reopenPublishReviewIntakes(
-        journal.state,
-        journal.events,
-        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-      );
-    } catch (error) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "A stored publish-review intake or its verified decision lineage failed closed validation.",
-        409,
-        { cause: error },
-      );
-    }
-    return {
-      schema: "studio.local-runtime-publish-review-intakes.v1",
-      commandId: reconciled.commandId,
-      runtimeId,
-      journalHead: journal.head,
-      intakes,
-    };
+    return this.queries.publishReviewIntakes(runtimeId);
   }
 
   private async withReviewMutation<T>(runtimeId: string, operation: () => Promise<T>): Promise<T> {
@@ -851,38 +549,7 @@ export class RuntimeStartService {
   }
 
   async publishReviewDecisions(runtimeId: string): Promise<RuntimeHostPublishReviewDecisionResponse> {
-    const record = await this.store.findByRuntimeId(runtimeId);
-    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    const reconciled = await this.reconcile(record, false);
-    const paths = this.store.paths(runtimeId);
-    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
-    let reviews;
-    try {
-      reviews = await reopenPublishReviewDecisions(
-        journal.state,
-        journal.events,
-        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-      );
-    } catch (error) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "A stored publish-review decision, revocation, or verified intake lineage failed closed validation.",
-        409,
-        { cause: error },
-      );
-    }
-    return {
-      schema: "studio.local-runtime-publish-review-decisions.v1",
-      commandId: reconciled.commandId,
-      runtimeId,
-      journalHead: journal.head,
-      reviewer: {
-        ...structuredClone(this.reviewer),
-        decisionAttestation: PUBLISH_REVIEW_DECISION_ATTESTATION,
-        revocationAttestation: PUBLISH_REVIEW_REVOCATION_ATTESTATION,
-      },
-      reviews,
-    };
+    return this.queries.publishReviewDecisions(runtimeId);
   }
 
   async createPublishReviewDecision(
@@ -903,7 +570,7 @@ export class RuntimeStartService {
     return this.withReviewMutation(runtimeId, async () => {
       const record = await this.store.findByRuntimeId(runtimeId);
       if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-      await this.reconcile(record, false);
+      await this.lifecycle.reconcile(record, false);
       const paths = this.store.paths(runtimeId);
       try {
         const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
@@ -937,7 +604,7 @@ export class RuntimeStartService {
     return this.withReviewMutation(runtimeId, async () => {
       const record = await this.store.findByRuntimeId(runtimeId);
       if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-      await this.reconcile(record, false);
+      await this.lifecycle.reconcile(record, false);
       const paths = this.store.paths(runtimeId);
       try {
         const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
@@ -954,95 +621,17 @@ export class RuntimeStartService {
   }
 
   async captionProductions(runtimeId: string): Promise<RuntimeHostCaptionProductionResponse> {
-    const record = await this.store.findByRuntimeId(runtimeId);
-    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    const reconciled = await this.reconcile(record, false);
-    const paths = this.store.paths(runtimeId);
-    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
-    let captions;
-    try {
-      captions = await reopenCaptionProductions(
-        journal.state,
-        journal.events,
-        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-      );
-    } catch (error) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "A stored caption artifact, receipt, or approval lineage failed closed validation.",
-        409,
-        { cause: error },
-      );
-    }
-    return {
-      schema: "studio.local-runtime-caption-productions.v1",
-      commandId: reconciled.commandId,
-      runtimeId,
-      journalHead: journal.head,
-      captions,
-    };
+    return this.queries.captionProductions(runtimeId);
   }
 
   async captionProductionResults(
     runtimeId: string,
   ): Promise<RuntimeHostCaptionProductionResultsResponse> {
-    const record = await this.store.findByRuntimeId(runtimeId);
-    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    const reconciled = await this.reconcile(record, false);
-    const paths = this.store.paths(runtimeId);
-    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
-    let results;
-    try {
-      results = await reopenCaptionProductionResults(
-        journal.state,
-        journal.events,
-        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-      );
-    } catch (error) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "A stored caption artifact, receipt, or approval lineage failed closed validation.",
-        409,
-        { cause: error },
-      );
-    }
-    return {
-      schema: "studio.local-runtime-caption-production-results.v1",
-      commandId: reconciled.commandId,
-      runtimeId,
-      journalHead: journal.head,
-      results,
-    };
+    return this.queries.captionProductionResults(runtimeId);
   }
 
   async captionQualityControls(runtimeId: string): Promise<RuntimeHostCaptionQualityControlResponse> {
-    const record = await this.store.findByRuntimeId(runtimeId);
-    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-    const reconciled = await this.reconcile(record, false);
-    const paths = this.store.paths(runtimeId);
-    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
-    let qualityControls;
-    try {
-      qualityControls = await reopenCaptionQualityControls(
-        journal.state,
-        journal.events,
-        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-      );
-    } catch (error) {
-      throw new RuntimeHostError(
-        "stored_content_inconsistent",
-        "A stored caption QC receipt or current-run candidate lineage failed closed validation.",
-        409,
-        { cause: error },
-      );
-    }
-    return {
-      schema: "studio.local-runtime-caption-quality-controls.v1",
-      commandId: reconciled.commandId,
-      runtimeId,
-      journalHead: journal.head,
-      qualityControls,
-    };
+    return this.queries.captionQualityControls(runtimeId);
   }
 
   async createCaptionQualityControl(
@@ -1063,7 +652,7 @@ export class RuntimeStartService {
     return this.withReviewMutation(runtimeId, async () => {
       const record = await this.store.findByRuntimeId(runtimeId);
       if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-      await this.reconcile(record, false);
+      await this.lifecycle.reconcile(record, false);
       const paths = this.store.paths(runtimeId);
       try {
         const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
@@ -1096,8 +685,8 @@ export class RuntimeStartService {
     return this.withReviewMutation(runtimeId, async () => {
       const record = await this.store.findByRuntimeId(runtimeId);
       if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-      await this.reconcile(record, false);
-      const start = await this.readStartReceipt(record);
+      await this.lifecycle.reconcile(record, false);
+      const start = await this.lifecycle.readStartReceipt(record);
       if (!start) {
         throw new RuntimeHostError(
           "stored_content_inconsistent",
@@ -1150,10 +739,10 @@ export class RuntimeStartService {
   async recover(): Promise<void> {
     for (const record of await this.store.list()) {
       if (record.lifecycle === "terminal" || record.lifecycle === "failed") {
-        await this.reconcile(record, true);
+        await this.lifecycle.reconcile(record, true);
         continue;
       }
-      await this.reconcile(record, true);
+      await this.lifecycle.reconcile(record, true);
     }
   }
 }

@@ -5,7 +5,7 @@ import type {
   ParentArtifactReadRequest,
   TaskRecord,
 } from "../model.ts";
-import type { ParentArtifactReadResult } from "../parentArtifactReadHost.ts";
+import type { ParentArtifactReadResult } from "../admission/parentArtifactReadHost.ts";
 
 export const PARENT_ARTIFACT_READ_TOOL = "artifact_read" as const;
 

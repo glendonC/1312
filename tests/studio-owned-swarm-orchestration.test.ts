@@ -22,7 +22,7 @@ import type {
   WorkerOutputEnvelope,
 } from "../src/studio/runtime/production/model.ts";
 import type { PendingRuntimeEvent, RuntimeEvent } from "../src/studio/runtime/production/protocol.ts";
-import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
+import { BoundedReportHost } from "../src/studio/runtime/production/study/reportHost.ts";
 import { BoundedRuntimeScheduler, type RuntimeIdentityFactory } from "../src/studio/runtime/production/scheduler.ts";
 import { adaptProductionRuntime } from "../src/studio/runtime/production/studioProjection.ts";
 import { runtimeTestJobContext } from "./runtime-test-job-context.ts";

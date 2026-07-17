@@ -10,10 +10,10 @@ import type {
   BoundedOrchestratorLauncherContext,
   BoundedOrchestratorLauncherFactory,
 } from "./runtimeApplication.ts";
-import { ParentArtifactAdmissionHost } from "../parentArtifactAdmissionHost.ts";
-import { ParentArtifactReadHost } from "../parentArtifactReadHost.ts";
-import { StudyPlanningHost } from "../studyPlanningHost.ts";
-import { OwnedMediaStudySynthesisHost } from "../studySynthesisHost.ts";
+import { ParentArtifactAdmissionHost } from "../admission/parentArtifactAdmissionHost.ts";
+import { ParentArtifactReadHost } from "../admission/parentArtifactReadHost.ts";
+import { StudyPlanningHost } from "../study/studyPlanningHost.ts";
+import { OwnedMediaStudySynthesisHost } from "../study/studySynthesisHost.ts";
 
 export type DeterministicOrchestratorMode =
   | "spawn_one"

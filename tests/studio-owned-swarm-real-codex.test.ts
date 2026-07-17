@@ -5,9 +5,9 @@ import test from "node:test";
 
 import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
-import { reopenStudyPlanningDecision } from "../src/studio/runtime/production/studyPlanningAudit.ts";
-import { reopenStudyReadiness } from "../src/studio/runtime/production/studyReadinessAudit.ts";
-import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/studySynthesisAudit.ts";
+import { reopenStudyPlanningDecision } from "../src/studio/runtime/production/study/studyPlanningAudit.ts";
+import { reopenStudyReadiness } from "../src/studio/runtime/production/study/studyReadinessAudit.ts";
+import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/study/studySynthesisAudit.ts";
 import { createProductionAnalysisRequest } from "../src/studio/runtime/production/runStart/analysisRequest.ts";
 import { loadOwnedSourceSession } from "../src/studio/runtime/production/runStart/sourceSessionLoader.ts";
 import {

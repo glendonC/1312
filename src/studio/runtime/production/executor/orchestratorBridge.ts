@@ -14,10 +14,10 @@ import type {
   OwnedMediaStudyExecutorReceipt,
 } from "../model.ts";
 import { canonicalSha256 } from "../artifactStore.ts";
-import type { ParentArtifactAdmissionHost } from "../parentArtifactAdmissionHost.ts";
-import type { ParentArtifactReadHost } from "../parentArtifactReadHost.ts";
-import type { StudyPlanningHost } from "../studyPlanningHost.ts";
-import type { OwnedMediaStudySynthesisHost } from "../studySynthesisHost.ts";
+import type { ParentArtifactAdmissionHost } from "../admission/parentArtifactAdmissionHost.ts";
+import type { ParentArtifactReadHost } from "../admission/parentArtifactReadHost.ts";
+import type { StudyPlanningHost } from "../study/studyPlanningHost.ts";
+import type { OwnedMediaStudySynthesisHost } from "../study/studySynthesisHost.ts";
 import { BoundedParentArtifactReadBridge } from "./parentArtifactReadBridge.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import { BoundedRuntimeScheduler, type SpawnDecision } from "../scheduler.ts";

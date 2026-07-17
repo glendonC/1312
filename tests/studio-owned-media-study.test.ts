@@ -5,11 +5,11 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
-import { reopenPublishReviewIntakes } from "../src/studio/runtime/production/publishReviewIntakeAudit.ts";
+import { reopenPublishReviewIntakes } from "../src/studio/runtime/production/review/publishReviewIntakeAudit.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
-import { reopenStudyPlanningDecision } from "../src/studio/runtime/production/studyPlanningAudit.ts";
-import { reopenStudyReadiness } from "../src/studio/runtime/production/studyReadinessAudit.ts";
-import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/studySynthesisAudit.ts";
+import { reopenStudyPlanningDecision } from "../src/studio/runtime/production/study/studyPlanningAudit.ts";
+import { reopenStudyReadiness } from "../src/studio/runtime/production/study/studyReadinessAudit.ts";
+import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/study/studySynthesisAudit.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
 import {
   DeterministicRuntimeExecutor,

@@ -1,6 +1,7 @@
 # Studio Autonomous Media Runtime
 
-Status: living implementation ledger for the Studio, media runtime, and development lab
+Status: deep implementation/reference ledger for the Studio, media runtime, and development lab;
+current Build Week status and roadmap live in [`docs/build-week/STATUS.md`](./build-week/STATUS.md)
 Last updated: 2026-07-16
 
 ## Purpose

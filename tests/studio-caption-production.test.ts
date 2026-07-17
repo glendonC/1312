@@ -5,11 +5,11 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
-import type { CaptionProductionExecutor } from "../src/studio/runtime/production/captionProductionExecutor.ts";
+import type { CaptionProductionExecutor } from "../src/studio/runtime/production/captions/captionProductionExecutor.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "../src/studio/runtime/production/model.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
-import { PublishReviewHost } from "../src/studio/runtime/production/publishReviewHost.ts";
+import { PublishReviewHost } from "../src/studio/runtime/production/review/publishReviewHost.ts";
 import {
   DeterministicRuntimeExecutor,
   DurableRuntimeCommandStore,

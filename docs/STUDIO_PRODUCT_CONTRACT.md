@@ -1,7 +1,7 @@
 # Studio Product Contract
 
 Status: shared UI/runtime contract and implementation inventory
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 ## Purpose
 
@@ -22,8 +22,9 @@ The UI/UX chat owns how these contracts are presented. The architecture chat own
 and runtime wiring that make them true. Neither chat may silently change an action's meaning or
 promote recorded replay into live runtime evidence.
 
-This is not a second architecture ledger. Runtime design and implementation status remain in
-[`docs/STUDIO_AUTONOMY.md`](./STUDIO_AUTONOMY.md), stable boundaries remain in
+This is not a second architecture ledger. Runtime design details remain in
+[`docs/STUDIO_AUTONOMY.md`](./STUDIO_AUTONOMY.md), current Build Week status and roadmap live in
+[`docs/build-week/STATUS.md`](./build-week/STATUS.md), stable boundaries remain in
 [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md), and exact wire contracts remain in
 [`docs/RUNTIME_CONTRACTS.md`](./RUNTIME_CONTRACTS.md).
 
@@ -732,9 +733,9 @@ semantics without updating this contract with the UIUX owner.
 | Stored assessment receipt and citation audit | `src/studio/runtime/production/assessmentAudit.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/ProductLocalRuntime.tsx` |
 | Child evidence-decision bridge, deterministic policy, and host | `src/studio/runtime/production/evidenceDecisionPolicy.ts`, `src/studio/runtime/production/evidenceDecisionHost.ts`, `src/studio/runtime/production/executor/childEvidenceDecisionBridge.ts`, `src/studio/runtime/production/executor/evidenceDecisionMcpServer.ts` |
 | Stored decision and audited-input verification | `src/studio/runtime/production/decisionReceiptAudit.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/ProductLocalRuntime.tsx` |
-| Host publish-review intake and stored lineage verification | `src/studio/runtime/production/publishReviewIntakeHost.ts`, `src/studio/runtime/production/publishReviewIntakeAudit.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
-| Host human review/revocation and stored lineage verification | `src/studio/runtime/production/publishReviewHost.ts`, `src/studio/runtime/production/publishReviewDecisionAudit.ts`, `src/studio/runtime/production/validation/publishReviewDecision.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
-| Bounded caption producer and recursive stored verification | `src/studio/runtime/production/captionProductionHost.ts`, `src/studio/runtime/production/captionProductionAudit.ts`, `src/studio/runtime/production/captionProductionExecutor.ts`, `src/studio/runtime/production/validation/captionProduction.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
+| Host publish-review intake and stored lineage verification | `src/studio/runtime/production/review/publishReviewIntakeHost.ts`, `src/studio/runtime/production/review/publishReviewIntakeAudit.ts`, `src/studio/runtime/production/runtimeHost/runtimeQueries.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
+| Host human review/revocation and stored lineage verification | `src/studio/runtime/production/review/publishReviewHost.ts`, `src/studio/runtime/production/review/publishReviewDecisionAudit.ts`, `src/studio/runtime/production/validation/publishReviewDecision.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
+| Bounded caption producer and recursive stored verification | `src/studio/runtime/production/captions/captionProductionHost.ts`, `src/studio/runtime/production/captions/captionProductionAudit.ts`, `src/studio/runtime/production/captions/captionProductionExecutor.ts`, `src/studio/runtime/production/validation/captionProduction.ts`, `src/studio/runtime/production/runtimeHost/service.ts`, `src/studio/localRuntime/productProductionFacts.tsx` |
 | Scheduler/journal/media/handoff fragments | `src/studio/runtime/production/` |
 | Dedicated source-artifact/task/spawn/worker/grant/operation/output-artifact/report adapter | `src/studio/runtime/production/studioProjection.ts` |
 | Workload floor and unavailable estimates | `src/studio/runtime/production/forecast/`, `tests/studio-forecast-production.test.ts` |

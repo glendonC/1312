@@ -50,12 +50,12 @@ export {
   OpenAiCaptionProductionExecutor,
   RecordedCaptionFixtureExecutor,
   type CaptionProductionExecutor,
-} from "../captionProductionExecutor.ts";
+} from "../captions/captionProductionExecutor.ts";
 export {
   OpenAiCurrentRunSpeechRecognizer,
   UnavailableCurrentRunSpeechRecognizer,
   type CurrentRunSpeechRecognizer,
-} from "../currentRunSpeechRecognizer.ts";
+} from "../semantic/currentRunSpeechRecognizer.ts";
 export { RuntimeSourceRegistry } from "./sourceRegistry.ts";
 export {
   DEFAULT_OWNED_MEDIA_INGEST_BYTES,

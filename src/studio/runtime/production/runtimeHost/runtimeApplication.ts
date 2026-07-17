@@ -6,7 +6,7 @@ import { FfmpegCapabilityHost } from "../mediaHost.ts";
 import { BoundedEvidenceReadHost } from "../evidenceHost.ts";
 import { BoundedEvidenceAssessmentHost } from "../evidenceAssessmentHost.ts";
 import { BoundedEvidenceDecisionHost } from "../evidenceDecisionHost.ts";
-import { SpeechTranscribeCapabilityHost } from "../semanticEvidenceHost.ts";
+import { SpeechTranscribeCapabilityHost } from "../semantic/semanticEvidenceHost.ts";
 import {
   CodexExecWorkerLauncher,
   type CodexWorkerLauncherOptions,
@@ -21,9 +21,9 @@ import type {
   ReportRecord,
   RuntimeLimits,
 } from "../model.ts";
-import { BoundedReportHost } from "../reportHost.ts";
-import { PublishReviewIntakeHost } from "../publishReviewIntakeHost.ts";
-import { StudyReadinessHost } from "../studyReadinessHost.ts";
+import { BoundedReportHost } from "../study/reportHost.ts";
+import { PublishReviewIntakeHost } from "../review/publishReviewIntakeHost.ts";
+import { StudyReadinessHost } from "../study/studyReadinessHost.ts";
 import { createRuntimeStart } from "../runStart/runtimeStart.ts";
 import { writeRuntimeStartReceipt } from "../runStart/receiptWriter.ts";
 import { BoundedRuntimeScheduler } from "../scheduler.ts";

@@ -17,15 +17,15 @@ import type {
   WorkerOutputEnvelope,
 } from "./model.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
-import { BoundedReportHost } from "./reportHost.ts";
+import { BoundedReportHost } from "./study/reportHost.ts";
 import { BoundedRuntimeScheduler } from "./scheduler.ts";
 import { FfmpegCapabilityHost } from "./mediaHost.ts";
 import { BoundedEvidenceReadHost } from "./evidenceHost.ts";
 import { BoundedEvidenceAssessmentHost } from "./evidenceAssessmentHost.ts";
 import { BoundedEvidenceDecisionHost } from "./evidenceDecisionHost.ts";
-import { SpeechTranscribeCapabilityHost } from "./semanticEvidenceHost.ts";
-import { reopenSemanticEvidence, semanticEvidenceCitation } from "./semanticEvidenceAudit.ts";
-import type { CurrentRunSpeechRecognizer } from "./currentRunSpeechRecognizer.ts";
+import { SpeechTranscribeCapabilityHost } from "./semantic/semanticEvidenceHost.ts";
+import { reopenSemanticEvidence, semanticEvidenceCitation } from "./semantic/semanticEvidenceAudit.ts";
+import type { CurrentRunSpeechRecognizer } from "./semantic/currentRunSpeechRecognizer.ts";
 import {
   BoundedChildEvidenceBridge,
   openChildEvidenceBridge,

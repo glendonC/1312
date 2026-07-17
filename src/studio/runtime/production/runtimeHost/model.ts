@@ -8,18 +8,18 @@ import type { ForecastArtifact } from "../forecast/model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import type { EvidenceAssessmentAudit } from "../assessmentAudit.ts";
 import type { EvidenceDecisionReceiptVerification } from "../decisionReceiptAudit.ts";
-import type { PublishReviewIntakeVerification } from "../publishReviewIntakeAudit.ts";
+import type { PublishReviewIntakeVerification } from "../review/publishReviewIntakeAudit.ts";
 import type {
   PublishReviewDecisionRequest,
   PublishReviewOperator,
   PublishReviewRevocationRequest,
 } from "../model.ts";
-import type { PublishReviewDecisionVerification } from "../publishReviewDecisionAudit.ts";
+import type { PublishReviewDecisionVerification } from "../review/publishReviewDecisionAudit.ts";
 import type {
   CaptionProductionVerification,
   VerifiedCaptionProductionResult,
-} from "../captionProductionAudit.ts";
-import type { CaptionQualityControlVerification } from "../captionQualityControlAudit.ts";
+} from "../captions/captionProductionAudit.ts";
+import type { CaptionQualityControlVerification } from "../captions/captionQualityControlAudit.ts";
 
 export const RUNTIME_HOST_LIFECYCLE_STATES = [
   "accepted",

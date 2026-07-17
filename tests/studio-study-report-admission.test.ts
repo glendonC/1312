@@ -21,21 +21,21 @@ import type {
   CurrentRunRecognizerInput,
   CurrentRunRecognizerResult,
   CurrentRunSpeechRecognizer,
-} from "../src/studio/runtime/production/currentRunSpeechRecognizer.ts";
+} from "../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts";
 import { BoundedParentArtifactReadBridge } from "../src/studio/runtime/production/executor/parentArtifactReadBridge.ts";
 import {
   buildStudyReportEnvelope,
   validateWorkerResult,
 } from "../src/studio/runtime/production/executor/workerContract.ts";
 import { MemoryEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
-import { ParentArtifactAdmissionHost } from "../src/studio/runtime/production/parentArtifactAdmissionHost.ts";
-import { reopenParentArtifactDisposition } from "../src/studio/runtime/production/parentArtifactAdmissionAudit.ts";
-import { ParentArtifactReadHost } from "../src/studio/runtime/production/parentArtifactReadHost.ts";
+import { ParentArtifactAdmissionHost } from "../src/studio/runtime/production/admission/parentArtifactAdmissionHost.ts";
+import { reopenParentArtifactDisposition } from "../src/studio/runtime/production/admission/parentArtifactAdmissionAudit.ts";
+import { ParentArtifactReadHost } from "../src/studio/runtime/production/admission/parentArtifactReadHost.ts";
 import type { PendingRuntimeEvent } from "../src/studio/runtime/production/protocol.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
-import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
-import { reopenSemanticEvidence, semanticEvidenceCitation } from "../src/studio/runtime/production/semanticEvidenceAudit.ts";
-import { SpeechTranscribeCapabilityHost } from "../src/studio/runtime/production/semanticEvidenceHost.ts";
+import { BoundedReportHost } from "../src/studio/runtime/production/study/reportHost.ts";
+import { reopenSemanticEvidence, semanticEvidenceCitation } from "../src/studio/runtime/production/semantic/semanticEvidenceAudit.ts";
+import { SpeechTranscribeCapabilityHost } from "../src/studio/runtime/production/semantic/semanticEvidenceHost.ts";
 import { BoundedRuntimeScheduler, type RuntimeIdentityFactory } from "../src/studio/runtime/production/scheduler.ts";
 import { adaptAuthenticatedProductionRuntime } from "../src/studio/runtime/production/authenticatedStudioProjection.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";

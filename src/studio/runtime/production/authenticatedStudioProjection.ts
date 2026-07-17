@@ -1,11 +1,11 @@
 import type { ContentAddressedArtifactStore } from "./artifactStore.ts";
 import type { RuntimeProjection } from "./model.ts";
-import { reopenSemanticEvidence } from "./semanticEvidenceAudit.ts";
-import { reopenStudyReport } from "./studyReportAudit.ts";
-import { reopenParentArtifactDisposition } from "./parentArtifactAdmissionAudit.ts";
-import { reopenStudyPlanningDecision } from "./studyPlanningAudit.ts";
-import { reopenOwnedMediaStudy } from "./studySynthesisAudit.ts";
-import { reopenStudyReadiness } from "./studyReadinessAudit.ts";
+import { reopenSemanticEvidence } from "./semantic/semanticEvidenceAudit.ts";
+import { reopenStudyReport } from "./study/studyReportAudit.ts";
+import { reopenParentArtifactDisposition } from "./admission/parentArtifactAdmissionAudit.ts";
+import { reopenStudyPlanningDecision } from "./study/studyPlanningAudit.ts";
+import { reopenOwnedMediaStudy } from "./study/studySynthesisAudit.ts";
+import { reopenStudyReadiness } from "./study/studyReadinessAudit.ts";
 import { adaptProductionRuntime, type ProductionStudioProjection } from "./studioProjection.ts";
 
 /** Storage-aware projection: invalid/absent semantic bytes never expose availability identities. */

@@ -1,7 +1,8 @@
 # Architecture (verified direction — UI-first week)
 
-Status: **decided for Build Week**; implement agents after UI scaffold is solid.  
-Last updated: 2026-07-15
+Status: stable architecture reference; current Build Week status and roadmap live in
+[`docs/build-week/STATUS.md`](./build-week/STATUS.md).
+Last updated: 2026-07-16
 
 ## Goals
 

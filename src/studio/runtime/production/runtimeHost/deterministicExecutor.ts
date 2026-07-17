@@ -23,10 +23,10 @@ import type {
   CurrentRunRecognizerInput,
   CurrentRunRecognizerResult,
   CurrentRunSpeechRecognizer,
-} from "../currentRunSpeechRecognizer.ts";
+} from "../semantic/currentRunSpeechRecognizer.ts";
 import { BoundedChildSemanticEvidenceBridge } from "../executor/childSemanticEvidenceBridge.ts";
-import { SpeechTranscribeCapabilityHost } from "../semanticEvidenceHost.ts";
-import { reopenSemanticEvidence, semanticEvidenceCitation } from "../semanticEvidenceAudit.ts";
+import { SpeechTranscribeCapabilityHost } from "../semantic/semanticEvidenceHost.ts";
+import { reopenSemanticEvidence, semanticEvidenceCitation } from "../semantic/semanticEvidenceAudit.ts";
 import { buildStudyReportEnvelope, validateWorkerResult } from "../executor/workerContract.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import {

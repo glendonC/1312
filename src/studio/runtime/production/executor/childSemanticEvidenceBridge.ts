@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
-import type { SemanticEvidenceHostResult } from "../semanticEvidenceHost.ts";
+import type { SemanticEvidenceHostResult } from "../semantic/semanticEvidenceHost.ts";
 import type { MediaScope, SemanticMediaObservation, TaskRecord } from "../model.ts";
 
 export const CHILD_SEMANTIC_EVIDENCE_TOOL = "speech_transcribe" as const;

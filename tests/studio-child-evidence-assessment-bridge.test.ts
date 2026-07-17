@@ -27,12 +27,12 @@ import {
 } from "../src/studio/runtime/production/executor/childEvidenceDecisionBridge.ts";
 import { MemoryEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import { CodexExecWorkerLauncher } from "../src/studio/runtime/production/launcher.ts";
-import { PublishReviewIntakeHost } from "../src/studio/runtime/production/publishReviewIntakeHost.ts";
+import { PublishReviewIntakeHost } from "../src/studio/runtime/production/review/publishReviewIntakeHost.ts";
 import type {
   EvidenceAssessmentClaim,
   SpawnRequestInput,
 } from "../src/studio/runtime/production/model.ts";
-import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
+import { BoundedReportHost } from "../src/studio/runtime/production/study/reportHost.ts";
 import { loadOwnedSourceSession } from "../src/studio/runtime/production/runStart/sourceSessionLoader.ts";
 import { BoundedRuntimeScheduler, type RuntimeIdentityFactory } from "../src/studio/runtime/production/scheduler.ts";
 import { runtimeTestJobContext } from "./runtime-test-job-context.ts";

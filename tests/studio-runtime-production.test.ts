@@ -26,7 +26,7 @@ import {
   assertRuntimeObservabilityIndex,
   validateRuntimeObservabilityIndex,
 } from "../src/studio/runtime/production/observability/validation.ts";
-import { BoundedReportHost } from "../src/studio/runtime/production/reportHost.ts";
+import { BoundedReportHost } from "../src/studio/runtime/production/study/reportHost.ts";
 import { RootOutputDispositionHost } from "../src/studio/runtime/production/rootOutputDispositionHost.ts";
 import {
   applyRuntimeEvent,

@@ -19,7 +19,7 @@ import type {
   CurrentRunRecognizerInput,
   CurrentRunRecognizerResult,
   CurrentRunSpeechRecognizer,
-} from "../src/studio/runtime/production/currentRunSpeechRecognizer.ts";
+} from "../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts";
 import {
   BoundedChildSemanticEvidenceBridge,
   callChildSemanticEvidenceBridge,
@@ -29,8 +29,8 @@ import { validateWorkerResult } from "../src/studio/runtime/production/executor/
 import { MemoryEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import type { PendingRuntimeEvent } from "../src/studio/runtime/production/protocol.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
-import { reopenSemanticEvidence, semanticEvidenceCitation } from "../src/studio/runtime/production/semanticEvidenceAudit.ts";
-import { SpeechTranscribeCapabilityHost } from "../src/studio/runtime/production/semanticEvidenceHost.ts";
+import { reopenSemanticEvidence, semanticEvidenceCitation } from "../src/studio/runtime/production/semantic/semanticEvidenceAudit.ts";
+import { SpeechTranscribeCapabilityHost } from "../src/studio/runtime/production/semantic/semanticEvidenceHost.ts";
 import { BoundedRuntimeScheduler, type RuntimeIdentityFactory } from "../src/studio/runtime/production/scheduler.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
 import { adaptAuthenticatedProductionRuntime } from "../src/studio/runtime/production/authenticatedStudioProjection.ts";

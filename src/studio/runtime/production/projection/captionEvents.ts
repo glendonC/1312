@@ -1,6 +1,6 @@
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
-import { canonicalSha256 } from "../artifactStore.ts";
+import { canonicalSha256 } from "../canonicalIdentity.ts";
 import { invariant } from "./shared.ts";
 
 export function applyCaptionEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {

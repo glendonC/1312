@@ -780,9 +780,12 @@ whose producers remain unavailable are still architectural requirements, not imp
 Loading, cancellation display, and lab selection are client/session state. They do not require new
 `RunBundle` fields.
 
-## Ordered implementation backlog
+## Capability build sequence
 
-### Phase 0: Stabilize the evidence shell
+This sequence records architectural dependencies and completion criteria; it is not the living
+roadmap or a current “phase.” See [`build-week/STATUS.md`](build-week/STATUS.md) for current status.
+
+### Evidence shell
 
 - Add build-time validation for every recorded run bundle and trace file.
 - Add a small runtime bundle assertion so malformed data fails during loading.
@@ -794,7 +797,7 @@ Loading, cancellation display, and lab selection are client/session state. They 
 
 Done when malformed or empty data cannot become a plausible-looking result.
 
-### Phase 1: Build the smallest Studio lab slice
+### Smallest Studio lab slice
 
 - Gate the lab behind development plus an explicit query parameter.
 - Add pure cursor reconstruction.
@@ -805,7 +808,7 @@ Done when malformed or empty data cannot become a plausible-looking result.
 Done when every current stable phase can be deliberately inspected without component state
 injection.
 
-### Phase 2: Design and build preflight UX
+### Preflight UX
 
 - Introduce explicit loading, probing, ready-to-confirm, failed, and cancelled session states.
 - Implement source/access and media metadata probing.
@@ -819,7 +822,7 @@ injection.
 Done when pasting a long or difficult source leads to an evidence-backed scope confirmation instead
 of an immediate expensive run.
 
-### Phase 3: Introduce task and dynamic-agent primitives
+### Task and dynamic-agent primitives
 
 - Add tasks with objectives, parents, media scope, inputs, outputs, dependencies, and budgets.
 - Add scheduler-approved spawn requests and dynamic agent registration.
@@ -830,7 +833,7 @@ of an immediate expensive run.
 Done when a child agent created during a live run can appear, work, report, and retire without being
 predeclared in the bundle.
 
-### Phase 4: Add scoped media tools and privileges
+### Scoped media tools and privileges
 
 - Implement seek, step, loop, region mark, extract, track/stem select, and frame requests.
 - Enforce capability grants in the tool host.
@@ -839,7 +842,7 @@ predeclared in the bundle.
 
 Done when every displayed media interaction corresponds to a real authorized operation.
 
-### Phase 5: Exercise the hardest audio case
+### Hardest audio case
 
 - Add music/speech/noise classification by time range.
 - Add overlap detection and targeted source separation.
@@ -851,7 +854,7 @@ Done when every displayed media interaction corresponds to a real authorized ope
 Done when the system can withhold or explain a mixed-source decision without hiding the limitations
 of the separation process.
 
-### Phase 6: Make coordination and provenance visible
+### Visible coordination and provenance
 
 - Add structured handoff and merge receipts.
 - Add an in-run cue/evidence ledger for committed, withheld, corrected, and dropped output.
@@ -860,7 +863,7 @@ of the separation process.
 
 Done when a user can answer why a final line exists without reading an unstructured log.
 
-### Phase 7: Gate learning and memory
+### Gated learning and memory
 
 - Treat glossary entries, corrections, and rules as proposals until accepted.
 - Preserve supporting run, cue, evidence, and producer references.
@@ -870,7 +873,7 @@ Done when a user can answer why a final line exists without reading an unstructu
 Done when the system can improve without silently converting one uncertain run into permanent
 truth.
 
-### Phase 8: Verify the complete experience
+### Complete-experience verification
 
 - Check all lab scenarios on desktop and mobile.
 - Verify keyboard-only navigation and focus behavior.
@@ -882,7 +885,7 @@ truth.
 Done when the deterministic replay, difficult-media scenarios, and future live transport all drive
 the same reducer and user-visible evidence model.
 
-### Phase 9: Index and query runtime observability
+### Runtime observability and queries
 
 - Add executor-produced queue, active, dependency-wait, and reporting spans.
 - Add model-adapter usage receipts with normalized measured units and raw receipt references.
@@ -896,7 +899,7 @@ the same reducer and user-visible evidence model.
 Done when a query result can be traced to real production events and receipts, and unavailable
 measurements cannot silently become zero or estimates.
 
-### Phase 10: Forecast time and cost
+### Time and cost forecasting
 
 - Convert the selected media range and explicit analysis plan into deterministic work units.
 - Add a versioned estimator and price-book adapter with reproducible snapshots.

@@ -1,517 +1,71 @@
 import type {
-  AgentRecord,
-  CaptionExecutorDescriptor,
-  CaptionProductionArtifact,
-  CaptionProductionReceipt,
-  CaptionProductionRequest,
-  CaptionQualityControlReceipt,
-  Capability,
-  CapabilityGrant,
-  EvidenceAssessmentReceipt,
-  EvidenceAssessmentRequest,
-  EvidenceDecisionReceipt,
-  EvidenceDecisionRequest,
-  ExecutorSpanReceipt,
-  EvidenceReadReceipt,
-  EvidenceReadRequest,
-  MediaOperationRequest,
-  MediaOperationReceipt,
-  CurrentRunRecognizerDescriptor,
-  SemanticMediaEvidenceReceipt,
-  SpeechTranscribeRequest,
-  ModelUsageReceipt,
-  OrchestratorDecisionRecord,
-  PublishReviewDecisionReceipt,
-  PublishReviewDecisionRequest,
-  PublishReviewIntakeReceipt,
-  PublishReviewRevocationReceipt,
-  PublishReviewRevocationRequest,
-  ReportRecord,
-  RootOutputDispositionReceipt,
-  ParentArtifactAdmissionReceipt,
-  ParentArtifactDispositionReceipt,
-  ParentArtifactReadReceipt,
-  ParentArtifactReadRequest,
-  StudyPlanningDecisionReceipt,
-  StudyFollowUpRecord,
-  OwnedMediaStudyConflict,
-  OwnedMediaStudyCoverageRange,
-  OwnedMediaStudyExecutorReceipt,
-  StudyReadinessReceipt,
-  StudyReadinessReceiptIdentity,
-  RuntimeArtifact,
-  SpawnRejection,
-  SpawnRequestInput,
-  TaskLaunchRecord,
-  TaskRecord,
-  TaskStatus,
-  TerminalChildIdentity,
-} from "./model.ts";
+  AgentRegisteredEvent,
+  ArtifactRecordedEvent,
+  ExecutorFinishedEvent,
+  ExecutorStartedEvent,
+  MediaOperationCompletedEvent,
+  MediaOperationFailedEvent,
+  MediaOperationStartedEvent,
+  ModelUsageRecordedEvent,
+  OrchestratorDecisionRecordedEvent,
+  OrchestratorToolCalledEvent,
+  ReportDecidedEvent,
+  ReportsWaitReturnedEvent,
+  ReportsWaitStartedEvent,
+  ReportSubmittedEvent,
+  RuntimeInterruptedEvent,
+  SpawnDecidedEvent,
+  SpawnRequestedEvent,
+  TaskCreatedEvent,
+  TaskLaunchClaimedEvent,
+  TaskTransitionedEvent,
+} from "./protocol/executionEvents.ts";
+import type {
+  EvidenceAssessmentCompletedEvent,
+  EvidenceAssessmentFailedEvent,
+  EvidenceAssessmentStartedEvent,
+  EvidenceDecisionCompletedEvent,
+  EvidenceDecisionFailedEvent,
+  EvidenceDecisionStartedEvent,
+  EvidenceReadCompletedEvent,
+  EvidenceReadFailedEvent,
+  EvidenceReadStartedEvent,
+  SemanticEvidenceCompletedEvent,
+  SemanticEvidenceFailedEvent,
+  SemanticEvidenceStartedEvent,
+} from "./protocol/evidenceEvents.ts";
+import type {
+  CaptionProductionCompletedEvent,
+  CaptionProductionFailedEvent,
+  CaptionProductionStartedEvent,
+  CaptionQualityControlDecidedEvent,
+  ParentArtifactDispositionRecordedEvent,
+  ParentArtifactReadCompletedEvent,
+  ParentArtifactReadFailedEvent,
+  ParentArtifactReadStartedEvent,
+  PublishReviewDecisionCompletedEvent,
+  PublishReviewDecisionFailedEvent,
+  PublishReviewDecisionStartedEvent,
+  PublishReviewIntakeCompletedEvent,
+  PublishReviewIntakeFailedEvent,
+  PublishReviewIntakeStartedEvent,
+  PublishReviewRevocationCompletedEvent,
+  PublishReviewRevocationFailedEvent,
+  PublishReviewRevocationStartedEvent,
+  RootOutputDispositionRecordedEvent,
+} from "./protocol/reviewEvents.ts";
+import type {
+  OwnedMediaStudyCompletedEvent,
+  StudyFollowUpLinkedEvent,
+  StudyPlanningDecisionRecordedEvent,
+  StudyReadinessAuditedEvent,
+} from "./protocol/studyEvents.ts";
 
-export type RuntimeProducerKind =
-  | "scheduler"
-  | "registry"
-  | "artifact_store"
-  | "media_host"
-  | "semantic_evidence_host"
-  | "evidence_host"
-  | "assessment_host"
-  | "decision_host"
-  | "publish_review_intake_host"
-  | "publish_review_host"
-  | "caption_production_host"
-  | "caption_quality_control_host"
-  | "handoff_host"
-  | "admission_host"
-  | "artifact_read_host"
-  | "study_planning_host"
-  | "study_synthesis_host"
-  | "study_audit_host"
-  | "launcher"
-  | "recovery_host";
-
-export interface RuntimeEventBase {
-  schema: "studio.runtime.event.v1";
-  runId: string;
-  seq: number;
-  eventId: string;
-  recordedAt: string;
-  producer: { kind: RuntimeProducerKind; id: string };
-  causationId: string | null;
-  correlationId: string | null;
-}
-
-export interface ArtifactRecordedEvent extends RuntimeEventBase {
-  type: "artifact.recorded";
-  data: { artifact: RuntimeArtifact };
-}
-
-export interface TaskCreatedEvent extends RuntimeEventBase {
-  type: "task.created";
-  data: { task: TaskRecord };
-}
-
-export interface SpawnRequestedEvent extends RuntimeEventBase {
-  type: "spawn.requested";
-  data: {
-    requestId: string;
-    requestedByTaskId: string;
-    requestedByAgentId: string;
-    authoredByExecutionId: string | null;
-    toolCallId: string | null;
-    input: SpawnRequestInput;
-  };
-}
-
-export interface SpawnDecidedEvent extends RuntimeEventBase {
-  type: "spawn.decided";
-  data: {
-    requestId: string;
-    accepted: boolean;
-    rejection: SpawnRejection | null;
-    taskId: string | null;
-    agentId: string | null;
-    grants: CapabilityGrant[];
-  };
-}
-
-export interface AgentRegisteredEvent extends RuntimeEventBase {
-  type: "agent.registered";
-  data: { agent: AgentRecord };
-}
-
-export interface TaskLaunchClaimedEvent extends RuntimeEventBase {
-  type: "task.launch_claimed";
-  data: { claim: TaskLaunchRecord };
-}
-
-export interface OrchestratorToolCalledEvent extends RuntimeEventBase {
-  type: "orchestrator.tool_called";
-  data: {
-    callId: string;
-    executionId: string;
-    taskId: string;
-    tool:
-      | "task_spawn_request"
-      | "task_reports_wait"
-      | "report_disposition"
-      | "artifact_read"
-      | "study_planning_decision"
-      | "study_synthesize";
-  };
-}
-
-export interface ReportsWaitStartedEvent extends RuntimeEventBase {
-  type: "reports.wait_started";
-  data: { waitId: string; executionId: string; parentTaskId: string };
-}
-
-export interface ReportsWaitReturnedEvent extends RuntimeEventBase {
-  type: "reports.wait_returned";
-  data: {
-    waitId: string;
-    result: "all_terminal" | "closed_failure";
-    failure: "no_children" | "child_interrupted" | "child_failed" | null;
-    children: TerminalChildIdentity[];
-  };
-}
-
-export interface OrchestratorDecisionRecordedEvent extends RuntimeEventBase {
-  type: "orchestrator.decision_recorded";
-  data: { decision: OrchestratorDecisionRecord };
-}
-
-export interface RuntimeInterruptedEvent extends RuntimeEventBase {
-  type: "runtime.interrupted";
-  data: { reason: string; taskIds: string[]; executionIds: string[] };
-}
-
-export interface TaskTransitionedEvent extends RuntimeEventBase {
-  type: "task.transitioned";
-  data: { taskId: string; agentId: string; status: TaskStatus; reason: string | null };
-}
-
-export interface ExecutorStartedEvent extends RuntimeEventBase {
-  type: "executor.started";
-  data: {
-    executionId: string;
-    taskId: string;
-    agentId: string;
-    launchClaimId: string;
-    startedAt: string;
-  };
-}
-
-export interface ModelUsageRecordedEvent extends RuntimeEventBase {
-  type: "model.usage_recorded";
-  data: { receipt: ModelUsageReceipt };
-}
-
-export interface ExecutorFinishedEvent extends RuntimeEventBase {
-  type: "executor.finished";
-  data: { receipt: ExecutorSpanReceipt };
-}
-
-export interface MediaOperationStartedEvent extends RuntimeEventBase {
-  type: "media.operation_started";
-  data: {
-    capability: Extract<Capability, "media.extract" | "media.seek">;
-    request: MediaOperationRequest;
-    grantId: string;
-  };
-}
-
-export interface MediaOperationCompletedEvent extends RuntimeEventBase {
-  type: "media.operation_completed";
-  data: {
-    operationId: string;
-    outputArtifactId: string;
-    receipt: MediaOperationReceipt;
-  };
-}
-
-export interface MediaOperationFailedEvent extends RuntimeEventBase {
-  type: "media.operation_failed";
-  data: { operationId: string; reason: string };
-}
-
-export interface SemanticEvidenceStartedEvent extends RuntimeEventBase {
-  type: "semantic.evidence_started";
-  data: {
-    request: SpeechTranscribeRequest;
-    grantId: string;
-    executionId: string;
-    launchClaimId: string;
-    sourceContentId: string;
-    producer: CurrentRunRecognizerDescriptor;
-    limits: SemanticMediaEvidenceReceipt["limits"];
-  };
-}
-
-export interface SemanticEvidenceCompletedEvent extends RuntimeEventBase {
-  type: "semantic.evidence_completed";
-  data: {
-    operationId: string;
-    outputArtifactId: string;
-    outputContentId: string;
-    receiptContentId: string;
-    receipt: SemanticMediaEvidenceReceipt;
-  };
-}
-
-export interface SemanticEvidenceFailedEvent extends RuntimeEventBase {
-  type: "semantic.evidence_failed";
-  data: { operationId: string; reason: string };
-}
-
-export interface EvidenceReadStartedEvent extends RuntimeEventBase {
-  type: "evidence.read_started";
-  data: {
-    request: EvidenceReadRequest;
-    grantId: string;
-    evidenceKind: EvidenceReadReceipt["input"]["evidenceKind"];
-    sourceArtifactId: string;
-    startMs: number;
-    endMs: number;
-    maxBytes: number;
-    maxItems: number;
-  };
-}
-
-export interface EvidenceReadCompletedEvent extends RuntimeEventBase {
-  type: "evidence.read_completed";
-  data: { operationId: string; receiptContentId: string; receipt: EvidenceReadReceipt };
-}
-
-export interface EvidenceReadFailedEvent extends RuntimeEventBase {
-  type: "evidence.read_failed";
-  data: { operationId: string; reason: string };
-}
-
-export interface EvidenceAssessmentStartedEvent extends RuntimeEventBase {
-  type: "analysis.evidence.assessment_started";
-  data: {
-    request: EvidenceAssessmentRequest;
-    grantId: string;
-    maxReadReceipts: number;
-    maxClaims: number;
-    maxCitations: number;
-    maxTokens: number;
-  };
-}
-
-export interface EvidenceAssessmentCompletedEvent extends RuntimeEventBase {
-  type: "analysis.evidence.assessment_completed";
-  data: {
-    operationId: string;
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: EvidenceAssessmentReceipt;
-  };
-}
-
-export interface EvidenceAssessmentFailedEvent extends RuntimeEventBase {
-  type: "analysis.evidence.assessment_failed";
-  data: { operationId: string; reason: string };
-}
-
-export interface EvidenceDecisionStartedEvent extends RuntimeEventBase {
-  type: "analysis.evidence.decision_started";
-  data: { request: EvidenceDecisionRequest; grantId: string; maxAuditedAssessments: number };
-}
-
-export interface EvidenceDecisionCompletedEvent extends RuntimeEventBase {
-  type: "analysis.evidence.decision_completed";
-  data: {
-    operationId: string;
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: EvidenceDecisionReceipt;
-  };
-}
-
-export interface EvidenceDecisionFailedEvent extends RuntimeEventBase {
-  type: "analysis.evidence.decision_failed";
-  data: { operationId: string; reason: string };
-}
-
-export interface PublishReviewIntakeStartedEvent extends RuntimeEventBase {
-  type: "publish.review.intake_started";
-  data: { intakeId: string; readiness: StudyReadinessReceiptIdentity };
-}
-
-export interface PublishReviewIntakeCompletedEvent extends RuntimeEventBase {
-  type: "publish.review.intake_completed";
-  data: {
-    intakeId: string;
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: PublishReviewIntakeReceipt;
-  };
-}
-
-export interface PublishReviewIntakeFailedEvent extends RuntimeEventBase {
-  type: "publish.review.intake_failed";
-  data: { intakeId: string; reason: string };
-}
-
-export interface PublishReviewDecisionStartedEvent extends RuntimeEventBase {
-  type: "publish.review.decision_started";
-  data: {
-    reviewId: string;
-    request: PublishReviewDecisionRequest;
-    reviewerLabel: string;
-  };
-}
-
-export interface PublishReviewDecisionCompletedEvent extends RuntimeEventBase {
-  type: "publish.review.decision_completed";
-  data: {
-    reviewId: string;
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: PublishReviewDecisionReceipt;
-  };
-}
-
-export interface PublishReviewDecisionFailedEvent extends RuntimeEventBase {
-  type: "publish.review.decision_failed";
-  data: { reviewId: string; reason: string };
-}
-
-export interface PublishReviewRevocationStartedEvent extends RuntimeEventBase {
-  type: "publish.review.revocation_started";
-  data: {
-    revocationId: string;
-    request: PublishReviewRevocationRequest;
-    reviewerLabel: string;
-  };
-}
-
-export interface PublishReviewRevocationCompletedEvent extends RuntimeEventBase {
-  type: "publish.review.revocation_completed";
-  data: {
-    revocationId: string;
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: PublishReviewRevocationReceipt;
-  };
-}
-
-export interface PublishReviewRevocationFailedEvent extends RuntimeEventBase {
-  type: "publish.review.revocation_failed";
-  data: { revocationId: string; reason: string };
-}
-
-export interface CaptionProductionStartedEvent extends RuntimeEventBase {
-  type: "caption.production_started";
-  data: {
-    jobId: string;
-    request: CaptionProductionRequest;
-    input: CaptionProductionArtifact["input"];
-    limits: CaptionProductionReceipt["limits"];
-    executor: CaptionExecutorDescriptor;
-  };
-}
-
-export interface CaptionProductionCompletedEvent extends RuntimeEventBase {
-  type: "caption.production_completed";
-  data: {
-    jobId: string;
-    captionArtifactId: string;
-    captionContentId: string;
-    receiptArtifactId: string;
-    receiptContentId: string;
-    receipt: CaptionProductionReceipt;
-  };
-}
-
-export interface CaptionProductionFailedEvent extends RuntimeEventBase {
-  type: "caption.production_failed";
-  data: { jobId: string; reason: string };
-}
-
-export interface CaptionQualityControlDecidedEvent extends RuntimeEventBase {
-  type: "caption.quality_control_decided";
-  data: {
-    qcId: string;
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: CaptionQualityControlReceipt;
-  };
-}
-
-export interface ReportSubmittedEvent extends RuntimeEventBase {
-  type: "report.submitted";
-  data: { report: ReportRecord };
-}
-
-export interface ReportDecidedEvent extends RuntimeEventBase {
-  type: "report.decided";
-  data: {
-    reportId: string;
-    decidedByTaskId: string;
-    decidedByAgentId: string;
-    accepted: boolean;
-    reason: string;
-  };
-}
-
-export interface RootOutputDispositionRecordedEvent extends RuntimeEventBase {
-  type: "root.output_disposition_recorded";
-  data: {
-    dispositionId: string;
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: RootOutputDispositionReceipt;
-  };
-}
-
-export interface ParentArtifactDispositionRecordedEvent extends RuntimeEventBase {
-  type: "parent.artifact_disposition_recorded";
-  data: {
-    dispositionArtifactId: string;
-    dispositionReceiptContentId: string;
-    dispositionReceipt: ParentArtifactDispositionReceipt;
-    admissionArtifactId: string | null;
-    admissionReceiptContentId: string | null;
-    admissionReceipt: ParentArtifactAdmissionReceipt | null;
-  };
-}
-
-export interface ParentArtifactReadStartedEvent extends RuntimeEventBase {
-  type: "parent.artifact_read_started";
-  data: { request: ParentArtifactReadRequest };
-}
-
-export interface ParentArtifactReadCompletedEvent extends RuntimeEventBase {
-  type: "parent.artifact_read_completed";
-  data: { operationId: string; receipt: ParentArtifactReadReceipt };
-}
-
-export interface ParentArtifactReadFailedEvent extends RuntimeEventBase {
-  type: "parent.artifact_read_failed";
-  data: { operationId: string; reason: string };
-}
-
-export interface StudyPlanningDecisionRecordedEvent extends RuntimeEventBase {
-  type: "study.planning_decision_recorded";
-  data: {
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: StudyPlanningDecisionReceipt;
-  };
-}
-
-export interface StudyFollowUpLinkedEvent extends RuntimeEventBase {
-  type: "study.follow_up_linked";
-  data: { followUp: StudyFollowUpRecord };
-}
-
-export interface OwnedMediaStudyCompletedEvent extends RuntimeEventBase {
-  type: "study.synthesis_completed";
-  data: {
-    studyId: string;
-    outputArtifactId: string;
-    outputContentId: string;
-    executorReceiptContentId: string;
-    executorReceipt: OwnedMediaStudyExecutorReceipt;
-    projection: {
-      coverage: OwnedMediaStudyCoverageRange[];
-      conflicts: OwnedMediaStudyConflict[];
-    };
-  };
-}
-
-export interface StudyReadinessAuditedEvent extends RuntimeEventBase {
-  type: "study.readiness_audited";
-  data: {
-    studyId: string;
-    outputArtifactId: string;
-    receiptContentId: string;
-    receipt: StudyReadinessReceipt;
-  };
-}
+export * from "./protocol/base.ts";
+export * from "./protocol/executionEvents.ts";
+export * from "./protocol/evidenceEvents.ts";
+export * from "./protocol/reviewEvents.ts";
+export * from "./protocol/studyEvents.ts";
 
 export type RuntimeEvent =
   | ArtifactRecordedEvent

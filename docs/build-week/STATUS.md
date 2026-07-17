@@ -31,6 +31,8 @@ score.
   orchestration, current-run semantic evidence, coverage-aware report admission, gap-directed study
   planning/synthesis, and study-causal captions with independent structural QC. The campaign is
   closed; do not reopen its slices as a new runtime plan.
+- **Runtime modularity:** launcher, validation, projection, protocol, and runtime-host review/caption
+  seams are split into cohesive modules; UI catch-up remains next.
 
 ## Explicit deferrals
 

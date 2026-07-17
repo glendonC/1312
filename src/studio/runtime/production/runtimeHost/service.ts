@@ -1,29 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
 
 import {
   canonicalSha256,
-  ContentAddressedArtifactStore,
   createSourceArtifactId,
   identifyFile,
 } from "../artifactStore.ts";
 import {
-  CaptionProductionHost,
-  CaptionProductionHostError,
-} from "../captions/captionProductionHost.ts";
-import {
-  CaptionQualityControlHost,
-  CaptionQualityControlHostError,
-} from "../captions/captionQualityControlHost.ts";
-import {
   RecordedCaptionFixtureExecutor,
   type CaptionProductionExecutor,
 } from "../captions/captionProductionExecutor.ts";
-import {
-  PublishReviewHost,
-  PublishReviewHostError,
-} from "../review/publishReviewHost.ts";
-import { FileEventJournal, RuntimeJournalConflict, RuntimeLedger } from "../journal.ts";
+import { RuntimeJournalConflict } from "../journal.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
 import {
   createRuntimePlan,
@@ -63,14 +49,9 @@ import {
 import { deterministicOrchestratorLauncherFactory } from "./deterministicOrchestrator.ts";
 import { RuntimeSourceRegistry } from "./sourceRegistry.ts";
 import { parseRuntimeHostStartRequest } from "./validation.ts";
-import {
-  assertPublishReviewDecisionRequest,
-  assertPublishReviewRevocationRequest,
-  validatePublishReviewOperator,
-} from "../validation/publishReviewDecision.ts";
+import { validatePublishReviewOperator } from "../validation/publishReviewDecision.ts";
 import type { PublishReviewOperator } from "../model.ts";
-import { assertCaptionProductionRequest } from "../validation/captionProduction.ts";
-import { assertCaptionQualityControlRequest } from "../validation/captionQualityControl.ts";
+import { RuntimeReviewCaptionCoordinator } from "./reviewCaptionCoordinator.ts";
 
 export interface RuntimeStartServiceOptions {
   store: DurableRuntimeCommandStore;
@@ -108,12 +89,10 @@ export class RuntimeStartService {
   private readonly now: () => Date;
   private readonly runtimeIdForCommand: (commandId: string) => string;
   private readonly hostInstanceId: string;
-  private readonly reviewer: PublishReviewOperator;
-  private readonly captionExecutor: CaptionProductionExecutor;
   private readonly lifecycle: RuntimeHostLifecycleCoordinator;
   private readonly queries: RuntimeHostQueries;
+  private readonly reviewCaption: RuntimeReviewCaptionCoordinator;
   private readonly initializing = new Map<string, Promise<RuntimeHostStartAcknowledgement>>();
-  private readonly reviewMutationTails = new Map<string, Promise<unknown>>();
 
   private constructor(options: RuntimeStartServiceOptions) {
     this.store = options.store;
@@ -124,16 +103,24 @@ export class RuntimeStartService {
     this.now = options.now ?? (() => new Date());
     this.runtimeIdForCommand = options.runtimeIdForCommand ?? deterministicRuntimeId;
     this.hostInstanceId = options.hostInstanceId ?? `host:${randomUUID()}`;
-    this.reviewer = validatePublishReviewOperator(
+    const reviewer = validatePublishReviewOperator(
       options.reviewer ?? { id: "reviewer:local-operator", label: "Local review operator" },
     );
-    this.captionExecutor = options.captionExecutor ?? new RecordedCaptionFixtureExecutor();
     this.lifecycle = new RuntimeHostLifecycleCoordinator(this.store, this.now);
     this.queries = new RuntimeHostQueries(
       this.store,
-      this.reviewer,
+      reviewer,
       (record, recovery) => this.lifecycle.reconcile(record, recovery),
     );
+    this.reviewCaption = new RuntimeReviewCaptionCoordinator({
+      store: this.store,
+      sources: this.sources,
+      lifecycle: this.lifecycle,
+      queries: this.queries,
+      reviewer,
+      captionExecutor: options.captionExecutor ?? new RecordedCaptionFixtureExecutor(),
+      now: this.now,
+    });
   }
 
   static async open(options: RuntimeStartServiceOptions): Promise<RuntimeStartService> {
@@ -445,109 +432,6 @@ export class RuntimeStartService {
     return this.queries.publishReviewIntakes(runtimeId);
   }
 
-  private async withReviewMutation<T>(runtimeId: string, operation: () => Promise<T>): Promise<T> {
-    const previous = this.reviewMutationTails.get(runtimeId) ?? Promise.resolve();
-    const next = previous.catch(() => undefined).then(operation);
-    this.reviewMutationTails.set(runtimeId, next);
-    try {
-      return await next;
-    } finally {
-      if (this.reviewMutationTails.get(runtimeId) === next) this.reviewMutationTails.delete(runtimeId);
-    }
-  }
-
-  private rethrowReviewHostError(error: unknown): never {
-    if (error instanceof PublishReviewHostError) {
-      if (error.code === "reviewer_identity_mismatch") {
-        throw new RuntimeHostError(
-          "reviewer_identity_mismatch",
-          "The attested reviewer identity does not match this host's configured review operator.",
-          403,
-          { cause: error },
-        );
-      }
-      if (error.code === "stored_lineage_invalid") {
-        throw new RuntimeHostError(
-          "stored_content_inconsistent",
-          "Stored publish-review lineage failed closed verification.",
-          409,
-          { cause: error },
-        );
-      }
-      throw new RuntimeHostError(
-        "illegal_review_transition",
-        error.message,
-        409,
-        { cause: error },
-      );
-    }
-    throw new RuntimeHostError(
-      "stored_content_inconsistent",
-      "The publish-review receipt could not be recorded against verified stored lineage.",
-      409,
-      { cause: error },
-    );
-  }
-
-  private rethrowCaptionHostError(error: unknown): never {
-    if (error instanceof RuntimeHostError) throw error;
-    if (error instanceof CaptionProductionHostError) {
-      if (error.code === "stored_lineage_invalid") {
-        throw new RuntimeHostError(
-          "stored_content_inconsistent",
-          "Stored caption authority or source lineage failed closed verification.",
-          409,
-          { cause: error },
-        );
-      }
-      if (error.code === "verified_unrevoked_approval_required") {
-        throw new RuntimeHostError(
-          "caption_authority_required",
-          error.message,
-          409,
-          { cause: error },
-        );
-      }
-      if (error.code === "verified_study_readiness_required" || error.code === "current_run_caption_executor_required") {
-        throw new RuntimeHostError(
-          "caption_current_run_causality_required",
-          error.message,
-          409,
-          { cause: error },
-        );
-      }
-      throw new RuntimeHostError(
-        "illegal_caption_transition",
-        error.message,
-        409,
-        { cause: error },
-      );
-    }
-    throw new RuntimeHostError(
-      "stored_content_inconsistent",
-      "Caption production could not be recorded against verified stored lineage.",
-      409,
-      { cause: error },
-    );
-  }
-
-  private rethrowCaptionQualityControlHostError(error: unknown): never {
-    if (error instanceof CaptionQualityControlHostError) {
-      throw new RuntimeHostError(
-        error.code === "stored_lineage_invalid" ? "stored_content_inconsistent" : "illegal_caption_qc_transition",
-        error.message,
-        409,
-        { cause: error },
-      );
-    }
-    throw new RuntimeHostError(
-      "stored_content_inconsistent",
-      "Caption QC could not be recorded against verified stored candidate lineage.",
-      409,
-      { cause: error },
-    );
-  }
-
   async publishReviewDecisions(runtimeId: string): Promise<RuntimeHostPublishReviewDecisionResponse> {
     return this.queries.publishReviewDecisions(runtimeId);
   }
@@ -556,68 +440,14 @@ export class RuntimeStartService {
     runtimeId: string,
     value: unknown,
   ): Promise<RuntimeHostPublishReviewDecisionResponse> {
-    let request;
-    try {
-      request = assertPublishReviewDecisionRequest(value);
-    } catch (error) {
-      throw new RuntimeHostError(
-        "invalid_review_request",
-        "The publish-review decision request is invalid or contains open fields.",
-        400,
-        { cause: error },
-      );
-    }
-    return this.withReviewMutation(runtimeId, async () => {
-      const record = await this.store.findByRuntimeId(runtimeId);
-      if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-      await this.lifecycle.reconcile(record, false);
-      const paths = this.store.paths(runtimeId);
-      try {
-        const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
-        await new PublishReviewHost(
-          ledger,
-          new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-          this.reviewer,
-        ).decide(request);
-      } catch (error) {
-        this.rethrowReviewHostError(error);
-      }
-      return this.publishReviewDecisions(runtimeId);
-    });
+    return this.reviewCaption.createPublishReviewDecision(runtimeId, value);
   }
 
   async createPublishReviewRevocation(
     runtimeId: string,
     value: unknown,
   ): Promise<RuntimeHostPublishReviewDecisionResponse> {
-    let request;
-    try {
-      request = assertPublishReviewRevocationRequest(value);
-    } catch (error) {
-      throw new RuntimeHostError(
-        "invalid_review_request",
-        "The publish-review revocation request is invalid or contains open fields.",
-        400,
-        { cause: error },
-      );
-    }
-    return this.withReviewMutation(runtimeId, async () => {
-      const record = await this.store.findByRuntimeId(runtimeId);
-      if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-      await this.lifecycle.reconcile(record, false);
-      const paths = this.store.paths(runtimeId);
-      try {
-        const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
-        await new PublishReviewHost(
-          ledger,
-          new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-          this.reviewer,
-        ).revoke(request);
-      } catch (error) {
-        this.rethrowReviewHostError(error);
-      }
-      return this.publishReviewDecisions(runtimeId);
-    });
+    return this.reviewCaption.createPublishReviewRevocation(runtimeId, value);
   }
 
   async captionProductions(runtimeId: string): Promise<RuntimeHostCaptionProductionResponse> {
@@ -638,102 +468,14 @@ export class RuntimeStartService {
     runtimeId: string,
     value: unknown,
   ): Promise<RuntimeHostCaptionQualityControlResponse> {
-    let request;
-    try {
-      request = assertCaptionQualityControlRequest(value);
-    } catch (error) {
-      throw new RuntimeHostError(
-        "invalid_caption_qc_request",
-        "The caption QC request is invalid or contains open fields.",
-        400,
-        { cause: error },
-      );
-    }
-    return this.withReviewMutation(runtimeId, async () => {
-      const record = await this.store.findByRuntimeId(runtimeId);
-      if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-      await this.lifecycle.reconcile(record, false);
-      const paths = this.store.paths(runtimeId);
-      try {
-        const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
-        await new CaptionQualityControlHost(
-          ledger,
-          new ContentAddressedArtifactStore(paths.artifactStoreRoot),
-        ).decide(request);
-      } catch (error) {
-        this.rethrowCaptionQualityControlHostError(error);
-      }
-      return this.captionQualityControls(runtimeId);
-    });
+    return this.reviewCaption.createCaptionQualityControl(runtimeId, value);
   }
 
   async createCaptionProduction(
     runtimeId: string,
     value: unknown,
   ): Promise<RuntimeHostCaptionProductionResponse> {
-    let request;
-    try {
-      request = assertCaptionProductionRequest(value);
-    } catch (error) {
-      throw new RuntimeHostError(
-        "invalid_caption_request",
-        "The caption-production request is invalid or contains open fields.",
-        400,
-        { cause: error },
-      );
-    }
-    return this.withReviewMutation(runtimeId, async () => {
-      const record = await this.store.findByRuntimeId(runtimeId);
-      if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
-      await this.lifecycle.reconcile(record, false);
-      const start = await this.lifecycle.readStartReceipt(record);
-      if (!start) {
-        throw new RuntimeHostError(
-          "stored_content_inconsistent",
-          "Caption production requires an immutable runtime-start receipt.",
-          409,
-        );
-      }
-      const loadedSource = await this.sources.resolve(record.sourceSessionId, record.sourceRevisionId);
-      const paths = this.store.paths(runtimeId);
-      try {
-        const ledger = await RuntimeLedger.open(runtimeId, new FileEventJournal(paths.journalPath), { now: this.now });
-        const artifacts = new ContentAddressedArtifactStore(paths.artifactStoreRoot);
-        const source = ledger.state().artifacts[start.record.sourceArtifactId];
-        if (!source || source.origin.kind !== "ingest") {
-          throw new Error("The runtime source artifact is missing from the production ledger");
-        }
-        const sourcePath = await artifacts.resolveVerified(source);
-        const produced = await new CaptionProductionHost(
-          ledger,
-          artifacts,
-          this.captionExecutor,
-          {
-            sourcePath,
-            fixtureCaptionPath: join(loadedSource.directory, "captions.json"),
-            sourceArtifactId: source.id,
-            sourceContentId: source.content.contentId,
-            analysisRequest: start.record.analysisRequest,
-          },
-        ).produce(request);
-        try {
-          await new CaptionQualityControlHost(ledger, artifacts).decide({
-            candidate: {
-              jobId: produced.caption.jobId,
-              captionArtifactId: produced.captionArtifactId,
-              captionContentId: produced.captionContentId,
-              captionReceiptId: produced.receipt.receiptId,
-              captionReceiptContentId: produced.receiptContentId,
-            },
-          });
-        } catch (error) {
-          this.rethrowCaptionQualityControlHostError(error);
-        }
-      } catch (error) {
-        this.rethrowCaptionHostError(error);
-      }
-      return this.captionProductions(runtimeId);
-    });
+    return this.reviewCaption.createCaptionProduction(runtimeId, value);
   }
 
   async recover(): Promise<void> {

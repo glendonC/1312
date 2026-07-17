@@ -3,9 +3,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { fileURLToPath } from "node:url";
 
-import { canonicalSha256, ContentAddressedArtifactStore } from "./artifactStore.ts";
+import { ContentAddressedArtifactStore } from "./artifactStore.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type {
   ExecutorSpanReceipt,
@@ -13,7 +12,6 @@ import type {
   ModelUsageReceipt,
   ReportRecord,
   RuntimeArtifact,
-  TaskRecord,
   WorkerOutputEnvelope,
 } from "./model.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
@@ -26,40 +24,12 @@ import { BoundedEvidenceDecisionHost } from "./evidenceDecisionHost.ts";
 import { SpeechTranscribeCapabilityHost } from "./semantic/semanticEvidenceHost.ts";
 import { reopenSemanticEvidence, semanticEvidenceCitation } from "./semantic/semanticEvidenceAudit.ts";
 import type { CurrentRunSpeechRecognizer } from "./semantic/currentRunSpeechRecognizer.ts";
-import {
-  BoundedChildEvidenceBridge,
-  openChildEvidenceBridge,
-  type ChildEvidenceReadHost,
-  type OpenChildEvidenceBridge,
-} from "./executor/childEvidenceBridge.ts";
-import {
-  BoundedChildEvidenceAssessmentBridge,
-  openChildEvidenceAssessmentBridge,
-  type ChildEvidenceAssessmentHost,
-  type OpenChildEvidenceAssessmentBridge,
-} from "./executor/childEvidenceAssessmentBridge.ts";
-import {
-  BoundedChildEvidenceDecisionBridge,
-  openChildEvidenceDecisionBridge,
-  type ChildEvidenceDecisionHost,
-  type OpenChildEvidenceDecisionBridge,
-} from "./executor/childEvidenceDecisionBridge.ts";
-import {
-  BoundedChildMediaBridge,
-  openChildMediaBridge,
-  type ChildMediaCapabilityHost,
-  type OpenChildMediaBridge,
-} from "./executor/childMediaBridge.ts";
-import {
-  BoundedChildSemanticEvidenceBridge,
-  openChildSemanticEvidenceBridge,
-  type ChildSemanticEvidenceHost,
-  type OpenChildSemanticEvidenceBridge,
-} from "./executor/childSemanticEvidenceBridge.ts";
-import {
-  parseCodexEvents,
-  type CodexUsageEvent,
-} from "./executor/codexEvents.ts";
+import type { ChildEvidenceReadHost } from "./executor/childEvidenceBridge.ts";
+import type { ChildEvidenceAssessmentHost } from "./executor/childEvidenceAssessmentBridge.ts";
+import type { ChildEvidenceDecisionHost } from "./executor/childEvidenceDecisionBridge.ts";
+import type { ChildMediaCapabilityHost } from "./executor/childMediaBridge.ts";
+import type { ChildSemanticEvidenceHost } from "./executor/childSemanticEvidenceBridge.ts";
+import { parseCodexEvents } from "./executor/codexEvents.ts";
 import { closedCodexExecArgs } from "./executor/codexInvocation.ts";
 import { LauncherFailure } from "./executor/launcherFailure.ts";
 import {
@@ -72,6 +42,18 @@ import {
   runBoundedProcess as runProcess,
   type ProcessResult,
 } from "./executor/processRunner.ts";
+import {
+  closeLauncherChildCapabilityBridges,
+  configureLauncherChildCapabilityMcp,
+  launcherChildCapabilityContext,
+  launcherChildCapabilityEnvironment,
+  openLauncherChildCapabilityBridges,
+} from "./launcher/childCapabilityBridges.ts";
+import {
+  closedProcessExitReason,
+  codexExecutorSpanReceipt,
+  recordCodexModelUsage,
+} from "./launcher/receipts.ts";
 
 export interface CodexWorkerLaunchResult {
   execution: ExecutorSpanReceipt;
@@ -108,37 +90,6 @@ export interface CodexWorkerLauncherOptions {
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
   semanticEvidenceMcpServerPath?: string;
-}
-
-function tomlString(value: string): string {
-  return JSON.stringify(value);
-}
-
-function tomlStrings(values: readonly string[]): string {
-  return `[${values.map(tomlString).join(",")}]`;
-}
-
-function closedProcessExitReason(result: ProcessResult): string {
-  const diagnostic = `${result.stderr}\n${result.stdout}`.toLowerCase();
-  if (diagnostic.includes("mcp") || diagnostic.includes("model context protocol")) {
-    return "Codex executor could not start its required closed MCP tool surface.";
-  }
-  if (diagnostic.includes("429") || diagnostic.includes("rate limit") || diagnostic.includes("too many requests")) {
-    return "Codex executor was rejected by the model service rate limit before a completed turn.";
-  }
-  if (diagnostic.includes("401") || diagnostic.includes("403") || diagnostic.includes("unauthorized") || diagnostic.includes("authentication")) {
-    return "Codex executor lacked model-service authorization before a completed turn.";
-  }
-  if (diagnostic.includes("model") && (diagnostic.includes("not found") || diagnostic.includes("unsupported") || diagnostic.includes("invalid"))) {
-    return "Codex executor model configuration was rejected before a completed turn.";
-  }
-  if (diagnostic.includes("stream") || diagnostic.includes("connection") || diagnostic.includes("transport")) {
-    return "Codex executor transport closed before a completed turn.";
-  }
-  if (diagnostic.includes("schema")) {
-    return "Codex executor output-schema configuration was rejected before a completed turn.";
-  }
-  return "Codex executor exited without a completed turn.";
 }
 
 export class CodexExecWorkerLauncher {
@@ -237,89 +188,6 @@ export class CodexExecWorkerLauncher {
     return this.versionPromise;
   }
 
-  private async recordUsage(
-    executionId: string,
-    task: TaskRecord,
-    version: string,
-    usageEvent: CodexUsageEvent,
-    rawUsageEvent: Record<string, unknown>,
-  ): Promise<ModelUsageReceipt> {
-    const raw = await this.artifacts.storeJson(rawUsageEvent);
-    const body = {
-      executionId,
-      taskId: task.id,
-      agentId: task.assignedAgentId,
-      producer: { id: "codex.exec" as const, version },
-      model: this.options.model ?? null,
-      measured: {
-        inputTokens: usageEvent.usage.input_tokens,
-        cachedInputTokens: usageEvent.usage.cached_input_tokens,
-        outputTokens: usageEvent.usage.output_tokens,
-        reasoningOutputTokens: usageEvent.usage.reasoning_output_tokens,
-      },
-      providerUnits: null,
-      billing: { amount: null, currency: null },
-      rawReceipt: {
-        source: "codex.exec.turn.completed" as const,
-        contentId: raw.content.contentId,
-        storageKey: raw.storageKey,
-      },
-    };
-    const receipt: ModelUsageReceipt = {
-      schema: "studio.model-usage.receipt.v1",
-      receiptId: `usage:${canonicalSha256(body)}`,
-      ...body,
-    };
-    await this.ledger.transact(
-      { producer: { kind: "launcher", id: "codex-exec-worker-launcher" }, causationId: executionId },
-      () => ({
-        pending: [{ type: "model.usage_recorded", data: { receipt } }] satisfies PendingRuntimeEvent[],
-        result: undefined,
-      }),
-    );
-    return receipt;
-  }
-
-  private spanReceipt(input: {
-    executionId: string;
-    task: TaskRecord;
-    version: string;
-    startedAt: string;
-    endedAt: string;
-    durationMs: number;
-    outcome: ExecutorSpanReceipt["outcome"];
-    process: Pick<ProcessResult, "exitCode" | "signal">;
-    outputArtifactIds: string[];
-    usageReceiptId: string | null;
-    failure: string | null;
-  }): ExecutorSpanReceipt {
-    const body = {
-      executionId: input.executionId,
-      taskId: input.task.id,
-      agentId: input.task.assignedAgentId,
-      phase: "active" as const,
-      producer: {
-        id: "codex.exec" as const,
-        version: input.version,
-        sandbox: "read-only" as const,
-        ephemeral: true as const,
-      },
-      startedAt: input.startedAt,
-      endedAt: input.endedAt,
-      monotonicDurationMs: input.durationMs,
-      outcome: input.outcome,
-      process: { exitCode: input.process.exitCode, signal: input.process.signal },
-      outputArtifactIds: input.outputArtifactIds,
-      modelUsageReceiptId: input.usageReceiptId,
-      failure: input.failure,
-    };
-    return {
-      schema: "studio.executor-span.receipt.v1",
-      receiptId: `span:${canonicalSha256(body)}`,
-      ...body,
-    };
-  }
-
   async launch(permit: LaunchPermit): Promise<CodexWorkerLaunchResult> {
     const scheduled = this.ledger.state().tasks[permit.taskId];
     if (
@@ -369,173 +237,29 @@ export class CodexExecWorkerLauncher {
     let processResult: ProcessResult | null = null;
     let usage: ModelUsageReceipt | null = null;
     let executorFinished = false;
-    let mediaBridge: OpenChildMediaBridge | null = null;
-    let evidenceBridge: OpenChildEvidenceBridge | null = null;
-    let assessmentBridge: OpenChildEvidenceAssessmentBridge | null = null;
-    let decisionBridge: OpenChildEvidenceDecisionBridge | null = null;
-    let semanticEvidenceBridge: OpenChildSemanticEvidenceBridge | null = null;
+    const childCapabilities = launcherChildCapabilityContext(task);
     try {
-      const mediaCapabilities = task.grants
-        .map((grant) => grant.capability)
-        .filter((capability): capability is "media.extract" | "media.seek" =>
-          capability === "media.extract" || capability === "media.seek");
-      if (mediaCapabilities.length > 0) {
-        mediaBridge = await openChildMediaBridge(new BoundedChildMediaBridge(task, this.mediaHost, {
-          nextOperationId: this.options.nextMediaOperationId,
-        }));
-      }
-      const evidenceGrant = task.grants.find((grant) => grant.capability === "evidence.read");
-      const semanticEvidenceGrant = task.grants.find((grant) => grant.capability === "speech.transcribe");
-      if (semanticEvidenceGrant) {
-        semanticEvidenceBridge = await openChildSemanticEvidenceBridge(new BoundedChildSemanticEvidenceBridge(
-          task,
-          this.semanticEvidenceHost,
-          { nextOperationId: this.options.nextSemanticEvidenceOperationId },
-        ));
-      }
-      if (evidenceGrant) {
-        evidenceBridge = await openChildEvidenceBridge(new BoundedChildEvidenceBridge(task, this.evidenceHost, {
-          nextOperationId: this.options.nextEvidenceOperationId,
-        }));
-      }
-      const assessmentGrant = task.grants.find((grant) => grant.capability === "analysis.evidence.assess");
-      if (assessmentGrant) {
-        assessmentBridge = await openChildEvidenceAssessmentBridge(new BoundedChildEvidenceAssessmentBridge(
-          task,
-          this.assessmentHost,
-          { nextOperationId: this.options.nextAssessmentOperationId },
-        ));
-      }
-      const decisionGrant = task.grants.find((grant) => grant.capability === "analysis.evidence.decide");
-      if (decisionGrant) {
-        decisionBridge = await openChildEvidenceDecisionBridge(new BoundedChildEvidenceDecisionBridge(
-          task,
-          this.decisionHost,
-          { nextOperationId: this.options.nextDecisionOperationId },
-        ));
-      }
+      await openLauncherChildCapabilityBridges(
+        task,
+        {
+          media: this.mediaHost,
+          evidence: this.evidenceHost,
+          assessment: this.assessmentHost,
+          decision: this.decisionHost,
+          semanticEvidence: this.semanticEvidenceHost,
+        },
+        this.options,
+        childCapabilities,
+      );
+      const {
+        mediaCapabilities,
+        evidenceGrant,
+        semanticEvidenceGrant,
+        assessmentGrant,
+        decisionGrant,
+      } = childCapabilities;
       const args = closedCodexExecArgs();
-      if (mediaBridge) {
-        const toolNames = mediaBridge.manifest.tools.map((tool) => tool.name);
-        const serverPath = this.options.mediaMcpServerPath ?? fileURLToPath(
-          new URL("./executor/mediaMcpServer.ts", import.meta.url),
-        );
-        args.push(
-          "-c",
-          `mcp_servers.studio_media.command=${tomlString(process.execPath)}`,
-          "-c",
-          `mcp_servers.studio_media.args=${tomlStrings([serverPath])}`,
-          "-c",
-          "mcp_servers.studio_media.required=true",
-          "-c",
-          `mcp_servers.studio_media.enabled_tools=${tomlStrings(toolNames)}`,
-          "-c",
-          "mcp_servers.studio_media.startup_timeout_sec=5",
-          "-c",
-          `mcp_servers.studio_media.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
-          "-c",
-          `mcp_servers.studio_media.env_vars=${tomlStrings([
-            "STUDIO_CHILD_MEDIA_BRIDGE_URL",
-            "STUDIO_CHILD_MEDIA_BRIDGE_TOKEN",
-          ])}`,
-        );
-      }
-      if (evidenceBridge) {
-        const serverPath = this.options.evidenceMcpServerPath ?? fileURLToPath(
-          new URL("./executor/evidenceMcpServer.ts", import.meta.url),
-        );
-        args.push(
-          "-c",
-          `mcp_servers.studio_evidence.command=${tomlString(process.execPath)}`,
-          "-c",
-          `mcp_servers.studio_evidence.args=${tomlStrings([serverPath])}`,
-          "-c",
-          "mcp_servers.studio_evidence.required=true",
-          "-c",
-          `mcp_servers.studio_evidence.enabled_tools=${tomlStrings([evidenceBridge.manifest.tool.name])}`,
-          "-c",
-          "mcp_servers.studio_evidence.startup_timeout_sec=5",
-          "-c",
-          `mcp_servers.studio_evidence.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
-          "-c",
-          `mcp_servers.studio_evidence.env_vars=${tomlStrings([
-            "STUDIO_CHILD_EVIDENCE_BRIDGE_URL",
-            "STUDIO_CHILD_EVIDENCE_BRIDGE_TOKEN",
-          ])}`,
-        );
-      }
-      if (semanticEvidenceBridge) {
-        const serverPath = this.options.semanticEvidenceMcpServerPath ?? fileURLToPath(
-          new URL("./executor/semanticEvidenceMcpServer.ts", import.meta.url),
-        );
-        args.push(
-          "-c",
-          `mcp_servers.studio_semantic_evidence.command=${tomlString(process.execPath)}`,
-          "-c",
-          `mcp_servers.studio_semantic_evidence.args=${tomlStrings([serverPath])}`,
-          "-c",
-          "mcp_servers.studio_semantic_evidence.required=true",
-          "-c",
-          `mcp_servers.studio_semantic_evidence.enabled_tools=${tomlStrings([semanticEvidenceBridge.manifest.tool.name])}`,
-          "-c",
-          "mcp_servers.studio_semantic_evidence.startup_timeout_sec=5",
-          "-c",
-          `mcp_servers.studio_semantic_evidence.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
-          "-c",
-          `mcp_servers.studio_semantic_evidence.env_vars=${tomlStrings([
-            "STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_URL",
-            "STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_TOKEN",
-          ])}`,
-        );
-      }
-      if (assessmentBridge) {
-        const serverPath = this.options.assessmentMcpServerPath ?? fileURLToPath(
-          new URL("./executor/evidenceAssessmentMcpServer.ts", import.meta.url),
-        );
-        args.push(
-          "-c",
-          `mcp_servers.studio_evidence_assessment.command=${tomlString(process.execPath)}`,
-          "-c",
-          `mcp_servers.studio_evidence_assessment.args=${tomlStrings([serverPath])}`,
-          "-c",
-          "mcp_servers.studio_evidence_assessment.required=true",
-          "-c",
-          `mcp_servers.studio_evidence_assessment.enabled_tools=${tomlStrings([assessmentBridge.manifest.tool.name])}`,
-          "-c",
-          "mcp_servers.studio_evidence_assessment.startup_timeout_sec=5",
-          "-c",
-          `mcp_servers.studio_evidence_assessment.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
-          "-c",
-          `mcp_servers.studio_evidence_assessment.env_vars=${tomlStrings([
-            "STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_URL",
-            "STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_TOKEN",
-          ])}`,
-        );
-      }
-      if (decisionBridge) {
-        const serverPath = this.options.decisionMcpServerPath ?? fileURLToPath(
-          new URL("./executor/evidenceDecisionMcpServer.ts", import.meta.url),
-        );
-        args.push(
-          "-c",
-          `mcp_servers.studio_evidence_decision.command=${tomlString(process.execPath)}`,
-          "-c",
-          `mcp_servers.studio_evidence_decision.args=${tomlStrings([serverPath])}`,
-          "-c",
-          "mcp_servers.studio_evidence_decision.required=true",
-          "-c",
-          `mcp_servers.studio_evidence_decision.enabled_tools=${tomlStrings([decisionBridge.manifest.tool.name])}`,
-          "-c",
-          "mcp_servers.studio_evidence_decision.startup_timeout_sec=5",
-          "-c",
-          `mcp_servers.studio_evidence_decision.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, this.options.maximumWallMs) / 1_000))}`,
-          "-c",
-          `mcp_servers.studio_evidence_decision.env_vars=${tomlStrings([
-            "STUDIO_CHILD_EVIDENCE_DECISION_BRIDGE_URL",
-            "STUDIO_CHILD_EVIDENCE_DECISION_BRIDGE_TOKEN",
-          ])}`,
-        );
-      }
+      configureLauncherChildCapabilityMcp(args, task, this.options, childCapabilities);
       args.push("--output-schema", schemaPath);
       if (this.options.model) args.push("--model", this.options.model);
       args.push("-");
@@ -544,29 +268,7 @@ export class CodexExecWorkerLauncher {
         args: this.commandArgs(args),
         cwd: directory,
         stdin: workerPrompt(task),
-        env: mediaBridge || semanticEvidenceBridge || evidenceBridge || assessmentBridge || decisionBridge ? {
-          ...process.env,
-          ...(mediaBridge ? {
-            STUDIO_CHILD_MEDIA_BRIDGE_URL: mediaBridge.endpoint,
-            STUDIO_CHILD_MEDIA_BRIDGE_TOKEN: mediaBridge.token,
-          } : {}),
-          ...(evidenceBridge ? {
-            STUDIO_CHILD_EVIDENCE_BRIDGE_URL: evidenceBridge.endpoint,
-            STUDIO_CHILD_EVIDENCE_BRIDGE_TOKEN: evidenceBridge.token,
-          } : {}),
-          ...(semanticEvidenceBridge ? {
-            STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_URL: semanticEvidenceBridge.endpoint,
-            STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_TOKEN: semanticEvidenceBridge.token,
-          } : {}),
-          ...(assessmentBridge ? {
-            STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_URL: assessmentBridge.endpoint,
-            STUDIO_CHILD_EVIDENCE_ASSESSMENT_BRIDGE_TOKEN: assessmentBridge.token,
-          } : {}),
-          ...(decisionBridge ? {
-            STUDIO_CHILD_EVIDENCE_DECISION_BRIDGE_URL: decisionBridge.endpoint,
-            STUDIO_CHILD_EVIDENCE_DECISION_BRIDGE_TOKEN: decisionBridge.token,
-          } : {}),
-        } : process.env,
+        env: launcherChildCapabilityEnvironment(childCapabilities),
         timeoutMs: Math.min(task.budget.wallMs, this.options.maximumWallMs),
         maxStdoutBytes: this.options.maxStdoutBytes,
         maxStderrBytes: this.options.maxStderrBytes,
@@ -584,7 +286,16 @@ export class CodexExecWorkerLauncher {
         );
       }
       const parsed = parseCodexEvents(processResult.stdout);
-      usage = await this.recordUsage(executionId, task, version, parsed.usageEvent, parsed.rawUsageEvent);
+      usage = await recordCodexModelUsage({
+        artifacts: this.artifacts,
+        ledger: this.ledger,
+        executionId,
+        task,
+        version,
+        model: this.options.model ?? null,
+        usageEvent: parsed.usageEvent,
+        rawUsageEvent: parsed.rawUsageEvent,
+      });
       if (mediaCapabilities.some((capability) =>
         !Object.values(this.ledger.state().operations).some((operation) =>
           operation.taskId === task.id && operation.capability === capability && operation.status === "completed"))) {
@@ -666,7 +377,7 @@ export class CodexExecWorkerLauncher {
       );
       const endedAt = this.options.now().toISOString();
       const durationMs = Math.max(0, Math.round(this.options.monotonicNow() - monotonicStart));
-      const span = this.spanReceipt({
+      const span = codexExecutorSpanReceipt({
         executionId,
         task,
         version,
@@ -725,7 +436,7 @@ export class CodexExecWorkerLauncher {
         const endedAt = this.options.now().toISOString();
         const durationMs = Math.max(0, Math.round(this.options.monotonicNow() - monotonicStart));
         const failure = error instanceof LauncherFailure ? error.safeReason : "Codex executor could not be started.";
-        const span = this.spanReceipt({
+        const span = codexExecutorSpanReceipt({
           executionId,
           task,
           version,
@@ -750,11 +461,7 @@ export class CodexExecWorkerLauncher {
       }
       throw error;
     } finally {
-      if (mediaBridge) await mediaBridge.close();
-      if (semanticEvidenceBridge) await semanticEvidenceBridge.close();
-      if (evidenceBridge) await evidenceBridge.close();
-      if (assessmentBridge) await assessmentBridge.close();
-      if (decisionBridge) await decisionBridge.close();
+      await closeLauncherChildCapabilityBridges(childCapabilities);
       await rm(directory, { recursive: true, force: true });
     }
   }

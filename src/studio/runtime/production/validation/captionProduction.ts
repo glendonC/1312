@@ -7,6 +7,7 @@ import type {
   CaptionProductionStatus,
   CaptionStudyIdentity,
   CaptionLineCausalityV3,
+  CaptionLineCausalityV4,
   GeneralizedCoverageState,
 } from "../model.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "../model.ts";
@@ -157,10 +158,10 @@ export function validateCaptionProductionInput(value: unknown, context: string, 
   };
 }
 
-function validateGeneralizedCausality(value: unknown, context: string, path: string): CaptionLineCausalityV3 {
+function validateGeneralizedCausality(value: unknown, context: string, path: string, version: 3 | 4): CaptionLineCausalityV3 | CaptionLineCausalityV4 {
   const item = object(value, context, path);
   exact(item, ["schema", "range", "source", "target", "lineage"], context, path);
-  literal(item.schema, "studio.caption-line-causality.v3", context, `${path}.schema`);
+  literal(item.schema, version === 4 ? "studio.caption-line-causality.v4" : "studio.caption-line-causality.v3", context, `${path}.schema`);
   const range = object(item.range, context, `${path}.range`);
   exact(range, ["artifactId", "trackId", "startMs", "endMs"], context, `${path}.range`);
   const parsedRange = {
@@ -186,7 +187,7 @@ function validateGeneralizedCausality(value: unknown, context: string, path: str
   const target = parseText(item.target, "en", `${path}.target`);
   if (source.state !== target.state || source.reasonCode !== target.reasonCode) fail(context, path, "source and target generalized authority must agree");
   const lineage = object(item.lineage, context, `${path}.lineage`);
-  exact(lineage, ["study", "readiness", "coverageId", "coverageState", "preservedStates", "claimIds", "citationIds"], context, `${path}.lineage`);
+  exact(lineage, ["study", "readiness", "coverageId", "coverageState", "preservedStates", "claimIds", "citationIds", ...(version === 4 ? ["passIds"] : [])], context, `${path}.lineage`);
   const study = object(lineage.study, context, `${path}.lineage.study`);
   exact(study, ["studyId", "artifactId", "contentId", "bytes", "schema"], context, `${path}.lineage.study`);
   const readiness = object(lineage.readiness, context, `${path}.lineage.readiness`);
@@ -197,21 +198,14 @@ function validateGeneralizedCausality(value: unknown, context: string, path: str
     oneOf<GeneralizedCoverageState>(state, states, context, `${path}.lineage.preservedStates[${index}]`));
   const claimIds = array(lineage.claimIds, context, `${path}.lineage.claimIds`).map((id, index) => stableIdentity(id, context, `${path}.lineage.claimIds[${index}]`));
   const citationIds = array(lineage.citationIds, context, `${path}.lineage.citationIds`).map((id, index) => stableIdentity(id, context, `${path}.lineage.citationIds[${index}]`));
+  const passIds = version === 4 ? array(lineage.passIds, context, `${path}.lineage.passIds`).map((id, index) => stableIdentity(id, context, `${path}.lineage.passIds[${index}]`)) : [];
   if (source.state === "available" && (coverageState !== "supported" || claimIds.length === 0 || citationIds.length === 0)) fail(context, path, "available generalized text requires supported speech causality");
   if (source.state === "withheld" && (claimIds.length !== 0 || citationIds.length !== 0)) fail(context, path, "withheld generalized text cannot retain claim authority");
-  return {
-    schema: "studio.caption-line-causality.v3",
+  const common = {
     range: parsedRange,
     source,
     target,
     lineage: {
-      study: {
-        studyId: stableIdentity(study.studyId, context, `${path}.lineage.study.studyId`),
-        artifactId: stableIdentity(study.artifactId, context, `${path}.lineage.study.artifactId`),
-        contentId: contentId(study.contentId, context, `${path}.lineage.study.contentId`),
-        bytes: integer(study.bytes, context, `${path}.lineage.study.bytes`, 1),
-        schema: literal(study.schema, "studio.owned-media-study.v2", context, `${path}.lineage.study.schema`),
-      },
       readiness: {
         readinessId: stableIdentity(readiness.readinessId, context, `${path}.lineage.readiness.readinessId`),
         receiptId: stableIdentity(readiness.receiptId, context, `${path}.lineage.readiness.receiptId`),
@@ -224,13 +218,42 @@ function validateGeneralizedCausality(value: unknown, context: string, path: str
       citationIds,
     },
   };
+  if (version === 4) return {
+    schema: "studio.caption-line-causality.v4",
+    ...common,
+    lineage: {
+      study: {
+        studyId: stableIdentity(study.studyId, context, `${path}.lineage.study.studyId`),
+        artifactId: stableIdentity(study.artifactId, context, `${path}.lineage.study.artifactId`),
+        contentId: contentId(study.contentId, context, `${path}.lineage.study.contentId`),
+        bytes: integer(study.bytes, context, `${path}.lineage.study.bytes`, 1),
+        schema: literal(study.schema, "studio.owned-media-study.v3", context, `${path}.lineage.study.schema`),
+      },
+      ...common.lineage,
+      passIds,
+    },
+  };
+  return {
+    schema: "studio.caption-line-causality.v3",
+    ...common,
+    lineage: {
+      study: {
+        studyId: stableIdentity(study.studyId, context, `${path}.lineage.study.studyId`),
+        artifactId: stableIdentity(study.artifactId, context, `${path}.lineage.study.artifactId`),
+        contentId: contentId(study.contentId, context, `${path}.lineage.study.contentId`),
+        bytes: integer(study.bytes, context, `${path}.lineage.study.bytes`, 1),
+        schema: literal(study.schema, "studio.owned-media-study.v2", context, `${path}.lineage.study.schema`),
+      },
+      ...common.lineage,
+    },
+  };
 }
 
-function validateLine(value: unknown, context: string, path: string, version: 1 | 2 | 3): CaptionProductionLine {
+function validateLine(value: unknown, context: string, path: string, version: 1 | 2 | 3 | 4): CaptionProductionLine {
   const item = object(value, context, path);
   exact(item, ["id", "startMs", "endMs", "lineage", "source", "target"], context, path);
   const lineage = object(item.lineage, context, `${path}.lineage`);
-  exact(lineage, version === 3
+  exact(lineage, version >= 3
     ? ["derivation", "source", "study", "readiness", "approval", "captionExecutor", "generalizedCausality"]
     : ["derivation", "source", "study", "readiness", "approval", "captionExecutor"], context, `${path}.lineage`);
   const lineageSource = object(lineage.source, context, `${path}.lineage.source`);
@@ -259,7 +282,7 @@ function validateLine(value: unknown, context: string, path: string, version: 1 
     ? null
     : oneOf<CaptionProductionLine["source"]["reasonCode"] & string>(
       source.reasonCode,
-      version === 3 ? V3_REASON_CODES : version === 2 ? V2_REASON_CODES : V1_REASON_CODES,
+      version >= 3 ? V3_REASON_CODES : version === 2 ? V2_REASON_CODES : V1_REASON_CODES,
       context,
       `${path}.source.reasonCode`,
     );
@@ -267,7 +290,7 @@ function validateLine(value: unknown, context: string, path: string, version: 1 
     ? null
     : oneOf<CaptionProductionLine["target"]["reasonCode"] & string>(
       target.reasonCode,
-      version === 3 ? V3_REASON_CODES : version === 2 ? V2_REASON_CODES : V1_REASON_CODES,
+      version >= 3 ? V3_REASON_CODES : version === 2 ? V2_REASON_CODES : V1_REASON_CODES,
       context,
       `${path}.target.reasonCode`,
     );
@@ -346,14 +369,14 @@ function validateLine(value: unknown, context: string, path: string, version: 1 
     (coverageState !== "supported" && coverageReason === null) ||
     (expectedStudyReason !== null &&
       (sourceState !== "withheld" || targetState !== "withheld" ||
-        (sourceReason !== expectedStudyReason && (version === 1 || sourceReason !== "not_in_requested_dialogue_scope") && version !== 3) ||
-        (targetReason !== expectedStudyReason && (version === 1 || targetReason !== "not_in_requested_dialogue_scope") && version !== 3) || sourceReason !== targetReason ||
+        (sourceReason !== expectedStudyReason && (version === 1 || sourceReason !== "not_in_requested_dialogue_scope") && version < 3) ||
+        (targetReason !== expectedStudyReason && (version === 1 || targetReason !== "not_in_requested_dialogue_scope") && version < 3) || sourceReason !== targetReason ||
         claimIds.length !== 0 || semanticCitations.length !== 0 || childReports.length !== 0))
   ) fail(context, `${path}.lineage.study`, "does not close supported coverage/citations or a null withheld range");
   const captionExecutor = object(lineage.captionExecutor, context, `${path}.lineage.captionExecutor`);
   exact(captionExecutor, ["jobId", "id", "version", "executionScope", "cognitionClaim"], context, `${path}.lineage.captionExecutor`);
-  const generalizedCausality = version === 3
-    ? validateGeneralizedCausality(lineage.generalizedCausality, context, `${path}.lineage.generalizedCausality`)
+  const generalizedCausality = version >= 3
+    ? validateGeneralizedCausality(lineage.generalizedCausality, context, `${path}.lineage.generalizedCausality`, version === 4 ? 4 : 3)
     : undefined;
   if (generalizedCausality && (
     generalizedCausality.range.startMs !== startMs || generalizedCausality.range.endMs !== endMs ||
@@ -449,11 +472,11 @@ export function validateCaptionProductionArtifact(
 ): CaptionProductionArtifact {
   const item = object(value, context, path);
   exact(item, ["schema", "jobId", "runId", "input", "executor", "lines", "result"], context, path);
-  const schema = oneOf<CaptionProductionArtifact["schema"]>(item.schema, new Set(["studio.caption-production.artifact.v1", "studio.caption-production.artifact.v2", "studio.caption-production.artifact.v3"]), context, `${path}.schema`);
+  const schema = oneOf<CaptionProductionArtifact["schema"]>(item.schema, new Set(["studio.caption-production.artifact.v1", "studio.caption-production.artifact.v2", "studio.caption-production.artifact.v3", "studio.caption-production.artifact.v4"]), context, `${path}.schema`);
   const input = validateCaptionProductionInput(item.input, context, `${path}.input`);
   const executor = validateCaptionExecutorDescriptor(item.executor, context, `${path}.executor`);
   const lines = array(item.lines, context, `${path}.lines`).map((line, index) =>
-    validateLine(line, context, `${path}.lines[${index}]`, schema === "studio.caption-production.artifact.v3" ? 3 : schema === "studio.caption-production.artifact.v2" ? 2 : 1));
+    validateLine(line, context, `${path}.lines[${index}]`, schema === "studio.caption-production.artifact.v4" ? 4 : schema === "studio.caption-production.artifact.v3" ? 3 : schema === "studio.caption-production.artifact.v2" ? 2 : 1));
   if (lines.length > CAPTION_PRODUCTION_LIMITS.maxLines || new Set(lines.map((line) => line.id)).size !== lines.length) {
     fail(context, `${path}.lines`, "exceed the line ceiling or contain duplicate identities");
   }
@@ -522,7 +545,7 @@ export function validateCaptionProductionReceipt(
 ): CaptionProductionReceipt {
   const item = object(value, context, path);
   exact(item, ["schema", "receiptId", "jobId", "authority", "input", "producer", "limits", "result"], context, path);
-  const schema = oneOf<CaptionProductionReceipt["schema"]>(item.schema, new Set(["studio.caption-production.receipt.v1", "studio.caption-production.receipt.v2", "studio.caption-production.receipt.v3"]), context, `${path}.schema`);
+  const schema = oneOf<CaptionProductionReceipt["schema"]>(item.schema, new Set(["studio.caption-production.receipt.v1", "studio.caption-production.receipt.v2", "studio.caption-production.receipt.v3", "studio.caption-production.receipt.v4"]), context, `${path}.schema`);
   const authority = object(item.authority, context, `${path}.authority`);
   exact(authority, ["approval", "verification"], context, `${path}.authority`);
   const verification = object(authority.verification, context, `${path}.authority.verification`);
@@ -534,8 +557,8 @@ export function validateCaptionProductionReceipt(
   const producer = object(item.producer, context, `${path}.producer`);
   exact(producer, ["id", "version", "policy", "executor"], context, `${path}.producer`);
   literal(producer.id, "studio.host-caption-production", context, `${path}.producer.id`);
-  const producerVersion = schema === "studio.caption-production.receipt.v3" ? "3" : schema === "studio.caption-production.receipt.v2" ? "2" : "1";
-  const producerPolicy = schema === "studio.caption-production.receipt.v3" ? "verified_unrevoked_approval_and_generalized_causality_v3_only" : schema === "studio.caption-production.receipt.v2" ? "verified_unrevoked_approval_and_dialogue_scope_only" : "verified_unrevoked_approval_only";
+  const producerVersion = schema === "studio.caption-production.receipt.v4" ? "4" : schema === "studio.caption-production.receipt.v3" ? "3" : schema === "studio.caption-production.receipt.v2" ? "2" : "1";
+  const producerPolicy = schema === "studio.caption-production.receipt.v4" ? "verified_unrevoked_approval_and_restudied_causality_v4_only" : schema === "studio.caption-production.receipt.v3" ? "verified_unrevoked_approval_and_generalized_causality_v3_only" : schema === "studio.caption-production.receipt.v2" ? "verified_unrevoked_approval_and_dialogue_scope_only" : "verified_unrevoked_approval_only";
   literal(producer.version, producerVersion, context, `${path}.producer.version`);
   literal(producer.policy, producerPolicy, context, `${path}.producer.policy`);
   const result = object(item.result, context, `${path}.result`);
@@ -558,7 +581,7 @@ export function validateCaptionProductionReceipt(
     exact(line, [
       "lineId", "startMs", "endMs", "sourceState", "targetState", "reasonCode", "coverageId",
       "coverageState", "claimIds", "semanticEvidenceArtifactIds", "reportArtifactIds",
-      ...(schema === "studio.caption-production.receipt.v3" ? ["generalizedCausality"] : []),
+      ...(schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" ? ["generalizedCausality"] : []),
     ], context, linePath);
     const startMs = integer(line.startMs, context, `${linePath}.startMs`);
     const endMs = integer(line.endMs, context, `${linePath}.endMs`, 1);
@@ -569,13 +592,13 @@ export function validateCaptionProductionReceipt(
       endMs,
       sourceState: oneOf<CaptionProductionLine["source"]["state"]>(line.sourceState, LINE_STATES, context, `${linePath}.sourceState`),
       targetState: oneOf<CaptionProductionLine["target"]["state"]>(line.targetState, LINE_STATES, context, `${linePath}.targetState`),
-      reasonCode: line.reasonCode === null ? null : oneOf<NonNullable<CaptionProductionLine["target"]["reasonCode"]>>(line.reasonCode, schema === "studio.caption-production.receipt.v3" ? V3_REASON_CODES : schema === "studio.caption-production.receipt.v2" ? V2_REASON_CODES : V1_REASON_CODES, context, `${linePath}.reasonCode`),
+      reasonCode: line.reasonCode === null ? null : oneOf<NonNullable<CaptionProductionLine["target"]["reasonCode"]>>(line.reasonCode, schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" ? V3_REASON_CODES : schema === "studio.caption-production.receipt.v2" ? V2_REASON_CODES : V1_REASON_CODES, context, `${linePath}.reasonCode`),
       coverageId: line.coverageId === null ? null : stableIdentity(line.coverageId, context, `${linePath}.coverageId`),
       coverageState: oneOf<CaptionProductionLine["lineage"]["study"]["coverage"]["state"]>(line.coverageState, new Set(["supported", "withheld", "unknown", "failed", "uncovered", "conflict"]), context, `${linePath}.coverageState`),
       claimIds: array(line.claimIds, context, `${linePath}.claimIds`).map((id, claimIndex) => stableIdentity(id, context, `${linePath}.claimIds[${claimIndex}]`)),
       semanticEvidenceArtifactIds: array(line.semanticEvidenceArtifactIds, context, `${linePath}.semanticEvidenceArtifactIds`).map((id, citationIndex) => stableIdentity(id, context, `${linePath}.semanticEvidenceArtifactIds[${citationIndex}]`)),
       reportArtifactIds: array(line.reportArtifactIds, context, `${linePath}.reportArtifactIds`).map((id, reportIndex) => stableIdentity(id, context, `${linePath}.reportArtifactIds[${reportIndex}]`)),
-      ...(schema === "studio.caption-production.receipt.v3" ? { generalizedCausality: validateGeneralizedCausality(line.generalizedCausality, context, `${linePath}.generalizedCausality`) } : {}),
+      ...(schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" ? { generalizedCausality: validateGeneralizedCausality(line.generalizedCausality, context, `${linePath}.generalizedCausality`, schema === "studio.caption-production.receipt.v4" ? 4 : 3) } : {}),
     };
   });
   if (lines.length !== counts.lineCount || new Set(lines.map((line) => line.lineId)).size !== lines.length) {

@@ -5,8 +5,8 @@ import test from "node:test";
 
 import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
-import { GeneralizedStudyReadinessHost } from "../src/studio/runtime/production/study/generalizedStudyReadinessHost.ts";
-import { generalizedReadinessReference } from "../src/studio/runtime/production/study/generalizedStudyRuntime.ts";
+import { RestudiedStudyReadinessHost } from "../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts";
+import { restudiedReadinessReference } from "../src/studio/runtime/production/study/restudiedStudyRuntime.ts";
 import { createProductionAnalysisRequest } from "../src/studio/runtime/production/runStart/analysisRequest.ts";
 import { loadOwnedSourceSession } from "../src/studio/runtime/production/runStart/sourceSessionLoader.ts";
 import {
@@ -18,7 +18,7 @@ import {
 
 const ENABLED = process.env.STUDIO_RUN_REAL_CODEX_SWARM === "1";
 
-test("guarded real Codex root closes the default U3 report-to-readiness spine", {
+test("guarded real Codex root closes the default U4 report-to-readiness spine", {
   skip: !ENABLED,
   timeout: 300_000,
 }, async (context) => {
@@ -87,17 +87,18 @@ test("guarded real Codex root closes the default U3 report-to-readiness spine", 
   const studies = Object.values(state.generalizedOwnedMediaStudies);
   assert.equal(studies.length, 1);
   const study = studies[0];
-  assert.equal(study.schema, "studio.owned-media-study.v2");
+  assert.equal(study.schema, "studio.owned-media-study.v3");
   assert.ok(study.reports.length >= 2);
   assert.ok(rootExecution.receipt.outputArtifactIds.includes(study.artifactId));
   const readiness = Object.values(state.generalizedStudyReadiness);
   assert.equal(readiness.length, 1);
   assert.equal(Object.values(state.publishReviewIntakes)[0].readinessId, readiness[0].id);
   const artifacts = new ContentAddressedArtifactStore(initialized.artifactStoreRoot);
-  const verifiedReadiness = await new GeneralizedStudyReadinessHost(state, artifacts).reopen(
-    generalizedReadinessReference(readiness[0]),
+  assert.equal(readiness[0].schema, "studio.study-readiness.receipt.v4");
+  const verifiedReadiness = await new RestudiedStudyReadinessHost(state, artifacts).reopen(
+    restudiedReadinessReference(readiness[0]),
   );
-  assert.equal(verifiedReadiness.reopenedStudy?.executorReceipt.producer.id, "studio.generalized-study-synthesis");
+  assert.equal(verifiedReadiness.reopenedStudy?.executorReceipt.producer.id, "studio.restudied-study-synthesis");
   assert.equal(verifiedReadiness.reopenedStudy?.envelope.root.executionId, rootExecution.id);
   assert.ok((verifiedReadiness.reopenedStudy?.envelope.reports.length ?? 0) >= 2);
   const replayed = await RuntimeLedger.open(runtimeId, new FileEventJournal(initialized.journalPath));

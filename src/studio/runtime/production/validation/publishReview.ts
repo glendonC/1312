@@ -67,7 +67,7 @@ export function validatePublishReviewIntakeReceipt(
   );
   oneOf(
     verification.producer,
-    new Set(["deterministic_study_readiness_gate_v1", "deterministic_study_readiness_gate_v3"]),
+    new Set(["deterministic_study_readiness_gate_v1", "deterministic_study_readiness_gate_v3", "deterministic_study_readiness_gate_v4"]),
     context,
     `${path}.input.verification.producer`,
   );

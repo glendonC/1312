@@ -34,15 +34,18 @@ be “more agents,” “faster captions,” or “we are a caption app.” It s
 duration truthfully accounted for by evidence that a bounded specialist actually inspected, with weak
 regions restudied or abstained rather than guessed.
 
-The first three implementation slices after the UI demo freeze are now complete: the fail-closed
+The first four implementation slices after the UI demo freeze now include: the fail-closed
 **acoustic triage and non-dialogue coverage boundary**, bounded **frame sampling with real child
-image delivery**, and additive **multimodal admission with generalized abstention**. Their receipts
-prove bounded execution, exact byte lineage, citation association, and state preservation; they do
-not prove producer accuracy, visual understanding, or semantic quality.
+image delivery**, additive **multimodal admission with generalized abstention**, and one
+**attenuated current-run speech re-study** vertical slice. Their receipts prove bounded execution,
+exact byte lineage, citation association, state preservation, and pass accounting; they do not prove
+producer accuracy, visual understanding, improvement, or semantic quality.
 
-U4 budgeted re-study is the next planned media-native boundary. U3 deliberately keeps U2 frame
+U4's first vertical slice is implemented; padded/overlapping audio, denser frames, alternate
+receipted configurations, and granted specialists remain closed until their producers land. U3
+deliberately keeps U2 frame
 identities cite-only, so no visual finding can affect a study until a later receipted producer exists.
-Web research follows admitted frame/audio evidence
+U5 OCR/scene evidence is the next planned media-native boundary. Web research follows admitted frame/audio evidence
 when names, history, or cultural context are outside the file. General computer-use is allowed later
 as a separately granted, isolated, receipted capability for dynamic external context; it is not a
 substitute for decoding and citing the owned video.
@@ -82,8 +85,9 @@ checklist below:
 3. **U3 — multimodal admission and generalized abstention (implemented 2026-07-17):** carry speech,
    acoustic coverage, frame sample identities, and later typed evidence slots through exact citations
    without upgrading weak/conflicting states. Frames remain cite-only.
-4. **U4 — budgeted multi-pass re-study:** request denser evidence, attenuated subranges, changed
-   producer configurations, or follow-up specialists for exact gaps within pass/run budgets.
+4. **U4 — budgeted multi-pass re-study (attenuated-speech slice implemented 2026-07-17):** the
+   default root can request one strict current-run speech subrange for an exact weak range/cause;
+   other typed delta producers fail closed.
 5. **U5 — OCR and scene context:** derive and cite provisional on-screen text/scene evidence from U2
    frames.
 6. **U6 — speaker/overlap evidence:** preserve anonymous turn/overlap hypotheses and use them to
@@ -121,12 +125,12 @@ artifact, grant, and audit boundaries are real.
 | Area | Real now | Not available today | Evidence |
 |---|---|---|---|
 | Owned ingest and preflight | Content-addressed owned bytes, rights receipt, `ffprobe`, pinned VAD speech windows, pinned speech-window language ranges, and additive preflight V4 with separately sealed acoustic observations/receipt | Acoustic accuracy evaluation, speaker/overlap, scene, OCR, and visual context | [`ARCHITECTURE.md` — source ingest boundary](../ARCHITECTURE.md#source-ingest-boundary) and [`STATUS.md` — backlog boundary](./STATUS.md#post-freeze-backlog-boundary) |
-| Orchestration | A model-executed root can request bounded children; the scheduler derives task/agent/grant identities and enforces scope, depth, concurrency, budgets, dependencies, and required outputs. The study root can disposition/read reports, record exact gaps/conflicts, request a causally linked follow-up, and synthesize | Typed requests for denser evidence, pass ceilings/configuration deltas, the new producers below, and unlimited/distributed execution | [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts), [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts), and the closed v2 exit in [`STATUS.md`](./STATUS.md#done) |
+| Orchestration | A model-executed default root can request bounded children and one host-normalized attenuated-speech re-study for an exact weak range/cause. The scheduler derives identities, attenuates context, enforces scope/budgets/pass caps, and dedupes completed work/configuration | Padded audio, denser frames, alternate recognizer/segmentation configurations, specialist re-study, and unlimited/distributed execution | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`scheduler.ts`](../../src/studio/runtime/production/scheduler.ts), and [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts) |
 | Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample` over one video scope with real task-private PNG image delivery, `speech.transcribe`, exact reads of pinned VAD/language receipts and U1 acoustic observations, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Visual interpretation/admission, OCR, scene/shot evidence, speakers/overlap, stems, web research, and computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); the U2 contract and host live in [`model/frames.ts`](../../src/studio/runtime/production/model/frames.ts) and [`frameHost.ts`](../../src/studio/runtime/production/frameHost.ts) |
 | Current-run speech evidence | A scoped host and bridge exist. With an explicitly enabled recognizer they can produce current-run timed hypotheses; the default unconfigured recognizer honestly returns unavailable | Semantic accuracy/calibration, a guarantee that every run has a live recognizer, alternative segmentation/recognizer passes, and semantic translation QC | [`currentRunSpeechRecognizer.ts`](../../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts) and [`run-runtime-host.ts`](../../scripts/run-runtime-host.ts) |
-| Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. The deterministic U3 admission policy re-derives U1 dialogue scope and prevents prose or an available second modality from upgrading a weaker state | U4 pass/exhaustion policy and semantic correctness arbitration | [`generalizedCoveragePolicy.ts`](../../src/studio/runtime/production/admission/generalizedCoveragePolicy.ts), [`model/studyReportsV2.ts`](../../src/studio/runtime/production/model/studyReportsV2.ts), and [`model/studiesV2.ts`](../../src/studio/runtime/production/model/studiesV2.ts) |
+| Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. U4 study v3 retains ordered pass history/disagreement; only pass-new exact speech citations support the executed subrange, and exhaustion stays weak without globally blocking unrelated ranges | Semantic correctness/truth arbitration and additional re-study producers | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`restudiedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/restudiedStudySynthesisHost.ts), and [`restudiedStudyReadinessHost.ts`](../../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts) |
 | Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks only for a frame-granted child. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Receipted research, visual evidence admission/interpretation, and isolated computer-use. These are permitted future capabilities only through new explicit grants | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`frameMcpServer.ts`](../../src/studio/runtime/production/executor/frameMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
-| Owned study spine | New owned runs default to the content-addressed U3 spine: evidence-citation v1, study-report v2, parent admission/read v2, owned-media-study v2, readiness v3, and approval-gated caption/caption-causality v3. Closed v1 receipts remain intact behind an explicit compatibility selector | Studio UI projection, semantic correctness/truth arbitration, U4 re-study, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`generalizedEvidenceAdmissionHost.ts`](../../src/studio/runtime/production/admission/generalizedEvidenceAdmissionHost.ts), and [`generalizedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/generalizedStudySynthesisHost.ts) |
+| Owned study spine | New owned runs default to evidence-citation v1, report/admission/read v2, the six-tool U4 root, owned-media-study v3, readiness v4, and approval-gated caption/caption-causality v4. Closed v1 planning remains an explicit non-default compatibility selector | Studio UI projection, semantic correctness/truth arbitration, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`orchestratorBridge.ts`](../../src/studio/runtime/production/executor/orchestratorBridge.ts), and [`restudiedStudyRuntime.ts`](../../src/studio/runtime/production/study/restudiedStudyRuntime.ts) |
 | Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen and the human-labeled `run-007` Bet G score exists with `judge: null` | Runtime semantic QC, calibrated transcription/translation confidence, additional scored runs and registered ablations, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
 
@@ -276,34 +280,41 @@ their audits.
   which observation supports which claim. “Several agents agree” is not independent evidence when
   they consumed the same hypothesis.
 - **Existing-spine dependency:** The completed report → admission/read → synthesis → readiness →
-  approval-gated caption lineage. The default U3 root intentionally omits planning/follow-up tools;
-  this is a contract cutover, not U4 or a new swarm campaign.
+  approval-gated caption lineage. U4 reuses report/admission v2 additively; it does not revive or
+  mutate the non-default v1 planning/follow-up events.
 
-### U4. Budgeted multi-pass re-study
+### U4. Budgeted multi-pass re-study — attenuated current-run speech slice implemented
 
-- **Real:** Tasks have media scopes and tool/wall budgets; the model root receives exact coverage
-  gaps/conflicts, may request causally linked follow-up tasks, and the scheduler enforces scope,
-  depth, concurrency, run budget, dependencies, and deduplication.
-- **Missing:** No typed “evidence density” request, per-range pass ledger, required configuration
-  delta, or policy for smaller overlapping windows, denser frames, alternate segmentation/recognizer,
-  and specialist escalation. A fluent one-shot report can still hide that it made no new observation.
-- **Done when:** A report or planning decision can identify an exact weak range and request one bounded
-  next pass: attenuated subranges, overlapping/padded audio windows, denser frame timestamps, an
-  alternate receipted segmentation/recognizer configuration, or a relevant acoustic/visual/speaker/
-  context specialist. The host records prior evidence, cause, requested delta, pass number, reserved
-  and measured spend, and terminal outcome. The scheduler caps passes per range and per producer,
-  rejects identical work/configurations, and prevents scope broadening. Synthesis retains every pass
-  and disagreement rather than silently replacing history. The range becomes supported only through
-  new citations; otherwise it terminates unknown/withheld/unavailable when the budget is exhausted.
-  “Hard/rapid” must be tied to evidence such as overlap, dense turns, truncation, recognizer
-  disagreement, or an exact failed range—not a role label.
+- **Real:** `study_restudy_request` is an additive sixth tool on the default generalized root. Its
+  host-derived input contains exact weak coverage, prior report/admission/citation/speech identities,
+  raw states, and an evidence-tied cause. The landed producer accepts only a strict attenuated
+  subrange already covered by broader current-run speech work; the host fixes pass 2, configuration
+  scope, a 20 s/one-call reservation, and the v2 child contract. The scheduler caps accepted passes
+  at one per range and four per producer, rejects a concurrent identical fingerprint, prevents scope
+  broadening, and attenuates task context. Request/terminal receipts and the projection retain prior
+  evidence, cause, delta, pass number, reserved/measured spend, terminal outcome, and disagreement.
+  `studio.owned-media-study.v3` retains every admitted report and accepted terminal pass in order.
+  Only pass-new range-closing current-run speech citations may support the executed cell; residual or
+  exhausted cells remain weak while unrelated supported coverage continues. Readiness v4 and
+  caption/caption-causality v4 retain pass/terminal-weak identities. The default path exercises this;
+  `studyContractVersion: "v1"` remains non-default.
+- **Still missing:** Padded/overlapping audio, denser frame timestamps, alternate receipted
+  segmentation/recognizer configurations, and acoustic/visual/speaker/context specialists have typed
+  request members but no registered U4 producer/grant, so they fail closed. Pass 3+, semantic
+  correctness arbitration, visual findings, and UI projection are not implemented.
+- **Implemented proof:** Default-path tests cover exact cause/range selection, unregistered-delta and
+  unchanged-range rejection, concurrent fingerprint dedupe, fixed reservation plus measured spend,
+  citation-only subrange support with weak residuals, terminal exhaustion that does not block an
+  unrelated supported range, ordered pass/report replay, and disagreement retained without support.
+  “Hard/rapid” is represented only by evidence states such as truncation, disagreement, or an exact
+  failed/weak range; worker labels create no authority.
 - **Non-goals:** Unlimited retries, transparent model-turn continuation, best-of-K cherry-picking,
   repeatedly asking the same model, or blocking the whole run because one range remains unknown.
 - **Fake-claim risk:** More passes, more tokens, or more agents do not equal better understanding.
   Without an exact evidence/configuration delta, multi-pass is repeated guessing.
-- **Existing-spine dependency:** Existing gap/conflict planning and follow-up causation, scheduler
-  limits, task context attenuation, typed reports, observability, and U3 abstention. It exercises the
-  closed spine with new evidence requests rather than rewriting it.
+- **Existing-spine dependency:** U3 report/admission/citation rules, scheduler limits, task-context
+  attenuation, observability, and abstention. It extends the closed spine with new evidence requests
+  and pass events rather than reusing v1 planning or replacing history.
 
 ### U5. OCR and scene/on-screen context
 
@@ -450,9 +461,10 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    cite-only frame identities pass through report admission/read, synthesis, readiness, caption
    causality, and cold replay. Every weak/conflicting/out-of-scope state and all v1 artifacts are
    preserved. No observation-correctness or visual-understanding claim is made.
-4. **Budgeted multi-pass re-study.** Add one exact gap-to-next-pass contract, per-range pass ledger,
-   configuration-delta/dedupe rule, and terminal abstention on budget exhaustion. Prove one hard range
-   can narrow into subranges or denser evidence without widening scope or repeating identical work.
+4. **Budgeted multi-pass re-study — attenuated-speech slice implemented 2026-07-17.** One exact
+   weak-range/cause contract, per-range pass ledger, fixed delta/configuration, scheduler caps/dedupe,
+   citation-only support, disagreement retention, and terminal exhaustion are wired on the default
+   path. Denser frames, padded audio, alternate configurations, and specialists remain closed.
 5. **OCR/scene evidence.** Add a pinned bounded producer over U2 frames and route one genuinely visual
    gap to one granted specialist. Admit provisional findings through U3; use U4 or abstain when weak.
 6. **Speaker/overlap evidence.** Add anonymous diarization/overlap hypotheses and one overlap-driven
@@ -486,8 +498,9 @@ downstream Apply outputs, not the product category.
 > 1321 has a bounded, local study-first path for owned media on the Korean→English beachhead. An
 > explicitly configured model root can request scoped coverage workers; the scheduler grants only the
 > tools and media ranges each task needs. When the current-run recognizer is explicitly enabled,
-> workers can cite its timed hypotheses in typed coverage reports; the root can admit reports, plan
-> exact gap/conflict follow-up, and synthesize a study whose verified readiness and human approval
+> workers can cite its timed hypotheses in typed coverage reports; the default root can admit reports,
+> request one bounded attenuated speech pass for an exact weak range/cause, and synthesize a study
+> that retains pass history and terminal weakness. Verified readiness and human approval
 > gate private post-study text artifacts and structural QC. Every stage preserves source, task,
 > evidence, report, study, approval, artifact, and QC lineage. This is preprocess understanding, not
 > a live-translate product.
@@ -495,8 +508,10 @@ downstream Apply outputs, not the product category.
 It is also honest to say:
 
 - the owned-path v2 runtime campaign is implemented and closed;
-- the orchestrator chooses bounded decomposition and gap-driven follow-up within the currently
-  grantable tool set;
+- the default orchestrator chooses bounded decomposition; the explicit v1 compatibility root retains
+  its closed gap-driven follow-up path;
+- the default root can request one host-normalized attenuated current-run speech pass; identical
+  work/configuration, unchanged/broadened scope, and unregistered delta producers fail closed;
 - workers use real receipted operations when those operations are granted and configured;
 - a missing/unconfigured recognizer is recorded as unavailable rather than replaced by fixture
   evidence;
@@ -509,8 +524,9 @@ It is also honest to say:
 The following sequenced backlog items are not current product claims:
 
 - end-to-end visual/audio understanding of the whole video;
-- accuracy or semantic-understanding claims for acoustic classification or sampled frames; dense
-  budgeted re-study, OCR, scene context, speaker/overlap understanding, or source separation;
+- accuracy or semantic-understanding claims for acoustic classification, sampled frames, or the U4
+  speech pass; padded/denser/alternate/specialist re-study, OCR, scene context, speaker/overlap
+  understanding, or source separation;
 - web research, historical/cultural grounding, live source citations, or bounded computer-use;
 - semantic per-run QC, calibrated quality, a model judge as truth, or a general “better than cold”
   claim.

@@ -14,8 +14,10 @@ import type {
   StudyReportSubmissionBindingV2,
 } from "../model.ts";
 import { STUDY_REPORT_V2_LIMITS } from "../model.ts";
-import { validateSupportedClaimCitationClosure } from "../evidenceCitations/audit.ts";
-import { validateEvidenceCitationEnvelope } from "./evidenceCitations.ts";
+import {
+  validateEvidenceCitationEnvelope,
+  validateSupportedClaimCitationClosure,
+} from "./evidenceCitations.ts";
 import {
   array,
   contentId,

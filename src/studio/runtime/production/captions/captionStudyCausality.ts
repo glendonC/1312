@@ -2,6 +2,7 @@ import { canonicalSha256 } from "../artifactStore.ts";
 import type { VerifiedOwnedMediaStudy } from "../study/studySynthesisAudit.ts";
 import type {
   CaptionLineCausalityV3,
+  CaptionLineCausalityV4,
   CaptionLineReasonCode,
   CaptionLineStudySupport,
   CaptionProductionLine,
@@ -11,6 +12,7 @@ import type {
   RuntimeProjection,
 } from "../model.ts";
 import type { GeneralizedStudySynthesisResult } from "../study/generalizedStudySynthesisHost.ts";
+import type { RestudiedStudySynthesisResult } from "../study/restudiedStudySynthesisHost.ts";
 import type { DialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.ts";
 import { rangeOverlapsNonDialogue } from "../../../acoustic/dialogueScopePolicy.ts";
 
@@ -34,7 +36,10 @@ export function captionStudyIdentity(study: VerifiedOwnedMediaStudy): CaptionStu
   };
 }
 
-export function generalizedCaptionStudyIdentity(study: GeneralizedStudySynthesisResult): CaptionStudyIdentity {
+type GeneralizedStudyResult = GeneralizedStudySynthesisResult | RestudiedStudySynthesisResult;
+type GeneralizedCausality = CaptionLineCausalityV3 | CaptionLineCausalityV4;
+
+export function generalizedCaptionStudyIdentity(study: GeneralizedStudyResult): CaptionStudyIdentity {
   return {
     studyId: study.study.studyId,
     artifactId: study.study.artifactId,
@@ -46,8 +51,8 @@ export function generalizedCaptionStudyIdentity(study: GeneralizedStudySynthesis
 
 function generalizedSupport(
   state: RuntimeProjection,
-  study: GeneralizedStudySynthesisResult,
-  causality: CaptionLineCausalityV3,
+  study: GeneralizedStudyResult,
+  causality: GeneralizedCausality,
 ): CaptionLineStudySupport {
   const coverage = causality.lineage.coverageId
     ? study.envelope.coverage.find((entry) => entry.coverageId === causality.lineage.coverageId)
@@ -120,9 +125,9 @@ function generalizedSupport(
 export function closeGeneralizedCaptionLineCausality(input: {
   line: Omit<CaptionProductionLine, "lineage">;
   state: RuntimeProjection;
-  study: GeneralizedStudySynthesisResult;
+  study: GeneralizedStudyResult;
   studyIdentity: CaptionStudyIdentity;
-  causality: CaptionLineCausalityV3;
+  causality: GeneralizedCausality;
   readiness: StudyReadinessReceiptIdentity;
   approval: PublishReviewDecisionReceiptIdentity;
   source: { artifactId: string; contentId: string };

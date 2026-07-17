@@ -25,6 +25,7 @@ import { BoundedReportHost } from "../study/reportHost.ts";
 import { PublishReviewIntakeHost } from "../review/publishReviewIntakeHost.ts";
 import { StudyReadinessHost } from "../study/studyReadinessHost.ts";
 import { recordGeneralizedReadiness } from "../study/generalizedStudyRuntime.ts";
+import { recordRestudiedReadiness } from "../study/restudiedStudyRuntime.ts";
 import { createRuntimeStart } from "../runStart/runtimeStart.ts";
 import { writeRuntimeStartReceipt } from "../runStart/receiptWriter.ts";
 import { BoundedRuntimeScheduler } from "../scheduler.ts";
@@ -36,7 +37,7 @@ export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 2,
   maxActiveWorkers: 4,
   runBudget: { wallMs: 240_000, toolCalls: 32 },
-  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.synthesize"],
+  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.restudy", "study.synthesize"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {
@@ -79,7 +80,7 @@ export type BoundedOrchestratorLauncherFactory = (
   context: BoundedOrchestratorLauncherContext,
 ) => BoundedOrchestratorLauncher;
 
-/** V1 is retained only for explicit historical fixture/replay compatibility. New owned runs use v2. */
+/** V1 is retained only for explicit historical fixture/replay compatibility. New owned runs use the v2 report/admission spine and v3 terminal study. */
 export type StudyContractVersion = "v1" | "v2";
 
 export function codexWorkerLauncherFactory(
@@ -193,16 +194,16 @@ export async function runBoundedRuntimeApplication(
   const rootPermit = await scheduler.createRoot({
     workloadKey: `root:${initialized.runStart.runtimeId}`,
     objective: generalized
-      ? `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing authorized ranges yourself, then wait for every accepted child. Each accepted child must require exactly one studio.study-report.v2 and use current-run speech as the only claim-support kind. Admit and read every accepted report, then emit exactly one studio.owned-media-study.v2 by copying the host-derived synthesis input without upgrading weak, absent, conflicting, or not-in-scope states. Acoustic evidence may qualify coverage and frames remain cite-only; neither authorizes dialogue text. This U3 root has no U4 planning or follow-up authority. Wiring and citation closure do not prove correctness, understanding, quality, or publication readiness.`
+      ? `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing authorized ranges yourself, then wait for every accepted child. Each accepted child must require exactly one studio.study-report.v2 and use current-run speech as the only claim-support kind. Admit and read every accepted report. For an exact host-derived weak range, you may request one strict attenuated current-run speech subrange with a required delta; the host fixes its pass, configuration scope, budget, and child contract, rejects identical work or scope broadening, and terminates exhaustion weak without blocking unrelated ranges. Admit/read any accepted pass report, then emit exactly one studio.owned-media-study.v3 by copying the host-derived synthesis input with every pass, prior weak state, disagreement, residual weak cell, and citation retained. Support requires pass-new range-closing speech citations. Acoustic evidence may qualify coverage and frames remain cite-only; neither authorizes dialogue text. More passes, tokens, agents, or labels do not prove correctness, understanding, quality, or publication readiness.`
       : `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing disjoint or overlapping authorized ranges yourself, then wait for every accepted child. ` +
         "Each accepted child contract must request speech.transcribe and report.submit, require exactly one studio.study-report.v1 output, partition its entire assigned scope with closed supported/withheld/unknown/failed states, and cite only current-run semantic observations for supported claims. After reading at least two model-dispositioned admissions, choose a closed plan, request causally named bounded follow-up when useful, and eventually emit one model-authored studio.owned-media-study.v1 with exact report/semantic citations and every gap/conflict preserved. Coverage and citation closure are structural facts, not correctness, understanding, agreement, truth arbitration, readiness, caption authority, quality, or publication.",
     workerKind: "orchestrator",
     workerLabel: "local-orchestrator",
     mediaScope,
     inputArtifactIds: [initialized.sourceArtifact.id, ...initialized.evidenceArtifacts.map((artifact) => artifact.id)],
-    requiredOutputs: [{ name: "owned-media study", artifactKind: generalized ? "studio.owned-media-study.v2" : "studio.owned-media-study.v1", required: true }],
+    requiredOutputs: [{ name: "owned-media study", artifactKind: generalized ? "studio.owned-media-study.v3" : "studio.owned-media-study.v1", required: true }],
     requiredCapabilities: generalized
-      ? ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.synthesize"]
+      ? ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.restudy", "study.synthesize"]
       : ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.plan", "study.synthesize"],
     dependencies: [],
     // Nine calls close the minimum two-child study path; reserve bounded headroom for
@@ -248,8 +249,13 @@ export async function runBoundedRuntimeApplication(
       ? Object.values(ledger.state().generalizedOwnedMediaStudies).filter((study) => study.rootTaskId === rootPermit.taskId)
       : Object.values(ledger.state().ownedMediaStudies).filter((study) => study.rootTaskId === rootPermit.taskId);
     if (studies.length !== 1) throw new Error("The model root did not close exactly one version-selected owned-media study");
+    const generalizedStudy = generalized ? ledger.state().generalizedOwnedMediaStudies[studies[0].id] : null;
     const readiness = generalized
-      ? await recordGeneralizedReadiness({ ledger, artifacts, study: ledger.state().generalizedOwnedMediaStudies[studies[0].id] })
+      ? generalizedStudy?.schema === "studio.owned-media-study.v3"
+        ? await recordRestudiedReadiness({ ledger, artifacts, study: generalizedStudy })
+        : generalizedStudy?.schema === "studio.owned-media-study.v2"
+          ? await recordGeneralizedReadiness({ ledger, artifacts, study: generalizedStudy })
+          : (() => { throw new Error("The default generalized root did not close a typed owned-media study"); })()
       : await new StudyReadinessHost(ledger, artifacts).audit(studies[0].id);
     await new PublishReviewIntakeHost(ledger, artifacts).create({
       readiness: {

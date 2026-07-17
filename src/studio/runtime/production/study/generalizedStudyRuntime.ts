@@ -236,6 +236,6 @@ export async function reopenGeneralizedReadiness(
   readinessId: string,
 ): Promise<GeneralizedReadinessV3Result> {
   const record = ledger.state().generalizedStudyReadiness[readinessId];
-  if (!record) throw new Error("Generalized readiness identity is not recorded in this runtime");
+  if (!record || record.schema !== "studio.study-readiness.receipt.v3") throw new Error("Generalized readiness v3 identity is not recorded in this runtime");
   return new GeneralizedStudyReadinessHost(ledger.state(), artifacts).reopen(generalizedReadinessReference(record));
 }

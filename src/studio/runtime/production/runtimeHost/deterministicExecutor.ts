@@ -115,6 +115,7 @@ export interface DeterministicExecutorOptions {
   mode?: DeterministicExecutionMode;
   control?: DeterministicExecutionControl;
   now?: () => Date;
+  restudyPassResult?: "supported" | "withheld";
 }
 
 class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
@@ -240,7 +241,8 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       const verifiedSemantic = await reopenSemanticEvidence(ledger.state(), artifacts, semanticResult.operationId);
       const citation = semanticEvidenceCitation(verifiedSemantic);
       const claimId = `claim:deterministic:${canonicalSha256({ taskId: task.id, scope, observationIds: citation.observations.map((entry) => entry.observationId) })}`;
-      const preservesGap = task.workerLabel.includes("study-gap");
+      const preservesGap = task.workerLabel.includes("study-gap") ||
+        (task.workerLabel === "attenuated-current-run-speech-pass-2" && this.owner.restudyPassResult === "withheld");
       const worker = validateWorkerResult({
         summary: "Deterministic test seam returned one typed current-run hypothesis report; correctness and quality were not assessed.",
         semanticEvidenceInputs: [citation],
@@ -456,12 +458,14 @@ export class DeterministicRuntimeExecutor {
   readonly mode: DeterministicExecutionMode;
   readonly control: DeterministicExecutionControl;
   readonly now: () => Date;
+  readonly restudyPassResult: "supported" | "withheld";
   launchInvocations = 0;
 
   constructor(options: DeterministicExecutorOptions = {}) {
     this.mode = options.mode ?? "completed";
     this.control = options.control ?? new DeterministicExecutionControl();
     this.now = options.now ?? (() => new Date());
+    this.restudyPassResult = options.restudyPassResult ?? "supported";
   }
 
   factory(): BoundedWorkerLauncherFactory {

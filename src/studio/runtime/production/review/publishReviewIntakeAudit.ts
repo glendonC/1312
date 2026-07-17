@@ -16,6 +16,8 @@ import type { RuntimeEvent } from "../protocol.ts";
 import { reopenStudyReadiness } from "../study/studyReadinessAudit.ts";
 import { GeneralizedStudyReadinessHost } from "../study/generalizedStudyReadinessHost.ts";
 import { generalizedReadinessReference } from "../study/generalizedStudyRuntime.ts";
+import { RestudiedStudyReadinessHost } from "../study/restudiedStudyReadinessHost.ts";
+import { restudiedReadinessReference } from "../study/restudiedStudyRuntime.ts";
 import { validatePublishReviewIntakeReceipt } from "../validation/publishReview.ts";
 
 const MAX_STORED_PUBLISH_REVIEW_INTAKE_BYTES = 64 * 1024;
@@ -139,7 +141,9 @@ export async function reopenPublishReviewIntakes(
 
     const generalized = state.generalizedStudyReadiness[identity.readinessId];
     const readiness = generalized
-      ? await new GeneralizedStudyReadinessHost(state, artifacts).reopen(generalizedReadinessReference(generalized))
+      ? generalized.schema === "studio.study-readiness.receipt.v4"
+        ? await new RestudiedStudyReadinessHost(state, artifacts).reopen(restudiedReadinessReference(generalized))
+        : await new GeneralizedStudyReadinessHost(state, artifacts).reopen(generalizedReadinessReference(generalized))
       : await reopenStudyReadiness(state, artifacts, identity.readinessId);
     const readinessArtifactId = generalized ? generalized.artifactId : state.studyReadiness[identity.readinessId]?.artifactId;
     if (
@@ -151,7 +155,7 @@ export async function reopenPublishReviewIntakes(
     const expectedOutcome = readiness.receipt.result.outcome === "proceed_to_caption_review" ? "queued" : "rejected";
     if (
       receipt.input.verification.integrity !== "stored_study_readiness_and_recursive_inputs_verified" ||
-      receipt.input.verification.producer !== (generalized ? "deterministic_study_readiness_gate_v3" : "deterministic_study_readiness_gate_v1") ||
+      receipt.input.verification.producer !== (generalized ? generalized.schema === "studio.study-readiness.receipt.v4" ? "deterministic_study_readiness_gate_v4" : "deterministic_study_readiness_gate_v3" : "deterministic_study_readiness_gate_v1") ||
       receipt.result.outcome !== expectedOutcome ||
       receipt.result.outcome !== intake.outcome ||
       !sameCanonical(receipt.result.reasonCodes, readiness.receipt.result.reasonCodes) ||

@@ -14,4 +14,5 @@ export * from "./model/studyReports.ts";
 export * from "./model/studyReportsV2.ts";
 export * from "./model/studies.ts";
 export * from "./model/studiesV2.ts";
+export * from "./model/studiesV3.ts";
 export * from "./model/tasks.ts";

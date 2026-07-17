@@ -6,12 +6,15 @@ import type {
   OwnedMediaStudyExecutorReceipt,
   OwnedMediaStudyArtifactV2,
   OwnedMediaStudyExecutorReceiptV2,
+  OwnedMediaStudyArtifactV3,
+  OwnedMediaStudyExecutorReceiptV3,
   ParentArtifactAdmissionReceiptV2,
   ParentArtifactReadReceiptV2,
   RuntimeArtifact,
   StudyPlanningDecisionReceipt,
   StudyReadinessReceipt,
   StudyReadinessReceiptV3,
+  StudyReadinessReceiptV4,
   StudyReportArtifact,
   StudyReportArtifactV2,
 } from "../model.ts";
@@ -276,6 +279,72 @@ export function buildOwnedMediaStudyArtifactV2(input: {
 export function buildStudyReadinessArtifactV3(input: {
   runId: string;
   receipt: StudyReadinessReceiptV3;
+  storedReceipt: { content: ContentIdentity; storageKey: string };
+}): RuntimeArtifact {
+  const artifact: RuntimeArtifact = {
+    schema: "studio.runtime.artifact.v1",
+    id: `artifact:${canonicalSha256({ runId: input.runId, readinessId: input.receipt.readinessId, kind: input.receipt.schema, contentId: input.storedReceipt.content.contentId })}`,
+    runId: input.runId,
+    kind: input.receipt.schema,
+    mediaClass: "non_media",
+    publication: "private",
+    content: input.storedReceipt.content,
+    storageKey: input.storedReceipt.storageKey,
+    durationMs: null,
+    tracks: [],
+    sourceArtifactIds: [input.receipt.input.artifactId],
+    producerTaskId: null,
+    producerAgentId: null,
+    origin: {
+      kind: "generalized_study_readiness",
+      readinessId: input.receipt.readinessId,
+      studyId: input.receipt.input.studyId,
+      studyArtifactId: input.receipt.input.artifactId,
+      receiptId: input.receipt.receiptId,
+      receiptContentId: input.storedReceipt.content.contentId,
+      outcome: input.receipt.result.outcome,
+    },
+  };
+  assertRuntimeArtifact(artifact);
+  return artifact;
+}
+
+export function buildOwnedMediaStudyArtifactV3(input: {
+  runId: string;
+  envelope: OwnedMediaStudyArtifactV3;
+  receipt: OwnedMediaStudyExecutorReceiptV3;
+  receiptContentId: string;
+  storedStudy: { content: ContentIdentity; storageKey: string };
+}): RuntimeArtifact {
+  const artifact: RuntimeArtifact = {
+    schema: "studio.runtime.artifact.v1",
+    id: input.receipt.output.artifactId,
+    runId: input.runId,
+    kind: input.envelope.schema,
+    mediaClass: "non_media",
+    publication: "private",
+    content: input.storedStudy.content,
+    storageKey: input.storedStudy.storageKey,
+    durationMs: null,
+    tracks: [],
+    sourceArtifactIds: input.envelope.sourceArtifacts.map((source) => source.artifactId),
+    producerTaskId: input.envelope.root.taskId,
+    producerAgentId: input.envelope.root.agentId,
+    origin: {
+      kind: "generalized_owned_media_study",
+      studyId: input.receipt.output.studyId,
+      executionId: input.envelope.root.executionId,
+      executorReceiptId: input.receipt.receiptId,
+      executorReceiptContentId: input.receiptContentId,
+    },
+  };
+  assertRuntimeArtifact(artifact);
+  return artifact;
+}
+
+export function buildStudyReadinessArtifactV4(input: {
+  runId: string;
+  receipt: StudyReadinessReceiptV4;
   storedReceipt: { content: ContentIdentity; storageKey: string };
 }): RuntimeArtifact {
   const artifact: RuntimeArtifact = {

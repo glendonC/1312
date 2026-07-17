@@ -17,6 +17,10 @@ import type {
   OwnedMediaStudyExecutorReceiptV2,
   OwnedMediaStudyCoverageRangeV2,
   OwnedMediaStudyClaimV2,
+  OwnedMediaStudyExecutorReceiptV3,
+  OwnedMediaStudyCoverageRangeV3,
+  StudyRestudyInput,
+  RangePassRequestReceipt,
 } from "../model.ts";
 import { canonicalSha256 } from "../artifactStore.ts";
 import type { ParentArtifactAdmissionHost } from "../admission/parentArtifactAdmissionHost.ts";
@@ -35,12 +39,15 @@ import {
   recordGeneralizedRead,
   recordGeneralizedStudy,
 } from "../study/generalizedStudyRuntime.ts";
+import { RangePassHost } from "../study/rangePassHost.ts";
+import { inspectRestudiedStudy, recordRestudiedStudy } from "../study/restudiedStudyRuntime.ts";
 
 export const ORCHESTRATOR_SPAWN_TOOL = "task_spawn_request" as const;
 export const ORCHESTRATOR_WAIT_TOOL = "task_reports_wait" as const;
 export const ORCHESTRATOR_DISPOSITION_TOOL = "report_disposition" as const;
 export const ORCHESTRATOR_READ_TOOL = "artifact_read" as const;
 export const ORCHESTRATOR_PLAN_TOOL = "study_planning_decision" as const;
+export const ORCHESTRATOR_RESTUDY_TOOL = "study_restudy_request" as const;
 export const ORCHESTRATOR_SYNTHESIZE_TOOL = "study_synthesize" as const;
 
 export type OrchestratorToolName =
@@ -49,11 +56,12 @@ export type OrchestratorToolName =
   | typeof ORCHESTRATOR_DISPOSITION_TOOL
   | typeof ORCHESTRATOR_READ_TOOL
   | typeof ORCHESTRATOR_PLAN_TOOL
+  | typeof ORCHESTRATOR_RESTUDY_TOOL
   | typeof ORCHESTRATOR_SYNTHESIZE_TOOL;
 
 export interface OrchestratorToolManifest {
   schema: "studio.orchestrator-tools.v1";
-  tools: Array<{ name: OrchestratorToolName; capability: "task.spawn.request" | "task.reports.wait" | "report.disposition" | "artifact.read" | "study.plan" | "study.synthesize" }>;
+  tools: Array<{ name: OrchestratorToolName; capability: "task.spawn.request" | "task.reports.wait" | "report.disposition" | "artifact.read" | "study.plan" | "study.restudy" | "study.synthesize" }>;
 }
 
 export interface SpawnToolResult {
@@ -78,6 +86,7 @@ export interface AdmittedArtifactReadToolResult {
   artifacts: Array<{ artifactId: string; contentId: string; schema: "studio.study-report.v1" | "studio.study-report.v2"; content: unknown }>;
   planningInput: StudyPlanningInput | null;
   synthesisInput?: { coverage: OwnedMediaStudyCoverageRangeV2[]; claims: OwnedMediaStudyClaimV2[] } | null;
+  restudyInput?: StudyRestudyInput | null;
 }
 
 export interface StudyPlanningToolResult {
@@ -87,13 +96,21 @@ export interface StudyPlanningToolResult {
   receipt: StudyPlanningDecisionReceipt;
 }
 
+export interface StudyRestudyToolResult {
+  schema: "studio.orchestrator-study-restudy-result.v1";
+  input: StudyRestudyInput;
+  requestReceipt: RangePassRequestReceipt;
+  requestReceiptContentId: string;
+  spawn: SpawnToolResult;
+}
+
 export interface StudySynthesisToolResult {
-  schema: "studio.orchestrator-study-synthesis-result.v1" | "studio.orchestrator-study-synthesis-result.v2";
+  schema: "studio.orchestrator-study-synthesis-result.v1" | "studio.orchestrator-study-synthesis-result.v2" | "studio.orchestrator-study-synthesis-result.v3";
   studyId: string;
   artifactId: string;
   contentId: string;
   executorReceiptContentId: string;
-  executorReceipt: OwnedMediaStudyExecutorReceipt | OwnedMediaStudyExecutorReceiptV2;
+  executorReceipt: OwnedMediaStudyExecutorReceipt | OwnedMediaStudyExecutorReceiptV2 | OwnedMediaStudyExecutorReceiptV3;
 }
 
 export interface ReportsWaitToolResult {
@@ -166,6 +183,8 @@ export class BoundedOrchestratorBridge {
   private readonly synthesisHost: OwnedMediaStudySynthesisHost | null;
   private readonly artifacts: ContentAddressedArtifactStore | null;
   private readonly generalized: boolean;
+  private readonly restudied: boolean;
+  private readonly rangePassHost: RangePassHost | null;
 
   constructor(input: {
     task: TaskRecord;
@@ -178,6 +197,7 @@ export class BoundedOrchestratorBridge {
     planningHost?: StudyPlanningHost;
     synthesisHost?: OwnedMediaStudySynthesisHost;
     artifacts?: ContentAddressedArtifactStore;
+    rangePassHost?: RangePassHost;
     nextCallId?: (tool: OrchestratorToolName) => string;
   }) {
     this.task = structuredClone(input.task);
@@ -190,7 +210,9 @@ export class BoundedOrchestratorBridge {
     this.planningHost = input.planningHost ?? null;
     this.synthesisHost = input.synthesisHost ?? null;
     this.artifacts = input.artifacts ?? null;
-    this.generalized = this.task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v2");
+    this.generalized = this.task.requiredOutputs.some((output) => output.required && (output.artifactKind === "studio.owned-media-study.v2" || output.artifactKind === "studio.owned-media-study.v3"));
+    this.restudied = this.task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v3");
+    this.rangePassHost = input.rangePassHost ?? null;
     this.nextCallId = input.nextCallId ?? ((tool) => `tool-call:${tool}:${randomUUID()}`);
   }
 
@@ -204,13 +226,16 @@ export class BoundedOrchestratorBridge {
     }
     const legacyCapabilities = ["report.disposition", "artifact.read", "study.plan", "study.synthesize"] as const;
     const generalizedCapabilities = ["report.disposition", "artifact.read", "study.synthesize"] as const;
+    const restudiedCapabilities = ["report.disposition", "artifact.read", "study.restudy", "study.synthesize"] as const;
     const planningEnabled = legacyCapabilities.every((capability) => capabilities.has(capability));
-    const generalizedEnabled = this.generalized && generalizedCapabilities.every((capability) => capabilities.has(capability)) && !capabilities.has("study.plan");
-    if ((planningEnabled && generalizedEnabled) ||
+    const generalizedEnabled = this.generalized && !this.restudied && generalizedCapabilities.every((capability) => capabilities.has(capability)) && !capabilities.has("study.plan") && !capabilities.has("study.restudy");
+    const restudiedEnabled = this.restudied && restudiedCapabilities.every((capability) => capabilities.has(capability)) && !capabilities.has("study.plan");
+    if ([planningEnabled, generalizedEnabled, restudiedEnabled].filter(Boolean).length > 1 ||
         (planningEnabled !== Boolean(this.admissionHost && this.readHost && this.planningHost && this.synthesisHost)) ||
-        (generalizedEnabled !== Boolean(this.artifacts)) ||
-        (!planningEnabled && !generalizedEnabled && capabilities.size !== 2) ||
-        (planningEnabled && capabilities.size !== 6) || (generalizedEnabled && capabilities.size !== 5)) {
+        (generalizedEnabled !== Boolean(this.artifacts && !this.restudied)) ||
+        (restudiedEnabled !== Boolean(this.artifacts && this.rangePassHost)) ||
+        (!planningEnabled && !generalizedEnabled && !restudiedEnabled && capabilities.size !== 2) ||
+        (planningEnabled && capabilities.size !== 6) || (generalizedEnabled && capabilities.size !== 5) || (restudiedEnabled && capabilities.size !== 6)) {
       throw new OrchestratorBridgeError("capability_not_granted", "The root orchestrator planning tool surface is incomplete or broader than its exact grants.");
     }
     return {
@@ -218,10 +243,11 @@ export class BoundedOrchestratorBridge {
       tools: [
         { name: ORCHESTRATOR_SPAWN_TOOL, capability: "task.spawn.request" },
         { name: ORCHESTRATOR_WAIT_TOOL, capability: "task.reports.wait" },
-        ...(planningEnabled || generalizedEnabled ? [
+        ...(planningEnabled || generalizedEnabled || restudiedEnabled ? [
           { name: ORCHESTRATOR_DISPOSITION_TOOL, capability: "report.disposition" as const },
           { name: ORCHESTRATOR_READ_TOOL, capability: "artifact.read" as const },
           ...(planningEnabled ? [{ name: ORCHESTRATOR_PLAN_TOOL, capability: "study.plan" as const }] : []),
+          ...(restudiedEnabled ? [{ name: ORCHESTRATOR_RESTUDY_TOOL, capability: "study.restudy" as const }] : []),
           { name: ORCHESTRATOR_SYNTHESIZE_TOOL, capability: "study.synthesize" as const },
         ] : []),
       ],
@@ -349,6 +375,44 @@ export class BoundedOrchestratorBridge {
     };
   }
 
+  async restudy(value: unknown): Promise<StudyRestudyToolResult> {
+    this.manifest();
+    if (!this.restudied || !this.rangePassHost) throw new OrchestratorBridgeError("capability_not_granted", "Study re-study is unavailable.");
+    const callId = this.nextCallId(ORCHESTRATOR_RESTUDY_TOOL);
+    await this.recordCall(callId, ORCHESTRATOR_RESTUDY_TOOL);
+    let result: Awaited<ReturnType<RangePassHost["request"]>>;
+    try {
+      result = await this.rangePassHost.request(this.executionId, callId, value);
+    } catch (error) {
+      throw new OrchestratorBridgeError("operation_rejected", error instanceof Error ? error.message : "The bounded re-study request failed closed.");
+    }
+    if (result.decision.permit) {
+      const permit = result.decision.permit;
+      const launch = this.childLauncher.launch(permit).then(() => undefined).catch(async (error: unknown) => {
+        if (error instanceof Error && error.name === "RuntimeApplicationInterrupted") throw error;
+        const child = this.ledger.state().tasks[permit.taskId];
+        if (child && (child.status === "scheduled" || child.status === "working") && child.ownerAgentId === permit.agentId) {
+          await this.scheduler.transitionTask(child.id, permit.agentId, "failed", "The accepted re-study child executor failed before making a terminal report available.").catch(() => undefined);
+        }
+      });
+      void launch.catch(() => undefined);
+      this.launches.set(permit.taskId, launch);
+    }
+    return {
+      schema: "studio.orchestrator-study-restudy-result.v1",
+      input: result.input,
+      requestReceipt: result.receipt,
+      requestReceiptContentId: result.receiptContentId,
+      spawn: {
+        schema: "studio.orchestrator-spawn-result.v1",
+        requestId: result.decision.requestId,
+        decision: result.decision.accepted ? "accepted" : "rejected",
+        rejection: result.decision.rejection,
+        followUpId: null,
+      },
+    };
+  }
+
   async disposition(value: unknown): Promise<ReportDispositionToolResult> {
     this.manifest();
     if (!this.admissionHost && !this.generalized) throw new OrchestratorBridgeError("capability_not_granted", "Report disposition is unavailable.");
@@ -373,6 +437,14 @@ export class BoundedOrchestratorBridge {
         reason: item.reason,
       });
       if (item.outcome === "rejected") {
+        const rangePass = Object.values(this.ledger.state().rangePasses).find((entry) => entry.accepted && entry.taskId === report.taskId);
+        if (rangePass && this.rangePassHost) {
+          const child = this.ledger.state().tasks[report.taskId];
+          if (child?.status === "working") {
+            await this.scheduler.transitionTask(child.id, child.assignedAgentId, "withheld", "The exact re-study report was rejected by the parent and cannot support this range.");
+          }
+          await this.rangePassHost.finalizeTask(report.taskId);
+        }
         return { schema: "studio.orchestrator-report-disposition-result.v2", disposition: { reportId: item.reportId, outcome: "rejected", reason: item.reason }, admission: null };
       }
       const admitted = await recordGeneralizedAdmission({ ledger: this.ledger, artifacts: this.artifacts, reportId: item.reportId, outputArtifactId: item.outputArtifactId });
@@ -431,10 +503,16 @@ export class BoundedOrchestratorBridge {
         parentTaskId: this.task.id,
         parentAgentId: this.task.assignedAgentId,
       });
+      if (this.restudied && this.rangePassHost) await this.rangePassHost.finalizeTask(admission.childTaskId);
       const completedReads = Object.values(this.ledger.state().generalizedParentArtifactReads).filter((entry) =>
         entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
       const synthesisInput = completedReads.length >= 2
-        ? await inspectGeneralizedStudy(this.ledger, this.artifacts, this.task.id).then(({ inspected }) => ({ coverage: inspected.coverage, claims: inspected.claims }))
+        ? this.restudied
+          ? await inspectRestudiedStudy(this.ledger, this.scheduler, this.artifacts, this.task.id).then(({ inspected }) => ({ coverage: inspected.coverage, claims: inspected.claims }))
+          : await inspectGeneralizedStudy(this.ledger, this.artifacts, this.task.id).then(({ inspected }) => ({ coverage: inspected.coverage, claims: inspected.claims }))
+        : null;
+      const restudyInput = completedReads.length >= 2 && this.restudied && this.rangePassHost
+        ? await this.rangePassHost.inspect(this.executionId)
         : null;
       return {
         schema: "studio.orchestrator-admitted-artifact-read-result.v2",
@@ -442,6 +520,7 @@ export class BoundedOrchestratorBridge {
         artifacts: [{ artifactId: result.receipt.returned.artifactId, contentId: result.receipt.returned.contentId, schema: "studio.study-report.v2", content: result.report }],
         planningInput: null,
         synthesisInput,
+        ...(this.restudied ? { restudyInput } : {}),
       };
     }
     const grant = this.ledger.state().parentArtifactReadGrants[item.grantId];
@@ -479,6 +558,20 @@ export class BoundedOrchestratorBridge {
         entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
       if (admissions.length < 2 || reads.length < admissions.length) {
         throw new OrchestratorBridgeError("operation_rejected", "Generalized synthesis requires every admitted report to be read and at least two admitted reports.");
+      }
+      if (this.restudied) {
+        const acceptedPasses = Object.values(this.ledger.state().rangePasses).filter((entry) =>
+          entry.accepted && entry.request.root.taskId === this.task.id);
+        if (acceptedPasses.some((entry) => !entry.terminal)) throw new OrchestratorBridgeError("operation_rejected", "Every accepted range pass must terminate before v3 synthesis.");
+        const result = await recordRestudiedStudy({ ledger: this.ledger, scheduler: this.scheduler, artifacts: this.artifacts, parentTaskId: this.task.id, request: value as Parameters<typeof recordRestudiedStudy>[0]["request"] });
+        return {
+          schema: "studio.orchestrator-study-synthesis-result.v3",
+          studyId: result.study.studyId,
+          artifactId: result.study.artifactId,
+          contentId: result.study.contentId,
+          executorReceiptContentId: result.executorReceiptContentId,
+          executorReceipt: result.executorReceipt,
+        };
       }
       const result = await recordGeneralizedStudy({ ledger: this.ledger, artifacts: this.artifacts, parentTaskId: this.task.id, request: value as Parameters<typeof recordGeneralizedStudy>[0]["request"] });
       return {
@@ -531,6 +624,9 @@ export class BoundedOrchestratorBridge {
     const interrupted = settled.find((result): result is PromiseRejectedResult =>
       result.status === "rejected" && result.reason instanceof Error && result.reason.name === "RuntimeApplicationInterrupted");
     if (interrupted) throw interrupted.reason;
+    if (this.restudied && this.rangePassHost) {
+      for (const taskId of this.launches.keys()) await this.rangePassHost.finalizeTask(taskId);
+    }
     const state = this.ledger.state();
     const taskIds = Object.values(state.spawnRequests)
       .filter((request) => request.authoredByExecutionId === this.executionId && request.accepted === true && request.taskId)

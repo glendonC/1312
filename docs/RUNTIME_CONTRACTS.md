@@ -38,6 +38,11 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   observation/receipt lineage, and U2 frame receipt/manifest/PNG/decoder identities before storing
   content-addressed report, admission/read, study, and readiness contracts and deriving caption
   causality from their recursively reopened lineage;
+- an additive U4 range-pass host and scheduler lane on the default generalized root: it derives exact
+  weak-range/cause/prior-evidence inputs, accepts only a strict attenuated current-run speech
+  subrange, fixes producer/configuration/budget/child scope, records request and terminal spend/
+  evidence receipts, dedupes identical work, and projects ordered pass/disagreement history into
+  study v3 and readiness/caption causality v4;
 - an `evidence.read` host plus separate task-private bridge that publishes only `evidence_read`,
   accepts only an exact scheduler-granted artifact id, injects task/agent/operation identity, and
   returns only facts intersecting the scheduler-granted source/window, clipped to that window, from
@@ -87,9 +92,12 @@ dependency-task, launch, executor, or path fields.
 The Codex root is a separate executor role with an explicitly configured model. Ambient Codex
 configuration and the documented shell, web, app, hook, goal, memory, remote-plugin, and built-in
 multi-agent tool families are disabled for that process. Its task-private MCP surface is selected
-from the root contract. A new owned run defaults to the U3 v2 contract and exposes exactly
-`task_spawn_request`, `task_reports_wait`, `report_disposition`, `artifact_read`, and
-`study_synthesize`. It has no `study_planning_decision` or follow-up authority. The explicit v1
+from the root contract. A new owned run keeps U3 report/admission v2 but closes the additive U4
+study-v3 path and exposes exactly `task_spawn_request`, `task_reports_wait`, `report_disposition`,
+`artifact_read`, `study_restudy_request`, and `study_synthesize`. It has no
+`study_planning_decision` or ambient follow-up authority. `study_restudy_request` accepts only one
+exact host-derived weak range/cause and a registered delta; the current slice registers a strict
+attenuated current-run speech subrange only. The explicit v1
 compatibility selector retains the closed six-tool planning/synthesis surface for historical
 fixtures. Spawn records the root execution/tool-call causation, returns one accepted/rejected
 scheduler decision, and starts accepted per-task launch promises without waiting. Wait journals
@@ -207,16 +215,49 @@ text only from range-closing current-run speech citations under supported ready 
 state yields null source and target text.
 
 These U3 objects are stored through the content-addressed artifact store and recursively cold-replayed
-by host adapters. New owned runs default to the version-selected U3 production path: worker report v2,
-parent admission/read v2, owned-media study v2, readiness v3, and, only after a verified human
-approval, caption-production/caption-causality v3. The launcher, worker report union, production-event
-projection, validation union, and artifact kinds carry that chain; there is no orphan additive host.
+by host adapters. They remain the report/admission evidence layer for new owned runs. U4 now extends
+the default terminal chain to owned-media study v3, readiness v4, and, only after a verified human
+approval, caption-production/caption-causality v4. The launcher, worker report union, production-event
+projection, validation union, artifact kinds, and observability index carry that chain; there is no
+orphan additive host.
 The explicit `studyContractVersion: "v1"` path preserves closed historical fixtures and receipts but
 is not the default. Audio-only runs request no frames, and absent acoustic or frame evidence supplies
-no authority; only current-run speech may authorize dialogue text. The U3 root omits U4 planning and
-follow-up tools. Studio UI projection remains outside this cutover. This boundary proves citation
+no authority; only current-run speech may authorize dialogue text. Studio UI projection remains
+outside this cutover. This boundary proves citation
 integrity, coverage policy, and abstention preservation—not multimodal understanding, OCR, scene
 semantics, producer accuracy, independent corroboration, truth arbitration, or caption quality.
+
+U4 does not reuse or mutate v1 planning/follow-up events. `studio.study-restudy-input.v1` is a
+host-derived view over the current admitted v2 reports: each candidate names one exact non-supported
+coverage cell, its evidence-tied cause/raw states, and prior report, admission, citation, observation,
+and current-run speech-operation/range identities. The model request contains only `inputId`, the
+exact `coverageId`/`causeId`, and one typed delta. Padded audio, denser frame timestamps, alternate
+receipted configuration, and granted-specialist members are reserved union shapes and fail closed in
+this slice because they have no registered producer/grant.
+
+The registered `attenuated_subrange` producer requires a strict contained range previously covered
+by broader current-run speech work. The host fixes pass number 2, the runtime-injected current-run
+recognizer configuration scope, a 20,000 ms/one-call reservation, and a single v2 report child with
+attenuated immutable task context. `studio.study-range-pass-request.receipt.v1` retains the prior
+evidence, cause, delta, producer/configuration, pass number, reservation, caps, and explicit
+understanding/improvement/semantic-correctness non-claims. The scheduler admits at most one pass per
+range and four per producer, rejects an already accepted work/configuration fingerprint—including a
+concurrent identical request—and applies the ordinary scope, depth, concurrency, dependency, and run
+budget checks. An unchanged/full weak range is not an attenuation and is rejected before scheduling.
+
+`studio.study-range-pass-terminal.receipt.v1` retains the scheduler task identity, complete optional
+report/admission/read lineage, cited/new/disagreement citation sets, executor active time, capability
+call count, available model usage or its closed absence, terminal outcome, and exhaustion bit.
+`studio.owned-media-study.v3` stores every admitted report and every accepted terminal pass in
+deterministic order. A weak cell becomes supported only for the exact executed subrange when one
+range-closing child claim is supported entirely by pass-new current-run speech citations. Prior
+conflict or statement disagreement cannot upgrade. Residual and exhausted cells remain unknown,
+withheld, or unavailable; unrelated supported ranges continue. `studio.study-readiness.receipt.v4`
+retains pass receipt identities and terminal weak coverage without treating one exhausted range as a
+global blocker, while unresolved conflict or stored-integrity failure still withholds. Caption
+causality v4 authorizes text only on supported cells and retains `passIds`/preserved states; weak cells
+remain locally null/withheld. Pass count, tokens, agents, labels, citation closure, and scheduler
+success are not understanding, correctness, accuracy, quality, improvement, or publication evidence.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

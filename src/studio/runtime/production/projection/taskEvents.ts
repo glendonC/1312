@@ -82,7 +82,7 @@ export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): bo
         `spawn request ${event.data.requestId} has no active model executor`,
       );
       invariant(
-        call?.tool === "task_spawn_request" && call.executionId === execution.id && call.taskId === execution.taskId &&
+        (call?.tool === "task_spawn_request" || call?.tool === "study_restudy_request") && call.executionId === execution.id && call.taskId === execution.taskId &&
           call.spawnRequestId === null,
         event,
         `spawn request ${event.data.requestId} has no matching tool call`,
@@ -143,6 +143,7 @@ export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): bo
       report_disposition: "report.disposition",
       artifact_read: "artifact.read",
       study_planning_decision: "study.plan",
+      study_restudy_request: "study.restudy",
       study_synthesize: "study.synthesize",
     }[event.data.tool];
     invariant(execution?.status === "active" && execution.taskId === task?.id, event, `tool call ${event.data.callId} has no active root executor`);

@@ -28,6 +28,10 @@ import { GeneralizedStudyReadinessHost } from "../study/generalizedStudyReadines
 import type { GeneralizedStudySynthesisResult } from "../study/generalizedStudySynthesisHost.ts";
 import { generalizedReadinessReference } from "../study/generalizedStudyRuntime.ts";
 import { GeneralizedCaptionCausalityHost } from "./generalizedCaptionCausality.ts";
+import { RestudiedStudyReadinessHost } from "../study/restudiedStudyReadinessHost.ts";
+import type { RestudiedStudySynthesisResult } from "../study/restudiedStudySynthesisHost.ts";
+import { restudiedReadinessReference } from "../study/restudiedStudyRuntime.ts";
+import { RestudiedCaptionCausalityHost } from "./restudiedCaptionCausality.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import {
   assertCaptionProductionRequest,
@@ -164,17 +168,25 @@ export class CaptionProductionHost {
     let readiness: Awaited<ReturnType<typeof reopenStudyReadiness>> | null = null;
     let study: Awaited<ReturnType<typeof reopenOwnedMediaStudy>> | null = null;
     let generalizedReadiness: Awaited<ReturnType<GeneralizedStudyReadinessHost["reopen"]>> | null = null;
-    let generalizedStudy: GeneralizedStudySynthesisResult | null = null;
+    let restudiedReadiness: Awaited<ReturnType<RestudiedStudyReadinessHost["reopen"]>> | null = null;
+    let generalizedStudy: GeneralizedStudySynthesisResult | RestudiedStudySynthesisResult | null = null;
     try {
       if (generalizedRecord) {
-        generalizedReadiness = await new GeneralizedStudyReadinessHost(state, this.artifacts)
-          .reopen(generalizedReadinessReference(generalizedRecord));
-        generalizedStudy = generalizedReadiness.reopenedStudy;
+        if (generalizedRecord.schema === "studio.study-readiness.receipt.v4") {
+          restudiedReadiness = await new RestudiedStudyReadinessHost(state, this.artifacts)
+            .reopen(restudiedReadinessReference(generalizedRecord));
+          generalizedStudy = restudiedReadiness.reopenedStudy;
+        } else {
+          generalizedReadiness = await new GeneralizedStudyReadinessHost(state, this.artifacts)
+            .reopen(generalizedReadinessReference(generalizedRecord));
+          generalizedStudy = generalizedReadiness.reopenedStudy;
+        }
+        const closedReadiness = restudiedReadiness ?? generalizedReadiness;
         if (!generalizedStudy || generalizedRecord.artifactId !== approval.readiness.artifactId ||
-            generalizedReadiness.readinessId !== approval.readiness.readinessId ||
-            generalizedReadiness.receiptId !== approval.readiness.receiptId ||
-            generalizedReadiness.receiptContentId !== approval.readiness.receiptContentId ||
-            generalizedReadiness.receipt.result.outcome !== "proceed_to_caption_review") {
+            closedReadiness!.readinessId !== approval.readiness.readinessId ||
+            closedReadiness!.receiptId !== approval.readiness.receiptId ||
+            closedReadiness!.receiptContentId !== approval.readiness.receiptContentId ||
+            closedReadiness!.receipt.result.outcome !== "proceed_to_caption_review") {
           throw new Error("The approval does not resolve to one exact generalized proceed-to-caption-review receipt");
         }
       } else {
@@ -199,9 +211,10 @@ export class CaptionProductionHost {
       ? generalizedCaptionStudyIdentity(generalizedStudy)
       : captionStudyIdentity(study!);
     const generalizedRootTask = generalizedStudy ? state.tasks[generalizedStudy.envelope.root.taskId] : null;
-    const matchesGeneralized = generalizedStudy && generalizedReadiness &&
-      generalizedReadiness.receipt.input.artifactId === studyIdentity.artifactId &&
-      generalizedReadiness.receipt.input.contentId === studyIdentity.contentId &&
+    const closedGeneralizedReadiness = restudiedReadiness ?? generalizedReadiness;
+    const matchesGeneralized = generalizedStudy && closedGeneralizedReadiness &&
+      closedGeneralizedReadiness.receipt.input.artifactId === studyIdentity.artifactId &&
+      closedGeneralizedReadiness.receipt.input.contentId === studyIdentity.contentId &&
       generalizedStudy.envelope.root.source.artifactId === source.id &&
       generalizedStudy.envelope.root.source.contentId === source.content.contentId &&
       generalizedRootTask?.jobContext.analysisRequest.requestId === analysis.requestId &&
@@ -324,10 +337,12 @@ export class CaptionProductionHost {
           throw new Error("The approval was revoked while caption production was active");
         }
         if (generalizedRecord) {
-          const readinessAfter = await new GeneralizedStudyReadinessHost(currentState, this.artifacts)
-            .reopen(generalizedReadinessReference(currentState.generalizedStudyReadiness[approval.readiness.readinessId]));
+          const currentGeneralized = currentState.generalizedStudyReadiness[approval.readiness.readinessId];
+          const readinessAfter = currentGeneralized.schema === "studio.study-readiness.receipt.v4"
+            ? await new RestudiedStudyReadinessHost(currentState, this.artifacts).reopen(restudiedReadinessReference(currentGeneralized))
+            : await new GeneralizedStudyReadinessHost(currentState, this.artifacts).reopen(generalizedReadinessReference(currentGeneralized));
           if (canonicalSha256(approvalAfter.readiness) !== canonicalSha256(approval.readiness) ||
-              canonicalSha256(readinessAfter.receipt) !== canonicalSha256(generalizedReadiness!.receipt) ||
+              canonicalSha256(readinessAfter.receipt) !== canonicalSha256(closedGeneralizedReadiness!.receipt) ||
               !readinessAfter.reopenedStudy || canonicalSha256(generalizedCaptionStudyIdentity(readinessAfter.reopenedStudy)) !== canonicalSha256(studyIdentity)) {
             throw new Error("The approved generalized study/readiness changed while caption production was active");
           }
@@ -348,19 +363,17 @@ export class CaptionProductionHost {
         );
       }
       const derivation = "current_run_source_execution" as const;
-      const captionLines: CaptionProductionArtifact["lines"] = generalizedStudy && generalizedReadiness
+      const captionLines: CaptionProductionArtifact["lines"] = generalizedStudy && closedGeneralizedReadiness
         ? await Promise.all(lines.map(async (line) => {
           if (line.source.state !== "available" || line.target.state !== "available" || line.source.text === null || line.target.text === null) {
             throw new Error("Generalized caption production requires current-run source and target text before causal authorization");
           }
           const covering = generalizedStudy.envelope.coverage.filter((entry) => entry.startMs <= line.startMs && entry.endMs >= line.endMs);
           if (covering.length !== 1) throw new Error("Generalized caption line has no unique study coverage range");
-          const causality = await new GeneralizedCaptionCausalityHost(this.ledger.state(), this.artifacts).close({
-            readiness: generalizedReadinessReference(generalizedRecord!),
-            range: { artifactId: covering[0].artifactId, trackId: covering[0].trackId, startMs: line.startMs, endMs: line.endMs },
-            sourceText: line.source.text,
-            targetText: line.target.text,
-          });
+          const range = { artifactId: covering[0].artifactId, trackId: covering[0].trackId, startMs: line.startMs, endMs: line.endMs };
+          const causality = generalizedRecord!.schema === "studio.study-readiness.receipt.v4"
+            ? await new RestudiedCaptionCausalityHost(this.ledger.state(), this.artifacts).close({ readiness: restudiedReadinessReference(generalizedRecord!), range, sourceText: line.source.text, targetText: line.target.text })
+            : await new GeneralizedCaptionCausalityHost(this.ledger.state(), this.artifacts).close({ readiness: generalizedReadinessReference(generalizedRecord!), range, sourceText: line.source.text, targetText: line.target.text });
           return closeGeneralizedCaptionLineCausality({
             line, state: this.ledger.state(), study: generalizedStudy!, studyIdentity, causality,
             readiness: approval.readiness, approval: request.approval,
@@ -387,7 +400,7 @@ export class CaptionProductionHost {
         }), readiness!.receipt.dialogueScopePolicy));
       const caption: CaptionProductionArtifact = {
         schema: generalizedStudy
-          ? "studio.caption-production.artifact.v3"
+          ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "studio.caption-production.artifact.v4" : "studio.caption-production.artifact.v3"
           : readiness!.receipt.dialogueScopePolicy
           ? "studio.caption-production.artifact.v2"
           : "studio.caption-production.artifact.v1",
@@ -427,9 +440,11 @@ export class CaptionProductionHost {
         input: structuredClone(input),
         producer: {
           id: "studio.host-caption-production" as const,
-          version: generalizedStudy ? "3" as const : readiness!.receipt.dialogueScopePolicy ? "2" as const : "1" as const,
+          version: generalizedStudy ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "4" as const : "3" as const : readiness!.receipt.dialogueScopePolicy ? "2" as const : "1" as const,
           policy: generalizedStudy
-            ? "verified_unrevoked_approval_and_generalized_causality_v3_only" as const
+            ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4"
+              ? "verified_unrevoked_approval_and_restudied_causality_v4_only" as const
+              : "verified_unrevoked_approval_and_generalized_causality_v3_only" as const
             : readiness!.receipt.dialogueScopePolicy
               ? "verified_unrevoked_approval_and_dialogue_scope_only" as const
               : "verified_unrevoked_approval_only" as const,
@@ -446,7 +461,7 @@ export class CaptionProductionHost {
       };
       const receipt: CaptionProductionReceipt = {
         schema: generalizedStudy
-          ? "studio.caption-production.receipt.v3"
+          ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "studio.caption-production.receipt.v4" : "studio.caption-production.receipt.v3"
           : readiness!.receipt.dialogueScopePolicy
           ? "studio.caption-production.receipt.v2"
           : "studio.caption-production.receipt.v1",

@@ -135,7 +135,7 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
       invariant(study?.artifactId === artifact.origin.studyArtifactId && artifact.producerTaskId === null && artifact.producerAgentId === null, event, `artifact ${artifact.id} has no exact owned-media study input`);
     } else if (artifact.origin.kind === "generalized_study_readiness") {
       const study = next.generalizedOwnedMediaStudies[artifact.origin.studyId];
-      invariant(study?.artifactId === artifact.origin.studyArtifactId && study.schema === "studio.owned-media-study.v2" && artifact.producerTaskId === null && artifact.producerAgentId === null, event, `artifact ${artifact.id} has no exact generalized study input`);
+      invariant(study?.artifactId === artifact.origin.studyArtifactId && (study.schema === "studio.owned-media-study.v2" || study.schema === "studio.owned-media-study.v3") && artifact.producerTaskId === null && artifact.producerAgentId === null, event, `artifact ${artifact.id} has no exact generalized study input`);
     } else if (artifact.origin.kind === "root_output_disposition") {
       const report = next.reports[artifact.origin.reportId];
       const expectedStatus = artifact.origin.outcome === "promoted_to_root" ? "accepted" : "rejected";

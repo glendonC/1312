@@ -44,6 +44,8 @@ import {
   buildGeneralizedParentReadArtifact as buildGeneralizedParentReadArtifactBuilder,
   buildOwnedMediaStudyArtifactV2 as buildOwnedMediaStudyArtifactV2Builder,
   buildStudyReadinessArtifactV3 as buildStudyReadinessArtifactV3Builder,
+  buildOwnedMediaStudyArtifactV3 as buildOwnedMediaStudyArtifactV3Builder,
+  buildStudyReadinessArtifactV4 as buildStudyReadinessArtifactV4Builder,
 } from "./artifactStore/studyArtifacts.ts";
 import {
   buildSemanticEvidenceArtifact as buildSemanticEvidenceArtifactBuilder,
@@ -453,6 +455,18 @@ export class ContentAddressedArtifactStore {
     input: Parameters<typeof buildStudyReadinessArtifactV3Builder>[0],
   ): ReturnType<typeof buildStudyReadinessArtifactV3Builder> {
     return buildStudyReadinessArtifactV3Builder(input);
+  }
+
+  buildOwnedMediaStudyArtifactV3(
+    input: Parameters<typeof buildOwnedMediaStudyArtifactV3Builder>[0],
+  ): ReturnType<typeof buildOwnedMediaStudyArtifactV3Builder> {
+    return buildOwnedMediaStudyArtifactV3Builder(input);
+  }
+
+  buildStudyReadinessArtifactV4(
+    input: Parameters<typeof buildStudyReadinessArtifactV4Builder>[0],
+  ): ReturnType<typeof buildStudyReadinessArtifactV4Builder> {
+    return buildStudyReadinessArtifactV4Builder(input);
   }
 
   buildSemanticEvidenceArtifact(

@@ -14,6 +14,7 @@ import { ParentArtifactAdmissionHost } from "../admission/parentArtifactAdmissio
 import { ParentArtifactReadHost } from "../admission/parentArtifactReadHost.ts";
 import { StudyPlanningHost } from "../study/studyPlanningHost.ts";
 import { OwnedMediaStudySynthesisHost } from "../study/studySynthesisHost.ts";
+import { RangePassHost } from "../study/rangePassHost.ts";
 
 export type DeterministicOrchestratorMode =
   | "spawn_one"
@@ -25,6 +26,9 @@ export type DeterministicOrchestratorMode =
   | "unsupported_claim"
   | "hidden_gap"
   | "duplicate_synthesis"
+  | "restudy_support"
+  | "restudy_exhausted"
+  | "restudy_disagreement"
   | "no_request";
 
 export interface DeterministicOrchestratorOptions {
@@ -92,7 +96,9 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
     let callIndex = 0;
     const planningEnabled = task.grants.some((grant) => grant.capability === "study.plan");
     const generalizedEnabled = task.requiredOutputs.some((output) =>
-      output.required && output.artifactKind === "studio.owned-media-study.v2");
+      output.required && (output.artifactKind === "studio.owned-media-study.v2" || output.artifactKind === "studio.owned-media-study.v3"));
+    const restudiedEnabled = task.requiredOutputs.some((output) =>
+      output.required && output.artifactKind === "studio.owned-media-study.v3");
     const planningHost = new StudyPlanningHost(ledger, artifacts);
     const bridge = new BoundedOrchestratorBridge({
       task,
@@ -101,6 +107,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       scheduler,
       childLauncher,
       ...(generalizedEnabled ? { artifacts } : {}),
+      ...(restudiedEnabled ? { rangePassHost: new RangePassHost(ledger, artifacts, scheduler) } : {}),
       ...(planningEnabled ? {
         admissionHost: new ParentArtifactAdmissionHost(ledger, artifacts),
         readHost: new ParentArtifactReadHost(ledger, artifacts),
@@ -120,13 +127,21 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       if (!rootScope || task.mediaScope.length !== 1) throw new Error("Deterministic generalized root requires one exact media scope");
       const midpoint = rootScope.startMs + Math.floor((rootScope.endMs - rootScope.startMs) / 2);
       if (midpoint <= rootScope.startMs || midpoint >= rootScope.endMs) throw new Error("Deterministic generalized root cannot split the bounded scope");
-      const scopes = [{ ...rootScope, endMs: midpoint }, { ...rootScope, startMs: midpoint }];
+      const restudyDisagreement = this.mode === "restudy_disagreement";
+      const restudyWeak = this.mode === "restudy_support" || this.mode === "restudy_exhausted";
+      const scopes = restudyDisagreement
+        ? [rootScope, rootScope]
+        : [{ ...rootScope, endMs: midpoint }, { ...rootScope, startMs: midpoint }];
       for (const [index, scope] of scopes.entries()) {
         await bridge.spawn({
           workloadKey: `deterministic-generalized-study-child:${ledger.runId}:${index}`,
           objective: "Return one v2 coverage partition from current-run speech. Speech alone may support claims; acoustic evidence is coverage qualification and frames are cite-only.",
           workerKind: "analysis",
-          workerLabel: `deterministic-generalized-study-worker-${index + 1}`,
+          workerLabel: restudyDisagreement
+            ? `deterministic-study-conflict-${index + 1}`
+            : restudyWeak && index === 0
+              ? "deterministic-study-gap-worker"
+              : `deterministic-generalized-study-worker-${index + 1}`,
           mediaScope: [scope],
           inputArtifactIds: [sourceId],
           requiredOutputs: [{ name: `generalized coverage study ${index + 1}`, artifactKind: "studio.study-report.v2", required: true }],
@@ -138,6 +153,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       const waited = await bridge.wait({});
       if (waited.result !== "all_terminal") throw new Error(`Deterministic generalized fan-out failed as ${waited.failure}`);
       let synthesisInput: { coverage: OwnedMediaStudyCoverageRangeV2[]; claims: OwnedMediaStudyClaimV2[] } | null = null;
+      let restudyInput: Awaited<ReturnType<RangePassHost["inspect"]>> | null = null;
       for (const child of waited.children) {
         if (!child.reportId || child.artifactIds.length !== 1) throw new Error("Deterministic generalized child did not return one typed report");
         const disposition = await bridge.disposition({
@@ -152,6 +168,89 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
           contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
         });
         synthesisInput = read.synthesisInput ?? synthesisInput;
+        restudyInput = read.restudyInput ?? restudyInput;
+      }
+      if (restudyWeak || restudyDisagreement) {
+        const candidate = restudyInput?.candidates[0];
+        if (!candidate) throw new Error("Deterministic U4 proof requires one exact evidence-derived weak candidate");
+        const width = candidate.range.endMs - candidate.range.startMs;
+        const inset = Math.max(1, Math.floor(width / 4));
+        const executionRange = {
+          ...candidate.range,
+          startMs: candidate.range.startMs + inset,
+          endMs: candidate.range.endMs - inset,
+        };
+        if (executionRange.startMs >= executionRange.endMs) throw new Error("Deterministic U4 candidate is too narrow for a strict attenuated subrange");
+
+        let unregisteredRejected = false;
+        try {
+          await bridge.restudy({
+            inputId: restudyInput!.inputId,
+            coverageId: candidate.coverageId,
+            causeId: candidate.cause.causeId,
+            delta: { kind: "padded_audio_window", executionRange, paddingBeforeMs: 1, paddingAfterMs: 1 },
+          });
+        } catch {
+          unregisteredRejected = true;
+        }
+        if (!unregisteredRejected) throw new Error("Deterministic U4 proof did not reject an unregistered delta producer");
+
+        let broadeningRejected = false;
+        try {
+          await bridge.restudy({
+            inputId: restudyInput!.inputId,
+            coverageId: candidate.coverageId,
+            causeId: candidate.cause.causeId,
+            delta: { kind: "attenuated_subrange", executionRange: candidate.range },
+          });
+        } catch {
+          broadeningRejected = true;
+        }
+        if (!broadeningRejected) throw new Error("Deterministic U4 proof did not reject an unchanged/broadened range");
+
+        const validRequest = {
+          inputId: restudyInput!.inputId,
+          coverageId: candidate.coverageId,
+          causeId: candidate.cause.causeId,
+          delta: { kind: "attenuated_subrange", executionRange },
+        } as const;
+        const concurrent = await Promise.all([bridge.restudy(validRequest), bridge.restudy(validRequest)]);
+        const requested = concurrent.find((entry) => entry.spawn.decision === "accepted");
+        const duplicate = concurrent.find((entry) => entry.spawn.decision === "rejected");
+        if (!requested || duplicate?.spawn.rejection !== "restudy_duplicate_work") {
+          throw new Error("Deterministic U4 concurrent fingerprint dedupe did not accept one exact pass and reject the duplicate");
+        }
+        if (requested.spawn.decision !== "accepted") throw new Error(`Deterministic U4 range pass was rejected as ${requested.spawn.rejection}`);
+        const passTaskId = ledger.state().rangePasses[requested.requestReceipt.passId]?.taskId;
+        if (!passTaskId) throw new Error("Deterministic U4 range pass lost its scheduled task");
+        const passWait = await bridge.wait({});
+        const passChild = passWait.children.find((entry) => entry.taskId === passTaskId);
+        if (!passChild?.reportId || passChild.artifactIds.length !== 1) throw new Error("Deterministic U4 range pass did not return one typed report");
+        const disposition = await bridge.disposition({
+          reportId: passChild.reportId,
+          outputArtifactId: passChild.artifactIds[0],
+          outcome: "accepted",
+          reason: "The deterministic U4 seam admits the structurally closed range-pass report; correctness, quality, and improvement remain unassessed.",
+        });
+        if (!disposition.admission || !("grant" in disposition.admission)) throw new Error("Deterministic U4 admission did not create exact read authority");
+        const read = await bridge.readAdmitted({
+          grantId: disposition.admission.grant.id,
+          contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
+        });
+        synthesisInput = read.synthesisInput ?? synthesisInput;
+
+        let duplicateRejected = false;
+        try {
+          await bridge.restudy({
+            inputId: restudyInput!.inputId,
+            coverageId: candidate.coverageId,
+            causeId: candidate.cause.causeId,
+            delta: { kind: "attenuated_subrange", executionRange },
+          });
+        } catch {
+          duplicateRejected = true;
+        }
+        if (!duplicateRejected) throw new Error("Deterministic U4 proof did not reject identical completed work/configuration");
       }
       if (!synthesisInput) throw new Error("Deterministic generalized root did not receive host-derived synthesis input");
       const synthesis = await bridge.synthesize(synthesisInput);

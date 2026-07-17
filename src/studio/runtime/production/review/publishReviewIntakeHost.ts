@@ -11,6 +11,7 @@ import type {
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import { reopenStudyReadiness, type VerifiedStudyReadiness } from "../study/studyReadinessAudit.ts";
 import { reopenGeneralizedReadiness } from "../study/generalizedStudyRuntime.ts";
+import { reopenRestudiedReadiness } from "../study/restudiedStudyRuntime.ts";
 import {
   assertPublishReviewIntakeRequest,
   validatePublishReviewIntakeReceipt,
@@ -46,7 +47,9 @@ export class PublishReviewIntakeHost {
     const readinessIdentity = assertPublishReviewIntakeRequest(requestValue);
     const generalized = this.ledger.state().generalizedStudyReadiness[readinessIdentity.readinessId];
     const readiness = generalized
-      ? await reopenGeneralizedReadiness(this.ledger, this.artifacts, readinessIdentity.readinessId)
+      ? generalized.schema === "studio.study-readiness.receipt.v4"
+        ? await reopenRestudiedReadiness(this.ledger, this.artifacts, readinessIdentity.readinessId)
+        : await reopenGeneralizedReadiness(this.ledger, this.artifacts, readinessIdentity.readinessId)
       : await reopenStudyReadiness(this.ledger.state(), this.artifacts, readinessIdentity.readinessId);
     if (
       readiness.readinessId !== readinessIdentity.readinessId ||
@@ -91,7 +94,9 @@ export class PublishReviewIntakeHost {
           verification: {
             integrity: "stored_study_readiness_and_recursive_inputs_verified" as const,
             producer: generalized
-              ? "deterministic_study_readiness_gate_v3" as const
+              ? generalized.schema === "studio.study-readiness.receipt.v4"
+                ? "deterministic_study_readiness_gate_v4" as const
+                : "deterministic_study_readiness_gate_v3" as const
               : "deterministic_study_readiness_gate_v1" as const,
           },
         },

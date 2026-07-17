@@ -13,7 +13,7 @@ export interface PublishReviewIntakeReceipt {
     readiness: StudyReadinessReceiptIdentity;
     verification: {
       integrity: "stored_study_readiness_and_recursive_inputs_verified";
-      producer: "deterministic_study_readiness_gate_v1" | "deterministic_study_readiness_gate_v3";
+      producer: "deterministic_study_readiness_gate_v1" | "deterministic_study_readiness_gate_v3" | "deterministic_study_readiness_gate_v4";
     };
   };
   producer: {

@@ -17,6 +17,7 @@ import type {
   TaskJobContext,
   TaskLaunchRecord,
   TaskStatus,
+  RangePassRequestReceipt,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
@@ -34,6 +35,7 @@ import {
   assertOrchestratorSpawnContract,
   assertTaskJobContext,
 } from "./validation/scheduling.ts";
+import { validateRangePassRequestReceipt } from "./validation/studiesV3.ts";
 
 export interface RuntimeIdentityFactory {
   next(kind: "request" | "task" | "agent" | "grant"): string;
@@ -460,6 +462,137 @@ export class BoundedRuntimeScheduler {
               data: { requestId, accepted: true, rejection: null, taskId, agentId, grants },
             },
             { type: "task.created", data: { task } },
+          ] satisfies PendingRuntimeEvent[],
+          result: { requestId, accepted: true, rejection: null, permit },
+        };
+      },
+    );
+    if (transaction.result.permit) this.permits.set(requestId, transaction.result.permit);
+    return transaction.result;
+  }
+
+  /** Atomic scheduler admission for one host-normalized attenuated current-run speech pass. */
+  async requestAttenuatedSpeechPass(inputValue: {
+    receipt: RangePassRequestReceipt;
+    receiptContentId: string;
+    child: SpawnRequestInput;
+    authorship: { executionId: string; toolCallId: string };
+  }): Promise<SpawnDecision> {
+    assertSpawnRequestInput(inputValue.child, "Attenuated speech pass child");
+    validateRangePassRequestReceipt(inputValue.receipt);
+    const input = structuredClone(inputValue.child);
+    const receipt = structuredClone(inputValue.receipt);
+    const requestId = this.identities.next("request");
+    const transaction = await this.ledger.transact<SpawnDecision>(
+      { producer: { kind: "scheduler", id: "bounded-scheduler" }, causationId: receipt.passId, correlationId: requestId },
+      ({ state }) => {
+        const requestEvent = {
+          type: "spawn.requested" as const,
+          data: {
+            requestId,
+            requestedByTaskId: receipt.root.taskId,
+            requestedByAgentId: receipt.root.agentId,
+            authoredByExecutionId: inputValue.authorship.executionId,
+            toolCallId: inputValue.authorship.toolCallId,
+            input,
+          },
+        };
+        const requestedEvent = {
+          type: "study.restudy_pass_requested" as const,
+          data: { receiptContentId: inputValue.receiptContentId, receipt },
+        };
+        const priorPasses = Object.values(state.rangePasses);
+        const duplicatePassIdentity = state.rangePasses[receipt.passId] !== undefined;
+        const sameRange = priorPasses.filter((entry) =>
+          entry.request.weakRange.artifactId === receipt.weakRange.artifactId &&
+          entry.request.weakRange.trackId === receipt.weakRange.trackId &&
+          entry.request.weakRange.startMs === receipt.weakRange.startMs &&
+          entry.request.weakRange.endMs === receipt.weakRange.endMs);
+        let rejection: SpawnRejection | null = duplicatePassIdentity || priorPasses.some((entry) => entry.accepted && entry.request.workFingerprint === receipt.workFingerprint)
+          ? "restudy_duplicate_work"
+          : sameRange.filter((entry) => entry.accepted).length >= receipt.limits.maxAcceptedPassesPerRange
+            ? "restudy_range_pass_cap"
+            : priorPasses.filter((entry) => entry.accepted && entry.request.producer.kind === receipt.producer.kind).length >= receipt.limits.maxAcceptedPassesPerProducer
+              ? "restudy_producer_pass_cap"
+              : this.violation(state, receipt.root.taskId, receipt.root.agentId, input);
+        const root = state.tasks[receipt.root.taskId];
+        const execution = state.executions[receipt.root.executionId];
+        const authoredCall = state.orchestratorToolCalls[inputValue.authorship.toolCallId];
+        const executionRange = receipt.delta.executionRange;
+        const childMatchesReceipt =
+          input.workloadKey === `restudy:${receipt.workFingerprint}` &&
+          input.workerKind === "analysis" &&
+          input.mediaScope.length === 1 &&
+          input.mediaScope[0].artifactId === executionRange.artifactId &&
+          input.mediaScope[0].trackId === executionRange.trackId &&
+          input.mediaScope[0].startMs === executionRange.startMs &&
+          input.mediaScope[0].endMs === executionRange.endMs &&
+          input.inputArtifactIds.length === 1 &&
+          input.inputArtifactIds[0] === root?.jobContext.source.artifactId &&
+          input.requiredOutputs.length === 1 &&
+          input.requiredOutputs[0].artifactKind === "studio.study-report.v2" &&
+          input.requiredOutputs[0].required === true &&
+          input.requiredCapabilities.length === 2 &&
+          input.requiredCapabilities[0] === "speech.transcribe" &&
+          input.requiredCapabilities[1] === "report.submit" &&
+          input.dependencies.length === 0 &&
+          input.budget.wallMs === receipt.reservedSpend.wallMs &&
+          input.budget.toolCalls === receipt.reservedSpend.toolCalls;
+        if (!root || root.parentTaskId !== null || root.ownerAgentId !== receipt.root.agentId ||
+            execution?.status !== "active" || execution.taskId !== root.id || execution.agentId !== root.ownerAgentId ||
+            inputValue.authorship.executionId !== execution.id ||
+            !root.grants.some((grant) => grant.capability === "study.restudy") ||
+            authoredCall?.tool !== "study_restudy_request" || authoredCall.executionId !== execution.id || authoredCall.taskId !== root.id ||
+            !childMatchesReceipt) rejection = "requester_not_authorized";
+        if (rejection) {
+          return {
+            pending: duplicatePassIdentity
+              ? [
+                  requestEvent,
+                  { type: "spawn.decided", data: { requestId, accepted: false, rejection, taskId: null, agentId: null, grants: [] } },
+                ] satisfies PendingRuntimeEvent[]
+              : [
+                  requestedEvent,
+                  requestEvent,
+                  { type: "spawn.decided", data: { requestId, accepted: false, rejection, taskId: null, agentId: null, grants: [] } },
+                  { type: "study.restudy_pass_decided", data: { passId: receipt.passId, spawnRequestId: requestId, accepted: false, rejection, taskId: null, agentId: null } },
+                ] satisfies PendingRuntimeEvent[],
+            result: { requestId, accepted: false, rejection, permit: null },
+          };
+        }
+        const taskId = this.identities.next("task");
+        const agentId = this.identities.next("agent");
+        const grants = this.grants(state, taskId, agentId, input);
+        const permit: LaunchPermit = { requestId, taskId, agentId, registrationSecret: this.identities.secret() };
+        const task: TaskRecord = {
+          id: taskId,
+          runId: state.runId,
+          workloadKey: input.workloadKey,
+          objective: input.objective,
+          workerKind: input.workerKind,
+          workerLabel: input.workerLabel,
+          parentTaskId: root.id,
+          parentAgentId: root.ownerAgentId,
+          depth: root.depth + 1,
+          assignedAgentId: agentId,
+          ownerAgentId: null,
+          jobContext: attenuateTaskJobContext(root.jobContext, input.mediaScope, input.inputArtifactIds),
+          mediaScope: structuredClone(input.mediaScope),
+          inputArtifactIds: [...input.inputArtifactIds],
+          requiredOutputs: structuredClone(input.requiredOutputs),
+          dependencies: [...input.dependencies],
+          budget: { ...input.budget },
+          grants,
+          status: "scheduled",
+          terminalReason: null,
+        };
+        return {
+          pending: [
+            requestedEvent,
+            requestEvent,
+            { type: "spawn.decided", data: { requestId, accepted: true, rejection: null, taskId, agentId, grants } },
+            { type: "task.created", data: { task } },
+            { type: "study.restudy_pass_decided", data: { passId: receipt.passId, spawnRequestId: requestId, accepted: true, rejection: null, taskId, agentId } },
           ] satisfies PendingRuntimeEvent[],
           result: { requestId, accepted: true, rejection: null, permit },
         };

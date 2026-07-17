@@ -20,6 +20,7 @@ import {
   ORCHESTRATOR_DISPOSITION_TOOL,
   ORCHESTRATOR_READ_TOOL,
   ORCHESTRATOR_PLAN_TOOL,
+  ORCHESTRATOR_RESTUDY_TOOL,
   ORCHESTRATOR_SYNTHESIZE_TOOL,
 } from "./executor/orchestratorBridge.ts";
 import { openOrchestratorBridge } from "./executor/orchestratorBridgeHttp.ts";
@@ -43,6 +44,7 @@ import { ParentArtifactAdmissionHost } from "./admission/parentArtifactAdmission
 import { ParentArtifactReadHost } from "./admission/parentArtifactReadHost.ts";
 import { StudyPlanningHost } from "./study/studyPlanningHost.ts";
 import { OwnedMediaStudySynthesisHost } from "./study/studySynthesisHost.ts";
+import { RangePassHost } from "./study/rangePassHost.ts";
 
 export interface OrchestratorChildLauncher {
   launch(permit: LaunchPermit): Promise<unknown>;
@@ -222,6 +224,7 @@ export class CodexExecOrchestratorLauncher {
         JSON.stringify(["task.reports.wait", "task.spawn.request"]),
         JSON.stringify(["artifact.read", "report.disposition", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
         JSON.stringify(["artifact.read", "report.disposition", "study.plan", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
+        JSON.stringify(["artifact.read", "report.disposition", "study.restudy", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
       ].includes(JSON.stringify(scheduled.grants.map((grant) => grant.capability).sort()))
     ) throw new Error("Orchestrator permit does not reference one exact unowned root contract");
 
@@ -252,7 +255,8 @@ export class CodexExecOrchestratorLauncher {
     const schemaPath = join(directory, "orchestrator-output.schema.json");
     await writeFile(schemaPath, `${JSON.stringify(orchestratorOutputSchema)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
     const planningEnabled = task.grants.some((grant) => grant.capability === "study.plan");
-    const generalizedEnabled = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v2");
+    const generalizedEnabled = task.requiredOutputs.some((output) => output.required && (output.artifactKind === "studio.owned-media-study.v2" || output.artifactKind === "studio.owned-media-study.v3"));
+    const restudiedEnabled = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v3");
     const boundedBridge = new BoundedOrchestratorBridge({
       task,
       executionId,
@@ -266,6 +270,7 @@ export class CodexExecOrchestratorLauncher {
         synthesisHost: new OwnedMediaStudySynthesisHost(this.ledger, this.artifacts),
       } : {}),
       ...(generalizedEnabled ? { artifacts: this.artifacts } : {}),
+      ...(restudiedEnabled ? { rangePassHost: new RangePassHost(this.ledger, this.artifacts, this.scheduler) } : {}),
     });
     const bridge = await openOrchestratorBridge(boundedBridge);
     let processResult: ProcessResult | null = null;
@@ -282,6 +287,8 @@ export class CodexExecOrchestratorLauncher {
         "-c", "mcp_servers.studio_orchestrator.required=true",
         "-c", `mcp_servers.studio_orchestrator.enabled_tools=${tomlStrings(planningEnabled
           ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL]
+          : restudiedEnabled
+            ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL]
           : generalizedEnabled
             ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL]
             : [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL])}`,
@@ -373,10 +380,13 @@ export class CodexExecOrchestratorLauncher {
           entry.parentTaskId === task.id);
         const studies = Object.values(state.generalizedOwnedMediaStudies).filter((entry) =>
           entry.executionId === executionId);
-        if (acceptedAdmissions.length < 2 || completedReads.length < 2 || studies.length !== 1) {
+        const acceptedPasses = Object.values(state.rangePasses).filter((entry) => entry.accepted);
+        if (acceptedAdmissions.length < 2 || completedReads.length < 2 || studies.length !== 1 ||
+            studies[0]?.schema !== (restudiedEnabled ? "studio.owned-media-study.v3" : "studio.owned-media-study.v2") ||
+            (restudiedEnabled && acceptedPasses.some((entry) => !entry.terminal))) {
           throw new LauncherFailure(
             "Orchestrator omitted required generalized admission, reads, or synthesis",
-            "Codex orchestrator did not close two generalized admitted reads and one v2 owned-media study.",
+            `Codex orchestrator did not close two generalized admitted reads, every accepted range pass, and one ${restudiedEnabled ? "v3" : "v2"} owned-media study.`,
           );
         }
       }

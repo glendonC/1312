@@ -14,6 +14,7 @@ export const CAPABILITIES = [
   "report.disposition",
   "artifact.read",
   "study.plan",
+  "study.restudy",
   "study.synthesize",
 ] as const;
 
@@ -237,7 +238,10 @@ export type SpawnRejection =
   | "missing_output_contract"
   | "dependency_unavailable"
   | "scope_violation"
-  | "capability_not_grantable";
+  | "capability_not_grantable"
+  | "restudy_duplicate_work"
+  | "restudy_range_pass_cap"
+  | "restudy_producer_pass_cap";
 
 export interface LaunchPermit {
   requestId: string;
@@ -299,6 +303,7 @@ export interface OrchestratorToolCallRecord {
     | "report_disposition"
     | "artifact_read"
     | "study_planning_decision"
+    | "study_restudy_request"
     | "study_synthesize";
   spawnRequestId: string | null;
 }

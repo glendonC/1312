@@ -16,6 +16,7 @@ export type RuntimeProducerKind =
   | "admission_host"
   | "artifact_read_host"
   | "study_planning_host"
+  | "study_restudy_host"
   | "study_synthesis_host"
   | "study_audit_host"
   | "launcher"

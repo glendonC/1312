@@ -8,6 +8,7 @@ import {
   ORCHESTRATOR_DISPOSITION_TOOL,
   ORCHESTRATOR_READ_TOOL,
   ORCHESTRATOR_PLAN_TOOL,
+  ORCHESTRATOR_RESTUDY_TOOL,
   ORCHESTRATOR_SYNTHESIZE_TOOL,
   OrchestratorBridgeError,
   type OrchestratorToolManifest,
@@ -17,6 +18,7 @@ import {
   type ReportDispositionToolResult,
   type AdmittedArtifactReadToolResult,
   type StudyPlanningToolResult,
+  type StudyRestudyToolResult,
   type StudySynthesisToolResult,
 } from "./orchestratorBridge.ts";
 
@@ -90,6 +92,7 @@ export async function openOrchestratorBridge(bridge: BoundedOrchestratorBridge):
         else if (body.name === ORCHESTRATOR_DISPOSITION_TOOL) json(response, 200, { ok: true, result: await bridge.disposition(body.arguments) });
         else if (body.name === ORCHESTRATOR_READ_TOOL) json(response, 200, { ok: true, result: await bridge.readAdmitted(body.arguments) });
         else if (body.name === ORCHESTRATOR_PLAN_TOOL) json(response, 200, { ok: true, result: await bridge.plan(body.arguments) });
+        else if (body.name === ORCHESTRATOR_RESTUDY_TOOL) json(response, 200, { ok: true, result: await bridge.restudy(body.arguments) });
         else if (body.name === ORCHESTRATOR_SYNTHESIZE_TOOL) json(response, 200, { ok: true, result: await bridge.synthesize(body.arguments) });
         else throw new OrchestratorBridgeError("invalid_request", "The orchestrator tool name is unavailable.");
         return;
@@ -153,10 +156,10 @@ export async function callOrchestratorBridge(
   token: string,
   name: OrchestratorToolName,
   args: unknown,
-): Promise<SpawnToolResult | ReportsWaitToolResult | ReportDispositionToolResult | AdmittedArtifactReadToolResult | StudyPlanningToolResult | StudySynthesisToolResult> {
+): Promise<SpawnToolResult | ReportsWaitToolResult | ReportDispositionToolResult | AdmittedArtifactReadToolResult | StudyPlanningToolResult | StudyRestudyToolResult | StudySynthesisToolResult> {
   const value = await remoteJson(endpoint, token, "/v1/call", {
     method: "POST",
     body: JSON.stringify({ name, arguments: args }),
   });
-  return value.result as SpawnToolResult | ReportsWaitToolResult | ReportDispositionToolResult | AdmittedArtifactReadToolResult | StudyPlanningToolResult | StudySynthesisToolResult;
+  return value.result as SpawnToolResult | ReportsWaitToolResult | ReportDispositionToolResult | AdmittedArtifactReadToolResult | StudyPlanningToolResult | StudyRestudyToolResult | StudySynthesisToolResult;
 }

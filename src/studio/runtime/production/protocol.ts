@@ -68,6 +68,11 @@ import type {
   GeneralizedParentArtifactReadCompletedEvent,
   GeneralizedOwnedMediaStudyCompletedEvent,
   GeneralizedStudyReadinessAuditedEvent,
+  StudyRestudyPassRequestedEvent,
+  StudyRestudyPassDecidedEvent,
+  StudyRestudyPassTerminalRecordedEvent,
+  RestudiedOwnedMediaStudyCompletedEvent,
+  RestudiedStudyReadinessAuditedEvent,
 } from "./protocol/studyEvents.ts";
 
 export * from "./protocol/base.ts";
@@ -138,7 +143,12 @@ export type RuntimeEvent =
   | GeneralizedParentAdmissionRecordedEvent
   | GeneralizedParentArtifactReadCompletedEvent
   | GeneralizedOwnedMediaStudyCompletedEvent
-  | GeneralizedStudyReadinessAuditedEvent;
+  | GeneralizedStudyReadinessAuditedEvent
+  | StudyRestudyPassRequestedEvent
+  | StudyRestudyPassDecidedEvent
+  | StudyRestudyPassTerminalRecordedEvent
+  | RestudiedOwnedMediaStudyCompletedEvent
+  | RestudiedStudyReadinessAuditedEvent;
 
 export type PendingRuntimeEvent = RuntimeEvent extends infer Event
   ? Event extends RuntimeEvent

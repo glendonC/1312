@@ -72,6 +72,7 @@ const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
     "report.disposition",
     "artifact.read",
     "study.plan",
+    "study.restudy",
     "study.synthesize",
   ]),
   media: new Set(["media.extract", "media.seek", "media.frames.sample", "speech.transcribe", "report.submit"]),

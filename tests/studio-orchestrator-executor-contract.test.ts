@@ -25,7 +25,8 @@ if (args[0] === "--version") {
 let prompt = "";
 for await (const chunk of process.stdin) prompt += chunk;
 const isRoot = Boolean(process.env.STUDIO_ORCHESTRATOR_BRIDGE_URL);
-const generalized = prompt.includes("exactly 5 closed, path-free tools") || prompt.includes("studio.study-report.v2");
+const generalized = prompt.includes("studio.study-report.v2");
+const restudied = prompt.includes("studio.owned-media-study.v3");
 const testMode = ${JSON.stringify(mode)};
 if (isRoot && testMode === "hang-root") await new Promise(() => setInterval(() => {}, 1_000));
 if (isRoot) {
@@ -47,7 +48,7 @@ if (isRoot) {
   }
   const modelIndex = args.indexOf("--model");
   if (args[modelIndex + 1] !== "owned-swarm-test-model") throw new Error("root model was not explicit");
-  if (!prompt.includes("exactly " + (generalized ? "5" : "6") + " closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext")) {
+  if (!prompt.includes("exactly 6 closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext") || (restudied && !prompt.includes("study_restudy_request"))) {
     throw new Error("closed root prompt contract is missing");
   }
   const root = JSON.parse(prompt.split("\\n\\n").at(-1));
@@ -102,7 +103,7 @@ if (isRoot) {
   if (generalized) {
     if (!synthesisInput) throw new Error("two admitted generalized reads did not expose synthesis input");
     const synthesis = await call("study_synthesize", synthesisInput);
-    if (!synthesis.studyId || synthesis.executorReceipt.schema !== "studio.owned-media-study.executor-receipt.v2") throw new Error("generalized study synthesis did not close");
+    if (!synthesis.studyId || synthesis.executorReceipt.schema !== (restudied ? "studio.owned-media-study.executor-receipt.v3" : "studio.owned-media-study.executor-receipt.v2")) throw new Error("generalized study synthesis did not close");
   } else {
   if (!planningInput) throw new Error("two admitted reads did not expose planning input");
   const planning = await call("study_planning_decision", {
@@ -270,7 +271,7 @@ test("Codex root launcher exposes the closed planning/synthesis tools and receip
   }
 });
 
-test("default Codex launcher closes the five-tool U3 report-to-readiness spine", async () => {
+test("default Codex launcher closes the six-tool U4 report-to-readiness spine", async () => {
   const directory = await mkdtemp(join(tmpdir(), "studio-orchestrator-u3-default-"));
   try {
     const loadedSource = await loadOwnedSourceSession(resolve("public/demo/runs/run-005"));
@@ -303,13 +304,16 @@ test("default Codex launcher closes the five-tool U3 report-to-readiness spine",
     );
     const state = (await RuntimeLedger.open(initialized.runStart.runtimeId, new FileEventJournal(initialized.journalPath))).state();
     const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
-    assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v2", required: true }]);
+    assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v3", required: true }]);
     assert.equal(root.grants.some((grant) => grant.capability === "study.plan"), false);
+    assert.equal(root.grants.some((grant) => grant.capability === "study.restudy"), true);
     assert.equal(Object.values(state.reports).filter((report) => report.study?.schema === "studio.study-report-submission.v2").length, 2);
     assert.equal(Object.keys(state.generalizedParentArtifactAdmissions).length, 2);
     assert.equal(Object.keys(state.generalizedParentArtifactReads).length, 2);
     assert.equal(Object.keys(state.generalizedOwnedMediaStudies).length, 1);
     assert.equal(Object.keys(state.generalizedStudyReadiness).length, 1);
+    assert.equal(Object.values(state.generalizedOwnedMediaStudies)[0].schema, "studio.owned-media-study.v3");
+    assert.equal(Object.values(state.generalizedStudyReadiness)[0].schema, "studio.study-readiness.receipt.v4");
     assert.equal(Object.keys(state.parentArtifactDispositions).length, 0);
     assert.equal(Object.keys(state.ownedMediaStudies).length, 0);
     assert.equal(Object.keys(state.studyPlanningDecisions).length, 0);

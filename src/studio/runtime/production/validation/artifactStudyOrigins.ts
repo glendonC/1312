@@ -104,7 +104,7 @@ export function validateStudyArtifactOrigin(
     string(origin.executorReceiptId, context, `${path}.origin.executorReceiptId`);
     contentId(origin.executorReceiptContentId, context, `${path}.origin.executorReceiptContentId`);
     if (
-      item.kind !== "studio.owned-media-study.v2" || mediaClass !== "non_media" || item.publication !== "private" ||
+      (item.kind !== "studio.owned-media-study.v2" && item.kind !== "studio.owned-media-study.v3") || mediaClass !== "non_media" || item.publication !== "private" ||
       item.durationMs !== null || (item.tracks as unknown[]).length !== 0 || sources.length === 0 || task === null || agent === null
     ) fail(context, path, "generalized owned-media studies must be private root-produced typed artifacts with source lineage");
   } else if (kind === "study_readiness") {
@@ -130,11 +130,11 @@ export function validateStudyArtifactOrigin(
     const receiptContentId = contentId(origin.receiptContentId, context, `${path}.origin.receiptContentId`);
     oneOf(origin.outcome, new Set(["proceed_to_caption_review", "withheld"]), context, `${path}.origin.outcome`);
     if (
-      item.kind !== "studio.study-readiness.receipt.v3" || mediaClass !== "non_media" || item.publication !== "private" ||
+      (item.kind !== "studio.study-readiness.receipt.v3" && item.kind !== "studio.study-readiness.receipt.v4") || mediaClass !== "non_media" || item.publication !== "private" ||
       item.durationMs !== null || (item.tracks as unknown[]).length !== 0 || task !== null || agent !== null ||
       JSON.stringify(sources) !== JSON.stringify([studyArtifactId]) ||
       receiptContentId !== (item.content as { contentId: string }).contentId
-    ) fail(context, path, "generalized readiness must be a private deterministic receipt over one exact v2 study");
+    ) fail(context, path, "generalized readiness must be a private deterministic receipt over one exact generalized study");
   } else {
     return false;
   }

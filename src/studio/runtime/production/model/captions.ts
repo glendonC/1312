@@ -6,6 +6,7 @@ import type {
   StudyReadinessReceiptIdentity,
 } from "./studies.ts";
 import type { CaptionLineCausalityV3 } from "./studiesV2.ts";
+import type { CaptionLineCausalityV4 } from "./studiesV3.ts";
 import type { GeneralizedCoverageReasonCode } from "./studyReportsV2.ts";
 
 export const CAPTION_PRODUCTION_LIMITS = {
@@ -82,7 +83,7 @@ export interface CaptionProductionLine {
       cognitionClaim: "none";
     };
     /** Present only on v3 caption artifacts; preserves the exact generalized abstention state. */
-    generalizedCausality?: CaptionLineCausalityV3;
+    generalizedCausality?: CaptionLineCausalityV3 | CaptionLineCausalityV4;
   };
   source: {
     language: "ko";
@@ -120,7 +121,7 @@ export interface CaptionExecutorDescriptor {
 }
 
 export interface CaptionProductionArtifact {
-  schema: "studio.caption-production.artifact.v1" | "studio.caption-production.artifact.v2" | "studio.caption-production.artifact.v3";
+  schema: "studio.caption-production.artifact.v1" | "studio.caption-production.artifact.v2" | "studio.caption-production.artifact.v3" | "studio.caption-production.artifact.v4";
   jobId: string;
   runId: string;
   input: {
@@ -146,7 +147,7 @@ export interface CaptionProductionArtifact {
 }
 
 export interface CaptionProductionReceipt {
-  schema: "studio.caption-production.receipt.v1" | "studio.caption-production.receipt.v2" | "studio.caption-production.receipt.v3";
+  schema: "studio.caption-production.receipt.v1" | "studio.caption-production.receipt.v2" | "studio.caption-production.receipt.v3" | "studio.caption-production.receipt.v4";
   receiptId: string;
   jobId: string;
   authority: {
@@ -163,8 +164,8 @@ export interface CaptionProductionReceipt {
   input: CaptionProductionArtifact["input"];
   producer: {
     id: "studio.host-caption-production";
-    version: "1" | "2" | "3";
-    policy: "verified_unrevoked_approval_only" | "verified_unrevoked_approval_and_dialogue_scope_only" | "verified_unrevoked_approval_and_generalized_causality_v3_only";
+    version: "1" | "2" | "3" | "4";
+    policy: "verified_unrevoked_approval_only" | "verified_unrevoked_approval_and_dialogue_scope_only" | "verified_unrevoked_approval_and_generalized_causality_v3_only" | "verified_unrevoked_approval_and_restudied_causality_v4_only";
     executor: CaptionExecutorDescriptor;
   };
   limits: typeof CAPTION_PRODUCTION_LIMITS;
@@ -184,7 +185,7 @@ export interface CaptionProductionReceipt {
       claimIds: string[];
       semanticEvidenceArtifactIds: string[];
       reportArtifactIds: string[];
-      generalizedCausality?: CaptionLineCausalityV3;
+      generalizedCausality?: CaptionLineCausalityV3 | CaptionLineCausalityV4;
     }>;
   };
 }

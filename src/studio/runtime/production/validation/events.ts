@@ -53,6 +53,12 @@ import {
   validateStudyReadinessReceiptV3,
 } from "./studiesV2.ts";
 import {
+  validateRangePassRequestReceipt,
+  validateRangePassTerminalReceipt,
+  validateOwnedMediaStudyExecutorReceiptV3,
+  validateStudyReadinessReceiptV4,
+} from "./studiesV3.ts";
+import {
   assertMediaExtractRequest,
   assertMediaSeekRequest,
   validateMediaOperationReceipt,
@@ -96,6 +102,9 @@ const REJECTIONS = new Set([
   "dependency_unavailable",
   "scope_violation",
   "capability_not_grantable",
+  "restudy_duplicate_work",
+  "restudy_range_pass_cap",
+  "restudy_producer_pass_cap",
 ]);
 
 export function assertRuntimeEvent(
@@ -129,7 +138,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -211,7 +220,7 @@ export function assertRuntimeEvent(
     string(data.callId, context, "event.data.callId");
     string(data.executionId, context, "event.data.executionId");
     string(data.taskId, context, "event.data.taskId");
-    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_synthesize"]), context, "event.data.tool");
+    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_restudy_request", "study_synthesize"]), context, "event.data.tool");
   } else if (type === "reports.wait_started") {
     exact(data, ["waitId", "executionId", "parentTaskId"], context, "event.data");
     string(data.waitId, context, "event.data.waitId");
@@ -587,6 +596,47 @@ export function assertRuntimeEvent(
     string(data.outputArtifactId, context, "event.data.outputArtifactId");
     contentId(data.receiptContentId, context, "event.data.receiptContentId");
     validateStudyReadinessReceiptV3(data.receipt);
+    const study = object(data.study, context, "event.data.study");
+    exact(study, ["study", "executorReceiptId", "executorReceiptContentId"], context, "event.data.study");
+    string(study.executorReceiptId, context, "event.data.study.executorReceiptId");
+    contentId(study.executorReceiptContentId, context, "event.data.study.executorReceiptContentId");
+  } else if (type === "study.restudy_pass_requested") {
+    exact(data, ["receiptContentId", "receipt"], context, "event.data");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateRangePassRequestReceipt(data.receipt);
+  } else if (type === "study.restudy_pass_decided") {
+    exact(data, ["passId", "spawnRequestId", "accepted", "rejection", "taskId", "agentId"], context, "event.data");
+    string(data.passId, context, "event.data.passId");
+    string(data.spawnRequestId, context, "event.data.spawnRequestId");
+    const accepted = boolean(data.accepted, context, "event.data.accepted");
+    const rejection = data.rejection === null ? null : oneOf(data.rejection, REJECTIONS, context, "event.data.rejection");
+    const taskId = nullableString(data.taskId, context, "event.data.taskId");
+    const agentId = nullableString(data.agentId, context, "event.data.agentId");
+    if (accepted !== (rejection === null && taskId !== null && agentId !== null)) fail(context, "event.data", "has an inconsistent range-pass decision");
+  } else if (type === "study.restudy_pass_terminal_recorded") {
+    exact(data, ["receiptContentId", "receipt"], context, "event.data");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateRangePassTerminalReceipt(data.receipt);
+  } else if (type === "study.restudied_synthesis_completed") {
+    exact(data, ["studyId", "outputArtifactId", "outputContentId", "executorReceiptContentId", "executorReceipt", "projection"], context, "event.data");
+    string(data.studyId, context, "event.data.studyId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.outputContentId, context, "event.data.outputContentId");
+    contentId(data.executorReceiptContentId, context, "event.data.executorReceiptContentId");
+    validateOwnedMediaStudyExecutorReceiptV3(data.executorReceipt);
+    const projection = object(data.projection, context, "event.data.projection");
+    exact(projection, ["reports", "passes", "coverage", "claims", "evidenceCitations"], context, "event.data.projection");
+    array(projection.reports, context, "event.data.projection.reports");
+    array(projection.passes, context, "event.data.projection.passes");
+    array(projection.coverage, context, "event.data.projection.coverage");
+    array(projection.claims, context, "event.data.projection.claims");
+    array(projection.evidenceCitations, context, "event.data.projection.evidenceCitations");
+  } else if (type === "study.restudied_readiness_audited") {
+    exact(data, ["studyId", "outputArtifactId", "receiptContentId", "receipt", "study"], context, "event.data");
+    string(data.studyId, context, "event.data.studyId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateStudyReadinessReceiptV4(data.receipt);
     const study = object(data.study, context, "event.data.study");
     exact(study, ["study", "executorReceiptId", "executorReceiptContentId"], context, "event.data.study");
     string(study.executorReceiptId, context, "event.data.study.executorReceiptId");

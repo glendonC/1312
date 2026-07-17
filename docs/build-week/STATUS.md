@@ -64,17 +64,31 @@ score.
   only; it does not prove scene understanding or admit visual findings.
 - **U3 multimodal admission and generalized abstention:** additive `studio.evidence-citation.v1`,
   `studio.study-report.v2`, parent admission/read v2, `studio.owned-media-study.v2`, readiness v3,
-  and caption-causality v3 now form the default content-addressed owned-audio study spine without
-  mutating closed v1 receipts. New owned runs select v2 when no contract version is supplied; v1 is
-  retained only through an explicit compatibility selector for historical fixtures and replay.
+  and caption-causality v3 established the content-addressed owned-audio evidence spine without
+  mutating closed v1 receipts. New owned runs still use report/admission v2; v1 is retained only
+  through an explicit compatibility selector for historical fixtures and replay.
   Per-kind cold adapters reopen current-run speech, U1 acoustic observation/receipt lineage, and U2
   frame receipt/manifest/PNG/decoder identities. Speech is the only landed claim-support kind and
   must exactly close its claimed range; acoustic citations qualify coverage, while frames remain
   cite-only. Unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states
   deterministically survive admission, synthesis, readiness, and caption causality. Readiness remains
   an integrity/coverage gate, not semantic QC. Future OCR/speaker/document slots fail closed without
-  producers. The default U3 root has no study-planning or follow-up tool, so this cutover does not
-  start U4. The Studio UI remains unwired and unchanged.
+  producers. U4 extends this evidence layer additively rather than reopening v1 planning. The Studio
+  UI remains unwired and unchanged.
+- **U4 budgeted re-study — attenuated current-run speech vertical slice:** the default generalized
+  root now exposes `study_restudy_request` beside the five U3 tools and closes terminal
+  `studio.owned-media-study.v3`, readiness v4, and caption/caption-causality v4 while reports and
+  admissions remain v2. A host-derived request names one exact weak range, evidence-tied cause,
+  prior report/citation/speech identities, and one strict attenuated subrange. The host fixes pass 2,
+  current-run speech configuration scope, and a 20 s/one-call reservation; the scheduler rejects
+  scope broadening, enforces one accepted pass per range/four per producer, and atomically dedupes an
+  identical work/configuration fingerprint. Request and terminal receipts retain reserved/measured
+  spend, task/report/admission/read lineage, outcome, and disagreement. Study v3 preserves every
+  admitted report and accepted pass in order; only pass-new range-closing current-run speech
+  citations can support the executed subrange. Otherwise the affected range terminates weak while
+  unrelated supported ranges continue. Padded audio, denser frames, alternate recognizer/
+  segmentation configuration, and specialist deltas are typed but fail closed until a producer and
+  grant are registered. No UI, U5/OCR, semantic-quality, improvement, or Bet G claim is included.
 
 ## Post-freeze backlog boundary
 
@@ -89,7 +103,8 @@ indefinite deferrals or a one-day implementation claim:
    producer rung.
 3. U3 multimodal admission and generalized abstention — implemented and default-runtime wired;
    frames remain cite-only.
-4. U4 budgeted multi-pass re-study over exact gaps/subranges.
+4. U4 budgeted multi-pass re-study — one attenuated current-run speech pass implemented and
+   default-runtime wired; additional delta producers remain closed.
 5. U5 OCR and scene/on-screen context.
 6. U6 anonymous speaker/overlap evidence.
 7. U7 conditional separation and raw/stem comparison.
@@ -137,6 +152,10 @@ indefinite deferrals or a one-day implementation claim:
   abstention preservation, and content-addressed replay. It does not prove multimodal understanding,
   evidence accuracy, independent corroboration, reliability equivalence, truth arbitration,
   transcription/translation quality, OCR, or scene understanding.
+- U4 proves exact weak-range/cause selection, one bounded delta-bearing pass, scheduler caps/dedupe,
+  durable pass history/disagreement, citation-only support upgrades, terminal weakness, and replay.
+  A pass count, token count, agent count, role label, or successful citation does not prove
+  understanding, semantic correctness, accuracy, quality, or improvement.
 
 ## Where to read what
 

@@ -12,6 +12,13 @@ import type {
   OwnedMediaStudyClaimV2,
   EvidenceCitationEnvelope,
   StudyReadinessReceiptV3,
+  RangePassRequestReceipt,
+  RangePassTerminalReceipt,
+  SpawnRejection,
+  OwnedMediaStudyExecutorReceiptV3,
+  OwnedMediaStudyCoverageRangeV3,
+  RangePassRecord,
+  StudyReadinessReceiptV4,
 } from "../model.ts";
 import type { RuntimeEventBase } from "./base.ts";
 
@@ -102,6 +109,61 @@ export interface GeneralizedStudyReadinessAuditedEvent extends RuntimeEventBase 
     receipt: StudyReadinessReceiptV3;
     study: {
       study: import("../model.ts").OwnedMediaStudyV2Identity;
+      executorReceiptId: string;
+      executorReceiptContentId: string;
+    };
+  };
+}
+
+export interface StudyRestudyPassRequestedEvent extends RuntimeEventBase {
+  type: "study.restudy_pass_requested";
+  data: { receiptContentId: string; receipt: RangePassRequestReceipt };
+}
+
+export interface StudyRestudyPassDecidedEvent extends RuntimeEventBase {
+  type: "study.restudy_pass_decided";
+  data: {
+    passId: string;
+    spawnRequestId: string;
+    accepted: boolean;
+    rejection: SpawnRejection | null;
+    taskId: string | null;
+    agentId: string | null;
+  };
+}
+
+export interface StudyRestudyPassTerminalRecordedEvent extends RuntimeEventBase {
+  type: "study.restudy_pass_terminal_recorded";
+  data: { receiptContentId: string; receipt: RangePassTerminalReceipt };
+}
+
+export interface RestudiedOwnedMediaStudyCompletedEvent extends RuntimeEventBase {
+  type: "study.restudied_synthesis_completed";
+  data: {
+    studyId: string;
+    outputArtifactId: string;
+    outputContentId: string;
+    executorReceiptContentId: string;
+    executorReceipt: OwnedMediaStudyExecutorReceiptV3;
+    projection: {
+      reports: import("../model.ts").AdmittedStudyReportV2[];
+      passes: RangePassRecord[];
+      coverage: OwnedMediaStudyCoverageRangeV3[];
+      claims: OwnedMediaStudyClaimV2[];
+      evidenceCitations: EvidenceCitationEnvelope[];
+    };
+  };
+}
+
+export interface RestudiedStudyReadinessAuditedEvent extends RuntimeEventBase {
+  type: "study.restudied_readiness_audited";
+  data: {
+    studyId: string;
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: StudyReadinessReceiptV4;
+    study: {
+      study: import("../model.ts").OwnedMediaStudyV3Identity;
       executorReceiptId: string;
       executorReceiptContentId: string;
     };

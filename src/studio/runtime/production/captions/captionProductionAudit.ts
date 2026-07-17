@@ -30,6 +30,9 @@ import { reopenOwnedMediaStudy } from "../study/studySynthesisAudit.ts";
 import { GeneralizedStudyReadinessHost } from "../study/generalizedStudyReadinessHost.ts";
 import { generalizedReadinessReference } from "../study/generalizedStudyRuntime.ts";
 import { GeneralizedCaptionCausalityHost } from "./generalizedCaptionCausality.ts";
+import { RestudiedStudyReadinessHost } from "../study/restudiedStudyReadinessHost.ts";
+import { restudiedReadinessReference } from "../study/restudiedStudyRuntime.ts";
+import { RestudiedCaptionCausalityHost } from "./restudiedCaptionCausality.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import {
   validateCaptionProductionArtifact,
@@ -152,7 +155,9 @@ export async function reopenCaptionProductionResults(
     }
     const generalizedRecord = state.generalizedStudyReadiness[approval.readiness.readinessId] ?? null;
     const generalizedReadiness = generalizedRecord
-      ? await new GeneralizedStudyReadinessHost(state, artifacts).reopen(generalizedReadinessReference(generalizedRecord))
+      ? generalizedRecord.schema === "studio.study-readiness.receipt.v4"
+        ? await new RestudiedStudyReadinessHost(state, artifacts).reopen(restudiedReadinessReference(generalizedRecord))
+        : await new GeneralizedStudyReadinessHost(state, artifacts).reopen(generalizedReadinessReference(generalizedRecord))
       : null;
     const readiness = generalizedRecord ? null : await reopenStudyReadiness(state, artifacts, approval.readiness.readinessId);
     if (generalizedReadiness) {
@@ -287,7 +292,9 @@ export async function reopenCaptionProductionResults(
     );
     const expectsDialogueScopeVersion = Boolean(readiness?.receipt.dialogueScopePolicy);
     if (generalizedStudy
-      ? caption.schema !== "studio.caption-production.artifact.v3" || receipt.schema !== "studio.caption-production.receipt.v3"
+      ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4"
+        ? caption.schema !== "studio.caption-production.artifact.v4" || receipt.schema !== "studio.caption-production.receipt.v4"
+        : caption.schema !== "studio.caption-production.artifact.v3" || receipt.schema !== "studio.caption-production.receipt.v3"
       : (caption.schema === "studio.caption-production.artifact.v2") !== expectsDialogueScopeVersion ||
         (receipt.schema === "studio.caption-production.receipt.v2") !== expectsDialogueScopeVersion
     ) throw new Error(`Caption production ${job.id} does not use the contract version required by its readiness policy`);
@@ -310,12 +317,9 @@ export async function reopenCaptionProductionResults(
         const causality = line.lineage.generalizedCausality;
         if (!causality) { invalidLineCausality = true; continue; }
         if (causality.source.state === "available" && causality.source.text !== null && causality.target.text !== null) {
-          const expected = await new GeneralizedCaptionCausalityHost(state, artifacts).close({
-            readiness: generalizedReadinessReference(generalizedRecord),
-            range: structuredClone(causality.range),
-            sourceText: causality.source.text,
-            targetText: causality.target.text,
-          });
+          const expected = generalizedRecord.schema === "studio.study-readiness.receipt.v4"
+            ? await new RestudiedCaptionCausalityHost(state, artifacts).close({ readiness: restudiedReadinessReference(generalizedRecord), range: structuredClone(causality.range), sourceText: causality.source.text, targetText: causality.target.text })
+            : await new GeneralizedCaptionCausalityHost(state, artifacts).close({ readiness: generalizedReadinessReference(generalizedRecord), range: structuredClone(causality.range), sourceText: causality.source.text, targetText: causality.target.text });
           if (!sameCanonical(expected, causality)) { invalidLineCausality = true; continue; }
         }
         const expectedLine = closeGeneralizedCaptionLineCausality({

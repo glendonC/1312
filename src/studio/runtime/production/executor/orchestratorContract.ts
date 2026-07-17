@@ -49,8 +49,11 @@ export function orchestratorPrompt(task: TaskRecord): string {
   const requiresDelegation = task.objective.startsWith("Delegate at least");
   const requiresCoverageStudyDelegation = task.objective.startsWith("Delegate at least two bounded coverage-study tasks");
   const requiresStudySynthesis = task.grants.some((grant) => grant.capability === "study.synthesize");
-  const generalized = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v2");
-  const exactTools = generalized
+  const generalized = task.requiredOutputs.some((output) => output.required && (output.artifactKind === "studio.owned-media-study.v2" || output.artifactKind === "studio.owned-media-study.v3"));
+  const restudied = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v3");
+  const exactTools = restudied
+    ? ["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_restudy_request", "study_synthesize"]
+    : generalized
     ? ["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_synthesize"]
     : requiresStudySynthesis
     ? ["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_synthesize"]
@@ -85,9 +88,15 @@ export function orchestratorPrompt(task: TaskRecord): string {
     ] : []),
     ...(generalized ? [
       "After the first wait, use report_disposition for every returned studio.study-report.v2 artifact. Accept or reject each one yourself with a reason. The host then cold-audits every typed citation and deterministically preserves acoustic dialogue scope and all weak/conflicting states; at least two accepted reports are required.",
-      "For each accepted result, call artifact_read with its returned admission grant id and exact report content id. After at least two reads, the result includes synthesisInput. This is the complete host-derived coverage and claim projection; copy its coverage and claims exactly into study_synthesize. Any rewrite, state upgrade, hidden range, changed citation, or prose substitution fails closed.",
+      `For each accepted result, call artifact_read with its returned admission grant id and exact report content id. After at least two reads, the result includes synthesisInput${restudied ? " and restudyInput" : ""}. The synthesisInput is the complete host-derived coverage and claim projection; copy its coverage and claims exactly into study_synthesize. Any rewrite, state upgrade, hidden range, changed citation, pass-history replacement, or prose substitution fails closed.`,
       "U3 current-run speech is the only claim-support kind. Acoustic evidence can qualify coverage, and frames are cite-only media context; neither may authorize dialogue text. Unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states must survive synthesis.",
-      "This root does not have study_planning_decision and must not request a U4 follow-up. The deterministic readiness v3 audit runs only after the executor receipt closes; you do not choose readiness or caption authority.",
+      ...(restudied ? [
+        "restudyInput contains only exact current weak ranges, prior evidence, and evidence-tied causes. You may call study_restudy_request once for an exact candidate only when you can name a strict attenuated subrange of its prior broader current-run speech work. Copy inputId, coverageId, and causeId exactly and provide delta kind attenuated_subrange with that strict subrange. The host fixes pass number, producer/configuration scope, budget, and child contract.",
+        "If a range pass is accepted, call task_reports_wait, disposition its v2 report, and artifact_read any accepted admission before synthesis. The next synthesisInput retains every pass, prior weak state, new citations, residual weak cells, and disagreement. A pass without a required delta, identical work/config, scope broadening, unlimited retry, or best-of-K selection is rejected.",
+        "More passes, tokens, agents, or a role label do not imply understanding. Support can arise only from pass-new range-closing current-run speech citations. Exhausted evidence remains unknown, withheld, or unavailable for that range while unrelated ranges continue. The deterministic readiness v4 audit runs only after the executor receipt closes.",
+      ] : [
+        "This root does not have study_planning_decision or study_restudy_request. The deterministic readiness v3 audit runs only after the executor receipt closes; you do not choose readiness or caption authority.",
+      ]),
     ] : []),
     "If any spawn is accepted, call task_reports_wait before returning. Do not treat scheduler acceptance, worker count, signal, VAD, language ID, or a report identity as semantic understanding, transcription, translation, or quality.",
     "Only when requiresDelegation is false and no child request is warranted, make no spawn call and return outcome no_request with a deliberate reason. If a child fails or is interrupted, preserve that state and normally return withheld.",

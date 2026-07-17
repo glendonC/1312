@@ -10,6 +10,7 @@ import {
   ORCHESTRATOR_DISPOSITION_TOOL,
   ORCHESTRATOR_READ_TOOL,
   ORCHESTRATOR_PLAN_TOOL,
+  ORCHESTRATOR_RESTUDY_TOOL,
   ORCHESTRATOR_SYNTHESIZE_TOOL,
 } from "./orchestratorBridge.ts";
 import {
@@ -23,11 +24,13 @@ if (!endpoint || !token) throw new Error("The bounded orchestrator bridge enviro
 
 const manifest = await fetchOrchestratorManifest(endpoint, token);
 const names = new Set(manifest.tools.map((tool) => tool.name));
-const planningNames = [ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL];
-if (!names.has(ORCHESTRATOR_SPAWN_TOOL) || !names.has(ORCHESTRATOR_WAIT_TOOL) ||
-    (names.size !== 2 && names.size !== 5 && names.size !== 6) ||
-    (names.size === 6 && planningNames.some((name) => !names.has(name))) ||
-    (names.size === 5 && [ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL].some((name) => !names.has(name)))) {
+const exactToolSets = [
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL],
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
+] as const;
+if (manifest.tools.length !== names.size || !exactToolSets.some((expected) => expected.length === names.size && expected.every((name) => names.has(name)))) {
   throw new Error("The bounded orchestrator tool manifest is incomplete or open");
 }
 
@@ -210,6 +213,38 @@ if (names.has(ORCHESTRATOR_PLAN_TOOL)) {
   );
 }
 
+if (names.has(ORCHESTRATOR_RESTUDY_TOOL)) {
+  const restudyDelta = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("attenuated_subrange"), executionRange: mediaScope }).strict(),
+    z.object({ kind: z.literal("padded_audio_window"), executionRange: mediaScope, paddingBeforeMs: z.number().int().nonnegative(), paddingAfterMs: z.number().int().nonnegative() }).strict(),
+    z.object({ kind: z.literal("denser_frame_timestamps"), executionRange: mediaScope, timestampsMs: z.array(z.number().int().nonnegative()).min(1).max(256) }).strict(),
+    z.object({ kind: z.literal("alternate_receipted_config"), executionRange: mediaScope, configurationContentId: z.string().min(1) }).strict(),
+    z.object({ kind: z.literal("granted_specialist"), executionRange: mediaScope, specialistKind: z.enum(["acoustic", "visual", "speaker", "context"]) }).strict(),
+  ]);
+  server.registerTool(
+    ORCHESTRATOR_RESTUDY_TOOL,
+    {
+      title: "Request one bounded range pass",
+      description: "Name one exact host-derived weak coverage/cause and one required evidence or configuration delta. Only strict attenuated current-run speech subranges are registered in this slice; all other typed deltas fail closed.",
+      inputSchema: z.object({
+        inputId: z.string().min(1),
+        coverageId: z.string().min(1),
+        causeId: z.string().min(1),
+        delta: restudyDelta,
+      }).strict(),
+      annotations: { title: "Request bounded range pass", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (args: unknown) => {
+      try {
+        const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_RESTUDY_TOOL, args);
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : "The bounded range pass failed closed." }] };
+      }
+    },
+  );
+}
+
 const studyCoverage = z.object({
   coverageId: z.string().min(1),
   artifactId: z.string().min(1),
@@ -268,6 +303,7 @@ const generalizedClaim = z.object({
   }).strict()).min(1).max(512),
   citationIds: z.array(z.string().min(1)).min(1).max(512),
 }).strict();
+const restudiedCoverage = generalizedCoverage.extend({ passIds: z.array(z.string().min(1)).max(32) }).strict();
 
 const legacySynthesisInput = z.object({
   planningDecisionId: z.string().min(1),
@@ -293,7 +329,7 @@ if (names.has(ORCHESTRATOR_SYNTHESIZE_TOOL)) {
       description: "Emit model-authored study coverage, claims, conflicts, and limitations. The host injects immutable context, dispositions, and follow-up history and rejects unsupported support.",
       inputSchema: names.has(ORCHESTRATOR_PLAN_TOOL)
         ? legacySynthesisInput
-        : z.object({ coverage: z.array(generalizedCoverage).min(1).max(256), claims: z.array(generalizedClaim).max(256) }).strict(),
+        : z.object({ coverage: z.array(names.has(ORCHESTRATOR_RESTUDY_TOOL) ? restudiedCoverage : generalizedCoverage).min(1).max(256), claims: z.array(generalizedClaim).max(256) }).strict(),
       annotations: { title: "Emit owned-media study", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async (args: unknown) => {

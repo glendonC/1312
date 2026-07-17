@@ -45,6 +45,7 @@ import type {
   StudyReadinessRecord,
 } from "./studies.ts";
 import type { OwnedMediaStudyRecordV2, StudyReadinessRecordV3 } from "./studiesV2.ts";
+import type { OwnedMediaStudyRecordV3, RangePassRecord, StudyReadinessRecordV4 } from "./studiesV3.ts";
 import type { GeneralizedParentAdmissionRecord, GeneralizedParentArtifactReadRecord } from "./studyReportsV2.ts";
 
 export interface RuntimeProjection {
@@ -81,7 +82,8 @@ export interface RuntimeProjection {
   studyPlanningDecisions: Record<string, StudyPlanningDecisionRecord>;
   studyFollowUps: Record<string, StudyFollowUpRecord>;
   ownedMediaStudies: Record<string, OwnedMediaStudyRecord>;
-  generalizedOwnedMediaStudies: Record<string, OwnedMediaStudyRecordV2>;
+  generalizedOwnedMediaStudies: Record<string, OwnedMediaStudyRecordV2 | OwnedMediaStudyRecordV3>;
   studyReadiness: Record<string, StudyReadinessRecord>;
-  generalizedStudyReadiness: Record<string, StudyReadinessRecordV3>;
+  generalizedStudyReadiness: Record<string, StudyReadinessRecordV3 | StudyReadinessRecordV4>;
+  rangePasses: Record<string, RangePassRecord>;
 }

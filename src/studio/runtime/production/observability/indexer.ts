@@ -55,10 +55,22 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "study.generalized_synthesis_completed") {
     return { kind: "owned_media_study", receipt: event.data.executorReceipt, rawReceiptContentId: null };
   }
+  if (event.type === "study.restudied_synthesis_completed") {
+    return { kind: "owned_media_study", receipt: event.data.executorReceipt, rawReceiptContentId: null };
+  }
+  if (event.type === "study.restudy_pass_requested") {
+    return { kind: "study_range_pass", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
+  if (event.type === "study.restudy_pass_terminal_recorded") {
+    return { kind: "study_range_pass", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "study.readiness_audited") {
     return { kind: "study_readiness", receipt: event.data.receipt, rawReceiptContentId: null };
   }
   if (event.type === "study.generalized_readiness_audited") {
+    return { kind: "study_readiness", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
+  if (event.type === "study.restudied_readiness_audited") {
     return { kind: "study_readiness", receipt: event.data.receipt, rawReceiptContentId: null };
   }
   if (event.type === "parent.generalized_admission_recorded") {

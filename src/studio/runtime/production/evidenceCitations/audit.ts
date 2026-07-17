@@ -11,11 +11,16 @@ import type {
   EvidenceCitationObservation,
   EvidenceCitationState,
   EvidenceCitationTarget,
-  QualifiedMediaRange,
   RuntimeProjection,
 } from "../model.ts";
 import { reopenSemanticEvidence, type VerifiedSemanticEvidence } from "../semantic/semanticEvidenceAudit.ts";
-import { evidenceCitationId, validateEvidenceCitationEnvelope } from "../validation/evidenceCitations.ts";
+import {
+  evidenceCitationId,
+  validateEvidenceCitationEnvelope,
+  validateSupportedClaimCitationClosure,
+} from "../validation/evidenceCitations.ts";
+
+export { validateSupportedClaimCitationClosure };
 
 function same(left: unknown, right: unknown): boolean {
   return canonicalSha256(left) === canonicalSha256(right);
@@ -299,38 +304,4 @@ export async function auditEvidenceCitation(
   }
   if (!same(citation, expected)) throw new Error(`Evidence citation ${citation.citationId} changed its audited producer projection`);
   return structuredClone(expected);
-}
-
-/** Exact tiling over available temporal claim-support observations. */
-export function validateSupportedClaimCitationClosure(
-  claimId: string,
-  range: QualifiedMediaRange,
-  citations: readonly EvidenceCitationEnvelope[],
-): void {
-  const observations = citations
-    .filter((citation) => citation.use === "claim_support" && citation.target.kind === "claim" && citation.target.claimId === claimId)
-    .flatMap((citation) => citation.observations)
-    .map((entry) => {
-      if (entry.state !== "available" || entry.locator.kind !== "temporal_range") {
-        throw new Error(`Supported claim ${claimId} contains non-available or non-temporal evidence`);
-      }
-      return entry;
-    })
-    .sort((left, right) => {
-      const leftRange = left.locator.kind === "temporal_range" ? left.locator.media : range;
-      const rightRange = right.locator.kind === "temporal_range" ? right.locator.media : range;
-      return leftRange.startMs - rightRange.startMs || leftRange.endMs - rightRange.endMs || left.observationId.localeCompare(right.observationId);
-    });
-  let cursor = range.startMs;
-  for (const observation of observations) {
-    const found = observation.locator.kind === "temporal_range" ? observation.locator.media : null;
-    if (!found || found.artifactId !== range.artifactId || found.trackId !== range.trackId ||
-        found.startMs !== cursor || found.endMs > range.endMs) {
-      throw new Error(`Supported claim ${claimId} citations do not exactly close its claimed range`);
-    }
-    cursor = found.endMs;
-  }
-  if (observations.length === 0 || cursor !== range.endMs) {
-    throw new Error(`Supported claim ${claimId} citations leave an unsupported gap`);
-  }
 }

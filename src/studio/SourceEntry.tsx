@@ -90,7 +90,8 @@ export default function SourceEntry({
 
   return (
     <motion.div
-      className="source-entry"
+      className="source-entry studio-bottom-bar-shell"
+      data-lifecycle-mode="source"
       ref={control}
       layout
       transition={SPRING}

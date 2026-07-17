@@ -24,8 +24,9 @@ export default function Dock() {
   const dock = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const cancelled = outcome?.kind === "cancelled";
-  const running = !complete && !cancelled;
-  const terminal = complete || cancelled;
+  const failed = outcome?.kind === "failed";
+  const running = !complete && !cancelled && !failed;
+  const terminal = complete || cancelled || failed;
   const percent = Math.round(done * 100);
 
   useLayoutEffect(() => {
@@ -85,13 +86,13 @@ export default function Dock() {
       </AnimatePresence>
 
       <motion.div
-        className="dock"
+        className="dock studio-bottom-bar-shell"
         ref={dock}
         layout
         transition={SPRING}
         data-running={running}
         data-paused={paused}
-        data-outcome={cancelled ? "cancelled" : complete ? "complete" : "running"}
+        data-outcome={cancelled ? "cancelled" : failed ? "failed" : complete ? "complete" : "running"}
       >
         <DockTrace box={box} done={done} />
 
@@ -115,6 +116,8 @@ export default function Dock() {
             <span className="dock-status" aria-live="polite">
               {cancelled ? (
                 <span className="dock-cancelled">Cancelled</span>
+              ) : failed ? (
+                <span className="dock-failed">Failed</span>
               ) : running ? (
                 pausePending ? (
                   <span className="dock-held">Pausing…</span>

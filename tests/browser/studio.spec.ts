@@ -252,6 +252,11 @@ test("recorded and owned setup paths share the centered staged panel", async ({ 
   await expect(recorded).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await expect(page.getByRole("button", { name: "01 Source" })).toHaveAttribute("aria-current", "step");
   await expect(page.getByRole("button", { name: "02 Range" })).toBeDisabled();
+  const recordedLifecycle = page.getByLabel("Studio lifecycle");
+  await expect(recordedLifecycle).toHaveAttribute("data-lifecycle-mode", "preparation");
+  await expect(recordedLifecycle).toHaveAttribute("data-preparation-stage", "source");
+  await expect(recordedLifecycle.locator(".dock-status")).toHaveText("Source");
+  await expect(recordedLifecycle.locator(".dock-pct")).toHaveText("1 / 6");
 
   const dockDuringRecorded = await page.locator(".studio-source-dock").boundingBox();
   for (const key of ["x", "y", "width", "height"] as const) {
@@ -268,6 +273,11 @@ test("recorded and owned setup paths share the centered staged panel", async ({ 
   await expect(owned.locator(".product-runtime-header")).toHaveCount(0);
   await expect(owned).toHaveAttribute("data-runtime", "false");
   await expect(owned.getByRole("button", { name: "Continue to Range" })).toBeDisabled();
+  const ownedLifecycle = owned.getByLabel("Studio lifecycle");
+  await expect(ownedLifecycle).toHaveAttribute("data-lifecycle-mode", "preparation");
+  await expect(ownedLifecycle).toHaveAttribute("data-preparation-stage", "source");
+  await expect(ownedLifecycle.locator(".dock-status")).toHaveText("Source");
+  await expect(ownedLifecycle.locator(".dock-pct")).toHaveText("1 / 6");
   await owned.getByRole("button", { name: "Back to source choices" }).click();
   await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
@@ -721,7 +731,7 @@ test("the welcome composition fits every supported viewport", async ({ page }, t
   }
 });
 
-test("a submitted source moves through setup and forecast before the recorded interface preview", async ({ page }) => {
+test("a submitted source moves through setup and forecast before the recorded interface preview", async ({ page }, testInfo) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Input Source" }).click();
   const clipField = page.getByRole("textbox", { name: "Clip link" });
@@ -743,8 +753,14 @@ test("a submitted source moves through setup and forecast before the recorded in
   })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
   await expect(page.getByText("Recorded test producer", { exact: true })).toBeVisible();
-  await expect(clipField).toBeVisible();
-  await expect(clipField).toHaveValue(submittedUrl);
+  await expect(clipField).toHaveCount(0);
+  const lifecycleBar = page.getByLabel("Studio lifecycle");
+  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
+  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "source");
+  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Source");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("1 / 6");
+  await expect(lifecycleBar.getByRole("button", { name: "Exit setup" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Explore recorded demo" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add owned media" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Korean samples" })).toBeVisible();
@@ -753,19 +769,24 @@ test("a submitted source moves through setup and forecast before the recorded in
   const welcomeOrbAfter = await page.locator(".welcome-orchestrator-anchor").boundingBox();
   const welcomePanelAfter = await page.locator(".preflight-stage-panel").boundingBox();
   const sourceDockAfter = await page.locator(".studio-source-dock").boundingBox();
-  const sourceBarAfter = await page.locator(".source-entry .dock-bar").boundingBox();
   for (const key of ["x", "y", "width", "height"] as const) {
     expect(Math.abs((sourceDockAfter?.[key] ?? Infinity) - (sourceDockBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
-    expect(Math.abs((sourceBarAfter?.[key] ?? Infinity) - (sourceBarBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
   }
-  expect(Math.abs((welcomeLockupAfter?.x ?? Infinity) - (welcomeLockupBefore?.x ?? -Infinity))).toBeLessThanOrEqual(1);
-  expect(Math.abs((welcomeLockupAfter?.width ?? Infinity) - (welcomeLockupBefore?.width ?? -Infinity))).toBeLessThanOrEqual(1);
-  for (const key of ["x", "y", "width", "height"] as const) {
-    expect(Math.abs((welcomeOrbAfter?.[key] ?? Infinity) - (welcomeOrbBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(1);
+  expect(sourceBarBefore).not.toBeNull();
+  const lifecycleBarBox = await lifecycleBar.boundingBox();
+  const viewportWidth = await page.evaluate(() => window.innerWidth);
+  expect(lifecycleBarBox).not.toBeNull();
+  expect(Math.abs((lifecycleBarBox?.x ?? 0) + (lifecycleBarBox?.width ?? 0) / 2 - viewportWidth / 2)).toBeLessThanOrEqual(1);
+  if (testInfo.project.name === "desktop") {
+    expect(Math.abs((welcomeLockupAfter?.x ?? Infinity) - (welcomeLockupBefore?.x ?? -Infinity))).toBeLessThanOrEqual(1);
+    expect(Math.abs((welcomeLockupAfter?.width ?? Infinity) - (welcomeLockupBefore?.width ?? -Infinity))).toBeLessThanOrEqual(1);
+    for (const key of ["x", "y", "width", "height"] as const) {
+      expect(Math.abs((welcomeOrbAfter?.[key] ?? Infinity) - (welcomeOrbBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(1);
+    }
+    const welcomePanelCenterBefore = (welcomePanelBefore?.x ?? Infinity) + (welcomePanelBefore?.width ?? 0) / 2;
+    const welcomePanelCenterAfter = (welcomePanelAfter?.x ?? -Infinity) + (welcomePanelAfter?.width ?? 0) / 2;
+    expect(Math.abs(welcomePanelCenterAfter - welcomePanelCenterBefore)).toBeLessThanOrEqual(1);
   }
-  const welcomePanelCenterBefore = (welcomePanelBefore?.x ?? Infinity) + (welcomePanelBefore?.width ?? 0) / 2;
-  const welcomePanelCenterAfter = (welcomePanelAfter?.x ?? -Infinity) + (welcomePanelAfter?.width ?? 0) / 2;
-  expect(Math.abs(welcomePanelCenterAfter - welcomePanelCenterBefore)).toBeLessThanOrEqual(1);
   const sourceBoundary = page.getByRole("note", { name: "Submitted source metadata boundary" });
   await sourceBoundary.getByText("Source details", { exact: true }).click();
   await expect(sourceBoundary.getByText("1:23", { exact: true })).toBeVisible();
@@ -817,6 +838,9 @@ test("a submitted source moves through setup and forecast before the recorded in
   expect(initialRequestId).toMatch(/^submitted-preparation:/);
 
   await page.getByRole("button", { name: "Continue to Range" }).click();
+  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "range");
+  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Range");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("2 / 6");
   await expect(page.getByRole("heading", { name: "Choose the section to prepare" })).toBeFocused();
   await expect(requestForm).toHaveAttribute("data-palette", "citron");
   await expect(page.getByLabel("Entire video · 0:00–1:23")).toBeChecked();
@@ -833,6 +857,9 @@ test("a submitted source moves through setup and forecast before the recorded in
   await page.getByLabel("Entire video · 0:00–1:23").check();
 
   await page.getByRole("button", { name: "Continue to Language" }).click();
+  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "language");
+  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Language");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("3 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "blue");
   await expect(page.getByLabel("Automatic · request detection later")).toBeChecked();
   await page.getByLabel("Declare the source language").check();
@@ -842,9 +869,15 @@ test("a submitted source moves through setup and forecast before the recorded in
   expect(changedLanguageRequestId).not.toBe(changedRangeRequestId);
 
   await page.getByRole("button", { name: "Continue to Output" }).click();
+  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "output");
+  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Output");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("4 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "lilac");
   await expect(page.getByLabel("Captions plus evidence and breakdown")).toBeChecked();
   await page.getByRole("button", { name: "Continue to Forecast" }).click();
+  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "forecast");
+  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Forecast");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("5 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "peach");
   const forecast = page.getByRole("heading", { name: "Here’s what Studio knows so far" });
   await expect(forecast).toBeVisible();
@@ -859,13 +892,29 @@ test("a submitted source moves through setup and forecast before the recorded in
   await page.getByRole("button", { name: "05 Forecast" }).click();
   await expect(forecast).toBeFocused();
   await page.getByRole("button", { name: "Continue to Review" }).click();
+  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "confirm");
+  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Review");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("6 / 6");
   await expect(requestForm).toHaveAttribute("data-palette", "teal");
   await expect(page.getByRole("heading", { name: "Preview the interface with a recorded run" })).toBeFocused();
   await expect(page.getByText(/submitted link remains untouched/i)).toBeVisible();
   await expect(page.getByText(/does not submit a runtime command/i)).toBeVisible();
   await page.getByRole("button", { name: "Preview run-006 recorded processing" }).click();
 
+  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "initializing");
+  await expect(lifecycleBar).toContainText("Initializing recorded preview");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
+  await lifecycleBar.getByRole("button", { name: "Cancel start" }).click();
+  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
+  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "confirm");
+  await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
+  await page.getByRole("button", { name: "Preview run-006 recorded processing" }).click();
+  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "initializing");
+
   await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
+  await expect(lifecycleBar).toHaveCount(0);
   await expect(page.locator('.hub [data-agent-identity="orchestrator-root"]')).toBeVisible();
   const thinking = page.locator('.hub [data-field-motion="thinking"]');
   await expect(thinking).toBeVisible();
@@ -917,17 +966,67 @@ test("submitted metadata resolution stays in the welcome composition", async ({ 
   await page.keyboard.press("Enter");
 
   await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "Resolving provider metadata" })).toBeVisible();
+  const lifecycleBar = page.getByLabel("Studio lifecycle");
+  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "resolving");
+  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Resolving metadata…");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("");
+  await expect(lifecycleBar.locator(".dock-pct")).toHaveAttribute("aria-hidden", "true");
+  await expect(lifecycleBar.getByRole("button", { name: "Cancel" })).toBeVisible();
+  await expect(lifecycleBar).toHaveCSS("display", "flex");
+  await expect(lifecycleBar).toHaveCSS("border-radius", "999px");
+  await expect(lifecycleBar).toHaveCSS("background-color", "rgba(255, 255, 255, 0.58)");
+  expect(await lifecycleBar.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe("none");
+  await expect(lifecycleBar.locator(".studio-lifecycle-bar-content")).toHaveCSS("display", "grid");
+  await expect(lifecycleBar.getByRole("button", { name: "Cancel" })).toHaveCSS("height", "40px");
+  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
   await expect(page.getByRole("heading", {
     name: "One moment—I’m asking YouTube for the title, creator, and duration. The media itself remains untouched.",
   })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Clip link" })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Clip link" })).toHaveValue("https://youtu.be/resolvingfixture");
+  await expect(page.getByRole("textbox", { name: "Clip link" })).toHaveCount(0);
   await expect(page.locator(".preflight")).toHaveCount(0);
 
   releaseResolution();
   await expect(page.getByRole("status").filter({ hasText: "Metadata resolved" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "I found the source. It’s 1:23 long." })).toBeVisible();
+});
+
+test("metadata resolution can be cancelled without implying a pausable operation", async ({ page }) => {
+  await page.unroute("**/api/studio/source-resolutions");
+  let releaseResolution!: () => void;
+  const resolutionGate = new Promise<void>((resolve) => {
+    releaseResolution = resolve;
+  });
+  await page.route("**/api/studio/source-resolutions", async (route) => {
+    const request = route.request().postDataJSON() as { url: string };
+    await resolutionGate;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(sourceResolutionReceipt(request.url)),
+    }).catch(() => undefined);
+  });
+
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  const submittedUrl = "https://youtu.be/cancelledfixture";
+  await page.getByRole("textbox", { name: "Clip link" }).fill(submittedUrl);
+  await page.getByRole("button", { name: "Resolve source metadata" }).click();
+
+  const lifecycleBar = page.getByLabel("Studio lifecycle");
+  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "resolving");
+  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
+  await lifecycleBar.getByRole("button", { name: "Cancel" }).click();
+
+  const sourceField = page.getByRole("textbox", { name: "Clip link" });
+  await expect(sourceField).toBeVisible();
+  await expect(sourceField).toHaveValue(submittedUrl);
+  await expect(sourceField).toBeFocused();
+  await expect(lifecycleBar).toHaveCount(0);
+
+  releaseResolution();
+  await page.waitForTimeout(150);
+  await expect(page.locator(".preflight-form")).toHaveCount(0);
+  await expect(sourceField).toBeVisible();
 });
 
 test("a long submitted source opens with an explicit editable two-minute request default", async ({ page }) => {
@@ -973,6 +1072,9 @@ test("submitted preview Results reports no submitted artifact before recorded de
   await expect(boundary).toContainText("run-006");
   await expect(boundary).toContainText("player, captions, workers, evidence, scores, and timing below belong only");
   await expect(boundary).toHaveAttribute("data-submitted-preparation-request-id", /^submitted-preparation:/);
+  await expect(page.locator('.dock[data-outcome="complete"]')).toBeVisible();
+  await expect(page.locator(".dock-status")).toHaveText("Done");
+  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
 });
 
 test("a remote metadata failure keeps duration and range controls unavailable", async ({ page }) => {
@@ -1005,6 +1107,10 @@ test("a remote metadata failure keeps duration and range controls unavailable", 
   await expect(page.getByRole("group", { name: "Analysis range" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Retry same source" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open recorded demo" })).toBeVisible();
+  await expect(page.getByLabel("Studio lifecycle")).toHaveAttribute("data-lifecycle-mode", "failed");
+  await expect(page.getByLabel("Studio lifecycle").locator(".dock-pct")).toHaveText("");
+  await expect(page.getByLabel("Studio lifecycle").locator(".dock-pct")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Retry same source" }).click();
   await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
   expect(attempts).toBe(2);
@@ -1034,7 +1140,10 @@ test("the submitted preparation sequence stays horizontally contained at every s
     await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
     await expect(panel).toHaveCSS("position", "relative");
     await expect(panel).toHaveCSS("overflow-y", "auto");
-    await expect(page.getByRole("textbox", { name: "Clip link" })).toHaveValue("https://youtu.be/dQw4w9WgXcQ");
+    const lifecycleBar = page.getByLabel("Studio lifecycle");
+    await expect(page.getByRole("textbox", { name: "Clip link" })).toHaveCount(0);
+    await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
+    await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "source");
     const sourceDock = page.locator(".studio-source-dock");
     const sourceDockBox = await sourceDock.boundingBox();
     expect(sourceDockBox).not.toBeNull();
@@ -1055,10 +1164,12 @@ test("the submitted preparation sequence stays horizontally contained at every s
     await page.getByRole("button", { name: "Continue to Language" }).click();
     await page.getByRole("button", { name: "Continue to Output" }).click();
     await page.getByRole("button", { name: "Continue to Forecast" }).click();
+    await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "forecast");
     await expect(page.getByRole("heading", { name: "Here’s what Studio knows so far" })).toBeFocused();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
 
     await page.getByRole("button", { name: "Continue to Review" }).click();
+    await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "confirm");
     await expect(page.getByRole("heading", { name: "Preview the interface with a recorded run" })).toBeFocused();
     await expect(page.getByRole("button", { name: "Preview run-006 recorded processing" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);

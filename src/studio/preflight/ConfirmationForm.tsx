@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useRef, useState, type ReactNode, type RefObject } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 
+import { useStudio } from "../store";
 import type { RunBundle } from "../transport";
 import {
   HOSTED_MAX_RANGE_S,
@@ -40,8 +41,11 @@ export default function ConfirmationForm({
   cancel,
   confirm,
 }: ConfirmationFormProps) {
-  const [stage, setStage] = useState<PreparationStage>("source");
-  const [furthestStage, setFurthestStage] = useState(0);
+  const stage = useStudio((state) => state.preparationStage);
+  const furthestStage = useStudio((state) => state.preparationFurthestStage);
+  const initialization = useStudio((state) => state.initialization);
+  const selectPreparationStage = useStudio((state) => state.selectPreparationStage);
+  const advancePreparationStage = useStudio((state) => state.advancePreparationStage);
   const stageHeading = useRef<HTMLHeadingElement>(null);
   const currentStageIndex = preparationStageIndex(stage);
   const { request } = session;
@@ -56,7 +60,7 @@ export default function ConfirmationForm({
           : null;
 
   function selectStage(nextStage: PreparationStage): void {
-    if (preparationStageIndex(nextStage) <= furthestStage) setStage(nextStage);
+    selectPreparationStage(nextStage);
   }
 
   function submitStage(): void {
@@ -65,11 +69,7 @@ export default function ConfirmationForm({
       return;
     }
     if (stage === "range" && !assessment?.canReplay) return;
-    const nextIndex = currentStageIndex + 1;
-    const nextStage = PREPARATION_STAGES[nextIndex]?.id;
-    if (!nextStage) return;
-    setFurthestStage((current) => Math.max(current, nextIndex));
-    setStage(nextStage);
+    advancePreparationStage();
   }
 
   function previousStage(): void {
@@ -77,7 +77,7 @@ export default function ConfirmationForm({
       cancel();
       return;
     }
-    setStage(PREPARATION_STAGES[currentStageIndex - 1].id);
+    selectPreparationStage(PREPARATION_STAGES[currentStageIndex - 1].id);
   }
 
   return (
@@ -247,8 +247,14 @@ export default function ConfirmationForm({
           <button type="button" className="ghost" onClick={previousStage}>
             {stage === "source" ? "Back to source choices" : `Back to ${PREPARATION_STAGES[currentStageIndex - 1].label}`}
           </button>
-          <button type="submit" className="cta" disabled={stage === "range" && !assessment?.canReplay}>
-            {stage === "confirm" ? "Replay recorded analysis" : `Continue to ${PREPARATION_STAGES[currentStageIndex + 1].label}`}
+          <button
+            type="submit"
+            className="cta"
+            disabled={(stage === "range" && !assessment?.canReplay) || initialization !== null}
+          >
+            {stage === "confirm"
+              ? initialization ? "Initializing recorded replay…" : "Replay recorded analysis"
+              : `Continue to ${PREPARATION_STAGES[currentStageIndex + 1].label}`}
           </button>
         </div>
       </motion.section>

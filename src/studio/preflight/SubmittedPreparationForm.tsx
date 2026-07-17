@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useRef, type CSSProperties, type RefObject } from "react";
 
 import type { StudioPreviewSession } from "../previewSession";
 import type { RemoteSourceResolutionReceipt } from "../sourceResolution";
+import { useStudio } from "../store";
 import {
   SUBMITTED_PREPARATION_POLICY,
   type SubmittedSourceLanguageIntent,
@@ -43,8 +44,11 @@ export default function SubmittedPreparationForm({
   cancel,
   confirm,
 }: SubmittedPreparationFormProps) {
-  const [stage, setStage] = useState<PreparationStage>("source");
-  const [furthestStage, setFurthestStage] = useState(0);
+  const stage = useStudio((state) => state.preparationStage);
+  const furthestStage = useStudio((state) => state.preparationFurthestStage);
+  const initialization = useStudio((state) => state.initialization);
+  const selectPreparationStage = useStudio((state) => state.selectPreparationStage);
+  const advancePreparationStage = useStudio((state) => state.advancePreparationStage);
   const stageHeading = useRef<HTMLHeadingElement>(null);
   const durationSeconds = resolution.source.durationMs / 1_000;
   const preparation = previewSession.preparation;
@@ -54,7 +58,7 @@ export default function SubmittedPreparationForm({
     ?? (preparation.status === "invalid" ? preparation.message : null);
 
   function selectStage(nextStage: PreparationStage): void {
-    if (preparationStageIndex(nextStage) <= furthestStage) setStage(nextStage);
+    selectPreparationStage(nextStage);
   }
 
   function submitStage(): void {
@@ -67,11 +71,7 @@ export default function SubmittedPreparationForm({
       return;
     }
 
-    const nextIndex = currentStageIndex + 1;
-    const nextStage = PREPARATION_STAGES[nextIndex]?.id;
-    if (!nextStage) return;
-    setFurthestStage((current) => Math.max(current, nextIndex));
-    setStage(nextStage);
+    advancePreparationStage();
   }
 
   function previousStage(): void {
@@ -79,11 +79,11 @@ export default function SubmittedPreparationForm({
       cancel();
       return;
     }
-    setStage(PREPARATION_STAGES[currentStageIndex - 1].id);
+    selectPreparationStage(PREPARATION_STAGES[currentStageIndex - 1].id);
   }
 
-  const advanceDisabled =
-    (stage === "range" || stage === "language" || stage === "output") && !requestReady;
+  const advanceDisabled = initialization !== null ||
+    ((stage === "range" || stage === "language" || stage === "output") && !requestReady);
 
   return (
     <form
@@ -184,7 +184,7 @@ export default function SubmittedPreparationForm({
             {stage === "source" ? "Cancel" : `Back to ${PREPARATION_STAGES[currentStageIndex - 1].label}`}
           </button>
           <button type="submit" className="cta" disabled={advanceDisabled}>
-            {advanceLabel(stage)}
+            {initialization ? "Initializing recorded preview…" : advanceLabel(stage)}
           </button>
         </div>
       </motion.section>

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 
 import AgentMark from "../AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "../agentIdentity";
+import LifecycleBottomBar from "../LifecycleBottomBar";
 import { initialRequest, type AnalysisRequest } from "../preflight/model";
 import PreparationStageNavigation, {
   PREPARATION_STAGES,
@@ -682,6 +683,15 @@ export default function ProductLocalRuntime({
     : setupStage === "output" && busy === "plan"
       ? "Reviewing local plan…"
       : `Continue to ${PREPARATION_STAGES[currentSetupStageIndex + 1].label}`;
+  const setupBusyCopy = busy === "connect"
+    ? "Connecting local host"
+    : busy === "ingest"
+      ? "Ingesting owned media"
+      : busy === "plan"
+        ? "Reviewing local plan"
+        : busy === "start"
+          ? "Initializing local runtime"
+          : null;
 
   if (processingMock) {
     return <ProductionProcessingMock scenario={processingMock} onClose={onClose} />;
@@ -919,6 +929,29 @@ export default function ProductLocalRuntime({
               </div>
             </motion.section>
           </form>
+
+          <div className="studio-source-dock product-runtime-setup-dock">
+            {setupBusyCopy ? (
+              <LifecycleBottomBar
+                mode={busy === "start" ? "initializing" : "resolving"}
+                title={setupBusyCopy}
+                busy
+              />
+            ) : error ? (
+              <LifecycleBottomBar
+                mode="failed"
+                title="Local setup needs attention"
+                primaryAction={{ label: "Exit setup", onClick: onClose }}
+              />
+            ) : (
+              <LifecycleBottomBar
+                mode="preparation"
+                title={PREPARATION_STAGES[currentSetupStageIndex].label}
+                stage={setupStage}
+                primaryAction={{ label: "Exit setup", onClick: onClose }}
+              />
+            )}
+          </div>
         </div>
       )}
     </section>

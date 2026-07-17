@@ -10,12 +10,14 @@ import {
 import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { Play } from "./glyphs";
+import LifecycleBottomBar from "./LifecycleBottomBar";
 import ProductLocalRuntime from "./localRuntime/ProductLocalRuntime";
 import {
   isProcessingMockScenario,
   type ProcessingMockScenario,
 } from "./localRuntime/ProductionProcessingMock";
 import Preflight from "./preflight/Preflight";
+import { PREPARATION_STAGES, preparationStageIndex } from "./preflight/PreparationStages";
 import SourceEntry from "./SourceEntry";
 import { useBundle, useStudio } from "./store";
 
@@ -189,11 +191,39 @@ function StudioSourceDock({
   setSourceUrl,
 }: StudioSourceDockProps) {
   const preflight = useStudio((state) => state.preflight);
+  const preparationStage = useStudio((state) => state.preparationStage);
+  const initialization = useStudio((state) => state.initialization);
+  const cancelInitialization = useStudio((state) => state.cancelInitialization);
+  const dismissPreflight = useStudio((state) => state.dismissPreflight);
+  const retrySubmittedSource = useStudio((state) => state.retrySubmittedSource);
+  const previewSession = useStudio((state) => state.previewSession);
   const notice =
     preflight.status !== "idle" && preflight.provenance.kind === "client_validation"
       ? preflight.message
       : null;
   const tone = preflight.status === "invalid_source" ? "deny" : "neutral";
+  const preparationIndex = preparationStageIndex(preparationStage);
+  const preparationItem = PREPARATION_STAGES[preparationIndex];
+  const sourceEntryMode =
+    initialization === null &&
+    (preflight.status === "idle" || preflight.provenance.kind === "client_validation");
+  const resolving =
+    initialization === null &&
+    preflight.status === "loading_source" &&
+    preflight.provenance.kind === "remote_resolution";
+  const preparing = initialization === null && preflight.status === "ready";
+  const failed =
+    initialization === null &&
+    preflight.status !== "ready" &&
+    preflight.status !== "idle" &&
+    preflight.status !== "loading_source" &&
+    preflight.status !== "cancelled" &&
+    preflight.provenance.kind !== "client_validation";
+
+  function returnToSource(): void {
+    dismissPreflight();
+    setSourceEntryOpen(true);
+  }
 
   return (
     <div className="studio-source-dock">
@@ -220,13 +250,65 @@ function StudioSourceDock({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.32, delay: 0.48, ease: [0.22, 1, 0.36, 1] }}
       >
-        <SourceEntry
-          open={sourceEntryOpen}
-          url={sourceUrl}
-          focusRequest={sourceFocusRequest}
-          setOpen={setSourceEntryOpen}
-          setUrl={setSourceUrl}
-        />
+        <AnimatePresence mode="wait" initial={false}>
+          {sourceEntryMode ? (
+            <SourceEntry
+              key="source-entry"
+              open={sourceEntryOpen}
+              url={sourceUrl}
+              focusRequest={sourceFocusRequest}
+              setOpen={setSourceEntryOpen}
+              setUrl={setSourceUrl}
+            />
+          ) : initialization ? (
+            <LifecycleBottomBar
+              key="initializing"
+              mode="initializing"
+              title={initialization === "submitted-preview"
+                ? "Initializing recorded preview"
+                : "Initializing recorded replay"}
+              busy
+              primaryAction={{
+                label: "Cancel start",
+                emphasis: "danger",
+                onClick: cancelInitialization,
+              }}
+            />
+          ) : resolving ? (
+            <LifecycleBottomBar
+              key="resolving"
+              mode="resolving"
+              title="Resolving metadata"
+              busy
+              primaryAction={{ label: "Cancel", emphasis: "danger", onClick: returnToSource }}
+            />
+          ) : preparing ? (
+            <LifecycleBottomBar
+              key="preparation"
+              mode="preparation"
+              title={preparationItem.label}
+              stage={preparationStage}
+              busy={previewSession?.preparation.status === "building"}
+              primaryAction={{ label: "Exit setup", onClick: returnToSource }}
+            />
+          ) : failed ? (
+            <LifecycleBottomBar
+              key="failed"
+              mode="failed"
+              title={preflight.title}
+              primaryAction={previewSession?.resolutionFailure?.retryable
+                ? { label: "Retry", onClick: retrySubmittedSource }
+                : { label: "Edit source", onClick: returnToSource }}
+            />
+          ) : (
+            <LifecycleBottomBar
+              key="cancelled"
+              mode="cancelled"
+              title="Request closed"
+              primaryAction={{ label: "Edit source", onClick: returnToSource }}
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

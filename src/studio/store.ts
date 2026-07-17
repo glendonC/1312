@@ -27,6 +27,11 @@ import {
   type OutputDepth,
   type PreflightSession,
 } from "./preflight/model";
+import {
+  PREPARATION_STAGES,
+  preparationStageIndex,
+  type PreparationStage,
+} from "./preflight/PreparationStages";
 import { createStudioPreviewSession, type StudioPreviewSession } from "./previewSession";
 import { resolveRemoteSource, SourceResolutionClientError } from "./sourceResolution";
 import {
@@ -58,9 +63,11 @@ export type Stage = "input" | "run";
 export type LoadStatus = "idle" | "loading" | "ready" | "failed";
 
 export interface SessionOutcome {
-  kind: "cancelled";
+  kind: "cancelled" | "failed";
   reason: string;
 }
+
+export type RunInitializationKind = "recorded-replay" | "submitted-preview";
 
 interface StudioStore {
   stage: Stage;
@@ -69,6 +76,9 @@ interface StudioStore {
   error: string | null;
   outcome: SessionOutcome | null;
   preflight: PreflightSession;
+  preparationStage: PreparationStage;
+  preparationFurthestStage: number;
+  initialization: RunInitializationKind | null;
   /** UI-only source context. Recorded evidence remains entirely inside bundle. */
   previewSession: StudioPreviewSession | null;
   outputDepth: OutputDepth;
@@ -98,14 +108,18 @@ interface StudioStore {
   retrySubmittedSource: () => void;
   updatePreflightRequest: (request: Partial<AnalysisRequest>) => void;
   updateSubmittedSourceLanguage: (intent: SubmittedSourceLanguageIntent) => void;
+  selectPreparationStage: (stage: PreparationStage) => void;
+  advancePreparationStage: () => void;
   dismissPreflight: () => void;
   cancelPreflight: () => void;
+  cancelInitialization: () => void;
   confirmPreflight: () => void;
   start: () => void;
   event: (trace: Trace) => void;
   end: () => void;
   reset: () => void;
   cancel: (reason?: string) => void;
+  fail: (reason: string) => void;
 
   pause: () => void;
   resume: () => void;
@@ -128,8 +142,28 @@ let handle: RunHandle | null = null;
 let loadVersion = 0;
 let sourceResolutionVersion = 0;
 let submittedPreparationVersion = 0;
+let sourceResolutionAbortController: AbortController | null = null;
+let initializationVersion = 0;
+let initializationTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useStudio = create<StudioStore>((set, get) => {
+  function clearInitialization(): void {
+    initializationVersion += 1;
+    if (initializationTimer !== null) clearTimeout(initializationTimer);
+    initializationTimer = null;
+  }
+
+  function resetPreparationLifecycle(): Pick<
+    StudioStore,
+    "preparationStage" | "preparationFurthestStage" | "initialization"
+  > {
+    return {
+      preparationStage: "source",
+      preparationFurthestStage: 0,
+      initialization: null,
+    };
+  }
+
   function invalidateSubmittedPreparation(): void {
     submittedPreparationVersion += 1;
     set((current) => current.previewSession
@@ -185,6 +219,9 @@ export const useStudio = create<StudioStore>((set, get) => {
   }
 
   function beginSubmittedResolution(source: string, existing?: StudioPreviewSession): void {
+    sourceResolutionAbortController?.abort();
+    const abortController = new AbortController();
+    sourceResolutionAbortController = abortController;
     const resolutionVersion = ++sourceResolutionVersion;
     submittedPreparationVersion += 1;
     const previewSession = existing ?? createStudioPreviewSession(source);
@@ -202,9 +239,10 @@ export const useStudio = create<StudioStore>((set, get) => {
       preflight: resolvingSubmittedSourcePreflight(),
       previewSession: pending,
       outcome: null,
+      ...resetPreparationLifecycle(),
     });
 
-    void resolveRemoteSource(source).then((resolution) => {
+    void resolveRemoteSource(source, fetch, abortController.signal).then((resolution) => {
       if (resolutionVersion !== sourceResolutionVersion) return;
       set((current) => current.previewSession?.source.raw === source
         ? {
@@ -247,6 +285,9 @@ export const useStudio = create<StudioStore>((set, get) => {
   error: null,
   outcome: null,
   preflight: idlePreflight(),
+  preparationStage: "source",
+  preparationFurthestStage: 0,
+  initialization: null,
   previewSession: null,
   outputDepth: "evidence",
   selected: null,
@@ -260,6 +301,9 @@ export const useStudio = create<StudioStore>((set, get) => {
   pausePending: false,
 
   async boot(next) {
+    clearInitialization();
+    sourceResolutionAbortController?.abort();
+    sourceResolutionAbortController = null;
     const version = ++loadVersion;
     submittedPreparationVersion += 1;
     handle?.stop();
@@ -272,6 +316,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       outcome: null,
       preflight: idlePreflight(),
       previewSession: null,
+      ...resetPreparationLifecycle(),
       outputDepth: "evidence",
       stage: "input",
       state: initialState(),
@@ -304,18 +349,21 @@ export const useStudio = create<StudioStore>((set, get) => {
   },
 
   openRecordedPreflight() {
+    clearInitialization();
+    sourceResolutionAbortController?.abort();
+    sourceResolutionAbortController = null;
     sourceResolutionVersion += 1;
     submittedPreparationVersion += 1;
     const { bundle, loadStatus } = get();
     if (loadStatus === "loading") {
-      set({ preflight: loadingRecordedPreflight(), previewSession: null });
+      set({ preflight: loadingRecordedPreflight(), previewSession: null, ...resetPreparationLifecycle() });
       return;
     }
     if (!bundle) {
-      set({ preflight: unavailableRecordedPreflight(), previewSession: null });
+      set({ preflight: unavailableRecordedPreflight(), previewSession: null, ...resetPreparationLifecycle() });
       return;
     }
-    set({ preflight: recordedPreflight(bundle), previewSession: null });
+    set({ preflight: recordedPreflight(bundle), previewSession: null, ...resetPreparationLifecycle() });
   },
 
   submitSource(source) {
@@ -347,14 +395,40 @@ export const useStudio = create<StudioStore>((set, get) => {
     rebuildSubmittedPreparation();
   },
 
+  selectPreparationStage(preparationStage) {
+    if (preparationStageIndex(preparationStage) > get().preparationFurthestStage) return;
+    set({ preparationStage });
+  },
+
+  advancePreparationStage() {
+    const currentIndex = preparationStageIndex(get().preparationStage);
+    const preparationStage = PREPARATION_STAGES[currentIndex + 1]?.id;
+    if (!preparationStage) return;
+    set((current) => ({
+      preparationStage,
+      preparationFurthestStage: Math.max(current.preparationFurthestStage, currentIndex + 1),
+    }));
+  },
+
   dismissPreflight() {
+    clearInitialization();
+    sourceResolutionAbortController?.abort();
+    sourceResolutionAbortController = null;
     sourceResolutionVersion += 1;
     submittedPreparationVersion += 1;
-    set({ preflight: idlePreflight(), previewSession: null });
+    set({ preflight: idlePreflight(), previewSession: null, ...resetPreparationLifecycle() });
   },
 
   cancelPreflight() {
+    clearInitialization();
+    sourceResolutionAbortController?.abort();
+    sourceResolutionAbortController = null;
     set((current) => ({ preflight: cancelledPreflight(current.preflight) }));
+  },
+
+  cancelInitialization() {
+    clearInitialization();
+    set({ initialization: null });
   },
 
   confirmPreflight() {
@@ -367,14 +441,27 @@ export const useStudio = create<StudioStore>((set, get) => {
         previewSession.resolution.source.durationMs / 1_000,
       );
       if (!assessment.canReplay) return;
-      set({ outputDepth: previewSession.preparation.request.output.depth });
-      get().start();
+      const version = ++initializationVersion;
+      set({
+        outputDepth: previewSession.preparation.request.output.depth,
+        initialization: "submitted-preview",
+      });
+      initializationTimer = setTimeout(() => {
+        initializationTimer = null;
+        if (version !== initializationVersion || get().initialization !== "submitted-preview") return;
+        get().start();
+      }, 520);
       return;
     }
     const assessment = assessRecordedRequest(preflight, bundle, import.meta.env.DEV);
     if (!assessment.canReplay) return;
-    set({ outputDepth: preflight.request.outputDepth });
-    get().start();
+    const version = ++initializationVersion;
+    set({ outputDepth: preflight.request.outputDepth, initialization: "recorded-replay" });
+    initializationTimer = setTimeout(() => {
+      initializationTimer = null;
+      if (version !== initializationVersion || get().initialization !== "recorded-replay") return;
+      get().start();
+    }, 520);
   },
 
   start() {
@@ -390,6 +477,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       paused: false,
       pausePending: false,
       outcome: null,
+      initialization: null,
       preflight: idlePreflight(),
       clipT: 0,
       state: seedCues(initialState(), bundle.captions.cues.map((c) => c.id)),
@@ -399,7 +487,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       speed: get().speed,
       onEvent: (trace) => get().event(trace),
       onEnd: () => get().end(),
-      onAbort: (reason) => get().cancel(reason),
+      onAbort: (reason) => get().fail(reason),
     });
   },
 
@@ -417,6 +505,9 @@ export const useStudio = create<StudioStore>((set, get) => {
   },
 
   reset() {
+    clearInitialization();
+    sourceResolutionAbortController?.abort();
+    sourceResolutionAbortController = null;
     sourceResolutionVersion += 1;
     submittedPreparationVersion += 1;
     handle?.stop();
@@ -431,6 +522,8 @@ export const useStudio = create<StudioStore>((set, get) => {
       pausePending: false,
       outcome: null,
       previewSession: null,
+      preflight: idlePreflight(),
+      ...resetPreparationLifecycle(),
     });
   },
 
@@ -445,6 +538,22 @@ export const useStudio = create<StudioStore>((set, get) => {
       pausePending: false,
       outcome: { kind: "cancelled", reason },
       preflight: idlePreflight(),
+      initialization: null,
+    });
+  },
+
+  fail(reason) {
+    handle?.stop();
+    handle = null;
+    set({
+      stage: "run",
+      selected: null,
+      playing: false,
+      paused: false,
+      pausePending: false,
+      outcome: { kind: "failed", reason },
+      preflight: idlePreflight(),
+      initialization: null,
     });
   },
 
@@ -500,7 +609,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       speed: get().speed,
       onEvent: (trace) => get().event(trace),
       onEnd: () => get().end(),
-      onAbort: (reason) => get().cancel(reason),
+      onAbort: (reason) => get().fail(reason),
     });
     if (!nextHandle.replay || nextHandle.pause() !== "applied") {
       nextHandle.stop();

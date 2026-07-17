@@ -19,7 +19,6 @@ export default function Preflight() {
   const session = useStudio((state) => state.preflight);
   const update = useStudio((state) => state.updatePreflightRequest);
   const dismiss = useStudio((state) => state.dismissPreflight);
-  const cancel = useStudio((state) => state.cancelPreflight);
   const confirm = useStudio((state) => state.confirmPreflight);
   const useRecorded = useStudio((state) => state.openRecordedPreflight);
   const retrySubmittedSource = useStudio((state) => state.retrySubmittedSource);
@@ -54,7 +53,7 @@ export default function Preflight() {
           assessment={assessment}
           update={update}
           updateSourceLanguage={updateSubmittedSourceLanguage}
-          cancel={cancel}
+          cancel={dismiss}
           confirm={confirm}
         />
       </section>

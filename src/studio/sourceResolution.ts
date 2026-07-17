@@ -181,6 +181,7 @@ export async function validateRemoteSourceResolution(value: unknown): Promise<Re
 export async function resolveRemoteSource(
   url: string,
   fetcher: SourceResolutionFetch = fetch,
+  signal?: AbortSignal,
 ): Promise<RemoteSourceResolutionReceipt> {
   let response: Response;
   try {
@@ -188,8 +189,10 @@ export async function resolveRemoteSource(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
+      signal,
     });
   } catch (error) {
+    if (signal?.aborted) throw error;
     throw new SourceResolutionClientError(
       "The source metadata resolver could not be reached.",
       "resolver_unavailable",

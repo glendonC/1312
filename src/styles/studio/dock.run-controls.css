@@ -1,6 +1,7 @@
 
 .dock,
-.source-entry {
+.source-entry,
+.studio-lifecycle-bar {
   position: relative;
   display: flex;
   overflow: hidden;
@@ -10,6 +11,40 @@
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(26px) saturate(1.7);
   -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.studio-lifecycle-bar[data-lifecycle-mode="failed"] {
+  border-color: color-mix(in srgb, var(--flag) 34%, var(--glass-border));
+}
+
+.studio-lifecycle-bar .dock-state,
+.studio-lifecycle-bar .dock-status {
+  width: 100%;
+  min-width: 0;
+}
+
+.studio-lifecycle-bar .dock-state {
+  overflow: hidden;
+}
+
+.studio-lifecycle-bar .dock-status > span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-lifecycle-bar [data-lifecycle-status="failed"] {
+  color: var(--flag);
+}
+
+.studio-lifecycle-bar [data-lifecycle-status="cancelled"] {
+  color: var(--ink-soft);
 }
 
 .dock-trace {
@@ -88,12 +123,20 @@
   color: var(--ink-soft);
 }
 
+.dock-failed {
+  color: var(--flag);
+}
+
 .dock-held {
   color: var(--hold);
 }
 
 .dock[data-outcome="cancelled"] .dock-trace-run {
   stroke: var(--ink-muted);
+}
+
+.dock[data-outcome="failed"] .dock-trace-run {
+  stroke: var(--flag);
 }
 
 .dock-pct {

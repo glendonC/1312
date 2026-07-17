@@ -132,3 +132,111 @@
 .dock-layout-option[aria-checked="true"] .dock-layout-check {
   background: currentColor;
 }
+
+/* The review-setup panel mirrors the layout menu, anchored to the left control. */
+.dock-parameters-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  display: grid;
+  width: 216px;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 17px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+}
+
+.dock-parameters-menu[hidden] {
+  display: none;
+}
+
+.dock-parameters-note {
+  margin: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.dock-parameters-summary {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.dock-parameters-summary > div {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.dock-parameters-summary dt {
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dock-parameters-summary dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.dock-parameters-summary dd small {
+  display: block;
+  margin-top: 1px;
+  color: var(--ink-muted);
+  font-size: 0.58rem;
+}
+
+.dock-parameters-actions {
+  display: grid;
+  gap: 4px;
+  margin-top: 1px;
+}
+
+.dock-parameters-actions button {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: var(--ink-soft);
+  background: rgba(22, 29, 27, 0.045);
+  font-family: var(--font-sans);
+  font-size: 0.74rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.dock-parameters-actions .dock-parameters-primary {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dock-parameters-actions button:hover,
+.dock-parameters-actions button:focus-visible {
+  color: var(--ink);
+  border-color: var(--accent-line);
+  outline: none;
+}
+
+.dock-parameters-actions .dock-parameters-primary:hover,
+.dock-parameters-actions .dock-parameters-primary:focus-visible {
+  color: var(--accent);
+}

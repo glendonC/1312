@@ -48,7 +48,8 @@ if (isRoot) {
   }
   const modelIndex = args.indexOf("--model");
   if (args[modelIndex + 1] !== "owned-swarm-test-model") throw new Error("root model was not explicit");
-  if (!prompt.includes("exactly 6 closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext") || (restudied && !prompt.includes("study_restudy_request"))) {
+  const expectedRootToolCount = restudied ? 7 : 6;
+  if (!prompt.includes("exactly " + expectedRootToolCount + " closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext") || (restudied && (!prompt.includes("study_restudy_request") || !prompt.includes("study_separation_request")))) {
     throw new Error("closed root prompt contract is missing");
   }
   const root = JSON.parse(prompt.split("\\n\\n").at(-1));
@@ -271,7 +272,7 @@ test("Codex root launcher exposes the closed planning/synthesis tools and receip
   }
 });
 
-test("default Codex launcher closes the six-tool U4 report-to-readiness spine", async () => {
+test("default Codex launcher closes the seven-tool U7 report-to-readiness spine", async () => {
   const directory = await mkdtemp(join(tmpdir(), "studio-orchestrator-u3-default-"));
   try {
     const loadedSource = await loadOwnedSourceSession(resolve("public/demo/runs/run-005"));
@@ -307,6 +308,7 @@ test("default Codex launcher closes the six-tool U4 report-to-readiness spine", 
     assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v3", required: true }]);
     assert.equal(root.grants.some((grant) => grant.capability === "study.plan"), false);
     assert.equal(root.grants.some((grant) => grant.capability === "study.restudy"), true);
+    assert.equal(root.grants.some((grant) => grant.capability === "study.separate"), true);
     assert.equal(Object.values(state.reports).filter((report) => report.study?.schema === "studio.study-report-submission.v2").length, 2);
     assert.equal(Object.keys(state.generalizedParentArtifactAdmissions).length, 2);
     assert.equal(Object.keys(state.generalizedParentArtifactReads).length, 2);

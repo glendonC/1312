@@ -38,6 +38,12 @@ import {
   type OpenChildSpeakerBridge,
 } from "../executor/childSpeakerBridge.ts";
 import {
+  BoundedChildSeparationBridge,
+  openChildSeparationBridge,
+  type ChildSeparationHost,
+  type OpenChildSeparationBridge,
+} from "../executor/childSeparationBridge.ts";
+import {
   BoundedChildMediaBridge,
   openChildMediaBridge,
   type ChildMediaCapabilityHost,
@@ -60,10 +66,12 @@ export interface LauncherChildCapabilityOptions {
   nextFrameOperationId?: () => string;
   nextOcrOperationId?: () => string;
   nextSpeakerOperationId?: () => string;
+  nextSeparationOperationId?: () => string;
   mediaMcpServerPath?: string;
   frameMcpServerPath?: string;
   ocrMcpServerPath?: string;
   speakerMcpServerPath?: string;
+  separationMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -75,6 +83,7 @@ export interface LauncherChildCapabilityHosts {
   frame: ChildFrameSamplingHost;
   ocr: ChildOcrHost;
   speaker: ChildSpeakerHost;
+  separation: ChildSeparationHost;
   evidence: ChildEvidenceReadHost;
   assessment: ChildEvidenceAssessmentHost;
   decision: ChildEvidenceDecisionHost;
@@ -88,12 +97,14 @@ export interface LauncherChildCapabilityContext {
   frameGrant: CapabilityGrant | undefined;
   ocrGrant: CapabilityGrant | undefined;
   speakerGrant: CapabilityGrant | undefined;
+  separationGrant: CapabilityGrant | undefined;
   assessmentGrant: CapabilityGrant | undefined;
   decisionGrant: CapabilityGrant | undefined;
   mediaBridge: OpenChildMediaBridge | null;
   frameBridge: OpenChildFrameBridge | null;
   ocrBridge: OpenChildOcrBridge | null;
   speakerBridge: OpenChildSpeakerBridge | null;
+  separationBridge: OpenChildSeparationBridge | null;
   evidenceBridge: OpenChildEvidenceBridge | null;
   assessmentBridge: OpenChildEvidenceAssessmentBridge | null;
   decisionBridge: OpenChildEvidenceDecisionBridge | null;
@@ -111,12 +122,14 @@ export function launcherChildCapabilityContext(task: TaskRecord): LauncherChildC
     frameGrant: task.grants.find((grant) => grant.capability === "media.frames.sample"),
     ocrGrant: task.grants.find((grant) => grant.capability === "media.frames.ocr"),
     speakerGrant: task.grants.find((grant) => grant.capability === "media.speakers.analyze"),
+    separationGrant: task.grants.find((grant) => grant.capability === "media.audio.separate"),
     assessmentGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.assess"),
     decisionGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.decide"),
     mediaBridge: null,
     frameBridge: null,
     ocrBridge: null,
     speakerBridge: null,
+    separationBridge: null,
     evidenceBridge: null,
     assessmentBridge: null,
     decisionBridge: null,
@@ -148,6 +161,11 @@ export async function openLauncherChildCapabilityBridges(
   if (context.speakerGrant) {
     context.speakerBridge = await openChildSpeakerBridge(new BoundedChildSpeakerBridge(task, hosts.speaker, {
       nextOperationId: options.nextSpeakerOperationId,
+    }));
+  }
+  if (context.separationGrant) {
+    context.separationBridge = await openChildSeparationBridge(new BoundedChildSeparationBridge(task, hosts.separation, {
+      nextOperationId: options.nextSeparationOperationId,
     }));
   }
   if (context.semanticEvidenceGrant) {
@@ -283,6 +301,18 @@ export function configureLauncherChildCapabilityMcp(
       `mcp_servers.studio_speakers.env_vars=${tomlStrings(["STUDIO_CHILD_SPEAKER_BRIDGE_URL", "STUDIO_CHILD_SPEAKER_BRIDGE_TOKEN"])}`,
     );
   }
+  if (context.separationBridge) {
+    const serverPath = options.separationMcpServerPath ?? fileURLToPath(new URL("../executor/separationMcpServer.ts", import.meta.url));
+    args.push(
+      "-c", `mcp_servers.studio_separation.command=${tomlString(process.execPath)}`,
+      "-c", `mcp_servers.studio_separation.args=${tomlStrings([serverPath])}`,
+      "-c", "mcp_servers.studio_separation.required=true",
+      "-c", `mcp_servers.studio_separation.enabled_tools=${tomlStrings([context.separationBridge.manifest.tool.name])}`,
+      "-c", "mcp_servers.studio_separation.startup_timeout_sec=5",
+      "-c", `mcp_servers.studio_separation.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, options.maximumWallMs) / 1_000))}`,
+      "-c", `mcp_servers.studio_separation.env_vars=${tomlStrings(["STUDIO_CHILD_SEPARATION_BRIDGE_URL", "STUDIO_CHILD_SEPARATION_BRIDGE_TOKEN"])}`,
+    );
+  }
   if (context.evidenceBridge) {
     const serverPath = options.evidenceMcpServerPath ?? fileURLToPath(
       new URL("../executor/evidenceMcpServer.ts", import.meta.url),
@@ -384,7 +414,7 @@ export function configureLauncherChildCapabilityMcp(
 export function launcherChildCapabilityEnvironment(
   context: LauncherChildCapabilityContext,
 ): NodeJS.ProcessEnv {
-  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.speakerBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
+  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.speakerBridge || context.separationBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
     ...process.env,
     ...(context.mediaBridge ? {
       STUDIO_CHILD_MEDIA_BRIDGE_URL: context.mediaBridge.endpoint,
@@ -401,6 +431,10 @@ export function launcherChildCapabilityEnvironment(
     ...(context.speakerBridge ? {
       STUDIO_CHILD_SPEAKER_BRIDGE_URL: context.speakerBridge.endpoint,
       STUDIO_CHILD_SPEAKER_BRIDGE_TOKEN: context.speakerBridge.token,
+    } : {}),
+    ...(context.separationBridge ? {
+      STUDIO_CHILD_SEPARATION_BRIDGE_URL: context.separationBridge.endpoint,
+      STUDIO_CHILD_SEPARATION_BRIDGE_TOKEN: context.separationBridge.token,
     } : {}),
     ...(context.evidenceBridge ? {
       STUDIO_CHILD_EVIDENCE_BRIDGE_URL: context.evidenceBridge.endpoint,
@@ -428,6 +462,7 @@ export async function closeLauncherChildCapabilityBridges(
   if (context.frameBridge) await context.frameBridge.close();
   if (context.ocrBridge) await context.ocrBridge.close();
   if (context.speakerBridge) await context.speakerBridge.close();
+  if (context.separationBridge) await context.separationBridge.close();
   if (context.semanticEvidenceBridge) await context.semanticEvidenceBridge.close();
   if (context.evidenceBridge) await context.evidenceBridge.close();
   if (context.assessmentBridge) await context.assessmentBridge.close();

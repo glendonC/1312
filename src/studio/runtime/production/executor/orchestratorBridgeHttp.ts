@@ -9,6 +9,7 @@ import {
   ORCHESTRATOR_READ_TOOL,
   ORCHESTRATOR_PLAN_TOOL,
   ORCHESTRATOR_RESTUDY_TOOL,
+  ORCHESTRATOR_SEPARATION_TOOL,
   ORCHESTRATOR_SYNTHESIZE_TOOL,
   OrchestratorBridgeError,
   type OrchestratorToolManifest,
@@ -93,6 +94,7 @@ export async function openOrchestratorBridge(bridge: BoundedOrchestratorBridge):
         else if (body.name === ORCHESTRATOR_READ_TOOL) json(response, 200, { ok: true, result: await bridge.readAdmitted(body.arguments) });
         else if (body.name === ORCHESTRATOR_PLAN_TOOL) json(response, 200, { ok: true, result: await bridge.plan(body.arguments) });
         else if (body.name === ORCHESTRATOR_RESTUDY_TOOL) json(response, 200, { ok: true, result: await bridge.restudy(body.arguments) });
+        else if (body.name === ORCHESTRATOR_SEPARATION_TOOL) json(response, 200, { ok: true, result: await bridge.separation(body.arguments) });
         else if (body.name === ORCHESTRATOR_SYNTHESIZE_TOOL) json(response, 200, { ok: true, result: await bridge.synthesize(body.arguments) });
         else throw new OrchestratorBridgeError("invalid_request", "The orchestrator tool name is unavailable.");
         return;

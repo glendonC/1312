@@ -1,4 +1,4 @@
-import { isFrameHostArtifactKind, isOcrHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
+import { isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind, isOcrHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
 import type {
   GeneralizedCoverageReasonCode,
   GeneralizedCoverageRange,
@@ -237,7 +237,7 @@ export function validateWorkerResult(
   expectedSpeakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [],
 ): WorkerResult {
   const item = record(value);
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker response failed its output authority contract.",
@@ -436,7 +436,7 @@ export function validateWorkerResult(
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker output schema cannot impersonate a host frame artifact.",
@@ -613,6 +613,8 @@ export function workerPrompt(task: TaskRecord): string {
             ? ["media_frames_ocr"]
           : grant.capability === "media.speakers.analyze"
             ? ["media_speakers_analyze"]
+          : grant.capability === "media.audio.separate"
+            ? ["media_audio_separate"]
         : []);
   const frameSampling = task.grants
     .filter((grant) => grant.capability === "media.frames.sample")
@@ -640,6 +642,9 @@ export function workerPrompt(task: TaskRecord): string {
     grantedAnonymousSpeakers: task.grants
       .filter((grant) => grant.capability === "media.speakers.analyze")
       .map((grant) => ({ mediaScope: grant.mediaScope, limits: grant.speakerScope?.limits ?? null })),
+    grantedConditionalSeparation: task.grants
+      .filter((grant) => grant.capability === "media.audio.separate")
+      .map((grant) => ({ mediaScope: grant.mediaScope, trigger: grant.separationScope?.trigger ?? null, limits: grant.separationScope?.limits ?? null })),
     grantedSemanticEvidence: semanticScope,
     grantedEvidence: task.grants
       .filter((grant) => grant.capability === "evidence.read")
@@ -677,6 +682,11 @@ export function workerPrompt(task: TaskRecord): string {
           "Overlap, rapid turns, missing hypotheses, and truncation are coverage states only. They never invent dialogue, validate transcription/translation, or authorize Korean/English caption text.",
           "Copy the returned operation/artifact/content/receipt identities into the top-level speakerEvidenceInputs list. Do not select individual favorable turns; the host reconstructs the complete accounting partition for each cited coverage cell.",
           "Do not label worker-authored output as studio.speaker-overlap-observations.v1 or studio.speaker-overlap-producer.receipt.v1; those kinds belong only to the host.",
+        ] : []),
+        ...(mediaTools.includes("media_audio_separate") ? [
+          "Invoke media_audio_separate exactly once with the closed empty object. The host injects the audited U6.1 trigger, raw source, exact range, model, configuration, task, agent, and grant; paths and selectors are not accepted.",
+          "The returned anonymous stems and raw/stem comparison are private host artifacts. Agreement, disagreement, or abstention establishes only that the same recognizer contract was compared over related inputs. It is not independent corroboration and grants no semantic preference, claim support, caption text, quality score, identity, truth, or publication authority.",
+          "Your studio.study-report.v2 must retain the assigned range as unknown or withheld with no claims and no evidence citations. Do not echo stem hypotheses as dialogue and do not label worker output as any studio separated-stem or raw-stem-comparison artifact kind.",
         ] : []),
         "Include the returned operation, artifact, receipt, and receipt-content identities in the required worker output.",
       ].join(" ");

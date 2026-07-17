@@ -25,6 +25,9 @@ import { BoundedOcrHost } from "./ocrHost.ts";
 import { auditOcr } from "./ocrAudit.ts";
 import { BoundedSpeakerOverlapHost } from "./speakerHost.ts";
 import { auditSpeakerOverlap } from "./speakerAudit.ts";
+import { BoundedConditionalSeparationHost } from "./separationHost.ts";
+import { auditConditionalSeparation } from "./separationAudit.ts";
+import type { SourceSeparator } from "./separation/separator.ts";
 import type { SpeakerDiarizer } from "./speaker/diarizer.ts";
 import type { OcrRecognizer } from "./ocr/recognizer.ts";
 import type { FrameDecoder } from "./frames/decoder.ts";
@@ -41,6 +44,7 @@ import type { ChildMediaCapabilityHost } from "./executor/childMediaBridge.ts";
 import type { ChildFrameSamplingHost } from "./executor/childFrameBridge.ts";
 import type { ChildOcrHost } from "./executor/childOcrBridge.ts";
 import type { ChildSpeakerHost } from "./executor/childSpeakerBridge.ts";
+import type { ChildSeparationHost } from "./executor/childSeparationBridge.ts";
 import type { ChildSemanticEvidenceHost } from "./executor/childSemanticEvidenceBridge.ts";
 import { parseCodexEvents } from "./executor/codexEvents.ts";
 import { closedCodexExecArgs } from "./executor/codexInvocation.ts";
@@ -97,12 +101,15 @@ export interface CodexWorkerLauncherOptions {
   nextFrameOperationId?: () => string;
   nextOcrOperationId?: () => string;
   nextSpeakerOperationId?: () => string;
+  nextSeparationOperationId?: () => string;
   mediaHost?: ChildMediaCapabilityHost;
   frameHost?: ChildFrameSamplingHost;
   ocrHost?: ChildOcrHost;
   ocrRecognizer?: OcrRecognizer;
   ocrFrameDecoder?: FrameDecoder;
   speakerHost?: ChildSpeakerHost;
+  separationHost?: ChildSeparationHost;
+  sourceSeparator?: SourceSeparator;
   speakerDiarizer?: SpeakerDiarizer;
   evidenceHost?: ChildEvidenceReadHost;
   assessmentHost?: ChildEvidenceAssessmentHost;
@@ -113,6 +120,7 @@ export interface CodexWorkerLauncherOptions {
   frameMcpServerPath?: string;
   ocrMcpServerPath?: string;
   speakerMcpServerPath?: string;
+  separationMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -132,13 +140,14 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextSpeakerOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "speakerMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextSpeakerOperationId" | "nextSeparationOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "speakerMcpServerPath" | "separationMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer" | "sourceSeparator"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
   private readonly frameHost: ChildFrameSamplingHost;
   private readonly ocrHost: ChildOcrHost;
   private readonly speakerHost: ChildSpeakerHost;
+  private readonly separationHost: ChildSeparationHost;
   private readonly evidenceHost: ChildEvidenceReadHost;
   private readonly assessmentHost: ChildEvidenceAssessmentHost;
   private readonly decisionHost: ChildEvidenceDecisionHost;
@@ -163,6 +172,12 @@ export class CodexExecWorkerLauncher {
     });
     this.speakerHost = options.speakerHost ?? new BoundedSpeakerOverlapHost(ledger, artifacts, {
       diarizer: options.speakerDiarizer,
+      temporaryRoot: options.temporaryRoot,
+    });
+    this.separationHost = options.separationHost ?? new BoundedConditionalSeparationHost(ledger, artifacts, {
+      separator: options.sourceSeparator,
+      recognizer: options.semanticRecognizer,
+      speakerDiarizer: options.speakerDiarizer,
       temporaryRoot: options.temporaryRoot,
     });
     this.evidenceHost = options.evidenceHost ?? new BoundedEvidenceReadHost(ledger, artifacts);
@@ -190,10 +205,12 @@ export class CodexExecWorkerLauncher {
       nextFrameOperationId: options.nextFrameOperationId,
       nextOcrOperationId: options.nextOcrOperationId,
       nextSpeakerOperationId: options.nextSpeakerOperationId,
+      nextSeparationOperationId: options.nextSeparationOperationId,
       mediaMcpServerPath: options.mediaMcpServerPath,
       frameMcpServerPath: options.frameMcpServerPath,
       ocrMcpServerPath: options.ocrMcpServerPath,
       speakerMcpServerPath: options.speakerMcpServerPath,
+      separationMcpServerPath: options.separationMcpServerPath,
       evidenceMcpServerPath: options.evidenceMcpServerPath,
       assessmentMcpServerPath: options.assessmentMcpServerPath,
       decisionMcpServerPath: options.decisionMcpServerPath,
@@ -201,6 +218,7 @@ export class CodexExecWorkerLauncher {
       ocrRecognizer: options.ocrRecognizer,
       ocrFrameDecoder: options.ocrFrameDecoder,
       speakerDiarizer: options.speakerDiarizer,
+      sourceSeparator: options.sourceSeparator,
     };
   }
 
@@ -248,7 +266,7 @@ export class CodexExecWorkerLauncher {
     }
     if (
       !scheduled.grants.some((grant) => grant.capability === "report.submit") ||
-      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.speakers.analyze", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
+      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.speakers.analyze", "media.audio.separate", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
     ) {
       throw new Error("Codex executor supports only report.submit plus scheduler-granted media, frame, anonymous-speaker, speech.transcribe, evidence-read, assessment, and decision capabilities");
     }
@@ -294,6 +312,7 @@ export class CodexExecWorkerLauncher {
           frame: this.frameHost,
           ocr: this.ocrHost,
           speaker: this.speakerHost,
+          separation: this.separationHost,
           evidence: this.evidenceHost,
           assessment: this.assessmentHost,
           decision: this.decisionHost,
@@ -309,6 +328,7 @@ export class CodexExecWorkerLauncher {
         frameGrant,
         ocrGrant,
         speakerGrant,
+        separationGrant,
         assessmentGrant,
         decisionGrant,
       } = childCapabilities;
@@ -417,6 +437,24 @@ export class CodexExecWorkerLauncher {
           receiptId: verified.receipt.receiptId,
           receiptContentId: verified.receiptArtifact.content.contentId,
         });
+      }
+      const completedSeparation = Object.values(this.ledger.state().conditionalSeparationOperations)
+        .filter((operation) => operation.taskId === task.id && operation.status === "completed")
+        .sort((left, right) => left.id.localeCompare(right.id));
+      if (separationGrant && completedSeparation.length === 0) {
+        throw new LauncherFailure(
+          "Codex child did not complete its granted conditional separation",
+          "Codex child did not complete its required exact-range private separation and raw/stem comparison.",
+        );
+      }
+      for (const operation of completedSeparation) {
+        const verified = await auditConditionalSeparation(this.ledger.state(), this.artifacts, operation.id, {
+          separator: this.options.sourceSeparator,
+          speakerDiarizer: this.options.speakerDiarizer,
+        });
+        if (verified.comparison.deterministicGate.semanticPreference !== null || verified.comparison.deterministicGate.captionAuthority !== "not_granted") {
+          throw new LauncherFailure("Conditional separation attempted an authority upgrade", "Conditional separation comparison is comparability-only and cannot authorize captions.");
+        }
       }
       if (evidenceGrant?.evidenceScope.some((scope) =>
         !Object.values(this.ledger.state().evidenceReads).some((operation) =>

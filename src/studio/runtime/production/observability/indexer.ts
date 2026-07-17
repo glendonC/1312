@@ -209,7 +209,7 @@ export async function buildRuntimeObservabilityIndex(
           origin.kind === "preflight_evidence" ||
           (origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
             ? origin.executorReceiptContentId !== content.contentId
-            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "speaker_overlap_receipt"
+            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "speaker_overlap_receipt" || origin.kind === "conditional_separation_receipt" || origin.kind === "raw_stem_comparison_receipt"
               ? artifact.content.contentId !== content.contentId
               : origin.receiptContentId !== content.contentId)
         ) {

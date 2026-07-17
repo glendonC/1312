@@ -21,6 +21,8 @@ import type {
   OcrRequest,
   SpeakerOverlapGrantScope,
   SpeakerOverlapRequest,
+  ConditionalSeparationGrantScope,
+  ConditionalSeparationRequest,
   MediaExtractRequest,
   MediaScope,
   MediaSeekRequest,
@@ -37,6 +39,7 @@ import { frameSamplingRequestFingerprint } from "./validation/frames.ts";
 import { assertOcrRequest, ocrRequestFingerprint } from "./validation/ocr.ts";
 import { SPEAKER_OVERLAP_PINNED_CONTENT_IDS } from "./model.ts";
 import { assertSpeakerOverlapRequest, speakerOverlapRequestFingerprint } from "./validation/speakers.ts";
+import { assertConditionalSeparationRequest, conditionalSeparationRequestFingerprint } from "./validation/separation.ts";
 
 export interface AuthorizedFrameSampling {
   request: FrameSampleRequest;
@@ -289,6 +292,79 @@ export function authorizeSpeakerOverlap(state: RuntimeProjection, requestValue: 
     launchClaimId: launch.id,
     requestFingerprint,
   };
+}
+
+export interface AuthorizedConditionalSeparation {
+  request: ConditionalSeparationRequest;
+  grant: CapabilityGrant & { separationScope: ConditionalSeparationGrantScope };
+  scope: MediaScope;
+  artifact: RuntimeArtifact;
+  track: MediaTrackDescriptor;
+  executionId: string;
+  launchClaimId: string;
+  requestFingerprint: string;
+}
+
+export function authorizeConditionalSeparation(state: RuntimeProjection, requestValue: unknown): AuthorizedConditionalSeparation {
+  assertConditionalSeparationRequest(requestValue);
+  const request = requestValue;
+  const task = state.tasks[request.taskId];
+  if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
+    throw new Error("Conditional separation requires a working task owned by the requesting agent");
+  }
+  if (capabilityOperationExists(state, request.operationId)) throw new Error(`Conditional separation operation ${request.operationId} already exists`);
+  const grant = task.grants.find((candidate) => candidate.id === request.grantId);
+  if (grant?.capability !== "media.audio.separate" || !grant.separationScope || grant.mediaScope.length !== 1) {
+    throw new Error("Conditional separation requires its exact audited scheduler grant");
+  }
+  const scope = grant.mediaScope[0];
+  const bound = grant.separationScope.source;
+  if (
+    scope.artifactId !== bound.artifactId || scope.trackId !== bound.trackId || scope.startMs !== bound.range.startMs || scope.endMs !== bound.range.endMs ||
+    grant.separationScope.trigger.range.startMs !== scope.startMs || grant.separationScope.trigger.range.endMs !== scope.endMs
+  ) throw new Error("Conditional separation refuses narrowed, widened, or changed grant range");
+  const artifact = state.artifacts[scope.artifactId];
+  if (
+    !artifact || artifact.origin.kind !== "ingest" || artifact.runId !== state.runId || artifact.content.contentId !== bound.contentId ||
+    task.jobContext.source.artifactId !== artifact.id || task.jobContext.source.contentId !== artifact.content.contentId
+  ) throw new Error("Conditional separation source changed from the immutable task context");
+  const track = artifact.tracks.find((candidate) => candidate.id === scope.trackId);
+  if (!track || track.kind !== "audio") throw new Error("Conditional separation requires one registered audio track");
+  if (
+    artifact.durationMs === null || scope.endMs > artifact.durationMs || scope.endMs - scope.startMs > grant.separationScope.limits.maxRangeMs ||
+    artifact.content.bytes > grant.separationScope.limits.maxSourceBytes
+  ) throw new Error("Conditional separation exceeds its exact source, range, or byte envelope");
+  const trigger = grant.separationScope.trigger;
+  const speaker = state.speakerOverlapOperations[trigger.operationId];
+  const observations = state.artifacts[trigger.observationsArtifactId];
+  const receipt = state.artifacts[trigger.receiptArtifactId];
+  if (
+    speaker?.status !== "completed" || speaker.sourceArtifactId !== artifact.id || speaker.trackId !== track.id ||
+    speaker.outputArtifactId !== observations?.id || observations?.origin.kind !== "speaker_overlap_observations" || observations.content.contentId !== trigger.observationsContentId ||
+    speaker.receiptArtifactId !== receipt?.id || receipt?.origin.kind !== "speaker_overlap_receipt" || speaker.receiptId !== trigger.receiptId ||
+    speaker.receiptContentId !== trigger.receiptContentId || receipt.content.contentId !== trigger.receiptContentId
+  ) throw new Error("Conditional separation lost its exact audited U6.1 trigger lineage");
+  if (taskCapabilityCallCount(state, task.id) >= task.budget.toolCalls) throw new Error("Conditional separation exceeds the task tool-call budget");
+  if (Object.values(state.conditionalSeparationOperations).filter((operation) => operation.grantId === grant.id).length >= grant.separationScope.limits.maxCalls) {
+    throw new Error("Conditional separation exceeds the grant call budget");
+  }
+  const requestFingerprint = conditionalSeparationRequestFingerprint({
+    sourceContentId: artifact.content.contentId,
+    trackId: track.id,
+    range: { startMs: scope.startMs, endMs: scope.endMs },
+    trigger,
+    modelContentIds: grant.separationScope.producerPolicy.modelContentIds,
+    configurationContentId: grant.separationScope.producerPolicy.configurationContentId,
+  });
+  if (Object.values(state.conditionalSeparationOperations).some((operation) => operation.taskId === task.id && operation.requestFingerprint === requestFingerprint)) {
+    throw new Error("Conditional separation rejects duplicate canonical work");
+  }
+  const executions = Object.values(state.executions).filter((execution) => execution.taskId === task.id && execution.agentId === request.agentId && execution.status === "active");
+  if (executions.length !== 1) throw new Error("Conditional separation requires one active task executor");
+  const execution = executions[0];
+  const launch = state.taskLaunches[task.id];
+  if (!launch || launch.executionId !== execution.id || launch.agentId !== request.agentId) throw new Error("Conditional separation executor lost durable launch lineage");
+  return { request, grant: grant as CapabilityGrant & { separationScope: ConditionalSeparationGrantScope }, scope, artifact, track, executionId: execution.id, launchClaimId: launch.id, requestFingerprint };
 }
 
 export interface AuthorizedSpeechTranscribe {

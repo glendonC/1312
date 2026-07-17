@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { assertRuntimeLimits, assertSpawnRequestInput } from "./assertions.ts";
 import { attenuateTaskJobContext } from "./jobContext.ts";
-import { FRAME_SAMPLING_LIMITS, OCR_LIMITS, SPEAKER_OVERLAP_LIMITS } from "./model.ts";
+import { CONDITIONAL_SEPARATION_LIMITS, FRAME_SAMPLING_LIMITS, OCR_LIMITS, SEPARATION_METHOD, SPEAKER_OVERLAP_LIMITS } from "./model.ts";
 import type {
   AgentRecord,
   CapabilityGrant,
@@ -18,6 +18,8 @@ import type {
   TaskLaunchRecord,
   TaskStatus,
   RangePassRequestReceipt,
+  ConditionalSeparationGrantScope,
+  U6SpeakerOverlapSeparationTrigger,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
@@ -127,6 +129,7 @@ export class BoundedRuntimeScheduler {
     taskId: string,
     agentId: string,
     input: SpawnRequestInput,
+    conditionalSeparationScope: ConditionalSeparationGrantScope | null = null,
   ): CapabilityGrant[] {
     return [...input.requiredCapabilities]
       .sort()
@@ -204,6 +207,10 @@ export class BoundedRuntimeScheduler {
             limits: structuredClone(SPEAKER_OVERLAP_LIMITS),
           },
         };
+        if (capability === "media.audio.separate") {
+          if (!conditionalSeparationScope) throw new Error("Conditional separation grants require an audited exact-range scope");
+          return { ...common, capability, separationScope: structuredClone(conditionalSeparationScope) };
+        }
         return { ...common, capability };
       });
   }
@@ -220,7 +227,7 @@ export class BoundedRuntimeScheduler {
     });
   }
 
-  private capabilityValid(state: RuntimeProjection, input: SpawnRequestInput): boolean {
+  private capabilityValid(state: RuntimeProjection, input: SpawnRequestInput, allowConditionalSeparation = false): boolean {
     const evidenceArtifacts = input.inputArtifactIds.filter(
       (artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence",
     );
@@ -234,10 +241,16 @@ export class BoundedRuntimeScheduler {
       : undefined;
     const speakerArtifact = speakerScope ? state.artifacts[speakerScope.artifactId] : null;
     const speakerTrack = speakerArtifact?.tracks.find((track) => track.id === speakerScope?.trackId);
+    const separationScope = input.requiredCapabilities.includes("media.audio.separate")
+      ? input.mediaScope.length === 1 ? input.mediaScope[0] : null
+      : undefined;
+    const separationArtifact = separationScope ? state.artifacts[separationScope.artifactId] : null;
+    const separationTrack = separationArtifact?.tracks.find((track) => track.id === separationScope?.trackId);
     return (
       input.requiredCapabilities.length > 0 &&
       input.requiredCapabilities.every((capability) => this.limits.grantableCapabilities.includes(capability)) &&
       roleAllowsCapabilities(input.workerKind, input.requiredCapabilities) &&
+      (!input.requiredCapabilities.includes("media.audio.separate") || allowConditionalSeparation) &&
       (!input.requiredCapabilities.some((capability) => capability.startsWith("media.") || capability === "speech.transcribe") || input.mediaScope.length > 0) &&
       (!input.requiredCapabilities.includes("evidence.read") ||
         (evidenceArtifacts.length > 0 &&
@@ -260,6 +273,12 @@ export class BoundedRuntimeScheduler {
         speakerArtifact?.origin.kind === "ingest" &&
         speakerTrack?.kind === "audio" &&
         speakerScope.endMs - speakerScope.startMs <= SPEAKER_OVERLAP_LIMITS.maxRangeMs
+      )) &&
+      (separationScope === undefined || (
+        separationScope !== null &&
+        separationArtifact?.origin.kind === "ingest" &&
+        separationTrack?.kind === "audio" &&
+        separationScope.endMs - separationScope.startMs <= CONDITIONAL_SEPARATION_LIMITS.maxRangeMs
       ))
     );
   }
@@ -276,7 +295,7 @@ export class BoundedRuntimeScheduler {
       source.content.contentId !== context.source.contentId ||
       !input.inputArtifactIds.includes(source.id)
     ) return false;
-    if ((input.requiredCapabilities.includes("media.frames.sample") || input.requiredCapabilities.includes("media.frames.ocr") || input.requiredCapabilities.includes("media.speakers.analyze")) && (
+    if ((input.requiredCapabilities.includes("media.frames.sample") || input.requiredCapabilities.includes("media.frames.ocr") || input.requiredCapabilities.includes("media.speakers.analyze") || input.requiredCapabilities.includes("media.audio.separate")) && (
       input.mediaScope.length !== 1 || input.mediaScope[0].artifactId !== source.id
     )) return false;
     if (!input.mediaScope.every((scope) =>
@@ -363,6 +382,7 @@ export class BoundedRuntimeScheduler {
     requestedByTaskId: string,
     requestedByAgentId: string,
     input: SpawnRequestInput,
+    allowConditionalSeparation = false,
   ): SpawnRejection | null {
     const parent = state.tasks[requestedByTaskId];
     if (
@@ -399,7 +419,7 @@ export class BoundedRuntimeScheduler {
     ) {
       return "scope_violation";
     }
-    if (!this.capabilityValid(state, input)) return "capability_not_grantable";
+    if (!this.capabilityValid(state, input, allowConditionalSeparation)) return "capability_not_grantable";
     const total = allocated(state);
     if (
       total.wallMs + input.budget.wallMs > this.limits.runBudget.wallMs ||
@@ -623,6 +643,115 @@ export class BoundedRuntimeScheduler {
             { type: "task.created", data: { task } },
             { type: "study.restudy_pass_decided", data: { passId: receipt.passId, spawnRequestId: requestId, accepted: true, rejection: null, taskId, agentId } },
           ] satisfies PendingRuntimeEvent[],
+          result: { requestId, accepted: true, rejection: null, permit },
+        };
+      },
+    );
+    if (transaction.result.permit) this.permits.set(requestId, transaction.result.permit);
+    return transaction.result;
+  }
+
+  /** Atomic admission for one exact U6.1-triggered separation grant. Not reachable through ordinary spawn. */
+  async requestConditionalSeparation(inputValue: {
+    trigger: U6SpeakerOverlapSeparationTrigger;
+    child: SpawnRequestInput;
+    authorship: { executionId: string; toolCallId: string; taskId: string; agentId: string };
+  }): Promise<SpawnDecision> {
+    assertSpawnRequestInput(inputValue.child, "Conditional separation child");
+    const input = structuredClone(inputValue.child);
+    const trigger = structuredClone(inputValue.trigger);
+    const requestId = this.identities.next("request");
+    const transaction = await this.ledger.transact<SpawnDecision>(
+      { producer: { kind: "scheduler", id: "bounded-scheduler" }, causationId: trigger.observationId, correlationId: requestId },
+      ({ state }) => {
+        const requestEvent = {
+          type: "spawn.requested" as const,
+          data: {
+            requestId,
+            requestedByTaskId: inputValue.authorship.taskId,
+            requestedByAgentId: inputValue.authorship.agentId,
+            authoredByExecutionId: inputValue.authorship.executionId,
+            toolCallId: inputValue.authorship.toolCallId,
+            input,
+          },
+        };
+        const root = state.tasks[inputValue.authorship.taskId];
+        const execution = state.executions[inputValue.authorship.executionId];
+        const call = state.orchestratorToolCalls[inputValue.authorship.toolCallId];
+        const speaker = state.speakerOverlapOperations[trigger.operationId];
+        const source = speaker ? state.artifacts[speaker.sourceArtifactId] : undefined;
+        const observations = state.artifacts[trigger.observationsArtifactId];
+        const speakerReceipt = state.artifacts[trigger.receiptArtifactId];
+        const exactRange = trigger.range.endMs > trigger.range.startMs &&
+          trigger.range.startMs >= (speaker?.startMs ?? Number.MAX_SAFE_INTEGER) && trigger.range.endMs <= (speaker?.endMs ?? -1);
+        const scope: ConditionalSeparationGrantScope | null = source && speaker ? {
+          schema: "studio.conditional-separation-grant.v1",
+          source: {
+            artifactId: source.id,
+            contentId: source.content.contentId,
+            trackId: speaker.trackId,
+            range: structuredClone(trigger.range),
+          },
+          trigger,
+          producerPolicy: {
+            methodId: SEPARATION_METHOD.id,
+            methodVersion: SEPARATION_METHOD.version,
+            modelId: SEPARATION_METHOD.modelId,
+            modelRevision: SEPARATION_METHOD.modelRevision,
+            modelContentIds: [...SEPARATION_METHOD.modelContentIds],
+            configurationContentId: SEPARATION_METHOD.configurationContentId,
+            stemRoles: ["source_estimate_1", "source_estimate_2"],
+          },
+          limits: structuredClone(CONDITIONAL_SEPARATION_LIMITS),
+        } : null;
+        const childMatches = Boolean(scope) &&
+          input.workloadKey === `separation:${trigger.observationId}` && input.workerKind === "analysis" &&
+          input.mediaScope.length === 1 && input.mediaScope[0].artifactId === scope!.source.artifactId &&
+          input.mediaScope[0].trackId === scope!.source.trackId && input.mediaScope[0].startMs === scope!.source.range.startMs &&
+          input.mediaScope[0].endMs === scope!.source.range.endMs && input.inputArtifactIds.length === 1 &&
+          input.inputArtifactIds[0] === scope!.source.artifactId && input.requiredOutputs.length === 1 &&
+          input.requiredOutputs[0].artifactKind === "studio.study-report.v2" && input.requiredOutputs[0].required === true &&
+          input.requiredCapabilities.length === 2 && input.requiredCapabilities[0] === "media.audio.separate" &&
+          input.requiredCapabilities[1] === "report.submit" && input.dependencies.length === 0 &&
+          input.budget.wallMs === CONDITIONAL_SEPARATION_LIMITS.maxWallMs && input.budget.toolCalls === 1;
+        let rejection: SpawnRejection | null = Object.values(state.conditionalSeparationOperations).some((operation) =>
+          operation.trigger.observationId === trigger.observationId ||
+          (operation.sourceArtifactId === source?.id && operation.trackId === speaker?.trackId && operation.startMs === trigger.range.startMs && operation.endMs === trigger.range.endMs))
+          ? "separation_duplicate_work"
+          : this.violation(state, inputValue.authorship.taskId, inputValue.authorship.agentId, input, true);
+        if (
+          !root || root.parentTaskId !== null || root.ownerAgentId !== inputValue.authorship.agentId ||
+          execution?.status !== "active" || execution.taskId !== root.id || execution.agentId !== root.ownerAgentId ||
+          !root.grants.some((grant) => grant.capability === "study.separate") ||
+          call?.tool !== "study_separation_request" || call.executionId !== execution.id || call.taskId !== root.id ||
+          speaker?.status !== "completed" || source?.origin.kind !== "ingest" ||
+          observations?.origin.kind !== "speaker_overlap_observations" || observations.content.contentId !== trigger.observationsContentId ||
+          speaker.outputArtifactId !== observations.id || speaker.receiptArtifactId !== trigger.receiptArtifactId ||
+          speaker.receiptId !== trigger.receiptId || speaker.receiptContentId !== trigger.receiptContentId ||
+          speakerReceipt?.origin.kind !== "speaker_overlap_receipt" || speakerReceipt.content.contentId !== trigger.receiptContentId ||
+          !exactRange || trigger.kind !== "u6_speaker_overlap" || !childMatches
+        ) rejection = "requester_not_authorized";
+        if (rejection || !scope || !root) {
+          return {
+            pending: [requestEvent, { type: "spawn.decided", data: { requestId, accepted: false, rejection: rejection ?? "requester_not_authorized", taskId: null, agentId: null, grants: [] } }] satisfies PendingRuntimeEvent[],
+            result: { requestId, accepted: false, rejection: rejection ?? "requester_not_authorized", permit: null },
+          };
+        }
+        const taskId = this.identities.next("task");
+        const agentId = this.identities.next("agent");
+        const grants = this.grants(state, taskId, agentId, input, scope);
+        const permit: LaunchPermit = { requestId, taskId, agentId, registrationSecret: this.identities.secret() };
+        const task: TaskRecord = {
+          id: taskId, runId: state.runId, workloadKey: input.workloadKey, objective: input.objective,
+          workerKind: input.workerKind, workerLabel: input.workerLabel, parentTaskId: root.id, parentAgentId: root.ownerAgentId,
+          depth: root.depth + 1, assignedAgentId: agentId, ownerAgentId: null,
+          jobContext: attenuateTaskJobContext(root.jobContext, input.mediaScope, input.inputArtifactIds),
+          mediaScope: structuredClone(input.mediaScope), inputArtifactIds: [...input.inputArtifactIds],
+          requiredOutputs: structuredClone(input.requiredOutputs), dependencies: [], budget: { ...input.budget }, grants,
+          status: "scheduled", terminalReason: null,
+        };
+        return {
+          pending: [requestEvent, { type: "spawn.decided", data: { requestId, accepted: true, rejection: null, taskId, agentId, grants } }, { type: "task.created", data: { task } }] satisfies PendingRuntimeEvent[],
           result: { requestId, accepted: true, rejection: null, permit },
         };
       },

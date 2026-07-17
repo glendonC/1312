@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod/v4";
 
-import { isFrameHostArtifactKind } from "../model.ts";
+import { isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind } from "../model.ts";
 
 import {
   ORCHESTRATOR_SPAWN_TOOL,
@@ -11,6 +11,7 @@ import {
   ORCHESTRATOR_READ_TOOL,
   ORCHESTRATOR_PLAN_TOOL,
   ORCHESTRATOR_RESTUDY_TOOL,
+  ORCHESTRATOR_SEPARATION_TOOL,
   ORCHESTRATOR_SYNTHESIZE_TOOL,
 } from "./orchestratorBridge.ts";
 import {
@@ -29,6 +30,7 @@ const exactToolSets = [
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SEPARATION_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
 ] as const;
 if (manifest.tools.length !== names.size || !exactToolSets.some((expected) => expected.length === names.size && expected.every((name) => names.has(name)))) {
   throw new Error("The bounded orchestrator tool manifest is incomplete or open");
@@ -59,8 +61,8 @@ const spawnInput = z.object({
   requiredOutputs: z.array(z.object({
     name: z.string().min(1).max(128),
     artifactKind: z.string().min(1).max(128).refine(
-      (kind) => !isFrameHostArtifactKind(kind),
-      "Host-only frame artifact kinds cannot be worker outputs",
+      (kind) => !isFrameHostArtifactKind(kind) && !isConditionalSeparationHostArtifactKind(kind),
+      "Host-only frame or conditional-separation artifact kinds cannot be worker outputs",
     ),
     required: z.boolean(),
   }).strict()).min(1).max(8),
@@ -240,6 +242,26 @@ if (names.has(ORCHESTRATOR_RESTUDY_TOOL)) {
         return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
       } catch (error) {
         return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : "The bounded range pass failed closed." }] };
+      }
+    },
+  );
+}
+
+if (names.has(ORCHESTRATOR_SEPARATION_TOOL)) {
+  server.registerTool(
+    ORCHESTRATOR_SEPARATION_TOOL,
+    {
+      title: "Request exact conditional separation",
+      description: "Select one exact host-derived U6.1 overlap trigger. The host fixes raw identity, range, local model/configuration, anonymous stems, budgets, and raw-versus-stem comparison; this grants no semantic or caption preference.",
+      inputSchema: z.object({ inputId: z.string().min(1), triggerId: z.string().min(1) }).strict(),
+      annotations: { title: "Request exact conditional separation", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (args: unknown) => {
+      try {
+        const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_SEPARATION_TOOL, args);
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : "Conditional separation failed closed." }] };
       }
     },
   );

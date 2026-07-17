@@ -129,9 +129,28 @@ score.
   range with prior broader speech. The existing `attenuated_subrange` producer runs once over that
   exact host range; widening, narrowing, forged `recognizer_disagreement`, identical work, and missing
   grants fail closed. Speaker evidence stays coverage-only, and the pass does not itself resolve the
-  conflict or authorize captions. No UI, named/person/biometric/cross-run identity, perfect
-  diarization, non-darwin native pins, diarization quality bench, U7 separation, ambient always-
-  diarize, OCR reopen, semantic-quality, or Bet G claim is included.
+  conflict or authorize captions. That U6 slice included no UI, named/person/biometric/cross-run
+  identity, perfect diarization, non-darwin native pins, diarization quality bench, U7 separation,
+  ambient always-diarize, OCR reopen, semantic-quality, or Bet G claim.
+- **U7 conditional separation and raw-versus-stem comparison — first U6.1-triggered vertical
+  slice:** the default restudied root now has the grant-gated `study_separation_request` tool. Its
+  closed request contains only a host-derived input identity and trigger identity. Ordinary child
+  spawn cannot request `media.audio.separate`; the scheduler may issue that one-call child grant
+  only for one cold-audited U6.1 `conflicting` overlap cell, with the source track and half-open range
+  copied exactly. No U1 separation trigger is admitted yet because no closed U1 eligibility policy
+  is documented. The replaceable producer seam is backed on this runtime by an explicitly
+  bootstrapped, offline SpeechBrain 1.1.0 SepFormer WSJ02Mix model at immutable revision
+  `3a2826343a10e2d2e8a75f79aeab5ff3a2473531`; missing or changed runtime/model bytes fail closed.
+  The host preserves the owned raw artifact, seals only the granted range, and stores two anonymous
+  private content-addressed derived audio estimates plus canonical separation/comparison receipts.
+  Stem origins directly retain raw source/content/track/range, U6 trigger, method, model, and
+  configuration lineage. One current-run recognizer contract runs over raw and both estimates; the
+  deterministic result is only `agreement`, `disagreement`, or `abstention` after normalized-text
+  comparison. It always carries null semantic preference and no semantic, caption, publication,
+  speaker/source-identity, or quality authority. Cold audit reopens raw, both stems, both receipts,
+  the comparison, the U6 trigger, and current producer lineage by stored identities rather than
+  caller paths. No U3 claim-support/caption schema, UI, public stem delivery, human preference,
+  quality score, R1/R2, or Bet G ablation is included.
 
 ## Post-freeze backlog boundary
 
@@ -154,7 +173,10 @@ indefinite deferrals or a one-day implementation claim:
 6. U6 anonymous speaker/overlap evidence — one pinned local producer, immutable accounting receipt,
    launcher bridge, U3 coverage qualification, and typed exact-range U4 overlap trigger implemented;
    non-darwin native pins and a diarization quality bench remain.
-7. U7 conditional separation and raw/stem comparison.
+7. U7 conditional separation and raw/stem comparison — the first U6.1-triggered, pinned local,
+   private-artifact, cold-audited slice is implemented and default-runtime wired; a closed U1
+   eligibility policy, other platforms/models, independent or human semantic preference, and Bet G
+   ablation remain.
 8. R1 bounded receipted web research.
 9. R2 optional bounded read-only computer-use after media senses and research.
 10. G1 semantic evaluation expansion, registered ablations, repeated captures, variance, and later
@@ -214,6 +236,11 @@ indefinite deferrals or a one-day implementation claim:
   not prove that pass resolved overlap, identify people, link speakers across artifacts or runs, prove
   speaker count/turn boundaries, validate any word or translation, authorize captions,
   perform separation, or establish diarization accuracy.
+- U7 proves one exact U6.1-triggered local separation path, private raw/stem lineage, immutable
+  receipts, same-recognizer structural comparison, and cold replay/tamper closure. It does not prove
+  that either estimate is cleaner or semantically better, that agreement is independent evidence,
+  that any recognized word or translation is correct, or that stems may support claims, captions,
+  publication, speaker identity, source identity, or a quality/improvement score.
 
 ## Where to read what
 

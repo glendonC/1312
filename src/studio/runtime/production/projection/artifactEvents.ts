@@ -23,8 +23,11 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
     const isAtomicSpeakerOverlap =
       (artifact.origin.kind === "speaker_overlap_observations" || artifact.origin.kind === "speaker_overlap_receipt") &&
       event.producer.kind === "speaker_host";
+    const isAtomicConditionalSeparation =
+      (artifact.origin.kind === "separation_stem" || artifact.origin.kind === "conditional_separation_receipt" || artifact.origin.kind === "raw_stem_comparison" || artifact.origin.kind === "raw_stem_comparison_receipt") &&
+      event.producer.kind === "separation_host";
     invariant(
-      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap,
+      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap || isAtomicConditionalSeparation,
       event,
       "artifact evidence must come from its bounded storage, capability, admission, planning, synthesis, or audit host",
     );
@@ -99,6 +102,24 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         event,
         `Speaker/overlap receipt ${artifact.id} changed observations lineage`,
       );
+    } else if (artifact.origin.kind === "separation_stem") {
+      const operation = next.conditionalSeparationOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `Separation stem ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Separation stem ${artifact.id} changed producer`);
+      invariant(artifact.sourceArtifactIds.length === 3 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId && artifact.sourceArtifactIds[1] === operation.trigger.observationsArtifactId && artifact.sourceArtifactIds[2] === operation.trigger.receiptArtifactId, event, `Separation stem ${artifact.id} changed raw or trigger lineage`);
+      invariant(artifact.origin.sourceArtifactId === operation.sourceArtifactId && artifact.origin.sourceContentId === next.artifacts[operation.sourceArtifactId]?.content.contentId && artifact.origin.trackId === operation.trackId && artifact.origin.startMs === operation.startMs && artifact.origin.endMs === operation.endMs && artifact.origin.triggerOperationId === operation.trigger.operationId && artifact.origin.triggerObservationId === operation.trigger.observationId, event, `Separation stem ${artifact.id} changed exact source, range, or trigger`);
+    } else if (artifact.origin.kind === "conditional_separation_receipt") {
+      const operation = next.conditionalSeparationOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `Separation receipt ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId && artifact.sourceArtifactIds.length === 5 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId && artifact.sourceArtifactIds[1] === operation.trigger.observationsArtifactId && artifact.sourceArtifactIds[2] === operation.trigger.receiptArtifactId && JSON.stringify(artifact.sourceArtifactIds.slice(3)) === JSON.stringify(artifact.origin.stemArtifactIds) && artifact.origin.stemArtifactIds.every((id) => next.artifacts[id]?.origin.kind === "separation_stem"), event, `Separation receipt ${artifact.id} changed source, trigger, or stem lineage`);
+    } else if (artifact.origin.kind === "raw_stem_comparison") {
+      const operation = next.conditionalSeparationOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `Raw/stem comparison ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId && artifact.sourceArtifactIds.length === 4 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId && artifact.sourceArtifactIds.slice(1, 3).every((id) => next.artifacts[id]?.origin.kind === "separation_stem") && next.artifacts[artifact.sourceArtifactIds[3]]?.origin.kind === "conditional_separation_receipt", event, `Raw/stem comparison ${artifact.id} changed raw, stem, or receipt lineage`);
+    } else if (artifact.origin.kind === "raw_stem_comparison_receipt") {
+      const operation = next.conditionalSeparationOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `Raw/stem comparison receipt ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId && artifact.sourceArtifactIds.length === 5 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId && artifact.sourceArtifactIds.slice(1, 3).every((id) => next.artifacts[id]?.origin.kind === "separation_stem") && next.artifacts[artifact.sourceArtifactIds[3]]?.origin.kind === "conditional_separation_receipt" && artifact.sourceArtifactIds[4] === artifact.origin.comparisonArtifactId && next.artifacts[artifact.origin.comparisonArtifactId]?.origin.kind === "raw_stem_comparison", event, `Raw/stem comparison receipt ${artifact.id} changed lineage`);
     } else if (artifact.origin.kind === "semantic_media_evidence") {
       const operation = next.semanticEvidence[artifact.origin.operationId];
       invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active semantic operation`);

@@ -10,6 +10,7 @@ import {
 } from "./frames.ts";
 import { assertOcrRequest, validateOcrLimits, validateOcrReceipt } from "./ocr.ts";
 import { assertSpeakerOverlapRequest, validateSpeakerOverlapLimits, validateSpeakerOverlapReceipt } from "./speakers.ts";
+import { assertConditionalSeparationRequest, validateConditionalSeparationLimits, validateConditionalSeparationReceipt, validateRawStemComparisonReceipt, validateU6SpeakerOverlapSeparationTrigger } from "./separation.ts";
 import {
   validatePublishReviewIntakeReceipt,
   validateStudyReadinessReceiptIdentity,
@@ -107,6 +108,7 @@ const REJECTIONS = new Set([
   "restudy_duplicate_work",
   "restudy_range_pass_cap",
   "restudy_producer_pass_cap",
+  "separation_duplicate_work",
 ]);
 
 export function assertRuntimeEvent(
@@ -140,7 +142,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "speaker_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "speaker_host", "separation_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -222,7 +224,7 @@ export function assertRuntimeEvent(
     string(data.callId, context, "event.data.callId");
     string(data.executionId, context, "event.data.executionId");
     string(data.taskId, context, "event.data.taskId");
-    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_restudy_request", "study_synthesize"]), context, "event.data.tool");
+    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_restudy_request", "study_separation_request", "study_synthesize"]), context, "event.data.tool");
   } else if (type === "reports.wait_started") {
     exact(data, ["waitId", "executionId", "parentTaskId"], context, "event.data");
     string(data.waitId, context, "event.data.waitId");
@@ -387,6 +389,38 @@ export function assertRuntimeEvent(
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     oneOf(data.reason, new Set(["source_unavailable", "input_oversized", "model_unavailable", "runtime_drift", "decoder_failed", "diarizer_timeout", "diarizer_failed", "artifact_oversized"]), context, "event.data.reason");
+  } else if (type === "media.conditional_separation_started") {
+    exact(data, ["request", "scope", "sourceContentId", "executionId", "launchClaimId", "requestFingerprint", "trigger", "limits"], context, "event.data");
+    assertConditionalSeparationRequest(data.request, context);
+    const scope = object(data.scope, context, "event.data.scope");
+    exact(scope, ["artifactId", "trackId", "startMs", "endMs"], context, "event.data.scope");
+    string(scope.artifactId, context, "event.data.scope.artifactId");
+    string(scope.trackId, context, "event.data.scope.trackId");
+    const startMs = integer(scope.startMs, context, "event.data.scope.startMs");
+    const endMs = integer(scope.endMs, context, "event.data.scope.endMs", 1);
+    if (endMs <= startMs) fail(context, "event.data.scope", "must be a non-empty range");
+    contentId(data.sourceContentId, context, "event.data.sourceContentId");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.launchClaimId, context, "event.data.launchClaimId");
+    string(data.requestFingerprint, context, "event.data.requestFingerprint");
+    validateU6SpeakerOverlapSeparationTrigger(data.trigger, context, "event.data.trigger");
+    validateConditionalSeparationLimits(data.limits, context, "event.data.limits");
+  } else if (type === "media.conditional_separation_completed") {
+    exact(data, ["operationId", "stemArtifactIds", "receiptArtifactId", "receiptContentId", "receipt", "comparisonArtifactId", "comparisonReceiptArtifactId", "comparisonReceiptContentId", "comparisonReceipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    const stemIds = array(data.stemArtifactIds, context, "event.data.stemArtifactIds").map((entry, index) => string(entry, context, `event.data.stemArtifactIds[${index}]`));
+    if (stemIds.length !== 2 || new Set(stemIds).size !== 2) fail(context, "event.data.stemArtifactIds", "must identify two unique stems");
+    string(data.receiptArtifactId, context, "event.data.receiptArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateConditionalSeparationReceipt(data.receipt, context, "event.data.receipt");
+    string(data.comparisonArtifactId, context, "event.data.comparisonArtifactId");
+    string(data.comparisonReceiptArtifactId, context, "event.data.comparisonReceiptArtifactId");
+    contentId(data.comparisonReceiptContentId, context, "event.data.comparisonReceiptContentId");
+    validateRawStemComparisonReceipt(data.comparisonReceipt, context, "event.data.comparisonReceipt");
+  } else if (type === "media.conditional_separation_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    oneOf(data.reason, new Set(["source_unavailable", "input_oversized", "trigger_invalid", "model_unavailable", "runtime_drift", "decoder_failed", "separator_timeout", "separator_failed", "recognizer_failed", "artifact_oversized"]), context, "event.data.reason");
   } else if (type === "semantic.evidence_started") {
     exact(data, ["request", "grantId", "executionId", "launchClaimId", "sourceContentId", "producer", "limits"], context, "event.data");
     assertSpeechTranscribeRequest(data.request, context);

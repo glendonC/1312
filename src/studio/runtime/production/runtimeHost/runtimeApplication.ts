@@ -37,7 +37,7 @@ export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 2,
   maxActiveWorkers: 4,
   runBudget: { wallMs: 240_000, toolCalls: 32 },
-  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "media.speakers.analyze", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.restudy", "study.synthesize"],
+  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "media.speakers.analyze", "media.audio.separate", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.restudy", "study.separate", "study.synthesize"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {
@@ -203,7 +203,7 @@ export async function runBoundedRuntimeApplication(
     inputArtifactIds: [initialized.sourceArtifact.id, ...initialized.evidenceArtifacts.map((artifact) => artifact.id)],
     requiredOutputs: [{ name: "owned-media study", artifactKind: generalized ? "studio.owned-media-study.v3" : "studio.owned-media-study.v1", required: true }],
     requiredCapabilities: generalized
-      ? ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.restudy", "study.synthesize"]
+      ? ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.restudy", "study.separate", "study.synthesize"]
       : ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.plan", "study.synthesize"],
     dependencies: [],
     // Nine calls close the minimum two-child study path; reserve bounded headroom for

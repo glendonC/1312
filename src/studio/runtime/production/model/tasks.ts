@@ -1,6 +1,7 @@
 import type { FrameSamplingGrantScope } from "./frames.ts";
 import type { OcrGrantScope } from "./ocr.ts";
 import type { SpeakerOverlapGrantScope } from "./speakers.ts";
+import type { ConditionalSeparationGrantScope } from "./separation.ts";
 
 export const CAPABILITIES = [
   "task.spawn.request",
@@ -11,6 +12,7 @@ export const CAPABILITIES = [
   "media.frames.sample",
   "media.frames.ocr",
   "media.speakers.analyze",
+  "media.audio.separate",
   "speech.transcribe",
   "evidence.read",
   "analysis.evidence.assess",
@@ -19,6 +21,7 @@ export const CAPABILITIES = [
   "artifact.read",
   "study.plan",
   "study.restudy",
+  "study.separate",
   "study.synthesize",
 ] as const;
 
@@ -190,24 +193,35 @@ export type CapabilityGrant =
       frameScope: FrameSamplingGrantScope;
       ocrScope?: never;
       speakerScope?: never;
+      separationScope?: never;
     })
   | (CapabilityGrantBase & {
       capability: "media.frames.ocr";
       ocrScope: OcrGrantScope;
       frameScope?: never;
       speakerScope?: never;
+      separationScope?: never;
     })
   | (CapabilityGrantBase & {
       capability: "media.speakers.analyze";
       speakerScope: SpeakerOverlapGrantScope;
       frameScope?: never;
       ocrScope?: never;
+      separationScope?: never;
     })
   | (CapabilityGrantBase & {
-      capability: Exclude<Capability, "media.frames.sample" | "media.frames.ocr" | "media.speakers.analyze">;
+      capability: "media.audio.separate";
+      separationScope: ConditionalSeparationGrantScope;
       frameScope?: never;
       ocrScope?: never;
       speakerScope?: never;
+    })
+  | (CapabilityGrantBase & {
+      capability: Exclude<Capability, "media.frames.sample" | "media.frames.ocr" | "media.speakers.analyze" | "media.audio.separate">;
+      frameScope?: never;
+      ocrScope?: never;
+      speakerScope?: never;
+      separationScope?: never;
     });
 
 export interface AgentRecord {
@@ -261,7 +275,8 @@ export type SpawnRejection =
   | "capability_not_grantable"
   | "restudy_duplicate_work"
   | "restudy_range_pass_cap"
-  | "restudy_producer_pass_cap";
+  | "restudy_producer_pass_cap"
+  | "separation_duplicate_work";
 
 export interface LaunchPermit {
   requestId: string;
@@ -324,6 +339,7 @@ export interface OrchestratorToolCallRecord {
     | "artifact_read"
     | "study_planning_decision"
     | "study_restudy_request"
+    | "study_separation_request"
     | "study_synthesize";
   spawnRequestId: string | null;
 }

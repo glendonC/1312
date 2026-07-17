@@ -99,8 +99,9 @@ checklist below:
 6. **U6 — speaker/overlap evidence (coverage + typed U4 trigger slices implemented 2026-07-17):**
    preserve anonymous turn/overlap hypotheses in U3 coverage/conflicts and let one exact audited
    overlap cell request bounded attenuated speech without granting transcript truth.
-7. **U7 — conditional separation and comparison:** preserve raw media, receipt derived stems, and
-   compare raw/stem evidence only for triggered ranges.
+7. **U7 — conditional separation and comparison (first U6.1-triggered slice implemented
+   2026-07-17):** preserve raw media, receipt private derived stems, and compare raw/stem hypotheses
+   only for one exact audited overlap range. U1 eligibility and semantic preference remain closed.
 8. **R1 — bounded web research:** add safe search plus document snapshot/span citations for exact
    unresolved context gaps.
 9. **R2 — optional bounded computer-use:** after media senses and R1, inspect dynamic external
@@ -391,22 +392,37 @@ their audits.
 - **Existing-spine dependency:** U1 acoustic scope, U3 evidence/abstention, U4 pass requests, and the
   existing semantic evidence/report path.
 
-### U7. Conditional separation and raw-versus-stem comparison
+### U7. Conditional separation and raw-versus-stem comparison — first U6.1-triggered slice implemented
 
-- **Real:** Raw artifacts are preserved; derived-media lineage, exact ranges, current-run recognizer
-  receipts, and conflict-aware study planning exist.
-- **Missing:** No source-separation host, stem quality gate, or raw/stem comparison report exists.
-- **Done when:** Only exact U1/U6-triggered ranges may receive a separation grant. The host preserves
-  raw media and stores each stem as a derived artifact with method/model/configuration/source lineage.
-  A specialist can run the same recognizer contract over raw and selected stems and report agreement,
-  disagreement, or abstention. A deterministic gate checks lineage and comparability; semantic
-  preference requires independent evidence or human review. Inconclusive separation stays withheld.
+- **Real:** `study_separation_request` exposes only exact host-derived U6.1 conflicting overlap
+  cells. The caller can copy only `inputId` and `triggerId`; ordinary spawn cannot acquire
+  `media.audio.separate`. The scheduler fixes one exact source/content/audio-track/range grant,
+  one-call limits, and the pinned producer policy. The replaceable `SourceSeparator` seam uses local
+  offline SpeechBrain SepFormer WSJ02Mix on the qualified macOS-arm64 runtime. The host keeps the raw
+  artifact unchanged and stores two anonymous private `studio.separated-audio-stem.v1` derived
+  artifacts plus canonical separation and comparison receipts. Direct origin fields and receipts
+  close method/model/configuration/raw source/range/U6 trigger lineage. The same current-run
+  recognizer contract runs over raw and both stems; deterministic NFC/whitespace-normalized text
+  yields only agreement, disagreement, or abstention. Cold audit reopens raw, stems, receipts,
+  comparison, U6 evidence, and current producer lineage without accepting caller paths or rerunning
+  separation. The result has null semantic preference and no caption or semantic authority.
+- **Still missing:** No closed U1 separation-eligibility policy exists, so U1 evidence cannot trigger
+  this slice. Non-darwin runtime pins, alternate models, a separation-quality bench, independent
+  evidence or human semantic preference, UI projection, public delivery, and the registered Bet G
+  raw-versus-stem ablation remain open. The default recognizer may honestly abstain when no live
+  current-run recognizer is configured.
+- **Slice done-when:** The landed U6.1 path proves exact trigger/grant/range closure, raw preservation,
+  private content-addressed stems, pinned replaceable execution, same-recognizer comparison,
+  immutable receipts, cold audit/tamper rejection, hard limits, duplicate rejection, typed
+  unavailable failure, and no caption-authority upgrade. The full U7 rung remains open for a typed U1
+  trigger policy and the quality/human-review work above.
 - **Non-goals:** Default separation of every clip, publishing stems, “cleaner sounds better” as a
   metric, or treating same-recognizer agreement on related audio as independent truth.
 - **Fake-claim risk:** Separation can create artifacts. A clean-sounding stem may delete speech or
   invent recognizer confidence without improving meaning.
-- **Existing-spine dependency:** U1/U6 triggers, U3 citations, U4 pass history, derived artifact
-  origins, raw-source preservation, and Bet G raw-versus-stem ablation.
+- **Existing-spine dependency:** This slice uses U6.1 audited overlap evidence, U4 pass/study context,
+  derived artifact origins, and raw-source preservation. U1 eligibility and Bet G ablation are later
+  consumers, not evidence claimed by this slice.
 
 ## External context rungs
 
@@ -513,9 +529,11 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    U3 coverage/conflict admission. One exact audited overlap cell can now request the existing bounded
    attenuated-speech pass under the closed `speaker_overlap` cause; no person identity and no automatic
    transcript truth comes from speaker labels.
-7. **Conditional separation + comparison.** Grant separation only for exact U1/U6-triggered ranges;
-   preserve raw audio, receipt stems, compare raw/stem evidence, and withhold when inconclusive. Run
-   a registered Bet G ablation before any improvement claim.
+7. **Conditional separation + comparison — first U6.1-triggered slice implemented 2026-07-17.** One
+   exact audited conflicting overlap cell may receive the pinned private separation grant; raw audio,
+   anonymous stems, lineage receipts, cold audit, and same-recognizer comparability are closed. U1
+   triggers remain unavailable. Run a registered Bet G ablation and require independent evidence or
+   human review before any preference or improvement claim.
 8. **Receipted web research.** Add safe bounded search + snapshot/read tools, typed span citations,
    freshness/provenance, and one exact gap-triggered context specialist. No ambient web or fixed
    research-worker count.

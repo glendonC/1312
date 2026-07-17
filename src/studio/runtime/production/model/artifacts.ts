@@ -75,6 +75,47 @@ export interface SpeakerOverlapReceiptArtifactOrigin {
   observationsArtifactId: string;
 }
 
+export interface SeparationStemArtifactOrigin {
+  kind: "separation_stem";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  stemRole: "source_estimate_1" | "source_estimate_2";
+  sourceArtifactId: string;
+  sourceContentId: string;
+  trackId: string;
+  startMs: number;
+  endMs: number;
+  triggerOperationId: string;
+  triggerObservationId: string;
+  methodId: "speechbrain-sepformer-wsj02mix";
+  modelContentIds: string[];
+  configurationContentId: string;
+}
+
+export interface ConditionalSeparationReceiptArtifactOrigin {
+  kind: "conditional_separation_receipt";
+  operationId: string;
+  receiptId: string;
+  stemArtifactIds: [string, string];
+}
+
+export interface RawStemComparisonArtifactOrigin {
+  kind: "raw_stem_comparison";
+  operationId: string;
+  separationReceiptId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface RawStemComparisonReceiptArtifactOrigin {
+  kind: "raw_stem_comparison_receipt";
+  operationId: string;
+  receiptId: string;
+  comparisonArtifactId: string;
+  separationReceiptId: string;
+}
+
 export interface SemanticMediaEvidenceArtifactOrigin {
   kind: "semantic_media_evidence";
   operationId: string;
@@ -325,6 +366,10 @@ export interface RuntimeArtifact {
     | OcrReceiptArtifactOrigin
     | SpeakerOverlapObservationsArtifactOrigin
     | SpeakerOverlapReceiptArtifactOrigin
+    | SeparationStemArtifactOrigin
+    | ConditionalSeparationReceiptArtifactOrigin
+    | RawStemComparisonArtifactOrigin
+    | RawStemComparisonReceiptArtifactOrigin
     | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
     | StudyReportArtifactOrigin

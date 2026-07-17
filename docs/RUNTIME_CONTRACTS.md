@@ -392,6 +392,67 @@ transcript truth, or authorize captions. Named/cross-run identity, a fit-for-pur
 quality bench, alternate models, non-darwin native platform pins, ambient always-diarize policy, U7
 separation, and all UI work remain outside this slice.
 
+U7 adds `study.separate` to the default restudied root without mutating the U3 admission or U4 study
+schemas. The root tool is `study_separation_request`; its request is exactly `{ inputId, triggerId }`.
+The request host cold-audits completed U6 operations and exposes only cells whose stored accounting
+state is `conflicting`, kind is `overlap`, and uncertainty reason is
+`overlap_hypothesis_requires_speech_restudy`. The special scheduler path copies that cell's exact
+owned-source content id, audio track, and half-open range into one `media.audio.separate` grant.
+Ordinary model-authored spawn cannot request that capability, and the child-facing separation tool
+accepts exactly `{}`. Missing root grant, model-authored range/model/path fields, a changed U6
+identity, widening or narrowing, duplicate work, or a non-triggered range fails closed. This first
+slice intentionally has no U1 trigger: no closed U1 separation-eligibility policy is currently
+documented, so U1 evidence cannot grant separation by implication.
+
+The replaceable producer seam is `SourceSeparator`. The qualified local implementation is
+`speechbrain-sepformer-wsj02mix` version 1 on macOS arm64, Python 3.14, SpeechBrain 1.1.0, Torch and
+torchaudio 2.11.0, CPU/one-thread execution, and a network-denied subprocess. It uses
+`speechbrain/sepformer-wsj02mix` at revision
+`3a2826343a10e2d2e8a75f79aeab5ff3a2473531`; the executable YAML/encoder/decoder/mask-network files
+are checked against the four content ids in `SEPARATION_METHOD` before HyperPyYAML parsing and again
+inside the runner. Installation is explicit through
+`python3 scripts/bootstrap-u7-separation.py --accept-model-card-license`; model/runtime bytes live
+under ignored `.studio/separation-runtime`,
+not Git or the artifact publication surface. Missing files are typed `model_unavailable`; changed
+model, package, adapter, or configuration lineage is `runtime_drift`. There is no unpinned or fake-
+stem fallback.
+
+Immediately before inference the host repeats the U6 cold audit, resolves and re-hashes the owned raw
+artifact from the content-addressed store, seals a private snapshot, and decodes only the grant to
+mono 8 kHz PCM16 WAV. The host leaves the raw artifact intact. It stores exactly two anonymous
+ordered estimates as private derived `studio.separated-audio-stem.v1` artifacts. Each stem origin
+directly binds the raw artifact/content/audio track/range, trigger operation/observation, receipt,
+method, four model content ids, and configuration content id. Canonical private non-media artifacts
+`studio.conditional-separation.receipt.v1`, `studio.raw-stem-comparison.v1`, and
+`studio.raw-stem-comparison.receipt.v1` close authorization, launch/execution, normalization,
+runtime/model/configuration, output, recognizer, and non-claim identities.
+
+The fixed grant permits one call, one range no longer than 10,000 ms, 80,000 decoded samples, two
+stems, 512 MiB raw source, 160,128 bytes each for normalized audio and each stem, 256 KiB separation
+receipt, 512 KiB comparison, 256 KiB comparison receipt, 256 recognizer segments per input, and
+60,000 ms wall time. Source, decoder, separator, recognizer-lineage, timeout, oversize, or artifact
+failure records a closed typed failure and creates no completed stem/comparison authority.
+
+One `CurrentRunSpeechRecognizer` descriptor is used over the raw grant and both selected estimates.
+Raw timestamps remain absolute; stem-relative segments are rebased to the same exact source range.
+If all three results are available, NFC/trimmed/whitespace-collapsed text comparison deterministically
+returns `agreement` or `disagreement`; otherwise it returns `abstention` with
+`recognizer_unavailable_or_incomplete`. The comparison gate establishes verified lineage,
+same-recognizer use, exact-range association, and structural comparability only. Its
+`semanticPreference` is always null, while semantic and caption authority are always `not_granted`.
+Stem results are not U3 citation inputs and cannot become `claim_support`, study claims, or caption
+text through this contract.
+
+Cold `auditConditionalSeparation` starts from the completed journal operation and reopens the raw
+artifact, both private stems, separation receipt, comparison, comparison receipt, exact U6 trigger,
+and current producer lineage by content identity; caller paths are not authority and separation is
+not rerun. Derivable artifact/receipt ids, canonical bytes, authorization, source/range/trigger,
+method/model/configuration, recognizer, and explicit non-claims must all agree. A clean-sounding
+estimate, same-recognizer agreement on related audio, or successful separation is not independent
+truth, transcription/translation correctness, speaker/source identity, quality, improvement,
+caption authority, publication, or public availability. Independent evidence or human review is
+required before any semantic preference, and inconclusive comparison remains abstention/withheld.
+
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and
 `analysis.evidence.assessment_failed`. A completed event binds its operation to the private

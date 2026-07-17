@@ -15,6 +15,7 @@ import { ParentArtifactReadHost } from "../admission/parentArtifactReadHost.ts";
 import { StudyPlanningHost } from "../study/studyPlanningHost.ts";
 import { OwnedMediaStudySynthesisHost } from "../study/studySynthesisHost.ts";
 import { RangePassHost } from "../study/rangePassHost.ts";
+import { ConditionalSeparationRequestHost } from "../study/conditionalSeparationRequestHost.ts";
 
 export type DeterministicOrchestratorMode =
   | "spawn_one"
@@ -100,6 +101,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       output.required && (output.artifactKind === "studio.owned-media-study.v2" || output.artifactKind === "studio.owned-media-study.v3"));
     const restudiedEnabled = task.requiredOutputs.some((output) =>
       output.required && output.artifactKind === "studio.owned-media-study.v3");
+    const separationEnabled = restudiedEnabled && task.grants.some((grant) => grant.capability === "study.separate");
     const planningHost = new StudyPlanningHost(ledger, artifacts);
     const bridge = new BoundedOrchestratorBridge({
       task,
@@ -108,7 +110,12 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       scheduler,
       childLauncher,
       ...(generalizedEnabled ? { artifacts } : {}),
-      ...(restudiedEnabled ? { rangePassHost: new RangePassHost(ledger, artifacts, scheduler) } : {}),
+      ...(restudiedEnabled ? {
+        rangePassHost: new RangePassHost(ledger, artifacts, scheduler),
+      } : {}),
+      ...(separationEnabled ? {
+        separationRequestHost: new ConditionalSeparationRequestHost(ledger, artifacts, scheduler),
+      } : {}),
       ...(planningEnabled ? {
         admissionHost: new ParentArtifactAdmissionHost(ledger, artifacts),
         readHost: new ParentArtifactReadHost(ledger, artifacts),

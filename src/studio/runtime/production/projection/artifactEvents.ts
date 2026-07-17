@@ -20,8 +20,11 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
     const isAtomicOcr =
       (artifact.origin.kind === "ocr_observations" || artifact.origin.kind === "ocr_receipt") &&
       event.producer.kind === "ocr_host";
+    const isAtomicSpeakerOverlap =
+      (artifact.origin.kind === "speaker_overlap_observations" || artifact.origin.kind === "speaker_overlap_receipt") &&
+      event.producer.kind === "speaker_host";
     invariant(
-      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr,
+      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap,
       event,
       "artifact evidence must come from its bounded storage, capability, admission, planning, synthesis, or audit host",
     );
@@ -79,6 +82,22 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
           JSON.stringify(artifact.sourceArtifactIds.slice(4)) === JSON.stringify(frameOperation.frameArtifactIds),
         event,
         `OCR receipt ${artifact.id} changed observations or U2 lineage`,
+      );
+    } else if (artifact.origin.kind === "speaker_overlap_observations") {
+      const operation = next.speakerOverlapOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `Speaker/overlap observations ${artifact.id} have no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Speaker/overlap observations ${artifact.id} changed producer`);
+      invariant(artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId, event, `Speaker/overlap observations ${artifact.id} changed source lineage`);
+    } else if (artifact.origin.kind === "speaker_overlap_receipt") {
+      const operation = next.speakerOverlapOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started", event, `Speaker/overlap receipt ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Speaker/overlap receipt ${artifact.id} changed producer`);
+      invariant(
+        artifact.sourceArtifactIds.length === 2 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId &&
+          artifact.sourceArtifactIds[1] === artifact.origin.observationsArtifactId &&
+          next.artifacts[artifact.origin.observationsArtifactId]?.origin.kind === "speaker_overlap_observations",
+        event,
+        `Speaker/overlap receipt ${artifact.id} changed observations lineage`,
       );
     } else if (artifact.origin.kind === "semantic_media_evidence") {
       const operation = next.semanticEvidence[artifact.origin.operationId];

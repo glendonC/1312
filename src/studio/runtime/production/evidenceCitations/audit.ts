@@ -8,6 +8,8 @@ import type { FrameDecoder } from "../frames/decoder.ts";
 import { FfmpegFrameDecoder } from "../frames/ffmpegDecoder.ts";
 import { auditOcr, type VerifiedOcrAudit } from "../ocrAudit.ts";
 import type { OcrRecognizer } from "../ocr/recognizer.ts";
+import { auditSpeakerOverlap, type VerifiedSpeakerOverlapAudit } from "../speakerAudit.ts";
+import type { SpeakerDiarizer } from "../speaker/diarizer.ts";
 import type {
   EvidenceCitationEnvelope,
   EvidenceCitationObservation,
@@ -312,9 +314,80 @@ export function ocrSpanCitation(input: {
   });
 }
 
+function speakerUpstreamState(verified: VerifiedSpeakerOverlapAudit): EvidenceCitationState {
+  if (verified.observations.state === "truncated") return "truncated";
+  if (verified.observations.state === "available") return "available";
+  return "unknown";
+}
+
+/**
+ * Reconstructs every U6 accounting cell in the exact target range. Target boundaries must align
+ * to the producer partition, preventing callers from omitting overlap or uncertainty cells.
+ */
+export function speakerTurnCitation(input: {
+  verified: VerifiedSpeakerOverlapAudit;
+  target: Extract<EvidenceCitationTarget, { kind: "coverage" }>;
+}): EvidenceCitationEnvelope {
+  const { verified, target } = input;
+  const range = target.range;
+  const source = verified.observations.source;
+  if (
+    range.artifactId !== source.artifactId || range.trackId !== source.audioTrackId ||
+    range.startMs < source.grantedRange.startMs || range.endMs > source.grantedRange.endMs
+  ) throw new Error("Speaker/overlap citation target escapes its audited source grant");
+  const cells = verified.observations.accounting.filter((cell) =>
+    cell.startMs >= range.startMs && cell.endMs <= range.endMs);
+  let cursor = range.startMs;
+  for (const cell of cells) {
+    if (cell.startMs !== cursor) throw new Error("Speaker/overlap citation target is not an exact accounting partition");
+    cursor = cell.endMs;
+  }
+  if (cells.length === 0 || cursor !== range.endMs) {
+    throw new Error("Speaker/overlap citation target boundaries must align to complete accounting cells");
+  }
+  return makeCitation({
+    evidenceKind: "speaker_turn",
+    use: "coverage_qualification",
+    target: structuredClone(target),
+    operationId: verified.observations.operationId,
+    evidence: {
+      artifactId: verified.observationsArtifact.id,
+      contentId: verified.observationsArtifact.content.contentId,
+    },
+    receipt: {
+      receiptId: verified.receipt.receiptId,
+      contentId: verified.receiptArtifact.content.contentId,
+      artifactId: verified.receiptArtifact.id,
+    },
+    source: {
+      artifactId: source.artifactId,
+      contentId: source.contentId,
+      trackId: source.audioTrackId,
+    },
+    upstreamState: speakerUpstreamState(verified),
+    upstreamReason: verified.observations.reason,
+    observations: cells.map((cell): EvidenceCitationObservation => ({
+      observationId: cell.observationId,
+      state: cell.state,
+      rawState: `speaker:${cell.kind}:${cell.uncertainty.reason}`,
+      locator: {
+        kind: "temporal_range",
+        media: {
+          artifactId: source.artifactId,
+          trackId: source.audioTrackId,
+          startMs: cell.startMs,
+          endMs: cell.endMs,
+        },
+      },
+    })),
+    nonClaims: { semanticCorrectness: "not_assessed", truthArbitration: "not_performed" },
+  });
+}
+
 export interface EvidenceCitationAuditOptions {
   frameDecoder?: FrameDecoder;
   ocrRecognizer?: OcrRecognizer;
+  speakerDiarizer?: SpeakerDiarizer;
 }
 
 /** Producer-specific cold audit dispatch. Future typed kinds have no adapter and fail closed. */
@@ -368,6 +441,14 @@ export async function auditEvidenceCitation(
       verified,
       observationIds: citation.observations.map((entry) => entry.observationId),
       target: citation.target as Extract<EvidenceCitationTarget, { kind: "media_context" }>,
+    });
+  } else if (citation.evidenceKind === "speaker_turn") {
+    const verified = await auditSpeakerOverlap(state, artifacts, citation.operationId!, {
+      diarizer: options.speakerDiarizer,
+    });
+    expected = speakerTurnCitation({
+      verified,
+      target: citation.target as Extract<EvidenceCitationTarget, { kind: "coverage" }>,
     });
   } else {
     throw new Error(`Evidence citation kind ${citation.evidenceKind} has no registered producer or audit adapter`);

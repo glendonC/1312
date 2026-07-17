@@ -233,6 +233,12 @@ export function validateEvidenceCitationEnvelope(
        observations.some((entry) => entry.locator.kind !== "media_point"))) {
     fail(context, path, "OCR hypotheses are audited point identities and remain cite-only media context");
   }
+  if (evidenceKind === "speaker_turn" &&
+      (use !== "coverage_qualification" || foundTarget.kind !== "coverage" || operationId === null ||
+       envelope.receipt.artifactId === null || observations.length === 0 ||
+       observations.some((entry) => entry.locator.kind !== "temporal_range"))) {
+    fail(context, path, "anonymous speaker/overlap hypotheses may qualify exact temporal coverage but cannot support caption claims");
+  }
   if (evidenceKind === "acoustic_range" && (use !== "coverage_qualification" || operationId !== null || envelope.receipt.artifactId !== null)) {
     fail(context, path, "acoustic observations may qualify coverage but cannot support transcript claims");
   }

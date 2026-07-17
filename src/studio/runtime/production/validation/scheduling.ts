@@ -9,7 +9,9 @@ import {
   FRAME_SAMPLING_LIMITS,
   isFrameHostArtifactKind,
   isOcrHostArtifactKind,
+  isSpeakerOverlapHostArtifactKind,
   OCR_LIMITS,
+  SPEAKER_OVERLAP_LIMITS,
   type MediaScope,
   type OrchestratorSpawnContract,
   type RequiredOutput,
@@ -22,6 +24,7 @@ import {
 } from "../model.ts";
 import { validateFrameSamplingGrantScope } from "./frames.ts";
 import { validateOcrGrantScope } from "./ocr.ts";
+import { validateSpeakerOverlapGrantScope } from "./speakers.ts";
 import {
   array,
   boolean,
@@ -78,11 +81,12 @@ const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
     "study.restudy",
     "study.synthesize",
   ]),
-  media: new Set(["media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "speech.transcribe", "report.submit"]),
+  media: new Set(["media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.speakers.analyze", "speech.transcribe", "report.submit"]),
   analysis: new Set([
     "media.seek",
     "media.frames.sample",
     "media.frames.ocr",
+    "media.speakers.analyze",
     "speech.transcribe",
     "evidence.read",
     "analysis.evidence.assess",
@@ -214,8 +218,8 @@ function outputs(value: unknown, context: string, path: string): RequiredOutput[
     exact(item, ["name", "artifactKind", "required"], context, `${path}[${index}]`);
     string(item.name, context, `${path}[${index}].name`);
     const artifactKind = string(item.artifactKind, context, `${path}[${index}].artifactKind`);
-    if (isFrameHostArtifactKind(artifactKind) || isOcrHostArtifactKind(artifactKind)) {
-      fail(context, `${path}[${index}].artifactKind`, "is a host-only frame artifact kind or OCR artifact kind");
+    if (isFrameHostArtifactKind(artifactKind) || isOcrHostArtifactKind(artifactKind) || isSpeakerOverlapHostArtifactKind(artifactKind)) {
+      fail(context, `${path}[${index}].artifactKind`, "is a host-only frame artifact kind, OCR artifact kind, or speaker/overlap artifact kind");
     }
     boolean(item.required, context, `${path}[${index}].required`);
   });
@@ -246,6 +250,8 @@ function grant(value: unknown, context: string, path: string): asserts value is 
       ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "frameScope"]
       : capability === "media.frames.ocr"
         ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "ocrScope"]
+        : capability === "media.speakers.analyze"
+          ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "speakerScope"]
         : ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope"],
     context,
     path,
@@ -262,6 +268,9 @@ function grant(value: unknown, context: string, path: string): asserts value is 
     : null;
   const ocrScope = capability === "media.frames.ocr"
     ? validateOcrGrantScope(item.ocrScope, context, `${path}.ocrScope`)
+    : null;
+  const speakerScope = capability === "media.speakers.analyze"
+    ? validateSpeakerOverlapGrantScope(item.speakerScope, context, `${path}.speakerScope`)
     : null;
   const mediaBound = capability.startsWith("media.") || capability === "speech.transcribe";
   if (mediaBound && mediaScope.length === 0) {
@@ -301,6 +310,13 @@ function grant(value: unknown, context: string, path: string): asserts value is 
     ocrScope === null || ocrScope.limits.maxFrames > OCR_LIMITS.maxFrames
   )) {
     fail(context, path, "media.frames.ocr grants require one bounded video scope and OCR envelope");
+  }
+  if (capability === "media.speakers.analyze" && (
+    mediaScope.length !== 1 ||
+    mediaScope[0].endMs - mediaScope[0].startMs > SPEAKER_OVERLAP_LIMITS.maxRangeMs ||
+    speakerScope === null
+  )) {
+    fail(context, path, "media.speakers.analyze grants require one bounded audio scope and speaker/overlap envelope");
   }
 }
 

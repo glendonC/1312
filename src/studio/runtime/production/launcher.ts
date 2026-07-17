@@ -11,6 +11,7 @@ import type {
   LaunchPermit,
   ModelUsageReceipt,
   OcrEvidenceCitationInput,
+  SpeakerOverlapEvidenceCitationInput,
   ReportRecord,
   RuntimeArtifact,
   WorkerOutputEnvelope,
@@ -22,6 +23,9 @@ import { FfmpegCapabilityHost } from "./mediaHost.ts";
 import { BoundedFrameSamplingHost } from "./frameHost.ts";
 import { BoundedOcrHost } from "./ocrHost.ts";
 import { auditOcr } from "./ocrAudit.ts";
+import { BoundedSpeakerOverlapHost } from "./speakerHost.ts";
+import { auditSpeakerOverlap } from "./speakerAudit.ts";
+import type { SpeakerDiarizer } from "./speaker/diarizer.ts";
 import type { OcrRecognizer } from "./ocr/recognizer.ts";
 import type { FrameDecoder } from "./frames/decoder.ts";
 import { BoundedEvidenceReadHost } from "./evidenceHost.ts";
@@ -36,6 +40,7 @@ import type { ChildEvidenceDecisionHost } from "./executor/childEvidenceDecision
 import type { ChildMediaCapabilityHost } from "./executor/childMediaBridge.ts";
 import type { ChildFrameSamplingHost } from "./executor/childFrameBridge.ts";
 import type { ChildOcrHost } from "./executor/childOcrBridge.ts";
+import type { ChildSpeakerHost } from "./executor/childSpeakerBridge.ts";
 import type { ChildSemanticEvidenceHost } from "./executor/childSemanticEvidenceBridge.ts";
 import { parseCodexEvents } from "./executor/codexEvents.ts";
 import { closedCodexExecArgs } from "./executor/codexInvocation.ts";
@@ -91,11 +96,14 @@ export interface CodexWorkerLauncherOptions {
   nextSemanticEvidenceOperationId?: () => string;
   nextFrameOperationId?: () => string;
   nextOcrOperationId?: () => string;
+  nextSpeakerOperationId?: () => string;
   mediaHost?: ChildMediaCapabilityHost;
   frameHost?: ChildFrameSamplingHost;
   ocrHost?: ChildOcrHost;
   ocrRecognizer?: OcrRecognizer;
   ocrFrameDecoder?: FrameDecoder;
+  speakerHost?: ChildSpeakerHost;
+  speakerDiarizer?: SpeakerDiarizer;
   evidenceHost?: ChildEvidenceReadHost;
   assessmentHost?: ChildEvidenceAssessmentHost;
   decisionHost?: ChildEvidenceDecisionHost;
@@ -104,6 +112,7 @@ export interface CodexWorkerLauncherOptions {
   mediaMcpServerPath?: string;
   frameMcpServerPath?: string;
   ocrMcpServerPath?: string;
+  speakerMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -123,12 +132,13 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextSpeakerOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "speakerMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
   private readonly frameHost: ChildFrameSamplingHost;
   private readonly ocrHost: ChildOcrHost;
+  private readonly speakerHost: ChildSpeakerHost;
   private readonly evidenceHost: ChildEvidenceReadHost;
   private readonly assessmentHost: ChildEvidenceAssessmentHost;
   private readonly decisionHost: ChildEvidenceDecisionHost;
@@ -150,6 +160,10 @@ export class CodexExecWorkerLauncher {
     this.ocrHost = options.ocrHost ?? new BoundedOcrHost(ledger, artifacts, {
       recognizer: options.ocrRecognizer,
       frameDecoder: options.ocrFrameDecoder,
+    });
+    this.speakerHost = options.speakerHost ?? new BoundedSpeakerOverlapHost(ledger, artifacts, {
+      diarizer: options.speakerDiarizer,
+      temporaryRoot: options.temporaryRoot,
     });
     this.evidenceHost = options.evidenceHost ?? new BoundedEvidenceReadHost(ledger, artifacts);
     this.assessmentHost = options.assessmentHost ?? new BoundedEvidenceAssessmentHost(ledger, artifacts);
@@ -175,15 +189,18 @@ export class CodexExecWorkerLauncher {
       nextSemanticEvidenceOperationId: options.nextSemanticEvidenceOperationId,
       nextFrameOperationId: options.nextFrameOperationId,
       nextOcrOperationId: options.nextOcrOperationId,
+      nextSpeakerOperationId: options.nextSpeakerOperationId,
       mediaMcpServerPath: options.mediaMcpServerPath,
       frameMcpServerPath: options.frameMcpServerPath,
       ocrMcpServerPath: options.ocrMcpServerPath,
+      speakerMcpServerPath: options.speakerMcpServerPath,
       evidenceMcpServerPath: options.evidenceMcpServerPath,
       assessmentMcpServerPath: options.assessmentMcpServerPath,
       decisionMcpServerPath: options.decisionMcpServerPath,
       semanticEvidenceMcpServerPath: options.semanticEvidenceMcpServerPath,
       ocrRecognizer: options.ocrRecognizer,
       ocrFrameDecoder: options.ocrFrameDecoder,
+      speakerDiarizer: options.speakerDiarizer,
     };
   }
 
@@ -231,9 +248,9 @@ export class CodexExecWorkerLauncher {
     }
     if (
       !scheduled.grants.some((grant) => grant.capability === "report.submit") ||
-      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
+      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.speakers.analyze", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
     ) {
-      throw new Error("Codex executor supports only report.submit plus scheduler-granted media, frame, speech.transcribe, evidence-read, assessment, and decision capabilities");
+      throw new Error("Codex executor supports only report.submit plus scheduler-granted media, frame, anonymous-speaker, speech.transcribe, evidence-read, assessment, and decision capabilities");
     }
 
     const claimedAt = this.options.now().toISOString();
@@ -276,6 +293,7 @@ export class CodexExecWorkerLauncher {
           media: this.mediaHost,
           frame: this.frameHost,
           ocr: this.ocrHost,
+          speaker: this.speakerHost,
           evidence: this.evidenceHost,
           assessment: this.assessmentHost,
           decision: this.decisionHost,
@@ -290,6 +308,7 @@ export class CodexExecWorkerLauncher {
         semanticEvidenceGrant,
         frameGrant,
         ocrGrant,
+        speakerGrant,
         assessmentGrant,
         decisionGrant,
       } = childCapabilities;
@@ -374,6 +393,31 @@ export class CodexExecWorkerLauncher {
           observationIds,
         });
       }
+      const completedSpeaker = Object.values(this.ledger.state().speakerOverlapOperations)
+        .filter((operation) => operation.taskId === task.id && operation.status === "completed")
+        .sort((left, right) => left.id.localeCompare(right.id));
+      if (speakerGrant && completedSpeaker.length === 0) {
+        throw new LauncherFailure(
+          "Codex child did not complete its granted anonymous speaker/overlap operation",
+          "Codex child did not complete its required receipted anonymous speaker/overlap analysis.",
+        );
+      }
+      const verifiedSpeakerEvidence: Awaited<ReturnType<typeof auditSpeakerOverlap>>[] = [];
+      const speakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [];
+      for (const operation of completedSpeaker) {
+        const verified = await auditSpeakerOverlap(this.ledger.state(), this.artifacts, operation.id, {
+          diarizer: this.options.speakerDiarizer,
+        });
+        verifiedSpeakerEvidence.push(verified);
+        speakerEvidenceInputs.push({
+          operationId: operation.id,
+          artifactId: verified.observationsArtifact.id,
+          contentId: verified.observationsArtifact.content.contentId,
+          receiptArtifactId: verified.receiptArtifact.id,
+          receiptId: verified.receipt.receiptId,
+          receiptContentId: verified.receiptArtifact.content.contentId,
+        });
+      }
       if (evidenceGrant?.evidenceScope.some((scope) =>
         !Object.values(this.ledger.state().evidenceReads).some((operation) =>
           operation.taskId === task.id &&
@@ -423,7 +467,7 @@ export class CodexExecWorkerLauncher {
           "Codex worker response failed its output contract.",
         );
       }
-      const worker = validateWorkerResult(workerValue, task, semanticEvidenceInputs, ocrEvidenceInputs);
+      const worker = validateWorkerResult(workerValue, task, semanticEvidenceInputs, ocrEvidenceInputs, speakerEvidenceInputs);
       const prepared = await Promise.all(
         worker.outputs.map(async (output) => {
           if ((output.kind === "studio.study-report.v1" || output.kind === "studio.study-report.v2") && "coverage" in output) {
@@ -436,6 +480,8 @@ export class CodexExecWorkerLauncher {
                   verifiedSemanticEvidence,
                   ocrEvidenceInputs: worker.ocrEvidenceInputs,
                   verifiedOcrEvidence,
+                  speakerEvidenceInputs: worker.speakerEvidenceInputs,
+                  verifiedSpeakerEvidence,
                   dialogueScopePolicy: await deriveTaskDialogueScopePolicy(this.ledger.state(), this.artifacts, task.id),
                 })
               : buildStudyReportEnvelope(task, output, worker.semanticEvidenceInputs);

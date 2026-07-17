@@ -4,6 +4,7 @@ import type {
   FrameSamplingStartedEvent,
 } from "./protocol/frameEvents.ts";
 import type { OcrCompletedEvent, OcrFailedEvent, OcrStartedEvent } from "./protocol/ocrEvents.ts";
+import type { SpeakerOverlapCompletedEvent, SpeakerOverlapFailedEvent, SpeakerOverlapStartedEvent } from "./protocol/speakerEvents.ts";
 import type {
   AgentRegisteredEvent,
   ArtifactRecordedEvent,
@@ -81,6 +82,7 @@ export * from "./protocol/executionEvents.ts";
 export * from "./protocol/evidenceEvents.ts";
 export * from "./protocol/frameEvents.ts";
 export * from "./protocol/ocrEvents.ts";
+export * from "./protocol/speakerEvents.ts";
 export * from "./protocol/reviewEvents.ts";
 export * from "./protocol/studyEvents.ts";
 
@@ -109,6 +111,9 @@ export type RuntimeEvent =
   | OcrStartedEvent
   | OcrCompletedEvent
   | OcrFailedEvent
+  | SpeakerOverlapStartedEvent
+  | SpeakerOverlapCompletedEvent
+  | SpeakerOverlapFailedEvent
   | SemanticEvidenceStartedEvent
   | SemanticEvidenceCompletedEvent
   | SemanticEvidenceFailedEvent

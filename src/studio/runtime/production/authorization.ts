@@ -19,6 +19,8 @@ import type {
   FrameSamplingGrantScope,
   OcrGrantScope,
   OcrRequest,
+  SpeakerOverlapGrantScope,
+  SpeakerOverlapRequest,
   MediaExtractRequest,
   MediaScope,
   MediaSeekRequest,
@@ -33,6 +35,8 @@ import { assertEvidenceDecisionRequest } from "./validation/decision.ts";
 import { capabilityOperationExists, taskCapabilityCallCount } from "./capabilityUsage.ts";
 import { frameSamplingRequestFingerprint } from "./validation/frames.ts";
 import { assertOcrRequest, ocrRequestFingerprint } from "./validation/ocr.ts";
+import { SPEAKER_OVERLAP_PINNED_CONTENT_IDS } from "./model.ts";
+import { assertSpeakerOverlapRequest, speakerOverlapRequestFingerprint } from "./validation/speakers.ts";
 
 export interface AuthorizedFrameSampling {
   request: FrameSampleRequest;
@@ -206,6 +210,81 @@ export function authorizeOcr(state: RuntimeProjection, requestValue: unknown): A
     artifact,
     track,
     frameOperation,
+    executionId: execution.id,
+    launchClaimId: launch.id,
+    requestFingerprint,
+  };
+}
+
+export interface AuthorizedSpeakerOverlap {
+  request: SpeakerOverlapRequest;
+  grant: CapabilityGrant & { speakerScope: SpeakerOverlapGrantScope };
+  scope: MediaScope;
+  artifact: RuntimeArtifact;
+  track: MediaTrackDescriptor;
+  executionId: string;
+  launchClaimId: string;
+  requestFingerprint: string;
+}
+
+export function authorizeSpeakerOverlap(state: RuntimeProjection, requestValue: unknown): AuthorizedSpeakerOverlap {
+  assertSpeakerOverlapRequest(requestValue);
+  const request = requestValue;
+  const task = state.tasks[request.taskId];
+  if (!task || task.status !== "working" || task.ownerAgentId !== request.agentId) {
+    throw new Error("Speaker/overlap analysis requires a working task owned by the requesting agent");
+  }
+  if (capabilityOperationExists(state, request.operationId)) {
+    throw new Error(`Speaker/overlap operation ${request.operationId} already exists`);
+  }
+  const grant = task.grants.find((candidate) => candidate.id === request.grantId);
+  if (grant?.capability !== "media.speakers.analyze" || !grant.speakerScope || grant.mediaScope.length !== 1) {
+    throw new Error("Speaker/overlap analysis requires its exact scheduler-issued grant");
+  }
+  const scope = grant.mediaScope[0];
+  const artifact = state.artifacts[scope.artifactId];
+  if (
+    !artifact || artifact.origin.kind !== "ingest" || artifact.runId !== state.runId ||
+    task.jobContext.source.artifactId !== artifact.id || task.jobContext.source.contentId !== artifact.content.contentId
+  ) throw new Error("Speaker/overlap source changed from the immutable task context");
+  const track = artifact.tracks.find((candidate) => candidate.id === scope.trackId);
+  if (!track || track.kind !== "audio") throw new Error("Speaker/overlap analysis requires one registered audio track");
+  if (
+    artifact.durationMs === null || scope.endMs > artifact.durationMs ||
+    scope.endMs - scope.startMs > grant.speakerScope.limits.maxRangeMs ||
+    artifact.content.bytes > grant.speakerScope.limits.maxSourceBytes
+  ) throw new Error("Speaker/overlap input exceeds its scheduler-granted source, range, or byte envelope");
+  if (taskCapabilityCallCount(state, task.id) >= task.budget.toolCalls) {
+    throw new Error("Speaker/overlap analysis exceeds the task tool-call budget");
+  }
+  if (Object.values(state.speakerOverlapOperations).filter((operation) => operation.grantId === grant.id).length >= grant.speakerScope.limits.maxCalls) {
+    throw new Error("Speaker/overlap analysis exceeds the grant call budget");
+  }
+  const requestFingerprint = speakerOverlapRequestFingerprint({
+    sourceContentId: artifact.content.contentId,
+    trackId: scope.trackId,
+    startMs: scope.startMs,
+    endMs: scope.endMs,
+    configurationContentIds: [...SPEAKER_OVERLAP_PINNED_CONTENT_IDS],
+  });
+  if (Object.values(state.speakerOverlapOperations).some((operation) =>
+    operation.taskId === task.id && operation.requestFingerprint === requestFingerprint)) {
+    throw new Error("Speaker/overlap analysis rejects duplicate canonical work");
+  }
+  const executions = Object.values(state.executions).filter((execution) =>
+    execution.taskId === task.id && execution.agentId === request.agentId && execution.status === "active");
+  if (executions.length !== 1) throw new Error("Speaker/overlap analysis requires one active task executor");
+  const execution = executions[0];
+  const launch = state.taskLaunches[task.id];
+  if (!launch || launch.executionId !== execution.id || launch.agentId !== request.agentId) {
+    throw new Error("Speaker/overlap executor lost its durable launch lineage");
+  }
+  return {
+    request,
+    grant: grant as CapabilityGrant & { speakerScope: SpeakerOverlapGrantScope },
+    scope,
+    artifact,
+    track,
     executionId: execution.id,
     launchClaimId: launch.id,
     requestFingerprint,

@@ -5,6 +5,7 @@ export type RuntimeProducerKind =
   | "media_host"
   | "frame_host"
   | "ocr_host"
+  | "speaker_host"
   | "semantic_evidence_host"
   | "evidence_host"
   | "assessment_host"

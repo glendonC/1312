@@ -32,6 +32,12 @@ import {
   type OpenChildOcrBridge,
 } from "../executor/childOcrBridge.ts";
 import {
+  BoundedChildSpeakerBridge,
+  openChildSpeakerBridge,
+  type ChildSpeakerHost,
+  type OpenChildSpeakerBridge,
+} from "../executor/childSpeakerBridge.ts";
+import {
   BoundedChildMediaBridge,
   openChildMediaBridge,
   type ChildMediaCapabilityHost,
@@ -53,9 +59,11 @@ export interface LauncherChildCapabilityOptions {
   nextSemanticEvidenceOperationId?: () => string;
   nextFrameOperationId?: () => string;
   nextOcrOperationId?: () => string;
+  nextSpeakerOperationId?: () => string;
   mediaMcpServerPath?: string;
   frameMcpServerPath?: string;
   ocrMcpServerPath?: string;
+  speakerMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -66,6 +74,7 @@ export interface LauncherChildCapabilityHosts {
   media: ChildMediaCapabilityHost;
   frame: ChildFrameSamplingHost;
   ocr: ChildOcrHost;
+  speaker: ChildSpeakerHost;
   evidence: ChildEvidenceReadHost;
   assessment: ChildEvidenceAssessmentHost;
   decision: ChildEvidenceDecisionHost;
@@ -78,11 +87,13 @@ export interface LauncherChildCapabilityContext {
   semanticEvidenceGrant: CapabilityGrant | undefined;
   frameGrant: CapabilityGrant | undefined;
   ocrGrant: CapabilityGrant | undefined;
+  speakerGrant: CapabilityGrant | undefined;
   assessmentGrant: CapabilityGrant | undefined;
   decisionGrant: CapabilityGrant | undefined;
   mediaBridge: OpenChildMediaBridge | null;
   frameBridge: OpenChildFrameBridge | null;
   ocrBridge: OpenChildOcrBridge | null;
+  speakerBridge: OpenChildSpeakerBridge | null;
   evidenceBridge: OpenChildEvidenceBridge | null;
   assessmentBridge: OpenChildEvidenceAssessmentBridge | null;
   decisionBridge: OpenChildEvidenceDecisionBridge | null;
@@ -99,11 +110,13 @@ export function launcherChildCapabilityContext(task: TaskRecord): LauncherChildC
     semanticEvidenceGrant: task.grants.find((grant) => grant.capability === "speech.transcribe"),
     frameGrant: task.grants.find((grant) => grant.capability === "media.frames.sample"),
     ocrGrant: task.grants.find((grant) => grant.capability === "media.frames.ocr"),
+    speakerGrant: task.grants.find((grant) => grant.capability === "media.speakers.analyze"),
     assessmentGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.assess"),
     decisionGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.decide"),
     mediaBridge: null,
     frameBridge: null,
     ocrBridge: null,
+    speakerBridge: null,
     evidenceBridge: null,
     assessmentBridge: null,
     decisionBridge: null,
@@ -130,6 +143,11 @@ export async function openLauncherChildCapabilityBridges(
   if (context.ocrGrant) {
     context.ocrBridge = await openChildOcrBridge(new BoundedChildOcrBridge(task, hosts.ocr, {
       nextOperationId: options.nextOcrOperationId,
+    }));
+  }
+  if (context.speakerGrant) {
+    context.speakerBridge = await openChildSpeakerBridge(new BoundedChildSpeakerBridge(task, hosts.speaker, {
+      nextOperationId: options.nextSpeakerOperationId,
     }));
   }
   if (context.semanticEvidenceGrant) {
@@ -244,6 +262,27 @@ export function configureLauncherChildCapabilityMcp(
       `mcp_servers.studio_ocr.env_vars=${tomlStrings(["STUDIO_CHILD_OCR_BRIDGE_URL", "STUDIO_CHILD_OCR_BRIDGE_TOKEN"])}`,
     );
   }
+  if (context.speakerBridge) {
+    const serverPath = options.speakerMcpServerPath ?? fileURLToPath(
+      new URL("../executor/speakerMcpServer.ts", import.meta.url),
+    );
+    args.push(
+      "-c",
+      `mcp_servers.studio_speakers.command=${tomlString(process.execPath)}`,
+      "-c",
+      `mcp_servers.studio_speakers.args=${tomlStrings([serverPath])}`,
+      "-c",
+      "mcp_servers.studio_speakers.required=true",
+      "-c",
+      `mcp_servers.studio_speakers.enabled_tools=${tomlStrings([context.speakerBridge.manifest.tool.name])}`,
+      "-c",
+      "mcp_servers.studio_speakers.startup_timeout_sec=5",
+      "-c",
+      `mcp_servers.studio_speakers.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, options.maximumWallMs) / 1_000))}`,
+      "-c",
+      `mcp_servers.studio_speakers.env_vars=${tomlStrings(["STUDIO_CHILD_SPEAKER_BRIDGE_URL", "STUDIO_CHILD_SPEAKER_BRIDGE_TOKEN"])}`,
+    );
+  }
   if (context.evidenceBridge) {
     const serverPath = options.evidenceMcpServerPath ?? fileURLToPath(
       new URL("../executor/evidenceMcpServer.ts", import.meta.url),
@@ -345,7 +384,7 @@ export function configureLauncherChildCapabilityMcp(
 export function launcherChildCapabilityEnvironment(
   context: LauncherChildCapabilityContext,
 ): NodeJS.ProcessEnv {
-  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
+  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.speakerBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
     ...process.env,
     ...(context.mediaBridge ? {
       STUDIO_CHILD_MEDIA_BRIDGE_URL: context.mediaBridge.endpoint,
@@ -358,6 +397,10 @@ export function launcherChildCapabilityEnvironment(
     ...(context.ocrBridge ? {
       STUDIO_CHILD_OCR_BRIDGE_URL: context.ocrBridge.endpoint,
       STUDIO_CHILD_OCR_BRIDGE_TOKEN: context.ocrBridge.token,
+    } : {}),
+    ...(context.speakerBridge ? {
+      STUDIO_CHILD_SPEAKER_BRIDGE_URL: context.speakerBridge.endpoint,
+      STUDIO_CHILD_SPEAKER_BRIDGE_TOKEN: context.speakerBridge.token,
     } : {}),
     ...(context.evidenceBridge ? {
       STUDIO_CHILD_EVIDENCE_BRIDGE_URL: context.evidenceBridge.endpoint,
@@ -384,6 +427,7 @@ export async function closeLauncherChildCapabilityBridges(
   if (context.mediaBridge) await context.mediaBridge.close();
   if (context.frameBridge) await context.frameBridge.close();
   if (context.ocrBridge) await context.ocrBridge.close();
+  if (context.speakerBridge) await context.speakerBridge.close();
   if (context.semanticEvidenceBridge) await context.semanticEvidenceBridge.close();
   if (context.evidenceBridge) await context.evidenceBridge.close();
   if (context.assessmentBridge) await context.assessmentBridge.close();

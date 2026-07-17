@@ -39,11 +39,17 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   run pinned local Tesseract.js/core 7.0.0 over the real PNG bytes with vendored Korean+English
   `tessdata_fast` 4.1.0 models, and atomically store private content-addressed observation/receipt
   artifacts under fixed count/byte/text/wall/call ceilings;
+- a separate path-free `media_speakers_analyze` bridge and bounded speaker/overlap host whose child
+  request is exactly `{}`, injects the one scheduler-owned source/audio-track/range, seals mono-16 kHz
+  PCM, runs a pinned local anonymous-clustering producer, and atomically stores complete-range
+  observation/receipt artifacts under fixed duration/turn/cell/cluster/byte/wall/call ceilings;
 - an additive host-owned U3 citation/admission lane that cold-audits current-run speech, U1 acoustic
-  observation/receipt lineage, U2 frame receipt/manifest/PNG/decoder identities, and U5 OCR
+  observation/receipt lineage, U2 frame receipt/manifest/PNG/decoder identities, U5 OCR, and U6
+  anonymous speaker/overlap
   observation/receipt/model/runtime lineage before storing content-addressed report, admission/read,
   study, and readiness contracts and deriving caption causality from their recursively reopened
-  lineage. Frame and OCR evidence remain cite-only; speech remains the only claim-support kind;
+  lineage. Frame and OCR evidence remain cite-only; anonymous speaker/overlap may qualify coverage
+  only; speech remains the only claim-support kind;
 - an additive U4 range-pass host and scheduler lane on the default generalized root: it derives exact
   weak-range/cause/prior-evidence inputs, accepts only a strict attenuated current-run speech
   subrange, fixes producer/configuration/budget/child scope, records request and terminal spend/
@@ -142,7 +148,7 @@ validated ingest-origin identity and content facts, and
 artifact references link only when their source/output destination is rendered. The deterministic
 host exercises one real bounded seek plus worker-output receipt/report lineage. No hosted runtime
 service or live control acknowledgement producer exists. The launcher can expose `media_extract`,
-`media_seek`, `media_frames_sample`, `media_frames_ocr`, `evidence_read`, `evidence_assess`, and/or `evidence_decide`
+`media_seek`, `media_frames_sample`, `media_frames_ocr`, `media_speakers_analyze`, `evidence_read`, `evidence_assess`, and/or `evidence_decide`
 only for matching live task grants, in addition to the closed
 structured report output. `evidence.read` is not a detector call: it reads registered, immutable
 V2/V3 receipt artifacts or V4 acoustic observations under an exact source/task window, per-artifact 32 KiB/64-fact ceilings, and the shared task tool-call
@@ -158,10 +164,16 @@ selection, or visual evidence admission. The default owned audio-study root does
 operation; the child supplies no paths, bytes, source, track, range, grant, or model configuration.
 Its receipt proves which pinned local producer ran over which verified frame identities. It does not
 prove text truth, identity, spelling, translation, cultural meaning, dialogue, or person identity.
+`media.speakers.analyze` is a separate one-call capability over one exact owned audio range; the
+child supplies no path, bytes, source, track, range, grant, model, clustering configuration, or
+speaker count. Its receipt proves which pinned local producer ran over which sealed normalized
+audio identity and how the complete granted range was accounted for. It does not prove person
+identity, biometric/cross-run linkage, correct turn boundaries or speaker count, transcription,
+translation, dialogue correctness, or caption authority.
 Successful receipts conservatively charge the full authorized wall grant and separately record
 elapsed host work before receipt persistence; the final append-only journal commit is an atomic
 durability boundary, not a preemptible decoder/model interval.
-`media.extract`, `media.seek`, `media.frames.sample`, `media.frames.ocr`, `evidence.read`,
+`media.extract`, `media.seek`, `media.frames.sample`, `media.frames.ocr`, `media.speakers.analyze`, `evidence.read`,
 `analysis.evidence.assess`, and `analysis.evidence.decide` are real
 scheduler/host/child-bridge capabilities; assessment is opinion over completed reads and decision is
 an audit-state gate, not sensing or publication. Publish-review intake is an application-host
@@ -212,7 +224,10 @@ separate observation and producer-receipt bytes, derive content-bound observatio
 coverage but never transcript text. U2 frame citations delegate to complete frame sampling audit and
 remain cite-only point identities. U5 OCR citations reopen the OCR observation/receipt artifacts,
 current pinned runtime/model/config identities, and complete U2 lineage, and remain cite-only media
-points. Speaker-turn and external-document slots have no producer adapter and therefore fail closed.
+points. U6 speaker-turn citations reopen the separate anonymous speaker/overlap observations and
+receipt, source, runtime/model/configuration lineage, and may qualify exact temporal coverage only;
+the adapter reconstructs every accounting cell in the target range. External-document remains a
+typed slot without a producer adapter and therefore fails closed.
 
 `studio.study-report.v2` and `studio.parent-admission.receipt.v2` re-derive the U1
 `studio.dialogue-scope-policy.v1` for the exact task. Deterministic precedence preserves conflicting,
@@ -232,7 +247,8 @@ approval, caption-production/caption-causality v4. The launcher, worker report u
 projection, validation union, artifact kinds, and observability index carry that chain; there is no
 orphan additive host.
 The explicit `studyContractVersion: "v1"` path preserves closed historical fixtures and receipts but
-is not the default. Audio-only runs request no frames/OCR, and absent acoustic, frame, or OCR evidence
+is not the default. Audio-only runs request no frames/OCR by default, U6 requires a separate explicit
+grant, and absent acoustic, frame, OCR, or speaker/overlap evidence
 supplies no authority; only current-run speech may authorize dialogue text. Studio UI projection remains
 outside this cutover. This boundary proves citation
 integrity, coverage policy, and abstention preservation—not multimodal understanding, OCR accuracy, scene
@@ -307,6 +323,59 @@ replace or overwrite spoken evidence or authorize Korean/English caption text. S
 boundaries, script/language inference, subtitle-perfect aggregation, root-selected visual
 specialists, U4 denser-frame/specialist deltas, UI, face/biometric/person identification, and frame
 publication are not implemented by this slice.
+
+U6 adds `media.speakers.analyze` without changing speech or caption claim authority. The scheduler
+issues it only over one owned-source audio-track range of at most 120,000 ms and one call. The
+task-private bridge accepts exactly `{}` and injects operation/task/agent/grant/source/track/range;
+the launcher requires a completed operation, cold-audits it, and requires the worker to echo only
+the exact authenticated observation/content/receipt identities. A worker cannot choose paths,
+ranges, models, speaker count, individual turns, or favorable accounting cells.
+
+The replaceable producer seam is `SpeakerDiarizer`. Production in this slice uses the official
+native `sherpa-onnx-node` 1.13.4 package and pinned darwin-arm64 addon at git revision
+`142807252687d81b40d6315f23470a1512a00de3`, CPU provider with one configured inference thread and
+no runtime network. Models are vendored pyannote segmentation 3.0 (`MIT`, SHA-256
+`220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079`) and 3D-Speaker ERes2Net
+base 16 kHz (`Apache-2.0`, SHA-256
+`1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b`). The fixed configuration
+uses mono 16 kHz normalized float inference, automatic cluster count (`-1`), threshold 0.5,
+minimum-on 0.3 s, minimum-off 0.5 s, and integer half-open millisecond output. Current pinned
+production support is darwin-arm64 only; another platform needs its own reviewed native package
+hashes behind the same seam rather than an unpinned fallback.
+
+The host re-hashes the registered source, decodes only the granted range to sealed s16le PCM, then
+maps producer cluster integers by first appearance to `anon_cluster_N`. Labels are scoped to the
+run, source artifact, and operation and have no identity meaning. The observation artifact contains
+raw turn intervals with unquantified model score uncertainty plus a sorted, gap-free,
+non-overlapping partition of the entire granted range: one-label cells are `available` anonymous
+turns unless shorter than the 500 ms reliability floor; multi-label cells are `conflicting`
+overlap; rapid cells and no-hypothesis cells are `unknown`; output-count overflow replaces the
+whole result with one `truncated` cell rather than retaining a favorable partial result. Empty means
+no cluster hypothesis, not proof of non-speech. The receipt retains source/normalized-audio content,
+authorization/execution/launch lineage, producer/runtime/model/configuration hashes, limits,
+measured counts, conservative full-grant wall accounting, output identity, and explicit person,
+biometric, cross-run, named-speaker, transcript, translation, dialogue, and perfect-diarization
+non-claims.
+
+Hard limits are 512 MiB registered source, 120,000 ms/1,920,000 decoded samples/3,840,000 normalized
+PCM bytes, 256 raw turns, 512 accounting cells, 16 local clusters, 512 KiB observations, 256 KiB
+receipt, 60,000 ms wall, and one call. Missing grant/source/audio/model, runtime drift, decoder or
+producer failure/timeout, oversize input, artifact overflow, duplicate work, or exhausted budgets
+produce no usable output/receipt authority. Cold audit reopens source and both canonical artifacts,
+re-derives receipt/artifact ids and authorization/source/range/output relationships, and re-hashes
+the current native/model lineage without rerunning inference; content or lineage drift fails closed.
+
+U3 admits `speaker_turn` only as `coverage_qualification` with temporal-range observations and a
+stored receipt artifact. The target must stay inside the audited grant and align with accounting
+cell boundaries; the host reconstructs every cell needed to tile it. Overlap remains conflicting,
+rapid/no-hypothesis remains unknown, and truncation remains truncated under existing precedence.
+`claim_support` validation and every caption-causality version still accept only range-closing
+`current_run_speech`, so speaker labels, turn splits, and overlap cannot create, replace, or upgrade
+Korean/English text. U4 v1 has no honest speaker-overlap cause code: speaker-only conflict is
+therefore excluded from attenuated-speech candidates rather than relabeled
+`recognizer_disagreement`. An exact typed overlap/weak-range U4 trigger, named/cross-run identity,
+accuracy evaluation, alternate models/platform pins, ambient always-diarize policy, U7 separation,
+and all UI work remain outside this slice.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

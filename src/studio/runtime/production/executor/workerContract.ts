@@ -1,10 +1,11 @@
-import { isFrameHostArtifactKind, isOcrHostArtifactKind, OCR_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
+import { isFrameHostArtifactKind, isOcrHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
 import type {
   GeneralizedCoverageReasonCode,
   GeneralizedCoverageRange,
   GeneralizedStudyClaim,
   OcrEvidenceCitationInput,
   SemanticEvidenceCitationInput,
+  SpeakerOverlapEvidenceCitationInput,
   StudyClaim,
   StudyCoverageRange,
   StudyReportArtifact,
@@ -14,10 +15,12 @@ import type {
 import type { DialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.ts";
 import type { VerifiedSemanticEvidence } from "../semantic/semanticEvidenceAudit.ts";
 import type { VerifiedOcrAudit } from "../ocrAudit.ts";
-import { currentRunSpeechCitation, ocrSpanCitation } from "../evidenceCitations/audit.ts";
+import type { VerifiedSpeakerOverlapAudit } from "../speakerAudit.ts";
+import { currentRunSpeechCitation, ocrSpanCitation, speakerTurnCitation } from "../evidenceCitations/audit.ts";
 import { deriveGeneralizedCoverageDecision } from "../admission/generalizedCoveragePolicy.ts";
 import { validateSemanticEvidenceCitationInput } from "../validation/semanticEvidence.ts";
 import { validateOcrEvidenceCitationInput } from "../validation/ocr.ts";
+import { validateSpeakerOverlapEvidenceCitationInput } from "../validation/speakers.ts";
 import { validateCoveragePartition, validateStudyReportArtifact } from "../validation/studyReports.ts";
 import { validateStudyReportArtifactV2 } from "../validation/studyReportsV2.ts";
 import { LauncherFailure } from "./launcherFailure.ts";
@@ -26,6 +29,7 @@ export interface WorkerResult {
   summary: string;
   semanticEvidenceInputs: SemanticEvidenceCitationInput[];
   ocrEvidenceInputs: OcrEvidenceCitationInput[];
+  speakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[];
   outputs: WorkerResultOutput[];
 }
 
@@ -81,10 +85,27 @@ export function buildStudyReportEnvelopeV2(input: {
   verifiedSemanticEvidence: VerifiedSemanticEvidence[];
   ocrEvidenceInputs: OcrEvidenceCitationInput[];
   verifiedOcrEvidence: VerifiedOcrAudit[];
+  speakerEvidenceInputs?: SpeakerOverlapEvidenceCitationInput[];
+  verifiedSpeakerEvidence?: VerifiedSpeakerOverlapAudit[];
   dialogueScopePolicy: DialogueScopePolicy | null;
 }): StudyReportArtifactV2 {
   const { task, output } = input;
   if (!task.parentTaskId || !task.parentAgentId) throw new Error("Root tasks cannot create child study reports");
+  const verifiedSpeakerEvidence = input.verifiedSpeakerEvidence ?? [];
+  const verifiedSpeakerByOperation = new Map(verifiedSpeakerEvidence.map((entry) => [entry.observations.operationId, entry]));
+  for (const citationInput of input.speakerEvidenceInputs ?? []) {
+    const verified = verifiedSpeakerByOperation.get(citationInput.operationId);
+    if (!verified || citationInput.artifactId !== verified.observationsArtifact.id ||
+        citationInput.contentId !== verified.observationsArtifact.content.contentId ||
+        citationInput.receiptArtifactId !== verified.receiptArtifact.id ||
+        citationInput.receiptId !== verified.receipt.receiptId ||
+        citationInput.receiptContentId !== verified.receiptArtifact.content.contentId) {
+      throw new Error(`Study report v2 speaker input ${citationInput.operationId} changed authenticated evidence identity`);
+    }
+  }
+  if ((input.speakerEvidenceInputs ?? []).length !== verifiedSpeakerEvidence.length) {
+    throw new Error("Study report v2 speaker evidence echo does not close every verified operation");
+  }
   const verifiedByOperation = new Map(input.verifiedSemanticEvidence.map((entry) => [entry.operationId, entry]));
   const claimCitations = new Map<string, ReturnType<typeof currentRunSpeechCitation>[]>();
   for (const claim of output.claims) {
@@ -107,7 +128,7 @@ export function buildStudyReportEnvelopeV2(input: {
   const coverageCitations: ReturnType<typeof currentRunSpeechCitation>[] = [];
   for (const proposal of output.coverage) {
     const range = { artifactId: proposal.artifactId, trackId: proposal.trackId, startMs: proposal.startMs, endMs: proposal.endMs };
-    const citations = proposal.claimIds.length === 0
+    const speechCoverageCitations = proposal.claimIds.length === 0
       ? input.verifiedSemanticEvidence.map((verified) => currentRunSpeechCitation({
           verified,
           target: { kind: "coverage", range },
@@ -116,6 +137,13 @@ export function buildStudyReportEnvelopeV2(input: {
             .map((entry) => entry.observationId),
         }))
       : [];
+    const speakerCoverageCitations = verifiedSpeakerEvidence
+      .filter((verified) => verified.observations.source.artifactId === range.artifactId &&
+        verified.observations.source.audioTrackId === range.trackId &&
+        verified.observations.source.grantedRange.startMs <= range.startMs &&
+        verified.observations.source.grantedRange.endMs >= range.endMs)
+      .map((verified) => speakerTurnCitation({ verified, target: { kind: "coverage", range } }));
+    const citations = [...speechCoverageCitations, ...speakerCoverageCitations];
     coverageCitations.push(...citations);
     const derived = deriveGeneralizedCoverageDecision({
       claimCount: proposal.claimIds.length,
@@ -206,9 +234,10 @@ export function validateWorkerResult(
   task: TaskRecord,
   expectedSemanticEvidenceInputs: SemanticEvidenceCitationInput[] = [],
   expectedOcrEvidenceInputs: OcrEvidenceCitationInput[] = [],
+  expectedSpeakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [],
 ): WorkerResult {
   const item = record(value);
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker response failed its output authority contract.",
@@ -216,7 +245,8 @@ export function validateWorkerResult(
   }
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
-  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : [])]);
+  const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
+  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : [])]);
   if (!item || Object.keys(item).some((key) => !allowedKeys.has(key))) {
     throw new LauncherFailure(
       "Worker result must contain only summary and outputs",
@@ -297,6 +327,35 @@ export function validateWorkerResult(
       "Codex worker response failed its OCR evidence citation contract.",
     );
   }
+  let speakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [];
+  if (speakerGranted) {
+    if (!Array.isArray(item.speakerEvidenceInputs)) {
+      throw new LauncherFailure(
+        "Speaker/overlap-consuming worker omitted its structured evidence input list",
+        "Codex worker response failed its speaker/overlap evidence citation contract.",
+      );
+    }
+    try {
+      speakerEvidenceInputs = item.speakerEvidenceInputs.map((input, index) =>
+        validateSpeakerOverlapEvidenceCitationInput(input, "Worker result", `speakerEvidenceInputs[${index}]`));
+    } catch (error) {
+      throw new LauncherFailure(
+        `Worker speaker/overlap evidence citation is invalid: ${error instanceof Error ? error.message : "invalid citation"}`,
+        "Codex worker response failed its speaker/overlap evidence citation contract.",
+      );
+    }
+    if (JSON.stringify(speakerEvidenceInputs) !== JSON.stringify(expectedSpeakerEvidenceInputs)) {
+      throw new LauncherFailure(
+        "Worker speaker/overlap citations do not equal the authenticated current-task artifact identities",
+        "Codex worker response failed its speaker/overlap evidence citation contract.",
+      );
+    }
+  } else if (expectedSpeakerEvidenceInputs.length !== 0) {
+    throw new LauncherFailure(
+      "Host supplied speaker/overlap evidence without a worker grant",
+      "Codex worker response failed its speaker/overlap evidence citation contract.",
+    );
+  }
   const required = task.requiredOutputs.filter((output) => output.required);
   if (item.outputs.length !== required.length) {
     throw new LauncherFailure(
@@ -373,11 +432,11 @@ export function validateWorkerResult(
       "Codex worker response failed its output contract.",
     );
   }
-  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, outputs };
+  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, speakerEvidenceInputs, outputs };
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker output schema cannot impersonate a host frame artifact.",
@@ -386,6 +445,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
   const required = task.requiredOutputs.filter((output) => output.required);
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
+  const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
   const semanticEvidenceInputs = {
     type: "array",
     minItems: 1,
@@ -435,6 +495,24 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         observationIds: { type: "array", minItems: 0, maxItems: OCR_LIMITS.maxTotalBoxes, items: { type: "string", minLength: 1 } },
       },
       required: ["operationId", "artifactId", "contentId", "receiptArtifactId", "receiptId", "receiptContentId", "observationIds"],
+    },
+  };
+  const speakerEvidenceInputs = {
+    type: "array",
+    minItems: 0,
+    maxItems: SPEAKER_OVERLAP_LIMITS.maxCalls,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        operationId: { type: "string", minLength: 1 },
+        artifactId: { type: "string", minLength: 1 },
+        contentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        receiptArtifactId: { type: "string", minLength: 1 },
+        receiptId: { type: "string", minLength: 1 },
+        receiptContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+      },
+      required: ["operationId", "artifactId", "contentId", "receiptArtifactId", "receiptId", "receiptContentId"],
     },
   };
   const coverage = {
@@ -511,6 +589,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
       summary: { type: "string", minLength: 1, maxLength: 2_000 },
       ...(semanticGranted ? { semanticEvidenceInputs } : {}),
       ...(ocrGranted ? { ocrEvidenceInputs } : {}),
+      ...(speakerGranted ? { speakerEvidenceInputs } : {}),
       outputs: {
         type: "array",
         minItems: required.length,
@@ -518,7 +597,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         items: outputItems,
       },
     },
-    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), "outputs"],
+    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), "outputs"],
   };
 }
 
@@ -532,6 +611,8 @@ export function workerPrompt(task: TaskRecord): string {
           ? ["media_frames_sample"]
           : grant.capability === "media.frames.ocr"
             ? ["media_frames_ocr"]
+          : grant.capability === "media.speakers.analyze"
+            ? ["media_speakers_analyze"]
         : []);
   const frameSampling = task.grants
     .filter((grant) => grant.capability === "media.frames.sample")
@@ -556,6 +637,9 @@ export function workerPrompt(task: TaskRecord): string {
     grantedOcr: task.grants
       .filter((grant) => grant.capability === "media.frames.ocr")
       .map((grant) => ({ mediaScope: grant.mediaScope, limits: grant.ocrScope?.limits ?? null })),
+    grantedAnonymousSpeakers: task.grants
+      .filter((grant) => grant.capability === "media.speakers.analyze")
+      .map((grant) => ({ mediaScope: grant.mediaScope, limits: grant.speakerScope?.limits ?? null })),
     grantedSemanticEvidence: semanticScope,
     grantedEvidence: task.grants
       .filter((grant) => grant.capability === "evidence.read")
@@ -586,6 +670,13 @@ export function workerPrompt(task: TaskRecord): string {
           "OCR text is a visual hypothesis, not dialogue, identity, spelling truth, translation, cultural meaning, or person identification. It cannot replace or overwrite speech evidence; below-threshold text is withheld.",
           "Copy the returned operation/artifact/content/receipt identities and all returned observation IDs into the top-level ocrEvidenceInputs list. For empty or truncated OCR, echo the same authenticated entry with an empty observationIds list so the host preserves that upstream state.",
           "Do not label worker-authored output as studio.ocr-observations.v1 or studio.ocr-producer.receipt.v1; those kinds belong only to the host.",
+        ] : []),
+        ...(mediaTools.includes("media_speakers_analyze") ? [
+          "Invoke media_speakers_analyze exactly once with the closed empty object. The host injects source, audio track, range, task, agent, and grant; paths and selectors are not accepted.",
+          "speaker labels are anonymous clustering hypotheses scoped only to this run, artifact, and operation. They do not identify people and cannot be compared across videos or runs.",
+          "Overlap, rapid turns, missing hypotheses, and truncation are coverage states only. They never invent dialogue, validate transcription/translation, or authorize Korean/English caption text.",
+          "Copy the returned operation/artifact/content/receipt identities into the top-level speakerEvidenceInputs list. Do not select individual favorable turns; the host reconstructs the complete accounting partition for each cited coverage cell.",
+          "Do not label worker-authored output as studio.speaker-overlap-observations.v1 or studio.speaker-overlap-producer.receipt.v1; those kinds belong only to the host.",
         ] : []),
         "Include the returned operation, artifact, receipt, and receipt-content identities in the required worker output.",
       ].join(" ");
@@ -626,7 +717,7 @@ export function workerPrompt(task: TaskRecord): string {
           "Return studio.study-report.v2 as typed coverage proposals and claims, never as prose-only content.",
           "Partition every assigned artifact/track range in order with no gaps or overlaps. A range may name claims, explicitly worker_withheld, explicitly operation_failed, or leave both absent for host-derived unknown/unavailable policy.",
           "Every proposed claim must cover the exact same range as its coverage cell and cite only authenticated current-run speech observations returned by speech_transcribe. The host reconstructs U3 evidence-citation.v1 identities and deterministically derives final coverage from receipts and acoustic dialogue scope; prose cannot upgrade it.",
-          "Frames and OCR hypotheses, when separately granted, remain cite-only media context and cannot authorize dialogue or caption text. Acoustic evidence can qualify coverage but cannot support transcript claims.",
+          "Frames and OCR hypotheses, when separately granted, remain cite-only media context. Anonymous speaker/overlap and acoustic evidence may qualify coverage but cannot authorize dialogue or caption text; current-run speech remains the only claim-support kind.",
           "Do not submit a coverage percentage or claim semantic quality. Weak, missing, conflicting, failed, truncated, unavailable, or out-of-scope evidence must remain an abstention.",
         ].join(" ")
       : "No typed study report is required by this task.";

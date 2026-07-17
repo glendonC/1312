@@ -61,6 +61,20 @@ export interface OcrReceiptArtifactOrigin {
   frameSamplingOperationId: string;
 }
 
+export interface SpeakerOverlapObservationsArtifactOrigin {
+  kind: "speaker_overlap_observations";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface SpeakerOverlapReceiptArtifactOrigin {
+  kind: "speaker_overlap_receipt";
+  operationId: string;
+  receiptId: string;
+  observationsArtifactId: string;
+}
+
 export interface SemanticMediaEvidenceArtifactOrigin {
   kind: "semantic_media_evidence";
   operationId: string;
@@ -309,6 +323,8 @@ export interface RuntimeArtifact {
     | FrameSamplingReceiptArtifactOrigin
     | OcrObservationsArtifactOrigin
     | OcrReceiptArtifactOrigin
+    | SpeakerOverlapObservationsArtifactOrigin
+    | SpeakerOverlapReceiptArtifactOrigin
     | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
     | StudyReportArtifactOrigin

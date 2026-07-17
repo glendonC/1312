@@ -2,6 +2,7 @@ import { fail } from "./primitives.ts";
 import { validateExecutionArtifactOrigin } from "./artifactExecutionOrigins.ts";
 import { validateFrameArtifactOrigin } from "./artifactFrameOrigins.ts";
 import { validateReviewArtifactOrigin } from "./artifactReviewOrigins.ts";
+import { validateSpeakerArtifactOrigin } from "./artifactSpeakerOrigins.ts";
 import { validateStudyArtifactOrigin } from "./artifactStudyOrigins.ts";
 
 export interface ArtifactOriginValidationInput {
@@ -21,6 +22,7 @@ export function validateArtifactOrigin(
 ): void {
   if (validateExecutionArtifactOrigin(kind, input)) return;
   if (validateFrameArtifactOrigin(kind, input)) return;
+  if (validateSpeakerArtifactOrigin(kind, input)) return;
   if (validateStudyArtifactOrigin(kind, input)) return;
   if (validateReviewArtifactOrigin(kind, input)) return;
   fail(input.context, `${input.path}.origin.kind`, `has unknown value ${kind}`);

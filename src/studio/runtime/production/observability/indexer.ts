@@ -40,6 +40,9 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "media.frames_ocr_completed") {
     return { kind: "ocr", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "media.speakers_completed") {
+    return { kind: "speaker_overlap", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "semantic.evidence_completed") {
     return { kind: "semantic_media_evidence", receipt: event.data.receipt, rawReceiptContentId: null };
   }
@@ -206,7 +209,7 @@ export async function buildRuntimeObservabilityIndex(
           origin.kind === "preflight_evidence" ||
           (origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
             ? origin.executorReceiptContentId !== content.contentId
-            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt"
+            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "speaker_overlap_receipt"
               ? artifact.content.contentId !== content.contentId
               : origin.receiptContentId !== content.contentId)
         ) {

@@ -49,6 +49,18 @@ function causeKind(state: StudyRestudyCandidate["state"], rawStates: readonly st
   return "failed_range";
 }
 
+/** U4 v1 has no honest speaker-overlap cause; do not relabel that state as recognizer disagreement. */
+export function defersSpeakerOverlapRestudy(
+  citations: readonly { evidenceKind: string; observations: readonly { state: string; rawState: string }[] }[],
+  rawStates: readonly string[],
+): boolean {
+  const hasSpeakerOverlap = citations.some((citation) => citation.evidenceKind === "speaker_turn" &&
+    citation.observations.some((observation) => observation.state === "conflicting" && observation.rawState.startsWith("speaker:overlap:")));
+  const hasOtherConflict = rawStates.some((raw) =>
+    raw.includes(":conflicting:") && !raw.includes(":speaker:overlap:"));
+  return hasSpeakerOverlap && !hasOtherConflict;
+}
+
 function terminalOutcome(state: GeneralizedCoverageState | null, taskStatus: string): RangePassTerminalOutcome {
   if (taskStatus === "withheld" || state === "withheld" || state === "conflicting" || state === "not_in_scope") return "withheld_exhausted";
   if (state === "unknown") return "unknown_exhausted";
@@ -123,7 +135,7 @@ export class RangePassHost {
       .filter((entry) => !alreadyPassedRanges.some((range) =>
         range.artifactId === entry.artifactId && range.trackId === entry.trackId &&
         range.startMs <= entry.startMs && range.endMs >= entry.endMs))
-      .map((entry) => {
+      .flatMap((entry) => {
         const matchingReports = inspected.reports.filter((report) => report.reportEnvelope.coverage.some((covered) => overlaps(covered, entry)));
         const reportArtifactIds = matchingReports.map((report) => report.report.artifactId).sort();
         const admissionIds = matchingReports.map((report) => report.admission.admissionId).sort();
@@ -145,14 +157,15 @@ export class RangePassHost {
         };
         const observationIds = [...new Set(citations.flatMap((citation) => citation.observations.map((observation) => observation.observationId)))].sort();
         const rawStates = [...new Set(matchingReports.flatMap((report) => report.reportEnvelope.coverage.filter((covered) => overlaps(covered, entry)).flatMap((covered) => covered.rawStates)))].sort();
+        if (entry.state === "conflicting" && defersSpeakerOverlapRestudy(citations, rawStates)) return [];
         const causeBody = { kind: causeKind(entry.state, rawStates), coverageId: entry.coverageId, range: { artifactId: entry.artifactId, trackId: entry.trackId, startMs: entry.startMs, endMs: entry.endMs }, priorState: entry.state, reportArtifactIds, citationIds, observationIds, rawStates };
-        return {
+        return [{
           coverageId: entry.coverageId,
           range: { artifactId: entry.artifactId, trackId: entry.trackId, startMs: entry.startMs, endMs: entry.endMs },
           state: entry.state,
           priorEvidence,
           cause: { causeId: `study-restudy-cause:${canonicalSha256(causeBody)}`, ...causeBody },
-        };
+        }];
       });
     const body = { schema: "studio.study-restudy-input.v1" as const, runId: state.runId, rootTaskId: root.id, rootAgentId: root.ownerAgentId, rootExecutionId: execution.id, candidates };
     return { ...body, inputId: `study-restudy-input:${canonicalSha256(body)}` };

@@ -73,7 +73,8 @@ score.
   cite-only. Unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states
   deterministically survive admission, synthesis, readiness, and caption causality. Readiness remains
   an integrity/coverage gate, not semantic QC. The U5 OCR slot now has a cite-only producer/audit;
-  speaker/document slots still fail closed without producers. U4 extends this evidence layer
+  U6 speaker-turn evidence now has a coverage-qualification-only producer/audit, while the document
+  slot still fails closed without a producer. U4 extends this evidence layer
   additively rather than reopening v1 planning. The Studio
   UI remains unwired and unchanged.
 - **U4 budgeted re-study — attenuated current-run speech vertical slice:** the default generalized
@@ -104,8 +105,27 @@ score.
   report/admission v2; OCR does not enter claim or coverage citation ids and cannot authorize KO/EN
   caption text or overwrite speech evidence. Scene/shot production, script/language inference,
   subtitle-perfect aggregation, default visual-specialist/root routing, and U4 denser-frame or
-  specialist wiring remain. No UI, face/biometric/person-id, publication, U6, semantic-quality, or
+  specialist wiring remain. No UI, face/biometric/person-id, publication, semantic-quality, or
   Bet G claim is included.
+- **U6 anonymous speaker/overlap evidence — coverage-qualification vertical slice:**
+  `media.speakers.analyze` is a one-call scheduler grant and task-private launcher/MCP bridge whose
+  child request is exactly `{}`; the host injects the owned source, audio track, range, task, agent,
+  and grant. Production seals mono-16 kHz PCM and runs pinned local `sherpa-onnx-node` 1.13.4 on
+  darwin-arm64 with pyannote segmentation 3.0 plus the 3D-Speaker ERes2Net embedding model. The
+  replaceable diarizer seam returns raw clusters; the host assigns only operation-local
+  `anon_cluster_N` labels, closes the complete granted range into available anonymous-turn,
+  conflicting overlap, unknown rapid/no-hypothesis, or truncated cells, and stores separate private
+  content-addressed observations and receipt artifacts with exact model/runtime/configuration hashes.
+  Cold audit reopens source and both artifacts, re-derives identities, and re-hashes current lineage
+  without rerunning inference. U3 registers `speaker_turn` only as exact temporal
+  `coverage_qualification`; the adapter reconstructs every accounting cell in the target range, so
+  a caller cannot omit overlap/uncertainty cells. It cannot be `claim_support`, cannot authorize
+  Korean/English caption text, and does not overwrite speech. Missing grant/model/source, oversized
+  normalized audio, drift, tamper, timeout, and output overflow fail closed. U4 v1 has no honest
+  speaker-overlap cause, so speaker-only overlap is deliberately excluded from attenuated-restudy
+  candidates rather than mislabeled `recognizer_disagreement`; the typed overlap-to-U4 hook remains.
+  No UI, named/person/biometric/cross-run identity, perfect diarization, U7 separation, ambient
+  always-diarize, OCR reopen, semantic-quality, or Bet G claim is included.
 
 ## Post-freeze backlog boundary
 
@@ -124,7 +144,9 @@ indefinite deferrals or a one-day implementation claim:
    default-runtime wired; additional delta producers remain closed.
 5. U5 OCR and scene/on-screen context — OCR cite-only vertical slice implemented; scene/shot,
    default specialist routing, and U4 denser-frame/specialist wiring remain.
-6. U6 anonymous speaker/overlap evidence.
+6. U6 anonymous speaker/overlap evidence — one pinned local producer, immutable accounting receipt,
+   launcher bridge, and U3 coverage-qualification slice implemented; a typed U4 overlap cause/trigger
+   remains closed.
 7. U7 conditional separation and raw/stem comparison.
 8. R1 bounded receipted web research.
 9. R2 optional bounded read-only computer-use after media senses and research.
@@ -179,6 +201,11 @@ indefinite deferrals or a one-day implementation claim:
   prove displayed text is correct, identify a person/place/object, infer script/language,
   translate/culturally interpret text, understand a scene, select the right frame, or improve a
   transcript/caption.
+- U6 proves one bounded local anonymous-clustering execution path, exact owned-audio lineage,
+  complete range accounting, immutable hypotheses/receipt, cold audit/tamper closure, and U3
+  coverage/conflict preservation. It does not identify people, link speakers across artifacts or
+  runs, prove speaker count/turn boundaries, validate any word or translation, authorize captions,
+  perform separation, or establish diarization accuracy.
 
 ## Where to read what
 

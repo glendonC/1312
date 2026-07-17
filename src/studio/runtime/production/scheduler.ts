@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { assertRuntimeLimits, assertSpawnRequestInput } from "./assertions.ts";
 import { attenuateTaskJobContext } from "./jobContext.ts";
-import { FRAME_SAMPLING_LIMITS, OCR_LIMITS } from "./model.ts";
+import { FRAME_SAMPLING_LIMITS, OCR_LIMITS, SPEAKER_OVERLAP_LIMITS } from "./model.ts";
 import type {
   AgentRecord,
   CapabilityGrant,
@@ -196,6 +196,14 @@ export class BoundedRuntimeScheduler {
             limits: structuredClone(OCR_LIMITS),
           },
         };
+        if (capability === "media.speakers.analyze") return {
+          ...common,
+          capability,
+          speakerScope: {
+            schema: "studio.speaker-overlap-grant.v1" as const,
+            limits: structuredClone(SPEAKER_OVERLAP_LIMITS),
+          },
+        };
         return { ...common, capability };
       });
   }
@@ -221,6 +229,11 @@ export class BoundedRuntimeScheduler {
       : undefined;
     const frameArtifact = frameScope ? state.artifacts[frameScope.artifactId] : null;
     const frameTrack = frameArtifact?.tracks.find((track) => track.id === frameScope?.trackId);
+    const speakerScope = input.requiredCapabilities.includes("media.speakers.analyze")
+      ? input.mediaScope.length === 1 ? input.mediaScope[0] : null
+      : undefined;
+    const speakerArtifact = speakerScope ? state.artifacts[speakerScope.artifactId] : null;
+    const speakerTrack = speakerArtifact?.tracks.find((track) => track.id === speakerScope?.trackId);
     return (
       input.requiredCapabilities.length > 0 &&
       input.requiredCapabilities.every((capability) => this.limits.grantableCapabilities.includes(capability)) &&
@@ -241,6 +254,12 @@ export class BoundedRuntimeScheduler {
         frameArtifact?.origin.kind === "ingest" &&
         frameTrack?.kind === "video" &&
         frameScope.endMs - frameScope.startMs <= FRAME_SAMPLING_LIMITS.maxDurationMs
+      )) &&
+      (speakerScope === undefined || (
+        speakerScope !== null &&
+        speakerArtifact?.origin.kind === "ingest" &&
+        speakerTrack?.kind === "audio" &&
+        speakerScope.endMs - speakerScope.startMs <= SPEAKER_OVERLAP_LIMITS.maxRangeMs
       ))
     );
   }
@@ -257,7 +276,7 @@ export class BoundedRuntimeScheduler {
       source.content.contentId !== context.source.contentId ||
       !input.inputArtifactIds.includes(source.id)
     ) return false;
-    if ((input.requiredCapabilities.includes("media.frames.sample") || input.requiredCapabilities.includes("media.frames.ocr")) && (
+    if ((input.requiredCapabilities.includes("media.frames.sample") || input.requiredCapabilities.includes("media.frames.ocr") || input.requiredCapabilities.includes("media.speakers.analyze")) && (
       input.mediaScope.length !== 1 || input.mediaScope[0].artifactId !== source.id
     )) return false;
     if (!input.mediaScope.every((scope) =>

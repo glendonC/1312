@@ -15,6 +15,7 @@ import type {
 import type { OperationRecord } from "./media.ts";
 import type { FrameSampleRecord } from "./frames.ts";
 import type { OcrOperationRecord } from "./ocr.ts";
+import type { SpeakerOverlapOperationRecord } from "./speakers.ts";
 import type { SemanticEvidenceRecord } from "./semanticEvidence.ts";
 import type {
   ReportRecord,
@@ -63,6 +64,7 @@ export interface RuntimeProjection {
   operations: Record<string, OperationRecord>;
   frameSamples: Record<string, FrameSampleRecord>;
   ocrOperations: Record<string, OcrOperationRecord>;
+  speakerOverlapOperations: Record<string, SpeakerOverlapOperationRecord>;
   semanticEvidence: Record<string, SemanticEvidenceRecord>;
   evidenceReads: Record<string, EvidenceReadRecord>;
   evidenceAssessments: Record<string, EvidenceAssessmentRecord>;

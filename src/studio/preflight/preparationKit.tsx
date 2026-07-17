@@ -45,9 +45,34 @@ export function StageConversation({
   );
 }
 
-/** An inline chip marking a live, editable value inside a conversational sentence. */
-export function ConversationValue({ children }: { children: ReactNode }) {
-  return <span className="preflight-conversation-value">{children}</span>;
+/**
+ * An inline chip marking a live value inside a conversational sentence. When an
+ * `onEdit` handler is supplied the chip becomes a button that opens the stage's
+ * editor; without one it stays static text (used for read-only source facts).
+ */
+export function ConversationValue({
+  children,
+  onEdit,
+  editLabel,
+}: {
+  children: ReactNode;
+  onEdit?: (anchor: HTMLButtonElement) => void;
+  editLabel?: string;
+}) {
+  if (!onEdit) {
+    return <span className="preflight-conversation-value">{children}</span>;
+  }
+  return (
+    <button
+      type="button"
+      className="preflight-conversation-value preflight-conversation-value-editable"
+      aria-label={editLabel}
+      aria-haspopup="dialog"
+      onClick={(event) => onEdit(event.currentTarget)}
+    >
+      {children}
+    </button>
+  );
 }
 
 /**
@@ -241,26 +266,31 @@ export function PreparationStagePopover({
 
       const preferredWidth = stage === "language" ? 390 : 350;
       const width = Math.min(preferredWidth, viewportWidth - edge * 2);
-      const availableAbove = Math.max(72, anchor.top - gap - (viewportTop + edge));
-      const maxHeight = Math.min(
-        stage === "language" ? 460 : 320,
-        viewportHeight - edge * 2,
-        availableAbove,
-      );
+      const preferredMax = stage === "language" ? 460 : 320;
+      const roomAbove = Math.max(0, anchor.top - gap - (viewportTop + edge));
+      const roomBelow = Math.max(0, viewportBottom - edge - (anchor.bottom + gap));
 
       popover.style.width = `${width}px`;
-      popover.style.maxHeight = `${maxHeight}px`;
+      const naturalHeight = Math.min(popover.scrollHeight, preferredMax, viewportHeight - edge * 2);
+      // Anchored to a low control (the shelf pill) the popover rises above it; anchored
+      // to a chip high in the card it drops below. Flip to below when above is cramped
+      // and below has at least as much room.
+      const placeBelow = naturalHeight > roomAbove && roomBelow >= roomAbove;
+      const maxHeight = Math.min(naturalHeight, Math.max(72, placeBelow ? roomBelow : roomAbove));
 
       const measuredHeight = Math.min(popover.scrollHeight, maxHeight);
       const left = Math.min(
         viewportRight - width - edge,
         Math.max(viewportLeft + edge, anchor.left + anchor.width / 2 - width / 2),
       );
-      const top = Math.max(viewportTop + edge, anchor.top - gap - measuredHeight);
+      const top = placeBelow
+        ? anchor.bottom + gap
+        : Math.max(viewportTop + edge, anchor.top - gap - measuredHeight);
 
+      popover.style.maxHeight = `${maxHeight}px`;
       popover.style.left = `${left}px`;
       popover.style.top = `${top}px`;
-      popover.dataset.placement = "above";
+      popover.dataset.placement = placeBelow ? "below" : "above";
       popover.dataset.positioned = "true";
     };
 

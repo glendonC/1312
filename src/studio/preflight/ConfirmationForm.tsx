@@ -5,8 +5,6 @@ import { Edit } from "../glyphs";
 import { useStudio } from "../store";
 import type { RunBundle } from "../transport";
 import {
-  HOSTED_MAX_RANGE_S,
-  RECOMMENDED_RANGE_S,
   formatSeconds,
   type AnalysisRequest,
   type RecordedPreflightFacts,
@@ -18,9 +16,7 @@ import {
   ConversationValue,
   PreparationControlShelf,
   PreparationStagePopover,
-  RangeModeChoice,
   StageConversation,
-  TimestampField,
   continueActionLabel,
   languageName,
   movePopoverFocus,
@@ -41,7 +37,6 @@ interface ConfirmationFormProps {
 }
 
 export default function ConfirmationForm({
-  bundle,
   session,
   facts,
   assessment,
@@ -56,9 +51,25 @@ export default function ConfirmationForm({
   const [editingStage, setEditingStage] = useState<PreparationStage | null>(null);
   const stageHeading = useRef<HTMLHeadingElement>(null);
   const parameterTrigger = useRef<HTMLButtonElement>(null);
+  // The element the open editor popover anchors to — the shelf pill or the
+  // clicked in-sentence chip, whichever opened it.
+  const editorAnchor = useRef<HTMLButtonElement | null>(null);
   const currentStageIndex = preparationStageIndex(stage);
   const { request } = session;
   const closeEditor = useCallback(() => setEditingStage(null), []);
+
+  function openStageEditor(target: PreparationStage, anchor: HTMLButtonElement): void {
+    editorAnchor.current = anchor;
+    setEditingStage(target);
+  }
+
+  function toggleStageEditor(): void {
+    if (editingStage === stage) {
+      setEditingStage(null);
+    } else if (parameterTrigger.current) {
+      openStageEditor(stage, parameterTrigger.current);
+    }
+  }
 
   function selectStage(nextStage: PreparationStage): void {
     setEditingStage(null);
@@ -123,23 +134,43 @@ export default function ConfirmationForm({
                 facts={facts}
                 request={request}
                 assessment={assessment}
+                onEdit={(anchor) => openStageEditor("range", anchor)}
               />
             )}
 
             {stage === "language" && (
-              <RecordedLanguageStage headingRef={stageHeading} facts={facts} request={request} />
+              <RecordedLanguageStage
+                headingRef={stageHeading}
+                facts={facts}
+                request={request}
+                onEdit={(anchor) => openStageEditor("language", anchor)}
+              />
             )}
 
             {stage === "output" && (
-              <RecordedOutputStage headingRef={stageHeading} request={request} />
+              <RecordedOutputStage
+                headingRef={stageHeading}
+                request={request}
+                onEdit={(anchor) => openStageEditor("output", anchor)}
+              />
             )}
 
             {stage === "forecast" && (
-              <RecordedForecast headingRef={stageHeading} facts={facts} request={request} />
+              <RecordedForecast
+                headingRef={stageHeading}
+                facts={facts}
+                request={request}
+                selectStage={selectStage}
+              />
             )}
 
             {stage === "confirm" && (
-              <RecordedConfirmation headingRef={stageHeading} facts={facts} request={request} />
+              <RecordedConfirmation
+                headingRef={stageHeading}
+                facts={facts}
+                request={request}
+                selectStage={selectStage}
+              />
             )}
           </motion.div>
       </motion.section>
@@ -157,7 +188,7 @@ export default function ConfirmationForm({
               open: editingStage === stage,
               popoverId: `preflight-${stage}-popover`,
               triggerRef: parameterTrigger,
-              onToggle: () => setEditingStage((current) => current === stage ? null : stage),
+              onToggle: toggleStageEditor,
             }
           : undefined}
         next={{
@@ -173,16 +204,13 @@ export default function ConfirmationForm({
           id={`preflight-${stage}-popover`}
           stage={stage}
           open={editingStage === stage}
-          triggerRef={parameterTrigger}
+          triggerRef={editorAnchor}
           currentValue={recordedParameterLabel(stage, facts, request)}
           onClose={closeEditor}
         >
-          {stage === "range" && (
-            <RecordedRangeEditor facts={facts} request={request} assessment={assessment} update={update} />
-          )}
+          {stage === "range" && <RecordedRangeEditor facts={facts} />}
           {stage === "language" && (
             <RecordedLanguageEditor
-              bundle={bundle}
               facts={facts}
               request={request}
               update={update}
@@ -227,18 +255,23 @@ function RecordedRangeStage({
   facts,
   request,
   assessment,
+  onEdit,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   facts: RecordedPreflightFacts;
   request: AnalysisRequest;
   assessment: RangeAssessment | null;
+  onEdit: (anchor: HTMLButtonElement) => void;
 }) {
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
-        I’ll replay <ConversationValue>{recordedRangeLabel(request)}</ConversationValue> of the recorded selection.
-        The demo holds one measured 0:00–{formatSeconds(facts.selection.duration)} window; replay it whole or narrow
-        it locally.
+        I’ll replay{" "}
+        <ConversationValue onEdit={onEdit} editLabel={`Edit range: ${recordedRangeLabel(request)}`}>
+          {recordedRangeLabel(request)}
+        </ConversationValue>{" "}
+        of the recorded selection — the one measured 0:00–{formatSeconds(facts.selection.duration)} window bundled
+        with this demo. A different range would need a new producer run.
       </StageConversation>
       {assessment?.reason && <p className="preflight-block" role="status">{assessment.reason}</p>}
     </section>
@@ -249,17 +282,22 @@ function RecordedLanguageStage({
   headingRef,
   facts,
   request,
+  onEdit,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   facts: RecordedPreflightFacts;
   request: AnalysisRequest;
+  onEdit: (anchor: HTMLButtonElement) => void;
 }) {
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
         I’ll keep the recorded <ConversationValue>{languageName(facts.declaredLanguage)}</ConversationValue> source
-        and request <ConversationValue>{languageName(request.targetLanguage)}</ConversationValue> output. The clip’s
-        language was declared when it was recorded, not freshly detected.
+        and request{" "}
+        <ConversationValue onEdit={onEdit} editLabel={`Edit target language: ${languageName(request.targetLanguage)}`}>
+          {languageName(request.targetLanguage)}
+        </ConversationValue>{" "}
+        output. The clip’s language was declared when it was recorded, not freshly detected.
       </StageConversation>
     </section>
   );
@@ -268,14 +306,19 @@ function RecordedLanguageStage({
 function RecordedOutputStage({
   headingRef,
   request,
+  onEdit,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   request: AnalysisRequest;
+  onEdit: (anchor: HTMLButtonElement) => void;
 }) {
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
-        I’ll surface <ConversationValue>{recordedOutputSentence(request.outputDepth)}</ConversationValue>.
+        I’ll surface{" "}
+        <ConversationValue onEdit={onEdit} editLabel={`Edit output: ${recordedOutputSentence(request.outputDepth)}`}>
+          {recordedOutputSentence(request.outputDepth)}
+        </ConversationValue>.
       </StageConversation>
     </section>
   );
@@ -285,18 +328,28 @@ function RecordedForecast({
   headingRef,
   facts,
   request,
+  selectStage,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   facts: RecordedPreflightFacts;
   request: AnalysisRequest;
+  selectStage: (stage: PreparationStage) => void;
 }) {
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
-        I’ve bound <ConversationValue>{recordedRangeLabel(request)}</ConversationValue>,{" "}
-        <ConversationValue>{recordedLanguageLabel(facts, request)}</ConversationValue>, and{" "}
-        <ConversationValue>{recordedOutputLabel(request)}</ConversationValue> to the recorded clip. Processing time,
-        cost, and runtime scale stay unavailable until a versioned backend estimate exists.
+        I’ve bound{" "}
+        <ConversationValue onEdit={() => selectStage("range")} editLabel={`Edit range: ${recordedRangeLabel(request)}`}>
+          {recordedRangeLabel(request)}
+        </ConversationValue>,{" "}
+        <ConversationValue onEdit={() => selectStage("language")} editLabel={`Edit language: ${recordedLanguageLabel(facts, request)}`}>
+          {recordedLanguageLabel(facts, request)}
+        </ConversationValue>, and{" "}
+        <ConversationValue onEdit={() => selectStage("output")} editLabel={`Edit output: ${recordedOutputLabel(request)}`}>
+          {recordedOutputLabel(request)}
+        </ConversationValue>{" "}
+        to the recorded clip. Processing time, cost, and runtime scale stay unavailable until a versioned backend
+        estimate exists.
       </StageConversation>
     </section>
   );
@@ -306,141 +359,55 @@ function RecordedConfirmation({
   headingRef,
   facts,
   request,
+  selectStage,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   facts: RecordedPreflightFacts;
   request: AnalysisRequest;
+  selectStage: (stage: PreparationStage) => void;
 }) {
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
         I’m ready to replay this recorded analysis with{" "}
-        <ConversationValue>{recordedRangeLabel(request)}</ConversationValue>,{" "}
-        <ConversationValue>{recordedLanguageLabel(facts, request)}</ConversationValue>, and{" "}
-        <ConversationValue>{recordedOutputLabel(request)}</ConversationValue>. This replays the bundled evidence; it
-        won’t download or start new media processing.
+        <ConversationValue onEdit={() => selectStage("range")} editLabel={`Edit range: ${recordedRangeLabel(request)}`}>
+          {recordedRangeLabel(request)}
+        </ConversationValue>,{" "}
+        <ConversationValue onEdit={() => selectStage("language")} editLabel={`Edit language: ${recordedLanguageLabel(facts, request)}`}>
+          {recordedLanguageLabel(facts, request)}
+        </ConversationValue>, and{" "}
+        <ConversationValue onEdit={() => selectStage("output")} editLabel={`Edit output: ${recordedOutputLabel(request)}`}>
+          {recordedOutputLabel(request)}
+        </ConversationValue>. This replays the bundled evidence; it won’t download or start new media processing.
       </StageConversation>
     </section>
   );
 }
 
-function RecordedRangeEditor({
-  facts,
-  request,
-  assessment,
-  update,
-}: {
-  facts: RecordedPreflightFacts;
-  request: AnalysisRequest;
-  assessment: RangeAssessment | null;
-  update: (request: Partial<AnalysisRequest>) => void;
-}) {
+function RecordedRangeEditor({ facts }: { facts: RecordedPreflightFacts }) {
   const duration = facts.selection.duration;
-  const feedbackId = "preflight-range-feedback";
-  const recommendation =
-    assessment?.recommendation === "recommended"
-      ? "Within the recommended 30–60 second range."
-      : assessment?.recommendation === "short"
-        ? "Shorter than the recommended 30 seconds."
-        : assessment?.recommendation === "long"
-          ? `Longer than the recommended ${RECOMMENDED_RANGE_S.max} seconds.`
-          : null;
-  const showLongLocal =
-    assessment?.duration != null && assessment.duration > HOSTED_MAX_RANGE_S && import.meta.env.DEV;
 
   return (
-    <fieldset className="preflight-range-editor">
-      <legend>Range selection</legend>
-      <RangeModeChoice
-        name="range"
-        value="full-source"
-        checked={false}
-        disabled
-        onChange={() => {}}
-        label="Entire source"
-        meta="the recorded demo contains only its selected window"
-        accessibleLabel="Entire source · the recorded demo contains only its selected window"
-      />
-      <RangeModeChoice
-        name="range"
-        value="recorded"
-        checked={request.rangeMode === "recorded"}
-        onChange={() => update({ rangeMode: "recorded", start: 0, end: duration })}
-        label="Recorded selection"
-        meta={`0:00–${formatSeconds(duration)}`}
-        accessibleLabel={`Recorded selection · 0:00–${formatSeconds(duration)}`}
-      />
-      <RangeModeChoice
-        name="range"
-        value="custom"
-        checked={request.rangeMode === "custom"}
-        onChange={() => update({ rangeMode: "custom" })}
-        label="Custom range"
-        accessibleLabel="Custom range"
-      />
-      <RangeModeChoice
-        name="range"
-        value="detected"
-        checked={false}
-        disabled
-        onChange={() => {}}
-        label="Detected-language range"
-        meta={facts.languageRanges ? "preflight evidence only" : "no language detector output"}
-        accessibleLabel={facts.languageRanges
-          ? "Measured language ranges · preflight evidence only; no replayable detected-language subrange"
-          : "Whole detected-language range · no language detector output"}
-      />
-      {request.rangeMode === "custom" && (
-        <div className="preflight-range-time-fields">
-          <TimestampField
-            label="Start"
-            value={request.start}
-            max={duration}
-            describedBy={feedbackId}
-            invalid={!assessment?.canReplay}
-            onChange={(start) => update({ start })}
-          />
-          <TimestampField
-            label="End"
-            value={request.end}
-            max={duration}
-            describedBy={feedbackId}
-            invalid={!assessment?.canReplay}
-            onChange={(end) => update({ end })}
-          />
-        </div>
-      )}
-      {!assessment?.canReplay && assessment?.reason ? (
-        <p id={feedbackId} className="preflight-range-feedback" data-invalid="true" role="status">
-          {assessment.reason}
-        </p>
-      ) : (
-        <p id={feedbackId} className="preflight-range-feedback">
-          Recommend {RECOMMENDED_RANGE_S.min}–{RECOMMENDED_RANGE_S.max}s · hosted maximum {HOSTED_MAX_RANGE_S}s.
-          {recommendation && ` ${recommendation}`}
-        </p>
-      )}
-      {showLongLocal && (
-        <Choice
-          name="long-local"
-          value="accept"
-          checked={request.acceptLongLocal}
-          onChange={() => update({ acceptLongLocal: !request.acceptLongLocal })}
-          label="Allow this longer local run with slower processing"
-        />
-      )}
-    </fieldset>
+    <div className="preflight-range-editor preflight-range-locked" aria-label="Recorded range selection">
+      <div className="preflight-range-locked-selection">
+        <span className="preflight-range-choice-indicator" aria-hidden="true" />
+        <strong>Recorded selection</strong>
+        <small>0:00–{formatSeconds(duration)}</small>
+      </div>
+      <p className="preflight-range-feedback">
+        The only replayable window — a different range would need a new producer run. This recorded clip has no
+        range recommender, detected-language sub-range, or custom-range output.
+      </p>
+    </div>
   );
 }
 
 function RecordedLanguageEditor({
-  bundle,
   facts,
   request,
   update,
   relevance,
 }: {
-  bundle: RunBundle;
   facts: RecordedPreflightFacts;
   request: AnalysisRequest;
   update: (request: Partial<AnalysisRequest>) => void;
@@ -453,15 +420,11 @@ function RecordedLanguageEditor({
         <b>{languageName(facts.declaredLanguage)}</b>
         <small>Declared in the recorded clip · not newly detected</small>
       </div>
-      <label className="preflight-target-language">
+      <div className="preflight-recorded-language">
         <span>Translation target</span>
-        <select
-          value={request.targetLanguage}
-          onChange={(event) => update({ targetLanguage: event.currentTarget.value })}
-        >
-          <option value={bundle.run.pair.target}>{languageName(bundle.run.pair.target)}</option>
-        </select>
-      </label>
+        <b>{languageName(request.targetLanguage)}</b>
+        <small>The only output language bundled with this recorded clip</small>
+      </div>
       <AdvancedFields request={request} update={update} relevance={relevance} />
     </div>
   );

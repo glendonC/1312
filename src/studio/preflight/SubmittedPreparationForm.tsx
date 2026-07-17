@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useCallback, useRef, useState, type RefObject } from "react";
 
 import { Edit } from "../glyphs";
@@ -62,6 +62,9 @@ export default function SubmittedPreparationForm({
   const [editingStage, setEditingStage] = useState<PreparationStage | null>(null);
   const stageHeading = useRef<HTMLHeadingElement>(null);
   const parameterTrigger = useRef<HTMLButtonElement>(null);
+  // The element the open editor popover anchors to — the shelf pill or the
+  // clicked in-sentence chip, whichever opened it.
+  const editorAnchor = useRef<HTMLButtonElement | null>(null);
   const durationSeconds = resolution.source.durationMs / 1_000;
   const preparation = previewSession.preparation;
   const currentStageIndex = preparationStageIndex(stage);
@@ -69,6 +72,19 @@ export default function SubmittedPreparationForm({
   const blockingMessage = assessment.reason
     ?? (preparation.status === "invalid" ? preparation.message : null);
   const closeEditor = useCallback(() => setEditingStage(null), []);
+
+  function openStageEditor(target: PreparationStage, anchor: HTMLButtonElement): void {
+    editorAnchor.current = anchor;
+    setEditingStage(target);
+  }
+
+  function toggleStageEditor(): void {
+    if (editingStage === stage) {
+      setEditingStage(null);
+    } else if (parameterTrigger.current) {
+      openStageEditor(stage, parameterTrigger.current);
+    }
+  }
 
   function selectStage(nextStage: PreparationStage): void {
     setEditingStage(null);
@@ -125,13 +141,11 @@ export default function SubmittedPreparationForm({
         layout
         transition={{ layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
       >
-        <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={stage}
             className="preflight-stage-body"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             onAnimationComplete={() => stageHeading.current?.focus({ preventScroll: true })}
           >
@@ -149,6 +163,7 @@ export default function SubmittedPreparationForm({
                 session={session}
                 preparationStatus={preparation.status}
                 blockingMessage={blockingMessage}
+                onEdit={(anchor) => openStageEditor("range", anchor)}
               />
             )}
 
@@ -158,6 +173,7 @@ export default function SubmittedPreparationForm({
                 previewSession={previewSession}
                 session={session}
                 blockingMessage={blockingMessage}
+                onEdit={(anchor) => openStageEditor("language", anchor)}
               />
             )}
 
@@ -165,6 +181,7 @@ export default function SubmittedPreparationForm({
               <SubmittedOutputStage
                 headingRef={stageHeading}
                 session={session}
+                onEdit={(anchor) => openStageEditor("output", anchor)}
               />
             )}
 
@@ -173,6 +190,7 @@ export default function SubmittedPreparationForm({
                 headingRef={stageHeading}
                 resolution={resolution}
                 request={preparation.request}
+                selectStage={selectStage}
               />
             )}
 
@@ -181,10 +199,10 @@ export default function SubmittedPreparationForm({
                 headingRef={stageHeading}
                 resolution={resolution}
                 request={preparation.request}
+                selectStage={selectStage}
               />
             )}
           </motion.div>
-        </AnimatePresence>
       </motion.section>
 
       <PreparationControlShelf
@@ -200,7 +218,7 @@ export default function SubmittedPreparationForm({
               open: editingStage === stage,
               popoverId: `preflight-${stage}-popover`,
               triggerRef: parameterTrigger,
-              onToggle: () => setEditingStage((current) => current === stage ? null : stage),
+              onToggle: toggleStageEditor,
             }
           : undefined}
         next={{
@@ -216,7 +234,7 @@ export default function SubmittedPreparationForm({
           id={`preflight-${stage}-popover`}
           stage={stage}
           open={editingStage === stage}
-          triggerRef={parameterTrigger}
+          triggerRef={editorAnchor}
           currentValue={stageParameterLabel(stage, previewSession, session, durationSeconds)}
           onClose={closeEditor}
         >
@@ -232,7 +250,6 @@ export default function SubmittedPreparationForm({
             <LanguageEditor
               previewSession={previewSession}
               session={session}
-              update={update}
               updateSourceLanguage={updateSourceLanguage}
             />
           )}
@@ -288,19 +305,23 @@ function SubmittedRangeStage({
   session,
   preparationStatus,
   blockingMessage,
+  onEdit,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   durationSeconds: number;
   session: PreflightSession;
   preparationStatus: StudioPreviewSession["preparation"]["status"];
   blockingMessage: string | null;
+  onEdit: (anchor: HTMLButtonElement) => void;
 }) {
   const range = liveRangeLabel(session, durationSeconds);
 
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
-        I’ll prepare <ConversationValue>{range}</ConversationValue> from this source. The current limit is{" "}
+        I’ll prepare{" "}
+        <ConversationValue onEdit={onEdit} editLabel={`Edit range: ${range}`}>{range}</ConversationValue>{" "}
+        from this source. The current limit is{" "}
         {formatSeconds(SUBMITTED_PREPARATION_POLICY.maximumDurationMs / 1_000)}, and I haven’t inspected the
         content to choose a section for you.
       </StageConversation>
@@ -317,11 +338,13 @@ function SubmittedLanguageStage({
   previewSession,
   session,
   blockingMessage,
+  onEdit,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   previewSession: StudioPreviewSession;
   session: PreflightSession;
   blockingMessage: string | null;
+  onEdit: (anchor: HTMLButtonElement) => void;
 }) {
   const sourceIntent = liveSourceLanguageSentence(previewSession.sourceLanguage);
   const target = languageName(session.request.targetLanguage);
@@ -329,8 +352,11 @@ function SubmittedLanguageStage({
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
-        I’ll <ConversationValue>{sourceIntent}</ConversationValue> and request{" "}
-        <ConversationValue>{target}</ConversationValue> output. Nothing has been detected yet.
+        I’ll{" "}
+        <ConversationValue onEdit={onEdit} editLabel={`Edit source language: ${sourceIntent}`}>{sourceIntent}</ConversationValue>{" "}
+        and request{" "}
+        <ConversationValue onEdit={onEdit} editLabel={`Edit target language: ${target}`}>{target}</ConversationValue>{" "}
+        output. Nothing has been detected yet.
       </StageConversation>
       {blockingMessage && <p className="preflight-block" role="status">{blockingMessage}</p>}
     </section>
@@ -340,15 +366,19 @@ function SubmittedLanguageStage({
 function SubmittedOutputStage({
   headingRef,
   session,
+  onEdit,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   session: PreflightSession;
+  onEdit: (anchor: HTMLButtonElement) => void;
 }) {
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
-        I’ll request <ConversationValue>{liveOutputLabel(session.request.outputDepth)}</ConversationValue>.
-        Processing still hasn’t started.
+        I’ll request{" "}
+        <ConversationValue onEdit={onEdit} editLabel={`Edit output: ${liveOutputLabel(session.request.outputDepth)}`}>
+          {liveOutputLabel(session.request.outputDepth)}
+        </ConversationValue>. Processing still hasn’t started.
       </StageConversation>
     </section>
   );
@@ -358,18 +388,28 @@ function SubmittedForecast({
   headingRef,
   resolution,
   request,
+  selectStage,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   resolution: RemoteSourceResolutionReceipt;
   request: SubmittedSourcePreparationRequest;
+  selectStage: (stage: PreparationStage) => void;
 }) {
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
-        I’ve bound <ConversationValue>{rangeLabel(request)}</ConversationValue>,{" "}
-        <ConversationValue>{compactLanguageLabel(request)}</ConversationValue>, and{" "}
-        <ConversationValue>{outputLabel(request)}</ConversationValue> to {resolution.source.label}. I still can’t
-        forecast processing time, cost, scale, or workload until a compatible producer runs.
+        I’ve bound{" "}
+        <ConversationValue onEdit={() => selectStage("range")} editLabel={`Edit range: ${rangeLabel(request)}`}>
+          {rangeLabel(request)}
+        </ConversationValue>,{" "}
+        <ConversationValue onEdit={() => selectStage("language")} editLabel={`Edit language: ${compactLanguageLabel(request)}`}>
+          {compactLanguageLabel(request)}
+        </ConversationValue>, and{" "}
+        <ConversationValue onEdit={() => selectStage("output")} editLabel={`Edit output: ${outputLabel(request)}`}>
+          {outputLabel(request)}
+        </ConversationValue>{" "}
+        to {resolution.source.label}. I still can’t forecast processing time, cost, scale, or workload until a
+        compatible producer runs.
       </StageConversation>
     </section>
   );
@@ -379,19 +419,27 @@ function SubmittedConfirmation({
   headingRef,
   resolution,
   request,
+  selectStage,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   resolution: RemoteSourceResolutionReceipt;
   request: SubmittedSourcePreparationRequest;
+  selectStage: (stage: PreparationStage) => void;
 }) {
   return (
     <section className="preflight-preparation">
       <StageConversation headingRef={headingRef}>
         I’m ready to open the recorded run-006 interface preview with{" "}
-        <ConversationValue>{rangeLabel(request)}</ConversationValue>,{" "}
-        <ConversationValue>{compactLanguageLabel(request)}</ConversationValue>, and{" "}
-        <ConversationValue>{outputLabel(request)}</ConversationValue>. This replays the bundled demonstration; it
-        won’t download or process {resolution.source.label}, and it does not submit a runtime command.
+        <ConversationValue onEdit={() => selectStage("range")} editLabel={`Edit range: ${rangeLabel(request)}`}>
+          {rangeLabel(request)}
+        </ConversationValue>,{" "}
+        <ConversationValue onEdit={() => selectStage("language")} editLabel={`Edit language: ${compactLanguageLabel(request)}`}>
+          {compactLanguageLabel(request)}
+        </ConversationValue>, and{" "}
+        <ConversationValue onEdit={() => selectStage("output")} editLabel={`Edit output: ${outputLabel(request)}`}>
+          {outputLabel(request)}
+        </ConversationValue>. This replays the bundled demonstration; it won’t download or process{" "}
+        {resolution.source.label}, and it does not submit a runtime command.
       </StageConversation>
     </section>
   );
@@ -474,12 +522,10 @@ function RangeEditor({
 function LanguageEditor({
   previewSession,
   session,
-  update,
   updateSourceLanguage,
 }: {
   previewSession: StudioPreviewSession;
   session: PreflightSession;
-  update: (request: Partial<AnalysisRequest>) => void;
   updateSourceLanguage: (intent: SubmittedSourceLanguageIntent) => void;
 }) {
   return (
@@ -516,15 +562,11 @@ function LanguageEditor({
           </label>
         )}
       </fieldset>
-      <label className="preflight-target-language">
+      <div className="preflight-recorded-language">
         <span>Requested target language</span>
-        <select
-          value={session.request.targetLanguage}
-          onChange={(event) => update({ targetLanguage: event.currentTarget.value })}
-        >
-          <option value="en">English</option>
-        </select>
-      </label>
+        <b>{languageName(session.request.targetLanguage)}</b>
+        <small>English is the only supported target today</small>
+      </div>
     </div>
   );
 }

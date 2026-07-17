@@ -174,6 +174,57 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
+/* Editable chips are buttons: reset the control and add an edit affordance. */
+button.preflight-conversation-value-editable {
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 180ms ease;
+}
+
+/* The edit mark collapses to zero width at rest so it never reserves empty
+   space; it expands and fades in only on hover/focus. */
+.preflight-conversation-value-editable::after {
+  content: "✎";
+  display: inline-block;
+  max-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  font-size: 0.72em;
+  opacity: 0;
+  vertical-align: baseline;
+  transition:
+    max-width 180ms ease,
+    margin-left 180ms ease,
+    opacity 150ms ease;
+}
+
+.preflight-conversation-value-editable:hover,
+.preflight-conversation-value-editable:focus-visible {
+  border-color: color-mix(in srgb, var(--palette-color) 52%, var(--glass-border-luminous));
+  color: color-mix(in srgb, var(--palette-ink) 88%, var(--ink));
+  background: color-mix(in srgb, var(--palette-color) 28%, rgba(255, 255, 255, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 5px 16px color-mix(in srgb, var(--palette-color) 16%, transparent);
+}
+
+.preflight-conversation-value-editable:hover::after,
+.preflight-conversation-value-editable:focus-visible::after {
+  max-width: 1.3em;
+  margin-left: 0.32em;
+  opacity: 0.75;
+}
+
+.preflight-conversation-value-editable:focus-visible {
+  outline: 2px solid var(--palette-ink);
+  outline-offset: 3px;
+}
+
 .preflight-source-link {
   display: inline;
   padding: 0.1em 0.34em 0.14em;

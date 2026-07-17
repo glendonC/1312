@@ -1,14 +1,11 @@
 import { useMemo } from "react";
 
 import { useBundle, useStudio } from "../store";
-import type { MediaProbeTrack } from "../types";
 import ConfirmationForm, { AdvancedFields } from "./ConfirmationForm";
 import SubmittedPreparationForm from "./SubmittedPreparationForm";
-import type { RecordedLanguageRange } from "./languageProjection";
 import {
   assessRecordedRequest,
   assessSubmittedPreviewRequest,
-  formatSeconds,
   type PreflightSession,
 } from "./model";
 
@@ -114,104 +111,11 @@ export default function Preflight() {
         session={session}
         facts={facts}
         assessment={assessment}
-        sourceDetails={<RecordedSourceFacts bundle={bundle} facts={facts} />}
         update={update}
-        cancel={dismiss}
         confirm={confirm}
       />
     </section>
   );
-}
-
-function RecordedSourceFacts({
-  bundle,
-  facts,
-}: {
-  bundle: NonNullable<ReturnType<typeof useBundle>>;
-  facts: NonNullable<PreflightSession["facts"]>;
-}) {
-  return (
-    <details className="preflight-recorded-facts">
-      <summary className="preflight-facts-intro"><span>Recorded source facts</span></summary>
-      <dl className="preflight-facts">
-        <div><dt>Source receipt</dt><dd>{facts.rights.basis === "ownership_attestation" ? "Owned local bytes receipted" : "Remote source ingested when recorded"}</dd></div>
-        <div><dt>{facts.creator ? "Source" : "Creator"}</dt><dd>{facts.creator ?? "Not inferred from ownership or filename"}</dd></div>
-        <div><dt>Rights</dt><dd>{facts.rights.label}{facts.rights.assertedBy ? ` · attested by ${facts.rights.assertedBy}` : ""}</dd></div>
-        <div><dt>Selected window</dt><dd>{facts.selection.sourceStart}–{facts.selection.sourceEnd} · {formatSeconds(facts.selection.duration)}</dd></div>
-        <div><dt>Recorded media</dt><dd>{facts.playableMedia ? "Playable artifact" : "No playable artifact"} · {facts.waveformSamples} waveform samples</dd></div>
-        {facts.mediaProbe && <div><dt>Tracks</dt><dd>{mediaSummary(facts.mediaProbe.container, facts.mediaProbe.tracks)}</dd></div>}
-        {facts.content && <div><dt>Raw provenance</dt><dd>SHA-256 {facts.content.hash.slice(0, 12)}… · {formatBytes(facts.content.bytes)} · {facts.content.preservation.replaceAll("_", " ")}</dd></div>}
-        {facts.speechActivity && (
-          <div data-testid="speech-activity-evidence">
-            <dt>Detector-measured speech</dt>
-            <dd>
-              {formatDetectorSeconds(facts.speechActivity.speechDuration)} speech · {(facts.speechActivity.coverage * 100).toFixed(1)}% of decoded samples · {facts.speechActivity.windows.length} speech {facts.speechActivity.windows.length === 1 ? "window" : "windows"}
-              <br />
-              {facts.speechActivity.windows.length > 0
-                ? facts.speechActivity.windows.map((window) => `${formatDetectorSeconds(window.startSeconds)}–${formatDetectorSeconds(window.endSeconds)}`).join(" · ")
-                : "The detector produced no speech windows."}
-              <br />
-              {facts.speechActivity.producer.id} {facts.speechActivity.producer.version} · model revision {facts.speechActivity.producer.modelRevision.slice(0, 12)}…
-            </dd>
-          </div>
-        )}
-        {facts.languageRanges && (
-          <div data-testid="language-range-evidence">
-            <dt>Language detector ranges</dt>
-            <dd>
-              {facts.languageRanges.ranges.length} receipted speech-range {facts.languageRanges.ranges.length === 1 ? "result" : "results"}
-              {facts.languageRanges.ranges.map((range) => (
-                <span key={`${range.speechWindowIndex}:${range.chunkIndex}`} data-testid="language-range" data-language-status={range.decision.status}>
-                  <br />{formatDetectorSeconds(range.startSeconds)}–{formatDetectorSeconds(range.endSeconds)} · {languageRangeDecision(range)}
-                </span>
-              ))}
-              <br />{facts.languageRanges.producer.id} {facts.languageRanges.producer.version} · {facts.languageRanges.producer.modelId} {facts.languageRanges.producer.quantization} · model revision {facts.languageRanges.producer.modelRevision.slice(0, 12)}…
-              <br />Probabilities are uncalibrated model softmax scores.
-            </dd>
-          </div>
-        )}
-        <div><dt>Clip language declaration</dt><dd>{facts.declaredLanguage} recorded in run.clip.lang · not detector output</dd></div>
-        <div><dt>Language pack</dt><dd>{bundle.run.pack} selected for the recorded job · not detector output</dd></div>
-      </dl>
-    </details>
-  );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function formatDetectorSeconds(seconds: number): string {
-  return `${seconds.toFixed(3).replace(/\.?(?:0+)$/, "")}s`;
-}
-
-function languageRangeDecision(range: RecordedLanguageRange): string {
-  const decision = range.decision;
-  if (decision.status === "classified") {
-    const probability =
-      decision.probability === null
-        ? "probability unavailable"
-        : `model probability ${(decision.probability * 100).toFixed(1)}%`;
-    const margin =
-      decision.margin === null
-        ? "margin unavailable"
-        : `model score margin ${(decision.margin * 100).toFixed(1)}%`;
-    return `${decision.code ?? "Unknown"} classified · ${probability} · ${margin}`;
-  }
-  const reason = decision.reason?.replaceAll("_", " ") ?? "no decision reason receipted";
-  return `${decision.status === "unknown" ? "Unknown" : "Withheld"} · ${reason}`;
-}
-
-function mediaSummary(containers: string[], tracks: MediaProbeTrack[]): string {
-  const preferred = containers.find((container) => container === "mp4") ?? containers[0] ?? "container unknown";
-  const descriptions = tracks.map((track) => {
-    if (track.type === "video") return `${track.codec} ${track.width}×${track.height}`;
-    if (track.type === "audio") return `${track.codec} ${track.sample_rate}Hz ${track.channels}ch`;
-    return `${track.type} ${track.codec}`;
-  });
-  return [preferred, ...descriptions].join(" · ");
 }
 
 function Provenance({ session }: { session: PreflightSession }) {

@@ -14,6 +14,7 @@ import { reopenOwnedMediaStudy } from "../src/studio/runtime/production/study/st
 import { RestudiedCaptionCausalityHost } from "../src/studio/runtime/production/captions/restudiedCaptionCausality.ts";
 import { RestudiedStudyReadinessHost } from "../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts";
 import { restudiedReadinessReference } from "../src/studio/runtime/production/study/restudiedStudyRuntime.ts";
+import { reopenRangePass } from "../src/studio/runtime/production/study/rangePassHost.ts";
 import { validateRangePassRequestReceipt, validateStudyRestudyRequest } from "../src/studio/runtime/production/validation/studiesV3.ts";
 import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
 import type { SpeakerDiarizer, SpeakerDiarizerResult } from "../src/studio/runtime/production/speaker/diarizer.ts";
@@ -283,6 +284,96 @@ test("default U4 exhausts only the affected weak range while unrelated supported
     assert.equal(readiness.outcome, "proceed_to_caption_review");
     assert.ok(readiness.terminalWeakCoverageIds.some((id) => study.coverage.find((entry) => entry.coverageId === id)?.passIds.includes(pass.id)));
     assert.equal(Object.values(state.tasks).find((task) => task.parentTaskId === null)?.status, "completed");
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("default U4 runs one bounded padded-audio pass without upgrading the prior weak cell", async () => {
+  const runtime = await runDefaultU4("restudy_padded_audio");
+  try {
+    assert.equal(runtime.lifecycle, "terminal");
+    const loaded = await journal(runtime);
+    const state = loaded.state;
+    const passes = Object.values(state.rangePasses);
+    assert.equal(passes.length, 1);
+    const pass = passes[0];
+    assert.equal(pass.accepted, true);
+    assert.equal(pass.request.delta.kind, "padded_audio_window");
+    if (pass.request.delta.kind !== "padded_audio_window") assert.fail("U4 did not retain the padded delta");
+    assert.equal(pass.request.cause.kind === "speaker_overlap", false);
+    assert.equal(pass.request.delta.paddingBeforeMs, 0);
+    assert.equal(pass.request.delta.paddingAfterMs, 250);
+    assert.equal(pass.request.delta.executionRange.startMs, pass.request.weakRange.startMs);
+    assert.equal(pass.request.delta.executionRange.endMs, pass.request.weakRange.endMs + 250);
+    assert.equal(pass.request.producer.configurationScope, "runtime_injected_current_run_recognizer_bounded_padding_v1");
+    assert.ok(pass.request.priorEvidence.speechExecutionRanges.some((range) =>
+      range.artifactId === pass.request.weakRange.artifactId && range.trackId === pass.request.weakRange.trackId &&
+      range.startMs === pass.request.weakRange.startMs && range.endMs === pass.request.weakRange.endMs));
+
+    const child = state.tasks[pass.taskId!];
+    assert.deepEqual(child.mediaScope, [pass.request.delta.executionRange]);
+    assert.deepEqual(state.spawnRequests[pass.spawnRequestId].input.requiredCapabilities, ["speech.transcribe", "report.submit"]);
+    assert.deepEqual(child.grants.map((grant) => grant.capability).sort(), ["report.submit", "speech.transcribe"]);
+    const operations = Object.values(state.semanticEvidence).filter((operation) => operation.taskId === child.id);
+    assert.equal(operations.length, 1);
+    assert.deepEqual({
+      artifactId: operations[0].sourceArtifactId,
+      trackId: operations[0].trackId,
+      startMs: operations[0].startMs,
+      endMs: operations[0].endMs,
+    }, pass.request.delta.executionRange);
+    assert.ok(pass.terminal?.evidence.reportId);
+    assert.ok(pass.terminal?.evidence.admissionId);
+    assert.ok(pass.terminal?.evidence.readOperationId);
+    assert.equal(pass.terminal?.measuredSpend.capabilityCalls, 1);
+    assert.equal(pass.terminal?.outcome, "withheld_exhausted");
+    assert.equal(pass.terminal?.exhausted, true);
+    assert.deepEqual(pass.terminal?.evidence.newCitationIds, []);
+    assert.deepEqual(pass.terminal?.evidence.disagreementCitationIds, []);
+
+    const study = Object.values(state.generalizedOwnedMediaStudies)[0];
+    if (study.schema !== "studio.owned-media-study.v3") assert.fail("default U4 did not record study v3");
+    assert.deepEqual(study.passes.map((entry) => entry.id), [pass.id]);
+    const passCoverage = study.coverage.filter((entry) => entry.passIds.includes(pass.id));
+    assert.ok(passCoverage.length > 0);
+    assert.ok(passCoverage.every((entry) => entry.state === "withheld"));
+    assert.ok(passCoverage.every((entry) => entry.preservedStates.includes(pass.request.priorState)));
+    assert.ok(passCoverage.every((entry) => entry.claimIds.length === 0));
+    assert.ok(study.coverage.some((entry) => !entry.passIds.includes(pass.id) && entry.state === "supported"));
+
+    const artifacts = new ContentAddressedArtifactStore(runtime.store.paths(runtime.runtimeId).artifactStoreRoot);
+    assert.deepEqual(await reopenRangePass(artifacts, pass), pass);
+    const changedPadding = {
+      ...structuredClone(pass.request),
+      delta: { ...structuredClone(pass.request.delta), paddingAfterMs: pass.request.delta.paddingAfterMs + 1 },
+    };
+    assert.throws(() => validateRangePassRequestReceipt(changedPadding), /registered bounded execution window/);
+    const changedConfiguration = {
+      ...structuredClone(pass.request),
+      producer: { ...structuredClone(pass.request.producer), configurationScope: "runtime_injected_current_run_recognizer" },
+    };
+    assert.throws(() => validateRangePassRequestReceipt(changedConfiguration), /configurationScope/);
+    const overLimit = {
+      ...structuredClone(pass.request),
+      delta: {
+        ...structuredClone(pass.request.delta),
+        executionRange: { ...structuredClone(pass.request.delta.executionRange), endMs: pass.request.weakRange.endMs + 2_001 },
+        paddingAfterMs: 2_001,
+      },
+    };
+    assert.throws(() => validateRangePassRequestReceipt(overLimit), /at most 2000/);
+    const missingPriorSpeech = structuredClone(pass.request);
+    missingPriorSpeech.priorEvidence.speechExecutionRanges = [];
+    assert.throws(() => validateRangePassRequestReceipt(missingPriorSpeech), /exact prior current-run speech/);
+    const unsupported = structuredClone(pass.request) as unknown as Record<string, unknown>;
+    unsupported.delta = {
+      kind: "denser_frame_timestamps",
+      executionRange: pass.request.delta.executionRange,
+      timestampsMs: [pass.request.delta.executionRange.startMs],
+    };
+    assert.throws(() => validateRangePassRequestReceipt(unsupported), /not registered/);
+    assert.deepEqual(projectRuntimeEvents(runtime.runtimeId, loaded.events), state);
   } finally {
     await cleanup(runtime);
   }

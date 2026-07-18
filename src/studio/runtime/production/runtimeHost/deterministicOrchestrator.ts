@@ -33,6 +33,7 @@ export type DeterministicOrchestratorMode =
   | "restudy_disagreement"
   | "restudy_research"
   | "restudy_speaker_overlap"
+  | "restudy_padded_audio"
   | "no_request";
 
 export interface DeterministicOrchestratorOptions {
@@ -142,7 +143,8 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       const midpoint = rootScope.startMs + Math.floor((rootScope.endMs - rootScope.startMs) / 2);
       if (midpoint <= rootScope.startMs || midpoint >= rootScope.endMs) throw new Error("Deterministic generalized root cannot split the bounded scope");
       const restudyDisagreement = this.mode === "restudy_disagreement" || this.mode === "restudy_research";
-      const restudyWeak = this.mode === "restudy_support" || this.mode === "restudy_exhausted";
+      const restudyPaddedAudio = this.mode === "restudy_padded_audio";
+      const restudyWeak = this.mode === "restudy_support" || this.mode === "restudy_exhausted" || restudyPaddedAudio;
       const restudySpeakerOverlap = this.mode === "restudy_speaker_overlap";
       const scopes = restudyDisagreement
         ? [rootScope, rootScope]
@@ -220,14 +222,20 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
         if (!candidate) throw new Error("Deterministic U4 proof requires one exact evidence-derived weak candidate");
         const width = candidate.range.endMs - candidate.range.startMs;
         const inset = Math.max(1, Math.floor(width / 4));
+        const paddingAfterMs = restudyPaddedAudio
+          ? Math.min(250, rootScope.endMs - candidate.range.endMs)
+          : 0;
+        if (restudyPaddedAudio && paddingAfterMs <= 0) throw new Error("Deterministic U4 padded candidate has no bounded root context");
         const executionRange = restudySpeakerOverlap
           ? structuredClone(candidate.cause.range)
+          : restudyPaddedAudio
+            ? { ...candidate.range, endMs: candidate.range.endMs + paddingAfterMs }
           : {
               ...candidate.range,
               startMs: candidate.range.startMs + inset,
               endMs: candidate.range.endMs - inset,
             };
-        if (executionRange.startMs >= executionRange.endMs) throw new Error("Deterministic U4 candidate is too narrow for a strict attenuated subrange");
+        if (!restudyPaddedAudio && executionRange.startMs >= executionRange.endMs) throw new Error("Deterministic U4 candidate is too narrow for a strict attenuated subrange");
 
         if (restudySpeakerOverlap) {
           let forgedCauseRejected = false;
@@ -242,6 +250,23 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
             forgedCauseRejected = true;
           }
           if (!forgedCauseRejected) throw new Error("Deterministic U6.1 proof accepted a forged recognizer-disagreement cause");
+          let paddedSpeakerRejected = false;
+          try {
+            await bridge.restudy({
+              inputId: restudyInput!.inputId,
+              coverageId: candidate.coverageId,
+              causeId: candidate.cause.causeId,
+              delta: {
+                kind: "padded_audio_window",
+                executionRange: { ...candidate.range, endMs: candidate.range.endMs + 1 },
+                paddingBeforeMs: 0,
+                paddingAfterMs: 1,
+              },
+            });
+          } catch {
+            paddedSpeakerRejected = true;
+          }
+          if (!paddedSpeakerRejected) throw new Error("Deterministic U6.1 proof accepted padded audio for a speaker-overlap cause");
         }
 
         let unregisteredRejected = false;
@@ -250,31 +275,74 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
             inputId: restudyInput!.inputId,
             coverageId: candidate.coverageId,
             causeId: candidate.cause.causeId,
-            delta: { kind: "padded_audio_window", executionRange, paddingBeforeMs: 1, paddingAfterMs: 1 },
+            delta: { kind: "denser_frame_timestamps", executionRange, timestampsMs: [executionRange.startMs] },
           });
         } catch {
           unregisteredRejected = true;
         }
         if (!unregisteredRejected) throw new Error("Deterministic U4 proof did not reject an unregistered delta producer");
 
-        let broadeningRejected = false;
+        if (restudyPaddedAudio) {
+          let outOfRootRejected = false;
+          try {
+            const paddingOutsideRootMs = rootScope.endMs - candidate.range.endMs + 1;
+            await bridge.restudy({
+              inputId: restudyInput!.inputId,
+              coverageId: candidate.coverageId,
+              causeId: candidate.cause.causeId,
+              delta: {
+                kind: "padded_audio_window",
+                executionRange: { ...candidate.range, endMs: candidate.range.endMs + paddingOutsideRootMs },
+                paddingBeforeMs: 0,
+                paddingAfterMs: paddingOutsideRootMs,
+              },
+            });
+          } catch {
+            outOfRootRejected = true;
+          }
+          if (!outOfRootRejected) throw new Error("Deterministic U4 padded proof accepted context outside the root audio scope");
+
+          let overLimitRejected = false;
+          try {
+            await bridge.restudy({
+              inputId: restudyInput!.inputId,
+              coverageId: candidate.coverageId,
+              causeId: candidate.cause.causeId,
+              delta: {
+                kind: "padded_audio_window",
+                executionRange: { ...candidate.range, endMs: candidate.range.endMs + 2_001 },
+                paddingBeforeMs: 0,
+                paddingAfterMs: 2_001,
+              },
+            });
+          } catch {
+            overLimitRejected = true;
+          }
+          if (!overLimitRejected) throw new Error("Deterministic U4 padded proof accepted padding above the registered ceiling");
+        }
+
+        let invalidRangeRejected = false;
         try {
           await bridge.restudy({
             inputId: restudyInput!.inputId,
             coverageId: candidate.coverageId,
             causeId: candidate.cause.causeId,
-            delta: { kind: "attenuated_subrange", executionRange: candidate.range },
+            delta: restudyPaddedAudio
+              ? { kind: "padded_audio_window", executionRange: candidate.range, paddingBeforeMs: 0, paddingAfterMs: 0 }
+              : { kind: "attenuated_subrange", executionRange: candidate.range },
           });
         } catch {
-          broadeningRejected = true;
+          invalidRangeRejected = true;
         }
-        if (!broadeningRejected) throw new Error("Deterministic U4 proof did not reject an unchanged/broadened range");
+        if (!invalidRangeRejected) throw new Error("Deterministic U4 proof did not reject an unchanged or unpadded range");
 
         const validRequest = {
           inputId: restudyInput!.inputId,
           coverageId: candidate.coverageId,
           causeId: candidate.cause.causeId,
-          delta: { kind: "attenuated_subrange", executionRange },
+          delta: restudyPaddedAudio
+            ? { kind: "padded_audio_window", executionRange, paddingBeforeMs: 0, paddingAfterMs }
+            : { kind: "attenuated_subrange", executionRange },
         } as const;
         const concurrent = await Promise.all([bridge.restudy(validRequest), bridge.restudy(validRequest)]);
         const requested = concurrent.find((entry) => entry.spawn.decision === "accepted");
@@ -315,10 +383,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
           let duplicateRejected = false;
           try {
             await bridge.restudy({
-              inputId: restudyInput!.inputId,
-              coverageId: candidate.coverageId,
-              causeId: candidate.cause.causeId,
-              delta: { kind: "attenuated_subrange", executionRange },
+              ...validRequest,
             });
           } catch {
             duplicateRejected = true;

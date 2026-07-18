@@ -570,14 +570,14 @@ export class BoundedRuntimeScheduler {
     return transaction.result;
   }
 
-  /** Atomic scheduler admission for one host-normalized attenuated current-run speech pass. */
-  async requestAttenuatedSpeechPass(inputValue: {
+  /** Atomic scheduler admission for one host-normalized registered current-run speech range pass. */
+  async requestSpeechRangePass(inputValue: {
     receipt: RangePassRequestReceipt;
     receiptContentId: string;
     child: SpawnRequestInput;
     authorship: { executionId: string; toolCallId: string };
   }): Promise<SpawnDecision> {
-    assertSpawnRequestInput(inputValue.child, "Attenuated speech pass child");
+    assertSpawnRequestInput(inputValue.child, "Speech range-pass child");
     validateRangePassRequestReceipt(inputValue.receipt);
     const input = structuredClone(inputValue.child);
     const receipt = structuredClone(inputValue.receipt);
@@ -618,9 +618,11 @@ export class BoundedRuntimeScheduler {
         const execution = state.executions[receipt.root.executionId];
         const authoredCall = state.orchestratorToolCalls[inputValue.authorship.toolCallId];
         const executionRange = receipt.delta.executionRange;
+        const padded = receipt.delta.kind === "padded_audio_window";
         const childMatchesReceipt =
           input.workloadKey === `restudy:${receipt.workFingerprint}` &&
           input.workerKind === "analysis" &&
+          input.workerLabel === (padded ? "padded-current-run-speech-pass-2" : "attenuated-current-run-speech-pass-2") &&
           input.mediaScope.length === 1 &&
           input.mediaScope[0].artifactId === executionRange.artifactId &&
           input.mediaScope[0].trackId === executionRange.trackId &&
@@ -629,6 +631,7 @@ export class BoundedRuntimeScheduler {
           input.inputArtifactIds.length === 1 &&
           input.inputArtifactIds[0] === root?.jobContext.source.artifactId &&
           input.requiredOutputs.length === 1 &&
+          input.requiredOutputs[0].name === (padded ? "padded audio speech re-study" : "attenuated speech re-study") &&
           input.requiredOutputs[0].artifactKind === "studio.study-report.v2" &&
           input.requiredOutputs[0].required === true &&
           input.requiredCapabilities.length === 2 &&

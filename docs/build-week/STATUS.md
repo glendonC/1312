@@ -85,23 +85,27 @@ score.
   slot still fails closed without a producer. U4 extends this evidence layer
   additively rather than reopening v1 planning. The Studio
   UI remains unwired and unchanged.
-- **U4 budgeted re-study — attenuated current-run speech vertical slice:** the default generalized
+- **U4 budgeted re-study: attenuated and padded current-run speech slices:** the default generalized
   root now exposes `study_restudy_request` beside the five U3 tools and closes terminal
   `studio.owned-media-study.v3`, readiness v4, and caption/caption-causality v4 while reports and
   admissions remain v2. A host-derived request names one exact weak range, evidence-tied cause,
-  prior report/citation/speech identities, and one attenuated speech delta. For the new closed
+  prior report/citation/speech identities, and one registered speech delta. For the closed
   `speaker_overlap` cause, the host derives one exact conflicting U6 accounting cell and requires the
-  caller to echo that temporal range unchanged; other causes still require a strict weak-range
-  subrange. Both require prior broader speech. The host fixes pass 2,
-  current-run speech configuration scope, and a 20 s/one-call reservation; the scheduler rejects
+  caller to echo that temporal range unchanged through `attenuated_subrange`. Other causes may use a
+  strict weak-range attenuation backed by broader prior speech, or `padded_audio_window` backed by
+  exact prior speech over the weak range. Padding must add context on at least one side, remain inside
+  the root audio scope and speech duration limit, and stay at or below 2 s per side. The host fixes
+  pass 2, a delta-specific current-run speech configuration scope, and a 20 s/one-call reservation;
+  the scheduler rejects
   scope broadening, enforces one accepted pass per range/four per producer, and atomically dedupes an
   identical work/configuration fingerprint. Request and terminal receipts retain reserved/measured
   spend, task/report/admission/read lineage, outcome, and disagreement. Study v3 preserves every
   admitted report and accepted pass in order; only pass-new range-closing current-run speech
-  citations can support the executed subrange. Otherwise the affected range terminates weak while
-  unrelated supported ranges continue. Padded audio, denser frames, alternate recognizer/
-  segmentation configuration, and specialist deltas are typed but fail closed until a producer and
-  grant are registered. No UI, U5/OCR, semantic-quality, improvement, or Bet G claim is included.
+  citations from attenuation can support the executed subrange. Padded context always preserves the
+  prior weak class and cannot perform semantic arbitration. Otherwise the affected range terminates
+  weak while unrelated supported ranges continue. Denser frames, alternate recognizer/segmentation
+  configuration, and specialist deltas remain typed but fail closed. No UI, U5/OCR,
+  semantic-quality, improvement, or Bet G claim is included.
 - **U5 on-screen OCR — cite-only vertical slice:** `media.frames.ocr` is now an explicit scheduler
   grant and task-private launcher/MCP bridge that accepts only a completed same-task U2 frame
   operation identity. The host cold-audits U2 source/manifest/receipt/PNG/decoder lineage, then runs
@@ -215,9 +219,9 @@ indefinite deferrals or a one-day implementation claim:
    producer rung.
 3. U3 multimodal admission and generalized abstention — implemented and default-runtime wired;
    frames remain cite-only.
-4. U4 budgeted multi-pass re-study — one attenuated current-run speech pass plus the exact U6.1
-   `speaker_overlap` cause/trigger implemented and default-runtime wired; additional delta producers
-   remain closed.
+4. U4 budgeted multi-pass re-study: attenuated current-run speech, the exact U6.1
+   `speaker_overlap` cause/trigger, and one bounded non-speaker padded-audio pass are implemented and
+   default-runtime wired; additional delta producers remain closed.
 5. U5 OCR and scene/on-screen context — OCR cite-only vertical slice implemented; scene/shot,
    default specialist routing, and U4 denser-frame/specialist wiring remain.
 6. U6 anonymous speaker/overlap evidence — one pinned local producer, immutable accounting receipt,
@@ -279,7 +283,8 @@ indefinite deferrals or a one-day implementation claim:
   evidence accuracy, independent corroboration, reliability equivalence, truth arbitration,
   transcription/translation quality, OCR accuracy, or scene understanding.
 - U4 proves exact weak-range/cause selection, one bounded delta-bearing pass, scheduler caps/dedupe,
-  durable pass history/disagreement, citation-only support upgrades, terminal weakness, and replay.
+  durable pass history/disagreement, attenuation-only citation support upgrades, padded-context
+  weak-state preservation, terminal weakness, and replay.
   A pass count, token count, agent count, role label, or successful citation does not prove
   understanding, semantic correctness, accuracy, quality, or improvement.
 - U5 proves one bounded local OCR execution path, exact U2 frame lineage, immutable hypotheses,

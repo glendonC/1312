@@ -281,6 +281,7 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       }
       const claimId = `claim:deterministic:${canonicalSha256({ taskId: task.id, scope, observationIds: citation.observations.map((entry) => entry.observationId) })}`;
       const preservesGap = task.workerLabel.includes("study-gap") ||
+        task.workerLabel === "padded-current-run-speech-pass-2" ||
         (task.workerLabel === "attenuated-current-run-speech-pass-2" && this.owner.restudyPassResult === "withheld");
       const worker = validateWorkerResult({
         summary: "Deterministic test seam returned one typed current-run hypothesis report; correctness and quality were not assessed.",

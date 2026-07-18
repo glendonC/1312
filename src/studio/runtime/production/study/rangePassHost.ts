@@ -18,7 +18,12 @@ import type {
   StudyRestudyCauseKind,
   StudyRestudyInput,
 } from "../model.ts";
-import { RANGE_PASS_LIMITS } from "../model.ts";
+import {
+  PADDED_AUDIO_WINDOW_LIMITS,
+  RANGE_PASS_LIMITS,
+  REGISTERED_SPEECH_RANGE_PASS_PRODUCERS,
+  SEMANTIC_EVIDENCE_LIMITS,
+} from "../model.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import { BoundedRuntimeScheduler, type SpawnDecision } from "../scheduler.ts";
 import { SEMANTIC_EVIDENCE_NORMALIZATION } from "../semantic/currentRunSpeechRecognizer.ts";
@@ -239,32 +244,65 @@ export class RangePassHost {
 
   async request(executionId: string, toolCallId: string, requestValue: unknown): Promise<RangePassRequestResult> {
     const request = validateStudyRestudyRequest(requestValue);
-    if (request.delta.kind !== "attenuated_subrange") throw new Error("The requested re-study delta has no registered producer/grant in this runtime slice");
+    if (request.delta.kind !== "attenuated_subrange" && request.delta.kind !== "padded_audio_window") {
+      throw new Error("The requested re-study delta has no registered producer/grant in this runtime slice");
+    }
     const input = await this.inspect(executionId);
     if (request.inputId !== input.inputId) throw new Error("Study re-study request changed its exact current input");
     const candidate = input.candidates.find((entry) => entry.coverageId === request.coverageId && entry.cause.causeId === request.causeId);
     if (!candidate) throw new Error("Study re-study request does not name one exact current weak range and cause");
+    const state = this.ledger.state();
+    const root = state.tasks[input.rootTaskId];
     const executionRange = request.delta.executionRange;
     const executionInsideWeak = executionRange.artifactId === candidate.range.artifactId && executionRange.trackId === candidate.range.trackId &&
       executionRange.startMs >= candidate.range.startMs && executionRange.endMs <= candidate.range.endMs;
-    if (candidate.cause.kind === "speaker_overlap") {
-      if (!executionInsideWeak || !sameRange(executionRange, candidate.cause.range)) {
-        throw new Error("Speaker-overlap re-study must use the exact host-derived overlap range");
+    if (request.delta.kind === "attenuated_subrange") {
+      if (candidate.cause.kind === "speaker_overlap") {
+        if (!executionInsideWeak || !sameRange(executionRange, candidate.cause.range)) {
+          throw new Error("Speaker-overlap re-study must use the exact host-derived overlap range");
+        }
+      } else if (!executionInsideWeak || sameRange(executionRange, candidate.range)) {
+        throw new Error("Attenuated re-study must be one strict subrange of the exact weak range");
       }
-    } else if (!executionInsideWeak || sameRange(executionRange, candidate.range)) {
-      throw new Error("Attenuated re-study must be one strict subrange of the exact weak range");
+      if (!candidate.priorEvidence.speechExecutionRanges.some((range) =>
+        range.artifactId === executionRange.artifactId && range.trackId === executionRange.trackId &&
+        range.startMs <= executionRange.startMs && range.endMs >= executionRange.endMs &&
+        (range.startMs < executionRange.startMs || range.endMs > executionRange.endMs))) {
+        throw new Error("Attenuated re-study has no prior broader current-run speech work to refine");
+      }
+      if (candidate.priorEvidence.speechExecutionRanges.some((range) => sameRange(range, executionRange))) {
+        throw new Error("Attenuated re-study repeats an identical prior speech range/configuration");
+      }
+    } else {
+      if (candidate.cause.kind === "speaker_overlap") {
+        throw new Error("Speaker-overlap re-study has no registered padded-audio producer");
+      }
+      const sameMedia = executionRange.artifactId === candidate.range.artifactId &&
+        executionRange.trackId === candidate.range.trackId;
+      const exactPadding = executionRange.startMs === candidate.range.startMs - request.delta.paddingBeforeMs &&
+        executionRange.endMs === candidate.range.endMs + request.delta.paddingAfterMs;
+      const strictlyContainsWeak = sameMedia && executionRange.startMs <= candidate.range.startMs &&
+        executionRange.endMs >= candidate.range.endMs && !sameRange(executionRange, candidate.range);
+      const rootContainsExecution = root.mediaScope.some((scope) => scope.artifactId === executionRange.artifactId &&
+        scope.trackId === executionRange.trackId && scope.startMs <= executionRange.startMs && scope.endMs >= executionRange.endMs);
+      const source = state.artifacts[root.jobContext.source.artifactId];
+      const audioTrack = source?.tracks.some((track) => track.id === executionRange.trackId && track.kind === "audio") ?? false;
+      if (!exactPadding || !strictlyContainsWeak || !rootContainsExecution || !audioTrack ||
+          request.delta.paddingBeforeMs > PADDED_AUDIO_WINDOW_LIMITS.maxPaddingBeforeMs ||
+          request.delta.paddingAfterMs > PADDED_AUDIO_WINDOW_LIMITS.maxPaddingAfterMs ||
+          executionRange.endMs - executionRange.startMs > SEMANTIC_EVIDENCE_LIMITS.maxDurationMs) {
+        throw new Error("Padded-audio re-study must use the exact registered window inside the root audio scope");
+      }
+      if (!candidate.priorEvidence.speechExecutionRanges.some((range) => sameRange(range, candidate.range))) {
+        throw new Error("Padded-audio re-study has no exact prior current-run speech work to contextualize");
+      }
+      if (candidate.priorEvidence.speechExecutionRanges.some((range) => sameRange(range, executionRange))) {
+        throw new Error("Padded-audio re-study repeats an identical prior speech range/configuration");
+      }
     }
-    if (!candidate.priorEvidence.speechExecutionRanges.some((range) =>
-      range.artifactId === executionRange.artifactId && range.trackId === executionRange.trackId &&
-      range.startMs <= executionRange.startMs && range.endMs >= executionRange.endMs &&
-      (range.startMs < executionRange.startMs || range.endMs > executionRange.endMs))) {
-      throw new Error("Attenuated re-study has no prior broader current-run speech work to refine");
-    }
-    if (candidate.priorEvidence.speechExecutionRanges.some((range) => sameRange(range, executionRange))) {
-      throw new Error("Attenuated re-study repeats an identical prior speech range/configuration");
-    }
-    const state = this.ledger.state(); const root = state.tasks[input.rootTaskId];
-    const workFingerprint = `restudy-work:${canonicalSha256({ schema: "studio.restudy-work-fingerprint.v1", runId: state.runId, sourceContentId: root.jobContext.source.contentId, trackId: executionRange.trackId, executionRange: { startMs: executionRange.startMs, endMs: executionRange.endMs }, deltaKind: request.delta.kind, producer: { kind: "current_run_speech", configurationScope: "runtime_injected_current_run_recognizer" }, normalization: SEMANTIC_EVIDENCE_NORMALIZATION })}`;
+    const producer = REGISTERED_SPEECH_RANGE_PASS_PRODUCERS[request.delta.kind];
+    const configurationScope = producer.configurationScope;
+    const workFingerprint = `restudy-work:${canonicalSha256({ schema: "studio.restudy-work-fingerprint.v1", runId: state.runId, sourceContentId: root.jobContext.source.contentId, trackId: executionRange.trackId, executionRange: { startMs: executionRange.startMs, endMs: executionRange.endMs }, deltaKind: request.delta.kind, producer: { kind: "current_run_speech", configurationScope }, normalization: SEMANTIC_EVIDENCE_NORMALIZATION })}`;
     const passId = `study-range-pass:${canonicalSha256({ runId: state.runId, inputId: input.inputId, coverageId: candidate.coverageId, causeId: candidate.cause.causeId, workFingerprint })}`;
     const receipt: RangePassRequestReceipt = {
       schema: "studio.study-range-pass-request.receipt.v1", receiptId: "pending", passId, runId: state.runId,
@@ -272,24 +310,27 @@ export class RangePassHost {
       coverageId: candidate.coverageId, weakRange: structuredClone(candidate.range), priorState: candidate.state,
       priorEvidence: structuredClone(candidate.priorEvidence), cause: structuredClone(candidate.cause), delta: structuredClone(request.delta),
       passNumber: 2,
-      producer: { kind: "current_run_speech", capability: "speech.transcribe", configurationScope: "runtime_injected_current_run_recognizer" },
+      producer: structuredClone(producer),
       workFingerprint, reservedSpend: { wallMs: RANGE_PASS_LIMITS.maxWallMsPerPass, toolCalls: RANGE_PASS_LIMITS.maxToolCallsPerPass }, limits: RANGE_PASS_LIMITS,
       nonClaims: { understanding: "not_claimed", improvement: "not_claimed", semanticCorrectness: "not_assessed" },
     };
     receipt.receiptId = receiptId("study-range-pass-request-receipt", receipt);
     validateRangePassRequestReceipt(receipt);
     const stored = await this.artifacts.storeJson(receipt);
+    const padded = request.delta.kind === "padded_audio_window";
     const child: SpawnRequestInput = {
       workloadKey: `restudy:${workFingerprint}`,
-      objective: "Perform exactly one attenuated current-run speech pass over the assigned subrange and return one studio.study-report.v2. Support requires new range-closing speech citations; otherwise preserve the exact weak state. This pass does not prove understanding, correctness, or improvement.",
-      workerKind: "analysis", workerLabel: "attenuated-current-run-speech-pass-2",
+      objective: padded
+        ? "Perform exactly one bounded current-run speech pass over the assigned padded audio window and return one studio.study-report.v2. Preserve the prior weak state; broader context is structural evidence only and does not prove semantic support, understanding, correctness, or improvement."
+        : "Perform exactly one attenuated current-run speech pass over the assigned subrange and return one studio.study-report.v2. Support requires new range-closing speech citations; otherwise preserve the exact weak state. This pass does not prove understanding, correctness, or improvement.",
+      workerKind: "analysis", workerLabel: padded ? "padded-current-run-speech-pass-2" : "attenuated-current-run-speech-pass-2",
       mediaScope: [structuredClone(executionRange)], inputArtifactIds: [root.jobContext.source.artifactId],
-      requiredOutputs: [{ name: "attenuated speech re-study", artifactKind: "studio.study-report.v2", required: true }],
+      requiredOutputs: [{ name: padded ? "padded audio speech re-study" : "attenuated speech re-study", artifactKind: "studio.study-report.v2", required: true }],
       requiredCapabilities: ["speech.transcribe", "report.submit"], dependencies: [],
       budget: structuredClone(receipt.reservedSpend),
     };
     if (!this.scheduler) throw new Error("Study re-study scheduling authority is unavailable");
-    const decision = await this.scheduler.requestAttenuatedSpeechPass({ receipt, receiptContentId: stored.content.contentId, child, authorship: { executionId, toolCallId } });
+    const decision = await this.scheduler.requestSpeechRangePass({ receipt, receiptContentId: stored.content.contentId, child, authorship: { executionId, toolCallId } });
     return { input, receipt, receiptContentId: stored.content.contentId, decision };
   }
 
@@ -336,11 +377,14 @@ export class RangePassHost {
       }
     }
     const newStatements = new Set(exactClaims.map((claim) => claim.statement.normalize("NFC").trim()));
-    const disagreement = new Set([...priorStatements, ...newStatements]).size > 1;
+    const attenuated = pass.request.delta.kind === "attenuated_subrange";
+    const disagreement = attenuated && new Set([...priorStatements, ...newStatements]).size > 1;
     const passOperationIds = new Set(Object.values(state.semanticEvidence).filter((operation) => operation.taskId === taskId).map((operation) => operation.id));
-    const supported = pass.request.priorState !== "conflicting" && !disagreement && exactClaims.length === 1 && citationIds.length > 0 && newCitationIds.length === citationIds.length &&
+    const supported = attenuated && pass.request.priorState !== "conflicting" && !disagreement && exactClaims.length === 1 && citationIds.length > 0 && newCitationIds.length === citationIds.length &&
       citations.length === newCitationIds.length && citations.every((citation) => citation.evidenceKind === "current_run_speech" && citation.use === "claim_support" && citation.operationId !== null && passOperationIds.has(citation.operationId));
-    const disagreementCitationIds = pass.request.priorState === "conflicting" || disagreement ? [...new Set([...pass.request.priorEvidence.citationIds, ...citationIds])].sort() : [];
+    const disagreementCitationIds = attenuated && (pass.request.priorState === "conflicting" || disagreement)
+      ? [...new Set([...pass.request.priorEvidence.citationIds, ...citationIds])].sort()
+      : [];
     const execution = Object.values(state.executions).find((entry) => entry.taskId === taskId) ?? null;
     const usage = execution?.modelUsageReceiptId ? state.modelUsage[execution.modelUsageReceiptId] : null;
     const terminal: RangePassTerminalReceipt = {
@@ -353,7 +397,11 @@ export class RangePassHost {
         capabilityCalls: taskCapabilityCallCount(state, taskId),
         modelUsage: usage ? { state: "available", receiptId: usage.receiptId, measured: structuredClone(usage.measured) } : { state: "unavailable", reason: execution?.receipt?.producer.id === "studio.deterministic-test-executor" ? "deterministic_executor" : "executor_failed_before_usage" },
       },
-      outcome: supported ? "supported_new_citations" : disagreement ? "withheld_exhausted" : terminalOutcome(exactCoverage?.state ?? null, task.status),
+      outcome: supported
+        ? "supported_new_citations"
+        : disagreement
+          ? "withheld_exhausted"
+          : terminalOutcome(attenuated ? exactCoverage?.state ?? null : pass.request.priorState, task.status),
       exhausted: !supported,
       nonClaims: { understanding: "not_claimed", improvement: "not_claimed", semanticCorrectness: "not_assessed" },
     };

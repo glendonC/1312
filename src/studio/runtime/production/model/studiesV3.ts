@@ -13,6 +13,24 @@ export const RANGE_PASS_LIMITS = {
   maxPriorCitations: 512,
 } as const;
 
+export const PADDED_AUDIO_WINDOW_LIMITS = {
+  maxPaddingBeforeMs: 2_000,
+  maxPaddingAfterMs: 2_000,
+} as const;
+
+export const REGISTERED_SPEECH_RANGE_PASS_PRODUCERS = {
+  attenuated_subrange: {
+    kind: "current_run_speech",
+    capability: "speech.transcribe",
+    configurationScope: "runtime_injected_current_run_recognizer",
+  },
+  padded_audio_window: {
+    kind: "current_run_speech",
+    capability: "speech.transcribe",
+    configurationScope: "runtime_injected_current_run_recognizer_bounded_padding_v1",
+  },
+} as const;
+
 export type StudyRestudyCauseKind =
   | "unobserved_range"
   | "unknown_evidence"
@@ -87,13 +105,9 @@ export interface RangePassRequestReceipt {
   priorState: StudyRestudyCandidate["state"];
   priorEvidence: StudyRestudyCandidate["priorEvidence"];
   cause: StudyRestudyCause;
-  delta: Extract<StudyRestudyDelta, { kind: "attenuated_subrange" }>;
+  delta: Extract<StudyRestudyDelta, { kind: "attenuated_subrange" | "padded_audio_window" }>;
   passNumber: number;
-  producer: {
-    kind: "current_run_speech";
-    capability: "speech.transcribe";
-    configurationScope: "runtime_injected_current_run_recognizer";
-  };
+  producer: (typeof REGISTERED_SPEECH_RANGE_PASS_PRODUCERS)[keyof typeof REGISTERED_SPEECH_RANGE_PASS_PRODUCERS];
   workFingerprint: string;
   reservedSpend: RuntimeBudget;
   limits: typeof RANGE_PASS_LIMITS;

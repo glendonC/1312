@@ -19,7 +19,10 @@ import type {
 } from "../model.ts";
 import {
   OWNED_MEDIA_STUDY_V3_LIMITS,
+  PADDED_AUDIO_WINDOW_LIMITS,
   RANGE_PASS_LIMITS,
+  REGISTERED_SPEECH_RANGE_PASS_PRODUCERS,
+  SEMANTIC_EVIDENCE_LIMITS,
 } from "../model.ts";
 import { validateEvidenceCitationEnvelope, validateSupportedClaimCitationClosure } from "./evidenceCitations.ts";
 import { validateGeneralizedCoveragePartition } from "./studyReportsV2.ts";
@@ -78,7 +81,7 @@ function sameRange(left: QualifiedMediaRange, right: QualifiedMediaRange): boole
 function budget(value: unknown, context: string, path: string) {
   const item = object(value, context, path); exact(item, ["wallMs", "toolCalls"], context, path);
   const result = { wallMs: integer(item.wallMs, context, `${path}.wallMs`, 1), toolCalls: integer(item.toolCalls, context, `${path}.toolCalls`, 1) };
-  if (result.wallMs !== RANGE_PASS_LIMITS.maxWallMsPerPass || result.toolCalls !== RANGE_PASS_LIMITS.maxToolCallsPerPass) fail(context, path, "must equal the registered attenuated-speech pass reservation");
+  if (result.wallMs !== RANGE_PASS_LIMITS.maxWallMsPerPass || result.toolCalls !== RANGE_PASS_LIMITS.maxToolCallsPerPass) fail(context, path, "must equal the registered speech range-pass reservation");
   return result;
 }
 
@@ -91,7 +94,12 @@ function delta(value: unknown, context: string, path: string): StudyRestudyDelta
   }
   if (kind === "padded_audio_window") {
     exact(item, ["kind", "executionRange", "paddingBeforeMs", "paddingAfterMs"], context, path);
-    return { kind, executionRange: range(item.executionRange, context, `${path}.executionRange`), paddingBeforeMs: integer(item.paddingBeforeMs, context, `${path}.paddingBeforeMs`), paddingAfterMs: integer(item.paddingAfterMs, context, `${path}.paddingAfterMs`) };
+    const paddingBeforeMs = integer(item.paddingBeforeMs, context, `${path}.paddingBeforeMs`);
+    const paddingAfterMs = integer(item.paddingAfterMs, context, `${path}.paddingAfterMs`);
+    if (paddingBeforeMs > PADDED_AUDIO_WINDOW_LIMITS.maxPaddingBeforeMs) fail(context, `${path}.paddingBeforeMs`, `must be at most ${PADDED_AUDIO_WINDOW_LIMITS.maxPaddingBeforeMs}`);
+    if (paddingAfterMs > PADDED_AUDIO_WINDOW_LIMITS.maxPaddingAfterMs) fail(context, `${path}.paddingAfterMs`, `must be at most ${PADDED_AUDIO_WINDOW_LIMITS.maxPaddingAfterMs}`);
+    if (paddingBeforeMs + paddingAfterMs === 0) fail(context, path, "must add bounded context on at least one side");
+    return { kind, executionRange: range(item.executionRange, context, `${path}.executionRange`), paddingBeforeMs, paddingAfterMs };
   }
   if (kind === "denser_frame_timestamps") {
     exact(item, ["kind", "executionRange", "timestampsMs"], context, path);
@@ -148,20 +156,35 @@ export function validateRangePassRequestReceipt(value: unknown): RangePassReques
   const prior = object(item.priorEvidence, context, "receipt.priorEvidence"); exact(prior, ["reportArtifactIds", "admissionIds", "citationIds", "speechOperationIds", "speechExecutionRanges"], context, "receipt.priorEvidence");
   const parsedCause = cause(item.cause, context, "receipt.cause");
   const parsedDelta = delta(item.delta, context, "receipt.delta");
-  if (parsedDelta.kind !== "attenuated_subrange") fail(context, "receipt.delta.kind", "is not registered in this runtime slice");
+  if (parsedDelta.kind !== "attenuated_subrange" && parsedDelta.kind !== "padded_audio_window") fail(context, "receipt.delta.kind", "is not registered in this runtime slice");
   const weakRange = range(item.weakRange, context, "receipt.weakRange");
   const executionInsideWeak = parsedDelta.executionRange.artifactId === weakRange.artifactId &&
     parsedDelta.executionRange.trackId === weakRange.trackId && parsedDelta.executionRange.startMs >= weakRange.startMs &&
     parsedDelta.executionRange.endMs <= weakRange.endMs;
-  const validSpeakerOverlap = parsedCause.kind === "speaker_overlap" && executionInsideWeak &&
-    sameRange(parsedDelta.executionRange, parsedCause.range);
-  const validExistingCause = parsedCause.kind !== "speaker_overlap" && sameRange(weakRange, parsedCause.range) &&
-    executionInsideWeak && !sameRange(parsedDelta.executionRange, weakRange);
-  if (!validSpeakerOverlap && !validExistingCause) {
-    fail(context, "receipt", "must bind the exact host-derived speaker overlap range or one strict weak-range subrange");
+  if (parsedDelta.kind === "attenuated_subrange") {
+    const validSpeakerOverlap = parsedCause.kind === "speaker_overlap" && executionInsideWeak &&
+      sameRange(parsedDelta.executionRange, parsedCause.range);
+    const validExistingCause = parsedCause.kind !== "speaker_overlap" && sameRange(weakRange, parsedCause.range) &&
+      executionInsideWeak && !sameRange(parsedDelta.executionRange, weakRange);
+    if (!validSpeakerOverlap && !validExistingCause) {
+      fail(context, "receipt", "must bind the exact host-derived speaker overlap range or one strict weak-range subrange");
+    }
+  } else {
+    const sameMedia = parsedDelta.executionRange.artifactId === weakRange.artifactId &&
+      parsedDelta.executionRange.trackId === weakRange.trackId;
+    const exactPadding = parsedDelta.executionRange.startMs === weakRange.startMs - parsedDelta.paddingBeforeMs &&
+      parsedDelta.executionRange.endMs === weakRange.endMs + parsedDelta.paddingAfterMs;
+    const durationMs = parsedDelta.executionRange.endMs - parsedDelta.executionRange.startMs;
+    if (parsedCause.kind === "speaker_overlap" || !sameRange(weakRange, parsedCause.range) || !sameMedia ||
+        !exactPadding || parsedDelta.executionRange.startMs < 0 || durationMs > SEMANTIC_EVIDENCE_LIMITS.maxDurationMs) {
+      fail(context, "receipt", "padded audio must bind one exact non-speaker weak range and its registered bounded execution window");
+    }
   }
   const producer = object(item.producer, context, "receipt.producer"); exact(producer, ["kind", "capability", "configurationScope"], context, "receipt.producer");
-  literal(producer.kind, "current_run_speech", context, "receipt.producer.kind"); literal(producer.capability, "speech.transcribe", context, "receipt.producer.capability"); literal(producer.configurationScope, "runtime_injected_current_run_recognizer", context, "receipt.producer.configurationScope");
+  const registeredProducer = REGISTERED_SPEECH_RANGE_PASS_PRODUCERS[parsedDelta.kind];
+  literal(producer.kind, registeredProducer.kind, context, "receipt.producer.kind");
+  literal(producer.capability, registeredProducer.capability, context, "receipt.producer.capability");
+  literal(producer.configurationScope, registeredProducer.configurationScope, context, "receipt.producer.configurationScope");
   const limits = object(item.limits, context, "receipt.limits"); exact(limits, Object.keys(RANGE_PASS_LIMITS), context, "receipt.limits"); for (const [key, expected] of Object.entries(RANGE_PASS_LIMITS)) if (limits[key] !== expected) fail(context, `receipt.limits.${key}`, `must equal ${expected}`);
   const nonClaims = object(item.nonClaims, context, "receipt.nonClaims"); exact(nonClaims, ["understanding", "improvement", "semanticCorrectness"], context, "receipt.nonClaims"); literal(nonClaims.understanding, "not_claimed", context, "receipt.nonClaims.understanding"); literal(nonClaims.improvement, "not_claimed", context, "receipt.nonClaims.improvement"); literal(nonClaims.semanticCorrectness, "not_assessed", context, "receipt.nonClaims.semanticCorrectness");
   const receipt: RangePassRequestReceipt = {
@@ -172,11 +195,14 @@ export function validateRangePassRequestReceipt(value: unknown): RangePassReques
     priorState: oneOf<RangePassRequestReceipt["priorState"]>(item.priorState, WEAK_STATES, context, "receipt.priorState"),
     priorEvidence: { reportArtifactIds: uniqueStrings(prior.reportArtifactIds, context, "receipt.priorEvidence.reportArtifactIds"), admissionIds: uniqueStrings(prior.admissionIds, context, "receipt.priorEvidence.admissionIds"), citationIds: uniqueStrings(prior.citationIds, context, "receipt.priorEvidence.citationIds"), speechOperationIds: uniqueStrings(prior.speechOperationIds, context, "receipt.priorEvidence.speechOperationIds"), speechExecutionRanges: array(prior.speechExecutionRanges, context, "receipt.priorEvidence.speechExecutionRanges").map((entry, index) => range(entry, context, `receipt.priorEvidence.speechExecutionRanges[${index}]`)) },
     cause: parsedCause, delta: parsedDelta, passNumber: integer(item.passNumber, context, "receipt.passNumber", 2),
-    producer: { kind: "current_run_speech" as const, capability: "speech.transcribe" as const, configurationScope: "runtime_injected_current_run_recognizer" as const },
+    producer: structuredClone(registeredProducer),
     workFingerprint: string(item.workFingerprint, context, "receipt.workFingerprint"), reservedSpend: budget(item.reservedSpend, context, "receipt.reservedSpend"), limits: RANGE_PASS_LIMITS,
     nonClaims: { understanding: "not_claimed" as const, improvement: "not_claimed" as const, semanticCorrectness: "not_assessed" as const },
   };
   if (receipt.coverageId !== receipt.cause.coverageId || receipt.priorState !== receipt.cause.priorState || receipt.passNumber !== 2) fail(context, "receipt", "changed its exact weak-range cause or single next-pass number");
+  if (receipt.delta.kind === "padded_audio_window" && !receipt.priorEvidence.speechExecutionRanges.some((speechRange) => sameRange(speechRange, receipt.weakRange))) {
+    fail(context, "receipt.priorEvidence.speechExecutionRanges", "must bind exact prior current-run speech over the weak range before padding");
+  }
   const body = structuredClone(receipt) as unknown as Record<string, unknown>; delete body.schema; delete body.receiptId;
   if (receipt.receiptId !== `study-range-pass-request-receipt:${canonicalSha256(body)}`) fail(context, "receipt.receiptId", "does not close the request receipt");
   return receipt;

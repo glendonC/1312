@@ -52,9 +52,10 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   only; speech remains the only claim-support kind;
 - an additive U4 range-pass host and scheduler lane on the default generalized root: it derives exact
   weak-range/cause/prior-evidence inputs, including a closed receipt-backed `speaker_overlap` cause
-  whose execution range is one exact audited U6 accounting cell; it accepts only that exact cell or a
-  strict attenuated current-run speech subrange for other causes, fixes producer/configuration/budget/
-  child scope, records request and terminal spend/
+  whose execution range is one exact audited U6 accounting cell; it accepts that exact attenuated
+  cell, a strict attenuated current-run speech subrange for other causes, or one registered bounded
+  padded-audio window around a non-speaker weak range with exact prior speech. It fixes producer,
+  configuration, budget, and child scope, records request and terminal spend/
   evidence receipts, dedupes identical work, and projects ordered pass/disagreement history into
   study v3 and readiness/caption causality v4;
 - an `evidence.read` host plus separate task-private bridge that publishes only `evidence_read`,
@@ -111,8 +112,9 @@ study-v3 path and exposes exactly `task_spawn_request`, `task_reports_wait`, `re
 `artifact_read`, `study_restudy_request`, and `study_synthesize`. It has no
 `study_planning_decision` or ambient follow-up authority. `study_restudy_request` accepts only one
 exact host-derived weak range/cause and a registered delta; the current slice registers attenuated
-current-run speech only. A `speaker_overlap` cause must copy its exact host-derived U6 cell; other
-causes require a strict weak-range subrange. The explicit v1
+current-run speech plus one bounded non-speaker padded-audio window. A `speaker_overlap` cause must
+copy its exact host-derived U6 cell through attenuation. Other causes may use a strict weak-range
+subrange or the registered padded window. The explicit v1
 compatibility selector retains the closed six-tool planning/synthesis surface for historical
 fixtures. Spawn records the root execution/tool-call causation, returns one accepted/rejected
 scheduler decision, and starts accepted per-task launch promises without waiting. Wait journals
@@ -261,9 +263,10 @@ U4 does not reuse or mutate v1 planning/follow-up events. `studio.study-restudy-
 host-derived view over the current admitted v2 reports: each candidate names one exact non-supported
 coverage cell, its evidence-tied cause/raw states, and prior report, admission, citation, observation,
 and current-run speech-operation/range identities. The model request contains only `inputId`, the
-exact `coverageId`/`causeId`, and one typed delta. Padded audio, denser frame timestamps, alternate
-receipted configuration, and granted-specialist members are reserved union shapes and fail closed in
-this slice because they have no registered producer/grant.
+exact `coverageId`/`causeId`, and one typed delta. Attenuated speech and bounded padded audio are the
+registered current-run speech deltas. Denser frame timestamps, alternate receipted configuration,
+and granted-specialist members remain reserved union shapes and fail closed because they have no
+registered producer/grant.
 
 For `speaker_overlap`, the host classifies only a cold-audited `speaker_turn` /
 `coverage_qualification` temporal observation whose state/raw tuple is exactly `conflicting` /
@@ -287,13 +290,24 @@ budget checks. An unchanged/full weak range is not an attenuation for ordinary c
 before scheduling. The overlap exception changes only range selection; caps, producer, configuration,
 normalization, work fingerprint, reservation, and dedupe remain identical.
 
+The registered `padded_audio_window` producer is unavailable for `speaker_overlap`. For another
+cause, it requires exact prior current-run speech over the complete weak range, adds context on at
+least one side and no more than 2,000 ms on either side, stays inside the root audio scope, and stays
+within the speech-operation duration ceiling. The declared padding must exactly match the derived
+execution range. It uses the distinct
+`runtime_injected_current_run_recognizer_bounded_padding_v1` configuration scope, the same pass caps,
+and one `speech.transcribe` plus `report.submit` child. Broader-context text is retained as structural
+operation/report lineage only. It cannot upgrade support, compare semantic statements, or change the
+prior weak class.
+
 `studio.study-range-pass-terminal.receipt.v1` retains the scheduler task identity, complete optional
 report/admission/read lineage, cited/new/disagreement citation sets, executor active time, capability
 call count, available model usage or its closed absence, terminal outcome, and exhaustion bit.
 `studio.owned-media-study.v3` stores every admitted report and every accepted terminal pass in
-deterministic order. A weak cell becomes supported only for the exact executed subrange when one
+deterministic order. An attenuated weak cell becomes supported only for the exact executed subrange when one
 range-closing child claim is supported entirely by pass-new current-run speech citations. Prior
-conflict or statement disagreement cannot upgrade. Residual and exhausted cells remain unknown,
+conflict or statement disagreement cannot upgrade, and a padded pass always remains weak. Residual
+and exhausted cells remain unknown,
 withheld, or unavailable; unrelated supported ranges continue. `studio.study-readiness.receipt.v4`
 retains pass receipt identities and terminal weak coverage without treating one exhausted range as a
 global blocker, while unresolved conflict or stored-integrity failure still withholds. Caption

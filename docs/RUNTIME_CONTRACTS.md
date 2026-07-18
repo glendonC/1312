@@ -532,6 +532,46 @@ grant-owned media target. These citations enter only the report-level evidence l
 they never enter claim or supported-coverage citation ids and grant no speech, caption, source-truth,
 entity-match, freshness, or quality authority.
 
+The R2 producer core is deliberately local and inadmissible. `computer.use.readonly` is a
+producer-only literal, not a member of the global task-capability union. `BoundedComputerUseHost`
+accepts only an injected task/agent/grant view and a closed four-identity request. Its scope fixes the
+exact owned-media gap, exact cold-audited `studio.research-exhaustion.receipt.v1` identity, one
+lowercase HTTPS origin and entry surface, one driver identity, all limits, and disabled cookies,
+credentials, uploads, downloads, mutations, and egress. The request has no URL, action, selector,
+coordinate, script, credential, cookie, path, or free-form objective field. An operation and its
+grant fingerprint are charged before cause audit or driver work, so failed attempts cannot retry
+around the one-call budget.
+
+The only current driver is `offline_fixture`. It exposes one deterministic in-memory state graph and
+a host-owned script of declared `follow_readonly_transition` actions. It has no network, filesystem,
+cookie, credential, download, upload, or mutation interface, and its accounting must keep all egress
+and download counters at zero. The host validates the complete trace before storage and enforces the
+fixed action, step, screenshot, dimension, pixel, byte, visible-content, wall, call, session, egress,
+and download ceilings. The registered wall ceiling, or a stricter host-composition ceiling, forms one
+effective deadline across R1 cause audit, driver execution, all storage, final cold audit, and normal
+temporary cleanup. Failed work stays charged. A shared bounded RGB PNG verifier checks signature,
+chunks, CRCs, dimensions, bounded decompression, RGB24 size, and scanline filters while the existing
+frame wrapper retains its own failure vocabulary.
+
+Before writing output, the host hashes and validates the complete trace against a canonical sealed
+fixture manifest and precomputes every JSON byte size and aggregate. Each state then produces a
+private content-addressed screenshot and canonical visible-content snapshot. Each transition
+produces a canonical action receipt, and the terminal canonical session receipt binds the exact
+cause, gap, surface, stored fixture manifest, driver, offline isolation declaration, ordered
+states/actions, stop reason, limits, accounting, and non-claims. Artifact identifiers include run,
+session, kind, ordinal, and content identity, so identical screenshot bytes at distinct states stay
+distinct contextual objects. Cold audit reruns no driver. It reopens and re-hashes the R1 cause,
+fixture manifest, session receipt, every screenshot, visible-content snapshot, and action receipt,
+rechecks PNG bounds, reconstructs the session id from run/operation/grant, verifies every cumulative
+action prefix, and reconstructs all contextual identities and ordering.
+
+This producer proves deterministic policy enforcement and immutable fixture lineage only. It does
+not observe live external state or prove browser isolation, DNS containment, credential isolation,
+source truth, entity match, currency, visual understanding, speech, claim support, coverage, caption
+authority, or evidence admission. Scheduler, launcher, protocol, projection, runtime artifact
+origins, a distinct external-screen citation kind, same-task and same-executor admission, and any
+real isolated browser driver remain R2 runtime-wiring work.
+
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and
 `analysis.evidence.assessment_failed`. A completed event binds its operation to the private

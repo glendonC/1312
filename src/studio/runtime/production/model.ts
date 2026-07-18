@@ -1,5 +1,6 @@
 export * from "./model/artifacts.ts";
 export * from "./model/captions.ts";
+export * from "./model/computerUse.ts";
 export * from "./model/evidence.ts";
 export * from "./model/evidenceCitations.ts";
 export * from "./model/execution.ts";

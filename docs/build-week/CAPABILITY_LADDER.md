@@ -497,9 +497,22 @@ their audits.
 ### R2. Optional bounded computer-use when the world is not in the file
 
 - **Real:** General computer-use is not currently granted; ambient apps and built-in computer/agent
-  tool families are closed. R1 will handle normal search and static document evidence more safely.
-- **Missing:** No isolated read-only browser/desktop capability for dynamic maps, interactive pages,
-  app-only reference material, or other external context that cannot be captured through R1.
+  tool families are closed. A producer-local `computer.use.readonly` contract now accepts only an
+  injected exact-gap grant bound to a cold-audited R1 empty-query cause, one fixed HTTPS origin and
+  surface, and the registered fixed limits. Its replaceable `offline_fixture` driver has no network,
+  filesystem, cookie, credential, download, upload, or mutation API. The host records the initial
+  state and closed read-only transitions as a sealed fixture manifest, content-addressed RGB PNG
+  screenshots, visible-content snapshots, action receipts, and one terminal session receipt. One
+  effective wall deadline covers cause audit, driver work, storage, final cold audit, and normal
+  cleanup. The cold audit reopens the cause and every stored object, reconstructs the session id and
+  per-action accounting, and rejects fixture drift. Identical pixels at different states retain
+  distinct contextual identities. This proves deterministic producer policy and immutable lineage
+  only.
+- **Missing:** The producer literal is not a global task capability and has no scheduler, launcher,
+  protocol, projection, task-private tool, runtime artifact origin, report citation, or evidence
+  admission path. No real isolated browser/desktop driver exists for dynamic maps, interactive pages,
+  app-only reference material, or other live external context. The offline fixture's zero egress does
+  not prove browser process isolation, DNS containment, credential isolation, or source freshness.
 - **Done when:** The root can request computer-use only for an exact unresolved context gap after the
   media-native and R1 routes are insufficient. The scheduler grants an ephemeral isolated session
   with allowlisted surfaces/origins, no ambient credentials or cookies, and hard step, screenshot,

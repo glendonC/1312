@@ -193,6 +193,15 @@ score.
   exact source bytes for every frozen clip and can materialize only the raw-versus-stem1 and
   raw-versus-stem2 capture pair for one named operation and repetition. It writes no synthetic
   evidence and grants no correctness, quality, judge, or preference authority.
+- **U7 follow-through accounting:** a content-addressed evaluation audit now derives all 9 required
+  minimum operation pairs and 18 capture slots from the immutable frozen-pack registration and
+  input registry. Complete same-operation pairs, exact capture bindings, human score bindings, and
+  extra positive repetitions remain visible; zero captures cannot look complete. The portable check
+  retains missing local sources and runtime as unavailable. A separate local-readiness probe verifies
+  ignored source bytes and the qualified pinned separator when present without creating a portable
+  platform pin. This workspace is locally ready, but the repository still has 0 of 18 minimum capture
+  slots and 0 scores. Result, judge, preference, quality, caption, publication, and stem-selection
+  authority remain unavailable.
 - The first wired R1 slice makes `research.investigate` a scheduler-issued grant that is mintable
   only through the recorded `study_research_request` root tool call under a root `study.research`
   grant, from one host-derived unresolved-conflict trigger re-derived inside the admission
@@ -282,9 +291,10 @@ indefinite deferrals or a one-day implementation claim:
 1. Catch the UI up to the validated production projections without inventing missing runtime facts.
 2. Make one owned-path walkthrough demoable end to end: source → plan → bounded swarm → study → human
    approval → private captions/QC, with the recorded lineage visible.
-3. Execute the pre-registered `hard-ko-v1` raw-versus-eligible-stem repetitions through the exact
-   packager, then obtain blinded human labels and score every capture. Measure variance later without
-   recasting run-007 or structural diagnostics as runtime semantic QC.
+3. Execute the 9 pending pre-registered `hard-ko-v1` raw-versus-eligible-stem operation pairs through
+   the exact packager, then obtain exact-byte-bound blinded human labels and score all 18 captures.
+   The follow-through audit is the structural checklist, not a semantic result. Measure variance
+   later without recasting run-007 or structural diagnostics as runtime semantic QC.
 
 ## Honesty non-claims
 
@@ -330,7 +340,9 @@ indefinite deferrals or a one-day implementation claim:
 - U7 proves one exact U6.1-triggered and one U7.1 U1-`mixed`-triggered local separation path, private
   raw/stem lineage, immutable receipts, same-recognizer structural comparison, and cold replay/tamper
   closure. The Bet G adapter proves only exact input registration, capture completeness, and
-  missing/withheld mapping. It does not prove that either estimate is cleaner or semantically better,
+  missing/withheld mapping. The follow-through audit proves only exact minimum-grid accounting,
+  pair/score binding, and typed local readiness; its current 0 of 18 state is pending, not success.
+  It does not prove that either estimate is cleaner or semantically better,
   that agreement is independent evidence, that any recognized word or translation is correct, or
   that stems may support claims, captions, publication, speaker identity, source identity, or a
   quality/improvement score.

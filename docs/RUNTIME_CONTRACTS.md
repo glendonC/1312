@@ -504,6 +504,24 @@ truth, transcription/translation correctness, speaker/source identity, quality, 
 caption authority, publication, or public availability. Independent evidence or human review is
 required before any semantic preference, and inconclusive comparison remains abstention/withheld.
 
+The evaluation-only `studio.bench.u7-follow-through.v1` audit closes the registered minimum capture
+grid without creating captures or scores. It derives three repetitions for every frozen clip and
+both ordered anonymous stem roles, for 9 required pairs and 18 capture slots in the current pack.
+Every slot remains exactly `pending`, `captured_unscored`, or `scored`; any capture must arrive as a
+complete same-operation pair, and any score must bind one exact capture with `judge: null`. Extra
+positive repetitions are retained separately rather than selected or discarded. The report and its
+current state are content-addressed, while result, preference, and judge authority remain null.
+
+`npm run u7:check` validates the portable registration, inputs, packaging, minimum grid, and
+hostile-state matrix. `npm run separation:check` adds portable negative producer checks;
+`npm run separation:local` runs the complete positive producer matrix plus local readiness only when
+the ignored qualified runtime is installed. `npm run u7:readiness` separately checks the ignored
+local source bytes and existing pinned separator lineage. Missing source files, byte drift,
+unsupported platforms, missing model bytes, runtime drift, and timeout remain typed local readiness
+states. Local readiness is not a repository-wide platform pin and is not capture completion. The
+current repository has zero U7 capture pairs and zero U7 score receipts, so actual execution and
+exact-byte-bound blinded human scoring remain required before any semantic result exists.
+
 The R1 bounded research contract is wired trigger-gated on the same shape as conditional
 separation, across a root capability `study.research` and a child capability
 `research.investigate`. The retained v1 `ResearchRequestHost` derives one content-addressed trigger

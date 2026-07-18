@@ -465,6 +465,14 @@ their audits.
   both ordered anonymous-stem capture drafts against raw audio with the registered configs unchanged.
   Empty or textless available output is missing; unavailable, unknown, and truncated output is
   withheld. Labels, score, judge, and preference remain null.
+- **Follow-through audit:** `studio.bench.u7-follow-through.v1` derives the exact minimum grid from
+  the immutable registration and inputs: 3 frozen clips, 3 minimum repetitions, 2 ordered anonymous
+  stems, 9 required pairs, and 18 capture slots. Slots are only pending, captured-unscored, or
+  scored. Pairs must share one operation, scores must bind exact capture bytes with `judge: null`,
+  extra positive repetitions remain visible, and the whole state is content-addressed. Portable
+  checks do not require ignored local media or runtime bytes. A separate local readiness command
+  verifies them when present and retains unavailable, drifted, unsupported-platform, and timeout
+  states without creating a platform claim.
 - **U7.1 U1 trigger:** A second eligible cause admits one cold-audited acoustic cell classified
   `mixed` — which by the U1 validator necessarily means strong certainty with both speech and music
   above the support threshold, i.e. two provably co-present source families in one exact range. The
@@ -476,14 +484,17 @@ their audits.
 - **Still missing:** The only U1 separation-eligibility class is `mixed`; every other acoustic class
   and all VAD/policy states stay non-triggering. Non-darwin runtime pins, alternate models, a
   separation-quality bench, independent evidence or human semantic preference, UI projection, public
-  delivery, and the registered Bet G capture executions, labels, and scores remain open. The default
-  recognizer may honestly abstain when no live current-run recognizer is configured.
+  delivery, and the registered Bet G capture executions, exact-byte-bound blinded human labels, and
+  scores remain open. The audit currently records zero of 18 minimum capture slots and zero scores;
+  it does not treat that pending state as completion. The default recognizer may honestly abstain
+  when no live current-run recognizer is configured.
 - **Slice done-when:** The landed U6.1 and U7.1 paths prove exact trigger/grant/range closure, raw
   preservation, private content-addressed stems, pinned replaceable execution, same-recognizer
   comparison, immutable receipts, cold audit/tamper rejection, hard limits, duplicate rejection, typed
   unavailable failure, and no caption-authority upgrade. The typed U1 `mixed` trigger policy has
-  landed additively; the full U7 rung remains open for the quality/human-review and platform work
-  above.
+  landed additively. The exact minimum-grid and local-readiness audit now closes structural
+  follow-through accounting; the full U7 rung remains open for actual captures, blinded human
+  scoring, quality review, and supported platform work above.
 - **Non-goals:** Default separation of every clip, publishing stems, “cleaner sounds better” as a
   metric, or treating same-recognizer agreement on related audio as independent truth.
 - **Fake-claim risk:** Separation can create artifacts. A clean-sounding stem may delete speech or

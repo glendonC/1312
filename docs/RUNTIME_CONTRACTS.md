@@ -462,6 +462,42 @@ truth, transcription/translation correctness, speaker/source identity, quality, 
 caption authority, publication, or public availability. Independent evidence or human review is
 required before any semantic preference, and inconclusive comparison remains abstention/withheld.
 
+The R1 bounded research contract is wired trigger-gated on the same shape as conditional
+separation, across a root capability `study.research` and a child capability
+`research.investigate`. `ResearchRequestHost` derives one content-addressed trigger per unresolved
+conflict of a reopened, byte-verified owned-media study, closing `inputId` over the full trigger
+list; the root tool `study_research_request` accepts only the exact `{ inputId, triggerId }` echo.
+`scheduler.requestResearch` re-derives the whole trigger list synchronously from live projection
+state, requires the recorded `orchestrator.tool_called` entry with tool `study_research_request`
+plus the root `study.research` grant, byte-compares the host-fixed child contract (workload key
+`research:<triggerId>`, one `studio.study-report.v2` output, capabilities exactly
+`research.investigate` plus `report.submit`, budget pinned to `RESEARCH_LIMITS`), rejects consumed
+triggers as `research_duplicate_work`, and mints the grant scope from host policy only: limits are
+`RESEARCH_LIMITS` verbatim and the domain allowlist is scheduler composition policy that defaults
+to empty, meaning no egress. Nothing model-authored enters the scope, and ordinary
+`task_spawn_request` can never acquire `research.investigate`. Ambient codex `web_search` stays
+disabled; the only egress path is the task-private research bridge.
+
+The launcher constructs one `BoundedResearchHost` per research-granted launch, bound to the real
+`executor.started` lineage, with the fixture search provider as the default seam, and mounts
+`research_search` and `research_document_snapshot` through the authenticated loopback bridge only
+under that grant. Ledger-bound operations journal `research.operation_started`,
+`research.operation_completed`, and `research.operation_failed` events from producer
+`research_host`; the `researchOperations` projection fold re-enforces the registry rules (per-grant
+fingerprint dedupe, call/query/document budgets that keep charging failed operations, and
+snapshot-requires-completed-same-grant-search), records artifacts under the
+`research_search_receipt`, `research_document_snapshot`, `research_extraction`, and
+`research_snapshot_receipt` origins, and pins receipt authorization to
+`{ grantId, taskId, agentId, executionId, launchClaimId }`. Unbound fixture receipts keep the
+narrow three-field authorization and never invent execution identities. Search snippets stay
+`routing_hint_not_citation`; snapshot receipts keep
+`dnsRebindingWindow: "checked_before_fetch_not_pinned"` (the destination address is re-resolved
+between the policy check and the fetch because no pinned dialer exists yet) and
+`speechEvidenceAuthority: "not_granted"`. Admission binds an `external_document_span` citation to
+its projected research operation's task, agent, and execution, admits it `cite_only` as media
+context only, and the closed citation validator keeps `claim_support` structurally reserved for
+current-run speech.
+
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and
 `analysis.evidence.assessment_failed`. A completed event binds its operation to the private

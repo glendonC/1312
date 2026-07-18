@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.dev/bench/schemas/u7-ablation-inputs.schema.json",
+  "title": "U7 ablation source input registry",
+  "description": "Exact pre-capture media identities for every frozen clip in one raw-versus-eligible-stem registration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "inputs_id",
+    "registered_at",
+    "ablation",
+    "pack_id",
+    "clips",
+    "notes"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "studio.bench.u7-ablation-inputs.v1" },
+    "inputs_id": {
+      "type": "string",
+      "pattern": "^bench-u7-inputs:sha256:[a-f0-9]{64}$"
+    },
+    "registered_at": { "type": "string", "format": "date-time" },
+    "ablation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ablation_id", "registration"],
+      "properties": {
+        "ablation_id": {
+          "type": "string",
+          "pattern": "^bench-ablation:sha256:[a-f0-9]{64}$"
+        },
+        "registration": { "$ref": "#/$defs/fileBinding" }
+      }
+    },
+    "pack_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "clips": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["clip_id", "source", "basis"],
+        "properties": {
+          "clip_id": { "type": "string", "minLength": 1 },
+          "source": { "$ref": "#/$defs/fileBinding" },
+          "basis": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind"],
+                "properties": {
+                  "kind": { "const": "pack_local_copy" }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "capture", "score"],
+                "properties": {
+                  "kind": { "const": "scored_capture_media" },
+                  "capture": { "$ref": "#/$defs/fileBinding" },
+                  "score": { "$ref": "#/$defs/fileBinding" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "notes": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

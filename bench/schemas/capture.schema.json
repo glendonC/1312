@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://1321.dev/bench/schemas/capture.schema.json",
   "title": "Run capture",
-  "description": "A dated record of one run over one clip. A capture is NOT a benchmark report: the clip was not drawn from a frozen pack, no gold exists for it, and nobody has reviewed the output. It therefore carries measurements of what the run DID (units emitted, units withheld, latency, gate hits) and nothing at all about whether the run was RIGHT. Accuracy lives in report.schema.json, needs gold, and cannot be reached from here. The `scored` field is pinned to false by this schema so a capture cannot quietly grow into a claim it has not earned.",
+  "description": "A dated record of one run over one clip. A capture is NOT a benchmark report: it contains no gold and carries no reviewed score. It therefore records only what the run did (units emitted, units withheld, latency, and gate hits), not whether the run was right. Accuracy lives in report.schema.json and a separately bound score receipt. The `scored` field is pinned to false by this schema so a capture cannot quietly grow into a claim it has not earned.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -33,7 +33,7 @@
     },
     "pack_evidence": {
       "const": false,
-      "description": "Always false. This clip was not drawn from the frozen Hard-KO pack, so /benchmarks/ may not render it as evidence."
+      "description": "Always false. A capture alone is not pack evidence, even when it names a frozen-pack clip. Only separately reviewed and scored receipts may support a benchmark result."
     },
 
     "clip": {
@@ -184,6 +184,84 @@
       "type": "object",
       "description": "Paths to the raw evidence this capture was derived from. A capture with no artifacts is an assertion.",
       "additionalProperties": { "type": "string" }
+    },
+
+    "ablation": {
+      "type": "object",
+      "description": "Optional exact U7 ablation lineage. Presence does not make the capture scored or semantically authoritative.",
+      "additionalProperties": false,
+      "required": ["schema", "registration", "inputs", "packaged_at", "repetition", "stem_role", "runtime", "semantic"],
+      "properties": {
+        "schema": { "const": "studio.bench.u7-capture-binding.v1" },
+        "registration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "content_id", "bytes", "ablation_id"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "bytes": { "type": "integer", "minimum": 1 },
+            "ablation_id": { "type": "string", "pattern": "^bench-ablation:sha256:[a-f0-9]{64}$" }
+          }
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "content_id", "bytes", "inputs_id"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "bytes": { "type": "integer", "minimum": 1 },
+            "inputs_id": { "type": "string", "pattern": "^bench-u7-inputs:sha256:[a-f0-9]{64}$" }
+          }
+        },
+        "packaged_at": { "type": "string", "format": "date-time" },
+        "repetition": { "type": "integer", "minimum": 1 },
+        "stem_role": { "enum": ["source_estimate_1", "source_estimate_2"] },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "run_id",
+            "operation_id",
+            "source_artifact_id",
+            "source_content_id",
+            "separation_receipt_id",
+            "separation_receipt_artifact_id",
+            "separation_receipt_content_id",
+            "comparison_artifact_id",
+            "comparison_content_id",
+            "comparison_receipt_id",
+            "comparison_receipt_artifact_id",
+            "comparison_receipt_content_id"
+          ],
+          "properties": {
+            "run_id": { "type": "string", "minLength": 1 },
+            "operation_id": { "type": "string", "minLength": 1 },
+            "source_artifact_id": { "type": "string", "minLength": 1 },
+            "source_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "separation_receipt_id": { "type": "string", "minLength": 1 },
+            "separation_receipt_artifact_id": { "type": "string", "minLength": 1 },
+            "separation_receipt_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "comparison_artifact_id": { "type": "string", "minLength": 1 },
+            "comparison_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "comparison_receipt_id": { "type": "string", "minLength": 1 },
+            "comparison_receipt_artifact_id": { "type": "string", "minLength": 1 },
+            "comparison_receipt_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          }
+        },
+        "semantic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["labels", "score", "judge", "preference"],
+          "properties": {
+            "labels": { "type": "null" },
+            "score": { "type": "null" },
+            "judge": { "type": "null" },
+            "preference": { "type": "null" }
+          }
+        }
+      }
     },
 
     "notes": { "type": "string", "minLength": 1 }

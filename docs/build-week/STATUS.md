@@ -44,11 +44,14 @@ score.
 - **Bet G first scored capture:** `hard-ko-v1` is frozen and the human-labeled run-007 score receipt
   exists with `judge: null`. It is one benchmark data point, not production semantic QC, calibration,
   or a general quality/improvement claim.
-- **Bet G ablation registration foundation:** `studio.bench.ablation.v1` binds one exact
+- **Bet G ablation packaging foundation:** `studio.bench.ablation.v1` binds one exact
   content-addressed config leaf delta to current frozen pack and freeze bytes, keeps results and
   model judge null, requires three paired repetitions per frozen clip, and separates structural
   diagnostics from human semantic scores. The first registration plans raw versus eligible
-  anonymous U7 stems. No registered capture, variance, or result exists yet.
+  anonymous U7 stems. `studio.bench.u7-ablation-inputs.v1` now binds exact pre-capture media for all
+  three frozen clips. A cold-audit-first packager emits both fixed anonymous-stem capture drafts,
+  preserves the exact registered configs, maps absent output only to missing or withheld, and keeps
+  semantic fields null. No registered capture, label, variance, or result exists yet.
 - **U1 acoustic triage:** a pinned local YAMNet-compatible ONNX producer now operates over the exact
   sealed mono-16 kHz owned-media bytes, produces a complete closed-vocabulary partition plus a
   separate execution receipt, and seals both additively in preflight V4. Spawned children can read
@@ -159,6 +162,10 @@ score.
   the comparison, the audited trigger cause, and current producer lineage by stored identities
   rather than caller paths. No U3 claim-support/caption schema, UI, public stem delivery, human preference,
   quality score, R1/R2, or Bet G ablation is included.
+- **U7-to-Bet-G packaging:** an evaluation-only adapter now consumes that cold audit. It registers
+  exact source bytes for every frozen clip and can materialize only the raw-versus-stem1 and
+  raw-versus-stem2 capture pair for one named operation and repetition. It writes no synthetic
+  evidence and grants no correctness, quality, judge, or preference authority.
 - The first wired R1 slice makes `research.investigate` a scheduler-issued grant that is mintable
   only through the recorded `study_research_request` root tool call under a root `study.research`
   grant, from one host-derived unresolved-conflict trigger re-derived inside the admission
@@ -218,8 +225,9 @@ indefinite deferrals or a one-day implementation claim:
    non-darwin native pins and a diarization quality bench remain.
 7. U7 conditional separation and raw/stem comparison — the first U6.1-triggered, pinned local,
    private-artifact, cold-audited slice is implemented and default-runtime wired, and a U7.1 closed
-   U1 `mixed`-acoustic eligibility trigger now reuses the same path; other platforms/models,
-   independent or human semantic preference, and Bet G ablation remain.
+   U1 `mixed`-acoustic eligibility trigger now reuses the same path. Its exact Bet G input and
+   capture-packaging boundary is implemented; other platforms/models, independent or human semantic
+   preference, registered capture executions, and scores remain.
 8. R1 bounded receipted web research — the first trigger-gated slice (grant, scheduler admission,
    launcher tools, journaled operations, production v2 report construction, cite-only span admission)
    is wired offline; a real
@@ -227,8 +235,8 @@ indefinite deferrals or a one-day implementation claim:
    deeper context-specialist synthesis remain. Default v3 conflict derivation is wired but dormant.
 9. R2 optional offline runtime wiring - implemented behind dormant root authority and explicit host
    composition; a real isolated read-only driver remains after media senses and R1.
-10. G1 semantic evaluation expansion, registered ablation captures, repeated scores, variance, and later
-    packs; structural QC remains separate.
+10. G1 semantic evaluation expansion, execution of registered ablation captures, repeated scores,
+    variance, and later packs; structural QC remains separate.
 
 ### Parked / out of this climb
 
@@ -246,8 +254,9 @@ indefinite deferrals or a one-day implementation claim:
 1. Catch the UI up to the validated production projections without inventing missing runtime facts.
 2. Make one owned-path walkthrough demoable end to end: source → plan → bounded swarm → study → human
    approval → private captions/QC, with the recorded lineage visible.
-3. Package the pre-registered `hard-ko-v1` raw-versus-eligible-stem paired captures and human labels;
-   measure variance later without recasting run-007 or structural diagnostics as runtime semantic QC.
+3. Execute the pre-registered `hard-ko-v1` raw-versus-eligible-stem repetitions through the exact
+   packager, then obtain blinded human labels and score every capture. Measure variance later without
+   recasting run-007 or structural diagnostics as runtime semantic QC.
 
 ## Honesty non-claims
 
@@ -286,9 +295,11 @@ indefinite deferrals or a one-day implementation claim:
   perform separation, or establish diarization accuracy.
 - U7 proves one exact U6.1-triggered and one U7.1 U1-`mixed`-triggered local separation path, private
   raw/stem lineage, immutable receipts, same-recognizer structural comparison, and cold replay/tamper
-  closure. It does not prove that either estimate is cleaner or semantically better, that agreement is
-  independent evidence, that any recognized word or translation is correct, or that stems may support
-  claims, captions, publication, speaker identity, source identity, or a quality/improvement score.
+  closure. The Bet G adapter proves only exact input registration, capture completeness, and
+  missing/withheld mapping. It does not prove that either estimate is cleaner or semantically better,
+  that agreement is independent evidence, that any recognized word or translation is correct, or
+  that stems may support claims, captions, publication, speaker identity, source identity, or a
+  quality/improvement score.
   The pinned SepFormer is a two-speaker wsj0-2mix model, so a `mixed` speech-plus-music U1 trigger
   runs it outside its training domain and claims only raw-versus-stem comparability, never that music
   and speech were cleanly separated.

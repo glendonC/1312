@@ -1,0 +1,60 @@
+{
+  "inputs_id": "bench-u7-inputs:sha256:c8bdceb1c3686ddb7723cdf7c891a35dd6680e5e410a99b4b5cb9310731c3e40",
+  "schema": "studio.bench.u7-ablation-inputs.v1",
+  "registered_at": "2026-07-18T14:01:14.000Z",
+  "ablation": {
+    "ablation_id": "bench-ablation:sha256:524b36e212177061cf4fa6226e5e56c6b6b8cedb91509e0e4dfa97e0e52104cb",
+    "registration": {
+      "path": "bench/ablations/hard-ko-v1-raw-vs-eligible-stem/registration.json",
+      "content_id": "sha256:f3bb9630b33fdc7cd5db1e6ed5cfa475d8bcb5f15b25a87c6d265f02de7ccb3d",
+      "bytes": 4416
+    }
+  },
+  "pack_id": "hard-ko-v1",
+  "clips": [
+    {
+      "clip_id": "local-eval-ko-control-01",
+      "source": {
+        "path": ".studio/scratch/control-01/gyumindInterviewTest.mp4",
+        "content_id": "sha256:2502c559cb77870dfddbedf074d7535c6c04cd9501b61435f7b910fd85c076e7",
+        "bytes": 5776236
+      },
+      "basis": {
+        "kind": "pack_local_copy"
+      }
+    },
+    {
+      "clip_id": "local-eval-ko-control-02",
+      "source": {
+        "path": ".studio/scratch/control-02/hyunseokInterviewTest.mp4",
+        "content_id": "sha256:48607e221bf5b12409e453171414667c9917c6eae7bdafa0497e2ffee76e4fc1",
+        "bytes": 9374608
+      },
+      "basis": {
+        "kind": "pack_local_copy"
+      }
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "source": {
+        "path": "public/demo/runs/run-007/clip.mp4",
+        "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+        "bytes": 3465772
+      },
+      "basis": {
+        "kind": "scored_capture_media",
+        "capture": {
+          "path": "bench/runs/run-007/capture.json",
+          "content_id": "sha256:41027b51b32831e2c16c63ba15cb22a4be1715dd6315e7cb0202f4015ae2aeb4",
+          "bytes": 12343
+        },
+        "score": {
+          "path": "bench/scores/run-007/score.json",
+          "content_id": "sha256:25564bc5a278231b6eefa6255a7af408ea4cda078e70aeadee777a957ab3e0df",
+          "bytes": 12789
+        }
+      }
+    }
+  ],
+  "notes": "Pre-capture source identities only. Local-evaluation media remains workspace-local and non-redistributable. The hard clip binds the exact media already named by the scored run-007 capture. No U7 output, label, score, or preference is registered here."
+}

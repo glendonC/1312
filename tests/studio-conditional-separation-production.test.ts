@@ -22,6 +22,14 @@ import { BoundedSpeakerOverlapHost } from "../src/studio/runtime/production/spea
 import { ConditionalSeparationRequestHost } from "../src/studio/runtime/production/study/conditionalSeparationRequestHost.ts";
 import { validateWorkerResult } from "../src/studio/runtime/production/executor/workerContract.ts";
 import { validateConditionalSeparationLimits, validateRawStemComparison } from "../src/studio/runtime/production/validation/separation.ts";
+import {
+  benchU7CaptureId,
+  materializeU7CaptureDrafts,
+  validateU7AblationInputs,
+  validateU7CapturePair,
+} from "../scripts/lib/bench-u7-ablation.mjs";
+import { readJsonFile } from "../scripts/lib/bench-gold.mjs";
+import { fileReceipt } from "../scripts/lib/immutable-receipts.mjs";
 import { runtimeTestJobContext } from "./runtime-test-job-context.ts";
 
 const SOURCE_FIXTURE = resolve("public/demo/runs/run-006/clip.mp4");
@@ -89,6 +97,23 @@ interface Harness {
   rootPermit: LaunchPermit;
   rootExecutionId: string;
   diarizer: OverlapDiarizer;
+}
+
+interface U7CaptureDraft {
+  stemRole: "source_estimate_1" | "source_estimate_2";
+  capture: {
+    capture_id: string;
+    ablation: {
+      semantic: { judge: null };
+      runtime: { source_content_id: string };
+    };
+    systems: Array<{ config: { audio: { input_mode: string } } }>;
+    units: Array<{
+      t_start: number;
+      t_end: number;
+      outputs: Record<string, { text: string | null; withheld: unknown }>;
+    }>;
+  };
 }
 
 async function startTask(runtime: Harness, permit: LaunchPermit, executionId: string): Promise<TaskRecord> {
@@ -186,6 +211,82 @@ test("U7 exact U6.1 trigger produces real private stems, raw/stem disagreement, 
     const audited = await auditConditionalSeparation(replay.state(), runtime.artifacts, produced.receipt.operationId, { speakerDiarizer: runtime.diarizer });
     assert.equal(audited.receipt.receiptId, produced.receipt.receiptId);
     assert.equal(audited.comparisonReceipt.nonClaims.captionAuthority, "not_granted");
+    const registrationPath = "bench/ablations/hard-ko-v1-raw-vs-eligible-stem/registration.json";
+    const inputsPath = "bench/ablations/hard-ko-v1-raw-vs-eligible-stem/inputs.json";
+    const registration = await readJsonFile(resolve(registrationPath));
+    const inputs = await readJsonFile(resolve(inputsPath));
+    const validatedInputs = await validateU7AblationInputs(inputs, { workspaceRoot: resolve(".") });
+    const registrationBinding = await fileReceipt(resolve(registrationPath), registrationPath);
+    const inputsBinding = await fileReceipt(resolve(inputsPath), inputsPath);
+    const captureDrafts = materializeU7CaptureDrafts({
+      registration,
+      registrationBinding,
+      inputs,
+      inputsBinding,
+      pack: validatedInputs.pack,
+      clipId: "Ux-TMWnmntM",
+      repetition: 1,
+      capturedAt: "2026-07-18T15:00:00.000Z",
+      audit: audited,
+    }) as U7CaptureDraft[];
+    await validateU7CapturePair(captureDrafts, {
+      registration,
+      registrationBinding,
+      inputs,
+      inputsBinding,
+      pack: validatedInputs.pack,
+    });
+    assert.deepEqual(captureDrafts.map((entry) => entry.stemRole), ["source_estimate_1", "source_estimate_2"]);
+    assert.ok(captureDrafts.every((entry) => entry.capture.ablation.semantic.judge === null));
+    assert.ok(captureDrafts.every((entry) => entry.capture.systems.length === 2));
+    assert.ok(captureDrafts.every((entry) => entry.capture.units.length === 1));
+    assert.ok(
+      captureDrafts.every(
+        (entry) => entry.capture.units[0].t_start === 12.5 && entry.capture.units[0].t_end === 13,
+      ),
+    );
+    assert.ok(
+      captureDrafts.every((entry) =>
+        Object.values(entry.capture.units[0].outputs).every((output) => typeof output.text === "string")),
+    );
+    await assert.rejects(
+      validateU7CapturePair(captureDrafts.slice(0, 1), {
+        registration,
+        registrationBinding,
+        inputs,
+        inputsBinding,
+        pack: validatedInputs.pack,
+      }),
+      /retain both anonymous stems/,
+    );
+    const changedConfig = structuredClone(captureDrafts);
+    changedConfig[0].capture.systems[0].config.audio.input_mode = "raw";
+    changedConfig[0].capture.capture_id = benchU7CaptureId(changedConfig[0].capture);
+    await assert.rejects(
+      validateU7CapturePair(changedConfig, {
+        registration,
+        registrationBinding,
+        inputs,
+        inputsBinding,
+        pack: validatedInputs.pack,
+      }),
+      /exact registered input, raw config, and stem config/,
+    );
+    const changedSource = structuredClone(captureDrafts);
+    for (const entry of changedSource) {
+      entry.capture.ablation.runtime.source_content_id = `sha256:${"0".repeat(64)}`;
+      entry.capture.capture_id = benchU7CaptureId(entry.capture);
+    }
+    await assert.rejects(
+      validateU7CapturePair(changedSource, {
+        registration,
+        registrationBinding,
+        inputs,
+        inputsBinding,
+        pack: validatedInputs.pack,
+      }),
+      /exact registered input, raw config, and stem config/,
+    );
     assert.throws(() => validateWorkerResult({ summary: "malicious stem promotion", separationEvidenceInputs: [produced.comparisonArtifact.id], outputs: [] }, task), /only summary and outputs/);
     const secondCall = `tool-call:u7-duplicate:${runtime.runId}`;
     await runtime.ledger.transact(

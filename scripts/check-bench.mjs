@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import { validateAblationRegistration } from "./lib/bench-ablation.mjs";
+import { validateU7AblationInputs, validateU7CapturePair } from "./lib/bench-u7-ablation.mjs";
 import {
   contaminationGuard,
   freezeChecks,
@@ -287,6 +288,7 @@ if (existsSync(capturesDir)) {
         `capture ${dir.name} failed schema validation:\n${ajv.errorsText(validateCapture.errors, { separator: "\n" })}`,
       );
     }
+    assert(capture.capture_id === dir.name, `capture directory ${dir.name} holds ${capture.capture_id}`);
 
     for (const [systemId, m] of Object.entries(capture.measured)) {
       assert(
@@ -597,6 +599,7 @@ if (existsSync(scoresDir)) {
 const ablationsDir = join(ROOT, "bench/ablations");
 const ablations = [];
 const ablationIds = new Set();
+const u7InputsByAblationId = new Map();
 if (existsSync(ablationsDir)) {
   for (const entry of readdirSync(ablationsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -610,6 +613,24 @@ if (existsSync(ablationsDir)) {
     assert(!ablationIds.has(registration.ablation_id), `duplicate ablation id ${registration.ablation_id}`);
     ablationIds.add(registration.ablation_id);
     ablations.push(registration);
+    if (registration.family === "raw_vs_eligible_stem") {
+      const inputsPath = join(ablationsDir, entry.name, "inputs.json");
+      assert(existsSync(inputsPath), `raw-versus-eligible-stem ablation ${entry.name} has no inputs.json`);
+      const validatedInputs = await validateU7AblationInputs(
+        await readJsonFile(inputsPath, `U7 ablation inputs ${entry.name}`),
+        { workspaceRoot: ROOT, context: `U7 ablation inputs ${entry.name}` },
+      );
+      assert(
+        validatedInputs.registration.ablation_id === registration.ablation_id,
+        `U7 ablation inputs ${entry.name} bind a different registration`,
+      );
+      u7InputsByAblationId.set(registration.ablation_id, {
+        inputs: validatedInputs.registry,
+        pack: validatedInputs.pack,
+        binding: await fileReceipt(inputsPath, `bench/ablations/${entry.name}/inputs.json`),
+        registrationBinding: await fileReceipt(path, `bench/ablations/${entry.name}/registration.json`),
+      });
+    }
   }
 }
 
@@ -632,6 +653,40 @@ for (const historical of new Set(ablationHistory)) {
     `ablation registration ${historical} was committed and later deleted; result-free registration is permanent`,
   );
 }
+
+const u7CaptureGroups = new Map();
+for (const capture of captures.filter((candidate) => candidate.ablation !== undefined)) {
+  const registration = ablations.find(
+    (candidate) => candidate.ablation_id === capture.ablation.registration.ablation_id,
+  );
+  const inputsInfo = u7InputsByAblationId.get(capture.ablation.registration.ablation_id);
+  assert(registration && inputsInfo, `U7 capture ${capture.capture_id} names an unknown registration`);
+  const groupKey = JSON.stringify({
+    ablationId: registration.ablation_id,
+    clipId: capture.clip.id,
+    repetition: capture.ablation.repetition,
+  });
+  const group = u7CaptureGroups.get(groupKey) ?? [];
+  group.push({ stemRole: capture.ablation.stem_role, capture });
+  u7CaptureGroups.set(groupKey, group);
+}
+for (const drafts of u7CaptureGroups.values()) {
+  const registration = ablations.find(
+    (candidate) => candidate.ablation_id === drafts[0].capture.ablation.registration.ablation_id,
+  );
+  const inputsInfo = u7InputsByAblationId.get(registration.ablation_id);
+  await validateU7CapturePair(drafts.sort((left, right) => left.stemRole.localeCompare(right.stemRole)), {
+    registration,
+    registrationBinding: inputsInfo.registrationBinding,
+    inputs: inputsInfo.inputs,
+    inputsBinding: inputsInfo.binding,
+    pack: inputsInfo.pack,
+    context: `committed U7 capture pair ${drafts[0].capture.ablation.runtime.operation_id}`,
+  });
+}
+console.log(
+  `U7 packaging check passed: ${u7InputsByAblationId.size} exact input registry, ${u7CaptureGroups.size} complete capture pair(s)`,
+);
 
 const ledger = await loadLedger({
   store: join(ROOT, "memory/review"),

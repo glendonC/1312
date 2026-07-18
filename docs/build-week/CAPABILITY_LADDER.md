@@ -101,8 +101,9 @@ checklist below:
    overlap cell request bounded attenuated speech without granting transcript truth.
 7. **U7 — conditional separation and comparison (U6.1 slice + U7.1 U1-`mixed` trigger implemented
    2026-07-17):** preserve raw media, receipt private derived stems, and compare raw/stem hypotheses
-   only for one exact audited overlap range or one cold-audited acoustic `mixed` cell. Semantic
-   preference and Bet G ablation remain closed.
+   only for one exact audited overlap range or one cold-audited acoustic `mixed` cell. The exact
+   frozen-input registry and cold-audit capture packager are now available to Bet G, while semantic
+   preference, capture execution, labels, and scores remain closed.
 8. **R1 — bounded web research (first wired slice implemented 2026-07-17):** add safe search plus
    document snapshot/span citations for exact unresolved context gaps. The trigger-gated
    grant/host/citation path is wired offline with a fixture provider and an empty default domain
@@ -145,7 +146,7 @@ artifact, grant, and audit boundaries are real.
 | Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. U4 study v3 retains ordered pass history/disagreement; only pass-new exact speech citations support the executed subrange, and exhaustion stays weak without globally blocking unrelated ranges | Semantic correctness/truth arbitration and additional re-study producers | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`restudiedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/restudiedStudySynthesisHost.ts), and [`restudiedStudyReadinessHost.ts`](../../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts) |
 | Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks, U5 OCR over completed frame identities, U6 anonymous speaker/overlap analysis whose request is exactly `{}`, R1 `research_search`/`research_document_snapshot`, and the R2 empty-object `computer_use_readonly` tool. R1 and R2 mount only under their exact trigger-gated grants. Only cold-audited snapshot spans and offline screen-region identities can enter a v2 report, both as cite-only context. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Scene/shot interpretation, default visual-specialist routing, unrestricted or automatic research, real-provider/freshness authority, and any live isolated computer-use driver | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`computerUseMcpServer.ts`](../../src/studio/runtime/production/executor/computerUseMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
 | Owned study spine | New owned runs default to evidence-citation v1, report/admission/read v2, the eight-tool U4 root, owned-media-study v3, readiness v4, and approval-gated caption/caption-causality v4. The dormant research tool requires a projected current conflict. Closed v1 planning remains an explicit non-default compatibility selector | Studio UI projection, semantic correctness/truth arbitration, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`orchestratorBridge.ts`](../../src/studio/runtime/production/executor/orchestratorBridge.ts), and [`restudiedStudyRuntime.ts`](../../src/studio/runtime/production/study/restudiedStudyRuntime.ts) |
-| Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen, the human-labeled `run-007` Bet G score exists with `judge: null`, and one result-free exact-delta ablation is registered | Runtime semantic QC, calibrated transcription/translation confidence, registered paired captures and scores, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), [`raw-vs-stem registration`](../../bench/ablations/hard-ko-v1-raw-vs-eligible-stem/registration.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
+| Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen, the human-labeled `run-007` Bet G score exists with `judge: null`, one result-free exact-delta ablation is registered, and its exact input/capture packaging contract is implemented | Runtime semantic QC, calibrated transcription/translation confidence, executed paired captures and scores, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), [`raw-vs-stem registration`](../../bench/ablations/hard-ko-v1-raw-vs-eligible-stem/registration.json), [`raw-vs-stem inputs`](../../bench/ablations/hard-ko-v1-raw-vs-eligible-stem/inputs.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
 
 The Bet G score is the content-addressed receipt under `bench/scores/`, not the legacy
@@ -417,6 +418,11 @@ their audits.
   Cold audit reopens raw, stems, receipts, comparison, the audited trigger evidence, and current
   producer lineage without accepting caller paths or rerunning separation. The result has null
   semantic preference and no caption or semantic authority.
+- **Bet G packaging:** `studio.bench.u7-ablation-inputs.v1` binds exact source bytes for every frozen
+  clip before capture. The evaluation adapter accepts one explicit cold-audited operation and emits
+  both ordered anonymous-stem capture drafts against raw audio with the registered configs unchanged.
+  Empty or textless available output is missing; unavailable, unknown, and truncated output is
+  withheld. Labels, score, judge, and preference remain null.
 - **U7.1 U1 trigger:** A second eligible cause admits one cold-audited acoustic cell classified
   `mixed` — which by the U1 validator necessarily means strong certainty with both speech and music
   above the support threshold, i.e. two provably co-present source families in one exact range. The
@@ -428,8 +434,8 @@ their audits.
 - **Still missing:** The only U1 separation-eligibility class is `mixed`; every other acoustic class
   and all VAD/policy states stay non-triggering. Non-darwin runtime pins, alternate models, a
   separation-quality bench, independent evidence or human semantic preference, UI projection, public
-  delivery, and the registered Bet G raw-versus-stem captures and scores remain open. The default recognizer may
-  honestly abstain when no live current-run recognizer is configured.
+  delivery, and the registered Bet G capture executions, labels, and scores remain open. The default
+  recognizer may honestly abstain when no live current-run recognizer is configured.
 - **Slice done-when:** The landed U6.1 and U7.1 paths prove exact trigger/grant/range closure, raw
   preservation, private content-addressed stems, pinned replaceable execution, same-recognizer
   comparison, immutable receipts, cold audit/tamper rejection, hard limits, duplicate rejection, typed
@@ -444,7 +450,7 @@ their audits.
   out of its training domain on speech-plus-music, so the U1 trigger may claim only comparability.
 - **Existing-spine dependency:** This rung uses U6.1 audited overlap evidence, U1 cold-audited
   acoustic evidence, U4 pass/study context, derived artifact origins, and raw-source preservation.
-  Bet G ablation is a later consumer, not evidence claimed by this slice.
+  The Bet G packager is a later consumer and adds no runtime evidence or semantic authority.
 
 ## External context rungs
 
@@ -543,10 +549,12 @@ their audits.
   `studio.bench.ablation.v1` now binds one result-free exact config delta to current frozen pack and
   freeze bytes, requires at least three paired repetitions per clip, fixes semantic scoring to human
   labels with `judge: null`, and marks structural diagnostics non-semantic. The first immutable
-  registration plans raw audio versus eligible anonymous U7 stems; it has no captures or results.
+  registration plans raw audio versus eligible anonymous U7 stems. Its immutable input registry
+  binds exact media for every frozen clip, and its cold-audit packager emits only both fixed
+  anonymous-stem capture drafts with closed missing/withheld behavior. It has no captures or results.
 - **Missing:** Per-run semantic transcription/translation QC before output, calibrated confidence,
-  independent semantic adjudication at product scale, repeated scored captures, completed producer
-  ablations, run variance, and generalization to new packs/media classes.
+  independent semantic adjudication at product scale, executed and human-labeled producer
+  ablations, repeated scored captures, run variance, and generalization to new packs/media classes.
 - **Done when:** Keep the two lanes separate. Structural QC continues to answer “is this exact output
   complete, available, and causally supported?” Semantic evaluation answers “is the Korean/English
   meaning correct?” through frozen gold and independent human labels. New producer comparisons pin
@@ -600,8 +608,9 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    One exact audited conflicting overlap cell, or one cold-audited acoustic `mixed` cell, may receive
    the pinned private separation grant; raw audio, anonymous stems, lineage receipts, cold audit, and
    same-recognizer comparability are closed. U1 `mixed`-acoustic triggers now reuse the same path
-   additively; no other acoustic class qualifies. Execute the registered Bet G ablation and require
-   independent evidence or human review before any preference or improvement claim.
+   additively; no other acoustic class qualifies. Exact Bet G inputs and paired capture packaging are
+   closed. Execute all registered repetitions, label and score every capture, and require independent
+   evidence or human review before any preference or improvement claim.
 8. **Receipted web research.** Add safe bounded search + snapshot/read tools, typed span citations,
    freshness/provenance, and one exact gap-triggered context specialist. No ambient web or fixed
    research-worker count. The trigger-gated grant, scheduler admission, launcher tools, journaled

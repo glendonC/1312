@@ -1,13 +1,14 @@
 # RFC 0001 — The Miss-to-Gold Conveyor
 
-Status: **frozen baseline and ablation foundation implemented** (updated 2026-07-18). The conveyor
+Status: **frozen baseline and ablation packaging foundation implemented** (updated 2026-07-18). The conveyor
 contracts and guards below are code. `hard-ko-v1` is frozen with three clips and six human
 adjudication receipts. run-007 has one post-freeze capture, human output labels, and a re-derived
 score receipt with `judge: null`. `studio.bench.ablation.v1` now pre-registers one exact
 content-addressed configuration delta against current frozen pack and freeze bytes, keeps results
 null, requires at least three paired repetitions per clip, and separates structural diagnostics
 from human semantic scoring. The first registration plans raw audio versus eligible anonymous U7
-stems; it contains no captures or result claim. The public aggregate is still a protocol draft.
+stems. Its exact frozen-clip source registry and cold-audit-first capture packager are implemented,
+but it contains no captures or result claim. The public aggregate is still a protocol draft.
 Scope: `bench/` contracts, `scripts/` producers, `docs/`. No contact with `src/studio/preflight/*`
 (language-detection workstream), `src/features/*`, or `src/pages/*` (UI workstream).
 Deliverable of: the 1321 technical north-star review (six repo evidence readers, seven bet
@@ -50,6 +51,7 @@ run artifacts (withholds, uncorroborated commits, phenomenon hits, cold/prepped 
   -> adjudicate  two blinded human reviewers; content-bound decision receipts
   -> freeze      scripts/freeze-pack.mjs advances clip status; pack becomes immutable
   -> register    scripts/register-ablation.mjs binds one exact result-free config delta
+  -> package     scripts/package-u7-ablation.mjs cold-audits one U7 operation; emits both stems
   -> score       scripts/score-run.mjs fills per_line/trail/delta_vs_cold + score receipt
   -> compare     report-series comparator: Run 1 -> N on the SAME frozen pack
 ```
@@ -60,10 +62,12 @@ test data.
 
 ## Contracts (all content-addressed, all append-only)
 
-The schemas live in `bench/schemas/` (`gold.schema.json`, `adjudication.schema.json`, and
-`ablation.schema.json`). Candidate, pack, freeze, output-label, score, and ablation invariants are
-enforced by `scripts/lib/bench-gold.mjs`, `scripts/lib/bench-ablation.mjs`, and `check-bench`. The
-stub directory this RFC originally shipped with has been retired in favour of the real files.
+The schemas live in `bench/schemas/` (`gold.schema.json`, `adjudication.schema.json`,
+`ablation.schema.json`, and `u7-ablation-inputs.schema.json`). Candidate, pack, freeze,
+output-label, score, ablation, and U7 packaging invariants are enforced by
+`scripts/lib/bench-gold.mjs`, `scripts/lib/bench-ablation.mjs`,
+`scripts/lib/bench-u7-ablation.mjs`, and `check-bench`. The stub directory this RFC originally
+shipped with has been retired in favour of the real files.
 
 ### `studio.bench.gold.v1` (per clip)
 
@@ -119,6 +123,21 @@ lane remains human-label-only `studio.bench.score.v1` with `judge: null`; struct
 availability, lineage, and
 capture-completeness diagnostics are explicitly non-semantic. A registration is a plan, not a
 result or quality claim.
+
+### `studio.bench.u7-ablation-inputs.v1` and `studio.bench.u7-capture-binding.v1`
+
+The immutable input registry binds every frozen clip to exact source bytes before capture. Control
+clips bind their pack-local receipts; the hard clip binds the exact media named by the scored
+run-007 capture and score receipt. `scripts/package-u7-ablation.mjs` accepts an explicit runtime
+directory, run, operation, clip, and repetition, then cold-audits the journal and artifact store. It
+materializes exactly two existing capture-schema drafts, one for each ordered anonymous stem
+against raw audio, with the registered configs copied exactly. No best-stem selection exists.
+
+Recognizer availability has a closed structural mapping. Usable available text is emitted; empty
+or textless available output is missing; unavailable, unknown, and truncated output is withheld.
+Partial text from a truncated result is never emitted. The capture binding keeps labels, score,
+judge, and preference null. If captures enter `bench/runs/`, score-everything deliberately keeps the
+repository red until blinded human labels and a score receipt exist for each capture.
 
 ## Honesty invariants (each mechanical, each fail-closed)
 
@@ -198,9 +217,10 @@ result or quality claim.
    decision receipt.
 
 Post-week update: `hard-ko-v1` is frozen at three clips and run-007 is scored from human labels with
-`judge: null`. One raw-versus-eligible-stem experiment is pre-registered with no results. Next are
-the registered paired captures and labels, variance measurement, the report-series comparator, and
-a later independently frozen pack before any generalization claim.
+`judge: null`. One raw-versus-eligible-stem experiment is pre-registered, its frozen inputs are
+content-bound, and its cold-audit packager is implemented with no captures or results. Next are the
+registered paired capture executions and labels, variance measurement, the report-series
+comparator, and a later independently frozen pack before any generalization claim.
 
 ## Failure modes
 

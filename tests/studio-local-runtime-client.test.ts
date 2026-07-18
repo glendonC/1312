@@ -14,9 +14,11 @@ import {
 import { createForecastArtifact } from "../src/studio/runtime/production/forecast/planner.ts";
 import { parseRuntimeHostStartRequest } from "../src/studio/runtime/production/runtimeHost/validation.ts";
 import type {
+  RuntimeHostPrivatePlaybackGrant,
   RuntimeHostSourceSummary,
   RuntimeHostStartAcknowledgement,
 } from "../src/studio/runtime/production/runtimeHost/model.ts";
+import { PRIVATE_PLAYBACK_GRANT_TTL_MS } from "../src/studio/runtime/production/runtimeHost/model.ts";
 
 const CONTENT = `sha256:${"a".repeat(64)}`;
 const RECEIPT_CONTENT = `sha256:${"b".repeat(64)}`;
@@ -806,4 +808,153 @@ test("host configuration accepts only exact loopback HTTP origins", () => {
   assert.equal(normalizeLocalRuntimeHostBaseUrl("http://[::1]:4312"), "http://[::1]:4312");
   assert.throws(() => normalizeLocalRuntimeHostBaseUrl("https://example.com"), /exact loopback HTTP origin/);
   assert.throws(() => normalizeLocalRuntimeHostBaseUrl("http://127.0.0.1:4312/v1"), /exact loopback HTTP origin/);
+});
+
+function privatePlaybackGrant(
+  overrides: Record<string, unknown> = {},
+): RuntimeHostPrivatePlaybackGrant & Record<string, unknown> {
+  const issuedAt = new Date().toISOString();
+  const grantId = "private-playback-grant:00000000-0000-4000-8000-000000000001";
+  return {
+    schema: "studio.private-playback-grant.v1",
+    grantId,
+    runtimeId: "runtime:fixture",
+    source: {
+      sessionId: SOURCE.sourceSessionId,
+      revisionId: SOURCE.sourceRevisionId,
+      artifactId: "artifact:fixture-source",
+      contentId: SOURCE.sourceContentId,
+      bytes: 329_662,
+      durationMs: SOURCE.durationMs,
+    },
+    mimeType: "audio/mp4",
+    timestampOrigin: { kind: "source_media_zero", offsetMs: 0 },
+    mediaPath: `/v1/private-source-media/${encodeURIComponent(grantId)}/${"s".repeat(43)}`,
+    issuedAt,
+    expiresAt: new Date(Date.parse(issuedAt) + PRIVATE_PLAYBACK_GRANT_TTL_MS).toISOString(),
+    ...overrides,
+  };
+}
+
+test("strict client mints, validates, and disposes one private playback handle without raw bytes", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const grant = privatePlaybackGrant();
+  const fetcher = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({ url: String(input), init });
+    if (calls.length === 1) return json(grant, 201);
+    return json({
+      schema: "studio.private-playback-grant-revoked.v1",
+      grantId: grant.grantId,
+      runtimeId: grant.runtimeId,
+      state: "revoked",
+      revokedAt: new Date().toISOString(),
+    });
+  };
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: fetcher,
+  });
+  const handle = await client.createPrivatePlaybackHandle({
+    runtimeId: grant.runtimeId,
+    sourceRevisionId: grant.source.revisionId,
+    sourceArtifactId: grant.source.artifactId,
+    sourceContentId: grant.source.contentId,
+  });
+
+  assert.equal(handle.schema, "studio.private-playback-handle.v1");
+  assert.equal(handle.src, `http://127.0.0.1:4312${grant.mediaPath}`);
+  assert.equal(handle.mimeType, "audio/mp4");
+  assert.deepEqual(handle.timestampOrigin, { kind: "source_media_zero", offsetMs: 0 });
+  assert.equal(handle.disposed, false);
+  assert.doesNotMatch(handle.src!, /(?:blob:|sha256:|artifact:|runtime:|token|\?|#)/);
+  assert.equal("bytes" in handle, false);
+  assert.equal("blob" in handle, false);
+
+  assert.equal(calls[0].init?.credentials, "omit");
+  assert.equal(calls[0].init?.redirect, "error");
+  assert.equal(calls[0].init?.cache, "no-store");
+  assert.equal(new Headers(calls[0].init?.headers).get("Authorization"), `Bearer ${"t".repeat(64)}`);
+  assert.equal(new Headers(calls[0].init?.headers).get("Accept"), "application/json");
+  assert.equal(new Headers(calls[0].init?.headers).get("Origin"), null);
+  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
+    schema: "studio.private-playback-grant-request.v1",
+    source: {
+      revisionId: grant.source.revisionId,
+      artifactId: grant.source.artifactId,
+      contentId: grant.source.contentId,
+    },
+  });
+
+  const firstDispose = handle.dispose();
+  assert.equal(handle.src, null, "local source is cleared before network revocation finishes");
+  assert.equal(handle.disposed, true);
+  assert.equal(handle.dispose(), firstDispose, "disposal is one-shot and idempotent");
+  await firstDispose;
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].url, /private-playback-grants\/private-playback-grant%3A.*\/revocations$/);
+  assert.deepEqual(JSON.parse(String(calls[1].init?.body)), {
+    schema: "studio.private-playback-grant-revocation.v1",
+  });
+});
+
+test("strict client fails closed on hostile private playback grant responses", async () => {
+  const expected = {
+    runtimeId: "runtime:fixture",
+    sourceRevisionId: SOURCE.sourceRevisionId,
+    sourceArtifactId: "artifact:fixture-source",
+    sourceContentId: SOURCE.sourceContentId,
+  };
+  const base = privatePlaybackGrant();
+  const hostile: Array<{ label: string; response: unknown }> = [
+    { label: "wrong runtime", response: { ...base, runtimeId: "runtime:other" } },
+    { label: "wrong content", response: { ...base, source: { ...base.source, contentId: `sha256:${"f".repeat(64)}` } } },
+    { label: "nonzero origin", response: { ...base, timestampOrigin: { kind: "source_media_zero", offsetMs: 1 } } },
+    { label: "unsupported MIME", response: { ...base, mimeType: "application/octet-stream" } },
+    { label: "off-origin path", response: { ...base, mediaPath: `http://evil.invalid${base.mediaPath}` } },
+    { label: "query secret", response: { ...base, mediaPath: `${base.mediaPath}?token=secret` } },
+    { label: "wrong grant in path", response: { ...base, mediaPath: `/v1/private-source-media/other/${"s".repeat(43)}` } },
+    { label: "expired", response: { ...base, expiresAt: base.issuedAt } },
+    { label: "extra path field", response: { ...base, sourcePath: "/tmp/private.m4a" } },
+  ];
+  for (const item of hostile) {
+    const client = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "t".repeat(64),
+      fetch: async () => json(item.response, 201),
+    });
+    await assert.rejects(
+      client.createPrivatePlaybackHandle(expected),
+      (error: unknown) => error instanceof RuntimeHostClientError && error.code === "invalid_host_response",
+      item.label,
+    );
+  }
+});
+
+test("private playback disposal stays locally closed when host revocation fails", async () => {
+  const grant = privatePlaybackGrant();
+  let calls = 0;
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => {
+      calls += 1;
+      return calls === 1
+        ? json(grant, 201)
+        : json({
+            schema: "studio.local-runtime-error.v1",
+            error: { code: "private_playback_grant_unavailable", message: "Grant is unavailable." },
+          }, 404);
+    },
+  });
+  const handle = await client.createPrivatePlaybackHandle({
+    runtimeId: grant.runtimeId,
+    sourceRevisionId: grant.source.revisionId,
+    sourceArtifactId: grant.source.artifactId,
+    sourceContentId: grant.source.contentId,
+  });
+  await assert.rejects(handle.dispose(), /Grant is unavailable/);
+  assert.equal(handle.src, null);
+  assert.equal(handle.disposed, true);
+  assert.equal(calls, 2);
 });

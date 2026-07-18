@@ -33,6 +33,7 @@ import {
 import { planResponse } from "./planResponse.ts";
 import { languageExplanationResponse } from "./languageExplanationResponses.ts";
 import {
+  contentId,
   exact,
   fail,
   identity,
@@ -46,6 +47,12 @@ import {
 } from "./reviewResponses.ts";
 import { pollResponse, statusResponse } from "./runtimeResponses.ts";
 import { ingestStatus, sourceSummary } from "./sourceResponses.ts";
+import {
+  privatePlaybackGrantResponse,
+  privatePlaybackRevocationResponse,
+  type PrivatePlaybackExpectation,
+  type PrivatePlaybackHandle,
+} from "./privatePlaybackResponse.ts";
 
 type RuntimeHostFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -93,14 +100,15 @@ export class LocalRuntimeHostClient {
   private async request(path: string, init: RequestInit = {}): Promise<unknown> {
     let response: Response;
     try {
+      const headers = new Headers(init.headers);
+      headers.set("Accept", "application/json");
+      headers.set("Authorization", `Bearer ${this.token}`);
       response = await this.fetcher(`${this.baseUrl}${path}`, {
         ...init,
         cache: "no-store",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${this.token}`,
-          ...init.headers,
-        },
+        credentials: "omit",
+        redirect: "error",
+        headers,
       });
     } catch (error) {
       throw new RuntimeHostClientError(
@@ -345,6 +353,49 @@ export class LocalRuntimeHostClient {
         body: JSON.stringify(request),
       }),
       runtimeId,
+    );
+  }
+
+  async createPrivatePlaybackHandle(
+    expected: PrivatePlaybackExpectation,
+  ): Promise<PrivatePlaybackHandle> {
+    const runtimeId = identity(expected.runtimeId, "Private playback runtime id");
+    const sourceRevisionId = identity(expected.sourceRevisionId, "Private playback source revision id");
+    const sourceArtifactId = identity(expected.sourceArtifactId, "Private playback source artifact id");
+    const sourceContentId = contentId(expected.sourceContentId, "Private playback source content id");
+    return privatePlaybackGrantResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/private-playback-grants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schema: "studio.private-playback-grant-request.v1",
+          source: {
+            revisionId: sourceRevisionId,
+            artifactId: sourceArtifactId,
+            contentId: sourceContentId,
+          },
+        }),
+      }),
+      {
+        baseUrl: this.baseUrl,
+        expected: { runtimeId, sourceRevisionId, sourceArtifactId, sourceContentId },
+        revoke: (revokeRuntimeId, grantId) => this.revokePrivatePlaybackGrant(revokeRuntimeId, grantId),
+      },
+    );
+  }
+
+  private async revokePrivatePlaybackGrant(runtimeId: string, grantId: string) {
+    return privatePlaybackRevocationResponse(
+      await this.request(
+        `/v1/runtimes/${encodeURIComponent(runtimeId)}/private-playback-grants/${encodeURIComponent(grantId)}/revocations`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ schema: "studio.private-playback-grant-revocation.v1" }),
+        },
+      ),
+      runtimeId,
+      grantId,
     );
   }
 }

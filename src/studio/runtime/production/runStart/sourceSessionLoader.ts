@@ -29,12 +29,47 @@ const TRACK_KINDS = new Set(["audio", "video", "subtitle", "data", "attachment"]
 export interface LoadedOwnedSourceSession {
   session: ProductionSourceSession;
   descriptor: SourceArtifactDescriptor;
+  playbackMimeType: BrowserPlaybackMimeType | null;
   operator: {
     label: string;
     rightsScope: ProductionSourceSession["sourceReceipt"]["rightsScope"];
   };
   directory: string;
   evidenceDescriptors: PreflightEvidenceArtifactDescriptor[];
+}
+
+export type BrowserPlaybackMimeType =
+  | "audio/flac"
+  | "audio/mpeg"
+  | "audio/mp4"
+  | "audio/ogg"
+  | "audio/wav"
+  | "audio/webm"
+  | "video/mp4"
+  | "video/ogg"
+  | "video/webm";
+
+/** Map only producer-validated probe facts to browser media types. */
+export function browserPlaybackMimeType(probe: MediaProbeReceipt): BrowserPlaybackMimeType | null {
+  const containers = new Set(probe.container.map((value) => value.toLowerCase()));
+  const hasAudio = probe.tracks.some((track) => track.type === "audio");
+  const hasVideo = probe.tracks.some((track) => track.type === "video");
+  if (!hasAudio && !hasVideo) return null;
+
+  const groups = [
+    { names: new Set(["mov", "mp4", "m4a", "3gp", "3g2", "mj2"]), type: hasVideo ? "video/mp4" : "audio/mp4" },
+    { names: new Set(["matroska", "webm"]), type: hasVideo ? "video/webm" : "audio/webm", required: "webm" },
+    { names: new Set(["ogg"]), type: hasVideo ? "video/ogg" : "audio/ogg" },
+    { names: new Set(["mp3"]), type: "audio/mpeg", audioOnly: true },
+    { names: new Set(["wav"]), type: "audio/wav", audioOnly: true },
+    { names: new Set(["flac"]), type: "audio/flac", audioOnly: true },
+  ] as const;
+  const matches = groups.filter((group) =>
+    [...containers].every((name) => group.names.has(name)) &&
+    [...containers].some((name) => group.names.has(name)) &&
+    (!("required" in group) || containers.has(group.required)) &&
+    (!("audioOnly" in group) || !hasVideo));
+  return matches.length === 1 ? matches[0].type : null;
 }
 
 function contained(root: string, candidate: string, label: string): string {
@@ -294,6 +329,7 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
   return {
     session,
     descriptor,
+    playbackMimeType: browserPlaybackMimeType(probe),
     operator: {
       label: source.label,
       rightsScope: source.rights.scope,

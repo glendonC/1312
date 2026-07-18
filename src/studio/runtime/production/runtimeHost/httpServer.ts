@@ -1,9 +1,11 @@
+import { createReadStream } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import { RuntimeHostError, safeRuntimeHostError } from "./errors.ts";
 import { validatePollCursor } from "./journalPolling.ts";
 import { OwnedMediaIngestService } from "./ownedMediaIngest.ts";
 import { RuntimeStartService } from "./service.ts";
+import { parsePrivatePlaybackRange } from "./privatePlayback.ts";
 
 export const DEFAULT_RUNTIME_HOST_BODY_BYTES = 64 * 1024;
 
@@ -120,6 +122,16 @@ function routeIdentity(pathname: string, expression: RegExp): string | null {
   }
 }
 
+function routeIdentities(pathname: string, expression: RegExp): [string, string] | null {
+  const match = expression.exec(pathname);
+  if (!match) return null;
+  try {
+    return [decodeURIComponent(match[1]), decodeURIComponent(match[2])];
+  } catch (error) {
+    throw new RuntimeHostError("invalid_identity", "A route identity is malformed.", 400, { cause: error });
+  }
+}
+
 export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Server {
   if (options.token.length < 32 || options.token.length > 512) {
     throw new RuntimeHostError("invalid_host_token", "The local host token must contain 32 to 512 characters.");
@@ -140,19 +152,73 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
       if (originHeader && !origin) {
         throw new RuntimeHostError("origin_not_allowed", "The request origin is not allowed.", 403);
       }
+      const url = new URL(request.url ?? "/", "http://runtime-host.local");
       if (request.method === "OPTIONS") {
         if (!origin) throw new RuntimeHostError("origin_required", "CORS preflight requires an allowed origin.", 403);
         sendNoContent(response, origin, {
-          "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
-          "Access-Control-Allow-Headers": "Authorization, Content-Type",
+          "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, OPTIONS",
+          "Access-Control-Allow-Headers": "Authorization, Content-Type, Range",
           "Access-Control-Max-Age": "600",
         });
         return;
       }
+
+      const privateMedia = routeIdentities(
+        url.pathname,
+        /^\/v1\/private-source-media\/([^/]+)\/([^/]+)$/,
+      );
+      if (privateMedia !== null) {
+        if (!origin) throw new RuntimeHostError("origin_required", "Private playback requires an allowed origin.", 403);
+        if (request.method !== "GET" && request.method !== "HEAD") {
+          throw new RuntimeHostError("method_not_allowed", "Only GET and HEAD are supported for private playback.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "Private playback accepts no query parameters.");
+        const media = await options.service.privatePlaybackMedia(privateMedia[0], privateMedia[1], origin);
+        let range;
+        try {
+          range = parsePrivatePlaybackRange(request.headers.range, media.bytes);
+        } catch (error) {
+          const safe = safeRuntimeHostError(error);
+          if (safe.httpStatus !== 416) throw error;
+          sendJson(response, 416, {
+            schema: "studio.local-runtime-error.v1",
+            error: { code: safe.code, message: safe.message },
+          }, origin, {
+            "Accept-Ranges": "bytes",
+            "Content-Range": `bytes */${media.bytes}`,
+            Vary: "Origin, Range",
+          });
+          return;
+        }
+        const start = range?.start ?? 0;
+        const end = range?.end ?? media.bytes - 1;
+        const length = end - start + 1;
+        response.writeHead(range ? 206 : 200, {
+          "Content-Type": media.mimeType,
+          "Content-Length": length.toString(),
+          "Accept-Ranges": "bytes",
+          ...(range ? { "Content-Range": `bytes ${start}-${end}/${media.bytes}` } : {}),
+          ETag: `"${media.contentId}"`,
+          "Cache-Control": "private, no-store, max-age=0",
+          Pragma: "no-cache",
+          "X-Content-Type-Options": "nosniff",
+          "Access-Control-Allow-Origin": origin,
+          "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length, Content-Range, Content-Type, ETag",
+          Vary: "Origin, Range",
+        });
+        if (request.method === "HEAD") {
+          response.end();
+          return;
+        }
+        const stream = createReadStream(media.path, { start, end });
+        stream.on("error", () => response.destroy());
+        stream.pipe(response);
+        return;
+      }
+
       if (request.headers.authorization !== `Bearer ${options.token}`) {
         throw new RuntimeHostError("unauthorized", "A valid local runtime-host token is required.", 401);
       }
-      const url = new URL(request.url ?? "/", "http://runtime-host.local");
 
       if (url.pathname === "/v1/owned-media-ingests") {
         if (!options.ownedMediaIngest) {
@@ -454,6 +520,67 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
           await options.service.createLanguageExplanation(
             languageExplanationRuntimeId,
             await readJsonBody(request, maximumBytes),
+          ),
+          origin,
+        );
+        return;
+      }
+
+      const privatePlaybackRuntimeId = routeIdentity(
+        url.pathname,
+        /^\/v1\/runtimes\/([^/]+)\/private-playback-grants$/,
+      );
+      if (privatePlaybackRuntimeId !== null) {
+        if (!origin) throw new RuntimeHostError("origin_required", "Private playback grants require an allowed origin.", 403);
+        if (request.method !== "POST") {
+          throw new RuntimeHostError("method_not_allowed", "Only POST is supported for private playback grants.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "Private playback grants accept no query parameters.");
+        if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+          throw new RuntimeHostError(
+            "unsupported_content_type",
+            "Private playback grants require Content-Type: application/json.",
+            415,
+          );
+        }
+        sendJson(
+          response,
+          201,
+          await options.service.createPrivatePlaybackGrant(
+            privatePlaybackRuntimeId,
+            await readJsonBody(request, maximumBytes),
+            origin,
+          ),
+          origin,
+        );
+        return;
+      }
+
+      const privatePlaybackRevocation = routeIdentities(
+        url.pathname,
+        /^\/v1\/runtimes\/([^/]+)\/private-playback-grants\/([^/]+)\/revocations$/,
+      );
+      if (privatePlaybackRevocation !== null) {
+        if (!origin) throw new RuntimeHostError("origin_required", "Private playback revocation requires an allowed origin.", 403);
+        if (request.method !== "POST") {
+          throw new RuntimeHostError("method_not_allowed", "Only POST is supported for private playback revocation.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "Private playback revocation accepts no query parameters.");
+        if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+          throw new RuntimeHostError(
+            "unsupported_content_type",
+            "Private playback revocation requires Content-Type: application/json.",
+            415,
+          );
+        }
+        sendJson(
+          response,
+          200,
+          await options.service.revokePrivatePlaybackGrant(
+            privatePlaybackRevocation[0],
+            privatePlaybackRevocation[1],
+            await readJsonBody(request, maximumBytes),
+            origin,
           ),
           origin,
         );

@@ -30,6 +30,10 @@ export type {
   RuntimeHostLanguageExplanationRequest,
   RuntimeHostLanguageExplanationResponse,
   RuntimeHostPlanResponse,
+  RuntimeHostPrivatePlaybackGrant,
+  RuntimeHostPrivatePlaybackGrantRequest,
+  RuntimeHostPrivatePlaybackGrantRevocationRequest,
+  RuntimeHostPrivatePlaybackGrantRevocationResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewDecisionRequest,
   RuntimeHostPublishReviewDecisionResponse,
@@ -40,6 +44,11 @@ export type {
   RuntimeHostStartRequest,
   RuntimeHostStatus,
 } from "./model.ts";
+export {
+  MAXIMUM_ACTIVE_PRIVATE_PLAYBACK_GRANTS,
+  RuntimePrivatePlaybackService,
+  parsePrivatePlaybackRange,
+} from "./privatePlayback.ts";
 export {
   codexWorkerLauncherFactory,
   codexOrchestratorLauncherFactory,

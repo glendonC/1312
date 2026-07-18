@@ -97,6 +97,62 @@ export interface RuntimeHostSourceSummary {
   detectedLanguageEvidenceAvailable: boolean;
 }
 
+export const PRIVATE_PLAYBACK_GRANT_TTL_MS = 10 * 60 * 1_000;
+
+export const PRIVATE_PLAYBACK_MIME_TYPES = [
+  "audio/flac",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/ogg",
+  "audio/wav",
+  "audio/webm",
+  "video/mp4",
+  "video/ogg",
+  "video/webm",
+] as const;
+
+export type PrivatePlaybackMimeType = (typeof PRIVATE_PLAYBACK_MIME_TYPES)[number];
+
+export interface RuntimeHostPrivatePlaybackGrantRequest {
+  schema: "studio.private-playback-grant-request.v1";
+  source: {
+    revisionId: string;
+    artifactId: string;
+    contentId: string;
+  };
+}
+
+export interface RuntimeHostPrivatePlaybackGrant {
+  schema: "studio.private-playback-grant.v1";
+  grantId: string;
+  runtimeId: string;
+  source: {
+    sessionId: string;
+    revisionId: string;
+    artifactId: string;
+    contentId: string;
+    bytes: number;
+    durationMs: number;
+  };
+  mimeType: PrivatePlaybackMimeType;
+  timestampOrigin: { kind: "source_media_zero"; offsetMs: 0 };
+  mediaPath: string;
+  issuedAt: string;
+  expiresAt: string;
+}
+
+export interface RuntimeHostPrivatePlaybackGrantRevocationRequest {
+  schema: "studio.private-playback-grant-revocation.v1";
+}
+
+export interface RuntimeHostPrivatePlaybackGrantRevocationResponse {
+  schema: "studio.private-playback-grant-revoked.v1";
+  grantId: string;
+  runtimeId: string;
+  state: "revoked";
+  revokedAt: string;
+}
+
 export const OWNED_MEDIA_INGEST_STATES = [
   "queued",
   "probing",

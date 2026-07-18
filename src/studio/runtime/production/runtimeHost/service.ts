@@ -33,6 +33,8 @@ import type {
   RuntimeHostDecisionReceiptResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
+  RuntimeHostPrivatePlaybackGrant,
+  RuntimeHostPrivatePlaybackGrantRevocationResponse,
   RuntimeHostPublishReviewIntakeResponse,
   RuntimeHostLanguageExplanationResponse,
   RuntimeHostPublishReviewDecisionResponse,
@@ -58,6 +60,7 @@ import type { LanguageExplanationExecutor } from "../languageExplanations/execut
 import { UnavailableLanguageExplanationExecutor } from "../languageExplanations/executor.ts";
 import { RuntimeLanguageExplanationCoordinator } from "./languageExplanationCoordinator.ts";
 import { RuntimeMutationQueue } from "./runtimeMutationQueue.ts";
+import { RuntimePrivatePlaybackService, type PrivatePlaybackMediaResource } from "./privatePlayback.ts";
 
 export interface RuntimeStartServiceOptions {
   store: DurableRuntimeCommandStore;
@@ -102,6 +105,7 @@ export class RuntimeStartService {
   private readonly queries: RuntimeHostQueries;
   private readonly reviewCaption: RuntimeReviewCaptionCoordinator;
   private readonly languageExplanation: RuntimeLanguageExplanationCoordinator;
+  private readonly privatePlayback: RuntimePrivatePlaybackService;
   private readonly studyContractVersion: StudyContractVersion;
   private readonly initializing = new Map<string, Promise<RuntimeHostStartAcknowledgement>>();
 
@@ -142,6 +146,12 @@ export class RuntimeStartService {
       queries: this.queries,
       executor: options.languageExplanationExecutor ?? new UnavailableLanguageExplanationExecutor(),
       mutationQueue,
+      now: this.now,
+    });
+    this.privatePlayback = new RuntimePrivatePlaybackService({
+      store: this.store,
+      sources: this.sources,
+      status: (runtimeId) => this.statusByRuntime(runtimeId),
       now: this.now,
     });
   }
@@ -510,6 +520,31 @@ export class RuntimeStartService {
     value: unknown,
   ): Promise<RuntimeHostLanguageExplanationResponse> {
     return this.languageExplanation.create(runtimeId, value);
+  }
+
+  async createPrivatePlaybackGrant(
+    runtimeId: string,
+    value: unknown,
+    origin: string,
+  ): Promise<RuntimeHostPrivatePlaybackGrant> {
+    return this.privatePlayback.create(runtimeId, value, origin);
+  }
+
+  async revokePrivatePlaybackGrant(
+    runtimeId: string,
+    grantId: string,
+    value: unknown,
+    origin: string,
+  ): Promise<RuntimeHostPrivatePlaybackGrantRevocationResponse> {
+    return this.privatePlayback.revoke(runtimeId, grantId, value, origin);
+  }
+
+  async privatePlaybackMedia(
+    grantId: string,
+    secret: string,
+    origin: string,
+  ): Promise<PrivatePlaybackMediaResource> {
+    return this.privatePlayback.media(grantId, secret, origin);
   }
 
   async recover(): Promise<void> {

@@ -4,3 +4,4 @@ import "./studio/runtime-host/review-cases.ts";
 import "./studio/runtime-host/journal-recovery-cases.ts";
 import "./studio/runtime-host/http-cases.ts";
 import "./studio/runtime-host/owned-ingest-cases.ts";
+import "./studio-private-playback.test.ts";

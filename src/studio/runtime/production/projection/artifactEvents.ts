@@ -29,8 +29,12 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
     const isAtomicResearch =
       (artifact.origin.kind === "research_search_receipt" || artifact.origin.kind === "research_document_snapshot" || artifact.origin.kind === "research_extraction" || artifact.origin.kind === "research_snapshot_receipt" || artifact.origin.kind === "research_exhaustion_receipt") &&
       event.producer.kind === "research_host";
+    const isAtomicComputerUse =
+      (artifact.origin.kind === "external_screen_fixture" || artifact.origin.kind === "external_screen_screenshot" ||
+        artifact.origin.kind === "external_screen_content" || artifact.origin.kind === "external_screen_action_receipt" ||
+        artifact.origin.kind === "external_screen_session_receipt") && event.producer.kind === "computer_use_host";
     invariant(
-      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap || isAtomicConditionalSeparation || isAtomicResearch,
+      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap || isAtomicConditionalSeparation || isAtomicResearch || isAtomicComputerUse,
       event,
       "artifact evidence must come from its bounded storage, capability, admission, planning, synthesis, or audit host",
     );
@@ -186,6 +190,48 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         event,
         `Research exhaustion ${artifact.id} changed empty-search grant or producer lineage`,
       );
+    } else if (artifact.origin.kind === "external_screen_fixture") {
+      const operation = next.computerUseOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started" && operation.sessionId === artifact.origin.sessionId, event, `External-screen fixture ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `External-screen fixture ${artifact.id} changed producer`);
+      invariant(JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([operation.gap.media.artifactId, operation.r1Cause.receiptArtifactId]) &&
+        artifact.origin.mediaSourceArtifactId === operation.gap.media.artifactId && artifact.origin.r1CauseArtifactId === operation.r1Cause.receiptArtifactId,
+      event, `External-screen fixture ${artifact.id} changed media or R1 lineage`);
+    } else if (artifact.origin.kind === "external_screen_screenshot") {
+      const operation = next.computerUseOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started" && operation.sessionId === artifact.origin.sessionId, event, `External-screen screenshot ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId && artifact.sourceArtifactIds.length === 1 &&
+        artifact.sourceArtifactIds[0] === artifact.origin.fixtureArtifactId && next.artifacts[artifact.origin.fixtureArtifactId]?.origin.kind === "external_screen_fixture",
+      event, `External-screen screenshot ${artifact.id} changed fixture or producer lineage`);
+    } else if (artifact.origin.kind === "external_screen_content") {
+      const operation = next.computerUseOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started" && operation.sessionId === artifact.origin.sessionId, event, `External-screen content ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId &&
+        JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([artifact.origin.fixtureArtifactId, artifact.origin.screenshotArtifactId]) &&
+        next.artifacts[artifact.origin.fixtureArtifactId]?.origin.kind === "external_screen_fixture" &&
+        next.artifacts[artifact.origin.screenshotArtifactId]?.origin.kind === "external_screen_screenshot",
+      event, `External-screen content ${artifact.id} changed screenshot or fixture lineage`);
+    } else if (artifact.origin.kind === "external_screen_action_receipt") {
+      const operation = next.computerUseOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started" && operation.sessionId === artifact.origin.sessionId, event, `External-screen action ${artifact.id} has no active operation`);
+      const expected = [artifact.origin.beforeScreenshotArtifactId, artifact.origin.beforeContentArtifactId, artifact.origin.afterScreenshotArtifactId, artifact.origin.afterContentArtifactId];
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId && JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify(expected) &&
+        next.artifacts[expected[0]]?.origin.kind === "external_screen_screenshot" && next.artifacts[expected[1]]?.origin.kind === "external_screen_content" &&
+        next.artifacts[expected[2]]?.origin.kind === "external_screen_screenshot" && next.artifacts[expected[3]]?.origin.kind === "external_screen_content",
+      event, `External-screen action ${artifact.id} changed adjacent state lineage`);
+    } else if (artifact.origin.kind === "external_screen_session_receipt") {
+      const operation = next.computerUseOperations[artifact.origin.operationId];
+      const origin = artifact.origin;
+      const stateArtifacts = origin.screenshotArtifactIds.flatMap((screenshotId, index) => [screenshotId, origin.visibleContentArtifactIds[index]]);
+      const expected = [origin.mediaSourceArtifactId, origin.r1CauseArtifactId, origin.fixtureArtifactId, ...stateArtifacts, ...origin.actionArtifactIds];
+      invariant(operation?.status === "started" && operation.sessionId === origin.sessionId, event, `External-screen session ${artifact.id} has no active operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId && JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify(expected) &&
+        origin.mediaSourceArtifactId === operation.gap.media.artifactId && origin.r1CauseArtifactId === operation.r1Cause.receiptArtifactId &&
+        next.artifacts[origin.fixtureArtifactId]?.origin.kind === "external_screen_fixture" &&
+        origin.screenshotArtifactIds.every((id) => next.artifacts[id]?.origin.kind === "external_screen_screenshot") &&
+        origin.visibleContentArtifactIds.every((id) => next.artifacts[id]?.origin.kind === "external_screen_content") &&
+        origin.actionArtifactIds.every((id) => next.artifacts[id]?.origin.kind === "external_screen_action_receipt"),
+      event, `External-screen session ${artifact.id} changed its ordered runtime lineage`);
     } else if (artifact.origin.kind === "semantic_media_evidence") {
       const operation = next.semanticEvidence[artifact.origin.operationId];
       invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active semantic operation`);

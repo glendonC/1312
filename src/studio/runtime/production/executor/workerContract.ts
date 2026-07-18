@@ -1,6 +1,8 @@
-import { isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind, isOcrHostArtifactKind, isResearchHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, RESEARCH_CITATION_MAX_SPANS, RESEARCH_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
+import { COMPUTER_USE_LIMITS, isComputerUseHostArtifactKind, isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind, isOcrHostArtifactKind, isResearchHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, RESEARCH_CITATION_MAX_SPANS, RESEARCH_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
 import type {
   GeneralizedCoverageReasonCode,
+  ComputerUseEvidenceCitationInput,
+  ComputerUseEvidenceSourceIdentity,
   GeneralizedCoverageRange,
   GeneralizedStudyClaim,
   OcrEvidenceCitationInput,
@@ -19,13 +21,16 @@ import type { VerifiedSemanticEvidence } from "../semantic/semanticEvidenceAudit
 import type { VerifiedOcrAudit } from "../ocrAudit.ts";
 import type { VerifiedSpeakerOverlapAudit } from "../speakerAudit.ts";
 import type { VerifiedResearchSnapshotAudit } from "../research/researchAudit.ts";
+import type { VerifiedComputerUseSession } from "../computerUse/computerUseAudit.ts";
 import { currentRunSpeechCitation, ocrSpanCitation, speakerTurnCitation } from "../evidenceCitations/audit.ts";
 import { externalDocumentSpanCitation } from "../research/researchCitation.ts";
+import { externalScreenRegionCitation } from "../computerUse/computerUseCitation.ts";
 import { deriveGeneralizedCoverageDecision } from "../admission/generalizedCoveragePolicy.ts";
 import { validateSemanticEvidenceCitationInput } from "../validation/semanticEvidence.ts";
 import { validateOcrEvidenceCitationInput } from "../validation/ocr.ts";
 import { validateSpeakerOverlapEvidenceCitationInput } from "../validation/speakers.ts";
 import { validateResearchEvidenceCitationInput } from "../validation/research.ts";
+import { validateComputerUseEvidenceCitationInput } from "../validation/computerUse.ts";
 import { validateCoveragePartition, validateStudyReportArtifact } from "../validation/studyReports.ts";
 import { validateStudyReportArtifactV2 } from "../validation/studyReportsV2.ts";
 import { LauncherFailure } from "./launcherFailure.ts";
@@ -36,6 +41,7 @@ export interface WorkerResult {
   ocrEvidenceInputs: OcrEvidenceCitationInput[];
   speakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[];
   researchEvidenceInputs: ResearchEvidenceCitationInput[];
+  computerUseEvidenceInputs: ComputerUseEvidenceCitationInput[];
   outputs: WorkerResultOutput[];
 }
 
@@ -95,6 +101,8 @@ export function buildStudyReportEnvelopeV2(input: {
   verifiedSpeakerEvidence?: VerifiedSpeakerOverlapAudit[];
   researchEvidenceInputs?: ResearchEvidenceCitationInput[];
   verifiedResearchEvidence?: VerifiedResearchSnapshotAudit[];
+  computerUseEvidenceInputs?: ComputerUseEvidenceCitationInput[];
+  verifiedComputerUseEvidence?: VerifiedComputerUseSession[];
   dialogueScopePolicy: DialogueScopePolicy | null;
 }): StudyReportArtifactV2 {
   const { task, output } = input;
@@ -253,6 +261,36 @@ export function buildStudyReportEnvelopeV2(input: {
     });
   });
   evidenceCitations.push(...researchCitations);
+  const verifiedComputerByOperation = new Map(
+    (input.verifiedComputerUseEvidence ?? []).map((entry) => [entry.receipt.operationId, entry]),
+  );
+  const seenComputerScreenshots = new Set<string>();
+  const computerUseCitations = (input.computerUseEvidenceInputs ?? []).map((candidate, index) => {
+    const citationInput = validateComputerUseEvidenceCitationInput(candidate, "Study report v2 computer-use input", `computerUseEvidenceInputs[${index}]`);
+    const verified = verifiedComputerByOperation.get(citationInput.operationId);
+    const state = verified?.states.find((entry) => entry.identity.stateId === citationInput.stateId);
+    if (!verified || !state || seenComputerScreenshots.has(citationInput.screenshotArtifactId) ||
+        citationInput.sessionArtifactId !== verified.receiptArtifactId ||
+        citationInput.sessionReceiptId !== verified.receipt.receiptId ||
+        citationInput.sessionReceiptContentId !== verified.receiptContentId ||
+        citationInput.screenshotArtifactId !== state.identity.screenshot.artifactId ||
+        citationInput.screenshotContentId !== state.identity.screenshot.content.contentId) {
+      throw new Error(`Study report v2 computer-use input ${citationInput.operationId} changed authenticated session state`);
+    }
+    seenComputerScreenshots.add(citationInput.screenshotArtifactId);
+    return externalScreenRegionCitation({
+      verified,
+      stateId: citationInput.stateId,
+      region: citationInput.region,
+      target: { kind: "media_context", qualifiesMedia: {
+        artifactId: verified.receipt.gap.media.artifactId,
+        trackId: verified.receipt.gap.media.trackId,
+        startMs: verified.receipt.gap.media.startMs,
+        endMs: verified.receipt.gap.media.endMs,
+      } },
+    });
+  });
+  evidenceCitations.push(...computerUseCitations);
   const sourceMap = new Map<string, string>([[task.jobContext.source.artifactId, task.jobContext.source.contentId]]);
   for (const citation of evidenceCitations) {
     sourceMap.set(citation.evidence.artifactId, citation.evidence.contentId);
@@ -286,9 +324,10 @@ export function validateWorkerResult(
   expectedOcrEvidenceInputs: OcrEvidenceCitationInput[] = [],
   expectedSpeakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [],
   expectedResearchEvidenceInputs: ResearchEvidenceSourceIdentity[] = [],
+  expectedComputerUseEvidenceInputs: ComputerUseEvidenceSourceIdentity[] = [],
 ): WorkerResult {
   const item = record(value);
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind) || isComputerUseHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker response failed its output authority contract.",
@@ -298,7 +337,8 @@ export function validateWorkerResult(
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
   const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
   const researchGranted = task.grants.some((grant) => grant.capability === "research.investigate");
-  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : [])]);
+  const computerUseGranted = task.grants.some((grant) => grant.capability === "computer.use.readonly");
+  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : [])]);
   if (!item || Object.keys(item).some((key) => !allowedKeys.has(key))) {
     throw new LauncherFailure(
       "Worker result must contain only summary and outputs",
@@ -459,6 +499,34 @@ export function validateWorkerResult(
       "Codex worker response failed its research evidence citation contract.",
     );
   }
+  let computerUseEvidenceInputs: ComputerUseEvidenceCitationInput[] = [];
+  if (computerUseGranted) {
+    if (!Array.isArray(item.computerUseEvidenceInputs) || item.computerUseEvidenceInputs.length > COMPUTER_USE_LIMITS.maxScreenshots) {
+      throw new LauncherFailure("Computer-use worker omitted or exceeded its structured screen-region list", "Codex worker response failed its external-screen citation contract.");
+    }
+    try {
+      computerUseEvidenceInputs = item.computerUseEvidenceInputs.map((entry, index) =>
+        validateComputerUseEvidenceCitationInput(entry, "Worker result", `computerUseEvidenceInputs[${index}]`));
+    } catch (error) {
+      throw new LauncherFailure(`Worker external-screen citation is invalid: ${error instanceof Error ? error.message : "invalid citation"}`, "Codex worker response failed its external-screen citation contract.");
+    }
+    const expectedByOperation = new Map(expectedComputerUseEvidenceInputs.map((entry) => [entry.operationId, entry]));
+    const seenScreenshots = new Set<string>();
+    for (const candidate of computerUseEvidenceInputs) {
+      const expected = expectedByOperation.get(candidate.operationId);
+      const screenshot = expected?.screenshots.find((entry) => entry.stateId === candidate.stateId);
+      if (!expected || !screenshot || seenScreenshots.has(candidate.screenshotArtifactId) ||
+          candidate.sessionArtifactId !== expected.sessionArtifactId || candidate.sessionReceiptId !== expected.sessionReceiptId ||
+          candidate.sessionReceiptContentId !== expected.sessionReceiptContentId ||
+          candidate.screenshotArtifactId !== screenshot.artifactId || candidate.screenshotContentId !== screenshot.contentId ||
+          candidate.region.x + candidate.region.width > screenshot.width || candidate.region.y + candidate.region.height > screenshot.height) {
+        throw new LauncherFailure("Worker external-screen citations do not name unique authenticated current-task screenshot regions", "Codex worker response failed its external-screen citation contract.");
+      }
+      seenScreenshots.add(candidate.screenshotArtifactId);
+    }
+  } else if (expectedComputerUseEvidenceInputs.length !== 0) {
+    throw new LauncherFailure("Host supplied external-screen evidence without a worker grant", "Codex worker response failed its external-screen citation contract.");
+  }
   const required = task.requiredOutputs.filter((output) => output.required);
   if (item.outputs.length !== required.length) {
     throw new LauncherFailure(
@@ -535,11 +603,11 @@ export function validateWorkerResult(
       "Codex worker response failed its output contract.",
     );
   }
-  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, speakerEvidenceInputs, researchEvidenceInputs, outputs };
+  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, speakerEvidenceInputs, researchEvidenceInputs, computerUseEvidenceInputs, outputs };
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind) || isComputerUseHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker output schema cannot impersonate a host frame artifact.",
@@ -550,6 +618,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
   const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
   const researchGranted = task.grants.some((grant) => grant.capability === "research.investigate");
+  const computerUseGranted = task.grants.some((grant) => grant.capability === "computer.use.readonly");
   const semanticEvidenceInputs = {
     type: "array",
     minItems: 1,
@@ -650,6 +719,33 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
       required: ["operationId", "receiptArtifactId", "receiptContentId", "extractionArtifactId", "extractionContentId", "spans"],
     },
   };
+  const computerUseEvidenceInputs = {
+    type: "array",
+    minItems: 0,
+    maxItems: COMPUTER_USE_LIMITS.maxScreenshots,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        operationId: { type: "string", minLength: 1 },
+        sessionArtifactId: { type: "string", minLength: 1 },
+        sessionReceiptId: { type: "string", minLength: 1 },
+        sessionReceiptContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        stateId: { type: "string", minLength: 1 },
+        screenshotArtifactId: { type: "string", minLength: 1 },
+        screenshotContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        region: {
+          type: "object", additionalProperties: false,
+          properties: {
+            x: { type: "integer", minimum: 0 }, y: { type: "integer", minimum: 0 },
+            width: { type: "integer", minimum: 1 }, height: { type: "integer", minimum: 1 },
+          },
+          required: ["x", "y", "width", "height"],
+        },
+      },
+      required: ["operationId", "sessionArtifactId", "sessionReceiptId", "sessionReceiptContentId", "stateId", "screenshotArtifactId", "screenshotContentId", "region"],
+    },
+  };
   const coverage = {
     type: "array", minItems: 1, maxItems: STUDY_REPORT_LIMITS.maxRanges,
     items: {
@@ -726,6 +822,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
       ...(ocrGranted ? { ocrEvidenceInputs } : {}),
       ...(speakerGranted ? { speakerEvidenceInputs } : {}),
       ...(researchGranted ? { researchEvidenceInputs } : {}),
+      ...(computerUseGranted ? { computerUseEvidenceInputs } : {}),
       outputs: {
         type: "array",
         minItems: required.length,
@@ -733,7 +830,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         items: outputItems,
       },
     },
-    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), "outputs"],
+    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : []), "outputs"],
   };
 }
 
@@ -784,6 +881,9 @@ export function workerPrompt(task: TaskRecord): string {
     grantedResearch: task.grants
       .filter((grant) => grant.capability === "research.investigate")
       .map((grant) => ({ gap: grant.researchScope?.gap ?? null, allowedDomains: grant.researchScope?.allowedDomains ?? [], limits: grant.researchScope?.limits ?? null })),
+    grantedComputerUse: task.grants
+      .filter((grant) => grant.capability === "computer.use.readonly")
+      .map((grant) => ({ gap: grant.computerUseScope?.gap ?? null, cause: grant.computerUseScope?.r1Cause ?? null, surface: grant.computerUseScope?.surface ?? null, driver: grant.computerUseScope?.driver ?? null, limits: grant.computerUseScope?.limits ?? null })),
     grantedSemanticEvidence: semanticScope,
     grantedEvidence: task.grants
       .filter((grant) => grant.capability === "evidence.read")
@@ -892,6 +992,15 @@ export function workerPrompt(task: TaskRecord): string {
         "To cite a completed document_snapshot, copy only its exact operation, snapshot receipt artifact/content, and extraction artifact/content identities into the top-level researchEvidenceInputs list, then select sorted non-overlapping UTF-8 byte spans within the returned extraction. Search results and snippets never belong in this list. You may leave the list empty.",
         "Do not label worker-authored output as any studio research receipt, snapshot, or extraction artifact kind; those belong only to the host.",
       ].join(" ");
+  const computerUseGranted = task.grants.some((grant) => grant.capability === "computer.use.readonly");
+  const computerUseBoundary = !computerUseGranted
+    ? "This executor exposes no computer-use tool, browser, desktop, app, cookie, credential, or external-screen state."
+    : [
+        "Invoke computer_use_readonly exactly once with the closed empty object. The host injects the exact gap, R1 cause, sealed offline fixture, HTTPS surface identity, driver, read-only transitions, task, agent, grant, and limits.",
+        "This is an offline fixture with zero egress and downloads. It is not a live browser, current external state, source truth, entity match, or evidence of understanding.",
+        "To cite a screenshot, copy only its operation, session receipt, state, screenshot artifact/content identities and choose one bounded pixel rectangle in computerUseEvidenceInputs. Do not copy URLs, visible text, targets, or author an evidence envelope.",
+        "The host converts selections into report-level cite-only media context. External-screen regions never become claim support, coverage qualification, dialogue, captions, semantic quality, readiness, or publication authority. You may leave the list empty.",
+      ].join(" ");
   const decisionScope = task.grants
     .find((grant) => grant.capability === "analysis.evidence.decide")?.decisionScope ?? null;
   const decisionBoundary = decisionScope === null
@@ -910,6 +1019,7 @@ export function workerPrompt(task: TaskRecord): string {
     semanticBoundary,
     studyBoundary,
     researchBoundary,
+    computerUseBoundary,
     evidenceBoundary,
     assessmentBoundary,
     decisionBoundary,

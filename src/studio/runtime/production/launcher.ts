@@ -11,6 +11,7 @@ import type {
   LaunchPermit,
   ModelUsageReceipt,
   OcrEvidenceCitationInput,
+  ComputerUseEvidenceSourceIdentity,
   ResearchEvidenceSourceIdentity,
   SpeakerOverlapEvidenceCitationInput,
   ReportRecord,
@@ -31,6 +32,9 @@ import { auditConditionalSeparation } from "./separationAudit.ts";
 import { BoundedResearchHost } from "./research/researchHost.ts";
 import { auditResearchSearch, auditResearchSnapshot } from "./research/researchAudit.ts";
 import { FixtureResearchProvider, type ResearchSearchProvider } from "./research/provider.ts";
+import { RuntimeComputerUseHost } from "./computerUse/runtimeComputerUseHost.ts";
+import { auditComputerUseSession } from "./computerUse/computerUseAudit.ts";
+import type { ReadOnlyExternalScreenDriver } from "./computerUse/driver.ts";
 import type { SourceSeparator } from "./separation/separator.ts";
 import type { SpeakerDiarizer } from "./speaker/diarizer.ts";
 import type { OcrRecognizer } from "./ocr/recognizer.ts";
@@ -107,6 +111,7 @@ export interface CodexWorkerLauncherOptions {
   nextSpeakerOperationId?: () => string;
   nextSeparationOperationId?: () => string;
   nextResearchOperationId?: () => string;
+  nextComputerUseOperationId?: () => string;
   mediaHost?: ChildMediaCapabilityHost;
   frameHost?: ChildFrameSamplingHost;
   ocrHost?: ChildOcrHost;
@@ -117,6 +122,8 @@ export interface CodexWorkerLauncherOptions {
   sourceSeparator?: SourceSeparator;
   /** Provider seam only; the launcher always constructs the per-grant research host itself. Fixture (no egress) by default. */
   researchSearchProvider?: ResearchSearchProvider;
+  /** Exact host-owned offline fixture driver. No driver means no computer-use launch. */
+  computerUseDriver?: ReadOnlyExternalScreenDriver;
   speakerDiarizer?: SpeakerDiarizer;
   evidenceHost?: ChildEvidenceReadHost;
   assessmentHost?: ChildEvidenceAssessmentHost;
@@ -129,6 +136,7 @@ export interface CodexWorkerLauncherOptions {
   speakerMcpServerPath?: string;
   separationMcpServerPath?: string;
   researchMcpServerPath?: string;
+  computerUseMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -148,7 +156,7 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextSpeakerOperationId" | "nextSeparationOperationId" | "nextResearchOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "speakerMcpServerPath" | "separationMcpServerPath" | "researchMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer" | "sourceSeparator" | "researchSearchProvider"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextSpeakerOperationId" | "nextSeparationOperationId" | "nextResearchOperationId" | "nextComputerUseOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "speakerMcpServerPath" | "separationMcpServerPath" | "researchMcpServerPath" | "computerUseMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer" | "sourceSeparator" | "researchSearchProvider" | "computerUseDriver"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
@@ -215,12 +223,14 @@ export class CodexExecWorkerLauncher {
       nextSpeakerOperationId: options.nextSpeakerOperationId,
       nextSeparationOperationId: options.nextSeparationOperationId,
       nextResearchOperationId: options.nextResearchOperationId,
+      nextComputerUseOperationId: options.nextComputerUseOperationId,
       mediaMcpServerPath: options.mediaMcpServerPath,
       frameMcpServerPath: options.frameMcpServerPath,
       ocrMcpServerPath: options.ocrMcpServerPath,
       speakerMcpServerPath: options.speakerMcpServerPath,
       separationMcpServerPath: options.separationMcpServerPath,
       researchMcpServerPath: options.researchMcpServerPath,
+      computerUseMcpServerPath: options.computerUseMcpServerPath,
       evidenceMcpServerPath: options.evidenceMcpServerPath,
       assessmentMcpServerPath: options.assessmentMcpServerPath,
       decisionMcpServerPath: options.decisionMcpServerPath,
@@ -230,6 +240,7 @@ export class CodexExecWorkerLauncher {
       speakerDiarizer: options.speakerDiarizer,
       sourceSeparator: options.sourceSeparator,
       researchSearchProvider: options.researchSearchProvider,
+      computerUseDriver: options.computerUseDriver,
     };
   }
 
@@ -277,9 +288,9 @@ export class CodexExecWorkerLauncher {
     }
     if (
       !scheduled.grants.some((grant) => grant.capability === "report.submit") ||
-      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.speakers.analyze", "media.audio.separate", "research.investigate", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
+      scheduled.grants.some((grant) => !["report.submit", "media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.speakers.analyze", "media.audio.separate", "research.investigate", "computer.use.readonly", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide"].includes(grant.capability))
     ) {
-      throw new Error("Codex executor supports only report.submit plus scheduler-granted media, frame, anonymous-speaker, research, speech.transcribe, evidence-read, assessment, and decision capabilities");
+      throw new Error("Codex executor supports only report.submit plus scheduler-granted media, frame, anonymous-speaker, research, sealed computer-use, speech.transcribe, evidence-read, assessment, and decision capabilities");
     }
 
     const claimedAt = this.options.now().toISOString();
@@ -330,7 +341,28 @@ export class CodexExecWorkerLauncher {
           },
         )
       : undefined;
+    const launchComputerUseGrant = task.grants.find((grant) => grant.capability === "computer.use.readonly");
+    const computerUseHost = launchComputerUseGrant?.capability === "computer.use.readonly" && this.options.computerUseDriver
+      ? new RuntimeComputerUseHost(
+          this.ledger,
+          this.artifacts,
+          task,
+          launchComputerUseGrant,
+          { executionId, launchClaimId: launchClaim.claim.id },
+          this.options.computerUseDriver,
+          {
+            temporaryRoot: this.options.temporaryRoot,
+            maximumWallMs: Math.min(task.budget.wallMs, this.options.maximumWallMs),
+          },
+        )
+      : undefined;
     try {
+      if (launchComputerUseGrant && !computerUseHost) {
+        throw new LauncherFailure(
+          "Computer-use grant has no sealed fixture driver",
+          "This executor cannot start the granted offline external-screen inspection.",
+        );
+      }
       await openLauncherChildCapabilityBridges(
         task,
         {
@@ -340,6 +372,7 @@ export class CodexExecWorkerLauncher {
           speaker: this.speakerHost,
           separation: this.separationHost,
           ...(researchHost ? { research: researchHost } : {}),
+          ...(computerUseHost ? { computerUse: computerUseHost } : {}),
           evidence: this.evidenceHost,
           assessment: this.assessmentHost,
           decision: this.decisionHost,
@@ -357,6 +390,7 @@ export class CodexExecWorkerLauncher {
         speakerGrant,
         separationGrant,
         researchGrant,
+        computerUseGrant,
         assessmentGrant,
         decisionGrant,
       } = childCapabilities;
@@ -537,6 +571,65 @@ export class CodexExecWorkerLauncher {
           });
         }
       }
+      const projectedComputerUse = Object.values(this.ledger.state().computerUseOperations)
+        .filter((operation) => computerUseGrant && operation.taskId === task.id && operation.grantId === computerUseGrant.id)
+        .sort((left, right) => left.id.localeCompare(right.id));
+      if (computerUseGrant && (
+        projectedComputerUse.length !== 1 || projectedComputerUse[0].status !== "completed" ||
+        projectedComputerUse[0].executionId !== executionId ||
+        projectedComputerUse[0].launchClaimId !== launchClaim.claim.id ||
+        !projectedComputerUse[0].sessionArtifactId || !projectedComputerUse[0].sessionReceiptId ||
+        !projectedComputerUse[0].sessionReceiptContentId
+      )) {
+        throw new LauncherFailure(
+          "Codex child did not complete one exact granted computer-use session",
+          "Codex child did not complete its required receipted offline external-screen inspection under this executor.",
+        );
+      }
+      const verifiedComputerUseEvidence: Awaited<ReturnType<typeof auditComputerUseSession>>[] = [];
+      const computerUseEvidenceInputs: ComputerUseEvidenceSourceIdentity[] = [];
+      for (const operation of projectedComputerUse) {
+        if (!operation.sessionArtifactId || !operation.sessionReceiptId || !operation.sessionReceiptContentId) {
+          throw new LauncherFailure("Computer-use operation lost its session identity", "A completed external-screen operation has no content-addressed session receipt.");
+        }
+        const verified = await auditComputerUseSession(this.artifacts, this.ledger.runId, operation.sessionReceiptContentId);
+        if (
+          verified.receipt.operationId !== operation.id || verified.receiptArtifactId !== operation.sessionArtifactId ||
+          verified.receipt.receiptId !== operation.sessionReceiptId ||
+          verified.receipt.authorization.grantId !== operation.grantId ||
+          verified.receipt.authorization.taskId !== task.id ||
+          verified.receipt.authorization.agentId !== task.assignedAgentId ||
+          verified.receipt.accounting.egressRequests !== 0 || verified.receipt.accounting.egressBytes !== 0 ||
+          verified.receipt.accounting.downloads !== 0 || verified.receipt.accounting.downloadBytes !== 0 ||
+          verified.receipt.nonClaims.liveExternalState !== "not_observed" ||
+          verified.receipt.nonClaims.claimSupportAuthority !== "not_granted" ||
+          verified.receipt.nonClaims.coverageAuthority !== "not_granted" ||
+          verified.receipt.nonClaims.captionAuthority !== "not_granted" ||
+          JSON.stringify(operation.screenshotArtifactIds) !== JSON.stringify(verified.states.map((state) => state.identity.screenshot.artifactId)) ||
+          JSON.stringify(operation.visibleContentArtifactIds) !== JSON.stringify(verified.states.map((state) => state.identity.visibleContent.artifactId)) ||
+          JSON.stringify(operation.actionArtifactIds) !== JSON.stringify(verified.actions.map((action) => action.identity.artifactId))
+        ) {
+          throw new LauncherFailure(
+            "Computer-use session changed its authenticated executor or offline lineage",
+            "External-screen context must remain bound to this exact task execution and sealed fixture session.",
+          );
+        }
+        verifiedComputerUseEvidence.push(verified);
+        computerUseEvidenceInputs.push({
+          operationId: operation.id,
+          sessionArtifactId: verified.receiptArtifactId,
+          sessionReceiptId: verified.receipt.receiptId,
+          sessionReceiptContentId: verified.receiptContentId,
+          screenshots: verified.states.map((state) => ({
+            stateId: state.identity.stateId,
+            ordinal: state.identity.ordinal,
+            artifactId: state.identity.screenshot.artifactId,
+            contentId: state.identity.screenshot.content.contentId,
+            width: state.identity.screenshot.width,
+            height: state.identity.screenshot.height,
+          })),
+        });
+      }
       if (evidenceGrant?.evidenceScope.some((scope) =>
         !Object.values(this.ledger.state().evidenceReads).some((operation) =>
           operation.taskId === task.id &&
@@ -593,6 +686,7 @@ export class CodexExecWorkerLauncher {
         ocrEvidenceInputs,
         speakerEvidenceInputs,
         researchEvidenceInputs,
+        computerUseEvidenceInputs,
       );
       const prepared = await Promise.all(
         worker.outputs.map(async (output) => {
@@ -610,6 +704,8 @@ export class CodexExecWorkerLauncher {
                   verifiedSpeakerEvidence,
                   researchEvidenceInputs: worker.researchEvidenceInputs,
                   verifiedResearchEvidence,
+                  computerUseEvidenceInputs: worker.computerUseEvidenceInputs,
+                  verifiedComputerUseEvidence,
                   dialogueScopePolicy: await deriveTaskDialogueScopePolicy(this.ledger.state(), this.artifacts, task.id),
                 })
               : buildStudyReportEnvelope(task, output, worker.semanticEvidenceInputs);

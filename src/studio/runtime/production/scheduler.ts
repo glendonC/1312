@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { assertRuntimeLimits, assertSpawnRequestInput } from "./assertions.ts";
 import { attenuateTaskJobContext } from "./jobContext.ts";
-import { CONDITIONAL_SEPARATION_LIMITS, FRAME_SAMPLING_LIMITS, OCR_LIMITS, RESEARCH_LIMITS, SEPARATION_METHOD, SPEAKER_OVERLAP_LIMITS } from "./model.ts";
+import { COMPUTER_USE_LIMITS, CONDITIONAL_SEPARATION_LIMITS, FRAME_SAMPLING_LIMITS, OCR_LIMITS, RESEARCH_LIMITS, SEPARATION_METHOD, SPEAKER_OVERLAP_LIMITS } from "./model.ts";
 import type {
   AnyResearchTriggerOption,
   ResearchGrantScope,
@@ -24,6 +24,10 @@ import type {
   ConditionalSeparationGrantScope,
   ConditionalSeparationTrigger,
   RuntimeArtifact,
+  ComputerUseDriverIdentity,
+  ComputerUseGrantScope,
+  ComputerUseRequestCandidate,
+  ComputerUseSurface,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import { currentRestudiedResearchBasis } from "./research/restudiedResearchBasis.ts";
@@ -51,6 +55,7 @@ import {
   validateResearchTriggerOption,
   validateRestudiedResearchTriggerOption,
 } from "./validation/research.ts";
+import { computerUseCandidateId, validateComputerUseDriver, validateComputerUseSurface } from "./validation/computerUse.ts";
 
 export interface RuntimeIdentityFactory {
   next(kind: "request" | "task" | "agent" | "grant"): string;
@@ -131,12 +136,16 @@ export class BoundedRuntimeScheduler {
   private readonly identities: RuntimeIdentityFactory;
   /** Host-policy egress allowlist for minted research grants. Never model-authored; empty means no egress. */
   private readonly researchAllowedDomains: string[];
+  private readonly computerUsePolicy: { surface: ComputerUseSurface; driver: ComputerUseDriverIdentity } | null;
 
   constructor(
     ledger: RuntimeLedger,
     limits: RuntimeLimits,
     identities: RuntimeIdentityFactory = new RandomRuntimeIdentityFactory(),
-    policies: { researchAllowedDomains?: readonly string[] } = {},
+    policies: {
+      researchAllowedDomains?: readonly string[];
+      computerUse?: { surface: ComputerUseSurface; driver: ComputerUseDriverIdentity };
+    } = {},
   ) {
     this.ledger = ledger;
     this.limits = limits;
@@ -145,6 +154,10 @@ export class BoundedRuntimeScheduler {
     this.researchAllowedDomains = policies.researchAllowedDomains === undefined
       ? []
       : validateResearchAllowedDomains([...policies.researchAllowedDomains], "Scheduler research policy", "researchAllowedDomains");
+    this.computerUsePolicy = policies.computerUse === undefined ? null : {
+      surface: validateComputerUseSurface(policies.computerUse.surface, "Scheduler computer-use policy", "surface"),
+      driver: validateComputerUseDriver(policies.computerUse.driver, "Scheduler computer-use policy", "driver"),
+    };
   }
 
   private grants(
@@ -154,6 +167,7 @@ export class BoundedRuntimeScheduler {
     input: SpawnRequestInput,
     conditionalSeparationScope: ConditionalSeparationGrantScope | null = null,
     researchScope: ResearchGrantScope | null = null,
+    computerUseScope: ComputerUseGrantScope | null = null,
   ): CapabilityGrant[] {
     return [...input.requiredCapabilities]
       .sort()
@@ -239,6 +253,10 @@ export class BoundedRuntimeScheduler {
           if (!researchScope) throw new Error("Research grants require an audited gap-bound scope");
           return { ...common, capability, researchScope: structuredClone(researchScope) };
         }
+        if (capability === "computer.use.readonly") {
+          if (!computerUseScope) throw new Error("Computer-use grants require an audited cause-bound scope");
+          return { ...common, capability, computerUseScope: structuredClone(computerUseScope) };
+        }
         return { ...common, capability };
       });
   }
@@ -255,7 +273,7 @@ export class BoundedRuntimeScheduler {
     });
   }
 
-  private capabilityValid(state: RuntimeProjection, input: SpawnRequestInput, allowConditionalSeparation = false, allowResearch = false): boolean {
+  private capabilityValid(state: RuntimeProjection, input: SpawnRequestInput, allowConditionalSeparation = false, allowResearch = false, allowComputerUse = false): boolean {
     const evidenceArtifacts = input.inputArtifactIds.filter(
       (artifactId) => state.artifacts[artifactId]?.origin.kind === "preflight_evidence",
     );
@@ -280,6 +298,7 @@ export class BoundedRuntimeScheduler {
       roleAllowsCapabilities(input.workerKind, input.requiredCapabilities) &&
       (!input.requiredCapabilities.includes("media.audio.separate") || allowConditionalSeparation) &&
       (!input.requiredCapabilities.includes("research.investigate") || allowResearch) &&
+      (!input.requiredCapabilities.includes("computer.use.readonly") || allowComputerUse) &&
       (!input.requiredCapabilities.some((capability) => capability.startsWith("media.") || capability === "speech.transcribe") || input.mediaScope.length > 0) &&
       (!input.requiredCapabilities.includes("evidence.read") ||
         (evidenceArtifacts.length > 0 &&
@@ -413,6 +432,7 @@ export class BoundedRuntimeScheduler {
     input: SpawnRequestInput,
     allowConditionalSeparation = false,
     allowResearch = false,
+    allowComputerUse = false,
   ): SpawnRejection | null {
     const parent = state.tasks[requestedByTaskId];
     if (
@@ -449,7 +469,7 @@ export class BoundedRuntimeScheduler {
     ) {
       return "scope_violation";
     }
-    if (!this.capabilityValid(state, input, allowConditionalSeparation, allowResearch)) return "capability_not_grantable";
+    if (!this.capabilityValid(state, input, allowConditionalSeparation, allowResearch, allowComputerUse)) return "capability_not_grantable";
     const total = allocated(state);
     if (
       total.wallMs + input.budget.wallMs > this.limits.runBudget.wallMs ||
@@ -963,6 +983,141 @@ export class BoundedRuntimeScheduler {
         const taskId = this.identities.next("task");
         const agentId = this.identities.next("agent");
         const grants = this.grants(state, taskId, agentId, input, null, scope);
+        const permit: LaunchPermit = { requestId, taskId, agentId, registrationSecret: this.identities.secret() };
+        const task: TaskRecord = {
+          id: taskId, runId: state.runId, workloadKey: input.workloadKey, objective: input.objective,
+          workerKind: input.workerKind, workerLabel: input.workerLabel, parentTaskId: root.id, parentAgentId: root.ownerAgentId,
+          depth: root.depth + 1, assignedAgentId: agentId, ownerAgentId: null,
+          jobContext: attenuateTaskJobContext(root.jobContext, input.mediaScope, input.inputArtifactIds),
+          mediaScope: structuredClone(input.mediaScope), inputArtifactIds: [...input.inputArtifactIds],
+          requiredOutputs: structuredClone(input.requiredOutputs), dependencies: [], budget: { ...input.budget }, grants,
+          status: "scheduled", terminalReason: null,
+        };
+        return {
+          pending: [requestEvent, { type: "spawn.decided", data: { requestId, accepted: true, rejection: null, taskId, agentId, grants } }, { type: "task.created", data: { task } }] satisfies PendingRuntimeEvent[],
+          result: { requestId, accepted: true, rejection: null, permit },
+        };
+      },
+    );
+    if (transaction.result.permit) this.permits.set(requestId, transaction.result.permit);
+    return transaction.result;
+  }
+
+  /** Dedicated R2 admission. Ordinary spawn never receives the allowComputerUse gate. */
+  async requestComputerUse(inputValue: {
+    inputId: string;
+    candidate: ComputerUseRequestCandidate;
+    child: SpawnRequestInput;
+    authorship: { executionId: string; toolCallId: string; taskId: string; agentId: string };
+  }): Promise<SpawnDecision> {
+    assertSpawnRequestInput(inputValue.child, "Computer-use child");
+    const input = structuredClone(inputValue.child);
+    const candidate = structuredClone(inputValue.candidate);
+    if (!inputValue.inputId || !candidate.candidateId || !candidate.exhaustionReceiptId) {
+      throw new Error("Computer-use admission requires exact host-derived input, candidate, and cause identities");
+    }
+    const requestId = this.identities.next("request");
+    const transaction = await this.ledger.transact<SpawnDecision>(
+      { producer: { kind: "scheduler", id: "bounded-scheduler" }, causationId: candidate.candidateId, correlationId: requestId },
+      ({ state }) => {
+        const requestEvent = {
+          type: "spawn.requested" as const,
+          data: {
+            requestId,
+            requestedByTaskId: inputValue.authorship.taskId,
+            requestedByAgentId: inputValue.authorship.agentId,
+            authoredByExecutionId: inputValue.authorship.executionId,
+            toolCallId: inputValue.authorship.toolCallId,
+            input,
+          },
+        };
+        const root = state.tasks[inputValue.authorship.taskId];
+        const execution = state.executions[inputValue.authorship.executionId];
+        const call = state.orchestratorToolCalls[inputValue.authorship.toolCallId];
+        const exhaustion = state.researchExhaustions[candidate.exhaustionReceiptId];
+        const researchTask = exhaustion ? state.tasks[exhaustion.taskId] : undefined;
+        const researchInput = exhaustion ? state.researchRequestInputs[exhaustion.gap.inputId] : undefined;
+        let authoritative: ComputerUseRequestCandidate | null = null;
+        if (root && exhaustion && researchTask?.parentTaskId === root.id && researchInput) {
+          try {
+            const currentBasis = currentRestudiedResearchBasis(state, researchInput.basis.root);
+            const trigger = researchInput.triggers.find((entry) => entry.triggerId === exhaustion.gap.triggerId);
+            if (
+              trigger && researchInput.basis.root.taskId === root.id &&
+              researchInput.basis.root.agentId === inputValue.authorship.agentId &&
+              researchInput.basis.root.executionId === inputValue.authorship.executionId &&
+              same(researchInput.basis, currentBasis) && same(trigger.source, exhaustion.gap.media) &&
+              trigger.gap.detail === exhaustion.gap.hypothesis
+            ) {
+              const body = {
+                exhaustionReceiptId: exhaustion.id,
+                gap: structuredClone(exhaustion.gap),
+                source: structuredClone(exhaustion.gap.media),
+              };
+              authoritative = { candidateId: computerUseCandidateId(body), ...body };
+            }
+          } catch {
+            authoritative = null;
+          }
+        }
+        const policy = this.computerUsePolicy;
+        const candidateValid = authoritative !== null && same(authoritative, candidate);
+        const scope: ComputerUseGrantScope | null = policy && authoritative && exhaustion ? {
+          schema: "studio.computer-use-grant.v1",
+          limits: structuredClone(COMPUTER_USE_LIMITS),
+          gap: structuredClone(authoritative.gap),
+          r1Cause: {
+            receiptId: exhaustion.id,
+            receiptArtifactId: exhaustion.outputArtifactId,
+            receiptContentId: exhaustion.receiptContentId,
+            reason: exhaustion.reason,
+          },
+          surface: structuredClone(policy.surface),
+          driver: structuredClone(policy.driver),
+          policy: {
+            actions: "host_declared_readonly_transitions_only",
+            egress: "disabled",
+            downloads: "disabled",
+            cookies: "disabled",
+            credentials: "disabled",
+            uploads: "disabled",
+            mutations: "disabled",
+          },
+        } : null;
+        const childMatches = Boolean(scope && authoritative) &&
+          input.workloadKey === `computer-use:${authoritative!.candidateId}` && input.workerKind === "analysis" &&
+          input.workerLabel === "gap-external-screen-context" && input.mediaScope.length === 1 &&
+          input.mediaScope[0].artifactId === authoritative!.source.artifactId &&
+          input.mediaScope[0].trackId === authoritative!.source.trackId &&
+          input.mediaScope[0].startMs === authoritative!.source.startMs &&
+          input.mediaScope[0].endMs === authoritative!.source.endMs && input.inputArtifactIds.length === 1 &&
+          input.inputArtifactIds[0] === authoritative!.source.artifactId && input.requiredOutputs.length === 1 &&
+          input.requiredOutputs[0].name === "external screen context note" &&
+          input.requiredOutputs[0].artifactKind === "studio.study-report.v2" && input.requiredOutputs[0].required === true &&
+          input.requiredCapabilities.length === 2 && input.requiredCapabilities[0] === "computer.use.readonly" &&
+          input.requiredCapabilities[1] === "report.submit" && input.dependencies.length === 0 &&
+          input.budget.wallMs === COMPUTER_USE_LIMITS.maxWallMs && input.budget.toolCalls === COMPUTER_USE_LIMITS.maxCalls;
+        let rejection: SpawnRejection | null = Object.values(state.computerUseOperations).some((operation) =>
+          operation.r1Cause.receiptId === candidate.exhaustionReceiptId || operation.gap.triggerId === candidate.gap.triggerId) ||
+          Object.values(state.spawnRequests).some((request) => request.accepted && request.input.workloadKey === `computer-use:${candidate.candidateId}`)
+          ? "computer_use_duplicate_work"
+          : this.violation(state, inputValue.authorship.taskId, inputValue.authorship.agentId, input, false, false, true);
+        if (
+          !root || root.parentTaskId !== null || root.ownerAgentId !== inputValue.authorship.agentId ||
+          execution?.status !== "active" || execution.taskId !== root.id || execution.agentId !== root.ownerAgentId ||
+          !root.grants.some((grant) => grant.capability === "study.computer-use") ||
+          call?.tool !== "study_computer_use_request" || call.executionId !== execution.id || call.taskId !== root.id ||
+          !policy || !candidateValid || !childMatches
+        ) rejection = "requester_not_authorized";
+        if (rejection || !scope || !root) {
+          return {
+            pending: [requestEvent, { type: "spawn.decided", data: { requestId, accepted: false, rejection: rejection ?? "requester_not_authorized", taskId: null, agentId: null, grants: [] } }] satisfies PendingRuntimeEvent[],
+            result: { requestId, accepted: false, rejection: rejection ?? "requester_not_authorized", permit: null },
+          };
+        }
+        const taskId = this.identities.next("task");
+        const agentId = this.identities.next("agent");
+        const grants = this.grants(state, taskId, agentId, input, null, null, scope);
         const permit: LaunchPermit = { requestId, taskId, agentId, registrationSecret: this.identities.secret() };
         const task: TaskRecord = {
           id: taskId, runId: state.runId, workloadKey: input.workloadKey, objective: input.objective,

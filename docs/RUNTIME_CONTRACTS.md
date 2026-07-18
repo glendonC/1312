@@ -532,15 +532,24 @@ grant-owned media target. These citations enter only the report-level evidence l
 they never enter claim or supported-coverage citation ids and grant no speech, caption, source-truth,
 entity-match, freshness, or quality authority.
 
-The R2 producer core is deliberately local and inadmissible. `computer.use.readonly` is a
-producer-only literal, not a member of the global task-capability union. `BoundedComputerUseHost`
-accepts only an injected task/agent/grant view and a closed four-identity request. Its scope fixes the
-exact owned-media gap, exact cold-audited `studio.research-exhaustion.receipt.v1` identity, one
-lowercase HTTPS origin and entry surface, one driver identity, all limits, and disabled cookies,
-credentials, uploads, downloads, mutations, and egress. The request has no URL, action, selector,
-coordinate, script, credential, cookie, path, or free-form objective field. An operation and its
-grant fingerprint are charged before cause audit or driver work, so failed attempts cannot retry
-around the one-call budget.
+The R2 producer core now has an optional production-runtime path. `computer.use.readonly` is a
+global child capability, while `study.computer-use` is a distinct dormant root request capability.
+Neither appears on the default root grant. A composed scheduler must also receive a sealed offline
+surface and driver policy, so the default runtime cannot request or execute R2 work. Ordinary
+model-authored spawn rejects `computer.use.readonly`; only the dedicated recorded
+`study_computer_use_request` root tool can enter `scheduler.requestComputerUse`.
+
+The request tool exposes only `{ inputId, candidateId }` from a host-derived candidate. Admission
+cold-reopens the projected `studio.research-exhaustion.receipt.v1`, then the scheduler re-derives the
+same current v3 research basis and requires the exact exhausted gap and current root executor. The
+child contract is fixed by the host, including workload key, output kind, capability set, limits,
+and `computerUseScope`. Duplicate work fails closed. `BoundedComputerUseHost` still accepts only the
+injected task/agent/grant view and a closed four-identity request. Its scope fixes the exact
+owned-media gap, exact R1 cause, one lowercase HTTPS origin and entry surface, one driver identity,
+all limits, and disabled cookies, credentials, uploads, downloads, mutations, and egress. The
+request has no URL, action, selector, coordinate, script, credential, cookie, path, or free-form
+objective field. An operation and its grant fingerprint are charged before cause audit or driver
+work, so failed attempts cannot retry around the one-call budget.
 
 The only current driver is `offline_fixture`. It exposes one deterministic in-memory state graph and
 a host-owned script of declared `follow_readonly_transition` actions. It has no network, filesystem,
@@ -565,12 +574,28 @@ fixture manifest, session receipt, every screenshot, visible-content snapshot, a
 rechecks PNG bounds, reconstructs the session id from run/operation/grant, verifies every cumulative
 action prefix, and reconstructs all contextual identities and ordering.
 
-This producer proves deterministic policy enforcement and immutable fixture lineage only. It does
-not observe live external state or prove browser isolation, DNS containment, credential isolation,
-source truth, entity match, currency, visual understanding, speech, claim support, coverage, caption
-authority, or evidence admission. Scheduler, launcher, protocol, projection, runtime artifact
-origins, a distinct external-screen citation kind, same-task and same-executor admission, and any
-real isolated browser driver remain R2 runtime-wiring work.
+The launcher mounts exactly one task-private `computer_use_readonly` tool with an empty-object
+request. Its loopback bridge binds the grant, task, execution, and launch claim; validates the
+canonical session receipt, screenshot bytes and dimensions, visible content, actions, state
+envelopes, identities, and ordered lineage; and requires exactly one same-grant completed operation.
+The runtime wrapper journals `computer_use.operation_started`, `computer_use.operation_completed`,
+or `computer_use.operation_failed` with producer `computer_use_host`. Completion is atomic with the
+five private runtime artifact origins: fixture manifest, screenshot, visible content, action
+receipt, and session receipt. Projection and cold replay preserve the operation and its executor and
+launch lineage, while Studio output projection excludes these host-private artifacts.
+
+A worker may select only bounded region identities from the completed offline session. The v2
+report builder emits them as `external_screen_region` citations with locator `screen_region`, and
+admission requires the same task, agent, executor, session, and screenshot. They are report-level
+`cite_only` media context only: they cannot enter claims or supported coverage and grant no source
+truth, entity match, currency, visual understanding, speech, caption, quality, or readiness
+authority.
+
+This configured path proves deterministic policy enforcement, runtime authorization, immutable
+fixture lineage, and cite-only external-screen admission. It does not observe live external state or
+prove browser process isolation, DNS containment, credential isolation, source freshness, or any
+semantic conclusion. There is no live browser, network, cookie, credential, download, upload, or
+mutation path. A real isolated read-only driver remains future R2 work.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

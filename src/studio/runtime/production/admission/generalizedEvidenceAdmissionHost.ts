@@ -146,6 +146,16 @@ export class GeneralizedEvidenceAdmissionHost {
         if (!operation || operation.taskId !== task.id || operation.agentId !== task.assignedAgentId || operation.executionId !== execution.id) {
           throw new Error(`Research citation ${verified.citationId} is cross-task or cross-executor`);
         }
+      } else if (verified.evidenceKind === "external_screen_region") {
+        const operation = this.state.computerUseOperations[verified.operationId!];
+        if (!operation || operation.status !== "completed" || operation.taskId !== task.id ||
+            operation.agentId !== task.assignedAgentId || operation.executionId !== execution.id ||
+            operation.sessionArtifactId !== verified.receipt.artifactId ||
+            operation.sessionReceiptId !== verified.receipt.receiptId ||
+            operation.sessionReceiptContentId !== verified.receipt.contentId ||
+            !operation.screenshotArtifactIds.includes(verified.evidence.artifactId)) {
+          throw new Error(`External-screen citation ${verified.citationId} is cross-task, cross-executor, or outside its completed session`);
+        }
       } else if (!task.jobContext.detectorEvidence.some((identity) => identity.artifactId === verified.evidence.artifactId && identity.contentId === verified.evidence.contentId)) {
         throw new Error(`Acoustic citation ${verified.citationId} is outside the task's immutable detector evidence`);
       }

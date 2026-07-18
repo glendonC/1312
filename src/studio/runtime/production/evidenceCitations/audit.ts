@@ -18,6 +18,8 @@ import type {
   RuntimeProjection,
 } from "../model.ts";
 import { externalDocumentSpanCitation, reopenResearchCitationSource } from "../research/researchCitation.ts";
+import { auditComputerUseSession } from "../computerUse/computerUseAudit.ts";
+import { externalScreenRegionCitation } from "../computerUse/computerUseCitation.ts";
 import { reopenSemanticEvidence, type VerifiedSemanticEvidence } from "../semantic/semanticEvidenceAudit.ts";
 import {
   evidenceCitationId,
@@ -462,6 +464,16 @@ export async function auditEvidenceCitation(
         }
         return { start: entry.locator.document.start, end: entry.locator.document.end };
       }),
+    });
+  } else if (citation.evidenceKind === "external_screen_region") {
+    const verified = await auditComputerUseSession(artifacts, state.runId, citation.receipt.contentId);
+    const locator = citation.observations[0]?.locator;
+    if (locator?.kind !== "screen_region") throw new Error("External-screen citation requires one screen_region locator");
+    expected = externalScreenRegionCitation({
+      verified,
+      stateId: locator.screen.stateId,
+      region: { x: locator.screen.x, y: locator.screen.y, width: locator.screen.width, height: locator.screen.height },
+      target: citation.target as Extract<EvidenceCitationTarget, { kind: "media_context" }>,
     });
   } else {
     throw new Error(`Evidence citation kind ${citation.evidenceKind} has no registered producer or audit adapter`);

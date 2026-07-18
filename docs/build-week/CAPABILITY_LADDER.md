@@ -109,8 +109,9 @@ checklist below:
    allowlist. The default v3 root now projects exact pre-synthesis conflict candidates, but an
    exact model echo is optional and non-conflicting runs grant nothing. The production v2 report
    path admits only bounded spans from cold-audited snapshots as cite-only context.
-9. **R2 — optional bounded computer-use:** after media senses and R1, inspect dynamic external
-   context in an isolated read-only session with action/screenshot receipts.
+9. **R2 - optional bounded computer-use (offline runtime slice implemented 2026-07-18):** after
+   media senses and exact R1 exhaustion, admit one explicitly composed offline fixture session with
+   action/screenshot receipts and cite-only screen regions. A real isolated driver remains.
 10. **G1 — semantic evaluation expansion:** score registered capability ablations, repeated captures,
     variance, and later packs while keeping structural QC separate from human semantic authority.
 
@@ -139,10 +140,10 @@ artifact, grant, and audit boundaries are real.
 |---|---|---|---|
 | Owned ingest and preflight | Content-addressed owned bytes, rights receipt, `ffprobe`, pinned VAD speech windows, pinned speech-window language ranges, and additive preflight V4 with separately sealed acoustic observations/receipt | Acoustic/diarization accuracy evaluation, scene, and visual context | [`ARCHITECTURE.md` — source ingest boundary](../ARCHITECTURE.md#source-ingest-boundary) and [`STATUS.md` — backlog boundary](./STATUS.md#post-freeze-backlog-boundary) |
 | Orchestration | A model-executed default root can request bounded children and one host-normalized attenuated-speech re-study for an exact weak range/cause, including an exact receipt-backed U6 `speaker_overlap` cell. The scheduler derives identities, attenuates context, enforces scope/budgets/pass caps, and dedupes completed work/configuration | Padded audio, denser frames, alternate recognizer/segmentation configurations, specialist re-study, and unlimited/distributed execution | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`scheduler.ts`](../../src/studio/runtime/production/scheduler.ts), and [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts) |
-| Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample`, `media.frames.ocr`, one path-free `media.speakers.analyze` call over an injected audio range, one exact-conflict-gated `research.investigate` grant with path-free search/snapshot tools and cite-only snapshot-span report inputs, `speech.transcribe`, exact reads of pinned VAD/language/U1 evidence, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Scene/shot interpretation, default visual-specialist routing, named/cross-run speakers, stems, unrestricted or automatic live web research, real-provider/freshness authority, and computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); U6 lives in [`model/speakers.ts`](../../src/studio/runtime/production/model/speakers.ts) and [`speakerHost.ts`](../../src/studio/runtime/production/speakerHost.ts) |
+| Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample`, `media.frames.ocr`, one path-free `media.speakers.analyze` call over an injected audio range, one exact-conflict-gated `research.investigate` grant with path-free search/snapshot tools and cite-only snapshot-span report inputs, one explicitly composed `computer.use.readonly` offline-fixture grant with cite-only screen-region report inputs, `speech.transcribe`, exact reads of pinned VAD/language/U1 evidence, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Scene/shot interpretation, default visual-specialist routing, named/cross-run speakers, stems, unrestricted or automatic live web research, real-provider/freshness authority, and live computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); U6 lives in [`model/speakers.ts`](../../src/studio/runtime/production/model/speakers.ts) and [`speakerHost.ts`](../../src/studio/runtime/production/speakerHost.ts) |
 | Current-run speech evidence | A scoped host and bridge exist. With an explicitly enabled recognizer they can produce current-run timed hypotheses; the default unconfigured recognizer honestly returns unavailable | Semantic accuracy/calibration, a guarantee that every run has a live recognizer, alternative segmentation/recognizer passes, and semantic translation QC | [`currentRunSpeechRecognizer.ts`](../../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts) and [`run-runtime-host.ts`](../../scripts/run-runtime-host.ts) |
 | Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. U4 study v3 retains ordered pass history/disagreement; only pass-new exact speech citations support the executed subrange, and exhaustion stays weak without globally blocking unrelated ranges | Semantic correctness/truth arbitration and additional re-study producers | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`restudiedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/restudiedStudySynthesisHost.ts), and [`restudiedStudyReadinessHost.ts`](../../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts) |
-| Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks, U5 OCR over completed frame identities, U6 anonymous speaker/overlap analysis whose request is exactly `{}`, and R1 `research_search`/`research_document_snapshot` mounted only under an exact-conflict-gated research grant. Only cold-audited snapshot identities and bounded UTF-8 spans can enter a v2 report. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Scene/shot interpretation, default visual-specialist routing, unrestricted or automatic research, real-provider/freshness authority, and isolated computer-use. These require later explicit grants | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`speakerMcpServer.ts`](../../src/studio/runtime/production/executor/speakerMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
+| Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks, U5 OCR over completed frame identities, U6 anonymous speaker/overlap analysis whose request is exactly `{}`, R1 `research_search`/`research_document_snapshot`, and the R2 empty-object `computer_use_readonly` tool. R1 and R2 mount only under their exact trigger-gated grants. Only cold-audited snapshot spans and offline screen-region identities can enter a v2 report, both as cite-only context. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Scene/shot interpretation, default visual-specialist routing, unrestricted or automatic research, real-provider/freshness authority, and any live isolated computer-use driver | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`computerUseMcpServer.ts`](../../src/studio/runtime/production/executor/computerUseMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
 | Owned study spine | New owned runs default to evidence-citation v1, report/admission/read v2, the eight-tool U4 root, owned-media-study v3, readiness v4, and approval-gated caption/caption-causality v4. The dormant research tool requires a projected current conflict. Closed v1 planning remains an explicit non-default compatibility selector | Studio UI projection, semantic correctness/truth arbitration, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`orchestratorBridge.ts`](../../src/studio/runtime/production/executor/orchestratorBridge.ts), and [`restudiedStudyRuntime.ts`](../../src/studio/runtime/production/study/restudiedStudyRuntime.ts) |
 | Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen and the human-labeled `run-007` Bet G score exists with `judge: null` | Runtime semantic QC, calibrated transcription/translation confidence, additional scored runs and registered ablations, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
@@ -494,25 +495,27 @@ their audits.
 - **Existing-spine dependency:** U3 document citations, U4 exact gap cause, scheduler budgets/grants,
   artifact store, report admission/read, and study limitations.
 
-### R2. Optional bounded computer-use when the world is not in the file
+### R2. Optional bounded computer-use when the world is not in the file (offline runtime slice implemented 2026-07-18)
 
-- **Real:** General computer-use is not currently granted; ambient apps and built-in computer/agent
-  tool families are closed. A producer-local `computer.use.readonly` contract now accepts only an
-  injected exact-gap grant bound to a cold-audited R1 empty-query cause, one fixed HTTPS origin and
-  surface, and the registered fixed limits. Its replaceable `offline_fixture` driver has no network,
-  filesystem, cookie, credential, download, upload, or mutation API. The host records the initial
-  state and closed read-only transitions as a sealed fixture manifest, content-addressed RGB PNG
-  screenshots, visible-content snapshots, action receipts, and one terminal session receipt. One
-  effective wall deadline covers cause audit, driver work, storage, final cold audit, and normal
-  cleanup. The cold audit reopens the cause and every stored object, reconstructs the session id and
-  per-action accounting, and rejects fixture drift. Identical pixels at different states retain
-  distinct contextual identities. This proves deterministic producer policy and immutable lineage
-  only.
-- **Missing:** The producer literal is not a global task capability and has no scheduler, launcher,
-  protocol, projection, task-private tool, runtime artifact origin, report citation, or evidence
-  admission path. No real isolated browser/desktop driver exists for dynamic maps, interactive pages,
-  app-only reference material, or other live external context. The offline fixture's zero egress does
-  not prove browser process isolation, DNS containment, credential isolation, or source freshness.
+- **Real:** Ambient apps and built-in computer/agent tool families remain closed.
+  `computer.use.readonly` is a global child capability behind a distinct dormant root
+  `study.computer-use` capability, and neither is on the default root grant. The default scheduler
+  has no R2 surface or driver policy. An explicitly composed runtime can admit the dedicated
+  `study_computer_use_request` only from the same current v3 basis and a cold-audited R1 empty-query
+  cause; ordinary spawn rejects the child capability. The scheduler fixes the exact child contract,
+  and the launcher mounts one task-private empty-object `computer_use_readonly` tool bound to the
+  grant, task, executor, and launch. Started, completed, and failed events project the operation.
+  Five private runtime origins retain the fixture manifest, bounded RGB PNG screenshots, visible
+  content, action receipts, and session receipt. The worker may select only bounded region
+  identities into `external_screen_region` citations, which admission keeps report-level and
+  `cite_only` under exact task, agent, executor, session, and screenshot lineage. The replaceable
+  `offline_fixture` driver has no network, filesystem, cookie, credential, download, upload, or
+  mutation API. Cold audit reopens the R1 cause and every stored object, reconstructs session and
+  cumulative-action identities, and rejects fixture drift.
+- **Missing:** No real isolated browser/desktop driver exists for dynamic maps, interactive pages,
+  app-only reference material, or other live external context. The offline fixture's zero egress
+  does not prove browser process isolation, DNS containment, credential isolation, source freshness,
+  or semantic correctness.
 - **Done when:** The root can request computer-use only for an exact unresolved context gap after the
   media-native and R1 routes are insufficient. The scheduler grants an ephemeral isolated session
   with allowlisted surfaces/origins, no ambient credentials or cookies, and hard step, screenshot,
@@ -601,9 +604,11 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    operations, production cite-only span report/admission path, and default-v3 pre-synthesis conflict
    trigger are wired offline (2026-07-18); real provider, freshness, DNS pinning, and deeper
    context-specialist synthesis remain open.
-9. **Optional bounded computer-use.** Only after media senses and R1, add an isolated read-only
-   session for one dynamic external-context gap with action/screenshot budgets and citations. It may
-   not replace file decoding or perform external mutations.
+9. **Optional bounded computer-use.** The configured offline runtime slice now admits one exact-gap,
+   cold-audited R1 exhaustion into a task-private read-only fixture session with action/screenshot
+   budgets and cite-only screen regions (2026-07-18). Add a real isolated driver only after its
+   process, network, credential, and download containment are explicit. It may not replace file
+   decoding or perform external mutations.
 10. **Semantic evaluation expansion.** Register and score the acoustic, frame, research, separation,
     and multi-pass ablations against frozen Bet G evidence; add repeated captures/variance and later
     packs. Keep production structural QC separate and keep humans—not a model judge—as semantic
@@ -657,8 +662,8 @@ The following sequenced backlog items are not current product claims:
   diarization quality, speaker/overlap understanding, non-darwin speaker runtime support, or source
   separation;
 - unrestricted or automatic live web research, historical/cultural grounding, source truth or
-  currency, real-provider source retrieval, or bounded computer-use; the wired R1 slice is offline,
-  exact-conflict-gated, and cite-only;
+  currency, real-provider source retrieval, or live computer-use; the wired R1 and R2 slices are
+  offline, exact-trigger-gated, and cite-only;
 - semantic per-run QC, calibrated quality, a model judge as truth, or a general “better than cold”
   claim.
 

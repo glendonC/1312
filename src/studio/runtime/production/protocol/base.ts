@@ -8,6 +8,7 @@ export type RuntimeProducerKind =
   | "speaker_host"
   | "separation_host"
   | "research_host"
+  | "computer_use_host"
   | "semantic_evidence_host"
   | "evidence_host"
   | "assessment_host"

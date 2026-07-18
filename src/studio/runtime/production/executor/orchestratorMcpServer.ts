@@ -13,6 +13,7 @@ import {
   ORCHESTRATOR_RESTUDY_TOOL,
   ORCHESTRATOR_SEPARATION_TOOL,
   ORCHESTRATOR_RESEARCH_TOOL,
+  ORCHESTRATOR_COMPUTER_USE_TOOL,
   ORCHESTRATOR_SYNTHESIZE_TOOL,
 } from "./orchestratorBridge.ts";
 import {
@@ -34,6 +35,8 @@ const exactToolSets = [
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SEPARATION_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_RESEARCH_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SEPARATION_TOOL, ORCHESTRATOR_RESEARCH_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_RESEARCH_TOOL, ORCHESTRATOR_COMPUTER_USE_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SEPARATION_TOOL, ORCHESTRATOR_RESEARCH_TOOL, ORCHESTRATOR_COMPUTER_USE_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
 ] as const;
 if (manifest.tools.length !== names.size || !exactToolSets.some((expected) => expected.length === names.size && expected.every((name) => names.has(name)))) {
   throw new Error("The bounded orchestrator tool manifest is incomplete or open");
@@ -285,6 +288,26 @@ if (names.has(ORCHESTRATOR_RESEARCH_TOOL)) {
         return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
       } catch (error) {
         return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : "Gap-triggered research failed closed." }] };
+      }
+    },
+  );
+}
+
+if (names.has(ORCHESTRATOR_COMPUTER_USE_TOOL)) {
+  server.registerTool(
+    ORCHESTRATOR_COMPUTER_USE_TOOL,
+    {
+      title: "Request bounded offline external-screen context",
+      description: "Echo one current host-derived R1 exhaustion candidate. The host fixes the offline fixture, read-only action graph, child contract, grant, and limits.",
+      inputSchema: z.object({ inputId: z.string().min(1), candidateId: z.string().min(1) }).strict(),
+      annotations: { title: "Request bounded offline external-screen context", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (args) => {
+      try {
+        const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_COMPUTER_USE_TOOL, args);
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : "The computer-use request failed closed." }] };
       }
     },
   );

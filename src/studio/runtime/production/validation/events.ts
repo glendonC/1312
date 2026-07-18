@@ -12,6 +12,7 @@ import { assertOcrRequest, validateOcrLimits, validateOcrReceipt } from "./ocr.t
 import { assertSpeakerOverlapRequest, validateSpeakerOverlapLimits, validateSpeakerOverlapReceipt } from "./speakers.ts";
 import { assertConditionalSeparationRequest, validateConditionalSeparationLimits, validateConditionalSeparationReceipt, validateConditionalSeparationTrigger, validateRawStemComparisonReceipt } from "./separation.ts";
 import { assertResearchRequest, validateResearchAllowedDomains, validateResearchExhaustionReceipt, validateResearchGapBinding, validateResearchLimits, validateResearchSearchReceipt, validateResearchSnapshotReceipt, validateRestudiedResearchRequestInput } from "./research.ts";
+import { assertComputerUseRequest, validateComputerUseGrantScope, validateComputerUseSessionReceipt } from "./computerUse.ts";
 import {
   validatePublishReviewIntakeReceipt,
   validateStudyReadinessReceiptIdentity,
@@ -111,6 +112,7 @@ const REJECTIONS = new Set([
   "restudy_producer_pass_cap",
   "separation_duplicate_work",
   "research_duplicate_work",
+  "computer_use_duplicate_work",
 ]);
 
 export function assertRuntimeEvent(
@@ -144,7 +146,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "speaker_host", "separation_host", "research_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "speaker_host", "separation_host", "research_host", "computer_use_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -226,7 +228,7 @@ export function assertRuntimeEvent(
     string(data.callId, context, "event.data.callId");
     string(data.executionId, context, "event.data.executionId");
     string(data.taskId, context, "event.data.taskId");
-    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_restudy_request", "study_separation_request", "study_research_request", "study_synthesize"]), context, "event.data.tool");
+    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_restudy_request", "study_separation_request", "study_research_request", "study_computer_use_request", "study_synthesize"]), context, "event.data.tool");
   } else if (type === "reports.wait_started") {
     exact(data, ["waitId", "executionId", "parentTaskId"], context, "event.data");
     string(data.waitId, context, "event.data.waitId");
@@ -462,6 +464,28 @@ export function assertRuntimeEvent(
     string(data.outputArtifactId, context, "event.data.outputArtifactId");
     contentId(data.receiptContentId, context, "event.data.receiptContentId");
     validateResearchExhaustionReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "computer_use.operation_started") {
+    exact(data, ["request", "scope", "executionId", "launchClaimId", "requestFingerprint", "sessionId"], context, "event.data");
+    assertComputerUseRequest(data.request, context);
+    validateComputerUseGrantScope(data.scope, context, "event.data.scope");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.launchClaimId, context, "event.data.launchClaimId");
+    string(data.requestFingerprint, context, "event.data.requestFingerprint");
+    string(data.sessionId, context, "event.data.sessionId");
+  } else if (type === "computer_use.operation_completed") {
+    exact(data, ["operationId", "fixtureArtifactId", "screenshotArtifactIds", "visibleContentArtifactIds", "actionArtifactIds", "sessionArtifactId", "sessionReceiptContentId", "receipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.fixtureArtifactId, context, "event.data.fixtureArtifactId");
+    uniqueStrings(data.screenshotArtifactIds, context, "event.data.screenshotArtifactIds");
+    uniqueStrings(data.visibleContentArtifactIds, context, "event.data.visibleContentArtifactIds");
+    uniqueStrings(data.actionArtifactIds, context, "event.data.actionArtifactIds");
+    string(data.sessionArtifactId, context, "event.data.sessionArtifactId");
+    contentId(data.sessionReceiptContentId, context, "event.data.sessionReceiptContentId");
+    validateComputerUseSessionReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "computer_use.operation_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    literal(data.reason, "producer_failed", context, "event.data.reason");
   } else if (type === "semantic.evidence_started") {
     exact(data, ["request", "grantId", "executionId", "launchClaimId", "sourceContentId", "producer", "limits"], context, "event.data");
     assertSpeechTranscribeRequest(data.request, context);

@@ -6,6 +6,9 @@ import {
   type ComputerUseActionReceipt,
   type ComputerUseDriverIdentity,
   type ComputerUseFixtureManifest,
+  type ComputerUseEvidenceCitationInput,
+  type ComputerUseRequestCandidate,
+  type ComputerUseRequestInput,
   type ComputerUseGrantScope,
   type ComputerUseIsolation,
   type ComputerUseLimits,
@@ -72,6 +75,14 @@ export function computerUseActionReceiptId(value: Omit<ComputerUseActionReceipt,
 export function computerUseSessionReceiptId(value: Omit<ComputerUseSessionReceipt, "receiptId">): string {
   const { schema: _schema, ...body } = value;
   return `computer-use-session-receipt:${canonicalSha256(body)}`;
+}
+
+export function computerUseCandidateId(value: Omit<ComputerUseRequestCandidate, "candidateId">): string {
+  return `computer-use-candidate:${canonicalSha256(value)}`;
+}
+
+export function computerUseRequestInputId(value: Omit<ComputerUseRequestInput, "inputId">): string {
+  return `computer-use-input:${canonicalSha256(value)}`;
 }
 
 export function validateComputerUseLimits(value: unknown, context: string, path: string): ComputerUseLimits {
@@ -528,4 +539,33 @@ export function validateComputerUseSessionReceipt(
   const { receiptId: _receiptId, ...body } = receipt;
   if (receiptId !== computerUseSessionReceiptId(body)) fail(context, `${path}.receiptId`, "does not close the receipt body");
   return receipt;
+}
+
+export function validateComputerUseEvidenceCitationInput(
+  value: unknown,
+  context = "Computer-use evidence input",
+  path = "input",
+): ComputerUseEvidenceCitationInput {
+  const item = object(value, context, path);
+  exact(item, [
+    "operationId", "sessionArtifactId", "sessionReceiptId", "sessionReceiptContentId", "stateId",
+    "screenshotArtifactId", "screenshotContentId", "region",
+  ], context, path);
+  const region = object(item.region, context, `${path}.region`);
+  exact(region, ["x", "y", "width", "height"], context, `${path}.region`);
+  return {
+    operationId: boundedIdentifier(item.operationId, context, `${path}.operationId`),
+    sessionArtifactId: boundedIdentifier(item.sessionArtifactId, context, `${path}.sessionArtifactId`),
+    sessionReceiptId: boundedIdentifier(item.sessionReceiptId, context, `${path}.sessionReceiptId`),
+    sessionReceiptContentId: contentId(item.sessionReceiptContentId, context, `${path}.sessionReceiptContentId`),
+    stateId: boundedIdentifier(item.stateId, context, `${path}.stateId`),
+    screenshotArtifactId: boundedIdentifier(item.screenshotArtifactId, context, `${path}.screenshotArtifactId`),
+    screenshotContentId: contentId(item.screenshotContentId, context, `${path}.screenshotContentId`),
+    region: {
+      x: integer(region.x, context, `${path}.region.x`),
+      y: integer(region.y, context, `${path}.region.y`),
+      width: integer(region.width, context, `${path}.region.width`, 1),
+      height: integer(region.height, context, `${path}.region.height`, 1),
+    },
+  };
 }

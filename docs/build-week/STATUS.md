@@ -174,18 +174,21 @@ score.
   identities plus sorted bounded UTF-8 byte spans into its v2 report. The launcher-owned builder
   emits those spans only as cite-only media context; searches/snippets cannot enter the list, and
   research cannot become claim support or supported coverage.
-- **R2 producer core:** a producer-local `computer.use.readonly` contract can execute one
-  deterministic `offline_fixture` external-screen session from an injected exact-gap grant bound to
-  a cold-audited R1 empty-query cause. The caller cannot supply URLs, actions, selectors,
-  coordinates, scripts, credentials, cookies, or objectives. One fixed HTTPS surface and a closed
-  read-only transition graph produce a sealed fixture manifest, bounded RGB PNG screenshots,
-  visible-content snapshots, ordered action receipts, and a terminal session receipt with zero
-  egress and downloads. One effective wall deadline covers cause audit, driver work, storage, final
-  cold audit, and normal cleanup. Cold audit reopens the R1 cause and every stored object,
-  reconstructs session and cumulative-action identities, and rejects fixture drift. This is
-  producer policy and lineage only: the literal is not in the task capability union, no real browser
-  runs, and scheduler, launcher, projection, artifact-origin, citation, and evidence-admission
-  wiring remain closed.
+- **R2 optional offline runtime wiring:** `computer.use.readonly` is now a global child capability
+  behind a distinct dormant root `study.computer-use` request capability. Neither is active on the
+  default root, and the default scheduler has no R2 surface or driver policy. Ordinary spawn cannot
+  request the child. A configured root may echo only the host-derived `{ inputId, candidateId }` for
+  the same current v3 conflict and cold-audited R1 empty-query cause; the scheduler fixes the child
+  contract and rejects stale, forged, duplicate, or cross-executor work. The launcher mounts one
+  task-private empty-object `computer_use_readonly` tool over the loopback bridge and requires one
+  same-grant, same-execution, same-launch completed operation. Started, completed, and failed events
+  project the executor/launch-bound operation, and five private origins retain the sealed fixture,
+  screenshots, visible content, action receipts, and session receipt. A worker can select only
+  bounded screen-region identities into `external_screen_region` citations. Admission keeps them
+  report-level and `cite_only`, with exact task, agent, executor, session, and screenshot lineage;
+  they cannot support claims, coverage, captions, quality, or readiness. The only driver remains
+  `offline_fixture`, with zero network, cookies, credentials, downloads, uploads, or mutations. No
+  live browser runs, and a real isolated read-only driver remains open.
 
 ## Post-freeze backlog boundary
 
@@ -217,8 +220,8 @@ indefinite deferrals or a one-day implementation claim:
    is wired offline; a real
    provider behind an explicit allow flag, DNS pinning, freshness/provenance depth, and
    deeper context-specialist synthesis remain. Default v3 conflict derivation is wired but dormant.
-9. R2 runtime wiring and a real isolated read-only driver after media senses, R1, and the completed
-   offline producer core.
+9. R2 optional offline runtime wiring - implemented behind dormant root authority and explicit host
+   composition; a real isolated read-only driver remains after media senses and R1.
 10. G1 semantic evaluation expansion, registered ablations, repeated captures, variance, and later
     packs; structural QC remains separate.
 

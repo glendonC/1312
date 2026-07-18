@@ -8,6 +8,7 @@ export function capabilityOperationExists(state: RuntimeProjection, operationId:
     state.speakerOverlapOperations[operationId] ||
     state.conditionalSeparationOperations[operationId] ||
     state.researchOperations[operationId] ||
+    state.computerUseOperations[operationId] ||
     state.semanticEvidence[operationId] ||
     state.evidenceReads[operationId] ||
     state.evidenceAssessments[operationId] ||
@@ -23,6 +24,7 @@ export function taskCapabilityCallCount(state: RuntimeProjection, taskId: string
     ...Object.values(state.speakerOverlapOperations),
     ...Object.values(state.conditionalSeparationOperations),
     ...Object.values(state.researchOperations),
+    ...Object.values(state.computerUseOperations),
     ...Object.values(state.semanticEvidence),
     ...Object.values(state.evidenceReads),
     ...Object.values(state.evidenceAssessments),
@@ -38,6 +40,7 @@ export function taskHasActiveCapability(state: RuntimeProjection, taskId: string
     ...Object.values(state.speakerOverlapOperations),
     ...Object.values(state.conditionalSeparationOperations),
     ...Object.values(state.researchOperations),
+    ...Object.values(state.computerUseOperations),
     ...Object.values(state.semanticEvidence),
     ...Object.values(state.evidenceReads),
     ...Object.values(state.evidenceAssessments),

@@ -43,6 +43,9 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "media.speakers_completed") {
     return { kind: "speaker_overlap", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "computer_use.operation_completed") {
+    return { kind: "computer_use", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "semantic.evidence_completed") {
     return { kind: "semantic_media_evidence", receipt: event.data.receipt, rawReceiptContentId: null };
   }
@@ -119,7 +122,12 @@ function receiptValue(event: RuntimeEvent): {
 function receiptArtifactLinks(state: RuntimeProjection, receiptId: string): RuntimeArtifact[] {
   return Object.values(state.artifacts).filter((artifact) => {
     const origin = artifact.origin;
-    if (origin.kind === "ingest" || origin.kind === "preflight_evidence" || origin.kind === "research_document_snapshot" || origin.kind === "research_extraction") return false;
+    if (
+      origin.kind === "ingest" || origin.kind === "preflight_evidence" ||
+      origin.kind === "research_document_snapshot" || origin.kind === "research_extraction" ||
+      origin.kind === "external_screen_fixture" || origin.kind === "external_screen_screenshot" ||
+      origin.kind === "external_screen_content" || origin.kind === "external_screen_action_receipt"
+    ) return false;
     return origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
       ? origin.executorReceiptId === receiptId
       : origin.receiptId === receiptId;
@@ -209,9 +217,13 @@ export async function buildRuntimeObservabilityIndex(
           origin.kind === "preflight_evidence" ||
           origin.kind === "research_document_snapshot" ||
           origin.kind === "research_extraction" ||
+          origin.kind === "external_screen_fixture" ||
+          origin.kind === "external_screen_screenshot" ||
+          origin.kind === "external_screen_content" ||
+          origin.kind === "external_screen_action_receipt" ||
           (origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
             ? origin.executorReceiptContentId !== content.contentId
-            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "speaker_overlap_receipt" || origin.kind === "conditional_separation_receipt" || origin.kind === "raw_stem_comparison_receipt" || origin.kind === "research_search_receipt" || origin.kind === "research_snapshot_receipt" || origin.kind === "research_exhaustion_receipt"
+            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "speaker_overlap_receipt" || origin.kind === "conditional_separation_receipt" || origin.kind === "raw_stem_comparison_receipt" || origin.kind === "research_search_receipt" || origin.kind === "research_snapshot_receipt" || origin.kind === "research_exhaustion_receipt" || origin.kind === "external_screen_session_receipt"
               ? artifact.content.contentId !== content.contentId
               : origin.receiptContentId !== content.contentId)
         ) {
@@ -240,7 +252,7 @@ export async function buildRuntimeObservabilityIndex(
         kind: artifact.kind,
         eventId: event.eventId,
         contentId: artifact.content.contentId,
-        receiptId: artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence" || artifact.origin.kind === "research_document_snapshot" || artifact.origin.kind === "research_extraction"
+        receiptId: artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence" || artifact.origin.kind === "research_document_snapshot" || artifact.origin.kind === "research_extraction" || artifact.origin.kind === "external_screen_fixture" || artifact.origin.kind === "external_screen_screenshot" || artifact.origin.kind === "external_screen_content" || artifact.origin.kind === "external_screen_action_receipt"
           ? null
           : artifact.origin.kind === "owned_media_study" || artifact.origin.kind === "generalized_owned_media_study"
             ? artifact.origin.executorReceiptId

@@ -6,6 +6,7 @@ import { validateSpeakerArtifactOrigin } from "./artifactSpeakerOrigins.ts";
 import { validateSeparationArtifactOrigin } from "./artifactSeparationOrigins.ts";
 import { validateResearchArtifactOrigin } from "./artifactResearchOrigins.ts";
 import { validateStudyArtifactOrigin } from "./artifactStudyOrigins.ts";
+import { validateComputerUseArtifactOrigin } from "./artifactComputerUseOrigins.ts";
 
 export interface ArtifactOriginValidationInput {
   item: Record<string, unknown>;
@@ -27,6 +28,7 @@ export function validateArtifactOrigin(
   if (validateSpeakerArtifactOrigin(kind, input)) return;
   if (validateSeparationArtifactOrigin(kind, input)) return;
   if (validateResearchArtifactOrigin(kind, input)) return;
+  if (validateComputerUseArtifactOrigin(kind, input)) return;
   if (validateStudyArtifactOrigin(kind, input)) return;
   if (validateReviewArtifactOrigin(kind, input)) return;
   fail(input.context, `${input.path}.origin.kind`, `has unknown value ${kind}`);

@@ -37,11 +37,11 @@ export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 2,
   maxActiveWorkers: 4,
   runBudget: { wallMs: 240_000, toolCalls: 32 },
-  // research.investigate is grantable but blocked from ordinary spawn by the scheduler's
-  // allowResearch gate, exactly like media.audio.separate. The v3 root receives only the dormant
-  // study.research request capability; an exact projected conflict is still required to mint a
-  // bounded child grant.
-  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "media.speakers.analyze", "media.audio.separate", "research.investigate", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.restudy", "study.separate", "study.research", "study.synthesize"],
+  // Research and computer-use child capabilities are grantable but remain blocked from ordinary
+  // spawn by dedicated scheduler gates. The default root receives only study.research: an exact
+  // projected conflict is required for R1, while R2 also requires an explicitly composed sealed
+  // fixture policy, driver, dormant root grant, and cold-audited R1 exhaustion cause.
+  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "media.speakers.analyze", "media.audio.separate", "research.investigate", "computer.use.readonly", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.restudy", "study.separate", "study.research", "study.computer-use", "study.synthesize"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {

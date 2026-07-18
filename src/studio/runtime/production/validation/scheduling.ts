@@ -11,6 +11,7 @@ import {
   isOcrHostArtifactKind,
   isSpeakerOverlapHostArtifactKind,
   isConditionalSeparationHostArtifactKind,
+  isComputerUseHostArtifactKind,
   isResearchHostArtifactKind,
   OCR_LIMITS,
   SPEAKER_OVERLAP_LIMITS,
@@ -29,6 +30,7 @@ import { validateOcrGrantScope } from "./ocr.ts";
 import { validateSpeakerOverlapGrantScope } from "./speakers.ts";
 import { validateConditionalSeparationGrantScope } from "./separation.ts";
 import { validateResearchGrantScope } from "./research.ts";
+import { validateComputerUseGrantScope } from "./computerUse.ts";
 import {
   array,
   boolean,
@@ -85,6 +87,7 @@ const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
     "study.restudy",
     "study.separate",
     "study.research",
+    "study.computer-use",
     "study.synthesize",
   ]),
   media: new Set(["media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.speakers.analyze", "media.audio.separate", "speech.transcribe", "report.submit"]),
@@ -95,6 +98,7 @@ const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
     "media.speakers.analyze",
     "media.audio.separate",
     "research.investigate",
+    "computer.use.readonly",
     "speech.transcribe",
     "evidence.read",
     "analysis.evidence.assess",
@@ -226,8 +230,8 @@ function outputs(value: unknown, context: string, path: string): RequiredOutput[
     exact(item, ["name", "artifactKind", "required"], context, `${path}[${index}]`);
     string(item.name, context, `${path}[${index}].name`);
     const artifactKind = string(item.artifactKind, context, `${path}[${index}].artifactKind`);
-    if (isFrameHostArtifactKind(artifactKind) || isOcrHostArtifactKind(artifactKind) || isSpeakerOverlapHostArtifactKind(artifactKind) || isConditionalSeparationHostArtifactKind(artifactKind) || isResearchHostArtifactKind(artifactKind)) {
-      fail(context, `${path}[${index}].artifactKind`, "is a host-only frame artifact kind reserved for the frame, OCR, speaker/overlap, conditional-separation, or research hosts");
+    if (isFrameHostArtifactKind(artifactKind) || isOcrHostArtifactKind(artifactKind) || isSpeakerOverlapHostArtifactKind(artifactKind) || isConditionalSeparationHostArtifactKind(artifactKind) || isResearchHostArtifactKind(artifactKind) || isComputerUseHostArtifactKind(artifactKind)) {
+      fail(context, `${path}[${index}].artifactKind`, "is a host-only frame artifact kind reserved for the frame, OCR, speaker/overlap, conditional-separation, research, or computer-use hosts");
     }
     boolean(item.required, context, `${path}[${index}].required`);
   });
@@ -264,6 +268,8 @@ function grant(value: unknown, context: string, path: string): asserts value is 
           ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "separationScope"]
         : capability === "research.investigate"
           ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "researchScope"]
+        : capability === "computer.use.readonly"
+          ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "computerUseScope"]
         : ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope"],
     context,
     path,
@@ -289,6 +295,9 @@ function grant(value: unknown, context: string, path: string): asserts value is 
     : null;
   const researchScope = capability === "research.investigate"
     ? validateResearchGrantScope(item.researchScope, context, `${path}.researchScope`)
+    : null;
+  const computerUseScope = capability === "computer.use.readonly"
+    ? validateComputerUseGrantScope(item.computerUseScope, context, `${path}.computerUseScope`)
     : null;
   const mediaBound = capability.startsWith("media.") || capability === "speech.transcribe";
   if (mediaBound && mediaScope.length === 0) {
@@ -347,6 +356,9 @@ function grant(value: unknown, context: string, path: string): asserts value is 
   // researchScope.gap.media.
   if (capability === "research.investigate" && researchScope === null) {
     fail(context, path, "research.investigate grants require one audited research gap envelope");
+  }
+  if (capability === "computer.use.readonly" && computerUseScope === null) {
+    fail(context, path, "computer.use.readonly grants require one sealed external-screen envelope");
   }
 }
 

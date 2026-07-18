@@ -40,6 +40,7 @@ const REASONS = new Set<GeneralizedCoverageReasonCode>([
 ]);
 const CITATION_KINDS = new Set<EvidenceCitationKind>([
   "current_run_speech", "acoustic_range", "frame_sample", "ocr_span", "speaker_turn", "external_document_span",
+  "external_screen_region",
 ]);
 const CITATION_STATES = new Set<EvidenceCitationState>([
   "available", "unknown", "withheld", "unavailable", "truncated", "conflicting", "failed", "not_in_scope",

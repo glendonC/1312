@@ -8,6 +8,7 @@ import { applyOcrEvent } from "./projection/ocrEvents.ts";
 import { applySpeakerOverlapEvent } from "./projection/speakerEvents.ts";
 import { applyConditionalSeparationEvent } from "./projection/separationEvents.ts";
 import { applyResearchEvent } from "./projection/researchEvents.ts";
+import { applyComputerUseEvent } from "./projection/computerUseEvents.ts";
 import { applyExecutionMediaEvent } from "./projection/executionMediaEvents.ts";
 import { applyReportEvent } from "./projection/reportEvents.ts";
 import { applySemanticEvidenceEvent } from "./projection/semanticEvidenceEvents.ts";
@@ -39,6 +40,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     researchOperations: {},
     researchExhaustions: {},
     researchRequestInputs: {},
+    computerUseOperations: {},
     semanticEvidence: {},
     evidenceReads: {},
     evidenceAssessments: {},
@@ -86,6 +88,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
   if (applySpeakerOverlapEvent(next, event)) return next;
   if (applyConditionalSeparationEvent(next, event)) return next;
   if (applyResearchEvent(next, event)) return next;
+  if (applyComputerUseEvent(next, event)) return next;
   if (applySemanticEvidenceEvent(next, event)) return next;
   if (applyEvidenceEvent(next, event)) return next;
   if (applyReviewEvent(next, event)) return next;

@@ -14,7 +14,8 @@ export type EvidenceCitationKind =
   | "frame_sample"
   | "ocr_span"
   | "speaker_turn"
-  | "external_document_span";
+  | "external_document_span"
+  | "external_screen_region";
 
 export type LandedEvidenceCitationKind =
   | "current_run_speech"
@@ -64,6 +65,21 @@ export type EvidenceObservationLocator =
         unit: "utf8_byte" | "unicode_code_point" | "page_character";
       };
       /** Non-temporal context has no authority unless it names the exact media it qualifies. */
+      qualifiesMedia: QualifiedMediaRange;
+    }
+  | {
+      kind: "screen_region";
+      screen: {
+        sessionId: string;
+        stateId: string;
+        ordinal: number;
+        screenshotId: string;
+        artifactId: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
       qualifiesMedia: QualifiedMediaRange;
     };
 

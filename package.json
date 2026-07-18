@@ -17,7 +17,7 @@
     "ocr:check": "node --test tests/studio-ocr-production.test.ts",
     "speakers:check": "node --test tests/studio-speaker-overlap-production.test.ts",
     "research:check": "node --test tests/studio-r1-research-production.test.ts tests/studio-r1-research-wiring.test.ts",
-    "computer-use:check": "node --test tests/studio-r2-computer-use-production.test.ts",
+    "computer-use:check": "node --test tests/studio-r2-computer-use-production.test.ts tests/studio-r2-computer-use-wiring.test.ts",
     "source:check": "node --test tests/studio-source-resolution.test.ts",
     "runtime:check": "node --test tests/studio-runtime-production.test.ts tests/studio-owned-swarm-orchestration.test.ts tests/studio-semantic-evidence.test.ts tests/studio-study-report-admission.test.ts tests/studio-owned-media-study.test.ts tests/studio-multimodal-admission.test.ts tests/studio-orchestrator-executor-contract.test.ts tests/studio-owned-swarm-real-codex.test.ts tests/studio-child-media-bridge.test.ts tests/studio-child-evidence-bridge.test.ts tests/studio-child-evidence-assessment-bridge.test.ts tests/studio-production-adapter.test.ts tests/studio-runtime-validation.test.ts tests/studio-executor-contract.test.ts tests/studio-runtime-inspector.test.ts tests/studio-run-start-production.test.ts tests/studio-runtime-host.test.ts tests/studio-caption-production.test.ts tests/studio-local-runtime-client.test.ts tests/studio-forecast-production.test.ts tests/studio-memory-inspection.test.ts",
     "runtime:index": "node scripts/index-runtime-observability.ts",

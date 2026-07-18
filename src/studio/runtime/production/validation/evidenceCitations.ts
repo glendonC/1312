@@ -29,6 +29,7 @@ const KINDS = new Set<EvidenceCitationKind>([
   "ocr_span",
   "speaker_turn",
   "external_document_span",
+  "external_screen_region",
 ]);
 const STATES = new Set<EvidenceCitationState>([
   "available", "unknown", "withheld", "unavailable", "truncated", "conflicting", "failed", "not_in_scope",
@@ -55,7 +56,7 @@ function mediaRange(value: unknown, context: string, path: string): QualifiedMed
 
 function locator(value: unknown, context: string, path: string): EvidenceObservationLocator {
   const item = object(value, context, path);
-  const kind = oneOf<EvidenceObservationLocator["kind"]>(item.kind, new Set(["temporal_range", "media_point", "document_span"]), context, `${path}.kind`);
+  const kind = oneOf<EvidenceObservationLocator["kind"]>(item.kind, new Set(["temporal_range", "media_point", "document_span", "screen_region"]), context, `${path}.kind`);
   if (kind === "temporal_range") {
     exact(item, ["kind", "media"], context, path);
     return { kind, media: mediaRange(item.media, context, `${path}.media`) };
@@ -80,6 +81,26 @@ function locator(value: unknown, context: string, path: string): EvidenceObserva
         timestampUs,
         qualifiesRange: { startMs, endMs },
       },
+    };
+  }
+  if (kind === "screen_region") {
+    exact(item, ["kind", "screen", "qualifiesMedia"], context, path);
+    const screen = object(item.screen, context, `${path}.screen`);
+    exact(screen, ["sessionId", "stateId", "ordinal", "screenshotId", "artifactId", "x", "y", "width", "height"], context, `${path}.screen`);
+    return {
+      kind,
+      screen: {
+        sessionId: string(screen.sessionId, context, `${path}.screen.sessionId`),
+        stateId: string(screen.stateId, context, `${path}.screen.stateId`),
+        ordinal: integer(screen.ordinal, context, `${path}.screen.ordinal`),
+        screenshotId: string(screen.screenshotId, context, `${path}.screen.screenshotId`),
+        artifactId: string(screen.artifactId, context, `${path}.screen.artifactId`),
+        x: integer(screen.x, context, `${path}.screen.x`),
+        y: integer(screen.y, context, `${path}.screen.y`),
+        width: integer(screen.width, context, `${path}.screen.width`, 1),
+        height: integer(screen.height, context, `${path}.screen.height`, 1),
+      },
+      qualifiesMedia: mediaRange(item.qualifiesMedia, context, `${path}.qualifiesMedia`),
     };
   }
   exact(item, ["kind", "document", "qualifiesMedia"], context, path);
@@ -136,6 +157,7 @@ function qualifiedRange(candidate: EvidenceCitationTarget): QualifiedMediaRange 
 function locatorQualifies(observation: EvidenceCitationObservation): QualifiedMediaRange {
   if (observation.locator.kind === "temporal_range") return observation.locator.media;
   if (observation.locator.kind === "document_span") return observation.locator.qualifiesMedia;
+  if (observation.locator.kind === "screen_region") return observation.locator.qualifiesMedia;
   return {
     artifactId: observation.locator.media.artifactId,
     trackId: observation.locator.media.trackId,
@@ -249,6 +271,13 @@ export function validateEvidenceCitationEnvelope(
       (use !== "cite_only" || operationId === null || envelope.receipt.artifactId === null ||
        observations.length === 0 || observations.some((entry) => entry.locator.kind !== "document_span"))) {
     fail(context, path, "external document evidence remains cite-only over explicit receipted document spans");
+  }
+  if (evidenceKind === "external_screen_region" &&
+      (use !== "cite_only" || foundTarget.kind !== "media_context" || operationId === null ||
+       envelope.receipt.artifactId === null || observations.length !== 1 ||
+       observations[0].state !== "available" || observations[0].locator.kind !== "screen_region" ||
+       observations[0].locator.screen.artifactId !== envelope.evidence.artifactId)) {
+    fail(context, path, "external-screen evidence is one audited cite-only pixel region");
   }
   const { schema: _schema, citationId: _citationId, ...body } = envelope;
   if (envelope.citationId !== evidenceCitationId(body)) {

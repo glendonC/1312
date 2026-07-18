@@ -150,6 +150,59 @@ export interface ResearchExhaustionReceiptArtifactOrigin {
   grantId: string;
 }
 
+export interface ExternalScreenFixtureArtifactOrigin {
+  kind: "external_screen_fixture";
+  operationId: string;
+  sessionId: string;
+  r1CauseArtifactId: string;
+  mediaSourceArtifactId: string;
+}
+
+export interface ExternalScreenScreenshotArtifactOrigin {
+  kind: "external_screen_screenshot";
+  operationId: string;
+  sessionId: string;
+  stateId: string;
+  ordinal: number;
+  screenshotId: string;
+  fixtureArtifactId: string;
+}
+
+export interface ExternalScreenContentArtifactOrigin {
+  kind: "external_screen_content";
+  operationId: string;
+  sessionId: string;
+  stateId: string;
+  ordinal: number;
+  fixtureArtifactId: string;
+  screenshotArtifactId: string;
+}
+
+export interface ExternalScreenActionReceiptArtifactOrigin {
+  kind: "external_screen_action_receipt";
+  operationId: string;
+  sessionId: string;
+  actionId: string;
+  index: number;
+  beforeScreenshotArtifactId: string;
+  beforeContentArtifactId: string;
+  afterScreenshotArtifactId: string;
+  afterContentArtifactId: string;
+}
+
+export interface ExternalScreenSessionReceiptArtifactOrigin {
+  kind: "external_screen_session_receipt";
+  operationId: string;
+  sessionId: string;
+  receiptId: string;
+  mediaSourceArtifactId: string;
+  r1CauseArtifactId: string;
+  fixtureArtifactId: string;
+  screenshotArtifactIds: string[];
+  visibleContentArtifactIds: string[];
+  actionArtifactIds: string[];
+}
+
 export interface SemanticMediaEvidenceArtifactOrigin {
   kind: "semantic_media_evidence";
   operationId: string;
@@ -409,6 +462,11 @@ export interface RuntimeArtifact {
     | ResearchExtractionArtifactOrigin
     | ResearchSnapshotReceiptArtifactOrigin
     | ResearchExhaustionReceiptArtifactOrigin
+    | ExternalScreenFixtureArtifactOrigin
+    | ExternalScreenScreenshotArtifactOrigin
+    | ExternalScreenContentArtifactOrigin
+    | ExternalScreenActionReceiptArtifactOrigin
+    | ExternalScreenSessionReceiptArtifactOrigin
     | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
     | StudyReportArtifactOrigin

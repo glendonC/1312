@@ -1,8 +1,20 @@
 import type { ContentIdentity } from "./source.ts";
 import type { ResearchExhaustionReason, ResearchGapBinding } from "./research.ts";
 
-/** Producer-local capability literal. S2 must add any global task-capability authority. */
+/** Global child capability. Ordinary spawn stays closed; only dedicated R2 admission can mint it. */
 export const COMPUTER_USE_CAPABILITY = "computer.use.readonly" as const;
+
+export const COMPUTER_USE_HOST_ARTIFACT_KINDS = [
+  "studio.external-screen-fixture.v1",
+  "studio.external-screen-screenshot.v1",
+  "studio.external-screen-content.v1",
+  "studio.external-screen-action.receipt.v1",
+  "studio.external-screen-session.receipt.v1",
+] as const;
+
+export function isComputerUseHostArtifactKind(value: string): boolean {
+  return (COMPUTER_USE_HOST_ARTIFACT_KINDS as readonly string[]).includes(value);
+}
 
 export const COMPUTER_USE_LIMITS = {
   maxCalls: 1,
@@ -281,4 +293,72 @@ export interface ComputerUseSessionReceipt {
     captionAuthority: "not_granted";
     evidenceAdmission: "not_granted_until_runtime_wiring";
   };
+}
+
+export interface ComputerUseOperationRecord {
+  id: string;
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  executionId: string;
+  launchClaimId: string;
+  requestFingerprint: string;
+  gap: ResearchGapBinding;
+  r1Cause: ComputerUseResearchCauseBinding;
+  surface: ComputerUseSurface;
+  status: "started" | "completed" | "failed";
+  sessionId: string;
+  fixtureArtifactId: string | null;
+  screenshotArtifactIds: string[];
+  visibleContentArtifactIds: string[];
+  actionArtifactIds: string[];
+  sessionArtifactId: string | null;
+  sessionReceiptId: string | null;
+  sessionReceiptContentId: string | null;
+  failure: "producer_failed" | null;
+}
+
+export interface ComputerUseRequestCandidate {
+  candidateId: string;
+  exhaustionReceiptId: string;
+  gap: ResearchGapBinding;
+  source: ResearchGapBinding["media"];
+}
+
+export interface ComputerUseRequestInput {
+  schema: "studio.computer-use-request-input.v1";
+  inputId: string;
+  runId: string;
+  candidates: ComputerUseRequestCandidate[];
+  nonClaims: {
+    r1CauseIsAuthority: "not_claimed";
+    liveExternalState: "not_available";
+  };
+}
+
+export interface ComputerUseEvidenceSourceIdentity {
+  operationId: string;
+  sessionArtifactId: string;
+  sessionReceiptId: string;
+  sessionReceiptContentId: string;
+  screenshots: Array<{
+    stateId: string;
+    ordinal: number;
+    artifactId: string;
+    contentId: string;
+    width: number;
+    height: number;
+  }>;
+}
+
+/** Worker-selectable subset. URL, text, target, and evidence envelopes are deliberately absent. */
+export interface ComputerUseEvidenceCitationInput {
+  operationId: string;
+  sessionArtifactId: string;
+  sessionReceiptId: string;
+  sessionReceiptContentId: string;
+  stateId: string;
+  screenshotArtifactId: string;
+  screenshotContentId: string;
+  region: { x: number; y: number; width: number; height: number };
 }

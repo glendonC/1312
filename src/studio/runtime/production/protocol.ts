@@ -7,6 +7,7 @@ import type { OcrCompletedEvent, OcrFailedEvent, OcrStartedEvent } from "./proto
 import type { SpeakerOverlapCompletedEvent, SpeakerOverlapFailedEvent, SpeakerOverlapStartedEvent } from "./protocol/speakerEvents.ts";
 import type { ConditionalSeparationCompletedEvent, ConditionalSeparationFailedEvent, ConditionalSeparationStartedEvent } from "./protocol/separationEvents.ts";
 import type { ResearchExhaustionRecordedEvent, ResearchOperationCompletedEvent, ResearchOperationFailedEvent, ResearchOperationStartedEvent, ResearchRequestInputRecordedEvent } from "./protocol/researchEvents.ts";
+import type { ComputerUseOperationCompletedEvent, ComputerUseOperationFailedEvent, ComputerUseOperationStartedEvent } from "./protocol/computerUseEvents.ts";
 import type {
   AgentRegisteredEvent,
   ArtifactRecordedEvent,
@@ -87,6 +88,7 @@ export * from "./protocol/ocrEvents.ts";
 export * from "./protocol/speakerEvents.ts";
 export * from "./protocol/separationEvents.ts";
 export * from "./protocol/researchEvents.ts";
+export * from "./protocol/computerUseEvents.ts";
 export * from "./protocol/reviewEvents.ts";
 export * from "./protocol/studyEvents.ts";
 
@@ -126,6 +128,9 @@ export type RuntimeEvent =
   | ResearchOperationFailedEvent
   | ResearchExhaustionRecordedEvent
   | ResearchRequestInputRecordedEvent
+  | ComputerUseOperationStartedEvent
+  | ComputerUseOperationCompletedEvent
+  | ComputerUseOperationFailedEvent
   | SemanticEvidenceStartedEvent
   | SemanticEvidenceCompletedEvent
   | SemanticEvidenceFailedEvent

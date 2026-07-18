@@ -43,6 +43,7 @@ import {
 import { RangePassHost } from "../study/rangePassHost.ts";
 import type { ConditionalSeparationRequestHost } from "../study/conditionalSeparationRequestHost.ts";
 import type { ResearchRequestExecutionHost } from "../study/researchRequestExecutionHost.ts";
+import type { ComputerUseRequestExecutionHost } from "../study/computerUseRequestExecutionHost.ts";
 import { inspectRestudiedStudy, recordRestudiedStudy } from "../study/restudiedStudyRuntime.ts";
 
 export const ORCHESTRATOR_SPAWN_TOOL = "task_spawn_request" as const;
@@ -53,6 +54,7 @@ export const ORCHESTRATOR_PLAN_TOOL = "study_planning_decision" as const;
 export const ORCHESTRATOR_RESTUDY_TOOL = "study_restudy_request" as const;
 export const ORCHESTRATOR_SEPARATION_TOOL = "study_separation_request" as const;
 export const ORCHESTRATOR_RESEARCH_TOOL = "study_research_request" as const;
+export const ORCHESTRATOR_COMPUTER_USE_TOOL = "study_computer_use_request" as const;
 export const ORCHESTRATOR_SYNTHESIZE_TOOL = "study_synthesize" as const;
 
 export type OrchestratorToolName =
@@ -64,11 +66,12 @@ export type OrchestratorToolName =
   | typeof ORCHESTRATOR_RESTUDY_TOOL
   | typeof ORCHESTRATOR_SEPARATION_TOOL
   | typeof ORCHESTRATOR_RESEARCH_TOOL
+  | typeof ORCHESTRATOR_COMPUTER_USE_TOOL
   | typeof ORCHESTRATOR_SYNTHESIZE_TOOL;
 
 export interface OrchestratorToolManifest {
   schema: "studio.orchestrator-tools.v1";
-  tools: Array<{ name: OrchestratorToolName; capability: "task.spawn.request" | "task.reports.wait" | "report.disposition" | "artifact.read" | "study.plan" | "study.restudy" | "study.separate" | "study.research" | "study.synthesize" }>;
+  tools: Array<{ name: OrchestratorToolName; capability: "task.spawn.request" | "task.reports.wait" | "report.disposition" | "artifact.read" | "study.plan" | "study.restudy" | "study.separate" | "study.research" | "study.computer-use" | "study.synthesize" }>;
 }
 
 export interface SpawnToolResult {
@@ -195,6 +198,7 @@ export class BoundedOrchestratorBridge {
   private readonly rangePassHost: RangePassHost | null;
   private readonly separationRequestHost: ConditionalSeparationRequestHost | null;
   private readonly researchRequestHost: ResearchRequestExecutionHost | null;
+  private readonly computerUseRequestHost: ComputerUseRequestExecutionHost | null;
 
   constructor(input: {
     task: TaskRecord;
@@ -210,6 +214,7 @@ export class BoundedOrchestratorBridge {
     rangePassHost?: RangePassHost;
     separationRequestHost?: ConditionalSeparationRequestHost;
     researchRequestHost?: ResearchRequestExecutionHost;
+    computerUseRequestHost?: ComputerUseRequestExecutionHost;
     nextCallId?: (tool: OrchestratorToolName) => string;
   }) {
     this.task = structuredClone(input.task);
@@ -227,6 +232,7 @@ export class BoundedOrchestratorBridge {
     this.rangePassHost = input.rangePassHost ?? null;
     this.separationRequestHost = input.separationRequestHost ?? null;
     this.researchRequestHost = input.researchRequestHost ?? null;
+    this.computerUseRequestHost = input.computerUseRequestHost ?? null;
     this.nextCallId = input.nextCallId ?? ((tool) => `tool-call:${tool}:${randomUUID()}`);
   }
 
@@ -246,15 +252,17 @@ export class BoundedOrchestratorBridge {
     const restudiedEnabled = this.restudied && restudiedCapabilities.every((capability) => capabilities.has(capability)) && !capabilities.has("study.plan");
     const separationEnabled = restudiedEnabled && capabilities.has("study.separate");
     const researchEnabled = restudiedEnabled && capabilities.has("study.research");
+    const computerUseEnabled = restudiedEnabled && capabilities.has("study.computer-use");
     if ([planningEnabled, generalizedEnabled, restudiedEnabled].filter(Boolean).length > 1 ||
         (planningEnabled !== Boolean(this.admissionHost && this.readHost && this.planningHost && this.synthesisHost)) ||
         (generalizedEnabled !== Boolean(this.artifacts && !this.restudied)) ||
         (restudiedEnabled !== Boolean(this.artifacts && this.rangePassHost)) ||
         (separationEnabled !== Boolean(this.separationRequestHost)) ||
         (researchEnabled !== Boolean(this.researchRequestHost)) ||
+        (computerUseEnabled !== Boolean(this.computerUseRequestHost)) ||
         (!planningEnabled && !generalizedEnabled && !restudiedEnabled && capabilities.size !== 2) ||
         (planningEnabled && capabilities.size !== 6) || (generalizedEnabled && capabilities.size !== 5) ||
-        (restudiedEnabled && capabilities.size !== 6 + (separationEnabled ? 1 : 0) + (researchEnabled ? 1 : 0))) {
+        (restudiedEnabled && capabilities.size !== 6 + (separationEnabled ? 1 : 0) + (researchEnabled ? 1 : 0) + (computerUseEnabled ? 1 : 0))) {
       throw new OrchestratorBridgeError("capability_not_granted", "The root orchestrator planning tool surface is incomplete or broader than its exact grants.");
     }
     return {
@@ -269,6 +277,7 @@ export class BoundedOrchestratorBridge {
           ...(restudiedEnabled ? [{ name: ORCHESTRATOR_RESTUDY_TOOL, capability: "study.restudy" as const }] : []),
           ...(separationEnabled ? [{ name: ORCHESTRATOR_SEPARATION_TOOL, capability: "study.separate" as const }] : []),
           ...(researchEnabled ? [{ name: ORCHESTRATOR_RESEARCH_TOOL, capability: "study.research" as const }] : []),
+          ...(computerUseEnabled ? [{ name: ORCHESTRATOR_COMPUTER_USE_TOOL, capability: "study.computer-use" as const }] : []),
           { name: ORCHESTRATOR_SYNTHESIZE_TOOL, capability: "study.synthesize" as const },
         ] : []),
       ],
@@ -489,6 +498,36 @@ export class BoundedOrchestratorBridge {
     }
     return {
       schema: "studio.orchestrator-research-result.v1",
+      input,
+      spawn: { schema: "studio.orchestrator-spawn-result.v1", requestId: decision.requestId, decision: decision.accepted ? "accepted" : "rejected", rejection: decision.rejection, followUpId: null },
+    };
+  }
+
+  async computerUse(value: unknown): Promise<{ schema: "studio.orchestrator-computer-use-result.v1"; input: Awaited<ReturnType<ComputerUseRequestExecutionHost["inspect"]>>; spawn: SpawnToolResult }> {
+    this.manifest();
+    if (!this.restudied || !this.computerUseRequestHost) throw new OrchestratorBridgeError("capability_not_granted", "Cause-gated computer-use is unavailable.");
+    const input = await this.computerUseRequestHost.inspect(this.executionId).catch((error) => {
+      throw new OrchestratorBridgeError("operation_rejected", error instanceof Error ? error.message : "Computer-use inspection failed closed.");
+    });
+    const callId = this.nextCallId(ORCHESTRATOR_COMPUTER_USE_TOOL);
+    await this.recordCall(callId, ORCHESTRATOR_COMPUTER_USE_TOOL);
+    const decision = await this.computerUseRequestHost.request(this.executionId, callId, value).catch((error) => {
+      throw new OrchestratorBridgeError("operation_rejected", error instanceof Error ? error.message : "Computer-use request failed closed.");
+    });
+    if (decision.permit) {
+      const permit = decision.permit;
+      const launch = this.childLauncher.launch(permit).then(() => undefined).catch(async (error: unknown) => {
+        if (error instanceof Error && error.name === "RuntimeApplicationInterrupted") throw error;
+        const child = this.ledger.state().tasks[permit.taskId];
+        if (child && (child.status === "scheduled" || child.status === "working") && child.ownerAgentId === permit.agentId) {
+          await this.scheduler.transitionTask(child.id, permit.agentId, "failed", "The accepted computer-use child failed before making a terminal report available.").catch(() => undefined);
+        }
+      });
+      void launch.catch(() => undefined);
+      this.launches.set(permit.taskId, launch);
+    }
+    return {
+      schema: "studio.orchestrator-computer-use-result.v1",
       input,
       spawn: { schema: "studio.orchestrator-spawn-result.v1", requestId: decision.requestId, decision: decision.accepted ? "accepted" : "rejected", rejection: decision.rejection, followUpId: null },
     };

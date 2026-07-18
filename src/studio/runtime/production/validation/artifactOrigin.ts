@@ -4,6 +4,7 @@ import { validateFrameArtifactOrigin } from "./artifactFrameOrigins.ts";
 import { validateReviewArtifactOrigin } from "./artifactReviewOrigins.ts";
 import { validateSpeakerArtifactOrigin } from "./artifactSpeakerOrigins.ts";
 import { validateSeparationArtifactOrigin } from "./artifactSeparationOrigins.ts";
+import { validateResearchArtifactOrigin } from "./artifactResearchOrigins.ts";
 import { validateStudyArtifactOrigin } from "./artifactStudyOrigins.ts";
 
 export interface ArtifactOriginValidationInput {
@@ -25,6 +26,7 @@ export function validateArtifactOrigin(
   if (validateFrameArtifactOrigin(kind, input)) return;
   if (validateSpeakerArtifactOrigin(kind, input)) return;
   if (validateSeparationArtifactOrigin(kind, input)) return;
+  if (validateResearchArtifactOrigin(kind, input)) return;
   if (validateStudyArtifactOrigin(kind, input)) return;
   if (validateReviewArtifactOrigin(kind, input)) return;
   fail(input.context, `${input.path}.origin.kind`, `has unknown value ${kind}`);

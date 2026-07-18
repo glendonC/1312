@@ -7,6 +7,10 @@ export const RESEARCH_HOST_ARTIFACT_KINDS = [
   "studio.research-document-snapshot.receipt.v1",
 ] as const;
 
+export function isResearchHostArtifactKind(value: string): boolean {
+  return (RESEARCH_HOST_ARTIFACT_KINDS as readonly string[]).includes(value);
+}
+
 /** Closed MIME allowlist. The grant scope cannot widen it. */
 export const RESEARCH_ALLOWED_MIME_TYPES = ["text/html", "text/plain"] as const;
 
@@ -91,6 +95,24 @@ export interface ResearchGrantView {
   grants: ResearchCapabilityGrant[];
 }
 
+/**
+ * Executor lineage resolved by the launcher from its own executor.started mint. Fixtures that
+ * run the host outside a RuntimeLedger execution omit the binding entirely; they never invent
+ * placeholder identities.
+ */
+export interface ResearchExecutionBinding {
+  executionId: string;
+  launchClaimId: string;
+}
+
+/**
+ * Two closed shapes, never a partial mix: ledger-bound receipts always carry the executor
+ * lineage; unbound fixture receipts always omit it.
+ */
+export type ResearchReceiptAuthorization =
+  | { grantId: string; taskId: string; agentId: string }
+  | { grantId: string; taskId: string; agentId: string; executionId: string; launchClaimId: string };
+
 export interface ResearchSearchRequest {
   operationId: string;
   taskId: string;
@@ -132,7 +154,7 @@ export interface ResearchSearchReceipt {
   operationId: string;
   runId: string;
   capability: typeof RESEARCH_CAPABILITY;
-  authorization: { grantId: string; taskId: string; agentId: string };
+  authorization: ResearchReceiptAuthorization;
   gap: ResearchGapBinding;
   provider: { id: string; version: string };
   query: string;
@@ -172,7 +194,7 @@ export interface ResearchDocumentSnapshotReceipt {
   operationId: string;
   runId: string;
   capability: typeof RESEARCH_CAPABILITY;
-  authorization: { grantId: string; taskId: string; agentId: string };
+  authorization: ResearchReceiptAuthorization;
   gap: ResearchGapBinding;
   search: {
     operationId: string;
@@ -265,4 +287,33 @@ export interface ResearchRequestReceipt {
   trigger: ResearchTriggerOption;
   /** Exact scope a scheduler-issued grant must carry for this request. */
   gap: ResearchGapBinding;
+}
+
+/**
+ * Journal-projected research operation, the ledger-bound relocation of the in-host
+ * ResearchOperationRegistry record. One record per started operation, both ops; failed
+ * operations keep charging grant and task budgets exactly like the registry.
+ */
+export interface ResearchOperationRecord {
+  id: string;
+  op: "search" | "document_snapshot";
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  executionId: string;
+  launchClaimId: string;
+  requestFingerprint: string;
+  gap: ResearchGapBinding;
+  status: "started" | "completed" | "failed";
+  query: string | null;
+  searchOperationId: string | null;
+  resultIndex: number | null;
+  receiptArtifactId: string | null;
+  receiptId: string | null;
+  receiptContentId: string | null;
+  documentArtifactId: string | null;
+  extractionArtifactId: string | null;
+  /** Completed search operations record their result count so snapshot admission stays closed. */
+  searchResultCount: number | null;
+  failure: ResearchFailureReason | null;
 }

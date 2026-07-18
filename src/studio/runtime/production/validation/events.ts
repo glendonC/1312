@@ -11,6 +11,7 @@ import {
 import { assertOcrRequest, validateOcrLimits, validateOcrReceipt } from "./ocr.ts";
 import { assertSpeakerOverlapRequest, validateSpeakerOverlapLimits, validateSpeakerOverlapReceipt } from "./speakers.ts";
 import { assertConditionalSeparationRequest, validateConditionalSeparationLimits, validateConditionalSeparationReceipt, validateConditionalSeparationTrigger, validateRawStemComparisonReceipt } from "./separation.ts";
+import { assertResearchRequest, validateResearchAllowedDomains, validateResearchGapBinding, validateResearchLimits, validateResearchSearchReceipt, validateResearchSnapshotReceipt } from "./research.ts";
 import {
   validatePublishReviewIntakeReceipt,
   validateStudyReadinessReceiptIdentity,
@@ -109,6 +110,7 @@ const REJECTIONS = new Set([
   "restudy_range_pass_cap",
   "restudy_producer_pass_cap",
   "separation_duplicate_work",
+  "research_duplicate_work",
 ]);
 
 export function assertRuntimeEvent(
@@ -142,7 +144,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "speaker_host", "separation_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "speaker_host", "separation_host", "research_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -224,7 +226,7 @@ export function assertRuntimeEvent(
     string(data.callId, context, "event.data.callId");
     string(data.executionId, context, "event.data.executionId");
     string(data.taskId, context, "event.data.taskId");
-    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_restudy_request", "study_separation_request", "study_synthesize"]), context, "event.data.tool");
+    oneOf(data.tool, new Set(["task_spawn_request", "task_reports_wait", "report_disposition", "artifact_read", "study_planning_decision", "study_restudy_request", "study_separation_request", "study_research_request", "study_synthesize"]), context, "event.data.tool");
   } else if (type === "reports.wait_started") {
     exact(data, ["waitId", "executionId", "parentTaskId"], context, "event.data");
     string(data.waitId, context, "event.data.waitId");
@@ -421,6 +423,37 @@ export function assertRuntimeEvent(
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     oneOf(data.reason, new Set(["source_unavailable", "input_oversized", "trigger_invalid", "model_unavailable", "runtime_drift", "decoder_failed", "separator_timeout", "separator_failed", "recognizer_failed", "artifact_oversized"]), context, "event.data.reason");
+  } else if (type === "research.operation_started") {
+    exact(data, ["request", "gap", "executionId", "launchClaimId", "requestFingerprint", "limits", "allowedDomains"], context, "event.data");
+    assertResearchRequest(data.request, context);
+    validateResearchGapBinding(data.gap, context, "event.data.gap");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.launchClaimId, context, "event.data.launchClaimId");
+    string(data.requestFingerprint, context, "event.data.requestFingerprint");
+    validateResearchLimits(data.limits, context, "event.data.limits");
+    validateResearchAllowedDomains(data.allowedDomains, context, "event.data.allowedDomains");
+  } else if (type === "research.operation_completed") {
+    exact(data, ["operationId", "op", "receiptArtifactId", "receiptContentId", "receipt", "documentArtifactId", "extractionArtifactId"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    const researchOp = oneOf<"search" | "document_snapshot">(data.op, new Set(["search", "document_snapshot"]), context, "event.data.op");
+    string(data.receiptArtifactId, context, "event.data.receiptArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    if (researchOp === "search") {
+      if (data.documentArtifactId !== null || data.extractionArtifactId !== null) {
+        fail(context, "event.data", "search completions carry no document artifacts");
+      }
+      const receipt = validateResearchSearchReceipt(data.receipt, context);
+      if (!("executionId" in receipt.authorization)) fail(context, "event.data.receipt.authorization", "journaled research receipts require executor lineage");
+    } else {
+      string(data.documentArtifactId, context, "event.data.documentArtifactId");
+      string(data.extractionArtifactId, context, "event.data.extractionArtifactId");
+      const receipt = validateResearchSnapshotReceipt(data.receipt, context);
+      if (!("executionId" in receipt.authorization)) fail(context, "event.data.receipt.authorization", "journaled research receipts require executor lineage");
+    }
+  } else if (type === "research.operation_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    oneOf(data.reason, new Set(["destination_not_allowed", "private_destination", "scheme_not_allowed", "credentials_in_url", "port_not_allowed", "url_too_long", "redirect_limit_exceeded", "mime_not_allowed", "byte_limit_exceeded", "wall_timeout", "fetch_failed", "provider_result_invalid", "artifact_oversized"]), context, "event.data.reason");
   } else if (type === "semantic.evidence_started") {
     exact(data, ["request", "grantId", "executionId", "launchClaimId", "sourceContentId", "producer", "limits"], context, "event.data");
     assertSpeechTranscribeRequest(data.request, context);

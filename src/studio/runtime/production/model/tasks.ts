@@ -2,6 +2,7 @@ import type { FrameSamplingGrantScope } from "./frames.ts";
 import type { OcrGrantScope } from "./ocr.ts";
 import type { SpeakerOverlapGrantScope } from "./speakers.ts";
 import type { ConditionalSeparationGrantScope } from "./separation.ts";
+import type { ResearchGrantScope } from "./research.ts";
 
 export const CAPABILITIES = [
   "task.spawn.request",
@@ -13,6 +14,7 @@ export const CAPABILITIES = [
   "media.frames.ocr",
   "media.speakers.analyze",
   "media.audio.separate",
+  "research.investigate",
   "speech.transcribe",
   "evidence.read",
   "analysis.evidence.assess",
@@ -22,6 +24,7 @@ export const CAPABILITIES = [
   "study.plan",
   "study.restudy",
   "study.separate",
+  "study.research",
   "study.synthesize",
 ] as const;
 
@@ -194,6 +197,7 @@ export type CapabilityGrant =
       ocrScope?: never;
       speakerScope?: never;
       separationScope?: never;
+      researchScope?: never;
     })
   | (CapabilityGrantBase & {
       capability: "media.frames.ocr";
@@ -201,6 +205,7 @@ export type CapabilityGrant =
       frameScope?: never;
       speakerScope?: never;
       separationScope?: never;
+      researchScope?: never;
     })
   | (CapabilityGrantBase & {
       capability: "media.speakers.analyze";
@@ -208,6 +213,7 @@ export type CapabilityGrant =
       frameScope?: never;
       ocrScope?: never;
       separationScope?: never;
+      researchScope?: never;
     })
   | (CapabilityGrantBase & {
       capability: "media.audio.separate";
@@ -215,13 +221,26 @@ export type CapabilityGrant =
       frameScope?: never;
       ocrScope?: never;
       speakerScope?: never;
+      researchScope?: never;
     })
   | (CapabilityGrantBase & {
-      capability: Exclude<Capability, "media.frames.sample" | "media.frames.ocr" | "media.speakers.analyze" | "media.audio.separate">;
+      capability: "research.investigate";
+      researchScope: ResearchGrantScope;
       frameScope?: never;
       ocrScope?: never;
       speakerScope?: never;
       separationScope?: never;
+    })
+  | (CapabilityGrantBase & {
+      capability: Exclude<
+        Capability,
+        "media.frames.sample" | "media.frames.ocr" | "media.speakers.analyze" | "media.audio.separate" | "research.investigate"
+      >;
+      frameScope?: never;
+      ocrScope?: never;
+      speakerScope?: never;
+      separationScope?: never;
+      researchScope?: never;
     });
 
 export interface AgentRecord {
@@ -276,7 +295,8 @@ export type SpawnRejection =
   | "restudy_duplicate_work"
   | "restudy_range_pass_cap"
   | "restudy_producer_pass_cap"
-  | "separation_duplicate_work";
+  | "separation_duplicate_work"
+  | "research_duplicate_work";
 
 export interface LaunchPermit {
   requestId: string;
@@ -340,6 +360,7 @@ export interface OrchestratorToolCallRecord {
     | "study_planning_decision"
     | "study_restudy_request"
     | "study_separation_request"
+    | "study_research_request"
     | "study_synthesize";
   spawnRequestId: string | null;
 }

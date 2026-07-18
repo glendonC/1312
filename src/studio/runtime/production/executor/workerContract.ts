@@ -1,4 +1,4 @@
-import { isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind, isOcrHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
+import { isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind, isOcrHostArtifactKind, isResearchHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
 import type {
   GeneralizedCoverageReasonCode,
   GeneralizedCoverageRange,
@@ -237,7 +237,7 @@ export function validateWorkerResult(
   expectedSpeakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [],
 ): WorkerResult {
   const item = record(value);
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker response failed its output authority contract.",
@@ -436,7 +436,7 @@ export function validateWorkerResult(
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker output schema cannot impersonate a host frame artifact.",
@@ -645,6 +645,9 @@ export function workerPrompt(task: TaskRecord): string {
     grantedConditionalSeparation: task.grants
       .filter((grant) => grant.capability === "media.audio.separate")
       .map((grant) => ({ mediaScope: grant.mediaScope, trigger: grant.separationScope?.trigger ?? null, limits: grant.separationScope?.limits ?? null })),
+    grantedResearch: task.grants
+      .filter((grant) => grant.capability === "research.investigate")
+      .map((grant) => ({ gap: grant.researchScope?.gap ?? null, allowedDomains: grant.researchScope?.allowedDomains ?? [], limits: grant.researchScope?.limits ?? null })),
     grantedSemanticEvidence: semanticScope,
     grantedEvidence: task.grants
       .filter((grant) => grant.capability === "evidence.read")
@@ -742,6 +745,16 @@ export function workerPrompt(task: TaskRecord): string {
         "Unknown, withheld, and truncated upstream states remain explicit in the receipted assessment; never upgrade them to supported.",
         "Include the returned assessment operation, output-artifact, receipt, and receipt-content identities in the required worker output.",
       ].join(" ");
+  const researchGranted = task.grants.some((grant) => grant.capability === "research.investigate");
+  const researchBoundary = !researchGranted
+    ? "This executor exposes no research tools and no web access. Do not claim that you searched, browsed, or verified anything externally."
+    : [
+        "This executor exposes research_search and research_document_snapshot only for the exact granted unresolved-conflict gap.",
+        "research_search accepts one bounded query string; the host injects task, agent, grant, provider, and budgets. Returned snippets are routing hints, never citations, and never evidence.",
+        "research_document_snapshot accepts only a completed searchOperationId plus a resultIndex; URLs and paths are never accepted. The host enforces the domain allowlist, byte and redirect ceilings, and stores receipted document and extraction artifacts.",
+        "A snapshot proves only what a public destination served at retrieval time. It is cite-only external context for the granted gap: it never becomes claim support, dialogue, caption text, transcript authority, entity identification, currency, or truth.",
+        "Do not label worker-authored output as any studio research receipt, snapshot, or extraction artifact kind; those belong only to the host.",
+      ].join(" ");
   const decisionScope = task.grants
     .find((grant) => grant.capability === "analysis.evidence.decide")?.decisionScope ?? null;
   const decisionBoundary = decisionScope === null
@@ -759,6 +772,7 @@ export function workerPrompt(task: TaskRecord): string {
     mediaBoundary,
     semanticBoundary,
     studyBoundary,
+    researchBoundary,
     evidenceBoundary,
     assessmentBoundary,
     decisionBoundary,

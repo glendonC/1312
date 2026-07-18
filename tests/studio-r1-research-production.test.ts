@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 
 import { ContentAddressedArtifactStore, identifyFile } from "../src/studio/runtime/production/artifactStore.ts";
 import { canonicalJsonContentId } from "../src/studio/runtime/production/artifactStore/contentIdentity.ts";
@@ -32,7 +32,7 @@ import {
   type ResearchGapBinding,
   type ResearchGrantView,
 } from "../src/studio/runtime/production/model/research.ts";
-import { fetchResearchDocument, ResearchEgressError, type ResearchFetcher } from "../src/studio/runtime/production/research/egressPolicy.ts";
+import { fetchResearchDocument, ResearchEgressError, type ResearchDnsLookup, type ResearchFetcher } from "../src/studio/runtime/production/research/egressPolicy.ts";
 import { FixtureResearchProvider } from "../src/studio/runtime/production/research/provider.ts";
 import { auditResearchSearch, auditResearchSnapshot } from "../src/studio/runtime/production/research/researchAudit.ts";
 import {
@@ -162,7 +162,7 @@ function fixtureFetcher(routes: Record<string, () => Response>, log: Array<{ url
 const publicLookup = async () => [{ address: "93.184.216.34", family: 4 }];
 const privateLookup = async () => [{ address: "10.0.0.5", family: 4 }];
 
-async function makeStore(t: Parameters<NonNullable<Parameters<typeof test>[1]>>[0]): Promise<{ store: ContentAddressedArtifactStore; root: string }> {
+async function makeStore(t: TestContext): Promise<{ store: ContentAddressedArtifactStore; root: string }> {
   const root = await mkdtemp(join(tmpdir(), "studio-r1-research-"));
   t.after(async () => rm(root, { recursive: true, force: true }));
   return { store: new ContentAddressedArtifactStore(root), root };
@@ -174,7 +174,7 @@ function makeHost(
     view?: ResearchGrantView;
     routes?: Record<string, () => Response>;
     log?: Array<{ url: string; init: RequestInit }>;
-    lookup?: typeof publicLookup;
+    lookup?: ResearchDnsLookup;
   } = {},
 ): BoundedResearchHost {
   return new BoundedResearchHost(RUN_ID, options.view ?? testView(), store, {
@@ -285,14 +285,14 @@ test("plain text snapshots back exact cite-only document span citations that sur
   upgraded.use = "claim_support";
   upgraded.target = { kind: "claim", claimId: "claim:fake", range: target.qualifiesMedia };
   const { schema: _schema, citationId: _citationId, ...upgradedBody } = upgraded;
-  upgraded.citationId = evidenceCitationId(upgradedBody);
+  upgraded.citationId = evidenceCitationId(upgradedBody as unknown as Parameters<typeof evidenceCitationId>[0]);
   assert.throws(() => validateEvidenceCitationEnvelope(upgraded), /claim support requires available current-run speech/);
 
   const coverageUpgrade: Record<string, unknown> = structuredClone(citation) as unknown as Record<string, unknown>;
   coverageUpgrade.use = "coverage_qualification";
   coverageUpgrade.target = { kind: "coverage", range: target.qualifiesMedia };
   const { schema: _s2, citationId: _c2, ...coverageBody } = coverageUpgrade;
-  coverageUpgrade.citationId = evidenceCitationId(coverageBody);
+  coverageUpgrade.citationId = evidenceCitationId(coverageBody as unknown as Parameters<typeof evidenceCitationId>[0]);
   assert.throws(() => validateEvidenceCitationEnvelope(coverageUpgrade), /cite-only over explicit receipted document spans/);
 
   await tamperStoredObject(root, snapshot.extraction.contentId, `${JSON.stringify({ forged: true })}\n`);
@@ -364,7 +364,7 @@ test("missing, wrong, and identity-escaping grants fail closed", async (t) => {
 });
 
 async function rejectSnapshot(
-  t: Parameters<NonNullable<Parameters<typeof test>[1]>>[0],
+  t: TestContext,
   query: string,
   resultIndex: number,
   matcher: (error: unknown) => boolean,

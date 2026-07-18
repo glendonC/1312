@@ -16,6 +16,7 @@
     "frames:check": "node --test tests/studio-frame-sampling.test.ts",
     "ocr:check": "node --test tests/studio-ocr-production.test.ts",
     "speakers:check": "node --test tests/studio-speaker-overlap-production.test.ts",
+    "research:check": "node --test tests/studio-r1-research-production.test.ts tests/studio-r1-research-wiring.test.ts",
     "source:check": "node --test tests/studio-source-resolution.test.ts",
     "runtime:check": "node --test tests/studio-runtime-production.test.ts tests/studio-owned-swarm-orchestration.test.ts tests/studio-semantic-evidence.test.ts tests/studio-study-report-admission.test.ts tests/studio-owned-media-study.test.ts tests/studio-multimodal-admission.test.ts tests/studio-orchestrator-executor-contract.test.ts tests/studio-owned-swarm-real-codex.test.ts tests/studio-child-media-bridge.test.ts tests/studio-child-evidence-bridge.test.ts tests/studio-child-evidence-assessment-bridge.test.ts tests/studio-production-adapter.test.ts tests/studio-runtime-validation.test.ts tests/studio-executor-contract.test.ts tests/studio-runtime-inspector.test.ts tests/studio-run-start-production.test.ts tests/studio-runtime-host.test.ts tests/studio-caption-production.test.ts tests/studio-local-runtime-client.test.ts tests/studio-forecast-production.test.ts tests/studio-memory-inspection.test.ts",
     "runtime:index": "node scripts/index-runtime-observability.ts",
@@ -24,7 +25,7 @@
     "runtime:host:caption-real": "node scripts/run-runtime-host.ts --source-directory public/demo/runs/run-005 --executor deterministic --caption-executor openai --allow-real-caption-production",
     "runtime:smoke:codex": "test -n \"$STUDIO_OWNED_SWARM_MODEL\" && node scripts/run-local-worker.ts --source-directory public/demo/runs/run-005 --source-language-mode declared --source-language ko --target-language en --language-pack ko-v3 --output-depth evidence --model \"$STUDIO_OWNED_SWARM_MODEL\"",
     "runtime:proof:owned-swarm": "node --test tests/studio-owned-swarm-real-codex.test.ts",
-    "studio:check": "npm run docs:check && npm run build && npm run bench:check && npm run evidence:check && npm run memory:check && npm run speech:check && npm run language:check && npm run acoustic:check && npm run frames:check && npm run ocr:check && npm run speakers:check && npm run source:check && npm run runtime:check && npm run studio:qa:list",
+    "studio:check": "npm run docs:check && npm run build && npm run bench:check && npm run evidence:check && npm run memory:check && npm run speech:check && npm run language:check && npm run acoustic:check && npm run frames:check && npm run ocr:check && npm run speakers:check && npm run research:check && npm run source:check && npm run runtime:check && npm run studio:qa:list",
     "studio:qa": "playwright test",
     "studio:qa:list": "playwright test --list",
     "preview": "astro preview"

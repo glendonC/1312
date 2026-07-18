@@ -119,7 +119,7 @@ function receiptValue(event: RuntimeEvent): {
 function receiptArtifactLinks(state: RuntimeProjection, receiptId: string): RuntimeArtifact[] {
   return Object.values(state.artifacts).filter((artifact) => {
     const origin = artifact.origin;
-    if (origin.kind === "ingest" || origin.kind === "preflight_evidence") return false;
+    if (origin.kind === "ingest" || origin.kind === "preflight_evidence" || origin.kind === "research_document_snapshot" || origin.kind === "research_extraction") return false;
     return origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
       ? origin.executorReceiptId === receiptId
       : origin.receiptId === receiptId;
@@ -207,9 +207,11 @@ export async function buildRuntimeObservabilityIndex(
         if (
           origin.kind === "ingest" ||
           origin.kind === "preflight_evidence" ||
+          origin.kind === "research_document_snapshot" ||
+          origin.kind === "research_extraction" ||
           (origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
             ? origin.executorReceiptContentId !== content.contentId
-            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "speaker_overlap_receipt" || origin.kind === "conditional_separation_receipt" || origin.kind === "raw_stem_comparison_receipt"
+            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "speaker_overlap_receipt" || origin.kind === "conditional_separation_receipt" || origin.kind === "raw_stem_comparison_receipt" || origin.kind === "research_search_receipt" || origin.kind === "research_snapshot_receipt"
               ? artifact.content.contentId !== content.contentId
               : origin.receiptContentId !== content.contentId)
         ) {
@@ -238,7 +240,7 @@ export async function buildRuntimeObservabilityIndex(
         kind: artifact.kind,
         eventId: event.eventId,
         contentId: artifact.content.contentId,
-        receiptId: artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence"
+        receiptId: artifact.origin.kind === "ingest" || artifact.origin.kind === "preflight_evidence" || artifact.origin.kind === "research_document_snapshot" || artifact.origin.kind === "research_extraction"
           ? null
           : artifact.origin.kind === "owned_media_study" || artifact.origin.kind === "generalized_owned_media_study"
             ? artifact.origin.executorReceiptId

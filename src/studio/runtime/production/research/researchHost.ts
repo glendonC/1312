@@ -5,16 +5,25 @@ import { performance } from "node:perf_hooks";
 
 import { ContentAddressedArtifactStore } from "../artifactStore.ts";
 import {
+  buildResearchDocumentArtifact,
+  buildResearchExtractionArtifact,
+  buildResearchSearchReceiptArtifact,
+  buildResearchSnapshotReceiptArtifact,
   researchDocumentArtifactId,
   researchExtractionArtifactId,
   researchSearchReceiptArtifactId,
   researchSnapshotReceiptArtifactId,
 } from "../artifactStore/researchArtifacts.ts";
+import type { RuntimeLedger } from "../journal.ts";
+import type { PendingRuntimeEvent } from "../protocol.ts";
 import {
   RESEARCH_CAPABILITY,
   type ResearchDocumentSnapshotReceipt,
+  type ResearchExecutionBinding,
   type ResearchExtractionArtifact,
+  type ResearchFailureReason,
   type ResearchGrantView,
+  type ResearchReceiptAuthorization,
   type ResearchSearchReceipt,
   type ResearchSearchResult,
   type ResearchSnapshotRequest,
@@ -78,6 +87,14 @@ export class BoundedResearchHost {
   private readonly fetcher: ResearchFetcher | undefined;
   private readonly lookup: ResearchDnsLookup | undefined;
   private readonly now: () => string;
+  /**
+   * Ledger-bound mode: every operation journals research.operation_* events whose reducer
+   * re-enforces the registry rules against the durable projection, and receipts carry the real
+   * executor lineage. The in-host registry stays only as the per-launch working memory; the
+   * projection is the single durable truth. Unbound mode is the R1.0 fixture contract unchanged
+   * and never invents execution identities.
+   */
+  private readonly binding: { ledger: RuntimeLedger; execution: ResearchExecutionBinding } | undefined;
   private readonly registry = new ResearchOperationRegistry();
 
   constructor(
@@ -89,6 +106,7 @@ export class BoundedResearchHost {
       fetcher?: ResearchFetcher;
       lookup?: ResearchDnsLookup;
       now?: () => string;
+      binding?: { ledger: RuntimeLedger; execution: ResearchExecutionBinding };
     },
   ) {
     this.runId = runId;
@@ -98,6 +116,40 @@ export class BoundedResearchHost {
     this.fetcher = options.fetcher;
     this.lookup = options.lookup;
     this.now = options.now ?? (() => new Date().toISOString());
+    this.binding = options.binding;
+  }
+
+  private authorization(grantId: string, taskId: string, agentId: string): ResearchReceiptAuthorization {
+    return this.binding
+      ? { grantId, taskId, agentId, executionId: this.binding.execution.executionId, launchClaimId: this.binding.execution.launchClaimId }
+      : { grantId, taskId, agentId };
+  }
+
+  private async journalStarted(authorized: ReturnType<typeof authorizeResearch>): Promise<void> {
+    if (!this.binding) return;
+    const { ledger, execution } = this.binding;
+    await ledger.transact(
+      { producer: { kind: "research_host", id: "bounded-research-host" }, causationId: authorized.request.operationId },
+      () => ({ pending: [{ type: "research.operation_started", data: {
+        request: authorized.request,
+        gap: structuredClone(authorized.scope.gap),
+        executionId: execution.executionId,
+        launchClaimId: execution.launchClaimId,
+        requestFingerprint: authorized.fingerprint,
+        limits: structuredClone(authorized.scope.limits),
+        allowedDomains: [...authorized.scope.allowedDomains],
+      } }] satisfies PendingRuntimeEvent[], result: undefined }),
+    );
+  }
+
+  private async journalFailed(operationId: string, error: unknown, fallback: ResearchFailureReason): Promise<void> {
+    if (!this.binding) return;
+    if (this.binding.ledger.state().researchOperations[operationId]?.status !== "started") return;
+    const reason = error instanceof ResearchEgressError ? error.reason : fallback;
+    await this.binding.ledger.transact(
+      { producer: { kind: "research_host", id: "bounded-research-host" }, causationId: operationId },
+      () => ({ pending: [{ type: "research.operation_failed", data: { operationId, reason } }] satisfies PendingRuntimeEvent[], result: undefined }),
+    );
   }
 
   async search(requestValue: unknown): Promise<VerifiedResearchSearch> {
@@ -105,6 +157,7 @@ export class BoundedResearchHost {
     const authorized = authorizeResearch(this.view, this.registry, requestValue);
     const { request, grant, scope } = authorized;
     if (request.op !== "search") throw new Error("Research search received a non-search request");
+    await this.journalStarted(authorized);
     this.registry.start({ operationId: request.operationId, grantId: grant.id, op: "search", fingerprint: authorized.fingerprint });
     try {
       const deadlineAtMs = start + scope.limits.maxWallMs;
@@ -149,7 +202,7 @@ export class BoundedResearchHost {
         operationId: request.operationId,
         runId: this.runId,
         capability: RESEARCH_CAPABILITY,
-        authorization: { grantId: grant.id, taskId: request.taskId, agentId: request.agentId },
+        authorization: this.authorization(grant.id, request.taskId, request.agentId),
         gap: structuredClone(scope.gap),
         provider: { id: this.provider.id, version: this.provider.version },
         query: request.query,
@@ -169,6 +222,25 @@ export class BoundedResearchHost {
         throw new ResearchEgressError("wall_timeout", "Research search exceeded its wall-time grant");
       }
       const receiptArtifactId = researchSearchReceiptArtifactId(this.runId, request.operationId, stored.content.contentId);
+      if (this.binding) {
+        const receiptArtifact = buildResearchSearchReceiptArtifact({
+          runId: this.runId,
+          taskId: request.taskId,
+          agentId: request.agentId,
+          receipt,
+          prepared: { artifactId: receiptArtifactId, content: stored.content, storageKey: stored.storageKey },
+        });
+        await this.binding.ledger.transact(
+          { producer: { kind: "research_host", id: "bounded-research-host" }, causationId: request.operationId },
+          () => ({ pending: [
+            { type: "artifact.recorded", data: { artifact: receiptArtifact } },
+            { type: "research.operation_completed", data: {
+              operationId: request.operationId, op: "search", receiptArtifactId, receiptContentId: stored.content.contentId,
+              receipt, documentArtifactId: null, extractionArtifactId: null,
+            } },
+          ] satisfies PendingRuntimeEvent[], result: undefined }),
+        );
+      }
       this.registry.completeSearch(request.operationId, {
         operationId: request.operationId,
         grantId: grant.id,
@@ -179,6 +251,7 @@ export class BoundedResearchHost {
       return { receipt, receiptContentId: stored.content.contentId, receiptArtifactId, storageKey: stored.storageKey };
     } catch (error) {
       this.registry.fail(request.operationId);
+      await this.journalFailed(request.operationId, error, "provider_result_invalid");
       throw error;
     }
   }
@@ -191,6 +264,7 @@ export class BoundedResearchHost {
     if (request.op !== "document_snapshot" || !authorized.search) {
       throw new Error("Research snapshot received a non-snapshot request");
     }
+    await this.journalStarted(authorized);
     this.registry.start({ operationId: request.operationId, grantId: grant.id, op: "document_snapshot", fingerprint: authorized.fingerprint });
     try {
       const deadlineAtMs = start + scope.limits.maxWallMs;
@@ -256,7 +330,7 @@ export class BoundedResearchHost {
         operationId: request.operationId,
         runId: this.runId,
         capability: RESEARCH_CAPABILITY,
-        authorization: { grantId: grant.id, taskId: request.taskId, agentId: request.agentId },
+        authorization: this.authorization(grant.id, request.taskId, request.agentId),
         gap: structuredClone(scope.gap),
         search: {
           operationId: storedSearch.operationId,
@@ -310,6 +384,48 @@ export class BoundedResearchHost {
         throw new ResearchEgressError("wall_timeout", "Research snapshot exceeded its wall-time grant");
       }
       const receiptArtifactId = researchSnapshotReceiptArtifactId(this.runId, request.operationId, storedReceipt.content.contentId);
+      if (this.binding) {
+        const documentArtifact = buildResearchDocumentArtifact({
+          runId: this.runId,
+          taskId: request.taskId,
+          agentId: request.agentId,
+          operationId: request.operationId,
+          searchOperationId: request.searchOperationId,
+          searchReceiptArtifactId: authorized.search.receiptArtifactId,
+          resultIndex: request.resultIndex,
+          prepared: documentPrepared,
+        });
+        const extractionRow = buildResearchExtractionArtifact({
+          runId: this.runId,
+          taskId: request.taskId,
+          agentId: request.agentId,
+          operationId: request.operationId,
+          documentArtifactId: documentPrepared.artifactId,
+          method,
+          prepared: { artifactId: extractionArtifactId, content: storedExtraction.content, storageKey: storedExtraction.storageKey },
+        });
+        const receiptRow = buildResearchSnapshotReceiptArtifact({
+          runId: this.runId,
+          taskId: request.taskId,
+          agentId: request.agentId,
+          receipt,
+          searchReceiptArtifactId: authorized.search.receiptArtifactId,
+          prepared: { artifactId: receiptArtifactId, content: storedReceipt.content, storageKey: storedReceipt.storageKey },
+        });
+        await this.binding.ledger.transact(
+          { producer: { kind: "research_host", id: "bounded-research-host" }, causationId: request.operationId },
+          () => ({ pending: [
+            { type: "artifact.recorded", data: { artifact: documentArtifact } },
+            { type: "artifact.recorded", data: { artifact: extractionRow } },
+            { type: "artifact.recorded", data: { artifact: receiptRow } },
+            { type: "research.operation_completed", data: {
+              operationId: request.operationId, op: "document_snapshot", receiptArtifactId,
+              receiptContentId: storedReceipt.content.contentId, receipt,
+              documentArtifactId: documentPrepared.artifactId, extractionArtifactId,
+            } },
+          ] satisfies PendingRuntimeEvent[], result: undefined }),
+        );
+      }
       this.registry.completeSnapshot(request.operationId);
       return {
         receipt,
@@ -329,6 +445,7 @@ export class BoundedResearchHost {
       };
     } catch (error) {
       this.registry.fail(request.operationId);
+      await this.journalFailed(request.operationId, error, "fetch_failed");
       throw error;
     }
   }

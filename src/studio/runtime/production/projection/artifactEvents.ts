@@ -26,8 +26,11 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
     const isAtomicConditionalSeparation =
       (artifact.origin.kind === "separation_stem" || artifact.origin.kind === "conditional_separation_receipt" || artifact.origin.kind === "raw_stem_comparison" || artifact.origin.kind === "raw_stem_comparison_receipt") &&
       event.producer.kind === "separation_host";
+    const isAtomicResearch =
+      (artifact.origin.kind === "research_search_receipt" || artifact.origin.kind === "research_document_snapshot" || artifact.origin.kind === "research_extraction" || artifact.origin.kind === "research_snapshot_receipt") &&
+      event.producer.kind === "research_host";
     invariant(
-      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap || isAtomicConditionalSeparation,
+      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap || isAtomicConditionalSeparation || isAtomicResearch,
       event,
       "artifact evidence must come from its bounded storage, capability, admission, planning, synthesis, or audit host",
     );
@@ -126,6 +129,48 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
       const operation = next.conditionalSeparationOperations[artifact.origin.operationId];
       invariant(operation?.status === "started", event, `Raw/stem comparison receipt ${artifact.id} has no active operation`);
       invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId && artifact.sourceArtifactIds.length === 5 && artifact.sourceArtifactIds[0] === operation.sourceArtifactId && artifact.sourceArtifactIds.slice(1, 3).every((id) => next.artifacts[id]?.origin.kind === "separation_stem") && next.artifacts[artifact.sourceArtifactIds[3]]?.origin.kind === "conditional_separation_receipt" && artifact.sourceArtifactIds[4] === artifact.origin.comparisonArtifactId && next.artifacts[artifact.origin.comparisonArtifactId]?.origin.kind === "raw_stem_comparison", event, `Raw/stem comparison receipt ${artifact.id} changed lineage`);
+    } else if (artifact.origin.kind === "research_search_receipt") {
+      const operation = next.researchOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started" && operation.op === "search", event, `Research search receipt ${artifact.id} has no active search operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Research search receipt ${artifact.id} changed producer`);
+      invariant(artifact.sourceArtifactIds.length === 0, event, `Research search receipt ${artifact.id} claims artifact lineage it does not have`);
+    } else if (artifact.origin.kind === "research_document_snapshot") {
+      const operation = next.researchOperations[artifact.origin.operationId];
+      const search = next.researchOperations[artifact.origin.searchOperationId];
+      invariant(operation?.status === "started" && operation.op === "document_snapshot", event, `Research document ${artifact.id} has no active snapshot operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Research document ${artifact.id} changed producer`);
+      invariant(
+        search?.status === "completed" && search.op === "search" && search.grantId === operation.grantId &&
+          artifact.origin.searchOperationId === operation.searchOperationId && artifact.origin.resultIndex === operation.resultIndex &&
+          artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === search.receiptArtifactId,
+        event,
+        `Research document ${artifact.id} changed its search lineage`,
+      );
+    } else if (artifact.origin.kind === "research_extraction") {
+      const operation = next.researchOperations[artifact.origin.operationId];
+      invariant(operation?.status === "started" && operation.op === "document_snapshot", event, `Research extraction ${artifact.id} has no active snapshot operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Research extraction ${artifact.id} changed producer`);
+      invariant(
+        artifact.sourceArtifactIds.length === 1 && artifact.sourceArtifactIds[0] === artifact.origin.documentArtifactId &&
+          next.artifacts[artifact.origin.documentArtifactId]?.origin.kind === "research_document_snapshot",
+        event,
+        `Research extraction ${artifact.id} changed its document lineage`,
+      );
+    } else if (artifact.origin.kind === "research_snapshot_receipt") {
+      const operation = next.researchOperations[artifact.origin.operationId];
+      const search = operation ? next.researchOperations[operation.searchOperationId ?? ""] : undefined;
+      invariant(operation?.status === "started" && operation.op === "document_snapshot", event, `Research snapshot receipt ${artifact.id} has no active snapshot operation`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Research snapshot receipt ${artifact.id} changed producer`);
+      invariant(
+        search?.status === "completed" && artifact.sourceArtifactIds.length === 3 &&
+          artifact.sourceArtifactIds[0] === search.receiptArtifactId &&
+          artifact.sourceArtifactIds[1] === artifact.origin.documentArtifactId &&
+          next.artifacts[artifact.origin.documentArtifactId]?.origin.kind === "research_document_snapshot" &&
+          artifact.sourceArtifactIds[2] === artifact.origin.extractionArtifactId &&
+          next.artifacts[artifact.origin.extractionArtifactId]?.origin.kind === "research_extraction",
+        event,
+        `Research snapshot receipt ${artifact.id} changed search, document, or extraction lineage`,
+      );
     } else if (artifact.origin.kind === "semantic_media_evidence") {
       const operation = next.semanticEvidence[artifact.origin.operationId];
       invariant(operation?.status === "started", event, `artifact ${artifact.id} has no active semantic operation`);

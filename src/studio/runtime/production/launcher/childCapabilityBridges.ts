@@ -44,6 +44,12 @@ import {
   type OpenChildSeparationBridge,
 } from "../executor/childSeparationBridge.ts";
 import {
+  BoundedChildResearchBridge,
+  openChildResearchBridge,
+  type ChildResearchHost,
+  type OpenChildResearchBridge,
+} from "../executor/childResearchBridge.ts";
+import {
   BoundedChildMediaBridge,
   openChildMediaBridge,
   type ChildMediaCapabilityHost,
@@ -67,11 +73,13 @@ export interface LauncherChildCapabilityOptions {
   nextOcrOperationId?: () => string;
   nextSpeakerOperationId?: () => string;
   nextSeparationOperationId?: () => string;
+  nextResearchOperationId?: () => string;
   mediaMcpServerPath?: string;
   frameMcpServerPath?: string;
   ocrMcpServerPath?: string;
   speakerMcpServerPath?: string;
   separationMcpServerPath?: string;
+  researchMcpServerPath?: string;
   evidenceMcpServerPath?: string;
   assessmentMcpServerPath?: string;
   decisionMcpServerPath?: string;
@@ -84,6 +92,8 @@ export interface LauncherChildCapabilityHosts {
   ocr: ChildOcrHost;
   speaker: ChildSpeakerHost;
   separation: ChildSeparationHost;
+  /** Per-launch, per-grant host; the launcher constructs it with the task's exact research grant view. */
+  research?: ChildResearchHost;
   evidence: ChildEvidenceReadHost;
   assessment: ChildEvidenceAssessmentHost;
   decision: ChildEvidenceDecisionHost;
@@ -98,6 +108,7 @@ export interface LauncherChildCapabilityContext {
   ocrGrant: CapabilityGrant | undefined;
   speakerGrant: CapabilityGrant | undefined;
   separationGrant: CapabilityGrant | undefined;
+  researchGrant: CapabilityGrant | undefined;
   assessmentGrant: CapabilityGrant | undefined;
   decisionGrant: CapabilityGrant | undefined;
   mediaBridge: OpenChildMediaBridge | null;
@@ -105,6 +116,7 @@ export interface LauncherChildCapabilityContext {
   ocrBridge: OpenChildOcrBridge | null;
   speakerBridge: OpenChildSpeakerBridge | null;
   separationBridge: OpenChildSeparationBridge | null;
+  researchBridge: OpenChildResearchBridge | null;
   evidenceBridge: OpenChildEvidenceBridge | null;
   assessmentBridge: OpenChildEvidenceAssessmentBridge | null;
   decisionBridge: OpenChildEvidenceDecisionBridge | null;
@@ -123,6 +135,7 @@ export function launcherChildCapabilityContext(task: TaskRecord): LauncherChildC
     ocrGrant: task.grants.find((grant) => grant.capability === "media.frames.ocr"),
     speakerGrant: task.grants.find((grant) => grant.capability === "media.speakers.analyze"),
     separationGrant: task.grants.find((grant) => grant.capability === "media.audio.separate"),
+    researchGrant: task.grants.find((grant) => grant.capability === "research.investigate"),
     assessmentGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.assess"),
     decisionGrant: task.grants.find((grant) => grant.capability === "analysis.evidence.decide"),
     mediaBridge: null,
@@ -130,6 +143,7 @@ export function launcherChildCapabilityContext(task: TaskRecord): LauncherChildC
     ocrBridge: null,
     speakerBridge: null,
     separationBridge: null,
+    researchBridge: null,
     evidenceBridge: null,
     assessmentBridge: null,
     decisionBridge: null,
@@ -167,6 +181,16 @@ export async function openLauncherChildCapabilityBridges(
     context.separationBridge = await openChildSeparationBridge(new BoundedChildSeparationBridge(task, hosts.separation, {
       nextOperationId: options.nextSeparationOperationId,
     }));
+  }
+  if (context.researchGrant) {
+    if (context.researchGrant.capability !== "research.investigate" || !hosts.research) {
+      throw new Error("A research-granted child requires its per-launch bounded research host");
+    }
+    context.researchBridge = await openChildResearchBridge(new BoundedChildResearchBridge(
+      { taskId: task.id, agentId: task.assignedAgentId, grants: [context.researchGrant] },
+      hosts.research,
+      { nextOperationId: options.nextResearchOperationId },
+    ));
   }
   if (context.semanticEvidenceGrant) {
     context.semanticEvidenceBridge = await openChildSemanticEvidenceBridge(new BoundedChildSemanticEvidenceBridge(
@@ -313,6 +337,18 @@ export function configureLauncherChildCapabilityMcp(
       "-c", `mcp_servers.studio_separation.env_vars=${tomlStrings(["STUDIO_CHILD_SEPARATION_BRIDGE_URL", "STUDIO_CHILD_SEPARATION_BRIDGE_TOKEN"])}`,
     );
   }
+  if (context.researchBridge) {
+    const serverPath = options.researchMcpServerPath ?? fileURLToPath(new URL("../executor/researchMcpServer.ts", import.meta.url));
+    args.push(
+      "-c", `mcp_servers.studio_research.command=${tomlString(process.execPath)}`,
+      "-c", `mcp_servers.studio_research.args=${tomlStrings([serverPath])}`,
+      "-c", "mcp_servers.studio_research.required=true",
+      "-c", `mcp_servers.studio_research.enabled_tools=${tomlStrings(context.researchBridge.manifest.tools.map((tool) => tool.name))}`,
+      "-c", "mcp_servers.studio_research.startup_timeout_sec=5",
+      "-c", `mcp_servers.studio_research.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, options.maximumWallMs) / 1_000))}`,
+      "-c", `mcp_servers.studio_research.env_vars=${tomlStrings(["STUDIO_CHILD_RESEARCH_BRIDGE_URL", "STUDIO_CHILD_RESEARCH_BRIDGE_TOKEN"])}`,
+    );
+  }
   if (context.evidenceBridge) {
     const serverPath = options.evidenceMcpServerPath ?? fileURLToPath(
       new URL("../executor/evidenceMcpServer.ts", import.meta.url),
@@ -414,7 +450,7 @@ export function configureLauncherChildCapabilityMcp(
 export function launcherChildCapabilityEnvironment(
   context: LauncherChildCapabilityContext,
 ): NodeJS.ProcessEnv {
-  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.speakerBridge || context.separationBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
+  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.speakerBridge || context.separationBridge || context.researchBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
     ...process.env,
     ...(context.mediaBridge ? {
       STUDIO_CHILD_MEDIA_BRIDGE_URL: context.mediaBridge.endpoint,
@@ -435,6 +471,10 @@ export function launcherChildCapabilityEnvironment(
     ...(context.separationBridge ? {
       STUDIO_CHILD_SEPARATION_BRIDGE_URL: context.separationBridge.endpoint,
       STUDIO_CHILD_SEPARATION_BRIDGE_TOKEN: context.separationBridge.token,
+    } : {}),
+    ...(context.researchBridge ? {
+      STUDIO_CHILD_RESEARCH_BRIDGE_URL: context.researchBridge.endpoint,
+      STUDIO_CHILD_RESEARCH_BRIDGE_TOKEN: context.researchBridge.token,
     } : {}),
     ...(context.evidenceBridge ? {
       STUDIO_CHILD_EVIDENCE_BRIDGE_URL: context.evidenceBridge.endpoint,
@@ -463,6 +503,7 @@ export async function closeLauncherChildCapabilityBridges(
   if (context.ocrBridge) await context.ocrBridge.close();
   if (context.speakerBridge) await context.speakerBridge.close();
   if (context.separationBridge) await context.separationBridge.close();
+  if (context.researchBridge) await context.researchBridge.close();
   if (context.semanticEvidenceBridge) await context.semanticEvidenceBridge.close();
   if (context.evidenceBridge) await context.evidenceBridge.close();
   if (context.assessmentBridge) await context.assessmentBridge.close();

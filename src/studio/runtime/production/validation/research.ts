@@ -166,8 +166,14 @@ export function assertResearchRequest(value: unknown, context = "Research reques
 
 function validateAuthorization(value: unknown, context: string, path: string): void {
   const item = object(value, context, path);
-  exact(item, ["grantId", "taskId", "agentId"], context, path);
-  for (const key of ["grantId", "taskId", "agentId"]) string(item[key], context, `${path}.${key}`);
+  // Two closed shapes: unbound fixture receipts omit the executor lineage entirely; ledger-bound
+  // receipts carry both fields. A partial binding is never valid.
+  const bound = "executionId" in item || "launchClaimId" in item;
+  const keys = bound
+    ? ["grantId", "taskId", "agentId", "executionId", "launchClaimId"]
+    : ["grantId", "taskId", "agentId"];
+  exact(item, keys, context, path);
+  for (const key of keys) string(item[key], context, `${path}.${key}`);
 }
 
 function validateSearchResult(value: unknown, context: string, path: string, expectedIndex: number): ResearchSearchResult {

@@ -116,6 +116,34 @@ export interface RawStemComparisonReceiptArtifactOrigin {
   separationReceiptId: string;
 }
 
+export interface ResearchSearchReceiptArtifactOrigin {
+  kind: "research_search_receipt";
+  operationId: string;
+  receiptId: string;
+}
+
+export interface ResearchDocumentSnapshotArtifactOrigin {
+  kind: "research_document_snapshot";
+  operationId: string;
+  searchOperationId: string;
+  resultIndex: number;
+}
+
+export interface ResearchExtractionArtifactOrigin {
+  kind: "research_extraction";
+  operationId: string;
+  documentArtifactId: string;
+  method: "html_text_v1" | "plain_text_v1";
+}
+
+export interface ResearchSnapshotReceiptArtifactOrigin {
+  kind: "research_snapshot_receipt";
+  operationId: string;
+  receiptId: string;
+  documentArtifactId: string;
+  extractionArtifactId: string;
+}
+
 export interface SemanticMediaEvidenceArtifactOrigin {
   kind: "semantic_media_evidence";
   operationId: string;
@@ -370,6 +398,10 @@ export interface RuntimeArtifact {
     | ConditionalSeparationReceiptArtifactOrigin
     | RawStemComparisonArtifactOrigin
     | RawStemComparisonReceiptArtifactOrigin
+    | ResearchSearchReceiptArtifactOrigin
+    | ResearchDocumentSnapshotArtifactOrigin
+    | ResearchExtractionArtifactOrigin
+    | ResearchSnapshotReceiptArtifactOrigin
     | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
     | StudyReportArtifactOrigin

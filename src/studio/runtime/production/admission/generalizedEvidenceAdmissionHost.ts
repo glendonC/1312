@@ -141,6 +141,11 @@ export class GeneralizedEvidenceAdmissionHost {
         if (!operation || operation.taskId !== task.id || operation.agentId !== task.assignedAgentId || operation.executionId !== execution.id) {
           throw new Error(`Speaker/overlap citation ${verified.citationId} is cross-task or cross-executor`);
         }
+      } else if (verified.evidenceKind === "external_document_span") {
+        const operation = this.state.researchOperations[verified.operationId!];
+        if (!operation || operation.taskId !== task.id || operation.agentId !== task.assignedAgentId || operation.executionId !== execution.id) {
+          throw new Error(`Research citation ${verified.citationId} is cross-task or cross-executor`);
+        }
       } else if (!task.jobContext.detectorEvidence.some((identity) => identity.artifactId === verified.evidence.artifactId && identity.contentId === verified.evidence.contentId)) {
         throw new Error(`Acoustic citation ${verified.citationId} is outside the task's immutable detector evidence`);
       }

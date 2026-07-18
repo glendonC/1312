@@ -76,6 +76,7 @@ export interface OrchestratorToolCalledEvent extends RuntimeEventBase {
       | "study_planning_decision"
       | "study_restudy_request"
       | "study_separation_request"
+      | "study_research_request"
       | "study_synthesize";
   };
 }

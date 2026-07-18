@@ -22,6 +22,7 @@ import {
   ORCHESTRATOR_PLAN_TOOL,
   ORCHESTRATOR_RESTUDY_TOOL,
   ORCHESTRATOR_SEPARATION_TOOL,
+  ORCHESTRATOR_RESEARCH_TOOL,
   ORCHESTRATOR_SYNTHESIZE_TOOL,
 } from "./executor/orchestratorBridge.ts";
 import { openOrchestratorBridge } from "./executor/orchestratorBridgeHttp.ts";
@@ -47,6 +48,7 @@ import { StudyPlanningHost } from "./study/studyPlanningHost.ts";
 import { OwnedMediaStudySynthesisHost } from "./study/studySynthesisHost.ts";
 import { RangePassHost } from "./study/rangePassHost.ts";
 import { ConditionalSeparationRequestHost } from "./study/conditionalSeparationRequestHost.ts";
+import { ResearchRequestExecutionHost } from "./study/researchRequestExecutionHost.ts";
 
 export interface OrchestratorChildLauncher {
   launch(permit: LaunchPermit): Promise<unknown>;
@@ -228,6 +230,8 @@ export class CodexExecOrchestratorLauncher {
         JSON.stringify(["artifact.read", "report.disposition", "study.plan", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
         JSON.stringify(["artifact.read", "report.disposition", "study.restudy", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
         JSON.stringify(["artifact.read", "report.disposition", "study.restudy", "study.separate", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
+        JSON.stringify(["artifact.read", "report.disposition", "study.research", "study.restudy", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
+        JSON.stringify(["artifact.read", "report.disposition", "study.research", "study.restudy", "study.separate", "study.synthesize", "task.reports.wait", "task.spawn.request"]),
       ].includes(JSON.stringify(scheduled.grants.map((grant) => grant.capability).sort()))
     ) throw new Error("Orchestrator permit does not reference one exact unowned root contract");
 
@@ -261,6 +265,7 @@ export class CodexExecOrchestratorLauncher {
     const generalizedEnabled = task.requiredOutputs.some((output) => output.required && (output.artifactKind === "studio.owned-media-study.v2" || output.artifactKind === "studio.owned-media-study.v3"));
     const restudiedEnabled = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v3");
     const separationEnabled = restudiedEnabled && task.grants.some((grant) => grant.capability === "study.separate");
+    const researchEnabled = restudiedEnabled && task.grants.some((grant) => grant.capability === "study.research");
     const boundedBridge = new BoundedOrchestratorBridge({
       task,
       executionId,
@@ -280,6 +285,9 @@ export class CodexExecOrchestratorLauncher {
       ...(separationEnabled ? {
         separationRequestHost: new ConditionalSeparationRequestHost(this.ledger, this.artifacts, this.scheduler),
       } : {}),
+      ...(researchEnabled ? {
+        researchRequestHost: new ResearchRequestExecutionHost(this.ledger, this.artifacts, this.scheduler),
+      } : {}),
     });
     const bridge = await openOrchestratorBridge(boundedBridge);
     let processResult: ProcessResult | null = null;
@@ -297,7 +305,7 @@ export class CodexExecOrchestratorLauncher {
         "-c", `mcp_servers.studio_orchestrator.enabled_tools=${tomlStrings(planningEnabled
           ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL]
           : restudiedEnabled
-            ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ...(separationEnabled ? [ORCHESTRATOR_SEPARATION_TOOL] : []), ORCHESTRATOR_SYNTHESIZE_TOOL]
+            ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ...(separationEnabled ? [ORCHESTRATOR_SEPARATION_TOOL] : []), ...(researchEnabled ? [ORCHESTRATOR_RESEARCH_TOOL] : []), ORCHESTRATOR_SYNTHESIZE_TOOL]
           : generalizedEnabled
             ? [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL]
             : [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL])}`,

@@ -8,6 +8,7 @@ export * from "./model/media.ts";
 export * from "./model/ocr.ts";
 export * from "./model/projection.ts";
 export * from "./model/reports.ts";
+export * from "./model/research.ts";
 export * from "./model/review.ts";
 export * from "./model/separation.ts";
 export * from "./model/semanticEvidence.ts";

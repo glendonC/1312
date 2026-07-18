@@ -37,7 +37,10 @@ export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 2,
   maxActiveWorkers: 4,
   runBudget: { wallMs: 240_000, toolCalls: 32 },
-  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "media.speakers.analyze", "media.audio.separate", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.restudy", "study.separate", "study.synthesize"],
+  // research.investigate is grantable but blocked from ordinary spawn by the scheduler's
+  // allowResearch gate, exactly like media.audio.separate; study.research stays off the default
+  // root contract, so the default spine mounts no research tool.
+  grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "media.speakers.analyze", "media.audio.separate", "research.investigate", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.restudy", "study.separate", "study.research", "study.synthesize"],
 };
 
 export class RuntimeApplicationInterrupted extends Error {

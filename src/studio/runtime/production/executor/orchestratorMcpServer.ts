@@ -12,6 +12,7 @@ import {
   ORCHESTRATOR_PLAN_TOOL,
   ORCHESTRATOR_RESTUDY_TOOL,
   ORCHESTRATOR_SEPARATION_TOOL,
+  ORCHESTRATOR_RESEARCH_TOOL,
   ORCHESTRATOR_SYNTHESIZE_TOOL,
 } from "./orchestratorBridge.ts";
 import {
@@ -31,6 +32,8 @@ const exactToolSets = [
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_PLAN_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
   [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SEPARATION_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_RESEARCH_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
+  [ORCHESTRATOR_SPAWN_TOOL, ORCHESTRATOR_WAIT_TOOL, ORCHESTRATOR_DISPOSITION_TOOL, ORCHESTRATOR_READ_TOOL, ORCHESTRATOR_RESTUDY_TOOL, ORCHESTRATOR_SEPARATION_TOOL, ORCHESTRATOR_RESEARCH_TOOL, ORCHESTRATOR_SYNTHESIZE_TOOL],
 ] as const;
 if (manifest.tools.length !== names.size || !exactToolSets.some((expected) => expected.length === names.size && expected.every((name) => names.has(name)))) {
   throw new Error("The bounded orchestrator tool manifest is incomplete or open");
@@ -262,6 +265,26 @@ if (names.has(ORCHESTRATOR_SEPARATION_TOOL)) {
         return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
       } catch (error) {
         return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : "Conditional separation failed closed." }] };
+      }
+    },
+  );
+}
+
+if (names.has(ORCHESTRATOR_RESEARCH_TOOL)) {
+  server.registerTool(
+    ORCHESTRATOR_RESEARCH_TOOL,
+    {
+      title: "Request exact gap-triggered research",
+      description: "Select one exact host-derived unresolved-conflict research trigger. The host fixes the gap binding, domain allowlist, budgets, and child contract; snippets are routing hints and document spans stay cite-only, never claim-support or caption authority.",
+      inputSchema: z.object({ inputId: z.string().min(1), triggerId: z.string().min(1) }).strict(),
+      annotations: { title: "Request exact gap-triggered research", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (args: unknown) => {
+      try {
+        const result = await callOrchestratorBridge(endpoint, token, ORCHESTRATOR_RESEARCH_TOOL, args);
+        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: "text" as const, text: error instanceof Error ? error.message : "Gap-triggered research failed closed." }] };
       }
     },
   );

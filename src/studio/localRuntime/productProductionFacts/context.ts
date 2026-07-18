@@ -34,6 +34,7 @@ export function buildProductionFactsContext({
   ]);
   const operationIds = new Set([
     ...projection.operations.map((operation) => operation.operationId),
+    ...(projection.semanticEvidence ?? []).map((operation) => operation.operationId),
     ...projection.evidenceReads.map((operation) => operation.operationId),
     ...projection.evidenceAssessments.map((operation) => operation.operationId),
     ...projection.evidenceDecisions.map((operation) => operation.operationId),

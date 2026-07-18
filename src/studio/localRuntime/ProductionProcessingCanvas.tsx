@@ -111,6 +111,7 @@ function currentFacts(production: ProductionStudioProjection): RecordedFact[] {
   const intake = production.publishReviewIntakes.at(-1);
   const decision = production.evidenceDecisions.at(-1);
   const assessment = production.evidenceAssessments.at(-1);
+  const semantic = (production.semanticEvidence ?? []).at(-1);
   const operation = production.operations.at(-1);
 
   if (captionQc) {
@@ -155,6 +156,13 @@ function currentFacts(production: ProductionStudioProjection): RecordedFact[] {
       key: assessment.operationId,
       label: "Evidence assessment",
       state: sentence(assessment.status),
+    });
+  }
+  if (semantic) {
+    facts.push({
+      key: semantic.operationId,
+      label: semantic.capability,
+      state: sentence(semantic.status),
     });
   }
   if (operation) {

@@ -45,10 +45,21 @@ test("owned processing canvas exposes projection facts and explicit missing rece
   await expect(coordination.locator("[data-production-live-grant-id]")).toHaveCount(0);
   await expect(coordination.getByText("No scheduler grant recorded")).toHaveCount(2);
   await expect(coordination.locator('[data-production-live-empty="handoffs"]')).toBeVisible();
-  const operation = coordination.locator("[data-production-live-operation-id]");
-  await expect(operation).toHaveCount(1);
-  await expect(operation).toHaveAttribute("data-operation-status", "started");
-  await expect(operation.getByText("No perception observation recorded for this operation")).toBeVisible();
+  const operations = coordination.locator("[data-production-live-operation-id]");
+  await expect(operations).toHaveCount(2);
+  const mediaOperation = coordination.locator("[data-production-live-operation-id]:not([data-operation-capability])");
+  await expect(mediaOperation).toHaveCount(1);
+  await expect(mediaOperation).toHaveAttribute("data-operation-status", "started");
+  await expect(mediaOperation.getByText("No perception observation recorded for this operation")).toBeVisible();
+  const semanticOperation = coordination.locator('[data-production-live-operation-id][data-operation-capability="speech.transcribe"]');
+  await expect(semanticOperation).toHaveCount(1);
+  await expect(semanticOperation).toHaveAttribute("data-operation-status", "started");
+  await expect(semanticOperation).toHaveAttribute("data-operation-audit", "not_completed");
+  await expect(semanticOperation.locator('[data-semantic-audit-state="not_completed"]')).toHaveText("Not completed");
+  await expect(semanticOperation.locator(".processing-receipt-missing")).not.toHaveCount(0);
+  await expect(coordination.locator('[data-production-projection-coverage="media-operations"]')).toContainText(
+    "not evidence about whether they ran",
+  );
   await expect(coordination.locator('[data-production-live-empty="caption-lineage"]')).toBeVisible();
   await expect(coordination.getByText(/No caption-production start receipt/)).toBeVisible();
   await expect(canvas.getByRole("button", { name: "Evidence", exact: true })).toBeVisible();
@@ -118,7 +129,35 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(speechOperation.first()).toHaveAttribute("data-operation-audit", /verified/);
   await expect(speechOperation.first().getByText("speech.transcribe", { exact: true })).toBeVisible();
   await expect(speechOperation.first().getByText(/stream:0/)).toBeVisible();
+  await expect(speechOperation.first().locator("[data-semantic-audit-state]")).toHaveText(/Verified at completion/);
+  await expect(coordination.locator('[data-production-projection-coverage="media-operations"]')).toContainText(
+    "not evidence about whether they ran",
+  );
   await expect(coordination.locator('[data-production-live-empty="caption-lineage"]')).toBeVisible();
+
+  const semanticFacts = production.locator('[data-production-region="semantic-evidence"]');
+  await expect(semanticFacts.getByRole("heading", { name: "Semantic media evidence operations" })).toBeVisible();
+  await expect(semanticFacts.locator('[data-production-empty="semantic-evidence"]')).toHaveCount(0);
+  const semanticFact = semanticFacts.locator("[data-production-semantic-evidence-id]");
+  await expect.poll(() => semanticFact.count()).toBeGreaterThan(0);
+  await expect(semanticFact.first()).toHaveAttribute("data-status", "completed");
+  await expect(semanticFact.first()).toHaveAttribute("data-operation-audit", /verified/);
+  await expect(semanticFact.first().getByText(/Verified at completion/)).toBeVisible();
+  const semanticFactId = await semanticFact.first().getAttribute("data-production-semantic-evidence-id");
+  expect(semanticFactId).toBeTruthy();
+  await expect(semanticFact.first().getByText(semanticFactId ?? "", { exact: true }).first()).toBeVisible();
+  await expect(semanticFact.first().getByText(/\) ms/).first()).toBeVisible();
+  await expect(semanticFacts.getByText("do not claim transcription accuracy")).toBeVisible();
+
+  const semanticArtifact = production.locator('[data-production-output-artifact-id][data-origin-kind="semantic_media_evidence"]');
+  await expect.poll(() => semanticArtifact.count()).toBeGreaterThan(0);
+  const semanticOperationLink = semanticArtifact.first().locator('[data-production-navigation="operation"]');
+  await expect(semanticOperationLink).toHaveCount(1);
+  const semanticHref = await semanticOperationLink.getAttribute("href");
+  expect(semanticHref).toMatch(/^#product-production-operation-/);
+  expect(
+    await page.evaluate((target) => Boolean(target && document.getElementById(target.slice(1))), semanticHref),
+  ).toBe(true);
 
   const review = production.locator('[data-production-region="publish-review-human-review"]');
   await expect(review.getByRole("heading", { name: "Queued intake human review" })).toBeVisible();

@@ -250,14 +250,16 @@ export default function ProductionCoordinationLedger({
                   <header><h5>{operation.capability}</h5><span>{sentence(operation.status)}</span></header>
                   <dl>
                     <div><dt>Operation</dt><dd>{identity(operation.operationId)}</dd></div>
+                    <div><dt>Completion audit</dt><dd data-semantic-audit-state={operation.audit}>{sentence(operation.audit)}</dd></div>
                     <div><dt>Worker / task</dt><dd>{identity(operation.executor.agentId)} · {identity(operation.executor.taskId)}</dd></div>
                     <div><dt>Grant</dt><dd>{identity(operation.executor.grantId)}</dd></div>
+                    <div><dt>Source</dt><dd>{identity(operation.source.artifactId)} · {identity(operation.source.contentId)}</dd></div>
                     <div><dt>Requested range</dt><dd>{seconds(operation.source.range.startMs)}–{seconds(operation.source.range.endMs)} · {operation.source.trackId}</dd></div>
                     <div><dt>Returned range</dt><dd>{operation.returnedRange ? `${seconds(operation.returnedRange.startMs)}–${seconds(operation.returnedRange.endMs)}` : "Not recorded"}</dd></div>
                     <div><dt>Receipt</dt><dd>{identity(operation.receipt?.receiptId ?? null)} · {identity(operation.receipt?.contentId ?? null)}</dd></div>
                     <div><dt>Output</dt><dd>{identity(operation.artifact?.artifactId ?? null)} · {identity(operation.artifact?.contentId ?? null)}</dd></div>
-                    <div><dt>Producer</dt><dd>{operation.producer.id} · {operation.producer.model ?? "model not recorded"} · {sentence(operation.producer.executionScope)}</dd></div>
-                    <div><dt>Observations</dt><dd>{operation.observationCount === null ? "Not recorded" : `${operation.observationCount} · ${operation.availability ? sentence(operation.availability.state) : "availability not recorded"}`}</dd></div>
+                    <div><dt>Producer</dt><dd>{operation.producer.id} {operation.producer.version} · {operation.producer.model ?? "model not recorded"} · {sentence(operation.producer.executionScope)}</dd></div>
+                    <div><dt>Observations</dt><dd>{operation.observationCount === null ? "Not recorded" : `${operation.observationCount} · ${operation.availability ? sentence(operation.availability.state) : "availability not recorded"}${operation.availability?.truncated ? " · truncated" : ""}`}</dd></div>
                     <div><dt>Failure</dt><dd>{operation.failure ?? "Not recorded"}</dd></div>
                   </dl>
                 </article>
@@ -279,6 +281,12 @@ export default function ProductionCoordinationLedger({
               ))}
             </div>
           )}
+          <p className="processing-receipt-boundary" data-production-projection-coverage="media-operations">
+            This panel projects media.extract, media.seek, speech.transcribe, and bounded evidence
+            reads only. Operations from other granted capabilities are not yet projected in this
+            surface, and their absence here is not evidence about whether they ran. The validated
+            journal remains the complete record.
+          </p>
         </section>
 
         <section className="processing-receipt-panel processing-receipt-panel-wide" aria-labelledby="processing-caption-ledger-title">

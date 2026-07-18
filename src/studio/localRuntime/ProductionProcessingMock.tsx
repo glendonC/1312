@@ -164,6 +164,7 @@ function activeProjection(empty: ProductionStudioProjection): ProductionStudioPr
         depth: 1,
         capabilities: [
           "media.seek",
+          "speech.transcribe",
           "evidence.read",
           "analysis.evidence.assess",
           "analysis.evidence.decide",
@@ -197,12 +198,48 @@ function activeProjection(empty: ProductionStudioProjection): ProductionStudioPr
       observation: null,
       failure: null,
     }],
+    semanticEvidence: [{
+      operationId: "operation:semantic:processing-contract-snapshot",
+      capability: "speech.transcribe",
+      status: "started",
+      audit: "not_completed",
+      producer: {
+        id: "fixture-recognizer",
+        version: "0.0.0",
+        model: null,
+        runtimeId: "fixture-runtime",
+        runtimeVersion: "0.0.0",
+        configurationId: "fixture-configuration",
+        configurationContentId: `sha256:${"0".repeat(64)}`,
+        executionScope: "current_run",
+      },
+      executor: {
+        taskId: CHILD_TASK_ID,
+        agentId: CHILD_AGENT_ID,
+        executionId: "execution:deterministic:processing-contract-snapshot",
+        launchClaimId: `launch:${CHILD_TASK_ID}`,
+        grantId: "grant:speech-transcribe:processing-contract-snapshot",
+      },
+      source: {
+        artifactId: SOURCE_ARTIFACT_ID,
+        contentId: SOURCE.sourceContentId,
+        trackId: "stream:0",
+        range: { startMs: 0, endMs: 47_200 },
+      },
+      returnedRange: null,
+      artifact: null,
+      receipt: null,
+      observationCount: null,
+      availability: null,
+      failure: null,
+    }],
     counts: {
       ...empty.counts,
       tasks: 2,
       workers: 2,
       executions: 1,
       operations: 1,
+      semanticEvidence: 1,
       sourceArtifacts: 1,
     },
   };
@@ -323,7 +360,7 @@ export default function ProductionProcessingMock({
             <b>Fixture evidence boundary</b>
             <p>
               {active
-                ? "This snapshot stops at the real media.operation_started projection shape: two registered workers, two working tasks, one active execution, and one started media.seek."
+                ? "This snapshot stops at the real started-operation projection shapes: two registered workers, two working tasks, one active execution, one started media.seek, and one started speech.transcribe with no completion receipt."
                 : "No production event projection is attached to this lifecycle-only fixture state."}
             </p>
           </div>

@@ -2,6 +2,7 @@ import { ContentAddressedArtifactStore } from "../artifactStore.ts";
 import { authorizeSpeechTranscribe } from "../authorization.ts";
 import {
   SEMANTIC_EVIDENCE_NORMALIZATION,
+  CurrentRunRecognizerProviderError,
   UnavailableCurrentRunSpeechRecognizer,
   type CurrentRunRecognizerResult,
   type CurrentRunSpeechRecognizer,
@@ -27,8 +28,24 @@ import {
 
 class SemanticRecognizerTimeout extends Error {}
 
+class SemanticRecognizerOutputError extends Error {
+  readonly kind: "availability" | "empty" | "range" | "text_state";
+
+  constructor(kind: "availability" | "empty" | "range" | "text_state") {
+    super(`Current-run speech recognizer output ${kind} failure`);
+    this.kind = kind;
+  }
+}
+
 function safeFailure(error: unknown): string {
   if (error instanceof SemanticRecognizerTimeout) return "Current-run speech recognizer timed out.";
+  if (error instanceof CurrentRunRecognizerProviderError) {
+    if (error.kind === "http") return `Current-run speech recognizer provider returned HTTP ${error.status}.`;
+    return `Current-run speech recognizer provider ${error.kind} failed.`;
+  }
+  if (error instanceof SemanticRecognizerOutputError) {
+    return `Current-run speech recognizer returned invalid ${error.kind.replace("_", "/")} evidence.`;
+  }
   return "Current-run speech recognizer failed its closed execution boundary.";
 }
 
@@ -63,10 +80,10 @@ function closeRecognizerResult(
   result: CurrentRunRecognizerResult,
 ): Pick<SemanticMediaEvidenceArtifact, "returnedRange" | "availability" | "observations"> {
   if (result.availability !== "available" && result.segments.length !== 0) {
-    throw new Error("Unavailable recognizer output cannot carry timed segments");
+    throw new SemanticRecognizerOutputError("availability");
   }
   if (result.availability === "available" && result.segments.length === 0) {
-    throw new Error("Available recognizer output must carry a timed segment");
+    throw new SemanticRecognizerOutputError("empty");
   }
   const normalized = result.segments.map((segment) => {
     if (
@@ -75,10 +92,10 @@ function closeRecognizerResult(
       segment.endMs <= segment.startMs ||
       segment.startMs < requested.startMs ||
       segment.endMs > requested.endMs
-    ) throw new Error("Recognizer returned a segment outside the authorized source range");
+    ) throw new SemanticRecognizerOutputError("range");
     const text = segment.text === null ? null : normalizeText(segment.text);
     if ((segment.state === "available") !== Boolean(text)) {
-      throw new Error("Recognizer segment text and state disagree");
+      throw new SemanticRecognizerOutputError("text_state");
     }
     return { range: { startMs: segment.startMs, endMs: segment.endMs }, state: segment.state, text };
   }).sort((left, right) => left.range.startMs - right.range.startMs || left.range.endMs - right.range.endMs);

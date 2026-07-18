@@ -61,11 +61,7 @@ export async function recordGeneralizedAdmission(input: {
       artifact?.kind !== "studio.study-report.v2" || artifact.id !== report.study.output.artifactId) {
     throw new Error("Generalized admission requires one exact accepted v2 report artifact");
   }
-  const host = new GeneralizedEvidenceAdmissionHost(state, input.artifacts);
-  const admitted = await host.admit(await storedReport(input.artifacts, artifact.content.contentId));
-  if (admitted.report.artifactId !== artifact.id || admitted.report.contentId !== artifact.content.contentId) {
-    throw new Error("Generalized admission changed the launcher's recorded report identity");
-  }
+  const admitted = await preflightGeneralizedAdmission(input);
   const storedReceipt = await input.artifacts.storeJson(admitted.admissionReceipt);
   const admissionArtifact = input.artifacts.buildGeneralizedParentAdmissionArtifact({
     runId: input.ledger.runId,
@@ -90,6 +86,34 @@ export async function recordGeneralizedAdmission(input: {
     }),
   );
   return { ...admitted, admissionArtifactId: admissionArtifact.id };
+}
+
+/**
+ * Cold-audits a proposed accepted report before the parent decision becomes immutable. This has no
+ * journal side effect; content-addressed report/receipt storage is idempotent and becomes authority
+ * only if the later accepted decision and admission events both record successfully.
+ */
+export async function preflightGeneralizedAdmission(input: {
+  ledger: RuntimeLedger;
+  artifacts: ContentAddressedArtifactStore;
+  reportId: string;
+  outputArtifactId: string;
+}): Promise<GeneralizedAdmissionResult> {
+  const state = input.ledger.state();
+  const report = state.reports[input.reportId];
+  const artifact = state.artifacts[input.outputArtifactId];
+  if (report?.study?.schema !== "studio.study-report-submission.v2" ||
+      (report.status !== "submitted" && report.status !== "accepted") ||
+      !report.outputArtifactIds.includes(input.outputArtifactId) ||
+      artifact?.kind !== "studio.study-report.v2" || artifact.id !== report.study.output.artifactId) {
+    throw new Error("Generalized admission preflight requires one exact submitted v2 report artifact");
+  }
+  const admitted = await new GeneralizedEvidenceAdmissionHost(state, input.artifacts)
+    .admit(await storedReport(input.artifacts, artifact.content.contentId));
+  if (admitted.report.artifactId !== artifact.id || admitted.report.contentId !== artifact.content.contentId) {
+    throw new Error("Generalized admission preflight changed the launcher's recorded report identity");
+  }
+  return admitted;
 }
 
 export async function recordGeneralizedRead(input: {

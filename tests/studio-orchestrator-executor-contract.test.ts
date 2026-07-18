@@ -4,15 +4,52 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
+import { canonicalSha256 } from "../src/studio/runtime/production/artifactStore.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import { createProductionAnalysisRequest } from "../src/studio/runtime/production/runStart/analysisRequest.ts";
 import { loadOwnedSourceSession } from "../src/studio/runtime/production/runStart/sourceSessionLoader.ts";
+import type { CurrentRunSpeechRecognizer } from "../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts";
 import {
   codexOrchestratorLauncherFactory,
   codexWorkerLauncherFactory,
   initializeRuntimeApplication,
+  PROOF_RUNTIME_LIMITS,
   runBoundedRuntimeApplication,
 } from "../src/studio/runtime/production/runtimeHost/runtimeApplication.ts";
+
+function currentRunRecognizer(): CurrentRunSpeechRecognizer {
+  return {
+    async describe({ requestedSourceLanguage }) {
+      const configuration = {
+        id: "studio.runtime-factory-test-recognizer.timed-segments.v1",
+        language: requestedSourceLanguage.mode === "declared" ? requestedSourceLanguage.languages[0] ?? null : null,
+        timestampMode: "segment" as const,
+        segmentation: "producer_defined" as const,
+      };
+      return {
+        id: "studio.runtime-factory-test-recognizer",
+        version: "1",
+        model: "test-current-run-recognizer",
+        runtime: { id: "node-test", version: process.version },
+        configuration: { ...configuration, contentId: `sha256:${canonicalSha256(configuration)}` },
+        executionScope: "current_run",
+        fixtureContentId: null,
+      };
+    },
+    async recognize(input) {
+      return {
+        availability: "available",
+        reason: "current_run_hypotheses_returned",
+        segments: [{
+          startMs: input.range.startMs,
+          endMs: input.range.endMs,
+          state: "available",
+          text: "현재 실행 인식기 배선 증명",
+        }],
+      };
+    },
+  };
+}
 
 async function fakeCodex(directory: string, mode: "normal" | "hang-root" = "normal"): Promise<{ executable: string; prefix: string[] }> {
   const script = join(directory, "fake-owned-swarm-codex.mjs");
@@ -52,6 +89,9 @@ if (isRoot) {
   if (!prompt.includes("exactly " + expectedRootToolCount + " closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext") || (restudied && (!prompt.includes("study_restudy_request") || !prompt.includes("study_separation_request") || !prompt.includes("study_research_request")))) {
     throw new Error("closed root prompt contract is missing");
   }
+  if (!prompt.includes('budget exactly {"wallMs":180000,"toolCalls":2}') || !prompt.includes("Never retry an equivalent rejected range")) {
+    throw new Error("initial coverage child budget contract is missing");
+  }
   const root = JSON.parse(prompt.split("\\n\\n").at(-1));
   const call = async (name, argumentsValue) => {
     const response = await fetch(process.env.STUDIO_ORCHESTRATOR_BRIDGE_URL + "/v1/call", {
@@ -76,7 +116,7 @@ if (isRoot) {
     requiredOutputs: [{ name: "coverage study", artifactKind: generalized ? "studio.study-report.v2" : "studio.study-report.v1", required: true }],
     requiredCapabilities: ["speech.transcribe", "report.submit"],
     dependencyWorkloadKeys: [],
-    budget: { wallMs: 10000, toolCalls: 2 },
+    budget: { wallMs: generalized ? 180000 : 10000, toolCalls: 2 },
   });
   const midpoint = Math.floor((root.mediaScope[0].startMs + root.mediaScope[0].endMs) / 2);
   const left = await call("task_spawn_request", child("left", root.mediaScope[0].startMs, midpoint));
@@ -142,17 +182,25 @@ if (!isRoot) {
   const worker = JSON.parse(prompt.split("\\n\\n").at(-1));
   const workerGeneralized = worker.requiredOutputs[0].artifactKind === "studio.study-report.v2";
   const scope = worker.grantedSemanticEvidence[0];
-  const response = await fetch(process.env.STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_URL + "/v1/call", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + process.env.STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_TOKEN,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name: "speech_transcribe", arguments: scope }),
-  });
-  const body = await response.json();
-  if (!response.ok || body.ok !== true) throw new Error("semantic evidence bridge rejected child call: " + JSON.stringify(body));
-  const evidence = body.result;
+  const marker = "AUTHENTICATED PRECOMPLETED SPEECH RESULT: ";
+  const precompletedLine = prompt.split("\\n\\n").find((entry) => entry.startsWith(marker));
+  let evidence;
+  if (precompletedLine) {
+    if (args.some((arg) => arg.includes("mcp_servers.studio_semantic"))) throw new Error("precompleted speech remained exposed as an MCP tool");
+    evidence = JSON.parse(precompletedLine.slice(marker.length));
+  } else {
+    const response = await fetch(process.env.STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_URL + "/v1/call", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + process.env.STUDIO_CHILD_SEMANTIC_EVIDENCE_BRIDGE_TOKEN,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: "speech_transcribe", arguments: scope }),
+    });
+    const body = await response.json();
+    if (!response.ok || body.ok !== true) throw new Error("semantic evidence bridge rejected child call: " + JSON.stringify(body));
+    evidence = body.result;
+  }
   const input = {
     operationId: evidence.operationId,
     artifactId: evidence.artifact.artifactId,
@@ -172,7 +220,7 @@ if (!isRoot) {
       : "insufficient_semantic_evidence";
   childFinal = {
     summary: "The child returned a closed coverage partition; correctness and semantic quality were not assessed.",
-    semanticEvidenceInputs: [input],
+    ...(precompletedLine ? {} : { semanticEvidenceInputs: [input] }),
     outputs: [{
       name: "coverage study",
       kind: workerGeneralized ? "studio.study-report.v2" : "studio.study-report.v1",
@@ -231,6 +279,8 @@ test("Codex root launcher exposes the closed planning/synthesis tools and receip
         executableArgsPrefix: fake.prefix,
         model,
         maximumWallMs: 20_000,
+        semanticRecognizer: currentRunRecognizer(),
+        preexecuteRequiredSemanticEvidence: true,
       }),
       codexOrchestratorLauncherFactory({
         executable: fake.executable,
@@ -262,6 +312,9 @@ test("Codex root launcher exposes the closed planning/synthesis tools and receip
     assert.ok(Object.values(state.reports).every((report) => report.study?.output.schema === "studio.study-report.v1"));
     assert.equal(Object.keys(state.parentArtifactDispositions).length, 2);
     assert.equal(Object.keys(state.parentArtifactReadGrants).length, 2);
+    assert.equal(Object.values(state.semanticEvidence).length, 2);
+    assert.ok(Object.values(state.semanticEvidence).every((evidence) =>
+      evidence.availability?.state === "available"));
     assert.equal(Object.keys(state.studyPlanningDecisions).length, 1);
     assert.equal(Object.keys(state.ownedMediaStudies).length, 1);
     assert.equal(Object.keys(state.studyReadiness).length, 1);
@@ -305,6 +358,11 @@ test("default Codex launcher closes the eight-tool research-aware report-to-read
     );
     const state = (await RuntimeLedger.open(initialized.runStart.runtimeId, new FileEventJournal(initialized.journalPath))).state();
     const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
+    const children = Object.values(state.tasks).filter((task) => task.parentTaskId === root.id);
+    assert.deepEqual(root.budget, { wallMs: 300_000, toolCalls: 20 });
+    assert.ok(children.every((task) => task.budget.wallMs === 180_000));
+    assert.equal(PROOF_RUNTIME_LIMITS.runBudget.wallMs, 740_000);
+    assert.ok(root.budget.wallMs > Math.max(...children.map((task) => task.budget.wallMs)));
     assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v3", required: true }]);
     assert.equal(root.grants.some((grant) => grant.capability === "study.plan"), false);
     assert.equal(root.grants.some((grant) => grant.capability === "study.restudy"), true);

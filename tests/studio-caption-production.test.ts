@@ -5,7 +5,10 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { ContentAddressedArtifactStore } from "../src/studio/runtime/production/artifactStore.ts";
-import type { CaptionProductionExecutor } from "../src/studio/runtime/production/captions/captionProductionExecutor.ts";
+import {
+  OpenAiCaptionProductionExecutor,
+  type CaptionProductionExecutor,
+} from "../src/studio/runtime/production/captions/captionProductionExecutor.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "../src/studio/runtime/production/model.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
@@ -292,6 +295,24 @@ test("full owned-run current-run captions and independent QC close under cold re
       fetch: async () => new Response(JSON.stringify(results), { status: 200, headers: { "Content-Type": "application/json" } }),
     });
     assert.deepEqual(await client.captionProductionResults(approval.runtimeId), results);
+
+    const realV2Summary = structuredClone(produced);
+    realV2Summary.captions[0].executor = {
+      id: "studio.openai-caption-producer",
+      version: "2",
+      classification: "real_recognizer_translator",
+      executionScope: "current_run",
+      cognitionClaim: "none",
+      recognizer: "gpt-4o-transcribe-diarize (per host-derived production range)",
+      translator: "gpt-5 (strict structured output)",
+      sourceCaptionContentId: null,
+    };
+    const summaryClient = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "caption-test-token",
+      fetch: async () => new Response(JSON.stringify(realV2Summary), { status: 200, headers: { "Content-Type": "application/json" } }),
+    });
+    assert.equal((await summaryClient.captionProductions(approval.runtimeId)).captions[0].executor.version, "2");
   } finally {
     await cleanup(runtime);
   }
@@ -318,6 +339,86 @@ test("default U4 approval produces a v4 caption artifact with durable pass-aware
     assert.equal(Object.keys(loaded.state.generalizedStudyReadiness).length, 1);
   } finally {
     await cleanup(runtime);
+  }
+});
+
+test("default U4 binds real-caption execution to the exact supported current-source study ranges", async () => {
+  let observedRanges: Array<{ startMs: number; endMs: number }> = [];
+  const evidenceBoundedExecutor: CaptionProductionExecutor = {
+    describe: currentRunCaptionExecutor.describe,
+    async execute(input) {
+      observedRanges = structuredClone(input.productionRanges);
+      const first = input.productionRanges[0];
+      return [{
+        id: "line-evidence-bounded-001",
+        startMs: first.startMs,
+        endMs: Math.min(first.endMs, first.startMs + 1_000),
+        source: { language: "ko", state: "available", text: "근거 구간", reasonCode: null },
+        target: { language: "en", state: "available", text: "Evidence range", reasonCode: null },
+      }];
+    },
+  };
+  const runtime = await harness({ captionExecutor: evidenceBoundedExecutor, defaultU4: true });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const loaded = await journal(runtime, approval.runtimeId);
+    const study = Object.values(loaded.state.generalizedOwnedMediaStudies)[0];
+    assert.deepEqual(observedRanges, study.coverage
+      .filter((entry) => entry.state === "supported")
+      .map((entry) => ({ startMs: entry.startMs, endMs: entry.endMs }))
+      .sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs));
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("real caption executor recognizes each host-derived range and requests strict translation output", async () => {
+  const originalFetch = globalThis.fetch;
+  let transcriptionCalls = 0;
+  let translationCalls = 0;
+  try {
+    globalThis.fetch = async (request, init) => {
+      const url = typeof request === "string" ? request : request instanceof URL ? request.href : request.url;
+      if (url.endsWith("/audio/transcriptions")) {
+        transcriptionCalls += 1;
+        assert.ok(init?.body instanceof FormData);
+        assert.equal(init.body.get("chunking_strategy"), "auto");
+        return new Response(JSON.stringify({
+          segments: [{ start: 0, end: 0.4, text: transcriptionCalls === 1 ? "첫 구간" : "둘째 구간" }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.endsWith("/chat/completions")) {
+        translationCalls += 1;
+        const body = JSON.parse(String(init?.body)) as {
+          response_format?: { type?: unknown; json_schema?: { strict?: unknown } };
+        };
+        assert.equal(body.response_format?.type, "json_schema");
+        assert.equal(body.response_format?.json_schema?.strict, true);
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({ lines: [
+            { id: "line-001-001", en: "First range" },
+            { id: "line-002-001", en: "Second range" },
+          ] }) } }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      assert.fail(`unexpected provider URL ${url}`);
+    };
+    const executor = new OpenAiCaptionProductionExecutor({ apiKey: "test-key" });
+    const lines = await executor.execute({
+      sourcePath: resolve("public/demo/runs/run-005/clip.m4a"),
+      fixtureCaptionPath: "",
+      range: { startMs: 0, endMs: 2_000 },
+      productionRanges: [{ startMs: 0, endMs: 500 }, { startMs: 1_000, endMs: 1_500 }],
+    }, new AbortController().signal);
+    assert.equal(transcriptionCalls, 2);
+    assert.equal(translationCalls, 1);
+    assert.deepEqual(lines.map((line) => ({ id: line.id, startMs: line.startMs, endMs: line.endMs, target: line.target.text })), [
+      { id: "line-001-001", startMs: 0, endMs: 400, target: "First range" },
+      { id: "line-002-001", startMs: 1_000, endMs: 1_400, target: "Second range" },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
@@ -552,6 +653,10 @@ test("revocation before, during, and after caption execution preserves exact aut
       await assert.rejects(producing, /failed closed verification|changed while caption production was running|revoked/);
       const loaded = await journal(runtime, approval.runtimeId);
       assert.equal(Object.values(loaded.state.captionProductions)[0].status, "failed");
+      assert.equal(
+        Object.values(loaded.state.captionProductions)[0].failure,
+        "Caption production failed closed during authority revalidation.",
+      );
       assert.equal(Object.keys(loaded.state.captionQualityControls).length, 0);
     } finally {
       releaseResolve();
@@ -593,6 +698,10 @@ test("caption executor failure and wall timeout record bounded failed jobs witho
       await assert.rejects(runtime.service.createCaptionProduction(approval.runtimeId, approval.request), /bounded caption executor/);
       const loaded = await journal(runtime, approval.runtimeId);
       assert.equal(Object.values(loaded.state.captionProductions)[0].status, "failed");
+      assert.equal(
+        Object.values(loaded.state.captionProductions)[0].failure,
+        "Caption production failed closed within its bounded current-run executor.",
+      );
       assert.equal(Object.keys(loaded.state.captionQualityControls).length, 0);
     } finally {
       await cleanup(runtime);

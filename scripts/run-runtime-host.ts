@@ -101,6 +101,8 @@ const ownedIngestRoot = resolve(value("--owned-ingest-root") ?? resolve(REPOSITO
 const youtubeLocalIngestRoot = resolve(value("--youtube-local-ingest-root") ?? resolve(REPOSITORY, ".studio/youtube-local-sources"));
 const maximumOwnedMediaBytes = integer("--maximum-owned-media-bytes", 512 * 1024 * 1024);
 const maximumYouTubeLocalRangeMs = integer("--maximum-youtube-local-range-ms", 120_000);
+const workerMaximumWallMs = integer("--worker-maximum-wall-ms", 45_000);
+const orchestratorMaximumWallMs = integer("--orchestrator-maximum-wall-ms", 60_000);
 const sourceRoot = value("--source-root");
 const reviewerId = value("--reviewer-id") ?? "reviewer:local-operator";
 const reviewerLabel = value("--reviewer-label") ?? "Local review operator";
@@ -145,11 +147,16 @@ const service = await RuntimeStartService.open({
   sources,
   launcherFactory: deterministic
     ? deterministic.factory()
-    : codexWorkerLauncherFactory({ model: configuredModel, maximumWallMs: 45_000, semanticRecognizer }),
+    : codexWorkerLauncherFactory({
+        model: configuredModel,
+        maximumWallMs: workerMaximumWallMs,
+        semanticRecognizer,
+        preexecuteRequiredSemanticEvidence: semanticRecognizer !== undefined,
+      }),
   ...(deterministic ? {} : {
     orchestratorLauncherFactory: codexOrchestratorLauncherFactory({
       model: configuredModel!,
-      maximumWallMs: 60_000,
+      maximumWallMs: orchestratorMaximumWallMs,
     }),
   }),
   reviewer: { id: reviewerId, label: reviewerLabel },
@@ -181,6 +188,10 @@ process.stdout.write(`${JSON.stringify({
   reviewer: { id: reviewerId, label: reviewerLabel },
   runtimeRoot,
   executor: executorMode === "codex" ? "real-codex-opt-in" : "deterministic-no-model",
+  executorLimits: executorMode === "codex" ? {
+    workerMaximumWallMs,
+    orchestratorMaximumWallMs,
+  } : null,
   captionExecutor: captionExecutorMode === "openai"
     ? "real-recognizer-translator-opt-in"
     : captionExecutorMode === "deterministic-test"

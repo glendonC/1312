@@ -60,7 +60,11 @@ import type { ChildOcrHost } from "./executor/childOcrBridge.ts";
 import type { ChildVisualTransitionHost } from "./executor/childVisualTransitionBridge.ts";
 import type { ChildSpeakerHost } from "./executor/childSpeakerBridge.ts";
 import type { ChildSeparationHost } from "./executor/childSeparationBridge.ts";
-import type { ChildSemanticEvidenceHost } from "./executor/childSemanticEvidenceBridge.ts";
+import {
+  BoundedChildSemanticEvidenceBridge,
+  type ChildSemanticEvidenceHost,
+  type ChildSemanticEvidenceToolResult,
+} from "./executor/childSemanticEvidenceBridge.ts";
 import { parseCodexEvents } from "./executor/codexEvents.ts";
 import { closedCodexExecArgs } from "./executor/codexInvocation.ts";
 import { LauncherFailure } from "./executor/launcherFailure.ts";
@@ -139,6 +143,8 @@ export interface CodexWorkerLauncherOptions {
   decisionHost?: ChildEvidenceDecisionHost;
   semanticEvidenceHost?: ChildSemanticEvidenceHost;
   semanticRecognizer?: CurrentRunSpeechRecognizer;
+  /** Execute an exact required speech grant through the child bridge before the model phase. */
+  preexecuteRequiredSemanticEvidence?: boolean;
   mediaMcpServerPath?: string;
   frameMcpServerPath?: string;
   ocrMcpServerPath?: string;
@@ -166,7 +172,7 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextVisualTransitionOperationId" | "nextSpeakerOperationId" | "nextSeparationOperationId" | "nextResearchOperationId" | "nextComputerUseOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "visualTransitionMcpServerPath" | "speakerMcpServerPath" | "separationMcpServerPath" | "researchMcpServerPath" | "computerUseMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer" | "sourceSeparator" | "researchSearchProvider" | "computerUseDriver"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextVisualTransitionOperationId" | "nextSpeakerOperationId" | "nextSeparationOperationId" | "nextResearchOperationId" | "nextComputerUseOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "visualTransitionMcpServerPath" | "speakerMcpServerPath" | "separationMcpServerPath" | "researchMcpServerPath" | "computerUseMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer" | "sourceSeparator" | "researchSearchProvider" | "computerUseDriver" | "preexecuteRequiredSemanticEvidence"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
@@ -258,6 +264,7 @@ export class CodexExecWorkerLauncher {
       sourceSeparator: options.sourceSeparator,
       researchSearchProvider: options.researchSearchProvider,
       computerUseDriver: options.computerUseDriver,
+      preexecuteRequiredSemanticEvidence: options.preexecuteRequiredSemanticEvidence ?? false,
     };
   }
 
@@ -320,7 +327,11 @@ export class CodexExecWorkerLauncher {
     const executionId = this.options.nextExecutionId();
     const directory = await mkdtemp(join(this.options.temporaryRoot ?? tmpdir(), "studio-codex-worker-"));
     const schemaPath = join(directory, "worker-output.schema.json");
-    await writeFile(schemaPath, `${JSON.stringify(workerOutputSchema(task))}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    const hostSuppliedSemanticEvidenceInputs = Boolean(
+      this.options.preexecuteRequiredSemanticEvidence &&
+      task.grants.some((grant) => grant.capability === "speech.transcribe"),
+    );
+    await writeFile(schemaPath, `${JSON.stringify(workerOutputSchema(task, { hostSuppliedSemanticEvidenceInputs }))}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
     const startedAt = this.options.now().toISOString();
     const monotonicStart = this.options.monotonicNow();
     await this.ledger.transact(
@@ -373,12 +384,27 @@ export class CodexExecWorkerLauncher {
           },
         )
       : undefined;
+    let precompletedSemanticEvidence: ChildSemanticEvidenceToolResult | null = null;
     try {
       if (launchComputerUseGrant && !computerUseHost) {
         throw new LauncherFailure(
           "Computer-use grant has no sealed fixture driver",
           "This executor cannot start the granted offline external-screen inspection.",
         );
+      }
+      if (this.options.preexecuteRequiredSemanticEvidence && childCapabilities.semanticEvidenceGrant) {
+        const semanticScope = childCapabilities.semanticEvidenceGrant.mediaScope;
+        if (semanticScope.length !== 1) {
+          throw new LauncherFailure(
+            "Preexecuted semantic evidence requires one exact grant range",
+            "The required current-run semantic evidence grant is not one exact range.",
+          );
+        }
+        precompletedSemanticEvidence = await new BoundedChildSemanticEvidenceBridge(
+          task,
+          this.semanticEvidenceHost,
+          { nextOperationId: this.options.nextSemanticEvidenceOperationId },
+        ).call(semanticScope[0]);
       }
       await openLauncherChildCapabilityBridges(
         task,
@@ -398,6 +424,7 @@ export class CodexExecWorkerLauncher {
         },
         this.options,
         childCapabilities,
+        { semanticEvidence: precompletedSemanticEvidence !== null },
       );
       const {
         mediaCapabilities,
@@ -418,13 +445,18 @@ export class CodexExecWorkerLauncher {
       args.push("--output-schema", schemaPath);
       if (this.options.model) args.push("--model", this.options.model);
       args.push("-");
+      const maximumWallMs = Math.min(task.budget.wallMs, this.options.maximumWallMs);
+      const preModelElapsedMs = Math.max(0, Math.round(this.options.monotonicNow() - monotonicStart));
+      if (preModelElapsedMs >= maximumWallMs) {
+        throw new LauncherFailure("Codex worker timed out before model synthesis", "Codex executor exceeded its active wall-time limit.");
+      }
       processResult = await runProcess({
         executable: this.options.executable,
         args: this.commandArgs(args),
         cwd: directory,
-        stdin: workerPrompt(task),
+        stdin: workerPrompt(task, { precompletedSemanticEvidence }),
         env: launcherChildCapabilityEnvironment(childCapabilities),
-        timeoutMs: Math.min(task.budget.wallMs, this.options.maximumWallMs),
+        timeoutMs: maximumWallMs - preModelElapsedMs,
         maxStdoutBytes: this.options.maxStdoutBytes,
         maxStderrBytes: this.options.maxStderrBytes,
       });
@@ -737,6 +769,7 @@ export class CodexExecWorkerLauncher {
         researchEvidenceInputs,
         computerUseEvidenceInputs,
         visualTransitionEvidenceInputs,
+        { hostSuppliedSemanticEvidenceInputs },
       );
       const prepared = await Promise.all(
         worker.outputs.map(async (output) => {

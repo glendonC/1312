@@ -62,7 +62,7 @@ test("OpenAI language-explanation adapter sends a bounded stored-false structure
     const body = JSON.parse(String(request.init?.body)) as {
       model: string;
       store: boolean;
-      text: { format: { type: string; strict: boolean } };
+      text: { format: { type: string; strict: boolean; schema: unknown } };
       max_output_tokens: number;
       prompt?: unknown;
     };
@@ -70,6 +70,8 @@ test("OpenAI language-explanation adapter sends a bounded stored-false structure
     assert.equal(body.store, false);
     assert.equal(body.text.format.type, "json_schema");
     assert.equal(body.text.format.strict, true);
+    assert.doesNotMatch(JSON.stringify(body.text.format.schema), /"const":/);
+    assert.match(JSON.stringify(body.text.format.schema), /"enum":\["meaning"\]/);
     assert.equal(body.max_output_tokens, 4_000);
     assert.equal("prompt" in body, false);
   } finally {

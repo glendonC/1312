@@ -29,8 +29,8 @@ export const LANGUAGE_EXPLANATION_OUTPUT_SCHEMA = {
             additionalProperties: false,
             required: ["kind", "availability", "reasonCode", "content"],
             properties: {
-              kind: { const: "meaning" },
-              availability: { const: "available" },
+              kind: { enum: ["meaning"] },
+              availability: { enum: ["available"] },
               reasonCode: { type: "null" },
               content: {
                 type: "object",
@@ -45,8 +45,8 @@ export const LANGUAGE_EXPLANATION_OUTPUT_SCHEMA = {
             additionalProperties: false,
             required: ["kind", "availability", "reasonCode", "content"],
             properties: {
-              kind: { const: "word" },
-              availability: { const: "available" },
+              kind: { enum: ["word"] },
+              availability: { enum: ["available"] },
               reasonCode: { type: "null" },
               content: {
                 type: "object",
@@ -65,8 +65,8 @@ export const LANGUAGE_EXPLANATION_OUTPUT_SCHEMA = {
             additionalProperties: false,
             required: ["kind", "availability", "reasonCode", "content"],
             properties: {
-              kind: { const: "phrase" },
-              availability: { const: "available" },
+              kind: { enum: ["phrase"] },
+              availability: { enum: ["available"] },
               reasonCode: { type: "null" },
               content: {
                 type: "object",
@@ -81,8 +81,8 @@ export const LANGUAGE_EXPLANATION_OUTPUT_SCHEMA = {
             additionalProperties: false,
             required: ["kind", "availability", "reasonCode", "content"],
             properties: {
-              kind: { const: "grammar" },
-              availability: { const: "available" },
+              kind: { enum: ["grammar"] },
+              availability: { enum: ["available"] },
               reasonCode: { type: "null" },
               content: {
                 type: "object",
@@ -111,8 +111,8 @@ export const LANGUAGE_EXPLANATION_OUTPUT_SCHEMA = {
             additionalProperties: false,
             required: ["kind", "availability", "reasonCode", "content"],
             properties: {
-              kind: { const: "translation_choice" },
-              availability: { const: "available" },
+              kind: { enum: ["translation_choice"] },
+              availability: { enum: ["available"] },
               reasonCode: { type: "null" },
               content: {
                 type: "object",

@@ -114,6 +114,7 @@ export default function ProductionCoordinationLedger({
 }: {
   production: ProductionStudioProjection;
 }) {
+  const semanticEvidence = production.semanticEvidence ?? [];
   const unlinkedReports = production.reports.filter((report) =>
     !production.spawnRequests.some((spawn) =>
       spawn.taskId === report.taskId && spawn.agentId === report.agentId));
@@ -128,13 +129,13 @@ export default function ProductionCoordinationLedger({
         <div>
           <span className="processing-kicker">Validated production projection</span>
           <h3 id="processing-receipt-board-title">Receipt-backed coordination</h3>
-          <p>Current journal facts only · deterministic host composition · no replay-agent state.</p>
+          <p>Current journal facts only · host-validated composition · no replay-agent state.</p>
         </div>
         <dl aria-label="Projection counts">
           <div><dt>Tasks</dt><dd>{production.counts.tasks}</dd></div>
           <div><dt>Workers</dt><dd>{production.counts.workers}</dd></div>
           <div><dt>Grants</dt><dd>{production.counts.grants}</dd></div>
-          <div><dt>Operations</dt><dd>{production.counts.operations + production.counts.evidenceReads}</dd></div>
+          <div><dt>Operations</dt><dd>{production.counts.operations + semanticEvidence.length + production.counts.evidenceReads}</dd></div>
         </dl>
       </header>
 
@@ -210,7 +211,7 @@ export default function ProductionCoordinationLedger({
             <span className="processing-receipt-index">03</span>
             <div><h4 id="processing-media-ledger-title">Media and perception receipts</h4><p>Only operations that reached the journal.</p></div>
           </header>
-          {production.operations.length === 0 && production.evidenceReads.length === 0 ? (
+          {production.operations.length === 0 && semanticEvidence.length === 0 && production.evidenceReads.length === 0 ? (
             <p className="processing-receipt-empty" data-production-live-empty="media-operations">
               No media operation or bounded evidence read is recorded.
             </p>
@@ -234,6 +235,29 @@ export default function ProductionCoordinationLedger({
                       </dd>
                     </div>
                     <div><dt>Output</dt><dd>{identity(operation.outputArtifactId)}</dd></div>
+                    <div><dt>Failure</dt><dd>{operation.failure ?? "Not recorded"}</dd></div>
+                  </dl>
+                </article>
+              ))}
+              {semanticEvidence.map((operation) => (
+                <article
+                  key={operation.operationId}
+                  data-production-live-operation-id={operation.operationId}
+                  data-operation-status={operation.status}
+                  data-operation-capability={operation.capability}
+                  data-operation-audit={operation.audit}
+                >
+                  <header><h5>{operation.capability}</h5><span>{sentence(operation.status)}</span></header>
+                  <dl>
+                    <div><dt>Operation</dt><dd>{identity(operation.operationId)}</dd></div>
+                    <div><dt>Worker / task</dt><dd>{identity(operation.executor.agentId)} · {identity(operation.executor.taskId)}</dd></div>
+                    <div><dt>Grant</dt><dd>{identity(operation.executor.grantId)}</dd></div>
+                    <div><dt>Requested range</dt><dd>{seconds(operation.source.range.startMs)}–{seconds(operation.source.range.endMs)} · {operation.source.trackId}</dd></div>
+                    <div><dt>Returned range</dt><dd>{operation.returnedRange ? `${seconds(operation.returnedRange.startMs)}–${seconds(operation.returnedRange.endMs)}` : "Not recorded"}</dd></div>
+                    <div><dt>Receipt</dt><dd>{identity(operation.receipt?.receiptId ?? null)} · {identity(operation.receipt?.contentId ?? null)}</dd></div>
+                    <div><dt>Output</dt><dd>{identity(operation.artifact?.artifactId ?? null)} · {identity(operation.artifact?.contentId ?? null)}</dd></div>
+                    <div><dt>Producer</dt><dd>{operation.producer.id} · {operation.producer.model ?? "model not recorded"} · {sentence(operation.producer.executionScope)}</dd></div>
+                    <div><dt>Observations</dt><dd>{operation.observationCount === null ? "Not recorded" : `${operation.observationCount} · ${operation.availability ? sentence(operation.availability.state) : "availability not recorded"}`}</dd></div>
                     <div><dt>Failure</dt><dd>{operation.failure ?? "Not recorded"}</dd></div>
                   </dl>
                 </article>

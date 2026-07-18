@@ -20,6 +20,7 @@ import type {
   CurrentRunRecognizerResult,
   CurrentRunSpeechRecognizer,
 } from "../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts";
+import { CurrentRunRecognizerProviderError } from "../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts";
 import {
   BoundedChildSemanticEvidenceBridge,
   callChildSemanticEvidenceBridge,
@@ -336,11 +337,16 @@ test("empty, unavailable, and unknown current-run outcomes remain closed identit
   }
 });
 
-test("model failure, timeout, and recognizer range escape fail closed without audited artifacts", async (t) => {
-  const cases: Array<{ name: string; recognizer: Recognizer; timeoutMs?: number }> = [
+test("model failure, typed provider failure, timeout, and recognizer range escape fail closed without audited artifacts", async (t) => {
+  const cases: Array<{ name: string; recognizer: Recognizer; timeoutMs?: number; expectedFailure?: string }> = [
     {
       name: "model failure",
       recognizer: new Recognizer(async () => { throw new Error("provider detail must not enter the journal"); }),
+    },
+    {
+      name: "provider http failure",
+      recognizer: new Recognizer(async () => { throw new CurrentRunRecognizerProviderError("http", 429); }),
+      expectedFailure: "Current-run speech recognizer provider returned HTTP 429.",
     },
     {
       name: "timeout",
@@ -356,6 +362,7 @@ test("model failure, timeout, and recognizer range escape fail closed without au
         reason: "current_run_hypotheses_returned",
         segments: [{ startMs: input.range.startMs, endMs: input.range.endMs + 1, state: "available", text: "escape" }],
       })),
+      expectedFailure: "Current-run speech recognizer returned invalid range evidence.",
     },
   ];
   for (const entry of cases) await t.test(entry.name, async () => {
@@ -379,6 +386,7 @@ test("model failure, timeout, and recognizer range escape fail closed without au
       assert.equal(projection.semanticEvidence?.[0].artifact, null);
       assert.equal(projection.semanticEvidence?.[0].availability, null);
       assert.equal(JSON.stringify(operation.failure).includes("provider detail"), false);
+      if (entry.expectedFailure) assert.equal(operation.failure, entry.expectedFailure);
     } finally {
       await cleanup(runtime);
     }

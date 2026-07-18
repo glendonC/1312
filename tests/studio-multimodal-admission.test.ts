@@ -20,6 +20,7 @@ import {
   reopenAcousticCitationSource,
 } from "../src/studio/runtime/production/evidenceCitations/audit.ts";
 import { BoundedFrameSamplingHost } from "../src/studio/runtime/production/frameHost.ts";
+import { buildStudyReportEnvelopeV2 } from "../src/studio/runtime/production/executor/workerContract.ts";
 import { FfmpegFrameDecoder } from "../src/studio/runtime/production/frames/ffmpegDecoder.ts";
 import { MemoryEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import type {
@@ -41,7 +42,7 @@ import type {
   CurrentRunRecognizerResult,
   CurrentRunSpeechRecognizer,
 } from "../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts";
-import { reopenSemanticEvidence } from "../src/studio/runtime/production/semantic/semanticEvidenceAudit.ts";
+import { reopenSemanticEvidence, semanticEvidenceCitation } from "../src/studio/runtime/production/semantic/semanticEvidenceAudit.ts";
 import { SpeechTranscribeCapabilityHost } from "../src/studio/runtime/production/semantic/semanticEvidenceHost.ts";
 import { GeneralizedStudyReadinessHost } from "../src/studio/runtime/production/study/generalizedStudyReadinessHost.ts";
 import { GeneralizedStudySynthesisHost } from "../src/studio/runtime/production/study/generalizedStudySynthesisHost.ts";
@@ -199,6 +200,29 @@ test("v2 speech report closes admission/read/synthesis/readiness/caption causali
     const verified = await reopenSemanticEvidence(runtime.ledger.state(), runtime.artifacts, semantic.envelope.operationId);
     const claimId = "claim:u3:spoken";
     const citation = currentRunSpeechCitation({ verified, target: { kind: "claim", claimId, range: runtime.scope }, observationIds: verified.envelope.observations.map((entry) => entry.observationId) });
+    const unavailableCitation = structuredClone(citation);
+    unavailableCitation.observations[0].state = "unavailable";
+    unavailableCitation.observations[0].rawState = "unavailable";
+    const unavailableWithWorkerAbstention = deriveGeneralizedCoverageDecision({
+      claimCount: 0,
+      citations: [unavailableCitation],
+      dialogueScopePolicy: null,
+      range: runtime.scope,
+      declaredReasonCode: "worker_withheld",
+    });
+    assert.equal(unavailableWithWorkerAbstention.state, "unavailable");
+    assert.equal(unavailableWithWorkerAbstention.reasonCode, "evidence_unavailable");
+    assert.equal(unavailableWithWorkerAbstention.rawStates.includes("worker_withheld"), false);
+    assert.deepEqual(
+      deriveGeneralizedCoverageDecision({
+        claimCount: 0,
+        citations: [unavailableCitation],
+        dialogueScopePolicy: null,
+        range: runtime.scope,
+        declaredReasonCode: unavailableWithWorkerAbstention.reasonCode,
+      }),
+      unavailableWithWorkerAbstention,
+    );
     const report: StudyReportArtifactV2 = { ...reportBase(runtime, [citation]), coverage: [{ ...runtime.scope, state: "supported", claimIds: [claimId], citationIds: [], rawStates: [], reason: null }], claims: [{ claimId, ...runtime.scope, statement: "The current-run recognizer emitted a timed speech hypothesis.", citationIds: [citation.citationId] }] };
     const admissionHost = new GeneralizedEvidenceAdmissionHost(runtime.ledger.state(), runtime.artifacts);
     const admitted = await admissionHost.admit(report);
@@ -229,6 +253,46 @@ test("v2 speech report closes admission/read/synthesis/readiness/caption causali
     sourceTheater.sourceArtifacts.push({ artifactId: "artifact:generic-source", contentId: `sha256:${"f".repeat(64)}` });
     await assert.rejects(admissionHost.admit(sourceTheater), /exact lineage only|generic support sources/);
   } finally { await rm(runtime.directory, { recursive: true, force: true }); }
+});
+
+test("worker abstention dominated by unavailable speech remains cold-admissible", async () => {
+  const runtime = await audioHarness();
+  try {
+    const recognizer: CurrentRunSpeechRecognizer = {
+      async describe() { return recognizerDescriptor(); },
+      async recognize() { return { availability: "unavailable", reason: "recognizer_unavailable", segments: [] }; },
+    };
+    const semantic = await new SpeechTranscribeCapabilityHost(runtime.ledger, runtime.artifacts, { recognizer }).transcribe({
+      operationId: "operation:u3-unavailable-speech",
+      taskId: runtime.child.id,
+      agentId: runtime.child.assignedAgentId,
+      ...runtime.scope,
+    });
+    const verified = await reopenSemanticEvidence(runtime.ledger.state(), runtime.artifacts, semantic.envelope.operationId);
+    const semanticInput = semanticEvidenceCitation(verified);
+    const report = buildStudyReportEnvelopeV2({
+      task: runtime.child,
+      executionId: runtime.childExecutionId,
+      output: {
+        name: "study report v2",
+        kind: "studio.study-report.v2",
+        coverage: [{ ...runtime.scope, claimIds: [], reason: { code: "worker_withheld", detail: "The worker made no semantic claim." } }],
+        claims: [],
+      },
+      semanticEvidenceInputs: [semanticInput],
+      verifiedSemanticEvidence: [verified],
+      ocrEvidenceInputs: [],
+      verifiedOcrEvidence: [],
+      dialogueScopePolicy: null,
+    });
+    assert.equal(report.coverage[0].state, "unavailable");
+    assert.equal(report.coverage[0].reason?.code, "evidence_unavailable");
+    assert.equal(report.coverage[0].rawStates.includes("worker_withheld"), false);
+    const admitted = await new GeneralizedEvidenceAdmissionHost(runtime.ledger.state(), runtime.artifacts).admit(report);
+    assert.equal(admitted.reportEnvelope.coverage[0].state, "unavailable");
+  } finally {
+    await rm(runtime.directory, { recursive: true, force: true });
+  }
 });
 
 test("unknown, withheld, and failed survive admission through caption causality without prose upgrade", async () => {

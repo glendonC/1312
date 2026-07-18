@@ -40,7 +40,7 @@ test("owned processing canvas exposes projection facts and explicit missing rece
   const canvas = page.getByRole("region", { name: "Processing canvas" });
   const coordination = canvas.getByRole("region", { name: "Receipt-backed coordination" });
   await expect(coordination).toBeVisible();
-  await expect(coordination).toContainText("deterministic host composition");
+  await expect(coordination).toContainText("host-validated composition");
   await expect(coordination.locator("[data-production-live-task-id]")).toHaveCount(2);
   await expect(coordination.locator("[data-production-live-grant-id]")).toHaveCount(0);
   await expect(coordination.getByText("No scheduler grant recorded")).toHaveCount(2);
@@ -112,6 +112,12 @@ test("attested approval explicitly produces private bounded captions without pub
   const handoff = coordination.locator("[data-production-live-spawn-id]");
   await expect.poll(() => handoff.count()).toBeGreaterThan(0);
   await expect(handoff.first()).toHaveAttribute("data-spawn-decision", "accepted");
+  const speechOperation = coordination.locator('[data-production-live-operation-id][data-operation-capability="speech.transcribe"]');
+  await expect.poll(() => speechOperation.count()).toBeGreaterThan(0);
+  await expect(speechOperation.first()).toHaveAttribute("data-operation-status", "completed");
+  await expect(speechOperation.first()).toHaveAttribute("data-operation-audit", /verified/);
+  await expect(speechOperation.first().getByText("speech.transcribe", { exact: true })).toBeVisible();
+  await expect(speechOperation.first().getByText(/stream:0/)).toBeVisible();
   await expect(coordination.locator('[data-production-live-empty="caption-lineage"]')).toBeVisible();
 
   const review = production.locator('[data-production-region="publish-review-human-review"]');

@@ -105,7 +105,7 @@ export function validateCaptionExecutorDescriptor(
     context,
     `${path}.id`,
   );
-  literal(item.version, "1", context, `${path}.version`);
+  const version = oneOf<CaptionExecutorDescriptor["version"]>(item.version, new Set(["1", "2"]), context, `${path}.version`);
   const recognizer = item.recognizer === null ? null : string(item.recognizer, context, `${path}.recognizer`);
   const translator = item.translator === null ? null : string(item.translator, context, `${path}.translator`);
   const sourceCaptionContentId = nullableContentId(item.sourceCaptionContentId, context, `${path}.sourceCaptionContentId`);
@@ -118,13 +118,13 @@ export function validateCaptionExecutorDescriptor(
   literal(item.cognitionClaim, "none", context, `${path}.cognitionClaim`);
   if (
     (classification === "recorded_real_pipeline_fixture" &&
-      (id !== "studio.recorded-caption-fixture-adapter" || executionScope !== "test_demo_only" || recognizer === null || translator === null)) ||
+      (id !== "studio.recorded-caption-fixture-adapter" || version !== "1" || executionScope !== "test_demo_only" || recognizer === null || translator === null)) ||
     (classification === "deterministic_current_run_test_seam" &&
-      (id !== "studio.deterministic-current-run-caption-test-seam" || executionScope !== "current_run" || recognizer === null || translator === null || sourceCaptionContentId !== null)) ||
+      (id !== "studio.deterministic-current-run-caption-test-seam" || version !== "1" || executionScope !== "current_run" || recognizer === null || translator === null || sourceCaptionContentId !== null)) ||
     (classification === "real_recognizer_translator" &&
       (id !== "studio.openai-caption-producer" || executionScope !== "current_run" || recognizer === null || translator === null || sourceCaptionContentId !== null))
   ) fail(context, path, "executor identity, classification, and evidence must agree");
-  return { id, version: "1", classification, executionScope, cognitionClaim: "none", recognizer, translator, sourceCaptionContentId };
+  return { id, version, classification, executionScope, cognitionClaim: "none", recognizer, translator, sourceCaptionContentId };
 }
 
 export function assertCaptionProductionRequest(value: unknown): CaptionProductionRequest {
@@ -419,7 +419,7 @@ function validateLine(value: unknown, context: string, path: string, version: 1 
           "studio.deterministic-current-run-caption-test-seam",
           "studio.openai-caption-producer",
         ]), context, `${path}.lineage.captionExecutor.id`),
-        version: literal(captionExecutor.version, "1", context, `${path}.lineage.captionExecutor.version`),
+        version: oneOf(captionExecutor.version, new Set(["1", "2"]), context, `${path}.lineage.captionExecutor.version`),
         executionScope: oneOf(captionExecutor.executionScope, new Set(["test_demo_only", "current_run"]), context, `${path}.lineage.captionExecutor.executionScope`),
         cognitionClaim: literal(captionExecutor.cognitionClaim, "none", context, `${path}.lineage.captionExecutor.cognitionClaim`),
       },

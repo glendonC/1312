@@ -16,6 +16,8 @@ export interface CaptionExecutorInput {
   sourcePath: string;
   fixtureCaptionPath: string;
   range: { startMs: number; endMs: number };
+  /** Host-derived source ranges. Real recognition is executed separately inside each range. */
+  productionRanges: Array<{ startMs: number; endMs: number }>;
 }
 
 export type CaptionExecutorLine = Omit<CaptionProductionLine, "lineage">;
@@ -23,6 +25,23 @@ export type CaptionExecutorLine = Omit<CaptionProductionLine, "lineage">;
 export interface CaptionProductionExecutor {
   describe(input: CaptionExecutorInput): Promise<CaptionExecutorDescriptor>;
   execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionExecutorLine[]>;
+}
+
+export type CaptionProductionExecutorErrorCode =
+  | "recognizer_provider_failed"
+  | "recognizer_output_invalid"
+  | "translator_provider_failed"
+  | "translator_output_invalid";
+
+/** Safe executor classification. Provider payloads and transcript bytes never enter the runtime journal. */
+export class CaptionProductionExecutorError extends Error {
+  readonly code: CaptionProductionExecutorErrorCode;
+
+  constructor(code: CaptionProductionExecutorErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "CaptionProductionExecutorError";
+    this.code = code;
+  }
 }
 
 interface LegacyCaptionCue {
@@ -225,74 +244,112 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
   async describe(): Promise<CaptionExecutorDescriptor> {
     return {
       id: "studio.openai-caption-producer",
-      version: "1",
+      version: "2",
       classification: "real_recognizer_translator",
       executionScope: "current_run",
       cognitionClaim: "none",
-      recognizer: "gpt-4o-transcribe-diarize",
-      translator: "gpt-5",
+      recognizer: "gpt-4o-transcribe-diarize (per host-derived production range)",
+      translator: "gpt-5 (strict structured output)",
       sourceCaptionContentId: null,
     };
   }
 
   async execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionExecutorLine[]> {
     const temporary = await mkdtemp(join(tmpdir(), "studio-caption-production-"));
-    const audioPath = join(temporary, "range.wav");
     try {
-      await execute(this.ffmpeg, [
-        "-nostdin", "-hide_banner", "-loglevel", "error",
-        "-ss", (input.range.startMs / 1_000).toFixed(3),
-        "-t", ((input.range.endMs - input.range.startMs) / 1_000).toFixed(3),
-        "-i", input.sourcePath,
-        "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", audioPath,
-      ], Math.min(20_000, CAPTION_PRODUCTION_LIMITS.maxWallMs));
-      if (signal.aborted) throw new Error("Real caption execution was aborted");
-      const form = new FormData();
-      form.append("file", new Blob([await readFile(audioPath)], { type: "audio/wav" }), "range.wav");
-      form.append("model", "gpt-4o-transcribe-diarize");
-      form.append("language", "ko");
-      form.append("response_format", "diarized_json");
-      form.append("chunking_strategy", JSON.stringify({ type: "server_vad" }));
-      let transcription: unknown;
-      try {
-        transcription = await apiJson(this.apiKey, "audio/transcriptions", form, signal, null);
-      } catch {
-        return [];
+      if (input.productionRanges.length === 0 || input.productionRanges.length > CAPTION_PRODUCTION_LIMITS.maxLines) {
+        throw new CaptionProductionExecutorError(
+          "recognizer_output_invalid",
+          "Real caption recognition requires a bounded non-empty host-derived production range set",
+        );
       }
-      const segments = (transcription as { segments?: unknown }).segments;
-      if (!Array.isArray(segments)) return [];
-      const sourceLines: CaptionExecutorLine[] = segments.map((candidate, index): CaptionExecutorLine => {
-        const segment = candidate as { start?: unknown; end?: unknown; text?: unknown };
-        const startMs = input.range.startMs + Math.round(Number(segment.start) * 1_000);
-        const endMs = input.range.startMs + Math.round(Number(segment.end) * 1_000);
-        const text = typeof segment.text === "string" ? segment.text.trim() : "";
+      const sourceLines: CaptionExecutorLine[] = [];
+      for (const [rangeIndex, range] of input.productionRanges.entries()) {
         if (
-          !Number.isSafeInteger(startMs) || !Number.isSafeInteger(endMs) || endMs <= startMs ||
-          startMs < input.range.startMs || endMs > input.range.endMs
-        ) throw new Error("Real recognizer returned timing outside the approved range");
-        return text
-          ? {
-              id: `line-${String(index + 1).padStart(3, "0")}`,
-              startMs,
-              endMs,
-              source: { language: "ko", state: "available", text, reasonCode: null },
-              target: { language: "en", state: "unavailable", text: null, reasonCode: "translator_unavailable" },
-            }
-          : {
-              id: `line-${String(index + 1).padStart(3, "0")}`,
-              startMs,
-              endMs,
-              source: { language: "ko", state: "unavailable", text: null, reasonCode: "recognizer_empty" },
-              target: { language: "en", state: "unavailable", text: null, reasonCode: "source_unavailable" },
-            };
-      }).sort((left, right) => left.startMs - right.startMs);
+          !Number.isSafeInteger(range.startMs) || !Number.isSafeInteger(range.endMs) ||
+          range.startMs < input.range.startMs || range.endMs > input.range.endMs || range.endMs <= range.startMs
+        ) {
+          throw new CaptionProductionExecutorError(
+            "recognizer_output_invalid",
+            "The host-derived caption production range is outside the approved analysis range",
+          );
+        }
+        const audioPath = join(temporary, `range-${String(rangeIndex + 1).padStart(3, "0")}.wav`);
+        await execute(this.ffmpeg, [
+          "-nostdin", "-hide_banner", "-loglevel", "error",
+          "-ss", (range.startMs / 1_000).toFixed(3),
+          "-t", ((range.endMs - range.startMs) / 1_000).toFixed(3),
+          "-i", input.sourcePath,
+          "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", audioPath,
+        ], Math.min(20_000, CAPTION_PRODUCTION_LIMITS.maxWallMs));
+        if (signal.aborted) throw new Error("Real caption execution was aborted");
+        const form = new FormData();
+        form.append("file", new Blob([await readFile(audioPath)], { type: "audio/wav" }), "range.wav");
+        form.append("model", "gpt-4o-transcribe-diarize");
+        form.append("language", "ko");
+        form.append("response_format", "diarized_json");
+        form.append("chunking_strategy", "auto");
+        let transcription: unknown;
+        try {
+          transcription = await apiJson(this.apiKey, "audio/transcriptions", form, signal, null);
+        } catch (error) {
+          throw new CaptionProductionExecutorError(
+            "recognizer_provider_failed",
+            "The bounded current-run caption recognizer failed closed",
+            { cause: error },
+          );
+        }
+        const segments = (transcription as { segments?: unknown }).segments;
+        if (!Array.isArray(segments)) {
+          throw new CaptionProductionExecutorError(
+            "recognizer_output_invalid",
+            "The bounded current-run caption recognizer returned no segment array",
+          );
+        }
+        for (const [segmentIndex, candidate] of segments.entries()) {
+          const segment = candidate as { start?: unknown; end?: unknown; text?: unknown };
+          const startMs = range.startMs + Math.round(Number(segment.start) * 1_000);
+          const endMs = range.startMs + Math.round(Number(segment.end) * 1_000);
+          const text = typeof segment.text === "string" ? segment.text.trim() : "";
+          if (
+            !Number.isSafeInteger(startMs) || !Number.isSafeInteger(endMs) || endMs <= startMs ||
+            startMs < range.startMs || endMs > range.endMs
+          ) {
+            throw new CaptionProductionExecutorError(
+              "recognizer_output_invalid",
+              "The bounded current-run caption recognizer returned timing outside its host-derived production range",
+            );
+          }
+          const id = `line-${String(rangeIndex + 1).padStart(3, "0")}-${String(segmentIndex + 1).padStart(3, "0")}`;
+          sourceLines.push(text
+            ? {
+                id,
+                startMs,
+                endMs,
+                source: { language: "ko", state: "available", text, reasonCode: null },
+                target: { language: "en", state: "unavailable", text: null, reasonCode: "translator_unavailable" },
+              }
+            : {
+                id,
+                startMs,
+                endMs,
+                source: { language: "ko", state: "unavailable", text: null, reasonCode: "recognizer_empty" },
+                target: { language: "en", state: "unavailable", text: null, reasonCode: "source_unavailable" },
+              });
+        }
+      }
+      sourceLines.sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs || left.id.localeCompare(right.id));
       if (sourceLines.length > CAPTION_PRODUCTION_LIMITS.maxLines) {
-        throw new Error("Real recognizer output exceeds the caption line ceiling");
+        throw new CaptionProductionExecutorError(
+          "recognizer_output_invalid",
+          "Real recognizer output exceeds the caption line ceiling",
+        );
       }
       const translatable = sourceLines.filter((line) => line.source.state === "available");
       if (translatable.length === 0) return sourceLines;
+      let response: unknown;
       try {
-        const response = await apiJson(
+        response = await apiJson(
           this.apiKey,
           "chat/completions",
           JSON.stringify({
@@ -300,19 +357,49 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
             messages: [
               {
                 role: "system",
-                content: "Translate each timed Korean source line into natural English subtitles. Preserve ids. If a line cannot be translated, omit it. Return JSON only.",
+                content: "Translate every Korean source line into a natural English subtitle. Copy every id exactly once and emit the required JSON schema only.",
               },
               {
                 role: "user",
                 content: JSON.stringify({ lines: translatable.map((line) => ({ id: line.id, ko: line.source.text })) }),
               },
             ],
-            response_format: { type: "json_object" },
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "caption_translations",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    lines: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: { id: { type: "string" }, en: { type: "string" } },
+                        required: ["id", "en"],
+                        additionalProperties: false,
+                      },
+                    },
+                  },
+                  required: ["lines"],
+                  additionalProperties: false,
+                },
+              },
+            },
             max_completion_tokens: 4_000,
           }),
           signal,
           "application/json",
         );
+      } catch (error) {
+        throw new CaptionProductionExecutorError(
+          "translator_provider_failed",
+          "The bounded current-run caption translator provider failed closed",
+          { cause: error },
+        );
+      }
+      try {
         const content = (response as { choices?: Array<{ message?: { content?: unknown } }> }).choices?.[0]?.message?.content;
         const translated = typeof content === "string" ? JSON.parse(content) as { lines?: unknown } : {};
         const byId = new Map<string, string>();
@@ -320,9 +407,14 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
           for (const candidate of translated.lines) {
             const line = candidate as { id?: unknown; en?: unknown };
             if (typeof line.id === "string" && typeof line.en === "string" && line.en.trim()) {
+              if (byId.has(line.id)) throw new Error("duplicate translation id");
               byId.set(line.id, line.en.trim());
             }
           }
+        }
+        const expectedIds = new Set(translatable.map((line) => line.id));
+        if (byId.size !== expectedIds.size || [...byId.keys()].some((id) => !expectedIds.has(id))) {
+          throw new Error("translation ids do not close the exact source line set");
         }
         return sourceLines.map((line): CaptionExecutorLine => {
           if (line.source.state !== "available") return line;
@@ -331,8 +423,12 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
             ? { ...line, target: { language: "en", state: "available", text: target, reasonCode: null } }
             : { ...line, target: { language: "en", state: "unavailable", text: null, reasonCode: "translator_missing_line" } };
         });
-      } catch {
-        return sourceLines;
+      } catch (error) {
+        throw new CaptionProductionExecutorError(
+          "translator_output_invalid",
+          "The bounded current-run caption translator returned invalid structured output",
+          { cause: error },
+        );
       }
     } finally {
       await rm(temporary, { recursive: true, force: true });

@@ -126,7 +126,9 @@ export function captionProductionResponse(
     if (!reopenedValue.sourceArtifactIds.includes(sourceValue.artifactId)) fail(`${captionContext}.reopened`, "omits the caption source.");
     const executor = object(caption.executor, `${captionContext}.executor`);
     exact(executor, ["id", "version", "classification", "executionScope", "cognitionClaim", "recognizer", "translator", "sourceCaptionContentId"], `${captionContext}.executor`);
-    if (executor.version !== "1") fail(`${captionContext}.executor.version`, "is unsupported.");
+    if (executor.version !== "1" && executor.version !== "2") {
+      fail(`${captionContext}.executor.version`, "is unsupported.");
+    }
     if (
       (executor.classification === "recorded_real_pipeline_fixture" && executor.id !== "studio.recorded-caption-fixture-adapter") ||
       (executor.classification === "deterministic_current_run_test_seam" && executor.id !== "studio.deterministic-current-run-caption-test-seam") ||
@@ -135,6 +137,7 @@ export function captionProductionResponse(
       (executor.classification === "recorded_real_pipeline_fixture" && executor.executionScope !== "test_demo_only") ||
       (executor.classification === "deterministic_current_run_test_seam" && executor.executionScope !== "current_run") ||
       (executor.classification === "real_recognizer_translator" && executor.executionScope !== "current_run") ||
+      (executor.classification !== "real_recognizer_translator" && executor.version !== "1") ||
       executor.cognitionClaim !== "none"
     ) fail(`${captionContext}.executor`, "identity and classification do not agree.");
     const recognizer = executor.recognizer === null ? null : string(executor.recognizer, `${captionContext}.executor.recognizer`);
@@ -179,7 +182,7 @@ export function captionProductionResponse(
       receiptContentId: contentId(caption.receiptContentId, `${captionContext}.receiptContentId`),
       executor: {
         id: executor.id as "studio.recorded-caption-fixture-adapter" | "studio.deterministic-current-run-caption-test-seam" | "studio.openai-caption-producer",
-        version: "1" as const,
+        version: executor.version as "1" | "2",
         classification: executor.classification as "recorded_real_pipeline_fixture" | "deterministic_current_run_test_seam" | "real_recognizer_translator",
         executionScope: executor.executionScope as "test_demo_only" | "current_run",
         cognitionClaim: "none" as const,

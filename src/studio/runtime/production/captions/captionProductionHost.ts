@@ -4,7 +4,11 @@ import {
   ContentAddressedArtifactStore,
   createCaptionArtifactId,
 } from "../artifactStore.ts";
-import type { CaptionProductionExecutor, CaptionExecutorInput } from "./captionProductionExecutor.ts";
+import {
+  CaptionProductionExecutorError,
+  type CaptionProductionExecutor,
+  type CaptionExecutorInput,
+} from "./captionProductionExecutor.ts";
 import {
   captionLineReceiptProjection,
   captionStudyIdentity,
@@ -77,6 +81,27 @@ export interface CaptionProductionHostResult {
   receiptArtifactId: string;
 }
 
+type CaptionProductionPhase = "executor" | "authority_revalidation" | "causality_closure" | "artifact_closure";
+
+function safeCaptionFailureReason(error: unknown, phase: CaptionProductionPhase): string {
+  if (error instanceof CaptionProductionExecutorError) {
+    if (error.code.startsWith("recognizer_")) {
+      return "Caption production failed closed during bounded current-run recognition.";
+    }
+    return "Caption production failed closed during bounded current-run translation.";
+  }
+  if (phase === "authority_revalidation") {
+    return "Caption production failed closed during authority revalidation.";
+  }
+  if (phase === "causality_closure") {
+    return "Caption production failed closed during study-causality closure.";
+  }
+  if (phase === "artifact_closure") {
+    return "Caption production failed closed during immutable artifact closure.";
+  }
+  return "Caption production failed closed within its bounded current-run executor.";
+}
+
 /** Separate, private caption authority. It cannot publish and accepts no media paths or prose. */
 export class CaptionProductionHost {
   private readonly ledger: RuntimeLedger;
@@ -117,12 +142,12 @@ export class CaptionProductionHost {
         "The immutable analysis range exceeds the caption-production duration ceiling",
       );
     }
-    const executorInput: CaptionExecutorInput = {
+    let executorInput: CaptionExecutorInput = {
       sourcePath: this.hostInput.sourcePath,
       fixtureCaptionPath: this.hostInput.fixtureCaptionPath,
       range: structuredClone(analysis.range),
+      productionRanges: [structuredClone(analysis.range)],
     };
-    const executor = await this.executor.describe(executorInput);
     const state = this.ledger.state();
     const source = state.artifacts[this.hostInput.sourceArtifactId];
     if (
@@ -238,6 +263,22 @@ export class CaptionProductionHost {
         "The approved study/readiness does not match the immutable current-run source and analysis scope",
       );
     }
+    if (generalizedStudy) {
+      const supported = generalizedStudy.envelope.coverage
+        .filter((entry) =>
+          entry.artifactId === source.id && entry.state === "supported" &&
+          entry.startMs >= analysis.range.startMs && entry.endMs <= analysis.range.endMs)
+        .map((entry) => ({ startMs: entry.startMs, endMs: entry.endMs }))
+        .sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs);
+      if (supported.length === 0 || supported.length > CAPTION_PRODUCTION_LIMITS.maxLines) {
+        throw new CaptionProductionHostError(
+          "verified_study_readiness_required",
+          "Caption production requires a bounded non-empty set of supported current-source study ranges",
+        );
+      }
+      executorInput = { ...executorInput, productionRanges: supported };
+    }
+    const executor = await this.executor.describe(executorInput);
     if (executor.executionScope !== "current_run") {
       throw new CaptionProductionHostError(
         "current_run_caption_executor_required",
@@ -262,6 +303,7 @@ export class CaptionProductionHost {
       readiness: structuredClone(approval.readiness),
     };
     let started = false;
+    let phase: CaptionProductionPhase = "executor";
     try {
       await this.ledger.transact(
         {
@@ -323,6 +365,7 @@ export class CaptionProductionHost {
           "Caption executor evidence changed while the bounded job was running",
         );
       }
+      phase = "authority_revalidation";
       try {
         await this.artifacts.resolveVerified(source);
         const currentState = this.ledger.state();
@@ -363,6 +406,7 @@ export class CaptionProductionHost {
         );
       }
       const derivation = "current_run_source_execution" as const;
+      phase = "causality_closure";
       const captionLines: CaptionProductionArtifact["lines"] = generalizedStudy && closedGeneralizedReadiness
         ? await Promise.all(lines.map(async (line) => {
           if (line.source.state !== "available" || line.target.state !== "available" || line.source.text === null || line.target.text === null) {
@@ -398,6 +442,7 @@ export class CaptionProductionHost {
           },
           derivation,
         }), readiness!.receipt.dialogueScopePolicy));
+      phase = "artifact_closure";
       const caption: CaptionProductionArtifact = {
         schema: generalizedStudy
           ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "studio.caption-production.artifact.v4" : "studio.caption-production.artifact.v3"
@@ -529,7 +574,7 @@ export class CaptionProductionHost {
           () => ({
             pending: [{
               type: "caption.production_failed",
-              data: { jobId, reason: "Caption production failed closed within its bounded executor contract." },
+              data: { jobId, reason: safeCaptionFailureReason(error, phase) },
             }] satisfies PendingRuntimeEvent[],
             result: undefined,
           }),

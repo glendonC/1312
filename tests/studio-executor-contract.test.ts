@@ -158,6 +158,91 @@ test("worker contract uses one closed schema, validator, and no-media prompt", (
   assert.match(workerPrompt(mediaContract), /audio_activity observation: signal or digital_silence/);
   assert.match(workerPrompt(mediaContract), /does not identify speech, words, speakers, music, or meaning/);
 
+  const semanticContract = structuredClone(contract);
+  semanticContract.mediaScope = [{ artifactId: "artifact:source", trackId: "stream:0", startMs: 0, endMs: 1_000 }];
+  semanticContract.grants.unshift({
+    id: "grant:speech",
+    capability: "speech.transcribe",
+    taskId: semanticContract.id,
+    agentId: semanticContract.assignedAgentId,
+    mediaScope: structuredClone(semanticContract.mediaScope),
+    evidenceScope: [],
+    assessmentScope: null,
+    decisionScope: null,
+  });
+  const semanticPrompt = workerPrompt(semanticContract);
+  assert.match(semanticPrompt, /MANDATORY FIRST ACTION: call speech_transcribe exactly once/);
+  assert.ok(semanticPrompt.indexOf("MANDATORY FIRST ACTION") < semanticPrompt.indexOf("Complete only the bounded task contract"));
+  const precompletedSemanticPrompt = workerPrompt(semanticContract, {
+    precompletedSemanticEvidence: {
+      schema: "studio.child-semantic-evidence-tool-result.v1",
+      capability: "speech.transcribe",
+      operationId: "operation:precompleted-speech",
+      artifact: { artifactId: "artifact:semantic", contentId: `sha256:${"b".repeat(64)}`, bytes: 512 },
+      receipt: { receiptId: "receipt:semantic", contentId: `sha256:${"c".repeat(64)}` },
+      availability: {
+        id: "availability:semantic",
+        state: "available",
+        reason: "current_run_hypotheses_returned",
+        truncated: false,
+      },
+      observations: [{
+        kind: "timed_transcript_hypothesis",
+        range: { startMs: 0, endMs: 1_000 },
+        state: "available",
+        text: "현재 실행 결과",
+        observationId: "observation:semantic",
+      }],
+    },
+  });
+  assert.doesNotMatch(precompletedSemanticPrompt, /MANDATORY FIRST ACTION/);
+  assert.match(precompletedSemanticPrompt, /AUTHENTICATED PRECOMPLETED SPEECH RESULT/);
+  assert.match(precompletedSemanticPrompt, /operation:precompleted-speech/);
+  assert.match(precompletedSemanticPrompt, /현재 실행 결과/);
+  assert.match(precompletedSemanticPrompt, /host will attach its exact operation/);
+  assert.match(precompletedSemanticPrompt, /do not emit that field/);
+
+  const semanticSchema = workerOutputSchema(semanticContract) as {
+    properties: Record<string, unknown>;
+    required: string[];
+  };
+  assert.ok("semanticEvidenceInputs" in semanticSchema.properties);
+  assert.ok(semanticSchema.required.includes("semanticEvidenceInputs"));
+  const hostSuppliedSemanticSchema = workerOutputSchema(semanticContract, {
+    hostSuppliedSemanticEvidenceInputs: true,
+  }) as {
+    properties: Record<string, unknown>;
+    required: string[];
+  };
+  assert.ok(!("semanticEvidenceInputs" in hostSuppliedSemanticSchema.properties));
+  assert.ok(!hostSuppliedSemanticSchema.required.includes("semanticEvidenceInputs"));
+
+  const hostSemanticInput = {
+    operationId: "operation:precompleted-speech",
+    artifactId: "artifact:semantic",
+    contentId: `sha256:${"b".repeat(64)}`,
+    receiptId: "receipt:semantic",
+    receiptContentId: `sha256:${"c".repeat(64)}`,
+    observations: [{ observationId: "observation:semantic", startMs: 0, endMs: 1_000 }],
+  };
+  const hostSuppliedResult = validateWorkerResult({
+    summary: "The bounded semantic range was studied.",
+    outputs: [{ name: "ack", kind: "worker-ack", content: "studied" }],
+  }, semanticContract, [hostSemanticInput], [], [], [], [], [], {
+    hostSuppliedSemanticEvidenceInputs: true,
+  });
+  assert.deepEqual(hostSuppliedResult.semanticEvidenceInputs, [hostSemanticInput]);
+  assert.throws(
+    () => validateWorkerResult({
+      summary: "The model attempted to override host evidence.",
+      semanticEvidenceInputs: [hostSemanticInput],
+      outputs: [{ name: "ack", kind: "worker-ack", content: "studied" }],
+    }, semanticContract, [hostSemanticInput], [], [], [], [], [], {
+      hostSuppliedSemanticEvidenceInputs: true,
+    }),
+    { message: "Worker result must contain only summary and outputs" },
+  );
+
   const frameContract = structuredClone(contract);
   frameContract.mediaScope = [{ artifactId: "artifact:source", trackId: "stream:0", startMs: 0, endMs: 1_000 }];
   frameContract.grants.unshift({

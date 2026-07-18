@@ -36,6 +36,7 @@ import type { ContentAddressedArtifactStore } from "../artifactStore.ts";
 import { BoundedReportHost } from "../study/reportHost.ts";
 import {
   inspectGeneralizedStudy,
+  preflightGeneralizedAdmission,
   recordGeneralizedAdmission,
   recordGeneralizedRead,
   recordGeneralizedStudy,
@@ -548,6 +549,14 @@ export class BoundedOrchestratorBridge {
       const report = this.ledger.state().reports[item.reportId];
       if (report?.study?.schema !== "studio.study-report-submission.v2" || !report.outputArtifactIds.includes(item.outputArtifactId)) {
         throw new OrchestratorBridgeError("invalid_request", "Generalized disposition requires one exact submitted v2 report output.");
+      }
+      if (item.outcome === "accepted") {
+        await preflightGeneralizedAdmission({
+          ledger: this.ledger,
+          artifacts: this.artifacts,
+          reportId: item.reportId,
+          outputArtifactId: item.outputArtifactId,
+        });
       }
       await new BoundedReportHost(this.ledger, undefined, this.artifacts).decide({
         reportId: item.reportId,

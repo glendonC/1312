@@ -183,6 +183,7 @@ export async function openLauncherChildCapabilityBridges(
   hosts: LauncherChildCapabilityHosts,
   options: LauncherChildCapabilityOptions,
   context: LauncherChildCapabilityContext,
+  precompleted: { semanticEvidence?: boolean } = {},
 ): Promise<void> {
   if (context.mediaCapabilities.length > 0) {
     context.mediaBridge = await openChildMediaBridge(new BoundedChildMediaBridge(task, hosts.media, {
@@ -235,7 +236,7 @@ export async function openLauncherChildCapabilityBridges(
       { nextOperationId: options.nextComputerUseOperationId },
     ));
   }
-  if (context.semanticEvidenceGrant) {
+  if (context.semanticEvidenceGrant && !precompleted.semanticEvidence) {
     context.semanticEvidenceBridge = await openChildSemanticEvidenceBridge(new BoundedChildSemanticEvidenceBridge(
       task,
       hosts.semanticEvidence,

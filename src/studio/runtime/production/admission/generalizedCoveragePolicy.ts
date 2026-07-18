@@ -95,11 +95,25 @@ export function deriveGeneralizedCoverageDecision(input: {
     ...input.citations.flatMap(citationEvidence),
     ...dialogueScopeEvidence(input.dialogueScopePolicy, input.range),
   ];
+  const addExplicitStateUnlessDominated = (
+    state: Extract<WeakStateEvidence["state"], "failed" | "withheld">,
+    raw: "operation_failed" | "worker_withheld",
+  ) => {
+    const priority = STATE_PRIORITY.indexOf(state);
+    const dominated = evidence.some((entry) => {
+      const entryPriority = STATE_PRIORITY.indexOf(entry.state);
+      return entryPriority >= 0 && entryPriority < priority;
+    });
+    // The report persists only the final reason code. If a stronger producer state wins, retaining
+    // the weaker model-declared raw marker would make the stored report impossible to re-derive
+    // during cold admission because that superseded declaration is no longer authoritative input.
+    if (!dominated) evidence.push({ state, raw });
+  };
   if (input.declaredReasonCode === "operation_failed") {
-    evidence.push({ state: "failed", raw: "operation_failed" });
+    addExplicitStateUnlessDominated("failed", "operation_failed");
   }
   if (input.declaredReasonCode === "worker_withheld") {
-    evidence.push({ state: "withheld", raw: "worker_withheld" });
+    addExplicitStateUnlessDominated("withheld", "worker_withheld");
   }
   if (input.claimCount === 0 && evidence.length === 0) {
     evidence.push({ state: "unknown", raw: "unobserved_range" });

@@ -41,6 +41,7 @@ import { validateVisualTransitionEvidenceCitationInput } from "../validation/vis
 import { validateCoveragePartition, validateStudyReportArtifact } from "../validation/studyReports.ts";
 import { validateStudyReportArtifactV2 } from "../validation/studyReportsV2.ts";
 import { LauncherFailure } from "./launcherFailure.ts";
+import type { ChildSemanticEvidenceToolResult } from "./childSemanticEvidenceBridge.ts";
 
 export interface WorkerResult {
   summary: string;
@@ -372,6 +373,7 @@ export function validateWorkerResult(
   expectedResearchEvidenceInputs: ResearchEvidenceSourceIdentity[] = [],
   expectedComputerUseEvidenceInputs: ComputerUseEvidenceSourceIdentity[] = [],
   expectedVisualTransitionEvidenceInputs: VisualTransitionEvidenceCitationInput[] = [],
+  options: WorkerResultValidationOptions = {},
 ): WorkerResult {
   const item = record(value);
   if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isVisualTransitionHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind) || isComputerUseHostArtifactKind(output.artifactKind))) {
@@ -386,7 +388,14 @@ export function validateWorkerResult(
   const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
   const researchGranted = task.grants.some((grant) => grant.capability === "research.investigate");
   const computerUseGranted = task.grants.some((grant) => grant.capability === "computer.use.readonly");
-  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(visualTransitionGranted ? ["visualTransitionEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : [])]);
+  const hostSuppliedSemanticEvidenceInputs = options.hostSuppliedSemanticEvidenceInputs ?? false;
+  if (hostSuppliedSemanticEvidenceInputs && !semanticGranted) {
+    throw new LauncherFailure(
+      "Host cannot attach semantic evidence without a worker grant",
+      "Codex worker response failed its semantic evidence citation contract.",
+    );
+  }
+  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted && !hostSuppliedSemanticEvidenceInputs ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(visualTransitionGranted ? ["visualTransitionEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : [])]);
   if (!item || Object.keys(item).some((key) => !allowedKeys.has(key))) {
     throw new LauncherFailure(
       "Worker result must contain only summary and outputs",
@@ -411,13 +420,28 @@ export function validateWorkerResult(
   }
   let semanticEvidenceInputs: SemanticEvidenceCitationInput[] = [];
   if (semanticGranted) {
-    if (!Array.isArray(item.semanticEvidenceInputs)) {
+    if (hostSuppliedSemanticEvidenceInputs) {
+      if (expectedSemanticEvidenceInputs.length === 0) {
+        throw new LauncherFailure(
+          "Host-supplied semantic evidence is empty",
+          "Codex worker response failed its semantic evidence citation contract.",
+        );
+      }
+      try {
+        semanticEvidenceInputs = expectedSemanticEvidenceInputs.map((input, index) =>
+          validateSemanticEvidenceCitationInput(input, "Host", `semanticEvidenceInputs[${index}]`));
+      } catch (error) {
+        throw new LauncherFailure(
+          `Host semantic evidence citation is invalid: ${error instanceof Error ? error.message : "invalid citation"}`,
+          "Codex worker response failed its semantic evidence citation contract.",
+        );
+      }
+    } else if (!Array.isArray(item.semanticEvidenceInputs)) {
       throw new LauncherFailure(
         "Semantic-consuming worker omitted its structured evidence input list",
         "Codex worker response failed its semantic evidence citation contract.",
       );
-    }
-    try {
+    } else try {
       semanticEvidenceInputs = item.semanticEvidenceInputs.map((input, index) =>
         validateSemanticEvidenceCitationInput(input, "Worker result", `semanticEvidenceInputs[${index}]`));
     } catch (error) {
@@ -426,7 +450,7 @@ export function validateWorkerResult(
         "Codex worker response failed its semantic evidence citation contract.",
       );
     }
-    if (JSON.stringify(semanticEvidenceInputs) !== JSON.stringify(expectedSemanticEvidenceInputs)) {
+    if (!hostSuppliedSemanticEvidenceInputs && JSON.stringify(semanticEvidenceInputs) !== JSON.stringify(expectedSemanticEvidenceInputs)) {
       throw new LauncherFailure(
         "Worker semantic evidence citations do not equal the authenticated current-task observations",
         "Codex worker response failed its semantic evidence citation contract.",
@@ -683,7 +707,15 @@ export function validateWorkerResult(
   return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, visualTransitionEvidenceInputs, speakerEvidenceInputs, researchEvidenceInputs, computerUseEvidenceInputs, outputs };
 }
 
-export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
+export interface WorkerResultValidationOptions {
+  hostSuppliedSemanticEvidenceInputs?: boolean;
+}
+
+export interface WorkerOutputSchemaOptions {
+  hostSuppliedSemanticEvidenceInputs?: boolean;
+}
+
+export function workerOutputSchema(task: TaskRecord, options: WorkerOutputSchemaOptions = {}): Record<string, unknown> {
   if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isVisualTransitionHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind) || isComputerUseHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
@@ -692,6 +724,14 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
   }
   const required = task.requiredOutputs.filter((output) => output.required);
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
+  const hostSuppliedSemanticEvidenceInputs = options.hostSuppliedSemanticEvidenceInputs ?? false;
+  if (hostSuppliedSemanticEvidenceInputs && !semanticGranted) {
+    throw new LauncherFailure(
+      "Host cannot attach semantic evidence without a worker grant",
+      "Codex worker output schema cannot attach ungranted semantic evidence.",
+    );
+  }
+  const modelSuppliesSemanticEvidenceInputs = semanticGranted && !hostSuppliedSemanticEvidenceInputs;
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
   const visualTransitionGranted = task.grants.some((grant) => grant.capability === "media.visual-transitions.analyze");
   const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
@@ -915,7 +955,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
     additionalProperties: false,
     properties: {
       summary: { type: "string", minLength: 1, maxLength: 2_000 },
-      ...(semanticGranted ? { semanticEvidenceInputs } : {}),
+      ...(modelSuppliesSemanticEvidenceInputs ? { semanticEvidenceInputs } : {}),
       ...(ocrGranted ? { ocrEvidenceInputs } : {}),
       ...(visualTransitionGranted ? { visualTransitionEvidenceInputs } : {}),
       ...(speakerGranted ? { speakerEvidenceInputs } : {}),
@@ -928,11 +968,15 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         items: outputItems,
       },
     },
-    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(visualTransitionGranted ? ["visualTransitionEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : []), "outputs"],
+    required: ["summary", ...(modelSuppliesSemanticEvidenceInputs ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(visualTransitionGranted ? ["visualTransitionEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : []), "outputs"],
   };
 }
 
-export function workerPrompt(task: TaskRecord): string {
+export interface WorkerPromptOptions {
+  precompletedSemanticEvidence?: ChildSemanticEvidenceToolResult | null;
+}
+
+export function workerPrompt(task: TaskRecord, options: WorkerPromptOptions = {}): string {
   const mediaTools = task.grants.flatMap((grant) =>
     grant.capability === "media.extract"
       ? ["media_extract"]
@@ -958,6 +1002,10 @@ export function workerPrompt(task: TaskRecord): string {
   const semanticScope = task.grants
     .filter((grant) => grant.capability === "speech.transcribe")
     .flatMap((grant) => grant.mediaScope);
+  const precompletedSemanticEvidence = options.precompletedSemanticEvidence ?? null;
+  if (precompletedSemanticEvidence && semanticScope.length !== 1) {
+    throw new Error("Precompleted semantic evidence requires one exact speech.transcribe grant range");
+  }
   const contract = {
     taskId: task.id,
     jobContext: task.jobContext,
@@ -1053,6 +1101,14 @@ export function workerPrompt(task: TaskRecord): string {
       ].join(" ");
   const semanticBoundary = semanticScope.length === 0
     ? "This executor exposes no speech_transcribe tool and cannot cite current-run semantic media evidence."
+    : precompletedSemanticEvidence
+      ? [
+          "The task executor already completed the contract-mandated speech_transcribe operation exactly once through the task-private bridge under this task, agent, grant, and execution before model synthesis.",
+          "No speech tool is exposed in this model phase, so the operation cannot be duplicated or retried.",
+          "Use only the authenticated precompleted result below. The host will attach its exact operation/artifact/content/receipt identities and observation id/ranges as the top-level semanticEvidenceInputs after model output; do not emit that field.",
+          "Claims remain worker-authored proposals and may cite only exact observations from the authenticated result.",
+          "Its timed text is a current-run recognizer hypothesis, not hearing, truth, understanding, agreement, or an accuracy claim. Preserve empty, unavailable, unknown, and truncated availability without upgrading it.",
+        ].join(" ")
     : [
         "Invoke speech_transcribe once for the exact granted artifact, track, and half-open range.",
         "Its timed text is a current-run recognizer hypothesis, not hearing, truth, understanding, agreement, or an accuracy claim.",
@@ -1060,6 +1116,7 @@ export function workerPrompt(task: TaskRecord): string {
         "Copy the returned operation/artifact/content/receipt identities and every exact observation id/range into the top-level semanticEvidenceInputs list.",
         "A free-text mention of any identity is not a citation and the output validator will reject it.",
         "Preserve empty, unavailable, unknown, and truncated availability without upgrading it.",
+        "After the one speech_transcribe result returns, immediately produce the required output JSON; do not deliberate, retry, or call another tool.",
       ].join(" ");
   const studyV1Boundary = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.study-report.v1");
   const studyV2Boundary = task.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.study-report.v2");
@@ -1122,8 +1179,12 @@ export function workerPrompt(task: TaskRecord): string {
         "Proceed_to_publish_review means only that a future publish-review producer may inspect the run; it does not mean captions exist or anything was published.",
         "Include the returned decision operation, output-artifact, receipt, receipt-content, outcome, and reason codes in the required worker output.",
       ].join(" ");
+  const mandatoryFirstAction = semanticScope.length === 0 || precompletedSemanticEvidence
+    ? null
+    : "MANDATORY FIRST ACTION: call speech_transcribe exactly once for the granted range. Do not emit final JSON, summarize, or deliberate before that tool result returns; a response without the tool call is rejected.";
   return [
     "You are one isolated child in the 1321 Studio production runtime.",
+    ...(mandatoryFirstAction ? [mandatoryFirstAction] : []),
     "Complete only the bounded task contract below and return the JSON required by the supplied output schema.",
     mediaBoundary,
     semanticBoundary,
@@ -1133,6 +1194,9 @@ export function workerPrompt(task: TaskRecord): string {
     evidenceBoundary,
     assessmentBoundary,
     decisionBoundary,
+    ...(precompletedSemanticEvidence ? [
+      `AUTHENTICATED PRECOMPLETED SPEECH RESULT: ${JSON.stringify(precompletedSemanticEvidence)}`,
+    ] : []),
     "Output content is a worker-authored artifact proposal; the parent decides whether to accept it.",
     JSON.stringify(contract),
   ].join("\n\n");

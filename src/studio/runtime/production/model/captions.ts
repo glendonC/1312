@@ -78,7 +78,7 @@ export interface CaptionProductionLine {
     captionExecutor: {
       jobId: string;
       id: CaptionExecutorDescriptor["id"];
-      version: "1";
+      version: CaptionExecutorDescriptor["version"];
       executionScope: CaptionExecutorDescriptor["executionScope"];
       cognitionClaim: "none";
     };
@@ -111,7 +111,7 @@ export interface CaptionExecutorDescriptor {
     | "studio.recorded-caption-fixture-adapter"
     | "studio.deterministic-current-run-caption-test-seam"
     | "studio.openai-caption-producer";
-  version: "1";
+  version: "1" | "2";
   classification: CaptionExecutorClassification;
   executionScope: "test_demo_only" | "current_run";
   cognitionClaim: "none";

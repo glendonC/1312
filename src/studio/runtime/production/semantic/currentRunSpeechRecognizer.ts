@@ -106,15 +106,59 @@ function execute(file: string, args: readonly string[], timeoutMs: number, signa
   });
 }
 
+export class CurrentRunRecognizerProviderError extends Error {
+  readonly kind: "transport" | "http" | "response";
+  readonly status: number | null;
+
+  constructor(
+    kind: "transport" | "http" | "response",
+    status: number | null = null,
+    options?: ErrorOptions,
+  ) {
+    super(`Current-run speech recognizer provider ${kind} failure`, options);
+    this.kind = kind;
+    this.status = status;
+  }
+}
+
 async function apiJson(apiKey: string, body: FormData, signal: AbortSignal): Promise<unknown> {
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body,
-    signal,
-  });
-  if (!response.ok) throw new Error(`Current-run speech recognizer returned ${response.status}`);
-  return response.json() as Promise<unknown>;
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body,
+      signal,
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new CurrentRunRecognizerProviderError("transport", null, { cause: error });
+  }
+  if (!response.ok) throw new CurrentRunRecognizerProviderError("http", response.status);
+  try {
+    return await response.json() as unknown;
+  } catch (error) {
+    throw new CurrentRunRecognizerProviderError("response", response.status, { cause: error });
+  }
+}
+
+export class SerialCurrentRunTranscriptionQueue {
+  private tail: Promise<void> = Promise.resolve();
+
+  async run<T>(signal: AbortSignal, request: () => Promise<T>): Promise<T> {
+    const predecessor = this.tail;
+    let release!: () => void;
+    this.tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await predecessor;
+    try {
+      if (signal.aborted) throw signal.reason ?? new Error("Current-run speech recognizer was aborted");
+      return await request();
+    } finally {
+      release();
+    }
+  }
 }
 
 /** Reusable current-run timed recognizer, independent of caption/review authority. */
@@ -122,6 +166,7 @@ export class OpenAiCurrentRunSpeechRecognizer implements CurrentRunSpeechRecogni
   private readonly apiKey: string;
   private readonly ffmpeg: string;
   private readonly model: string;
+  private readonly transcriptionQueue = new SerialCurrentRunTranscriptionQueue();
 
   constructor(options: { apiKey: string; ffmpeg?: string; model?: string }) {
     if (!options.apiKey.trim()) throw new Error("The current-run speech recognizer requires an API key");
@@ -139,6 +184,10 @@ export class OpenAiCurrentRunSpeechRecognizer implements CurrentRunSpeechRecogni
       language: configuredLanguage(input.requestedSourceLanguage),
       segmentation: "server_vad",
     });
+  }
+
+  private async transcribe(body: FormData, signal: AbortSignal): Promise<unknown> {
+    return this.transcriptionQueue.run(signal, () => apiJson(this.apiKey, body, signal));
   }
 
   async recognize(input: CurrentRunRecognizerInput, signal: AbortSignal): Promise<CurrentRunRecognizerResult> {
@@ -165,8 +214,11 @@ export class OpenAiCurrentRunSpeechRecognizer implements CurrentRunSpeechRecogni
       const language = configuredLanguage(input.requestedSourceLanguage);
       if (language) form.append("language", language);
       form.append("response_format", "diarized_json");
-      form.append("chunking_strategy", JSON.stringify({ type: "server_vad" }));
-      const value = await apiJson(this.apiKey, form, signal);
+      form.append("chunking_strategy", "auto");
+      // Coverage workers may normalize in parallel, but this shared production recognizer
+      // admits one provider transcription at a time. This keeps provider pressure bounded
+      // without introducing retries or changing either worker's authorized source range.
+      const value = await this.transcribe(form, signal);
       const rawSegments = (value as { segments?: unknown }).segments;
       if (rawSegments === undefined) {
         return { availability: "unknown", reason: "recognizer_output_unknown", segments: [] };

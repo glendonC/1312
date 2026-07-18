@@ -84,7 +84,7 @@ const spawnInput = z.object({
   ])).min(1).max(6),
   dependencyWorkloadKeys: z.array(z.string().min(1).max(256)).max(8),
   budget: z.object({
-    wallMs: z.number().int().positive().max(120_000),
+    wallMs: z.number().int().positive().max(180_000),
     toolCalls: z.number().int().positive().max(16),
   }).strict(),
   followUpCause: z.object({

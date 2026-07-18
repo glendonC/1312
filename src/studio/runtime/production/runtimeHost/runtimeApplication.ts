@@ -38,8 +38,9 @@ export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxActiveWorkers: 4,
   runBudget: { wallMs: 240_000, toolCalls: 32 },
   // research.investigate is grantable but blocked from ordinary spawn by the scheduler's
-  // allowResearch gate, exactly like media.audio.separate; study.research stays off the default
-  // root contract, so the default spine mounts no research tool.
+  // allowResearch gate, exactly like media.audio.separate. The v3 root receives only the dormant
+  // study.research request capability; an exact projected conflict is still required to mint a
+  // bounded child grant.
   grantableCapabilities: ["task.spawn.request", "task.reports.wait", "report.submit", "media.extract", "media.seek", "media.frames.sample", "media.speakers.analyze", "media.audio.separate", "research.investigate", "speech.transcribe", "evidence.read", "analysis.evidence.assess", "analysis.evidence.decide", "report.disposition", "artifact.read", "study.plan", "study.restudy", "study.separate", "study.research", "study.synthesize"],
 };
 
@@ -197,7 +198,7 @@ export async function runBoundedRuntimeApplication(
   const rootPermit = await scheduler.createRoot({
     workloadKey: `root:${initialized.runStart.runtimeId}`,
     objective: generalized
-      ? `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing authorized ranges yourself, then wait for every accepted child. Each accepted child must require exactly one studio.study-report.v2 and use current-run speech as the only claim-support kind. Admit and read every accepted report. For an exact host-derived weak range, you may request one strict attenuated current-run speech subrange with a required delta; for a typed speaker_overlap cause, copy its exact host-derived overlap range, which must refine prior broader speech work. The host fixes pass, configuration scope, budget, and child contract, rejects identical work or scope changes, and terminates exhaustion weak without blocking unrelated ranges. Admit/read any accepted pass report, then emit exactly one studio.owned-media-study.v3 by copying the host-derived synthesis input with every pass, prior weak state, disagreement, residual weak cell, and citation retained. Support requires pass-new range-closing speech citations. Acoustic and anonymous speaker/overlap evidence may qualify coverage, and frames remain cite-only; none authorizes dialogue text. More passes, tokens, agents, or labels do not prove correctness, understanding, quality, or publication readiness.`
+      ? `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing authorized ranges yourself, then wait for every accepted child. Each accepted child must require exactly one studio.study-report.v2 and use current-run speech as the only claim-support kind. Admit and read every accepted report. For an exact host-derived weak range, you may request one strict attenuated current-run speech subrange with a required delta; for a typed speaker_overlap cause, copy its exact host-derived overlap range, which must refine prior broader speech work. For an exact conflicting researchInput trigger only, you may optionally request one bounded cite-only context child; an empty trigger list grants no research, and external context never upgrades speech or caption authority. The host fixes pass/research configuration scope, budgets, and child contracts, rejects identical work or scope changes, and terminates exhaustion weak without blocking unrelated ranges. Admit/read any accepted pass report, then emit exactly one studio.owned-media-study.v3 by copying the host-derived synthesis input with every pass, prior weak state, disagreement, residual weak cell, and citation retained. Support requires pass-new range-closing speech citations. Acoustic and anonymous speaker/overlap evidence may qualify coverage, and frames remain cite-only; none authorizes dialogue text. More passes, tokens, agents, or labels do not prove correctness, understanding, quality, or publication readiness.`
       : `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing disjoint or overlapping authorized ranges yourself, then wait for every accepted child. ` +
         "Each accepted child contract must request speech.transcribe and report.submit, require exactly one studio.study-report.v1 output, partition its entire assigned scope with closed supported/withheld/unknown/failed states, and cite only current-run semantic observations for supported claims. After reading at least two model-dispositioned admissions, choose a closed plan, request causally named bounded follow-up when useful, and eventually emit one model-authored studio.owned-media-study.v1 with exact report/semantic citations and every gap/conflict preserved. Coverage and citation closure are structural facts, not correctness, understanding, agreement, truth arbitration, readiness, caption authority, quality, or publication.",
     workerKind: "orchestrator",
@@ -206,12 +207,13 @@ export async function runBoundedRuntimeApplication(
     inputArtifactIds: [initialized.sourceArtifact.id, ...initialized.evidenceArtifacts.map((artifact) => artifact.id)],
     requiredOutputs: [{ name: "owned-media study", artifactKind: generalized ? "studio.owned-media-study.v3" : "studio.owned-media-study.v1", required: true }],
     requiredCapabilities: generalized
-      ? ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.restudy", "study.separate", "study.synthesize"]
+      ? ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.restudy", "study.separate", "study.research", "study.synthesize"]
       : ["task.spawn.request", "task.reports.wait", "report.disposition", "artifact.read", "study.plan", "study.synthesize"],
     dependencies: [],
-    // Nine calls close the minimum two-child study path; reserve bounded headroom for
-    // planning/follow-up while leaving two 8-call child allocations inside the 32-call run cap.
-    budget: { wallMs: 120_000, toolCalls: 16 },
+    // Nine calls close the minimum two-child study path; bounded v3 headroom also covers an
+    // optional exact research request and one re-study while total child allocations remain
+    // inside the 32-call run cap.
+    budget: { wallMs: 120_000, toolCalls: generalized ? 20 : 16 },
   }, createRootTaskJobContext({
     sourceArtifact: initialized.sourceArtifact,
     evidenceArtifacts: initialized.evidenceArtifacts,

@@ -11,7 +11,7 @@ import {
 import { assertOcrRequest, validateOcrLimits, validateOcrReceipt } from "./ocr.ts";
 import { assertSpeakerOverlapRequest, validateSpeakerOverlapLimits, validateSpeakerOverlapReceipt } from "./speakers.ts";
 import { assertConditionalSeparationRequest, validateConditionalSeparationLimits, validateConditionalSeparationReceipt, validateConditionalSeparationTrigger, validateRawStemComparisonReceipt } from "./separation.ts";
-import { assertResearchRequest, validateResearchAllowedDomains, validateResearchExhaustionReceipt, validateResearchGapBinding, validateResearchLimits, validateResearchSearchReceipt, validateResearchSnapshotReceipt } from "./research.ts";
+import { assertResearchRequest, validateResearchAllowedDomains, validateResearchExhaustionReceipt, validateResearchGapBinding, validateResearchLimits, validateResearchSearchReceipt, validateResearchSnapshotReceipt, validateRestudiedResearchRequestInput } from "./research.ts";
 import {
   validatePublishReviewIntakeReceipt,
   validateStudyReadinessReceiptIdentity,
@@ -423,6 +423,9 @@ export function assertRuntimeEvent(
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     oneOf(data.reason, new Set(["source_unavailable", "input_oversized", "trigger_invalid", "model_unavailable", "runtime_drift", "decoder_failed", "separator_timeout", "separator_failed", "recognizer_failed", "artifact_oversized"]), context, "event.data.reason");
+  } else if (type === "research.request_input_recorded") {
+    exact(data, ["input"], context, "event.data");
+    validateRestudiedResearchRequestInput(data.input, context, "event.data.input");
   } else if (type === "research.operation_started") {
     exact(data, ["request", "gap", "executionId", "launchClaimId", "requestFingerprint", "limits", "allowedDomains"], context, "event.data");
     assertResearchRequest(data.request, context);

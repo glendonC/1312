@@ -4,6 +4,7 @@ import { assertRuntimeLimits, assertSpawnRequestInput } from "./assertions.ts";
 import { attenuateTaskJobContext } from "./jobContext.ts";
 import { CONDITIONAL_SEPARATION_LIMITS, FRAME_SAMPLING_LIMITS, OCR_LIMITS, RESEARCH_LIMITS, SEPARATION_METHOD, SPEAKER_OVERLAP_LIMITS } from "./model.ts";
 import type {
+  AnyResearchTriggerOption,
   ResearchGrantScope,
   ResearchTriggerOption,
   AgentRecord,
@@ -25,6 +26,7 @@ import type {
   RuntimeArtifact,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
+import { currentRestudiedResearchBasis } from "./research/restudiedResearchBasis.ts";
 import { u1AcousticTriggerLineageMatches } from "./separation/acousticSeparationTrigger.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
 import {
@@ -47,6 +49,7 @@ import {
   researchTriggerId,
   validateResearchAllowedDomains,
   validateResearchTriggerOption,
+  validateRestudiedResearchTriggerOption,
 } from "./validation/research.ts";
 
 export interface RuntimeIdentityFactory {
@@ -66,6 +69,10 @@ export class RandomRuntimeIdentityFactory implements RuntimeIdentityFactory {
 
 function active(status: TaskStatus): boolean {
   return status === "scheduled" || status === "working" || status === "waiting_for_children" || status === "reported";
+}
+
+function same(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function scopeContains(parent: MediaScope, child: MediaScope): boolean {
@@ -813,13 +820,16 @@ export class BoundedRuntimeScheduler {
    */
   async requestResearch(inputValue: {
     inputId: string;
-    trigger: ResearchTriggerOption;
+    trigger: AnyResearchTriggerOption;
     child: SpawnRequestInput;
     authorship: { executionId: string; toolCallId: string; taskId: string; agentId: string };
   }): Promise<SpawnDecision> {
     assertSpawnRequestInput(inputValue.child, "Research child");
     const input = structuredClone(inputValue.child);
-    const trigger = validateResearchTriggerOption(structuredClone(inputValue.trigger), "Research admission", "trigger");
+    const triggerValue = structuredClone(inputValue.trigger);
+    const trigger = triggerValue.gap.kind === "unresolved_restudy_conflict"
+      ? validateRestudiedResearchTriggerOption(triggerValue, "Research admission", "trigger")
+      : validateResearchTriggerOption(triggerValue, "Research admission", "trigger");
     if (typeof inputValue.inputId !== "string" || inputValue.inputId.length === 0) {
       throw new Error("Research admission requires the host-derived input identity");
     }
@@ -841,51 +851,73 @@ export class BoundedRuntimeScheduler {
         const root = state.tasks[inputValue.authorship.taskId];
         const execution = state.executions[inputValue.authorship.executionId];
         const call = state.orchestratorToolCalls[inputValue.authorship.toolCallId];
-        // Sync re-derivation of every research trigger from the projected study records. The
-        // records mirror the stored envelope's conflicts/coverage (drift-checked by the host),
-        // so the content-addressed inputId and triggerId recompute without file IO.
-        let derived: ResearchTriggerOption[] | null = [];
-        for (const record of Object.values(state.ownedMediaStudies).sort((left, right) => left.id.localeCompare(right.id))) {
-          if (derived === null) break;
-          const studyArtifact = state.artifacts[record.artifactId];
-          if (!studyArtifact || studyArtifact.origin.kind !== "owned_media_study" || studyArtifact.origin.studyId !== record.id || studyArtifact.content.contentId !== record.contentId) {
-            derived = null;
-            break;
+        // V1 remains synchronously derived from the completed study projection. V2 admits only
+        // a journal-projected candidate whose admission/read/pass identities still equal the
+        // current root basis; the scheduler never repeats the asynchronous stored-byte audit.
+        let authoritative: AnyResearchTriggerOption | null = null;
+        let triggerValid = false;
+        if (trigger.gap.kind === "unresolved_restudy_conflict") {
+          const candidate = state.researchRequestInputs[inputValue.inputId];
+          if (candidate) {
+            try {
+              const currentBasis = currentRestudiedResearchBasis(state, candidate.basis.root);
+              const matches = candidate.triggers.filter((entry) => entry.triggerId === trigger.triggerId);
+              authoritative = matches.length === 1 ? matches[0] : null;
+              triggerValid = candidate.inputId === inputValue.inputId &&
+                candidate.basis.root.taskId === inputValue.authorship.taskId &&
+                candidate.basis.root.agentId === inputValue.authorship.agentId &&
+                candidate.basis.root.executionId === inputValue.authorship.executionId &&
+                same(candidate.basis, currentBasis) &&
+                authoritative !== null && same(authoritative, trigger);
+            } catch {
+              authoritative = null;
+              triggerValid = false;
+            }
           }
-          for (const conflict of record.conflicts) {
-            const coverage = record.coverage.find((candidate) => candidate.coverageId === conflict.coverageId);
-            const source = coverage ? state.artifacts[coverage.artifactId] : undefined;
-            if (!coverage || !source) {
+        } else {
+          let derived: ResearchTriggerOption[] | null = [];
+          for (const record of Object.values(state.ownedMediaStudies).sort((left, right) => left.id.localeCompare(right.id))) {
+            if (derived === null) break;
+            const studyArtifact = state.artifacts[record.artifactId];
+            if (!studyArtifact || studyArtifact.origin.kind !== "owned_media_study" || studyArtifact.origin.studyId !== record.id || studyArtifact.content.contentId !== record.contentId) {
               derived = null;
               break;
             }
-            const body: Omit<ResearchTriggerOption, "triggerId"> = {
-              source: {
-                artifactId: coverage.artifactId,
-                contentId: source.content.contentId,
-                trackId: coverage.trackId,
-                startMs: coverage.startMs,
-                endMs: coverage.endMs,
-              },
-              gap: {
-                kind: "unresolved_study_conflict",
-                studyId: record.id,
-                studyArtifactId: studyArtifact.id,
-                studyContentId: record.contentId,
-                conflictId: conflict.conflictId,
-                coverageId: conflict.coverageId,
-                detail: conflict.detail,
-              },
-            };
-            derived.push({ triggerId: researchTriggerId(body), ...body });
+            for (const conflict of record.conflicts) {
+              const coverage = record.coverage.find((candidate) => candidate.coverageId === conflict.coverageId);
+              const source = coverage ? state.artifacts[coverage.artifactId] : undefined;
+              if (!coverage || !source) {
+                derived = null;
+                break;
+              }
+              const body: Omit<ResearchTriggerOption, "triggerId"> = {
+                source: {
+                  artifactId: coverage.artifactId,
+                  contentId: source.content.contentId,
+                  trackId: coverage.trackId,
+                  startMs: coverage.startMs,
+                  endMs: coverage.endMs,
+                },
+                gap: {
+                  kind: "unresolved_study_conflict",
+                  studyId: record.id,
+                  studyArtifactId: studyArtifact.id,
+                  studyContentId: record.contentId,
+                  conflictId: conflict.conflictId,
+                  coverageId: conflict.coverageId,
+                  detail: conflict.detail,
+                },
+              };
+              derived.push({ triggerId: researchTriggerId(body), ...body });
+            }
           }
+          const expectedInputId = derived === null
+            ? null
+            : researchRequestInputId({ schema: "studio.research-request-input.v1", runId: state.runId, triggers: derived });
+          const matches = derived === null ? [] : derived.filter((candidate) => candidate.triggerId === trigger.triggerId);
+          authoritative = matches.length === 1 ? matches[0] : null;
+          triggerValid = expectedInputId === inputValue.inputId && authoritative !== null && same(authoritative, trigger);
         }
-        const expectedInputId = derived === null
-          ? null
-          : researchRequestInputId({ schema: "studio.research-request-input.v1", runId: state.runId, triggers: derived });
-        const matches = derived === null ? [] : derived.filter((candidate) => candidate.triggerId === trigger.triggerId);
-        const authoritative = matches.length === 1 ? matches[0] : null;
-        const triggerValid = expectedInputId === inputValue.inputId && authoritative !== null;
         const scope: ResearchGrantScope | null = authoritative ? {
           schema: "studio.research-grant.v1",
           limits: structuredClone(RESEARCH_LIMITS),
@@ -907,10 +939,12 @@ export class BoundedRuntimeScheduler {
           input.requiredCapabilities.length === 2 && input.requiredCapabilities[0] === "research.investigate" &&
           input.requiredCapabilities[1] === "report.submit" && input.dependencies.length === 0 &&
           input.budget.wallMs === RESEARCH_LIMITS.maxWallMs && input.budget.toolCalls === RESEARCH_LIMITS.maxCalls;
-        // Duplicate-work: any journaled research operation already bound to this content-addressed
-        // trigger. Requests for a consumed gap stay closed after the first child completes.
+        // Duplicate-work: v2 closes at the first accepted child; retained v1 semantics close once
+        // an operation consumes the trigger and otherwise defer to the ordinary owner check.
         let rejection: SpawnRejection | null = Object.values(state.researchOperations).some((operation) =>
-          operation.gap.triggerId === trigger.triggerId)
+          operation.gap.triggerId === trigger.triggerId) || (trigger.gap.kind === "unresolved_restudy_conflict" &&
+            Object.values(state.spawnRequests).some((request) =>
+              request.accepted && request.input.workloadKey === `research:${trigger.triggerId}`))
           ? "research_duplicate_work"
           : this.violation(state, inputValue.authorship.taskId, inputValue.authorship.agentId, input, false, true);
         if (

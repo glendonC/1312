@@ -106,7 +106,8 @@ checklist below:
 8. **R1 — bounded web research (first wired slice implemented 2026-07-17):** add safe search plus
    document snapshot/span citations for exact unresolved context gaps. The trigger-gated
    grant/host/citation path is wired offline with a fixture provider and an empty default domain
-   allowlist; no default run produces research yet.
+   allowlist. The default v3 root now projects exact pre-synthesis conflict candidates, but an
+   exact model echo is optional and non-conflicting runs grant nothing.
 9. **R2 — optional bounded computer-use:** after media senses and R1, inspect dynamic external
    context in an isolated read-only session with action/screenshot receipts.
 10. **G1 — semantic evaluation expansion:** score registered capability ablations, repeated captures,
@@ -137,11 +138,11 @@ artifact, grant, and audit boundaries are real.
 |---|---|---|---|
 | Owned ingest and preflight | Content-addressed owned bytes, rights receipt, `ffprobe`, pinned VAD speech windows, pinned speech-window language ranges, and additive preflight V4 with separately sealed acoustic observations/receipt | Acoustic/diarization accuracy evaluation, scene, and visual context | [`ARCHITECTURE.md` — source ingest boundary](../ARCHITECTURE.md#source-ingest-boundary) and [`STATUS.md` — backlog boundary](./STATUS.md#post-freeze-backlog-boundary) |
 | Orchestration | A model-executed default root can request bounded children and one host-normalized attenuated-speech re-study for an exact weak range/cause, including an exact receipt-backed U6 `speaker_overlap` cell. The scheduler derives identities, attenuates context, enforces scope/budgets/pass caps, and dedupes completed work/configuration | Padded audio, denser frames, alternate recognizer/segmentation configurations, specialist re-study, and unlimited/distributed execution | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`scheduler.ts`](../../src/studio/runtime/production/scheduler.ts), and [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts) |
-| Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample`, `media.frames.ocr`, one path-free `media.speakers.analyze` call over an injected audio range, one trigger-gated `research.investigate` grant with path-free search/snapshot tools, `speech.transcribe`, exact reads of pinned VAD/language/U1 evidence, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Scene/shot interpretation, default visual-specialist routing, named/cross-run speakers, stems, default-run or live web research, and computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); U6 lives in [`model/speakers.ts`](../../src/studio/runtime/production/model/speakers.ts) and [`speakerHost.ts`](../../src/studio/runtime/production/speakerHost.ts) |
+| Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample`, `media.frames.ocr`, one path-free `media.speakers.analyze` call over an injected audio range, one exact-conflict-gated `research.investigate` grant with path-free search/snapshot tools, `speech.transcribe`, exact reads of pinned VAD/language/U1 evidence, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Scene/shot interpretation, default visual-specialist routing, named/cross-run speakers, stems, unrestricted or automatic live web research, research-span report production, and computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); U6 lives in [`model/speakers.ts`](../../src/studio/runtime/production/model/speakers.ts) and [`speakerHost.ts`](../../src/studio/runtime/production/speakerHost.ts) |
 | Current-run speech evidence | A scoped host and bridge exist. With an explicitly enabled recognizer they can produce current-run timed hypotheses; the default unconfigured recognizer honestly returns unavailable | Semantic accuracy/calibration, a guarantee that every run has a live recognizer, alternative segmentation/recognizer passes, and semantic translation QC | [`currentRunSpeechRecognizer.ts`](../../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts) and [`run-runtime-host.ts`](../../scripts/run-runtime-host.ts) |
 | Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. U4 study v3 retains ordered pass history/disagreement; only pass-new exact speech citations support the executed subrange, and exhaustion stays weak without globally blocking unrelated ranges | Semantic correctness/truth arbitration and additional re-study producers | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`restudiedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/restudiedStudySynthesisHost.ts), and [`restudiedStudyReadinessHost.ts`](../../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts) |
-| Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks, U5 OCR over completed frame identities, U6 anonymous speaker/overlap analysis whose request is exactly `{}`, and R1 `research_search`/`research_document_snapshot` mounted only under a trigger-gated research grant. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Scene/shot interpretation, default visual-specialist routing, research on any default run, and isolated computer-use. These require later explicit grants | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`speakerMcpServer.ts`](../../src/studio/runtime/production/executor/speakerMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
-| Owned study spine | New owned runs default to evidence-citation v1, report/admission/read v2, the six-tool U4 root, owned-media-study v3, readiness v4, and approval-gated caption/caption-causality v4. Closed v1 planning remains an explicit non-default compatibility selector | Studio UI projection, semantic correctness/truth arbitration, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`orchestratorBridge.ts`](../../src/studio/runtime/production/executor/orchestratorBridge.ts), and [`restudiedStudyRuntime.ts`](../../src/studio/runtime/production/study/restudiedStudyRuntime.ts) |
+| Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks, U5 OCR over completed frame identities, U6 anonymous speaker/overlap analysis whose request is exactly `{}`, and R1 `research_search`/`research_document_snapshot` mounted only under an exact-conflict-gated research grant. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Scene/shot interpretation, default visual-specialist routing, unrestricted or automatic research, research-span report production, and isolated computer-use. These require later explicit grants | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`speakerMcpServer.ts`](../../src/studio/runtime/production/executor/speakerMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
+| Owned study spine | New owned runs default to evidence-citation v1, report/admission/read v2, the eight-tool U4 root, owned-media-study v3, readiness v4, and approval-gated caption/caption-causality v4. The dormant research tool requires a projected current conflict. Closed v1 planning remains an explicit non-default compatibility selector | Studio UI projection, semantic correctness/truth arbitration, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`orchestratorBridge.ts`](../../src/studio/runtime/production/executor/orchestratorBridge.ts), and [`restudiedStudyRuntime.ts`](../../src/studio/runtime/production/study/restudiedStudyRuntime.ts) |
 | Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen and the human-labeled `run-007` Bet G score exists with `judge: null` | Runtime semantic QC, calibrated transcription/translation confidence, additional scored runs and registered ablations, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
 
@@ -463,11 +464,13 @@ their audits.
   `external_document_span` citations from receipted snapshots
   admit as cite-only media context; snippets stay routing hints. Ambient codex web search stays
   disabled and the default provider is the offline fixture with an empty domain allowlist, so no
-  egress happens without explicit composition policy.
-- **Still missing:** No default run produces research: the default root does not hold
-  `study.research`, and trigger derivation reads v1 owned-media studies, which the default v3 spine
-  never populates mid-run, so live codex runs surface zero triggers. There is no real search
-  provider or allow-real flag, no pinned-socket dialer (the receipts keep disclosing
+  egress happens without explicit composition policy. The default v3 root now holds dormant
+  `study.research`; its admitted-read result exposes a journal-projected v2 candidate derived from
+  a cold-reopened pre-synthesis inspection. The candidate closes the exact root,
+  admission/read/pass basis and conflict evidence; stale, forged, duplicate, ungranted, and empty
+  trigger requests fail closed.
+- **Still missing:** There is no real search provider or allow-real flag, no pinned-socket dialer
+  (the receipts keep disclosing
   `dnsRebindingWindow: "checked_before_fetch_not_pinned"`), no freshness UI, no production worker
   path carrying research spans into a study report, and no specialist depth beyond one gap-bound
   child. The only registered typed insufficiency cause is the structurally provable full empty-query
@@ -578,8 +581,9 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
 8. **Receipted web research.** Add safe bounded search + snapshot/read tools, typed span citations,
    freshness/provenance, and one exact gap-triggered context specialist. No ambient web or fixed
    research-worker count. The trigger-gated grant, scheduler admission, launcher tools, journaled
-   operations, and cite-only span admission are wired offline (2026-07-17); real provider,
-   freshness, DNS pinning, and study-admitted research reports remain open.
+   operations, cite-only span admission, and default-v3 pre-synthesis conflict trigger are wired
+   offline (2026-07-18); real provider, freshness, DNS pinning, and study-admitted research reports
+   remain open.
 9. **Optional bounded computer-use.** Only after media senses and R1, add an isolated read-only
    session for one dynamic external-context gap with action/screenshot budgets and citations. It may
    not replace file decoding or perform external mutations.
@@ -635,9 +639,9 @@ The following sequenced backlog items are not current product claims:
   hypotheses, or the U4 speech pass; padded/denser/alternate/specialist re-study, scene context,
   diarization quality, speaker/overlap understanding, non-darwin speaker runtime support, or source
   separation;
-- live web research on any default run, historical/cultural grounding, source truth or currency,
-  live source citations, or bounded computer-use; the wired R1 slice is offline, trigger-gated, and
-  cite-only;
+- unrestricted or automatic live web research, historical/cultural grounding, source truth or
+  currency, live source citations, research-span report production, or bounded computer-use; the
+  wired R1 slice is offline, exact-conflict-gated, and cite-only;
 - semantic per-run QC, calibrated quality, a model judge as truth, or a general “better than cold”
   claim.
 

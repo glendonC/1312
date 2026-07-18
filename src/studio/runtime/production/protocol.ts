@@ -6,7 +6,7 @@ import type {
 import type { OcrCompletedEvent, OcrFailedEvent, OcrStartedEvent } from "./protocol/ocrEvents.ts";
 import type { SpeakerOverlapCompletedEvent, SpeakerOverlapFailedEvent, SpeakerOverlapStartedEvent } from "./protocol/speakerEvents.ts";
 import type { ConditionalSeparationCompletedEvent, ConditionalSeparationFailedEvent, ConditionalSeparationStartedEvent } from "./protocol/separationEvents.ts";
-import type { ResearchExhaustionRecordedEvent, ResearchOperationCompletedEvent, ResearchOperationFailedEvent, ResearchOperationStartedEvent } from "./protocol/researchEvents.ts";
+import type { ResearchExhaustionRecordedEvent, ResearchOperationCompletedEvent, ResearchOperationFailedEvent, ResearchOperationStartedEvent, ResearchRequestInputRecordedEvent } from "./protocol/researchEvents.ts";
 import type {
   AgentRegisteredEvent,
   ArtifactRecordedEvent,
@@ -125,6 +125,7 @@ export type RuntimeEvent =
   | ResearchOperationCompletedEvent
   | ResearchOperationFailedEvent
   | ResearchExhaustionRecordedEvent
+  | ResearchRequestInputRecordedEvent
   | SemanticEvidenceStartedEvent
   | SemanticEvidenceCompletedEvent
   | SemanticEvidenceFailedEvent

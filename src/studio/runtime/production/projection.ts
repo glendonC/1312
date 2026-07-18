@@ -38,6 +38,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     conditionalSeparationOperations: {},
     researchOperations: {},
     researchExhaustions: {},
+    researchRequestInputs: {},
     semanticEvidence: {},
     evidenceReads: {},
     evidenceAssessments: {},

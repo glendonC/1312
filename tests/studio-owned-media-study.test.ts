@@ -156,6 +156,11 @@ test("default owned path exposes U4 while preserving v2 report/admission and clo
     const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
     assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v3", required: true }]);
     assert.equal(root.grants.some((grant) => grant.capability === "study.restudy"), true);
+    assert.equal(root.grants.some((grant) => grant.capability === "study.research"), true);
+    const researchInputs = Object.values(state.researchRequestInputs);
+    assert.equal(researchInputs.length, 1);
+    assert.deepEqual(researchInputs[0].triggers, []);
+    assert.equal(Object.values(state.spawnRequests).some((entry) => entry.input.workloadKey.startsWith("research:")), false);
     assert.equal(Object.keys(state.rangePasses).length, 0);
     assert.equal(Object.keys(state.speakerOverlapOperations).length, 0);
     assert.equal(Object.values(state.reports).filter((report) => report.study?.schema === "studio.study-report-submission.v2").length, 2);
@@ -304,6 +309,54 @@ test("default U4 retains conflicting prior evidence and pass disagreement withou
     const readiness = Object.values(state.generalizedStudyReadiness)[0];
     assert.equal(readiness.outcome, "withheld");
     assert.ok(readiness.reasonCodes.includes("unresolved_conflict"));
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("default v3 projects one exact conflict research trigger and rejects forged, duplicate, and stale echoes", async () => {
+  const runtime = await runDefaultU4("restudy_research");
+  try {
+    const loaded = await journal(runtime);
+    const state = loaded.state;
+    const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
+    const rootExecution = Object.values(state.executions).find((execution) => execution.taskId === root.id)!;
+    assert.equal(runtime.lifecycle, "terminal");
+    const inputs = Object.values(state.researchRequestInputs);
+    const initial = inputs.find((input) => input.basis.reports.length === 2 && input.basis.passes.length === 0);
+    const current = inputs.find((input) => input.basis.reports.length === 3 && input.basis.passes.length === 1);
+    assert.ok(initial);
+    assert.ok(current);
+    assert.deepEqual(initial.basis.root, { taskId: root.id, agentId: root.assignedAgentId, executionId: rootExecution.id });
+    assert.equal(initial.triggers.length, 1);
+    const trigger = initial.triggers[0];
+    assert.equal(trigger.gap.kind, "unresolved_restudy_conflict");
+    assert.equal(trigger.evidence.state, "conflicting");
+    assert.ok(trigger.evidence.preservedStates.includes("conflicting"));
+    assert.equal(state.artifacts[trigger.source.artifactId]?.content.contentId, trigger.source.contentId);
+    assert.ok(current.inputId !== initial.inputId);
+    assert.deepEqual(current.triggers, []);
+
+    const researchSpawns = Object.values(state.spawnRequests).filter((entry) =>
+      entry.input.workloadKey === `research:${trigger.triggerId}`);
+    assert.equal(researchSpawns.length, 2);
+    assert.equal(researchSpawns.filter((entry) => entry.accepted).length, 1);
+    assert.equal(researchSpawns.find((entry) => !entry.accepted)?.rejection, "research_duplicate_work");
+    const researchTask = Object.values(state.tasks).find((task) => task.workloadKey === `research:${trigger.triggerId}`);
+    assert.ok(researchTask);
+    const researchGrant = researchTask.grants.find((grant) => grant.capability === "research.investigate");
+    assert.ok(researchGrant?.capability === "research.investigate");
+    assert.equal(researchGrant.researchScope.gap.inputId, initial.inputId);
+    assert.equal(researchGrant.researchScope.gap.triggerId, trigger.triggerId);
+    assert.deepEqual(researchGrant.researchScope.gap.media, trigger.source);
+    assert.equal(Object.values(state.orchestratorToolCalls).filter((entry) => entry.tool === "study_research_request").length, 4);
+    assert.deepEqual(projectRuntimeEvents(runtime.runtimeId, loaded.events), state);
+    const tampered = structuredClone(loaded.events);
+    const candidateEvent = tampered.find((event) =>
+      event.type === "research.request_input_recorded" && event.data.input.inputId === initial.inputId);
+    assert.ok(candidateEvent?.type === "research.request_input_recorded");
+    candidateEvent.data.input.triggers[0].triggerId = `${candidateEvent.data.input.triggers[0].triggerId}:tampered`;
+    assert.throws(() => projectRuntimeEvents(runtime.runtimeId, tampered), /triggerId/);
   } finally {
     await cleanup(runtime);
   }

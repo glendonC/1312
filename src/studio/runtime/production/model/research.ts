@@ -279,6 +279,61 @@ export interface ResearchRequestInput {
   triggers: ResearchTriggerOption[];
 }
 
+/** Exact projected identities that made one cold-reopened v3 inspection possible. */
+export interface RestudiedResearchReportBasis {
+  admissionId: string;
+  admissionReceiptContentId: string;
+  reportArtifactId: string;
+  reportContentId: string;
+  readOperationId: string;
+  readReceiptContentId: string;
+}
+
+export interface RestudiedResearchPassBasis {
+  passId: string;
+  requestReceiptContentId: string;
+  terminalReceiptContentId: string;
+}
+
+export interface RestudiedResearchBasis {
+  basisId: string;
+  root: { taskId: string; agentId: string; executionId: string };
+  reports: RestudiedResearchReportBasis[];
+  passes: RestudiedResearchPassBasis[];
+}
+
+/** One v3 conflict candidate; it is structural context only and grants no research by itself. */
+export interface RestudiedResearchTriggerOption {
+  triggerId: string;
+  basisId: string;
+  source: ResearchQualifiedMedia;
+  gap: {
+    kind: "unresolved_restudy_conflict";
+    coverageId: string;
+    detail: string;
+  };
+  evidence: {
+    state: "conflicting";
+    preservedStates: string[];
+    rawStates: string[];
+    claimIds: string[];
+    citationIds: string[];
+    passIds: string[];
+  };
+}
+
+/** Durable pre-synthesis v3 research choices derived from a cold-reopened inspection. */
+export interface RestudiedResearchRequestInput {
+  schema: "studio.research-request-input.v2";
+  runId: string;
+  inputId: string;
+  basis: RestudiedResearchBasis;
+  triggers: RestudiedResearchTriggerOption[];
+}
+
+export type AnyResearchRequestInput = ResearchRequestInput | RestudiedResearchRequestInput;
+export type AnyResearchTriggerOption = ResearchTriggerOption | RestudiedResearchTriggerOption;
+
 export interface ResearchRequestReceipt {
   schema: "studio.research-request.receipt.v1";
   receiptId: string;

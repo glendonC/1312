@@ -6,8 +6,14 @@ import type {
   ResearchLimits,
   ResearchRequest,
   ResearchSearchReceipt,
+  RestudiedResearchRequestInput,
 } from "../model.ts";
 import type { RuntimeEventBase } from "./base.ts";
+
+export interface ResearchRequestInputRecordedEvent extends RuntimeEventBase {
+  type: "research.request_input_recorded";
+  data: { input: RestudiedResearchRequestInput };
+}
 
 export interface ResearchOperationStartedEvent extends RuntimeEventBase {
   type: "research.operation_started";

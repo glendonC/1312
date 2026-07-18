@@ -21,6 +21,9 @@ import {
   type ResearchSearchResult,
   type ResearchSearchState,
   type ResearchTriggerOption,
+  type RestudiedResearchBasis,
+  type RestudiedResearchRequestInput,
+  type RestudiedResearchTriggerOption,
 } from "../model/research.ts";
 import {
   array,
@@ -70,6 +73,18 @@ export function researchTriggerId(value: Omit<ResearchTriggerOption, "triggerId"
 
 export function researchRequestInputId(value: Omit<ResearchRequestInput, "inputId">): string {
   return `research-request-input:${canonicalSha256(value)}`;
+}
+
+export function restudiedResearchBasisId(value: Omit<RestudiedResearchBasis, "basisId">): string {
+  return `restudied-research-basis:${canonicalSha256(value)}`;
+}
+
+export function restudiedResearchTriggerId(value: Omit<RestudiedResearchTriggerOption, "triggerId">): string {
+  return `restudied-research-trigger:${canonicalSha256(value)}`;
+}
+
+export function restudiedResearchRequestInputId(value: Omit<RestudiedResearchRequestInput, "inputId">): string {
+  return `restudied-research-request-input:${canonicalSha256(value)}`;
 }
 
 export function researchRequestFingerprint(input: {
@@ -453,6 +468,109 @@ export function validateResearchRequestInput(value: unknown, context = "Research
   const input = item as unknown as ResearchRequestInput;
   const { inputId: _inputId, ...withoutId } = input;
   if (inputIdValue !== researchRequestInputId(withoutId)) fail(context, `${path}.inputId`, "does not close the input body");
+  return input;
+}
+
+function sortedUniqueStrings(value: unknown, context: string, path: string): string[] {
+  const values = uniqueStrings(value, context, path);
+  if (values.some((entry, index) => index > 0 && values[index - 1].localeCompare(entry) > 0)) {
+    fail(context, path, "must be sorted");
+  }
+  return values;
+}
+
+export function validateRestudiedResearchBasis(
+  value: unknown,
+  context = "Restudied research basis",
+  path = "basis",
+): RestudiedResearchBasis {
+  const item = object(value, context, path);
+  exact(item, ["basisId", "root", "reports", "passes"], context, path);
+  const basisIdValue = string(item.basisId, context, `${path}.basisId`);
+  const root = object(item.root, context, `${path}.root`);
+  exact(root, ["taskId", "agentId", "executionId"], context, `${path}.root`);
+  for (const key of ["taskId", "agentId", "executionId"]) string(root[key], context, `${path}.root.${key}`);
+  const reports = array(item.reports, context, `${path}.reports`);
+  if (reports.length < 2) fail(context, `${path}.reports`, "requires at least two admitted and read reports");
+  let priorAdmissionId: string | null = null;
+  for (const [index, value] of reports.entries()) {
+    const report = object(value, context, `${path}.reports[${index}]`);
+    exact(report, ["admissionId", "admissionReceiptContentId", "reportArtifactId", "reportContentId", "readOperationId", "readReceiptContentId"], context, `${path}.reports[${index}]`);
+    const admissionId = string(report.admissionId, context, `${path}.reports[${index}].admissionId`);
+    if (priorAdmissionId !== null && priorAdmissionId.localeCompare(admissionId) >= 0) fail(context, `${path}.reports`, "must be uniquely sorted by admissionId");
+    priorAdmissionId = admissionId;
+    contentId(report.admissionReceiptContentId, context, `${path}.reports[${index}].admissionReceiptContentId`);
+    string(report.reportArtifactId, context, `${path}.reports[${index}].reportArtifactId`);
+    contentId(report.reportContentId, context, `${path}.reports[${index}].reportContentId`);
+    string(report.readOperationId, context, `${path}.reports[${index}].readOperationId`);
+    contentId(report.readReceiptContentId, context, `${path}.reports[${index}].readReceiptContentId`);
+  }
+  const passes = array(item.passes, context, `${path}.passes`);
+  let priorPassId: string | null = null;
+  for (const [index, value] of passes.entries()) {
+    const pass = object(value, context, `${path}.passes[${index}]`);
+    exact(pass, ["passId", "requestReceiptContentId", "terminalReceiptContentId"], context, `${path}.passes[${index}]`);
+    const passId = string(pass.passId, context, `${path}.passes[${index}].passId`);
+    if (priorPassId !== null && priorPassId.localeCompare(passId) >= 0) fail(context, `${path}.passes`, "must be uniquely sorted by passId");
+    priorPassId = passId;
+    contentId(pass.requestReceiptContentId, context, `${path}.passes[${index}].requestReceiptContentId`);
+    contentId(pass.terminalReceiptContentId, context, `${path}.passes[${index}].terminalReceiptContentId`);
+  }
+  const basis = item as unknown as RestudiedResearchBasis;
+  const { basisId: _basisId, ...withoutId } = basis;
+  if (basisIdValue !== restudiedResearchBasisId(withoutId)) fail(context, `${path}.basisId`, "does not close the basis body");
+  return basis;
+}
+
+export function validateRestudiedResearchTriggerOption(
+  value: unknown,
+  context = "Restudied research trigger",
+  path = "trigger",
+): RestudiedResearchTriggerOption {
+  const item = object(value, context, path);
+  exact(item, ["triggerId", "basisId", "source", "gap", "evidence"], context, path);
+  const triggerIdValue = string(item.triggerId, context, `${path}.triggerId`);
+  string(item.basisId, context, `${path}.basisId`);
+  validateResearchQualifiedMedia(item.source, context, `${path}.source`);
+  const gap = object(item.gap, context, `${path}.gap`);
+  exact(gap, ["kind", "coverageId", "detail"], context, `${path}.gap`);
+  literal(gap.kind, "unresolved_restudy_conflict", context, `${path}.gap.kind`);
+  string(gap.coverageId, context, `${path}.gap.coverageId`);
+  string(gap.detail, context, `${path}.gap.detail`);
+  const evidence = object(item.evidence, context, `${path}.evidence`);
+  exact(evidence, ["state", "preservedStates", "rawStates", "claimIds", "citationIds", "passIds"], context, `${path}.evidence`);
+  literal(evidence.state, "conflicting", context, `${path}.evidence.state`);
+  for (const key of ["preservedStates", "rawStates", "claimIds", "citationIds", "passIds"]) {
+    sortedUniqueStrings(evidence[key], context, `${path}.evidence.${key}`);
+  }
+  const trigger = item as unknown as RestudiedResearchTriggerOption;
+  const { triggerId: _triggerId, ...withoutId } = trigger;
+  if (triggerIdValue !== restudiedResearchTriggerId(withoutId)) fail(context, `${path}.triggerId`, "does not close the trigger body");
+  return trigger;
+}
+
+export function validateRestudiedResearchRequestInput(
+  value: unknown,
+  context = "Restudied research request input",
+  path = "input",
+): RestudiedResearchRequestInput {
+  const item = object(value, context, path);
+  exact(item, ["schema", "runId", "inputId", "basis", "triggers"], context, path);
+  literal(item.schema, "studio.research-request-input.v2", context, `${path}.schema`);
+  string(item.runId, context, `${path}.runId`);
+  const inputIdValue = string(item.inputId, context, `${path}.inputId`);
+  const basis = validateRestudiedResearchBasis(item.basis, context, `${path}.basis`);
+  const triggers = array(item.triggers, context, `${path}.triggers`);
+  let priorTriggerId: string | null = null;
+  for (const [index, value] of triggers.entries()) {
+    const trigger = validateRestudiedResearchTriggerOption(value, context, `${path}.triggers[${index}]`);
+    if (trigger.basisId !== basis.basisId) fail(context, `${path}.triggers[${index}].basisId`, "must match the input basis");
+    if (priorTriggerId !== null && priorTriggerId.localeCompare(trigger.triggerId) >= 0) fail(context, `${path}.triggers`, "must be uniquely sorted by triggerId");
+    priorTriggerId = trigger.triggerId;
+  }
+  const input = item as unknown as RestudiedResearchRequestInput;
+  const { inputId: _inputId, ...withoutId } = input;
+  if (inputIdValue !== restudiedResearchRequestInputId(withoutId)) fail(context, `${path}.inputId`, "does not close the input body");
   return input;
 }
 

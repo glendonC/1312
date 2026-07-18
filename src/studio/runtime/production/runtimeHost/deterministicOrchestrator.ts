@@ -3,7 +3,7 @@ import {
   BoundedOrchestratorBridge,
   type ReportsWaitToolResult,
 } from "../executor/orchestratorBridge.ts";
-import type { ExecutorSpanReceipt, OwnedMediaStudyClaimV2, OwnedMediaStudyCoverageRangeV2, StudyPlanningInput, StudyReportArtifact, TaskRecord } from "../model.ts";
+import type { ExecutorSpanReceipt, OwnedMediaStudyClaimV2, OwnedMediaStudyCoverageRangeV2, RestudiedResearchRequestInput, StudyPlanningInput, StudyReportArtifact, TaskRecord } from "../model.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import type {
   BoundedOrchestratorLauncher,
@@ -31,6 +31,7 @@ export type DeterministicOrchestratorMode =
   | "restudy_support"
   | "restudy_exhausted"
   | "restudy_disagreement"
+  | "restudy_research"
   | "restudy_speaker_overlap"
   | "no_request";
 
@@ -140,7 +141,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       if (!rootScope || task.mediaScope.length !== 1) throw new Error("Deterministic generalized root requires one exact media scope");
       const midpoint = rootScope.startMs + Math.floor((rootScope.endMs - rootScope.startMs) / 2);
       if (midpoint <= rootScope.startMs || midpoint >= rootScope.endMs) throw new Error("Deterministic generalized root cannot split the bounded scope");
-      const restudyDisagreement = this.mode === "restudy_disagreement";
+      const restudyDisagreement = this.mode === "restudy_disagreement" || this.mode === "restudy_research";
       const restudyWeak = this.mode === "restudy_support" || this.mode === "restudy_exhausted";
       const restudySpeakerOverlap = this.mode === "restudy_speaker_overlap";
       const scopes = restudyDisagreement
@@ -174,6 +175,7 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       if (waited.result !== "all_terminal") throw new Error(`Deterministic generalized fan-out failed as ${waited.failure}`);
       let synthesisInput: { coverage: OwnedMediaStudyCoverageRangeV2[]; claims: OwnedMediaStudyClaimV2[] } | null = null;
       let restudyInput: Awaited<ReturnType<RangePassHost["inspect"]>> | null = null;
+      let researchInput: RestudiedResearchRequestInput | null = null;
       for (const child of waited.children) {
         if (!child.reportId || child.artifactIds.length !== 1) throw new Error("Deterministic generalized child did not return one typed report");
         const disposition = await bridge.disposition({
@@ -189,6 +191,29 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
         });
         synthesisInput = read.synthesisInput ?? synthesisInput;
         restudyInput = read.restudyInput ?? restudyInput;
+        researchInput = read.researchInput?.schema === "studio.research-request-input.v2" ? read.researchInput : researchInput;
+      }
+      const initialResearchRequest = this.mode === "restudy_research"
+        ? (() => {
+            const trigger = researchInput?.triggers[0];
+            if (!researchInput || !trigger) throw new Error("Deterministic S0b proof requires one exact v3 conflict trigger");
+            return { inputId: researchInput.inputId, triggerId: trigger.triggerId };
+          })()
+        : null;
+      if (initialResearchRequest) {
+        let forgedRejected = false;
+        try {
+          await bridge.research({ ...initialResearchRequest, triggerId: `${initialResearchRequest.triggerId}:forged` });
+        } catch {
+          forgedRejected = true;
+        }
+        if (!forgedRejected) throw new Error("Deterministic S0b proof accepted a forged v3 research trigger");
+        const accepted = await bridge.research(initialResearchRequest);
+        if (accepted.spawn.decision !== "accepted") throw new Error(`Deterministic S0b research was rejected as ${accepted.spawn.rejection}`);
+        const duplicate = await bridge.research(initialResearchRequest);
+        if (duplicate.spawn.decision !== "rejected" || duplicate.spawn.rejection !== "research_duplicate_work") {
+          throw new Error("Deterministic S0b proof did not close duplicate v3 research work");
+        }
       }
       if (restudyWeak || restudyDisagreement || restudySpeakerOverlap) {
         const candidate = restudyInput?.candidates[0];
@@ -275,6 +300,16 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
           contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
         });
         synthesisInput = read.synthesisInput ?? synthesisInput;
+
+        if (initialResearchRequest) {
+          let staleRejected = false;
+          try {
+            await bridge.research(initialResearchRequest);
+          } catch {
+            staleRejected = true;
+          }
+          if (!staleRejected) throw new Error("Deterministic S0b proof accepted a stale pre-pass research basis");
+        }
 
         if (!restudySpeakerOverlap) {
           let duplicateRejected = false;

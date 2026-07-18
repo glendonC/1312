@@ -84,7 +84,7 @@ export interface RestudiedStudySynthesisResult extends RestudiedStudyV3Reference
   executorReceipt: OwnedMediaStudyExecutorReceiptV3;
 }
 
-interface RestudiedStudyInspection extends RestudiedStudySynthesisRequest {
+export interface RestudiedStudyInspection extends RestudiedStudySynthesisRequest {
   reports: AdmittedStudyReportV2[];
   passes: RangePassRecord[];
   root: OwnedMediaStudyArtifactV3["root"];

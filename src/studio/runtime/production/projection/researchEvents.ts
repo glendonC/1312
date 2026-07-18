@@ -1,7 +1,8 @@
 import { capabilityOperationExists, taskCapabilityCallCount } from "../capabilityUsage.ts";
 import { researchExhaustionReceiptArtifactId } from "../artifactStore/researchArtifacts.ts";
-import type { RuntimeProjection } from "../model.ts";
+import type { RestudiedResearchBasis, RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
+import { currentRestudiedResearchBasis } from "../research/restudiedResearchBasis.ts";
 import { researchRequestFingerprint } from "../validation/research.ts";
 import { invariant } from "./shared.ts";
 
@@ -15,6 +16,42 @@ function same(left: unknown, right: unknown): boolean {
  * and snapshot-requires-completed-same-grant-search, all enforced in the fold.
  */
 export function applyResearchEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
+  if (event.type === "research.request_input_recorded") {
+    invariant(event.producer.kind === "research_host", event, "Research request inputs must come from the bounded research host");
+    const input = event.data.input;
+    const root = next.tasks[input.basis.root.taskId];
+    const execution = next.executions[input.basis.root.executionId];
+    invariant(
+      input.runId === next.runId && root?.parentTaskId === null && root.status === "working" &&
+        root.assignedAgentId === input.basis.root.agentId && root.ownerAgentId === input.basis.root.agentId &&
+        root.requiredOutputs.some((output) => output.required && output.artifactKind === "studio.owned-media-study.v3") &&
+        root.grants.some((grant) => grant.capability === "study.research") &&
+        execution?.status === "active" && execution.taskId === root.id && execution.agentId === root.ownerAgentId,
+      event,
+      `Research request input ${input.inputId} lacks its active granted v3 root`,
+    );
+    let currentBasis: RestudiedResearchBasis;
+    try {
+      currentBasis = currentRestudiedResearchBasis(next, input.basis.root);
+    } catch (error) {
+      invariant(false, event, error instanceof Error ? error.message : "Research request input lost its current basis");
+    }
+    invariant(same(currentBasis, input.basis), event, `Research request input ${input.inputId} is stale`);
+    for (const trigger of input.triggers) {
+      const source = next.artifacts[trigger.source.artifactId];
+      invariant(
+        trigger.basisId === input.basis.basisId && source?.content.contentId === trigger.source.contentId &&
+          root.mediaScope.some((scope) => scope.artifactId === trigger.source.artifactId && scope.trackId === trigger.source.trackId &&
+            trigger.source.startMs >= scope.startMs && trigger.source.endMs <= scope.endMs) &&
+          trigger.evidence.state === "conflicting" && trigger.evidence.preservedStates.includes("conflicting"),
+        event,
+        `Research request trigger ${trigger.triggerId} escaped its source or conflicting basis`,
+      );
+    }
+    invariant(!next.researchRequestInputs[input.inputId], event, `Research request input ${input.inputId} is duplicated`);
+    next.researchRequestInputs[input.inputId] = structuredClone(input);
+    return true;
+  }
   if (event.type === "research.operation_started") {
     invariant(event.producer.kind === "research_host", event, "Research must come from its bounded host");
     const { request, gap } = event.data;

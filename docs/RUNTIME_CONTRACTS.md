@@ -464,12 +464,21 @@ required before any semantic preference, and inconclusive comparison remains abs
 
 The R1 bounded research contract is wired trigger-gated on the same shape as conditional
 separation, across a root capability `study.research` and a child capability
-`research.investigate`. `ResearchRequestHost` derives one content-addressed trigger per unresolved
-conflict of a reopened, byte-verified owned-media study, closing `inputId` over the full trigger
-list; the root tool `study_research_request` accepts only the exact `{ inputId, triggerId }` echo.
-`scheduler.requestResearch` re-derives the whole trigger list synchronously from live projection
-state, requires the recorded `orchestrator.tool_called` entry with tool `study_research_request`
-plus the root `study.research` grant, byte-compares the host-fixed child contract (workload key
+`research.investigate`. The retained v1 `ResearchRequestHost` derives one content-addressed trigger
+per unresolved conflict of a completed, byte-verified v1 study. On the default v3 spine,
+`RestudiedResearchRequestHost` instead cold-reopens the pre-synthesis v3 inspection after at least
+two admitted reads. It records `studio.research-request-input.v2` through
+`research.request_input_recorded`, closing the input over the active root executor, every ordered
+admission/read identity, every accepted terminal pass identity, and exact conflicting coverage
+states, raw states, claims, citations, and pass ids. `researchRequestInputs` is durable candidate
+state, not grant authority; non-conflicting inspection records an empty trigger list.
+
+The admitted-read result exposes that exact `researchInput`, and `study_research_request` accepts
+only its `{ inputId, triggerId }` echo. `scheduler.requestResearch` re-derives v1 triggers or, for
+v2, requires the projected candidate and synchronously checks that its admission/read/pass basis is
+still current without repeating the asynchronous byte audit. It also requires the recorded
+`orchestrator.tool_called` entry plus the root `study.research` grant and byte-compares the
+host-fixed child contract (workload key
 `research:<triggerId>`, one `studio.study-report.v2` output, capabilities exactly
 `research.investigate` plus `report.submit`, budget pinned to `RESEARCH_LIMITS`), rejects consumed
 triggers as `research_duplicate_work`, and mints the grant scope from host policy only: limits are
@@ -509,7 +518,9 @@ lineage; cold audit reopens every search receipt. The outcome is `r1_insufficien
 structural sense. Its non-claims keep semantic insufficiency, source truth, entity match, speech,
 claim-support, and caption authority closed; `r2Authorization: "cause_only"` makes it a future
 authorization input, not an R2 grant. Unused query budget or failed operations cannot produce the
-cause. The default v3 root and production research-report path remain disconnected at this slice.
+cause. The default v3 root now holds dormant request authority and can mint one child only from a
+current projected conflict; research is never automatic. The production worker-to-v2-report path
+for receipted research spans remains disconnected at this slice.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

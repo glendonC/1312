@@ -225,6 +225,18 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       throw new Error(reason);
     }
 
+    if (task.grants.some((grant) => grant.capability === "research.investigate")) {
+      const reason = "The deterministic contract seam does not perform research; the granted child closes without ambient egress.";
+      const span = this.span(task, executionId, startedAt, { outcome: "failed", outputArtifactIds: [], failure: reason });
+      await artifacts.storeJson(span);
+      await ledger.transact(
+        { producer: { kind: "launcher", id: "deterministic-test-executor" }, causationId: executionId },
+        () => ({ pending: [{ type: "executor.finished", data: { receipt: span } }] satisfies PendingRuntimeEvent[], result: undefined }),
+      );
+      await scheduler.transitionTask(task.id, task.assignedAgentId, "failed", reason);
+      throw new Error(reason);
+    }
+
     const studySlot = task.requiredOutputs.find((output) => output.required && (output.artifactKind === "studio.study-report.v1" || output.artifactKind === "studio.study-report.v2"));
     if (studySlot) {
       if (task.workerLabel.includes("study-fail")) {

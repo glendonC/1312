@@ -21,6 +21,7 @@ import type {
   OwnedMediaStudyCoverageRangeV3,
   StudyRestudyInput,
   RangePassRequestReceipt,
+  AnyResearchRequestInput,
 } from "../model.ts";
 import { canonicalSha256 } from "../artifactStore.ts";
 import type { ParentArtifactAdmissionHost } from "../admission/parentArtifactAdmissionHost.ts";
@@ -93,6 +94,7 @@ export interface AdmittedArtifactReadToolResult {
   planningInput: StudyPlanningInput | null;
   synthesisInput?: { coverage: OwnedMediaStudyCoverageRangeV2[]; claims: OwnedMediaStudyClaimV2[] } | null;
   restudyInput?: StudyRestudyInput | null;
+  researchInput?: AnyResearchRequestInput | null;
 }
 
 export interface StudyPlanningToolResult {
@@ -593,6 +595,9 @@ export class BoundedOrchestratorBridge {
       const restudyInput = completedReads.length >= 2 && this.restudied && this.rangePassHost
         ? await this.rangePassHost.inspect(this.executionId)
         : null;
+      const researchInput = completedReads.length >= 2 && this.restudied && this.researchRequestHost
+        ? await this.researchRequestHost.inspect(this.executionId)
+        : null;
       return {
         schema: "studio.orchestrator-admitted-artifact-read-result.v2",
         receipt: result.receipt,
@@ -600,6 +605,7 @@ export class BoundedOrchestratorBridge {
         planningInput: null,
         synthesisInput,
         ...(this.restudied ? { restudyInput } : {}),
+        ...(this.restudied && this.researchRequestHost ? { researchInput } : {}),
       };
     }
     const grant = this.ledger.state().parentArtifactReadGrants[item.grantId];

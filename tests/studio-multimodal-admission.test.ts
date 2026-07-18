@@ -398,15 +398,19 @@ test("U2 frame adapter is cold-audited cite-only identity and cannot become clai
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
-test("future document span slot names qualified media but fails admission without a producer adapter", async () => {
+test("document span citations without a reopenable research receipt fail closed", async () => {
   const body: Omit<EvidenceCitationEnvelope, "schema" | "citationId"> = {
-    evidenceKind: "external_document_span", use: "cite_only", target: { kind: "media_context", qualifiesMedia: { artifactId: "artifact:media", trackId: "stream:0", startMs: 0, endMs: 1_000 } }, operationId: null,
-    evidence: { artifactId: "artifact:document", contentId: `sha256:${"1".repeat(64)}` }, receipt: { receiptId: "receipt:document", contentId: `sha256:${"2".repeat(64)}`, artifactId: null }, source: { artifactId: "artifact:media", contentId: `sha256:${"3".repeat(64)}`, trackId: "stream:0" }, upstreamState: "available", upstreamReason: "future_document_receipt",
+    evidenceKind: "external_document_span", use: "cite_only", target: { kind: "media_context", qualifiesMedia: { artifactId: "artifact:media", trackId: "stream:0", startMs: 0, endMs: 1_000 } }, operationId: "operation:document:1",
+    evidence: { artifactId: "artifact:document", contentId: `sha256:${"1".repeat(64)}` }, receipt: { receiptId: "receipt:document", contentId: `sha256:${"2".repeat(64)}`, artifactId: "artifact:document-receipt" }, source: { artifactId: "artifact:media", contentId: `sha256:${"3".repeat(64)}`, trackId: "stream:0" }, upstreamState: "available", upstreamReason: "future_document_receipt",
     observations: [{ observationId: "document-observation:1", state: "available", rawState: "span_available", locator: { kind: "document_span", document: { entityId: "document:1", artifactId: "artifact:document", start: 10, end: 20, unit: "unicode_code_point" }, qualifiesMedia: { artifactId: "artifact:media", trackId: "stream:0", startMs: 0, endMs: 1_000 } } }],
     nonClaims: { semanticCorrectness: "not_assessed", truthArbitration: "not_performed" },
   };
-  const citation = validateEvidenceCitationEnvelope({ schema: "studio.evidence-citation.v1", citationId: evidenceCitationId(body), ...body });
+  const unbacked: any = { schema: "studio.evidence-citation.v1", citationId: evidenceCitationId(body), ...body };
+  const citation = validateEvidenceCitationEnvelope(unbacked);
+  const withoutReceipt: any = structuredClone(unbacked); withoutReceipt.operationId = null; withoutReceipt.receipt.artifactId = null;
+  const { schema: _schema, citationId: _citationId, ...withoutReceiptBody } = withoutReceipt; withoutReceipt.citationId = evidenceCitationId(withoutReceiptBody);
+  assert.throws(() => validateEvidenceCitationEnvelope(withoutReceipt), /cite-only over explicit receipted document spans/);
   const ledger = await RuntimeLedger.open("runtime:u3-future", new MemoryEventJournal()); const directory = await mkdtemp(join(tmpdir(), "studio-u3-future-"));
-  try { await assert.rejects(auditEvidenceCitation(ledger.state(), new ContentAddressedArtifactStore(directory), citation), /no registered producer or audit adapter/); }
+  try { await assert.rejects(auditEvidenceCitation(ledger.state(), new ContentAddressedArtifactStore(directory), citation), /ENOENT|Research snapshot receipt|bounded JSON contract/); }
   finally { await rm(directory, { recursive: true, force: true }); }
 });

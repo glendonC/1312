@@ -966,9 +966,15 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(rangePopover).not.toBeVisible();
   await expect(rangeParameter).toBeFocused();
   await rangeParameter.click();
-  await page.getByLabel("Custom range").check();
+  await page.getByRole("radio", { name: "Custom range" }).check();
+  await expect(rangePopover.getByText("2 min max", { exact: true })).toBeVisible();
+  const rangeTrim = rangePopover.getByRole("group", { name: "Custom range trim" });
+  const startGrip = rangeTrim.getByRole("slider", { name: "Start trim handle" });
+  await startGrip.press("ArrowRight");
+  await expect(page.getByRole("textbox", { name: "Start timestamp" })).toHaveValue("0:01");
   const rangeEnd = page.getByRole("textbox", { name: "End timestamp" });
   await expect(rangeEnd).toHaveValue("1:23");
+  await expect.poll(() => rangePopover.evaluate((element) => element.scrollHeight - element.clientHeight)).toBe(0);
   await rangeEnd.fill("1:30");
   // The invalid reason is shown inline in the editor (the stage sentence echoes it too, so scope here).
   await expect(rangePopover.getByText("Choose a valid range within 0:00–1:23.")).toBeVisible();
@@ -1206,6 +1212,112 @@ test("metadata resolution can be cancelled without implying a pausable operation
   await expect(sourceField).toBeVisible();
 });
 
+test("a submitted custom range presents one exact and directly manipulable trim control", async ({ page }) => {
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/customrangefixture");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Continue to Range" }).click();
+  await page.getByRole("button", { name: "Update range: 0:00–1:23" }).click();
+
+  const rangePopover = page.getByRole("dialog", { name: "Range options" });
+  await page.getByRole("radio", { name: "Custom range" }).check();
+  const trimControl = rangePopover.getByRole("group", { name: "Custom range trim" });
+  const sourceRange = trimControl.getByRole("group", { name: "Source range" });
+  const startTimestamp = page.getByRole("textbox", { name: "Start timestamp" });
+  const endTimestamp = page.getByRole("textbox", { name: "End timestamp" });
+  const selectedDuration = trimControl.getByLabel("Selected duration");
+  const startHandle = sourceRange.getByRole("slider", { name: "Start trim handle" });
+  const endHandle = sourceRange.getByRole("slider", { name: "End trim handle" });
+  await expect(startTimestamp).toHaveValue("0:00");
+  await expect(endTimestamp).toHaveValue("1:23");
+  await expect(selectedDuration).toHaveText("1:23 selected");
+  await expect(startHandle).toHaveAttribute("aria-valuetext", "0:00 start");
+  await expect(endHandle).toHaveAttribute("aria-valuetext", "1:23 end");
+  await expect(rangePopover).toHaveAttribute("data-scrollable", "false");
+  const customControlSurface = await trimControl.evaluate((element) => ({
+    borderWidth: getComputedStyle(element).borderTopWidth,
+    backgroundImage: getComputedStyle(element).backgroundImage,
+  }));
+  expect(customControlSurface).toEqual({ borderWidth: "0px", backgroundImage: "none" });
+  const endpointSurface = await startTimestamp.evaluate((element) => ({
+    borderWidth: getComputedStyle(element).borderTopWidth,
+    borderRadius: Number.parseFloat(getComputedStyle(element).borderRadius),
+    backgroundColor: getComputedStyle(element).backgroundColor,
+  }));
+  expect(endpointSurface.borderWidth).toBe("1px");
+  expect(endpointSurface.borderRadius).toBeGreaterThanOrEqual(7);
+  expect(endpointSurface.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  for (const handle of [startHandle, endHandle]) {
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(24);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
+  }
+
+  await startTimestamp.focus();
+  await expect(trimControl).toHaveAttribute("data-active-boundary", "start");
+  await expect(startHandle).toHaveAttribute("data-active", "true");
+  expect(await startTimestamp.evaluate((element) => Number.parseFloat(getComputedStyle(element).outlineWidth)))
+    .toBeGreaterThanOrEqual(2);
+  await page.keyboard.press("Tab");
+  await expect(endTimestamp).toBeFocused({ timeout: 10_000 });
+  await expect(trimControl).toHaveAttribute("data-active-boundary", "end");
+  await page.keyboard.press("Tab");
+  await expect(startHandle).toBeFocused({ timeout: 10_000 });
+  await page.keyboard.press("Tab");
+  await expect(endHandle).toBeFocused({ timeout: 10_000 });
+
+  await startHandle.press("ArrowRight");
+  await expect(startTimestamp).toHaveValue("0:01");
+  await endHandle.press("ArrowLeft");
+  await expect(endTimestamp).toHaveValue("1:22");
+  const [trackBox, endHandleBox] = await Promise.all([
+    trimControl.locator(".preflight-range-trim-track").boundingBox(),
+    endHandle.boundingBox(),
+  ]);
+  expect(trackBox).not.toBeNull();
+  expect(endHandleBox).not.toBeNull();
+  await page.mouse.move(
+    (endHandleBox?.x ?? 0) + (endHandleBox?.width ?? 0) / 2,
+    (endHandleBox?.y ?? 0) + (endHandleBox?.height ?? 0) / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    (trackBox?.x ?? 0) + (trackBox?.width ?? 0) * 0.75,
+    (trackBox?.y ?? 0) + (trackBox?.height ?? 0) / 2,
+  );
+  await page.mouse.up();
+  await expect(endTimestamp).toHaveValue("1:02");
+  await expect(selectedDuration).toHaveText("1:01 selected");
+
+  await endTimestamp.fill("1:30");
+  await expect(rangePopover.getByText("Choose a valid range within 0:00–1:23.")).toBeVisible();
+  await expect(endTimestamp).toHaveAttribute("aria-invalid", "true");
+  await expect(sourceRange.getByRole("slider", { name: "End trim handle" })).toHaveCount(0);
+  await expect(trimControl.locator(".preflight-range-trim-selection")).toHaveCount(0);
+  await expect(page.locator(".preflight-stage-panel .preflight-block")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeDisabled();
+
+  await startTimestamp.fill("70");
+  await startTimestamp.press("Enter");
+  await endTimestamp.fill("60");
+  await endTimestamp.press("Enter");
+  await expect(startTimestamp).toHaveValue("1:10");
+  await expect(endTimestamp).toHaveValue("1:00");
+  await expect(startTimestamp).toHaveAttribute("aria-invalid", "true");
+  await expect(endTimestamp).toHaveAttribute("aria-invalid", "true");
+  await expect(selectedDuration).toHaveText("Range incomplete");
+  await expect(trimControl.locator(".preflight-range-trim-selection")).toHaveCount(0);
+
+  await endTimestamp.fill("80");
+  await endTimestamp.press("Enter");
+  await expect(endTimestamp).toHaveValue("1:20");
+  await expect(selectedDuration).toHaveText("0:10 selected");
+  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
+  await expect.poll(() => rangePopover.evaluate((element) => element.scrollHeight - element.clientHeight)).toBe(0);
+});
+
 test("a long submitted source opens with an explicit editable two-minute request default", async ({ page }) => {
   await page.unroute("**/api/studio/source-resolutions");
   await page.route("**/api/studio/source-resolutions", async (route) => {
@@ -1213,7 +1325,7 @@ test("a long submitted source opens with an explicit editable two-minute request
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(sourceResolutionReceipt(request.url, 203_000)),
+      body: JSON.stringify(sourceResolutionReceipt(request.url, 758_000)),
     });
   });
 
@@ -1223,17 +1335,120 @@ test("a long submitted source opens with an explicit editable two-minute request
   await page.keyboard.press("Enter");
 
   await expect(page.getByRole("note", { name: "Submitted source metadata boundary" })).toContainText(
-    "It’s 3:23 long",
+    "It’s 12:38 long",
   );
   await page.getByRole("button", { name: "Continue to Range" }).click();
   await page.getByRole("button", { name: "Update range: 0:00–2:00" }).click();
-  await expect(page.getByLabel("Custom range")).toBeChecked();
-  await expect(page.getByRole("textbox", { name: "Start timestamp" })).toHaveValue("0:00");
-  await expect(page.getByRole("textbox", { name: "End timestamp" })).toHaveValue("2:00");
+  await expect(page.getByRole("radio", { name: "Custom range" })).toBeChecked();
+  const longRangePopover = page.getByRole("dialog", { name: "Range options" });
+  const longRangeTrim = longRangePopover.getByRole("group", { name: "Custom range trim" });
+  const longSourceRange = longRangeTrim.getByRole("group", { name: "Source range" });
+  const longStartTimestamp = page.getByRole("textbox", { name: "Start timestamp" });
+  const longEndTimestamp = page.getByRole("textbox", { name: "End timestamp" });
+  const selectedDuration = longRangeTrim.getByLabel("Selected duration");
+  await expect(longStartTimestamp).toHaveValue("0:00");
+  await expect(longEndTimestamp).toHaveValue("2:00");
+  await expect(selectedDuration).toHaveText("2:00 selected");
+  const longStartHandle = longSourceRange.getByRole("slider", { name: "Start trim handle" });
+  await longStartHandle.press("ArrowRight");
+  await expect(longStartTimestamp).toHaveValue("0:01");
+  const longEndHandle = longSourceRange.getByRole("slider", { name: "End trim handle" });
+  await longEndHandle.press("ArrowRight");
+  await expect(longEndTimestamp).toHaveValue("2:01");
+  await longStartTimestamp.fill("0:00:50");
+  await longStartTimestamp.press("Enter");
+  await longEndTimestamp.fill("170");
+  await longEndTimestamp.press("Enter");
+  await expect(longStartTimestamp).toHaveValue("0:50");
+  await expect(longEndTimestamp).toHaveValue("2:50");
+  await expect(selectedDuration).toHaveText("2:00 selected");
+  const [sourceTrackBox, selectedRangeBox] = await Promise.all([
+    longRangeTrim.locator(".preflight-range-trim-track").boundingBox(),
+    longRangeTrim.locator(".preflight-range-trim-selection").boundingBox(),
+  ]);
+  expect(sourceTrackBox).not.toBeNull();
+  expect(selectedRangeBox).not.toBeNull();
+  const selectedWidthRatio = (selectedRangeBox?.width ?? 0) / (sourceTrackBox?.width ?? 1);
+  expect(selectedWidthRatio).toBeGreaterThan(0.14);
+  expect(selectedWidthRatio).toBeLessThan(0.18);
+
+  await longEndTimestamp.fill("171");
+  await longEndTimestamp.press("Enter");
+  await expect(selectedDuration).toHaveText("2:01 selected");
+  await expect(selectedDuration).toHaveAttribute("data-invalid", "true");
+  await expect(longRangePopover.getByText(
+    "The current hosted request contract is limited to 120 seconds. Choose a custom range within the resolved video.",
+  )).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeDisabled();
+  await longEndTimestamp.fill("170");
+  await longEndTimestamp.press("Enter");
+  await expect.poll(() => longRangePopover.evaluate((element) => element.scrollHeight - element.clientHeight)).toBe(0);
   // A source longer than the limit makes the Entire option visibly unavailable rather than selectable.
-  await expect(page.getByLabel("Entire video, 3:23, exceeds 2:00 limit")).toBeDisabled();
-  await expect(page.getByText("Select up to 2:00. No section was recommended.")).toBeVisible();
+  await expect(page.getByLabel("Entire video, 12:38, exceeds 2:00 limit")).toBeDisabled();
+  await expect(longRangePopover.getByText("2 min max", { exact: true })).toBeVisible();
+  await expect(longRangePopover.getByText("Choose up to 2:00.")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
+});
+
+test("a compact submitted range popover does not show a phantom scrollbar", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one compact viewport covers popover measurement");
+  await page.setViewportSize({ width: 440, height: 340 });
+  await page.unroute("**/api/studio/source-resolutions");
+  await page.route("**/api/studio/source-resolutions", async (route) => {
+    const request = route.request().postDataJSON() as { url: string };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(sourceResolutionReceipt(request.url, 758_000)),
+    });
+  });
+
+  await page.goto("/studio/");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "Clip link" }).fill("https://youtu.be/compactrangefixture");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Continue to Range" }).click();
+  await page.getByRole("button", { name: "Update range: 0:00–2:00" }).click();
+
+  const rangePopover = page.getByRole("dialog", { name: "Range options" });
+  await expect(rangePopover).toBeVisible();
+  await expect(rangePopover).toHaveAttribute("data-scrollable", "false");
+  const compactTrim = rangePopover.getByRole("group", { name: "Custom range trim" });
+  const compactStart = compactTrim.getByRole("textbox", { name: "Start timestamp" });
+  const compactEnd = compactTrim.getByRole("textbox", { name: "End timestamp" });
+  const compactSourceRange = compactTrim.getByRole("group", { name: "Source range" });
+  const [popoverBox, trimBox, startBox, endBox, stripBox, startHandleBox, endHandleBox, lifecycleBox] = await Promise.all([
+    rangePopover.boundingBox(),
+    compactTrim.boundingBox(),
+    compactStart.boundingBox(),
+    compactEnd.boundingBox(),
+    compactSourceRange.boundingBox(),
+    compactSourceRange.getByRole("slider", { name: "Start trim handle" }).boundingBox(),
+    compactSourceRange.getByRole("slider", { name: "End trim handle" }).boundingBox(),
+    page.getByLabel("Studio lifecycle").boundingBox(),
+  ]);
+  for (const box of [popoverBox, trimBox, startBox, endBox, stripBox, startHandleBox, endHandleBox, lifecycleBox]) {
+    expect(box).not.toBeNull();
+  }
+  expect(startBox?.x ?? Infinity).toBeGreaterThanOrEqual((popoverBox?.x ?? 0) - 0.5);
+  expect((endBox?.x ?? 0) + (endBox?.width ?? 0)).toBeLessThanOrEqual(
+    (popoverBox?.x ?? 0) + (popoverBox?.width ?? 0) + 0.5,
+  );
+  expect((startBox?.x ?? 0) + (startBox?.width ?? 0)).toBeLessThan(endBox?.x ?? 0);
+  expect(stripBox?.width ?? 0).toBeGreaterThan(startBox?.width ?? Infinity);
+  expect(startHandleBox?.width ?? 0).toBeGreaterThanOrEqual(24);
+  expect(endHandleBox?.width ?? 0).toBeGreaterThanOrEqual(24);
+  expect((popoverBox?.y ?? 0) + (popoverBox?.height ?? 0)).toBeLessThanOrEqual(
+    (lifecycleBox?.y ?? 0) - 8,
+  );
+  await compactEnd.focus();
+  expect(await compactEnd.evaluate((element) => Number.parseFloat(getComputedStyle(element).outlineWidth)))
+    .toBeGreaterThanOrEqual(2);
+  await expect(compactTrim).toHaveAttribute("data-active-boundary", "end");
+  expect(await rangePopover.evaluate((element) => getComputedStyle(element).overflowY))
+    .toMatch(/^(clip|hidden)$/);
+  await expect.poll(() => rangePopover.evaluate((element) => element.scrollHeight - element.clientHeight))
+    .toBeLessThanOrEqual(2);
 });
 
 test("submitted preview Results reports no submitted artifact before recorded demo output", async ({ page }, testInfo) => {
@@ -1263,13 +1478,20 @@ test("completed recorded runs expose Results from the terminal dock", async ({ p
   await scenario(page).selectOption("unscored-complete");
   await page.locator(".studio-lab").evaluate((element) => element.remove());
 
-  const results = page.getByRole("region", { name: "Recorded Results" });
+  const results = page.locator("#studio-recorded-results");
   await expect(results).toBeVisible();
+  await expect(results).toHaveAccessibleName(/Result/);
   const openResults = page.getByRole("button", { name: "Open Results" });
   await expect(openResults).toBeVisible();
   await expect(page.getByRole("button", { name: "Run again", exact: true })).toBeVisible();
 
+  await page.getByRole("button", { name: /^orchestrator,/ }).click();
+  const focus = page.getByRole("dialog", { name: "Orchestrator" });
+  await expect(focus).toBeVisible();
   await openResults.click();
+  await expect(focus).toHaveCount(0);
+  await expect(page.locator(".agent-focus-backdrop")).toHaveCount(0);
+  await expect(page.locator(".stage")).not.toHaveAttribute("data-agent-focus", "true");
   await expect(results).toBeFocused();
   await expect.poll(() => results.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
@@ -1637,6 +1859,7 @@ test("agent focus presents one bare media stage and one recorded activity narrat
     "agent-focus-title",
     "agent-focus-nameplate-rule",
     "agent-focus-role-remit",
+    "agent-focus-lineage",
   ]);
 
   const environment = focus.locator(".agent-focus-environment");
@@ -1650,6 +1873,12 @@ test("agent focus presents one bare media stage and one recorded activity narrat
   ).toBeVisible();
   await expect(environment.locator(".agent-focus-source-head p")).toHaveCount(0);
   await expect(environment.locator(".agent-focus-stage-rule")).toHaveCount(2);
+  const dividerStyle = await environment.locator(".agent-focus-stage-rule").first().evaluate((element) => ({
+    accentContent: getComputedStyle(element, "::after").content,
+    lineBackground: getComputedStyle(element, "::before").backgroundImage,
+  }));
+  expect(dividerStyle.accentContent).toBe("none");
+  expect(dividerStyle.lineBackground).toContain("linear-gradient");
   await expect(visualEvidence.locator(".env-media-frame .env-media-caption")).toHaveCount(0);
   await expect(visualEvidence.locator(".env-media-transcript")).toHaveCount(0);
   await expect(visualEvidence.locator(".agent-focus-evidence-map")).toHaveCount(0);
@@ -1659,6 +1888,14 @@ test("agent focus presents one bare media stage and one recorded activity narrat
   await expect(narrative.getByRole("heading", { name: "Translating" })).toBeVisible();
   await expect(narrative.locator(".agent-focus-activity-group > ol > li").first()).toContainText("draft");
   await expect(narrative.locator(".agent-focus-activity-group")).not.toHaveCount(0);
+  const historyChip = narrative.locator(".activity-chips li").first();
+  await expect(historyChip).toBeVisible();
+  const historyChipSurface = await historyChip.evaluate((element) => ({
+    backgroundColor: getComputedStyle(element).backgroundColor,
+    borderColor: getComputedStyle(element).borderColor,
+  }));
+  expect(historyChipSurface.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(historyChipSurface.borderColor).not.toBe("rgba(0, 0, 0, 0)");
   for (const label of ["Media", "Process", "Assignment", "History", "Results"]) {
     await expect(focus.getByRole("button", { name: label, exact: true })).toHaveCount(0);
   }
@@ -1685,33 +1922,64 @@ test("agent focus presents one bare media stage and one recorded activity narrat
   };
 
   const commands = focus.getByRole("navigation", { name: "Agent focus commands" });
-  const [environmentBox, commandsBox] = await Promise.all([
+  const [environmentBox, commandsBox, closeFocusBox] = await Promise.all([
     environment.boundingBox(),
     commands.boundingBox(),
+    commands.getByRole("button", { name: "Close agent focus" }).boundingBox(),
   ]);
   expect(environmentBox).not.toBeNull();
   expect(commandsBox).not.toBeNull();
+  expect(closeFocusBox).not.toBeNull();
   expect(commandsBox?.y ?? 0).toBeGreaterThanOrEqual(
     (environmentBox?.y ?? 0) + (environmentBox?.height ?? 0) - 0.5,
   );
-  await expect(commands.locator(".agent-focus-cycle-label")).toHaveText(
-    /Cycle agents\s*·\s*\d+\/\d+/,
-  );
+  expect((commandsBox?.y ?? Infinity) - ((environmentBox?.y ?? 0) + (environmentBox?.height ?? 0)))
+    .toBeLessThanOrEqual(8);
+  await expect(commands.locator(".agent-focus-cycle-eyebrow")).toHaveText("Cycle agents");
+  await expect(commands.locator(".agent-focus-cycle-position")).toContainText(/\d+of \d+/);
   await expect(commands.getByRole("button", { name: "Previous agent" })).toBeVisible();
   await expect(commands.getByRole("button", { name: "Next agent" })).toBeVisible();
-  await expect(commands.getByRole("button", { name: "Close agent focus" })).toBeVisible();
+  const closeFocus = commands.getByRole("button", { name: "Close agent focus" });
+  await expect(closeFocus).toBeVisible();
+  await expect(closeFocus).toContainText("Close");
+  await expect(closeFocus).toContainText("Esc");
+  await expect(closeFocus.locator(".agent-focus-escape-x")).toHaveCount(0);
+  const closeSurface = await closeFocus.evaluate((element) => {
+    const shortcut = element.querySelector("kbd") as HTMLElement;
+    return {
+      backgroundColor: getComputedStyle(element).backgroundColor,
+      borderRadius: getComputedStyle(element).borderRadius,
+      shortcutBackground: getComputedStyle(shortcut).backgroundColor,
+      shortcutBorder: getComputedStyle(shortcut).borderTopWidth,
+      shortcutRadius: getComputedStyle(shortcut).borderRadius,
+      shortcutShadow: getComputedStyle(shortcut).boxShadow,
+    };
+  });
+  expect(closeSurface.backgroundColor).toBe("rgb(226, 61, 45)");
+  expect(Number.parseFloat(closeSurface.borderRadius)).toBeGreaterThanOrEqual(20);
+  expect(closeSurface.shortcutBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(closeSurface.shortcutBorder).toBe("0px");
+  expect(closeSurface.shortcutRadius).toBe("0px");
+  expect(closeSurface.shortcutShadow).toBe("none");
+  expect(Math.abs(
+    ((closeFocusBox?.x ?? 0) + (closeFocusBox?.width ?? 0)) -
+    ((commandsBox?.x ?? 0) + (commandsBox?.width ?? 0)),
+  )).toBeLessThanOrEqual(0.5);
   await expect(focus.getByText("Reasoning", { exact: true })).toHaveCount(0);
 
-  await commands.getByRole("button", { name: "Next agent" }).click();
+  await expect(closeFocus).toBeFocused();
+  await page.keyboard.press("ArrowRight");
   const verifierFocus = page.getByRole("dialog", { name: "Verifier 01" });
   await expect(verifierFocus).toBeVisible();
   await expect(verifierFocus.getByLabel("Recorded source video")).toBeVisible();
+  await expect(verifierFocus.getByRole("button", { name: "Close agent focus" })).toBeFocused();
   await expectFocusSettled(verifierFocus);
   await expectMediaGeometryStable(verifierFocus);
 
-  await verifierFocus.getByRole("button", { name: "Previous agent" }).click();
+  await page.keyboard.press("ArrowLeft");
   const translatorFocus = page.getByRole("dialog", { name: "Translator 01" });
   await expect(translatorFocus).toBeVisible();
+  await expect(translatorFocus.getByRole("button", { name: "Close agent focus" })).toBeFocused();
   await expectFocusSettled(translatorFocus);
   await expectMediaGeometryStable(translatorFocus);
 
@@ -1730,6 +1998,8 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
   );
   await page.keyboard.press("Enter");
   await finishPreparation(page);
+  await expect(page.locator(".graph-preview-mark")).toHaveCount(0);
+  await expect(page.getByText(/These agents replay a bundled demonstration/)).toHaveCount(0);
 
   const orchestrator = page.getByRole("button", { name: /^orchestrator,/ });
   await expect(orchestrator).toBeVisible();
@@ -1867,7 +2137,7 @@ test("agent focus separates identity, bare media, narrative, and commands at eve
     await expect(projection.getByRole("heading", { name: "Coordinating" })).toBeVisible();
 
     const [focusBox, environmentBox, focusBodyBox, heroBox, identityBox, mediaBox,
-      mediaFrameBox, projectionBox, commandsBox, dockBox, after, graphState] =
+      mediaFrameBox, projectionBox, commandsBox, closeBox, dockBox, after, graphState] =
       await Promise.all([
         focus.boundingBox(),
         environment.boundingBox(),
@@ -1878,6 +2148,7 @@ test("agent focus separates identity, bare media, narrative, and commands at eve
         mediaFrame.boundingBox(),
         projection.boundingBox(),
         commands.boundingBox(),
+        commands.getByRole("button", { name: "Close agent focus" }).boundingBox(),
         page.locator(".dock-well").boundingBox(),
         anchor.boundingBox(),
         page.locator(".graph").evaluate((element) => ({
@@ -1896,6 +2167,7 @@ test("agent focus separates identity, bare media, narrative, and commands at eve
       mediaFrameBox,
       projectionBox,
       commandsBox,
+      closeBox,
       dockBox,
       before,
       after,
@@ -1916,6 +2188,14 @@ test("agent focus separates identity, bare media, narrative, and commands at eve
       && a.y + a.height > b.y + 0.5;
     expect(overlaps(identityBox!, mediaFrameBox!)).toBe(false);
     expect(overlaps(mediaFrameBox!, projectionBox!)).toBe(false);
+    expect((commandsBox?.y ?? 0) - ((environmentBox?.y ?? 0) + (environmentBox?.height ?? 0)))
+      .toBeGreaterThanOrEqual(-0.5);
+    expect((commandsBox?.y ?? Infinity) - ((environmentBox?.y ?? 0) + (environmentBox?.height ?? 0)))
+      .toBeLessThanOrEqual(8);
+    expect(Math.abs(
+      ((closeBox?.x ?? 0) + (closeBox?.width ?? 0)) -
+      ((commandsBox?.x ?? 0) + (commandsBox?.width ?? 0)),
+    )).toBeLessThanOrEqual(0.5);
 
     expect(focusBox).toMatchObject({ x: 0, y: 0, width: viewport.width, height: viewport.height });
     expect(graphState.transform).not.toBe("none");
@@ -2127,7 +2407,7 @@ test("keyboard opens agent focus, restores the trigger, and keeps playback on th
   await page.keyboard.press("Enter");
   const segmentFocus = page.getByRole("dialog", { name: "Segmenter 01" });
   await expect(segmentFocus.getByRole("complementary", { name: "Recorded activity" })).toBeVisible();
-  await expect(segmentFocus.locator(".agent-focus-activity-state h3")).toContainText("Complete");
+  await expect(segmentFocus.getByRole("heading", { name: "Complete" })).toBeVisible();
   await expect(segmentFocus.getByLabel("Recorded source video")).toBeVisible();
   await expect(segmentFocus.getByLabel("Recorded source video")).toHaveAttribute("controls");
   await expect(segmentFocus.getByRole("button", { name: "Close agent focus" })).toBeFocused();

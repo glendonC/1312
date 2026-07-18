@@ -23,8 +23,8 @@ import {
   PreparationStagePanel,
   PreparationStagePopover,
   RangeModeChoice,
+  RangeTrimControl,
   StageConversation,
-  TimestampField,
   continueActionLabel,
   formatTimestamp,
   languageName,
@@ -156,7 +156,6 @@ export default function SubmittedPreparationForm({
               durationSeconds={durationSeconds}
               session={session}
               preparationStatus={preparation.status}
-              blockingMessage={blockingMessage}
               onEdit={(anchor) => openStageEditor("range", anchor)}
             />
           )}
@@ -298,14 +297,12 @@ function SubmittedRangeStage({
   durationSeconds,
   session,
   preparationStatus,
-  blockingMessage,
   onEdit,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   durationSeconds: number;
   session: PreflightSession;
   preparationStatus: StudioPreviewSession["preparation"]["status"];
-  blockingMessage: string | null;
   onEdit: (anchor: HTMLButtonElement) => void;
 }) {
   const range = liveRangeLabel(session, durationSeconds);
@@ -322,7 +319,6 @@ function SubmittedRangeStage({
       {preparationStatus === "building" && (
         <p className="preflight-binding" role="status">Updating the exact request…</p>
       )}
-      {blockingMessage && <p className="preflight-block" role="status">{blockingMessage}</p>}
     </section>
   );
 }
@@ -453,7 +449,7 @@ function RangeEditor({
   const maximumDuration = SUBMITTED_PREPARATION_POLICY.maximumDurationMs / 1_000;
   const entireUnavailable = durationSeconds > maximumDuration;
   const feedbackId = "preflight-range-feedback";
-  const hasFeedback = !assessment.canReplay || entireUnavailable;
+  const hasFeedback = !assessment.canReplay;
 
   return (
     <fieldset className="preflight-range-editor">
@@ -483,35 +479,23 @@ function RangeEditor({
         checked={session.request.rangeMode === "custom"}
         onChange={() => update({ rangeMode: "custom" })}
         label="Custom range"
+        meta="2 min max"
         accessibleLabel="Custom range"
       />
       {session.request.rangeMode === "custom" && (
-        <div className="preflight-range-time-fields">
-          <TimestampField
-            label="Start"
-            value={session.request.start}
-            max={durationSeconds}
-            describedBy={hasFeedback ? feedbackId : undefined}
-            invalid={!assessment.canReplay}
-            onChange={(start) => update({ start })}
-          />
-          <TimestampField
-            label="End"
-            value={session.request.end}
-            max={durationSeconds}
-            describedBy={hasFeedback ? feedbackId : undefined}
-            invalid={!assessment.canReplay}
-            onChange={(end) => update({ end })}
-          />
-        </div>
+        <RangeTrimControl
+          start={session.request.start}
+          end={session.request.end}
+          duration={durationSeconds}
+          maximumDuration={maximumDuration}
+          describedBy={hasFeedback ? feedbackId : undefined}
+          invalid={!assessment.canReplay}
+          onChange={update}
+        />
       )}
       {!assessment.canReplay && assessment.reason ? (
         <p id={feedbackId} className="preflight-range-feedback" data-invalid="true" role="status">
           {assessment.reason}
-        </p>
-      ) : entireUnavailable ? (
-        <p id={feedbackId} className="preflight-range-feedback">
-          Select up to {formatTimestamp(maximumDuration)}. No section was recommended.
         </p>
       ) : null}
     </fieldset>

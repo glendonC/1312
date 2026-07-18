@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -312,7 +313,7 @@ export function PreparationStagePopover({
           horizontalEnd - width,
           Math.max(horizontalStart, anchor.left + anchor.width / 2 - width / 2),
         );
-        const lowerBoundary = lifecycleBounds && lifecycleBounds.top > shelfBounds.bottom
+        const lowerBoundary = lifecycleBounds && lifecycleBounds.top > viewportTop + edge
           ? Math.min(viewportBottom - edge, lifecycleBounds.top - 12)
           : viewportBottom - edge;
         const belowTop = shelfBounds.bottom + gap;
@@ -320,7 +321,11 @@ export function PreparationStagePopover({
         const availableAbove = Math.max(0, anchor.top - gap - (viewportTop + edge));
 
         popover.style.width = `${width}px`;
-        const naturalHeight = Math.min(popover.scrollHeight, viewportHeight - edge * 2);
+        // `scrollHeight` excludes the border while `max-height` uses the border box. Include the
+        // border so a popover that naturally fits is not made a couple of pixels too short and
+        // given a phantom scrollbar.
+        const borderHeight = popover.offsetHeight - popover.clientHeight;
+        const naturalHeight = Math.min(popover.scrollHeight + borderHeight, viewportHeight - edge * 2);
         let maxHeight = naturalHeight;
         let top = belowTop;
         let placement: "below" | "above" | "sheet" = "below";
@@ -344,6 +349,7 @@ export function PreparationStagePopover({
         }
 
         popover.style.maxHeight = `${Math.max(0, maxHeight)}px`;
+        popover.dataset.scrollable = maxHeight + 0.5 < naturalHeight ? "true" : "false";
         popover.style.left = `${left}px`;
         popover.style.top = `${top}px`;
         popover.dataset.placement = placement;
@@ -358,7 +364,12 @@ export function PreparationStagePopover({
       const roomBelow = Math.max(0, viewportBottom - edge - (anchor.bottom + gap));
 
       popover.style.width = `${width}px`;
-      const naturalHeight = Math.min(popover.scrollHeight, preferredMax, viewportHeight - edge * 2);
+      const borderHeight = popover.offsetHeight - popover.clientHeight;
+      const naturalHeight = Math.min(
+        popover.scrollHeight + borderHeight,
+        preferredMax,
+        viewportHeight - edge * 2,
+      );
       // Anchored to a low control (the shelf pill) the popover rises above it; anchored
       // to a chip high in the card it drops below. Flip to below when above is cramped
       // and below has at least as much room.
@@ -375,6 +386,7 @@ export function PreparationStagePopover({
         : Math.max(viewportTop + edge, anchor.top - gap - measuredHeight);
 
       popover.style.maxHeight = `${maxHeight}px`;
+      popover.dataset.scrollable = maxHeight + 0.5 < naturalHeight ? "true" : "false";
       popover.style.left = `${left}px`;
       popover.style.top = `${top}px`;
       popover.dataset.placement = placeBelow ? "below" : "above";
@@ -400,6 +412,11 @@ export function PreparationStagePopover({
     });
     const resizeObserver = new ResizeObserver(positionPopover);
     resizeObserver.observe(popover);
+    // A constrained popover's border box does not resize when conditional editor content mounts;
+    // its scroll area grows instead. Observe the subtree too so the popover is remeasured before
+    // that temporary constraint can become a persistent scrollbar.
+    const mutationObserver = new MutationObserver(positionPopover);
+    mutationObserver.observe(popover, { childList: true, subtree: true, characterData: true });
     window.addEventListener("resize", positionPopover);
     window.addEventListener("scroll", positionPopover, true);
     window.visualViewport?.addEventListener("resize", positionPopover);
@@ -408,6 +425,7 @@ export function PreparationStagePopover({
     return () => {
       cancelAnimationFrame(focusFrame);
       resizeObserver.disconnect();
+      mutationObserver.disconnect();
       window.removeEventListener("resize", positionPopover);
       window.removeEventListener("scroll", positionPopover, true);
       window.visualViewport?.removeEventListener("resize", positionPopover);
@@ -491,17 +509,23 @@ export function RangeModeChoice({
 /** A timestamp text field that stays editable as free text and normalizes on blur. */
 export function TimestampField({
   label,
+  accessibleLabel,
   value,
   max,
   describedBy,
   invalid,
+  active,
+  onActivate,
   onChange,
 }: {
   label: string;
+  accessibleLabel?: string;
   value: number;
   max: number;
   describedBy?: string;
   invalid: boolean;
+  active?: boolean;
+  onActivate?: () => void;
   onChange: (value: number) => void;
 }) {
   const [draft, setDraft] = useState(() => formatTimestamp(value));
@@ -525,7 +549,7 @@ export function TimestampField({
   }
 
   return (
-    <label className="preflight-range-time-field">
+    <label className="preflight-range-time-field" data-active={active ? "true" : undefined}>
       <span>{label}</span>
       <input
         type="text"
@@ -533,11 +557,14 @@ export function TimestampField({
         autoComplete="off"
         spellCheck={false}
         value={draft}
-        aria-label={`${label} timestamp`}
+        aria-label={accessibleLabel ?? `${label} timestamp`}
         aria-describedby={describedBy}
         aria-invalid={invalid}
         data-over-source={parsedDraft !== null && parsedDraft > max ? "true" : undefined}
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          setFocused(true);
+          onActivate?.();
+        }}
         onChange={(event) => updateDraft(event.currentTarget.value)}
         onBlur={normalizeDraft}
         onKeyDown={(event) => {
@@ -547,6 +574,230 @@ export function TimestampField({
         }}
       />
     </label>
+  );
+}
+
+/** Exact In/Out fields and directly owned trim grips for one submitted-source interval. */
+export function RangeTrimControl({
+  start,
+  end,
+  duration,
+  maximumDuration,
+  describedBy,
+  invalid,
+  onChange,
+}: {
+  start: number;
+  end: number;
+  duration: number;
+  maximumDuration: number;
+  describedBy?: string;
+  invalid: boolean;
+  onChange: (range: { start?: number; end?: number }) => void;
+}) {
+  const safeDuration = Math.max(1, duration);
+  const [activeBoundary, setActiveBoundary] = useState<"start" | "end">("start");
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    boundary: "start" | "end";
+    pointerId: number;
+    offsetX: number;
+  } | null>(null);
+  const startPlaced = Number.isFinite(start) && start >= 0 && start <= safeDuration;
+  const endPlaced = Number.isFinite(end) && end >= 0 && end <= safeDuration;
+  const ordered = startPlaced && endPlaced && end > start;
+  const selectionDuration = Number.isFinite(start) && Number.isFinite(end) && end > start
+    ? end - start
+    : null;
+  const startInvalid = !startPlaced || (Number.isFinite(end) && start >= end);
+  const endInvalid = !endPlaced || (Number.isFinite(start) && end <= start);
+  const durationInvalid = selectionDuration !== null && selectionDuration > maximumDuration;
+
+  function position(value: number): number {
+    return (value / safeDuration) * 100;
+  }
+
+  function boundaryValue(boundary: "start" | "end"): number {
+    return boundary === "start" ? start : end;
+  }
+
+  function boundaryLimits(boundary: "start" | "end"): { minimum: number; maximum: number } {
+    if (boundary === "start" && endPlaced) {
+      return { minimum: 0, maximum: Math.max(0, end - Math.min(1, safeDuration)) };
+    }
+    if (boundary === "end" && startPlaced) {
+      return { minimum: Math.min(safeDuration, start + Math.min(1, safeDuration)), maximum: safeDuration };
+    }
+    return { minimum: 0, maximum: safeDuration };
+  }
+
+  function selectBoundary(boundary: "start" | "end", value: number): void {
+    const { minimum, maximum } = boundaryLimits(boundary);
+    const nextValue = Math.min(maximum, Math.max(minimum, value));
+    onChange({ [boundary]: Number(nextValue.toFixed(3)) });
+  }
+
+  function valueFromPointer(clientX: number, offsetX: number): number | null {
+    const track = trackRef.current;
+    if (!track) return null;
+    const bounds = track.getBoundingClientRect();
+    if (bounds.width <= 0) return null;
+    const proportion = Math.min(1, Math.max(0, (clientX - offsetX - bounds.left) / bounds.width));
+    if (proportion === 0) return 0;
+    if (proportion === 1) return safeDuration;
+    return Math.round(proportion * safeDuration);
+  }
+
+  function beginDrag(boundary: "start" | "end", event: ReactPointerEvent<HTMLDivElement>): void {
+    if (event.button !== 0) return;
+    const track = trackRef.current;
+    if (!track) return;
+    const bounds = track.getBoundingClientRect();
+    const value = boundaryValue(boundary);
+    const handleX = bounds.left + (value / safeDuration) * bounds.width;
+    event.preventDefault();
+    setActiveBoundary(boundary);
+    event.currentTarget.focus({ preventScroll: true });
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      boundary,
+      pointerId: event.pointerId,
+      offsetX: event.clientX - handleX,
+    };
+  }
+
+  function continueDrag(event: ReactPointerEvent<HTMLDivElement>): void {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const value = valueFromPointer(event.clientX, drag.offsetX);
+    if (value !== null) selectBoundary(drag.boundary, value);
+  }
+
+  function endDrag(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function selectWithKeyboard(
+    boundary: "start" | "end",
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ): void {
+    const currentValue = boundaryValue(boundary);
+    if (!Number.isFinite(currentValue)) return;
+    let nextValue: number | null = null;
+    const coarseStep = event.shiftKey ? 10 : 1;
+    const { minimum, maximum } = boundaryLimits(boundary);
+    if (event.key === "ArrowLeft" || event.key === "ArrowDown") nextValue = currentValue - coarseStep;
+    if (event.key === "ArrowRight" || event.key === "ArrowUp") nextValue = currentValue + coarseStep;
+    if (event.key === "PageDown") nextValue = currentValue - 10;
+    if (event.key === "PageUp") nextValue = currentValue + 10;
+    if (event.key === "Home") nextValue = minimum;
+    if (event.key === "End") nextValue = maximum;
+    if (nextValue === null) return;
+    event.preventDefault();
+    setActiveBoundary(boundary);
+    selectBoundary(boundary, nextValue);
+  }
+
+  return (
+    <div
+      className="preflight-range-trim-control"
+      data-invalid={invalid ? "true" : undefined}
+      data-active-boundary={activeBoundary}
+      role="group"
+      aria-label="Custom range trim"
+      aria-describedby={describedBy}
+    >
+      <div className="preflight-range-time-fields" role="group" aria-label="Range times">
+        <TimestampField
+          label="Start"
+          accessibleLabel="Start timestamp"
+          value={start}
+          max={safeDuration}
+          describedBy={describedBy}
+          invalid={startInvalid}
+          active={activeBoundary === "start"}
+          onActivate={() => setActiveBoundary("start")}
+          onChange={(nextStart) => onChange({ start: nextStart })}
+        />
+        <output
+          className="preflight-range-duration"
+          data-invalid={invalid || durationInvalid ? "true" : undefined}
+          aria-label="Selected duration"
+        >
+          {selectionDuration === null ? "Range incomplete" : `${formatTimestamp(selectionDuration)} selected`}
+        </output>
+        <TimestampField
+          label="End"
+          accessibleLabel="End timestamp"
+          value={end}
+          max={safeDuration}
+          describedBy={describedBy}
+          invalid={endInvalid}
+          active={activeBoundary === "end"}
+          onActivate={() => setActiveBoundary("end")}
+          onChange={(nextEnd) => onChange({ end: nextEnd })}
+        />
+      </div>
+      <div className="preflight-range-source-strip" role="group" aria-label="Source range">
+        <div
+          ref={trackRef}
+          className="preflight-range-trim-track"
+          data-valid-geometry={ordered ? "true" : "false"}
+          aria-hidden="true"
+        >
+          <span className="preflight-range-trim-rail" />
+          {ordered && (
+            <span
+              className="preflight-range-trim-selection"
+              data-invalid={invalid ? "true" : undefined}
+              style={{ left: `${position(start)}%`, right: `${100 - position(end)}%` }}
+            />
+          )}
+        </div>
+        {(["start", "end"] as const).map((boundary) => {
+          const value = boundaryValue(boundary);
+          const placed = boundary === "start" ? startPlaced : endPlaced;
+          const endpointInvalid = boundary === "start" ? startInvalid : endInvalid;
+          if (!placed) return null;
+          return (
+            <div
+              key={boundary}
+              className="preflight-range-trim-handle"
+              data-boundary={boundary}
+              data-active={activeBoundary === boundary ? "true" : undefined}
+              data-invalid={invalid || endpointInvalid ? "true" : undefined}
+              style={{ left: `${position(value)}%` }}
+              role="slider"
+              tabIndex={0}
+              aria-label={`${boundary === "start" ? "Start" : "End"} trim handle`}
+              aria-orientation="horizontal"
+              aria-valuemin={0}
+              aria-valuemax={safeDuration}
+              aria-valuenow={value}
+              aria-valuetext={`${formatTimestamp(value)} ${boundary}`}
+              aria-invalid={invalid || endpointInvalid}
+              aria-describedby={describedBy}
+              onFocus={() => setActiveBoundary(boundary)}
+              onKeyDown={(event) => selectWithKeyboard(boundary, event)}
+              onPointerDown={(event) => beginDrag(boundary, event)}
+              onPointerMove={continueDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+            >
+              <span aria-hidden="true" />
+            </div>
+          );
+        })}
+      </div>
+      <div className="preflight-range-source-scale" aria-hidden="true">
+        <span>0:00</span>
+        <span>{formatTimestamp(duration)} source</span>
+      </div>
+    </div>
   );
 }
 

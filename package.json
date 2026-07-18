@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro check && astro build",
+    "docs:check": "node scripts/check-docs.mjs",
     "bench:check": "node scripts/check-bench.mjs",
     "evidence:check": "node scripts/index-recorded-evidence.mjs --run run-005 --check && node scripts/index-recorded-evidence.mjs --run run-006 --check",
     "memory:check": "node --test tests/studio-memory-producer.test.mjs && node scripts/check-memory.mjs",
@@ -23,7 +24,7 @@
     "runtime:host:caption-real": "node scripts/run-runtime-host.ts --source-directory public/demo/runs/run-005 --executor deterministic --caption-executor openai --allow-real-caption-production",
     "runtime:smoke:codex": "test -n \"$STUDIO_OWNED_SWARM_MODEL\" && node scripts/run-local-worker.ts --source-directory public/demo/runs/run-005 --source-language-mode declared --source-language ko --target-language en --language-pack ko-v3 --output-depth evidence --model \"$STUDIO_OWNED_SWARM_MODEL\"",
     "runtime:proof:owned-swarm": "node --test tests/studio-owned-swarm-real-codex.test.ts",
-    "studio:check": "npm run build && npm run bench:check && npm run evidence:check && npm run memory:check && npm run speech:check && npm run language:check && npm run acoustic:check && npm run frames:check && npm run ocr:check && npm run speakers:check && npm run source:check && npm run runtime:check && npm run studio:qa:list",
+    "studio:check": "npm run docs:check && npm run build && npm run bench:check && npm run evidence:check && npm run memory:check && npm run speech:check && npm run language:check && npm run acoustic:check && npm run frames:check && npm run ocr:check && npm run speakers:check && npm run source:check && npm run runtime:check && npm run studio:qa:list",
     "studio:qa": "playwright test",
     "studio:qa:list": "playwright test --list",
     "preview": "astro preview"

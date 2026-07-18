@@ -1,0 +1,551 @@
+.learning-workspace {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-height: 520px;
+  flex-direction: column;
+  border: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--paper-elevated, #fff);
+}
+
+.learning-view-switch {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  padding: 7px;
+  border-bottom: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+  background: var(--paper-soft, #f7f7f5);
+}
+
+.learning-session-note {
+  margin-left: auto;
+  padding-right: 5px;
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.learning-view-switch button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  background: transparent;
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.learning-view-switch button[aria-pressed="true"] {
+  color: var(--ink, #161d1b);
+  background: var(--paper-elevated, #fff);
+  box-shadow: 0 0 0 1px var(--line, rgba(22, 29, 27, 0.1));
+}
+
+.learning-caption-guide {
+  flex: none;
+  margin: 0;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.learning-caption-guide b {
+  color: var(--ink, #161d1b);
+  font-weight: var(--weight-medium, 500);
+}
+
+.result-main .learning-workspace .cues {
+  flex: 1;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.learning-workspace .cue {
+  cursor: default;
+}
+
+.learning-workspace .cue-src {
+  font-size: 1.03rem;
+  line-height: 1.58;
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.learning-workspace .cue-src::selection,
+.learning-workspace .cue-src *::selection {
+  color: var(--ink, #161d1b);
+  background: color-mix(in srgb, var(--accent, #2f746e) 24%, transparent);
+}
+
+.learning-workspace .cue-tgt {
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.learning-workspace .cue.is-pinned {
+  border-left-color: var(--ink, #161d1b);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--ink, #161d1b) 18%, transparent);
+}
+
+.cue-seek {
+  align-self: start;
+  min-width: 42px;
+  min-height: 34px;
+  margin: -6px 0 0 -6px;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cue-seek:hover,
+.cue-seek:focus-visible {
+  color: var(--accent, #2f746e);
+  background: var(--accent-soft, rgba(47, 116, 110, 0.08));
+}
+
+.learning-span {
+  position: relative;
+  min-height: 32px;
+  margin: -5px 1px;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 5px;
+  color: inherit;
+  background: color-mix(in srgb, var(--accent, #2f746e) 8%, transparent);
+  font: inherit;
+  font-weight: var(--weight-medium, 500);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent, #2f746e) 60%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.learning-span:hover,
+.learning-span:focus-visible {
+  color: var(--accent, #2f746e);
+  background: color-mix(in srgb, var(--accent, #2f746e) 20%, transparent);
+}
+
+.learning-sentence-action {
+  align-self: flex-start;
+  min-height: 30px;
+  padding: 4px 0;
+  border: 0;
+  color: var(--accent, #2f746e);
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.learning-sentence-action:hover,
+.learning-sentence-action:focus-visible {
+  color: var(--ink, #161d1b);
+}
+
+.learning-sentence-action.is-unavailable {
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+}
+
+.learning-view-switch button:focus-visible,
+.cue-seek:focus-visible,
+.learning-span:focus-visible,
+.learning-sentence-action:focus-visible,
+.learning-panel-close:focus-visible,
+.learning-keep:focus-visible,
+.learning-my-set li button:focus-visible,
+.learning-prototype-boundary summary:focus-visible,
+.learning-unavailable-facets summary:focus-visible {
+  outline: 2px solid var(--accent, #2f746e);
+  outline-offset: 2px;
+}
+
+.learning-workspace-failure {
+  flex: none;
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+}
+
+.learning-workspace-failure b {
+  display: block;
+  color: var(--ink, #161d1b);
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium, 500);
+}
+
+.learning-workspace-failure p {
+  margin: 3px 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.learning-workspace-failure code {
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6rem;
+}
+
+.cue-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.cue-unavailable > span {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.learning-panel {
+  flex: none;
+  max-height: min(360px, 48vh);
+  padding: 14px 15px;
+  border-bottom: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+  overflow-y: auto;
+  color: var(--ink, #161d1b);
+  background: var(--paper-elevated, #fff);
+  scroll-padding-top: 72px;
+}
+
+.learning-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.learning-panel-head > div {
+  min-width: 0;
+}
+
+.learning-panel-head span,
+.learning-my-set header > span {
+  color: var(--accent, #2f746e);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.61rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.learning-panel-head h3,
+.learning-my-set h3 {
+  margin: 3px 0 1px;
+  font-size: 1.08rem;
+  font-weight: var(--weight-medium, 500);
+  line-height: 1.35;
+}
+
+.learning-panel-head p {
+  margin: 0;
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-family: var(--font-mono, monospace);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.learning-panel-close,
+.learning-my-set li button {
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 0;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.learning-panel-close:hover,
+.learning-panel-close:focus-visible,
+.learning-my-set li button:hover,
+.learning-my-set li button:focus-visible {
+  color: var(--ink, #161d1b);
+  text-decoration: underline;
+}
+
+.learning-panel-translation {
+  margin: 12px 0 0;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.learning-insights {
+  margin-top: 10px;
+}
+
+.learning-insight {
+  padding: 11px 0;
+  border-top: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+}
+
+.learning-insight h4 {
+  margin: 0 0 6px;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-family: var(--font-mono, monospace);
+  font-size: 0.63rem;
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.learning-insight p {
+  margin: 0 0 7px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.learning-insight p:last-child {
+  margin-bottom: 0;
+}
+
+.learning-insight dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.learning-insight dl div {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.32fr) minmax(0, 1fr);
+  gap: 9px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.learning-insight dt {
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+}
+
+.learning-insight dd {
+  margin: 0;
+}
+
+.learning-unavailable {
+  margin-top: 10px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong, rgba(22, 29, 27, 0.16));
+}
+
+.learning-unavailable b {
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium, 500);
+}
+
+.learning-unavailable p {
+  margin: 3px 0;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.learning-unavailable code {
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6rem;
+}
+
+.learning-unavailable-facets {
+  border-top: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+}
+
+.learning-unavailable-facets > summary {
+  padding: 11px 0;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.learning-unavailable-facets[open] > summary {
+  color: var(--ink, #161d1b);
+}
+
+.learning-unavailable-facets .learning-insight:first-of-type {
+  border-top: 0;
+}
+
+.learning-panel-actions {
+  padding: 12px 0 3px;
+  border-top: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+}
+
+.learning-keep {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent, #2f746e);
+  border-radius: 7px;
+  color: var(--paper-elevated, #fff);
+  background: var(--accent, #2f746e);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.learning-keep:disabled {
+  border-color: var(--line-strong, rgba(22, 29, 27, 0.16));
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  background: transparent;
+  cursor: default;
+}
+
+.learning-prototype-boundary {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+}
+
+.learning-prototype-boundary summary {
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.learning-prototype-boundary p {
+  margin: 7px 0 0;
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.learning-my-set {
+  flex: 1;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.learning-my-set header p,
+.learning-my-set-empty {
+  margin: 5px 0 0;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.learning-my-set ul {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.learning-my-set li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+}
+
+.learning-my-set li b {
+  display: block;
+  font-size: 0.96rem;
+  font-weight: var(--weight-medium, 500);
+}
+
+.learning-my-set li span {
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-family: var(--font-mono, monospace);
+  font-size: 0.63rem;
+}
+
+.learning-my-set li p {
+  margin: 4px 0 0;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-size: 0.8rem;
+}
+
+@media (max-width: 820px) {
+  .learning-workspace {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .result-main .learning-workspace .cues {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .learning-view-switch button,
+  .learning-sentence-action,
+  .cue-seek {
+    min-height: 44px;
+  }
+
+  .learning-span {
+    min-height: 44px;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .learning-panel-close,
+  .learning-keep,
+  .learning-my-set li button {
+    min-height: 44px;
+  }
+
+  .learning-panel {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    max-height: min(72dvh, 620px);
+    padding: 18px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    border: 1px solid var(--line-strong, rgba(22, 29, 27, 0.16));
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -12px 36px rgba(22, 29, 27, 0.18);
+    overscroll-behavior: contain;
+  }
+
+  .learning-panel::before {
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: -7px auto 11px;
+    border-radius: 999px;
+    background: var(--line-strong, rgba(22, 29, 27, 0.16));
+    content: "";
+  }
+
+  .learning-panel-head {
+    position: sticky;
+    top: -18px;
+    z-index: 1;
+    padding: 12px 0 10px;
+    border-bottom: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+    background: var(--paper-elevated, #fff);
+  }
+
+  .result-viewer[data-view-mode="fullscreen"] .learning-workspace {
+    overflow: hidden;
+  }
+
+  .result-viewer[data-view-mode="fullscreen"] .learning-workspace .cues {
+    max-height: none;
+    overflow-y: auto;
+  }
+}

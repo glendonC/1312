@@ -1,17 +1,13 @@
 # RFC 0001 — The Miss-to-Gold Conveyor
 
-Status: **scaffold implemented** (2026-07-14, same day as proposal). The contracts, tools, and
-guards below are code: `bench/schemas/gold.schema.json` + `adjudication.schema.json`,
-`scripts/lib/bench-gold.mjs`, `scripts/mine-gold-candidates.mjs`, `scripts/freeze-pack.mjs`,
-`scripts/score-run.mjs`, the extended `scripts/check-bench.mjs` (discovery, contamination and
-routing guards, score-everything, fail-closed drills), the content-bound drafting prompt at
-`bench/prompts/gold-drafter-v1/`, its fail-closed materializer, the human worksheet at
-`bench/ADJUDICATION.md`, and the ablation-bound rule gate in
-`scripts/lib/memory-review.mjs` (invariant 6 — the skeleton key is closed). run-006 is mined and
-routed gold (13 candidates). The only candidate-shaped draft is explicitly a non-authoritative
-example produced without direct audio audition; no real gold is drafted or adjudicated, and
-nothing is frozen or scored. The remaining constraints are an audio-grounded Korean draft, a
-second Korean-fluent blinded reviewer, and at least two independently sourced control clips.
+Status: **frozen baseline and ablation foundation implemented** (updated 2026-07-18). The conveyor
+contracts and guards below are code. `hard-ko-v1` is frozen with three clips and six human
+adjudication receipts. run-007 has one post-freeze capture, human output labels, and a re-derived
+score receipt with `judge: null`. `studio.bench.ablation.v1` now pre-registers one exact
+content-addressed configuration delta against current frozen pack and freeze bytes, keeps results
+null, requires at least three paired repetitions per clip, and separates structural diagnostics
+from human semantic scoring. The first registration plans raw audio versus eligible anonymous U7
+stems; it contains no captures or result claim. The public aggregate is still a protocol draft.
 Scope: `bench/` contracts, `scripts/` producers, `docs/`. No contact with `src/studio/preflight/*`
 (language-detection workstream), `src/features/*`, or `src/pages/*` (UI workstream).
 Deliverable of: the 1321 technical north-star review (six repo evidence readers, seven bet
@@ -20,32 +16,29 @@ champions, three judges, three adversarial skeptics; judges voted 3–0 for this
 ## One line
 
 Build the conveyor that turns each run's own misses into **agent-drafted, human-adjudicated,
-receipt-frozen gold**, and the scorer/comparator over it — because every learning bet in this
-repo (correction pairs, rules, routers, policies) is currently deadlocked on gold that does not
-exist, while the fail-closed slots that will receive it are already built and waiting.
+receipt-frozen gold**, then pre-register, score, and compare exact changes against it. Frozen gold
+now exists; repeated captures, variance, later packs, and the report-series comparator remain open.
 
 ## The deadlock this resolves
 
-Verified in-repo on 2026-07-14:
+At proposal time on 2026-07-14, the repository had these blockers:
 
-- `scripts/lib/memory-review.mjs:371-388` — an accepted **rule** requires a scored, frozen
-  benchmark receipt. `bench/` is `protocol_draft`: no packs, no gold, no scored report has ever
-  existed. The most powerful memory kind is structurally unreachable.
-- `public/demo/runs/run-006/score.json` — `per_line: []`, `trail: []`, `delta_vs_cold: null`,
+- accepted behavioral rules required scored frozen benchmark evidence, but no frozen pack or score
+  receipt existed;
+- `public/demo/runs/run-006/score.json` had `per_line: []`, `trail: []`, `delta_vs_cold: null`,
   status `unscored`, with the note "this run cannot mark its own homework." The slots are
-  deliberately reserved for exactly this artifact.
-- `bench/scores/` exists and is empty. `bench/runs/run-006/capture.json` is already pinned
+  deliberately reserved for exactly this artifact;
+- `bench/scores/` was empty, while `bench/runs/run-006/capture.json` was already pinned
   ("so a later run has something to be compared against"). `bench/schemas/capture.schema.json`
   keys units by **time** and pins `unit.gold` to JSON type `null` so a capture can never carry
-  its own answer key.
-- One real run (run-006) yields the raw candidates on disk today: 4 `asr_agreement` withholds
+  its own answer key;
+- one real run, run-006, yielded raw candidates: 4 `asr_agreement` withholds
   with machine-readable gate `{id, reason}`, 3 uncorroborated commits (`agreement: null`),
   5 ko-v3 phenomenon-flagged hard lines, and 15 inline cold-vs-prepped contrastive pairs.
-  Nothing conveys them into `bench/packs/`.
+  Nothing conveyed them into `bench/packs/`.
 
-Everything downstream — Run-1→N curves, rule promotion, correction-pair training labels,
-router/bandit reward, hard-audio capability deltas — is a promissory note only frozen
-adjudicated gold can cash.
+The frozen pack and run-007 score resolve the first evidence deadlock. They do not resolve
+Run-1-to-N curves, variance, later-pack replication, raw-versus-stem outcomes, or the comparator.
 
 ## The conveyor
 
@@ -56,6 +49,7 @@ run artifacts (withholds, uncorroborated commits, phenomenon hits, cold/prepped 
   -> draft       Codex/GPT-5.6 agents draft korean_gold + critical units as PROPOSALS
   -> adjudicate  two blinded human reviewers; content-bound decision receipts
   -> freeze      scripts/freeze-pack.mjs advances clip status; pack becomes immutable
+  -> register    scripts/register-ablation.mjs binds one exact result-free config delta
   -> score       scripts/score-run.mjs fills per_line/trail/delta_vs_cold + score receipt
   -> compare     report-series comparator: Run 1 -> N on the SAME frozen pack
 ```
@@ -66,10 +60,10 @@ test data.
 
 ## Contracts (all content-addressed, all append-only)
 
-The schemas live in `bench/schemas/` (`gold.schema.json`, `adjudication.schema.json`); the
-candidates manifest, pack, freeze, output-labels, and score contracts are enforced by the hand
-validators in `scripts/lib/bench-gold.mjs`. The stub directory this RFC originally shipped with
-has been retired in favour of the real files.
+The schemas live in `bench/schemas/` (`gold.schema.json`, `adjudication.schema.json`, and
+`ablation.schema.json`). Candidate, pack, freeze, output-label, score, and ablation invariants are
+enforced by `scripts/lib/bench-gold.mjs`, `scripts/lib/bench-ablation.mjs`, and `check-bench`. The
+stub directory this RFC originally shipped with has been retired in favour of the real files.
 
 ### `studio.bench.gold.v1` (per clip)
 
@@ -114,6 +108,18 @@ and prompt hash plus a sampled human audit receipt, not as a default. `check-ben
 every score receipt from its bound bytes with the same pure scorer; a receipt that does not
 re-derive fails the build.
 
+### `studio.bench.ablation.v1` (result-free registration)
+
+Emitted immutably by `register-ablation.mjs` under `bench/ablations/<slug>/registration.json`.
+The tool stamps registration time and derives pack, freeze, configuration, and registration ids.
+The validator requires a currently frozen pack, registration strictly after freeze, exactly one
+scalar leaf difference between same-shaped configs, at least three paired repetitions per clip,
+score-everything, all declared stems without best-stem selection, and `results: null`. The semantic
+lane remains human-label-only `studio.bench.score.v1` with `judge: null`; structural eligibility,
+availability, lineage, and
+capture-completeness diagnostics are explicitly non-semantic. A registration is a plan, not a
+result or quality claim.
+
 ## Honesty invariants (each mechanical, each fail-closed)
 
 1. **Pre-registration.** Scoring refuses a capture dated on or before the pack's freeze day
@@ -138,10 +144,10 @@ re-derive fails the build.
    clip); refuse to headline any Run-1→N delta smaller than that spread. At the initial pack
    size (~40–60 units) only step-changes ≥ ~0.25 are resolvable; incremental Run-N vs Run-N+1
    claims wait for ~200+ units.
-6. **Ablation-bound rule promotion** — fixes a live gap found during this review:
-   `memory-review.mjs` currently accepts a rule given *any* scored frozen report with matching
-   `pack_id`. One scored report is a skeleton key for unlimited rules. The gate must instead
-   require a **pair** of scored reports on the same frozen pack whose subject configs are
+6. **Ablation-bound rule promotion** closes a live gap found during the original review. The old
+   gate accepted a rule given any scored frozen report with matching `pack_id`, so one report was
+   a skeleton key for unlimited rules. The implemented gate instead requires a **pair** of scored
+   reports on the same frozen pack whose subject configs are
    content-addressed and provably include/exclude the proposed rule (rule `content_id` stamped
    into `result.config`), with the delta recorded in the decision receipt.
 7. **Control clips and pack versioning.** Every pack carries ≥2 independently sourced clips not
@@ -191,11 +197,10 @@ re-derive fails the build.
    self-control report all fail; only the honest pair accepts, and the delta is recorded on the
    decision receipt.
 
-Post-week: have a Korean-fluent drafter/reviewer audition and correct the real run-006 candidate,
-recruit the second Korean-fluent blinded reviewer (a contractor is fine — without a real second
-human, gold is receipt theater), source at least two independent controls, then complete and
-freeze `hard-ko-v1` (5 clips). Only after that: first scored report, first ablation-bound rule
-acceptance, report-series comparator, pack v2.
+Post-week update: `hard-ko-v1` is frozen at three clips and run-007 is scored from human labels with
+`judge: null`. One raw-versus-eligible-stem experiment is pre-registered with no results. Next are
+the registered paired captures and labels, variance measurement, the report-series comparator, and
+a later independently frozen pack before any generalization claim.
 
 ## Failure modes
 

@@ -1,0 +1,118 @@
+{
+  "ablation_id": "bench-ablation:sha256:524b36e212177061cf4fa6226e5e56c6b6b8cedb91509e0e4dfa97e0e52104cb",
+  "schema": "studio.bench.ablation.v1",
+  "slug": "hard-ko-v1-raw-vs-eligible-stem",
+  "status": "registered",
+  "registered_at": "2026-07-18T13:41:09.000Z",
+  "family": "raw_vs_eligible_stem",
+  "hypothesis": "Changing only recognized audio input from preserved raw audio to eligible anonymous U7 estimates may change the human-labelled four-way outcome distribution.",
+  "pack": {
+    "pack_id": "hard-ko-v1",
+    "manifest": {
+      "path": "bench/packs/hard-ko-v1/pack.json",
+      "content_id": "sha256:12041b80b72c3d6135a26fc68eb6820288dd345cc2d9ed1921ac5226700e3adb",
+      "bytes": 4839
+    },
+    "freeze": {
+      "path": "bench/packs/hard-ko-v1/freeze.json",
+      "content_id": "sha256:8feeac2614a08ecfc21f98ca1e8cf725106a3b94332a5e46823cf72222a1aec8",
+      "bytes": 4931
+    }
+  },
+  "subject": {
+    "system_id": "1321-u7-recognizer-ablation-v1",
+    "baseline": {
+      "config_id": "bench-config:sha256:db0f6f1d5bd28ca3022cf797d2e73fe9b8374aab10fe80232f5ab946a4d3db4a",
+      "config": {
+        "audio": {
+          "input_mode": "raw",
+          "variant_eligibility": "receipt_backed_u6_speaker_overlap_or_u1_acoustic_mixed",
+          "ineligible_variant": "missing_or_withheld"
+        },
+        "separation": {
+          "method_id": "speechbrain-sepformer-wsj02mix",
+          "method_version": "1",
+          "model_id": "speechbrain/sepformer-wsj02mix",
+          "model_revision": "3a2826343a10e2d2e8a75f79aeab5ff3a2473531",
+          "configuration_content_id": "sha256:ddf92728a965dc19e84a530be2ce8dcc64cec5828d3de046597c0bc6bfa5b23b",
+          "stem_roles": [
+            "source_estimate_1",
+            "source_estimate_2"
+          ]
+        },
+        "comparison": {
+          "recognizer_scope": "same_current_run_contract",
+          "variant_estimates": "score_each_declared_stem_no_selection",
+          "semantic_preference": null
+        }
+      }
+    },
+    "variant": {
+      "config_id": "bench-config:sha256:49fdc2ca448af627f549e6e2c22c870f734c77cc59a9d49bdd33fd01e7516f0f",
+      "config": {
+        "audio": {
+          "input_mode": "eligible_anonymous_stems",
+          "variant_eligibility": "receipt_backed_u6_speaker_overlap_or_u1_acoustic_mixed",
+          "ineligible_variant": "missing_or_withheld"
+        },
+        "separation": {
+          "method_id": "speechbrain-sepformer-wsj02mix",
+          "method_version": "1",
+          "model_id": "speechbrain/sepformer-wsj02mix",
+          "model_revision": "3a2826343a10e2d2e8a75f79aeab5ff3a2473531",
+          "configuration_content_id": "sha256:ddf92728a965dc19e84a530be2ce8dcc64cec5828d3de046597c0bc6bfa5b23b",
+          "stem_roles": [
+            "source_estimate_1",
+            "source_estimate_2"
+          ]
+        },
+        "comparison": {
+          "recognizer_scope": "same_current_run_contract",
+          "variant_estimates": "score_each_declared_stem_no_selection",
+          "semantic_preference": null
+        }
+      }
+    }
+  },
+  "delta": {
+    "path": "/audio/input_mode",
+    "baseline": "raw",
+    "variant": "eligible_anonymous_stems"
+  },
+  "capture_policy": {
+    "selection": "all_frozen_pack_clips",
+    "minimum_repetitions_per_clip": 3,
+    "pairing": "same_clip_and_repetition",
+    "capture_after_registration": true,
+    "score_every_capture": true,
+    "variant_inputs": "all_declared_stems_no_selection",
+    "ineligible_variant_outcome": "missing_or_withheld"
+  },
+  "lanes": {
+    "semantic": {
+      "authority": "human_labels_only",
+      "score_schema": "studio.bench.score.v1",
+      "judge": null,
+      "outcomes": [
+        "correct",
+        "wrong",
+        "withheld",
+        "missing"
+      ],
+      "catastrophic_counts": true,
+      "headline_source": "score_receipts_only"
+    },
+    "structural": {
+      "authority": "diagnostic_only",
+      "measurements": [
+        "eligibility",
+        "producer_availability",
+        "lineage_validity",
+        "capture_completeness"
+      ],
+      "semantic_authority": false
+    }
+  },
+  "results": null,
+  "notes": "Pre-registration only. Structural raw/stem comparability is not correctness, quality, or preference. The capture package must score every declared anonymous stem without selection, retain every paired repetition, and leave absent or ineligible variant output missing or withheld."
+}

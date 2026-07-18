@@ -44,6 +44,11 @@ score.
 - **Bet G first scored capture:** `hard-ko-v1` is frozen and the human-labeled run-007 score receipt
   exists with `judge: null`. It is one benchmark data point, not production semantic QC, calibration,
   or a general quality/improvement claim.
+- **Bet G ablation registration foundation:** `studio.bench.ablation.v1` binds one exact
+  content-addressed config leaf delta to current frozen pack and freeze bytes, keeps results and
+  model judge null, requires three paired repetitions per frozen clip, and separates structural
+  diagnostics from human semantic scores. The first registration plans raw versus eligible
+  anonymous U7 stems. No registered capture, variance, or result exists yet.
 - **U1 acoustic triage:** a pinned local YAMNet-compatible ONNX producer now operates over the exact
   sealed mono-16 kHz owned-media bytes, produces a complete closed-vocabulary partition plus a
   separate execution receipt, and seals both additively in preflight V4. Spawned children can read
@@ -222,7 +227,7 @@ indefinite deferrals or a one-day implementation claim:
    deeper context-specialist synthesis remain. Default v3 conflict derivation is wired but dormant.
 9. R2 optional offline runtime wiring - implemented behind dormant root authority and explicit host
    composition; a real isolated read-only driver remains after media senses and R1.
-10. G1 semantic evaluation expansion, registered ablations, repeated captures, variance, and later
+10. G1 semantic evaluation expansion, registered ablation captures, repeated scores, variance, and later
     packs; structural QC remains separate.
 
 ### Parked / out of this climb
@@ -241,8 +246,8 @@ indefinite deferrals or a one-day implementation claim:
 1. Catch the UI up to the validated production projections without inventing missing runtime facts.
 2. Make one owned-path walkthrough demoable end to end: source → plan → bounded swarm → study → human
    approval → private captions/QC, with the recorded lineage visible.
-3. Package the frozen `hard-ko-v1` and human-labeled run-007 receipt as the separate Bet G baseline;
-   add registered ablations and variance later without recasting that score as runtime semantic QC.
+3. Package the pre-registered `hard-ko-v1` raw-versus-eligible-stem paired captures and human labels;
+   measure variance later without recasting run-007 or structural diagnostics as runtime semantic QC.
 
 ## Honesty non-claims
 

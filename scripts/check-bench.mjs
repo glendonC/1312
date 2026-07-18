@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
+import { validateAblationRegistration } from "./lib/bench-ablation.mjs";
 import {
   contaminationGuard,
   freezeChecks,
@@ -593,6 +594,45 @@ if (existsSync(scoresDir)) {
   }
 }
 
+const ablationsDir = join(ROOT, "bench/ablations");
+const ablations = [];
+const ablationIds = new Set();
+if (existsSync(ablationsDir)) {
+  for (const entry of readdirSync(ablationsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const path = join(ablationsDir, entry.name, "registration.json");
+    assert(existsSync(path), `ablation directory ${entry.name} has no registration.json`);
+    const registration = await validateAblationRegistration(
+      await readJsonFile(path, `ablation registration ${entry.name}`),
+      { workspaceRoot: ROOT, context: `ablation registration ${entry.name}` },
+    );
+    assert(registration.slug === entry.name, `ablation directory ${entry.name} holds ${registration.slug}`);
+    assert(!ablationIds.has(registration.ablation_id), `duplicate ablation id ${registration.ablation_id}`);
+    ablationIds.add(registration.ablation_id);
+    ablations.push(registration);
+  }
+}
+
+let ablationHistory = [];
+try {
+  ablationHistory = execSync("git log --diff-filter=A --name-only --format= -- bench/ablations", {
+    cwd: ROOT,
+    stdio: "pipe",
+  })
+    .toString()
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.endsWith("/registration.json"));
+} catch {
+  console.log("ablation history unverified: not a git checkout or git unavailable");
+}
+for (const historical of new Set(ablationHistory)) {
+  assert(
+    existsSync(join(ROOT, historical)),
+    `ablation registration ${historical} was committed and later deleted; result-free registration is permanent`,
+  );
+}
+
 const ledger = await loadLedger({
   store: join(ROOT, "memory/review"),
   workspaceRoot: ROOT,
@@ -622,7 +662,7 @@ scoreEverythingCheck({ freezes, captures, scores });
 
 const goldRouted = manifests.filter(({ manifest }) => manifest.routing.route === "gold").length;
 console.log(
-  `conveyor check passed: ${manifests.length} candidates manifest(s) (${goldRouted} routed gold), ${looseGoldCandidates} candidate-only gold file(s), ${adjudicationCount} adjudication receipt(s), ${packClips.length} pack clip(s), ${freezes.length} frozen pack(s), ${scores.length} score receipt(s), ${ledger.proposals.length} memory proposal(s) clean`,
+  `conveyor check passed: ${manifests.length} candidates manifest(s) (${goldRouted} routed gold), ${looseGoldCandidates} candidate-only gold file(s), ${adjudicationCount} adjudication receipt(s), ${packClips.length} pack clip(s), ${freezes.length} frozen pack(s), ${scores.length} score receipt(s), ${ablations.length} result-free ablation registration(s), ${ledger.proposals.length} memory proposal(s) clean`,
 );
 
 /* ------------------------------------------------------- fail-closed drills */

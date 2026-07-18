@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.dev/bench/schemas/ablation.schema.json",
+  "title": "Frozen-pack ablation pre-registration",
+  "description": "A content-addressed, result-free plan for one exact producer configuration delta over one frozen pack. Structural diagnostics remain separate from human semantic scoring.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ablation_id",
+    "slug",
+    "status",
+    "registered_at",
+    "family",
+    "hypothesis",
+    "pack",
+    "subject",
+    "delta",
+    "capture_policy",
+    "lanes",
+    "results",
+    "notes"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "studio.bench.ablation.v1" },
+    "ablation_id": {
+      "type": "string",
+      "pattern": "^bench-ablation:sha256:[a-f0-9]{64}$"
+    },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "status": { "const": "registered" },
+    "registered_at": { "type": "string", "format": "date-time" },
+    "family": {
+      "enum": [
+        "acoustic_policy",
+        "frame_context",
+        "research_context",
+        "raw_vs_eligible_stem",
+        "restudy_pass"
+      ]
+    },
+    "hypothesis": { "type": "string", "minLength": 1 },
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack_id", "manifest", "freeze"],
+      "properties": {
+        "pack_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "manifest": { "$ref": "#/$defs/fileBinding" },
+        "freeze": { "$ref": "#/$defs/fileBinding" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system_id", "baseline", "variant"],
+      "properties": {
+        "system_id": { "type": "string", "minLength": 1 },
+        "baseline": { "$ref": "#/$defs/configuration" },
+        "variant": { "$ref": "#/$defs/configuration" }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "baseline", "variant"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/(?:[^~/]|~0|~1)+(?:/(?:[^~/]|~0|~1)+)*$" },
+        "baseline": { "$ref": "#/$defs/scalar" },
+        "variant": { "$ref": "#/$defs/scalar" }
+      }
+    },
+    "capture_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection",
+        "minimum_repetitions_per_clip",
+        "pairing",
+        "capture_after_registration",
+        "score_every_capture",
+        "variant_inputs",
+        "ineligible_variant_outcome"
+      ],
+      "properties": {
+        "selection": { "const": "all_frozen_pack_clips" },
+        "minimum_repetitions_per_clip": { "type": "integer", "minimum": 3 },
+        "pairing": { "const": "same_clip_and_repetition" },
+        "capture_after_registration": { "const": true },
+        "score_every_capture": { "const": true },
+        "variant_inputs": { "const": "all_declared_stems_no_selection" },
+        "ineligible_variant_outcome": { "const": "missing_or_withheld" }
+      }
+    },
+    "lanes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semantic", "structural"],
+      "properties": {
+        "semantic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority",
+            "score_schema",
+            "judge",
+            "outcomes",
+            "catastrophic_counts",
+            "headline_source"
+          ],
+          "properties": {
+            "authority": { "const": "human_labels_only" },
+            "score_schema": { "const": "studio.bench.score.v1" },
+            "judge": { "type": "null" },
+            "outcomes": {
+              "type": "array",
+              "prefixItems": [
+                { "const": "correct" },
+                { "const": "wrong" },
+                { "const": "withheld" },
+                { "const": "missing" }
+              ],
+              "items": false,
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "catastrophic_counts": { "const": true },
+            "headline_source": { "const": "score_receipts_only" }
+          }
+        },
+        "structural": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authority", "measurements", "semantic_authority"],
+          "properties": {
+            "authority": { "const": "diagnostic_only" },
+            "measurements": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "eligibility",
+                  "producer_availability",
+                  "lineage_validity",
+                  "capture_completeness"
+                ]
+              }
+            },
+            "semantic_authority": { "const": false }
+          }
+        }
+      }
+    },
+    "results": { "type": "null" },
+    "notes": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_id", "config"],
+      "properties": {
+        "config_id": {
+          "type": "string",
+          "pattern": "^bench-config:sha256:[a-f0-9]{64}$"
+        },
+        "config": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": true
+        }
+      }
+    },
+    "scalar": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" }
+      ]
+    }
+  }
+}

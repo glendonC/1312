@@ -1,5 +1,6 @@
 /**
- * The conveyor's contracts: candidates -> gold -> adjudication -> freeze -> score.
+ * The conveyor's contracts: candidates -> gold -> adjudication -> freeze -> score, plus
+ * result-free frozen-pack ablation pre-registration.
  *
  * Agents draft; humans decide; code freezes; nothing scores itself. Every artifact here is
  * content-addressed and append-only, and every claim a later stage relies on is re-derived from
@@ -17,6 +18,8 @@
  *   studio.bench.output-labels.v1  human judgments of one capture's emitted lines against gold
  *   studio.bench.score.v1        the scored result: mechanical withheld/missing, human-labelled
  *                                correct/wrong, four-way outcomes, null-never-zero rates
+ *   studio.bench.ablation.v1     one exact config delta, bound before captures to frozen bytes;
+ *                                results null and structural diagnostics non-semantic
  *
  * What is mechanical and what is human is deliberate: withheld and missing are read off the
  * capture (a gate either fired or it did not), while correct/wrong/catastrophic exist ONLY as
@@ -39,6 +42,7 @@ export const BENCH_GOLD_SCHEMAS = Object.freeze({
   freeze: "studio.bench.freeze.v1",
   labels: "studio.bench.output-labels.v1",
   score: "studio.bench.score.v1",
+  ablation: "studio.bench.ablation.v1",
 });
 
 export const CANDIDATE_SIGNALS = Object.freeze([

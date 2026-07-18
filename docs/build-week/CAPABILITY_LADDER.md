@@ -145,7 +145,7 @@ artifact, grant, and audit boundaries are real.
 | Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. U4 study v3 retains ordered pass history/disagreement; only pass-new exact speech citations support the executed subrange, and exhaustion stays weak without globally blocking unrelated ranges | Semantic correctness/truth arbitration and additional re-study producers | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`restudiedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/restudiedStudySynthesisHost.ts), and [`restudiedStudyReadinessHost.ts`](../../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts) |
 | Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks, U5 OCR over completed frame identities, U6 anonymous speaker/overlap analysis whose request is exactly `{}`, R1 `research_search`/`research_document_snapshot`, and the R2 empty-object `computer_use_readonly` tool. R1 and R2 mount only under their exact trigger-gated grants. Only cold-audited snapshot spans and offline screen-region identities can enter a v2 report, both as cite-only context. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Scene/shot interpretation, default visual-specialist routing, unrestricted or automatic research, real-provider/freshness authority, and any live isolated computer-use driver | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`computerUseMcpServer.ts`](../../src/studio/runtime/production/executor/computerUseMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
 | Owned study spine | New owned runs default to evidence-citation v1, report/admission/read v2, the eight-tool U4 root, owned-media-study v3, readiness v4, and approval-gated caption/caption-causality v4. The dormant research tool requires a projected current conflict. Closed v1 planning remains an explicit non-default compatibility selector | Studio UI projection, semantic correctness/truth arbitration, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`orchestratorBridge.ts`](../../src/studio/runtime/production/executor/orchestratorBridge.ts), and [`restudiedStudyRuntime.ts`](../../src/studio/runtime/production/study/restudiedStudyRuntime.ts) |
-| Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen and the human-labeled `run-007` Bet G score exists with `judge: null` | Runtime semantic QC, calibrated transcription/translation confidence, additional scored runs and registered ablations, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
+| Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen, the human-labeled `run-007` Bet G score exists with `judge: null`, and one result-free exact-delta ablation is registered | Runtime semantic QC, calibrated transcription/translation confidence, registered paired captures and scores, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), [`raw-vs-stem registration`](../../bench/ablations/hard-ko-v1-raw-vs-eligible-stem/registration.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
 
 The Bet G score is the content-addressed receipt under `bench/scores/`, not the legacy
@@ -428,7 +428,7 @@ their audits.
 - **Still missing:** The only U1 separation-eligibility class is `mixed`; every other acoustic class
   and all VAD/policy states stay non-triggering. Non-darwin runtime pins, alternate models, a
   separation-quality bench, independent evidence or human semantic preference, UI projection, public
-  delivery, and the registered Bet G raw-versus-stem ablation remain open. The default recognizer may
+  delivery, and the registered Bet G raw-versus-stem captures and scores remain open. The default recognizer may
   honestly abstain when no live current-run recognizer is configured.
 - **Slice done-when:** The landed U6.1 and U7.1 paths prove exact trigger/grant/range closure, raw
   preservation, private content-addressed stems, pinned replaceable execution, same-recognizer
@@ -540,8 +540,12 @@ their audits.
 - **Real:** The current caption QC reopens exact current-run candidate, study, readiness, approval,
   and evidence lineage and checks structural availability/completeness. Separately, `hard-ko-v1` is
   frozen and `bench/scores/run-007/score.json` is a human-labeled score receipt with `judge: null`.
+  `studio.bench.ablation.v1` now binds one result-free exact config delta to current frozen pack and
+  freeze bytes, requires at least three paired repetitions per clip, fixes semantic scoring to human
+  labels with `judge: null`, and marks structural diagnostics non-semantic. The first immutable
+  registration plans raw audio versus eligible anonymous U7 stems; it has no captures or results.
 - **Missing:** Per-run semantic transcription/translation QC before output, calibrated confidence,
-  independent semantic adjudication at product scale, repeated scored captures, registered producer
+  independent semantic adjudication at product scale, repeated scored captures, completed producer
   ablations, run variance, and generalization to new packs/media classes.
 - **Done when:** Keep the two lanes separate. Structural QC continues to answer “is this exact output
   complete, available, and causally supported?” Semantic evaluation answers “is the Korean/English
@@ -596,7 +600,7 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    One exact audited conflicting overlap cell, or one cold-audited acoustic `mixed` cell, may receive
    the pinned private separation grant; raw audio, anonymous stems, lineage receipts, cold audit, and
    same-recognizer comparability are closed. U1 `mixed`-acoustic triggers now reuse the same path
-   additively; no other acoustic class qualifies. Run a registered Bet G ablation and require
+   additively; no other acoustic class qualifies. Execute the registered Bet G ablation and require
    independent evidence or human review before any preference or improvement claim.
 8. **Receipted web research.** Add safe bounded search + snapshot/read tools, typed span citations,
    freshness/provenance, and one exact gap-triggered context specialist. No ambient web or fixed

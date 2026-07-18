@@ -398,6 +398,10 @@ export default function ProductionProcessingCanvas({
   const artifact = artifactState(production, captionResultCount);
   const activeWorkers = workers.filter((worker) =>
     worker.status === "working" || worker.status === "reporting");
+  const receiptedOperations =
+    production.operations.filter((operation) => operation.receiptId !== null).length +
+    (production.semanticEvidence ?? []).filter((operation) => operation.receipt !== null).length +
+    production.evidenceReads.filter((read) => read.receiptId !== null).length;
   const failed = lifecycle.tone === "failed" || pollState === "error";
 
   function closeWorkerFocus(): void {
@@ -464,6 +468,14 @@ export default function ProductionProcessingCanvas({
                     ? `${activeWorkers.length} workers are active`
                     : `${workers.length} recorded ${workers.length === 1 ? "worker" : "workers"}`}
               </h3>
+              <p
+                className="processing-topology-receipts"
+                data-production-receipted-operations={receiptedOperations}
+              >
+                {receiptedOperations === 0
+                  ? "0 operation receipts · worker activity is a journal lifecycle claim, not receipted media work"
+                  : `${receiptedOperations} operation ${receiptedOperations === 1 ? "receipt" : "receipts"} in the coordination ledger below`}
+              </p>
             </div>
             <span>{production.counts.tasks} {production.counts.tasks === 1 ? "task" : "tasks"}</span>
           </header>

@@ -295,6 +295,13 @@
   font-size: 0.56rem;
 }
 
+.processing-topology-receipts {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+}
+
 .processing-worker-field {
   position: relative;
   display: grid;

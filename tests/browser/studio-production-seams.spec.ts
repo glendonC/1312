@@ -38,6 +38,9 @@ test("owned processing canvas exposes projection facts and explicit missing rece
   await page.goto("/studio/?processingMock=running");
 
   const canvas = page.getByRole("region", { name: "Processing canvas" });
+  const receiptedOperations = canvas.locator("[data-production-receipted-operations]");
+  await expect(receiptedOperations).toHaveAttribute("data-production-receipted-operations", "0");
+  await expect(receiptedOperations).toContainText("not receipted media work");
   const coordination = canvas.getByRole("region", { name: "Receipt-backed coordination" });
   await expect(coordination).toBeVisible();
   await expect(coordination).toContainText("host-validated composition");
@@ -116,6 +119,12 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(processingCanvas.getByRole("button", { name: "Cancel" })).toHaveCount(0);
   await expect(processingCanvas.getByRole("button", { name: "Stop" })).toHaveCount(0);
   await expect(processingCanvas.getByText(/no pause or cancellation command/)).toBeVisible();
+  const receiptedOperationsPairing = processingCanvas.locator("[data-production-receipted-operations]");
+  await expect(receiptedOperationsPairing).toBeVisible();
+  await expect.poll(async () =>
+    Number(await receiptedOperationsPairing.getAttribute("data-production-receipted-operations")),
+  ).toBeGreaterThan(0);
+  await expect(receiptedOperationsPairing).toContainText("coordination ledger below");
   const coordination = processingCanvas.getByRole("region", { name: "Receipt-backed coordination" });
   await expect(coordination).toBeVisible();
   await expect.poll(() => coordination.locator("[data-production-live-task-id]").count()).toBeGreaterThan(1);

@@ -129,13 +129,37 @@ export type LearningPresentation =
       source: Extract<LearningViewingSource, { context: { origin: "verified_production_caption" } }>;
       explanations: {
         state: "unavailable";
-        reasonCode: "production_media_playback_unavailable" | "caption_authority_revoked";
+        reasonCode:
+          | "production_media_playback_unavailable"
+          | "production_explanation_interaction_unavailable"
+          | "caption_authority_revoked";
       };
       savedItems: { state: "unavailable"; reasonCode: "canonical_saved_item_missing" };
     };
 
 export type LearningPlayback =
-  | { state: "available"; currentTimeMs: number; onSeek: (timeMs: number) => void }
+  | {
+      state: "available";
+      authority: "recorded_fixture";
+      currentTimeMs: number;
+      onSeek: (timeMs: number) => void;
+    }
+  | {
+      state: "available";
+      authority: "verified_production_caption";
+      binding: {
+        runtimeId: string;
+        sourceRevisionId: string;
+        sourceArtifactId: string;
+        sourceContentId: string;
+        captionJobId: string;
+        captionArtifactId: string;
+        captionContentId: string;
+        timestampOrigin: { kind: "source_media_zero"; offsetMs: 0 };
+      };
+      currentTimeMs: number;
+      onSeek: (timeMs: number) => void;
+    }
   | { state: "unavailable"; reasonCode: "production_media_playback_unavailable" };
 
 export interface SessionSavedSelection {

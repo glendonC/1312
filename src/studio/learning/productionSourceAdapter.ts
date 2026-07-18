@@ -137,6 +137,10 @@ export function projectVerifiedProductionLearningSource(
   const context: Extract<LearningSourceContext, { origin: "verified_production_caption" }> = {
     origin: "verified_production_caption",
     authorityState: verification.authorityState,
+    timeline: {
+      analysisRange: structuredClone(verification.source.range),
+      timestampOrigin: { kind: "source_media_zero", offsetMs: 0 },
+    },
     identities: {
       runId: artifact.runId,
       sourceArtifactId: verification.source.artifactId,

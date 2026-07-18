@@ -16,7 +16,10 @@ import {
 } from "./sourceAdapterPrimitives.ts";
 
 const RECORDED_SOURCE_CONTEXT_KEYS = new Set(["origin", "identities", "rights", "nonClaims"]);
-const PRODUCTION_SOURCE_CONTEXT_KEYS = new Set(["origin", "authorityState", "identities", "rights", "nonClaims"]);
+const PRODUCTION_SOURCE_CONTEXT_KEYS = new Set(["origin", "authorityState", "timeline", "identities", "rights", "nonClaims"]);
+const PRODUCTION_TIMELINE_KEYS = new Set(["analysisRange", "timestampOrigin"]);
+const PRODUCTION_RANGE_KEYS = new Set(["startMs", "endMs"]);
+const TIMESTAMP_ORIGIN_KEYS = new Set(["kind", "offsetMs"]);
 const RIGHTS_KEYS = new Set(["basis", "licence", "attribution", "mediaExport", "textExport"]);
 const EXPORT_STATE_KEYS = new Set(["state", "reasonCode"]);
 const RECORDED_IDENTITY_KEYS = new Set([
@@ -194,7 +197,10 @@ export function validateLearningSourceContext(input: unknown): LearningSourceCon
   if (input.origin === "verified_production_caption") {
     if (
       !exactKeys(input, PRODUCTION_SOURCE_CONTEXT_KEYS) ||
-      !exactKeys(input.identities, PRODUCTION_IDENTITY_KEYS)
+      !exactKeys(input.identities, PRODUCTION_IDENTITY_KEYS) ||
+      !record(input.timeline) || !exactKeys(input.timeline, PRODUCTION_TIMELINE_KEYS) ||
+      !record(input.timeline.analysisRange) || !exactKeys(input.timeline.analysisRange, PRODUCTION_RANGE_KEYS) ||
+      !record(input.timeline.timestampOrigin) || !exactKeys(input.timeline.timestampOrigin, TIMESTAMP_ORIGIN_KEYS)
     ) {
       throw new Error("Production learning source context contains recorded authority fields");
     }
@@ -205,6 +211,13 @@ export function validateLearningSourceContext(input: unknown): LearningSourceCon
     }
     if (
       (input.authorityState !== "unrevoked" && input.authorityState !== "revoked_after_completion") ||
+      typeof input.timeline.analysisRange.startMs !== "number" ||
+      !Number.isInteger(input.timeline.analysisRange.startMs) || input.timeline.analysisRange.startMs < 0 ||
+      typeof input.timeline.analysisRange.endMs !== "number" ||
+      !Number.isInteger(input.timeline.analysisRange.endMs) ||
+      input.timeline.analysisRange.endMs <= input.timeline.analysisRange.startMs ||
+      input.timeline.timestampOrigin.kind !== "source_media_zero" ||
+      input.timeline.timestampOrigin.offsetMs !== 0 ||
       input.rights.basis !== "production_private_source_policy" ||
       input.rights.licence !== null || input.rights.attribution !== null ||
       input.rights.textExport.state !== "unavailable" ||
@@ -239,6 +252,13 @@ export function validateLearningViewingSource(input: LearningViewingSource): Lea
       moment.startMs < 0 || moment.endMs <= moment.startMs ||
       !nonEmptyString(moment.sourceLanguage) || !nonEmptyString(moment.targetLanguage)
     ) throw new Error("Learning viewing source moment is invalid");
+    if (
+      context.origin === "verified_production_caption" &&
+      (
+        moment.startMs < context.timeline.analysisRange.startMs ||
+        moment.endMs > context.timeline.analysisRange.endMs
+      )
+    ) throw new Error("Production learning moment falls outside its verified analysis range");
     const support = moment.support;
     const supportArrays = [
       support.claimIds,

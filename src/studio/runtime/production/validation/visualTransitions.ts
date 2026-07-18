@@ -1,4 +1,4 @@
-import { canonicalSha256 } from "../artifactStore/contentIdentity.ts";
+import { canonicalSha256 } from "../canonicalIdentity.ts";
 import {
   VISUAL_TRANSITION_LIMITS,
   VISUAL_TRANSITION_PRODUCER,

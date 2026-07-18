@@ -1,7 +1,7 @@
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { invariant } from "./shared.ts";
-import { canonicalJsonContentId } from "../artifactStore.ts";
+import { canonicalJsonContentId } from "../canonicalIdentity.ts";
 
 export function applyStudySynthesisEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
   if (event.type === "study.restudied_synthesis_completed") {

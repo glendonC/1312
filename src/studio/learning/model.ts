@@ -7,6 +7,7 @@ export type LearningReasonCode =
   | "production_caption_unavailable"
   | "explanation_not_prepared"
   | "production_media_playback_unavailable"
+  | "production_explanation_interaction_unavailable"
   | "caption_authority_revoked"
   | "generator_abstained"
   | "facet_not_applicable"
@@ -73,6 +74,10 @@ export type LearningSourceContext =
   | {
       origin: "verified_production_caption";
       authorityState: "unrevoked" | "revoked_after_completion";
+      timeline: {
+        analysisRange: { startMs: number; endMs: number };
+        timestampOrigin: { kind: "source_media_zero"; offsetMs: 0 };
+      };
       identities: {
         runId: string;
         sourceArtifactId: string;

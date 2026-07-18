@@ -172,6 +172,56 @@
   margin-top: 14px;
 }
 
+.product-runtime-private-player {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.product-runtime-private-player > header,
+.product-runtime-private-player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-runtime-private-player h5 {
+  margin-top: 3px;
+  font-size: 0.76rem;
+  font-weight: var(--weight-medium);
+}
+
+.product-runtime-private-player audio,
+.product-runtime-private-player video {
+  display: none;
+}
+
+.product-runtime-private-player-controls {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.product-runtime-private-player-controls button {
+  min-width: 64px;
+}
+
+.product-runtime-private-player-controls output,
+.product-runtime-private-player > header code {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+}
+
+.product-runtime-private-player-controls span,
+.product-runtime-private-player > p {
+  color: var(--ink-muted);
+  font-size: 0.64rem;
+}
+
 .product-runtime-caption-lines {
   display: grid;
   gap: 0;

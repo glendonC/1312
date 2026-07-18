@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import {
   DurableRuntimeCommandStore,
+  DeterministicCurrentRunCaptionTestExecutor,
   DeterministicRuntimeExecutor,
   OwnedMediaIngestService,
   OpenAiCaptionProductionExecutor,
@@ -63,11 +64,14 @@ if (executorMode === "codex" && !configuredModel) {
   throw new Error("Real Codex orchestration requires an explicit --model identity");
 }
 const captionExecutorMode = value("--caption-executor") ?? "recorded";
-if (captionExecutorMode !== "recorded" && captionExecutorMode !== "openai") {
-  throw new Error("--caption-executor must be recorded or openai");
+if (captionExecutorMode !== "recorded" && captionExecutorMode !== "deterministic-test" && captionExecutorMode !== "openai") {
+  throw new Error("--caption-executor must be recorded, deterministic-test, or openai");
 }
 if (captionExecutorMode === "openai" && !flag("--allow-real-caption-production")) {
   throw new Error("Real caption production requires --allow-real-caption-production");
+}
+if (captionExecutorMode === "deterministic-test" && !flag("--allow-deterministic-caption-test-seam")) {
+  throw new Error("Deterministic current-run caption testing requires --allow-deterministic-caption-test-seam");
 }
 const semanticRecognizerMode = value("--semantic-recognizer") ?? "unavailable";
 if (semanticRecognizerMode !== "unavailable" && semanticRecognizerMode !== "openai") {
@@ -115,7 +119,9 @@ const store = await DurableRuntimeCommandStore.open(runtimeRoot);
 const deterministic = executorMode === "deterministic" ? new DeterministicRuntimeExecutor() : null;
 const captionExecutor = captionExecutorMode === "openai"
   ? new OpenAiCaptionProductionExecutor({ apiKey: await openAiKey() })
-  : new RecordedCaptionFixtureExecutor();
+  : captionExecutorMode === "deterministic-test"
+    ? new DeterministicCurrentRunCaptionTestExecutor()
+    : new RecordedCaptionFixtureExecutor();
 const semanticRecognizer = semanticRecognizerMode === "openai"
   ? new OpenAiCurrentRunSpeechRecognizer({ apiKey: await openAiKey() })
   : undefined;
@@ -163,7 +169,9 @@ process.stdout.write(`${JSON.stringify({
   executor: executorMode === "codex" ? "real-codex-opt-in" : "deterministic-no-model",
   captionExecutor: captionExecutorMode === "openai"
     ? "real-recognizer-translator-opt-in"
-    : "recorded-real-pipeline-fixture-adapter",
+    : captionExecutorMode === "deterministic-test"
+      ? "deterministic-current-run-test-seam-no-cognition"
+      : "recorded-real-pipeline-fixture-adapter",
   semanticRecognizer: semanticRecognizerMode === "openai"
     ? "current-run-openai-opt-in"
     : "current-run-unavailable-no-fixture-fallback",

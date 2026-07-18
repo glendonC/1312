@@ -10,7 +10,7 @@ import type {
 } from "../model.ts";
 import { OWNED_MEDIA_STUDY_LIMITS } from "../model.ts";
 import { validateSemanticEvidenceCitationInput } from "./semanticEvidence.ts";
-import { assertTaskJobContext } from "./scheduling.ts";
+import { assertTaskJobContext } from "./taskJobContext.ts";
 import {
   array,
   contentId,

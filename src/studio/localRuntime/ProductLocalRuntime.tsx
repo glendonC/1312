@@ -801,7 +801,9 @@ export default function ProductLocalRuntime({
               onCaptionProduction={submitCaptionProduction}
             />
             <ProductionCaptionResults
+              client={client}
               runtimeId={runtime.status.runtimeId}
+              sourceRevisionId={runtime.status.sourceRevisionId}
               results={runtime.captionResults}
             />
           </details>
@@ -1075,4 +1077,3 @@ export default function ProductLocalRuntime({
     </section>
   );
 }
-

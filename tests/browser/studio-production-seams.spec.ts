@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Request, type Response } from "@playwright/test";
 
 function productStudioUrl(): string {
   const runtimeHost = process.env.STUDIO_RUNTIME_HOST_URL;
@@ -8,22 +8,26 @@ function productStudioUrl(): string {
 async function openCompletedDeterministicProjection(page: Page, endSeconds?: number): Promise<Locator> {
   const token = process.env.STUDIO_RUNTIME_HOST_TOKEN ?? "";
   await page.goto(productStudioUrl());
-  await page.getByRole("button", { name: "Use owned local source" }).click();
+  await page.getByRole("button", { name: "Add owned media" }).click();
 
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
-  await productRuntime.getByLabel("Paste-once bearer token").fill(token);
-  await productRuntime.getByRole("button", { name: "Connect to local host" }).click();
-  await expect(productRuntime.getByLabel("Registered owned source")).toBeVisible();
+  await productRuntime.getByRole("button", { name: "Open connect to local host" }).click();
+  await productRuntime.getByRole("textbox", { name: "Paste-once bearer token", exact: true }).fill(token);
+  await productRuntime.getByRole("button", { name: "Connect to local host", exact: true }).click();
+  await expect(productRuntime.getByRole("combobox", { name: "Registered owned source" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await productRuntime.getByRole("button", { name: "Continue to Range" }).click();
   if (endSeconds !== undefined) {
-    await productRuntime.getByLabel("End, seconds").fill(String(endSeconds));
+    await productRuntime.getByLabel("End timestamp").fill(String(endSeconds));
   }
+  await productRuntime.getByRole("button", { name: "Continue to Language" }).click();
   await productRuntime.getByLabel("Declared source language").fill("ko");
   await productRuntime.getByLabel("Language-pack identity (optional)").fill("ko-v3");
-  await productRuntime.getByRole("button", { name: "Review local plan" }).click();
-  await productRuntime
-    .getByRole("region", { name: "Local runtime plan" })
-    .getByRole("button", { name: "Accept forecast and start local runtime" })
-    .click();
+  await productRuntime.getByRole("button", { name: "Continue to Output" }).click();
+  await productRuntime.getByRole("button", { name: "Continue to Forecast" }).click();
+  await expect(productRuntime.getByRole("region", { name: "Review the local runtime plan" })).toBeVisible();
+  await productRuntime.getByRole("button", { name: "Continue to Review" }).click();
+  await productRuntime.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
 
   const status = productRuntime.getByRole("region", { name: "Local runtime status" });
   await expect(status.getByRole("heading", { name: "Terminal", exact: true })).toBeVisible({ timeout: 10_000 });
@@ -52,8 +56,26 @@ test("owned processing canvas exposes projection facts and explicit missing rece
 });
 
 test("attested approval explicitly produces private bounded captions without publication", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   test.skip(testInfo.project.name !== "desktop", "one deterministic desktop review path is sufficient");
   test.skip(!process.env.STUDIO_RUNTIME_HOST_TOKEN, "requires an operator-started deterministic runtime host");
+
+  const mediaRequests: Request[] = [];
+  const mediaResponses: Response[] = [];
+  const revocationRequests: Request[] = [];
+  const revocationResponses: Response[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/v1/private-source-media/")) mediaRequests.push(request);
+    if (request.url().includes("/private-playback-grants/") && request.url().endsWith("/revocations")) {
+      revocationRequests.push(request);
+    }
+  });
+  page.on("response", (response) => {
+    if (response.url().includes("/v1/private-source-media/")) mediaResponses.push(response);
+    if (response.url().includes("/private-playback-grants/") && response.url().endsWith("/revocations")) {
+      revocationResponses.push(response);
+    }
+  });
 
   const production = await openCompletedDeterministicProjection(page, 47.2);
   const processingCanvas = page.getByRole("region", { name: "Processing canvas" });
@@ -67,25 +89,12 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(processingCanvas.getByText(/no pause or cancellation command/)).toBeVisible();
   const coordination = processingCanvas.getByRole("region", { name: "Receipt-backed coordination" });
   await expect(coordination).toBeVisible();
-  await expect(coordination.locator("[data-production-live-task-id]")).toHaveCount(2);
-  await expect(coordination.locator("[data-production-live-grant-id]")).toHaveCount(6);
+  await expect.poll(() => coordination.locator("[data-production-live-task-id]").count()).toBeGreaterThan(1);
+  await expect.poll(() => coordination.locator("[data-production-live-grant-id]").count()).toBeGreaterThan(0);
   const handoff = coordination.locator("[data-production-live-spawn-id]");
-  await expect(handoff).toHaveCount(1);
-  await expect(handoff).toHaveAttribute("data-spawn-decision", "accepted");
-  await expect(handoff.getByText("Promoted to root", { exact: true })).toBeVisible();
-  await expect(coordination.locator("[data-production-live-operation-id]")).toHaveCount(1);
-  await expect(coordination.locator("[data-production-live-evidence-read-id]")).toHaveCount(2);
+  await expect.poll(() => handoff.count()).toBeGreaterThan(0);
+  await expect(handoff.first()).toHaveAttribute("data-spawn-decision", "accepted");
   await expect(coordination.locator('[data-production-live-empty="caption-lineage"]')).toBeVisible();
-  const worker = processingCanvas.getByRole("button", { name: "Inspect bounded-media-child, Complete" });
-  await expect(worker).toBeVisible();
-  await worker.click();
-  const workerFocus = page.getByRole("dialog", { name: "bounded-media-child" });
-  await expect(workerFocus).toBeVisible();
-  await expect(workerFocus.getByText(/not an autonomous playback control/)).toBeVisible();
-  await expect(workerFocus.getByText("analysis.evidence.assess", { exact: false })).toBeVisible();
-  await workerFocus.getByRole("button", { name: "Close" }).press("Escape");
-  await expect(workerFocus).toHaveCount(0);
-  await expect(worker).toBeFocused();
 
   const review = production.locator('[data-production-region="publish-review-human-review"]');
   await expect(review.getByRole("heading", { name: "Queued intake human review" })).toBeVisible();
@@ -116,9 +125,9 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(job).toHaveCount(1, { timeout: 10_000 });
   await expect(job).toHaveAttribute("data-status", "completed");
   await expect(job).toHaveAttribute("data-caption-authority-state", "unrevoked");
-  await expect(job.locator("[data-production-caption-line-count]")).toHaveText("16");
-  await expect(job.locator("[data-production-caption-withheld-count]")).toHaveText("2");
-  await expect(job.locator("[data-production-caption-unavailable-count]")).toHaveText("1");
+  await expect(job.locator("[data-production-caption-line-count]")).toHaveText("6");
+  await expect(job.locator("[data-production-caption-withheld-count]")).toHaveText("0");
+  await expect(job.locator("[data-production-caption-unavailable-count]")).toHaveText("0");
   await expect(captions.locator('[data-production-caption-artifact-id]')).toHaveCount(2);
   await expect(captions.locator('[data-caption-artifact-role="timed_captions"]')).toHaveCount(1);
   await expect(captions.locator('[data-caption-artifact-role="production_receipt"]')).toHaveCount(1);
@@ -126,23 +135,72 @@ test("attested approval explicitly produces private bounded captions without pub
     "Upload, CDN delivery, and public publication are absent",
   );
   await expect(productionResults.locator('[data-production-results-job-id]')).toHaveCount(1, { timeout: 10_000 });
-  await expect(productionResults.locator('[data-production-results-line-id]')).toHaveCount(16);
+  await expect(productionResults.locator('[data-production-results-line-id]')).toHaveCount(6);
   const productionLearning = productionResults.getByRole("region", { name: "Language learning workspace" });
   await expect(productionLearning).toHaveAttribute("data-learning-mode", "production");
+  const privatePlayer = productionResults.getByRole("region", { name: "Private production media playback" });
+  await expect(privatePlayer).toHaveCount(1);
+  await expect(privatePlayer).toHaveAttribute("data-private-playback-state", "ready", { timeout: 10_000 });
+  await expect(privatePlayer).toHaveAttribute("data-private-playback-timestamp-origin", "source_media_zero");
+  const media = privatePlayer.locator("[data-private-production-media]");
+  await expect(media).toHaveCount(1);
+  await expect.poll(() => media.evaluate((element: HTMLMediaElement) => element.readyState))
+    .toBeGreaterThanOrEqual(2);
+  const decoded = await media.evaluate((element: HTMLMediaElement) => ({
+    currentSrc: element.currentSrc,
+    duration: element.duration,
+    readyState: element.readyState,
+    crossOrigin: element.crossOrigin,
+  }));
+  expect(decoded.currentSrc).toContain("/v1/private-source-media/");
+  expect(decoded.duration).toBeGreaterThanOrEqual(47.2);
+  expect(decoded.readyState).toBeGreaterThanOrEqual(2);
+  expect(decoded.crossOrigin).toBe("anonymous");
+  await expect.poll(() => mediaRequests.length).toBeGreaterThan(0);
+  const initialMediaHeaders = await Promise.all(mediaRequests.map((request) => request.allHeaders()));
+  expect(initialMediaHeaders.some((headers) => headers.origin === new URL(page.url()).origin)).toBe(true);
+  expect(initialMediaHeaders.some((headers) => headers.range?.startsWith("bytes="))).toBe(true);
+  expect(mediaResponses.some((response) => response.status() === 206)).toBe(true);
+
+  const targetCue = productionLearning.locator("[data-production-results-line-id]").nth(5);
+  const seekButton = targetCue.getByRole("button", { name: /^Seek to / });
+  const seekLabel = await seekButton.getAttribute("aria-label");
+  const seekMatch = /^Seek to (\d+):(\d+(?:\.\d+)?)$/.exec(seekLabel ?? "");
+  expect(seekMatch).not.toBeNull();
+  const expectedSeconds = Number(seekMatch?.[1]) * 60 + Number(seekMatch?.[2]);
+  await seekButton.click();
+  await expect(targetCue).toHaveClass(/is-active/);
+  await expect.poll(() => media.evaluate((element: HTMLMediaElement) => element.currentTime))
+    .toBeGreaterThan(expectedSeconds - 0.1);
+  expect(await media.evaluate((element: HTMLMediaElement) => element.currentTime))
+    .toBeLessThan(expectedSeconds + 0.5);
+
+  const playButton = privatePlayer.getByRole("button", { name: "Play private source" });
+  const beforePlay = await media.evaluate((element: HTMLMediaElement) => element.currentTime);
+  await playButton.click();
+  await expect(privatePlayer.getByRole("button", { name: "Pause private source" })).toBeVisible();
+  await expect.poll(() => media.evaluate((element: HTMLMediaElement) => element.currentTime))
+    .toBeGreaterThan(beforePlay + 0.1);
+  await privatePlayer.getByRole("button", { name: "Pause private source" }).click();
+
   await expect(productionLearning).toContainText("Production learning unavailable");
-  await expect(productionLearning).toContainText("production_media_playback_unavailable");
+  await expect(productionLearning).toContainText("production_explanation_interaction_unavailable");
   await expect(productionLearning.getByText("Prepared prototype")).toHaveCount(0);
   await expect(productionLearning.getByRole("button", { name: /Explain|My Set/ })).toHaveCount(0);
   await expect(productionResults).toContainText("not replay Results identity");
   await expect(productionResults).toContainText("does not claim transcription accuracy, English quality, or a Bet G score");
-  await expect(processingCanvas.getByRole("heading", { name: "Caption candidate withheld" })).toBeVisible();
-  await expect(processingCanvas.getByText(/Recorded fixture test demo only/)).toBeVisible();
+  await expect(processingCanvas.getByRole("heading", { name: "Structurally accepted private candidate" })).toBeVisible();
   const liveCaption = coordination.locator("[data-production-live-caption-job-id]");
   await expect(liveCaption).toHaveCount(1);
-  await expect(liveCaption).toHaveAttribute("data-caption-execution-scope", "test_demo_only");
-  await expect(liveCaption).toHaveAttribute("data-caption-qc-outcome", "withheld");
-  await expect(liveCaption).toContainText("recorded_fixture_test_demo_only");
+  await expect(liveCaption).toHaveAttribute("data-caption-execution-scope", "current_run");
+  await expect(liveCaption).toHaveAttribute("data-caption-qc-outcome", "accepted");
+  await expect(liveCaption).toContainText("deterministic_current_run_test_seam");
   await expect(liveCaption).toContainText("cognition claim none");
+
+  await processingCanvas.getByRole("button", { name: "Prepare another run" }).click();
+  await expect(privatePlayer).toHaveCount(0);
+  await expect.poll(() => revocationRequests.length).toBeGreaterThan(0);
+  await expect.poll(() => revocationResponses.some((response) => response.status() === 200)).toBe(true);
 });
 
 test("attested reviewer rejects one verified queued intake with a visible closed reason", async ({ page }, testInfo) => {

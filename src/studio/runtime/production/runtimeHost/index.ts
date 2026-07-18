@@ -64,6 +64,7 @@ export {
   type LanguageExplanationExecutor,
 } from "../languageExplanations/index.ts";
 export {
+  DeterministicCurrentRunCaptionTestExecutor,
   OpenAiCaptionProductionExecutor,
   RecordedCaptionFixtureExecutor,
   type CaptionProductionExecutor,

@@ -59,6 +59,7 @@ const REASON_LABELS: Record<LearningReasonCode, string> = {
   production_caption_unavailable: "The verified production caption is unavailable.",
   explanation_not_prepared: "No contextual explanation is prepared for this language moment.",
   production_media_playback_unavailable: "Private production media playback is not connected to the browser learning surface.",
+  production_explanation_interaction_unavailable: "Private media playback is verified. Production explanation interaction is not connected yet.",
   caption_authority_revoked: "Caption authority was revoked after completion, so no new explanation may be requested.",
   generator_abstained: "The production explanation generator abstained.",
   facet_not_applicable: "This facet does not apply to the selected span.",
@@ -197,8 +198,13 @@ export default function LearningResults({
               <><b>Prepared prototype.</b> Tap highlighted language, select a phrase, or choose Explain sentence.
                 Selection does not seek or pause playback.</>
             ) : (
-              <><b>Verified production captions.</b> Learning selection is unavailable until this private media can
-                play in the browser. No prototype explanation is substituted.</>
+              playback.state === "available" ? (
+                <><b>Verified production playback.</b> Caption seeking follows the exact private source timeline.
+                  Explanation selection is not connected yet, and no prototype explanation is substituted.</>
+              ) : (
+                <><b>Verified production captions.</b> Learning selection is unavailable until this private media can
+                  play in the browser. No prototype explanation is substituted.</>
+              )
             )}
           </p>
           {pinned && (

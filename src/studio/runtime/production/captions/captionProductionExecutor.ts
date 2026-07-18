@@ -137,6 +137,49 @@ export class RecordedCaptionFixtureExecutor implements CaptionProductionExecutor
   }
 }
 
+/** Explicit no-model browser-test seam. Its numbered interval labels make no transcription claim. */
+export class DeterministicCurrentRunCaptionTestExecutor implements CaptionProductionExecutor {
+  async describe(): Promise<CaptionExecutorDescriptor> {
+    return {
+      id: "studio.deterministic-current-run-caption-test-seam",
+      version: "1",
+      classification: "deterministic_current_run_test_seam",
+      executionScope: "current_run",
+      cognitionClaim: "none",
+      recognizer: "deterministic-numbered-interval-test-seam",
+      translator: "deterministic-numbered-interval-test-seam",
+      sourceCaptionContentId: null,
+    };
+  }
+
+  async execute(input: CaptionExecutorInput, signal: AbortSignal): Promise<CaptionExecutorLine[]> {
+    if (signal.aborted) throw new Error("Deterministic caption test execution was aborted");
+    const durationMs = input.range.endMs - input.range.startMs;
+    const lineCount = Math.min(6, Math.max(1, Math.floor(durationMs / 500)));
+    return Array.from({ length: lineCount }, (_, index) => {
+      const startMs = input.range.startMs + Math.floor(durationMs * index / lineCount);
+      const endMs = input.range.startMs + Math.floor(durationMs * (index + 1) / lineCount);
+      return {
+        id: `deterministic-current-run-line-${String(index + 1).padStart(3, "0")}`,
+        startMs,
+        endMs,
+        source: {
+          language: "ko" as const,
+          state: "available" as const,
+          text: `테스트 구간 ${index + 1}`,
+          reasonCode: null,
+        },
+        target: {
+          language: "en" as const,
+          state: "available" as const,
+          text: `Test interval ${index + 1}`,
+          reasonCode: null,
+        },
+      };
+    });
+  }
+}
+
 function execute(file: string, args: readonly string[], timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
     execFile(

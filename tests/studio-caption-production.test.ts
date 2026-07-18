@@ -738,6 +738,10 @@ test("exact selected caption spans produce private receipted explanations and co
     const learningSource = projectVerifiedProductionLearningSource(caption);
     assert.equal(learningSource.state, "ready");
     if (learningSource.state === "ready") {
+      assert.deepEqual(learningSource.source.context.timeline, {
+        analysisRange: caption.verification.source.range,
+        timestampOrigin: { kind: "source_media_zero", offsetMs: 0 },
+      });
       const learningRequest = productionSelectionRequest(learningSource.source, line.id, {
         side: "source",
         unit: "unicode_code_point",

@@ -2,7 +2,7 @@ import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { invariant } from "./shared.ts";
 import { taskCapabilityCallCount } from "../capabilityUsage.ts";
-import { canonicalJsonContentId } from "../artifactStore.ts";
+import { canonicalJsonContentId } from "../canonicalIdentity.ts";
 
 export function applyRestudyEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
   if (event.type === "study.restudy_pass_requested") {

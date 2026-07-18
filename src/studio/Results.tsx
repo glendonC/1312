@@ -159,6 +159,7 @@ export default function Results() {
             presentation={learningPresentation}
             playback={{
               state: "available",
+              authority: "recorded_fixture",
               currentTimeMs: clipT * 1_000,
               onSeek: (timeMs) => setClipT(timeMs / 1_000),
             }}

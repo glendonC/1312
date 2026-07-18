@@ -25,13 +25,19 @@ type ProductionSource = Extract<LearningViewingSource, { context: { origin: "ver
 
 export function projectProductionLearningPresentation(
   source: ProductionSource,
+  options: { playbackAvailable?: boolean } = {},
 ): Extract<LearningPresentation, { mode: "production" }> {
   validateLearningViewingSource(source);
   return {
     mode: "production",
     source,
     explanations: source.context.authorityState === "unrevoked"
-      ? { state: "unavailable", reasonCode: "production_media_playback_unavailable" }
+      ? {
+          state: "unavailable",
+          reasonCode: options.playbackAvailable
+            ? "production_explanation_interaction_unavailable"
+            : "production_media_playback_unavailable",
+        }
       : { state: "unavailable", reasonCode: "caption_authority_revoked" },
     savedItems: { state: "unavailable", reasonCode: "canonical_saved_item_missing" },
   };

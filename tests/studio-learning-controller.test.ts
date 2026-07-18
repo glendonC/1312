@@ -25,6 +25,10 @@ function source(): ProductionSource {
     context: {
       origin: "verified_production_caption",
       authorityState: "unrevoked",
+      timeline: {
+        analysisRange: { startMs: 0, endMs: 1_000 },
+        timestampOrigin: { kind: "source_media_zero", offsetMs: 0 },
+      },
       identities: {
         runId: "runtime-1",
         sourceArtifactId: "source-artifact-1",

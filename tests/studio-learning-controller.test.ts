@@ -6,6 +6,7 @@ import {
   productionSelectionRequest,
   type ProductionLearningRuntimeClient,
 } from "../src/studio/localRuntime/productionLearningController.ts";
+import { RuntimeHostClientError } from "../src/studio/localRuntime/client.ts";
 import type { LearningViewingSource } from "../src/studio/learning/model.ts";
 import type { LearningSelectionRequest } from "../src/studio/learning/presentation.ts";
 import { projectVerifiedProductionLearningExplanation } from "../src/studio/learning/productionExplanationAdapter.ts";
@@ -437,6 +438,91 @@ test("controller cold-reads, creates once, and requests the fixed five-facet con
   assert.equal(posted.length, 1);
   assert.deepEqual(posted[0].facetKinds, LANGUAGE_EXPLANATION_FACET_KINDS);
   assert.equal("prompt" in posted[0], false);
+});
+
+test("controller coalesces concurrent exact requests into one cold read and one POST", async () => {
+  const sourceValue = source();
+  const requestValue = request(sourceValue);
+  let reads = 0;
+  let posts = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const client: ProductionLearningRuntimeClient = {
+    async languageExplanations() {
+      reads += 1;
+      return response(sourceValue, requestValue);
+    },
+    async createLanguageExplanation() {
+      posts += 1;
+      await gate;
+      return response(sourceValue, requestValue, {
+        attempts: [attempt(sourceValue, requestValue, 0, "completed")],
+        results: [verifiedResult(sourceValue, requestValue)],
+      });
+    },
+  };
+  const controller = new ProductionLearningController(client);
+  const input = { runtimeId: "runtime-1", source: sourceValue, request: requestValue };
+  const first = controller.request(input);
+  const second = controller.request(input);
+  assert.equal(first, second);
+  release();
+  assert.equal((await first).state, "partial");
+  assert.equal((await second).state, "partial");
+  assert.equal(reads, 1);
+  assert.equal(posts, 1);
+});
+
+test("production selections use Unicode code-point offsets across astral characters", () => {
+  const sourceValue = source();
+  sourceValue.moments[0].source.text = "가😀나";
+  const selected = productionSelectionRequest(sourceValue, "line-1", {
+    side: "source",
+    unit: "unicode_code_point",
+    start: 1,
+    end: 2,
+    text: "😀",
+  });
+  assert.deepEqual(selected.span, {
+    side: "source",
+    unit: "unicode_code_point",
+    start: 1,
+    end: 2,
+    text: "😀",
+  });
+  assert.throws(() => productionSelectionRequest(sourceValue, "line-1", {
+    side: "source",
+    unit: "unicode_code_point",
+    start: 1,
+    end: 3,
+    text: "😀",
+  }), /exact selected span/);
+});
+
+test("an unconfigured explanation executor is unavailable and non-retryable", async () => {
+  const sourceValue = source();
+  const requestValue = request(sourceValue);
+  let posts = 0;
+  const client: ProductionLearningRuntimeClient = {
+    async languageExplanations() { return response(sourceValue, requestValue); },
+    async createLanguageExplanation() {
+      posts += 1;
+      throw new RuntimeHostClientError(
+        "No language explanation executor is configured.",
+        "language_explanation_unavailable",
+        409,
+      );
+    },
+  };
+  const state = await new ProductionLearningController(client).request({
+    runtimeId: "runtime-1",
+    source: sourceValue,
+    request: requestValue,
+  });
+  assert.equal(state.state, "unavailable");
+  assert.equal("reasonCode" in state && state.reasonCode, "production_explanation_executor_unavailable");
+  assert.equal("retry" in state && state.retry, "unavailable");
+  assert.equal(posts, 1);
 });
 
 test("controller exposes explicit retry, loading, and exhausted states without automatic fixture fallback", async () => {

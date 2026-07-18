@@ -64,6 +64,24 @@ test("attested approval explicitly produces private bounded captions without pub
   const mediaResponses: Response[] = [];
   const revocationRequests: Request[] = [];
   const revocationResponses: Response[] = [];
+  const languageExplanationPosts: Request[] = [];
+  let releaseFirstExplanationPost!: () => void;
+  let observeFirstExplanationPost!: () => void;
+  const firstExplanationPostGate = new Promise<void>((resolve) => { releaseFirstExplanationPost = resolve; });
+  const firstExplanationPostObserved = new Promise<void>((resolve) => { observeFirstExplanationPost = resolve; });
+  let delayedFirstExplanationPost = false;
+  await page.route("**/v1/runtimes/*/language-explanations", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      languageExplanationPosts.push(request);
+      if (!delayedFirstExplanationPost) {
+        delayedFirstExplanationPost = true;
+        observeFirstExplanationPost();
+        await firstExplanationPostGate;
+      }
+    }
+    await route.continue();
+  });
   page.on("request", (request) => {
     if (request.url().includes("/v1/private-source-media/")) mediaRequests.push(request);
     if (request.url().includes("/private-playback-grants/") && request.url().endsWith("/revocations")) {
@@ -183,10 +201,80 @@ test("attested approval explicitly produces private bounded captions without pub
     .toBeGreaterThan(beforePlay + 0.1);
   await privatePlayer.getByRole("button", { name: "Pause private source" }).click();
 
-  await expect(productionLearning).toContainText("Production learning unavailable");
-  await expect(productionLearning).toContainText("production_explanation_interaction_unavailable");
+  await expect(productionLearning.getByText("Production learning unavailable")).toHaveCount(0);
   await expect(productionLearning.getByText("Prepared prototype")).toHaveCount(0);
-  await expect(productionLearning.getByRole("button", { name: /Explain|My Set/ })).toHaveCount(0);
+  await expect(productionLearning.getByRole("button", { name: /My Set/ })).toHaveCount(0);
+
+  const firstCue = productionLearning.locator("[data-production-results-line-id]").first();
+  const fullSource = firstCue.locator(".cue-src");
+  const fullSourceText = await fullSource.textContent();
+  expect(fullSourceText).not.toBeNull();
+  await firstCue.getByRole("button", { name: /^Explain source sentence at / }).dblclick();
+  await firstExplanationPostObserved;
+  const explanationPanel = productionLearning.getByRole("complementary", { name: "Pinned language explanation" });
+  await expect(explanationPanel).toHaveAttribute("data-learning-state", "production-loading");
+  await expect(explanationPanel).toContainText("Requesting production explanation");
+  expect(languageExplanationPosts).toHaveLength(1);
+  const fullSentenceRequest = languageExplanationPosts[0].postDataJSON() as {
+    lineId: string;
+    selection: { side: string; unit: string; start: number; end: number; text: string };
+    facetKinds: string[];
+  };
+  expect(fullSentenceRequest.lineId).toBe(await firstCue.getAttribute("data-learning-line-id"));
+  expect(fullSentenceRequest.selection).toEqual({
+    side: "source",
+    unit: "unicode_code_point",
+    start: 0,
+    end: Array.from(fullSourceText ?? "").length,
+    text: fullSourceText,
+  });
+  expect(fullSentenceRequest.facetKinds).toEqual(["meaning", "word", "phrase", "grammar", "translation_choice"]);
+  releaseFirstExplanationPost();
+  await expect(explanationPanel).toHaveAttribute("data-learning-state", "production-unavailable");
+  await expect(explanationPanel).toContainText("production_explanation_executor_unavailable");
+  await expect(explanationPanel.getByRole("button", { name: "Retry explanation" })).toHaveCount(0);
+  await expect(explanationPanel).not.toContainText("Prepared prototype");
+  await explanationPanel.getByRole("button", { name: "Close explanation" }).click();
+  await firstCue.getByRole("button", { name: /^Explain source sentence at / }).click();
+  await expect(explanationPanel).toHaveAttribute("data-learning-state", "production-unavailable");
+  expect(languageExplanationPosts).toHaveLength(1);
+  await explanationPanel.getByRole("button", { name: "Close explanation" }).click();
+
+  const targetText = firstCue.locator(".cue-tgt");
+  const selectedTarget = await targetText.evaluate((element) => {
+    const text = element.textContent ?? "";
+    const selected = "interval";
+    const startOffset = text.indexOf(selected);
+    if (!(element.firstChild instanceof Text) || startOffset < 0) throw new Error("Expected target phrase is absent");
+    const range = document.createRange();
+    range.setStart(element.firstChild, startOffset);
+    range.setEnd(element.firstChild, startOffset + selected.length);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    return {
+      text: selected,
+      start: Array.from(text.slice(0, startOffset)).length,
+      end: Array.from(text.slice(0, startOffset + selected.length)).length,
+    };
+  });
+  await expect.poll(() => languageExplanationPosts.length).toBe(2);
+  await expect(explanationPanel).toHaveAttribute("data-selected-side", "target");
+  await expect(explanationPanel).toHaveAttribute("data-selected-start", String(selectedTarget.start));
+  await expect(explanationPanel).toHaveAttribute("data-selected-end", String(selectedTarget.end));
+  const targetSpanRequest = languageExplanationPosts[1].postDataJSON() as {
+    selection: { side: string; unit: string; start: number; end: number; text: string };
+  };
+  expect(targetSpanRequest.selection).toEqual({
+    side: "target",
+    unit: "unicode_code_point",
+    start: selectedTarget.start,
+    end: selectedTarget.end,
+    text: selectedTarget.text,
+  });
+  await expect(explanationPanel).toHaveAttribute("data-learning-state", "production-unavailable");
+  await expect(explanationPanel.getByRole("button", { name: "Retry explanation" })).toHaveCount(0);
   await expect(productionResults).toContainText("not replay Results identity");
   await expect(productionResults).toContainText("does not claim transcription accuracy, English quality, or a Bet G score");
   await expect(processingCanvas.getByRole("heading", { name: "Structurally accepted private candidate" })).toBeVisible();

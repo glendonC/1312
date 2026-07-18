@@ -10,17 +10,21 @@ import {
 } from "./model";
 import type {
   AvailableLearningFacet,
+  LearningExplanationState,
   LearningFacet,
   LearningFacetKind,
   LearningPlayback,
   LearningPresentation,
   LearningPrototypeProjection,
+  LearningSelectionRequest,
   PreparedLearningSelection,
+  ProductionLearningInteraction,
   SessionSavedSelection,
 } from "./presentation.ts";
 
 type PinnedSelection =
   | { state: "prepared"; selection: PreparedLearningSelection; span: SelectedLanguageSpan }
+  | { state: "production"; request: LearningSelectionRequest }
   | {
       state: "unavailable";
       moment: PresentedMoment;
@@ -60,6 +64,7 @@ const REASON_LABELS: Record<LearningReasonCode, string> = {
   explanation_not_prepared: "No contextual explanation is prepared for this language moment.",
   production_media_playback_unavailable: "Private production media playback is not connected to the browser learning surface.",
   production_explanation_interaction_unavailable: "Private media playback is verified. Production explanation interaction is not connected yet.",
+  production_explanation_executor_unavailable: "No production explanation executor is configured for this runtime host.",
   caption_authority_revoked: "Caption authority was revoked after completion, so no new explanation may be requested.",
   generator_abstained: "The production explanation generator abstained.",
   facet_not_applicable: "This facet does not apply to the selected span.",
@@ -79,9 +84,11 @@ const REASON_LABELS: Record<LearningReasonCode, string> = {
 export default function LearningResults({
   presentation,
   playback,
+  productionInteraction,
 }: {
   presentation: LearningPresentation;
   playback: LearningPlayback;
+  productionInteraction?: ProductionLearningInteraction;
 }) {
   const { source } = presentation;
   const [pinned, setPinned] = useState<PinnedSelection | null>(null);
@@ -90,6 +97,10 @@ export default function LearningResults({
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
   const captionGuideId = useId();
   const prototype = presentation.mode === "prototype" ? presentation.explanations : null;
+  const productionReady = presentation.mode === "production" &&
+    presentation.explanations.state === "ready" &&
+    productionInteraction !== undefined &&
+    productionPlaybackMatches(presentation, playback);
   const sourceKey = presentation.mode === "prototype"
     ? `${source.context.identities.runId}:${source.context.identities.captionContentId ?? "none"}`
     : `${source.context.identities.runId}:${source.context.identities.captionContentId}`;
@@ -104,6 +115,13 @@ export default function LearningResults({
     setReturnFocus(null);
   }, [sourceKey]);
 
+  useEffect(() => {
+    if (presentation.mode === "production" && !productionReady) {
+      setPinned(null);
+      setReturnFocus(null);
+    }
+  }, [presentation.mode, productionReady]);
+
   const openPinned = (next: PinnedSelection, trigger: HTMLElement) => {
     setReturnFocus(trigger);
     setPinned(next);
@@ -112,7 +130,10 @@ export default function LearningResults({
   const selectSentence = (moment: PresentedMoment, trigger: HTMLElement) => {
     if (moment.source.state !== "available") return;
     const fullSpan = fullCodePointSpan(moment.source.text, "source");
-    if (!prototype) return;
+    if (!prototype) {
+      if (productionReady) requestProductionSelection(moment, fullSpan, trigger);
+      return;
+    }
     if (prototype.state === "failed") {
       openPinned({ state: "failed", moment, span: fullSpan, reasonCode: prototype.reasonCode }, trigger);
       return;
@@ -130,15 +151,22 @@ export default function LearningResults({
   const selectCaptionRange = (
     moment: PresentedMoment,
     momentSelections: PreparedLearningSelection[],
-    sourceElement: HTMLElement,
+    textElement: HTMLElement,
+    side: "source" | "target",
   ) => {
-    if (moment.source.state !== "available") return;
-    const span = selectedCodePointSpan(sourceElement, moment.source.text);
+    const selectedText = side === "source" ? moment.source : moment.target;
+    if (selectedText.state !== "available") return;
+    const span = selectedCodePointSpan(textElement, selectedText.text, side);
     if (!span) return;
 
-    if (!prototype) return;
+    if (!prototype) {
+      if (productionReady) requestProductionSelection(moment, span, textElement);
+      window.getSelection()?.removeAllRanges();
+      return;
+    }
+    if (side !== "source") return;
     if (prototype.state === "failed") {
-      openPinned({ state: "failed", moment, span, reasonCode: prototype.reasonCode }, sourceElement);
+      openPinned({ state: "failed", moment, span, reasonCode: prototype.reasonCode }, textElement);
     } else {
       const prepared = momentSelections.find((candidate) =>
         candidate.span.start === span.start &&
@@ -146,10 +174,30 @@ export default function LearningResults({
         candidate.span.text === span.text);
       openPinned(prepared
         ? { state: "prepared", selection: prepared, span: prepared.span }
-        : { state: "unavailable", moment, span, reasonCode: "explanation_not_prepared" }, sourceElement);
+        : { state: "unavailable", moment, span, reasonCode: "explanation_not_prepared" }, textElement);
     }
 
     window.getSelection()?.removeAllRanges();
+  };
+
+  const requestProductionSelection = (
+    moment: PresentedMoment,
+    span: SelectedLanguageSpan,
+    trigger: HTMLElement,
+  ) => {
+    if (!productionReady || !productionInteraction) return;
+    const request: LearningSelectionRequest = {
+      lineId: moment.lineId,
+      startMs: moment.startMs,
+      endMs: moment.endMs,
+      sourceLanguage: moment.sourceLanguage,
+      targetLanguage: moment.targetLanguage,
+      source: moment.source,
+      target: moment.target,
+      span: { ...span },
+    };
+    productionInteraction.onRequest(request);
+    openPinned({ state: "production", request }, trigger);
   };
 
   const closePinned = () => {
@@ -198,9 +246,10 @@ export default function LearningResults({
               <><b>Prepared prototype.</b> Tap highlighted language, select a phrase, or choose Explain sentence.
                 Selection does not seek or pause playback.</>
             ) : (
-              playback.state === "available" ? (
+              productionReady ? (
                 <><b>Verified production playback.</b> Caption seeking follows the exact private source timeline.
-                  Explanation selection is not connected yet, and no prototype explanation is substituted.</>
+                  Select an available source or target span, or choose Explain source sentence. No prototype
+                  explanation is substituted.</>
               ) : (
                 <><b>Verified production captions.</b> Learning selection is unavailable until this private media can
                   play in the browser. No prototype explanation is substituted.</>
@@ -209,11 +258,13 @@ export default function LearningResults({
           </p>
           {pinned && (
             <ExplanationPanel
-              key={`${pinned.state}:${pinned.state === "prepared" ? pinned.selection.lineId : pinned.moment.lineId}:${pinned.span.start}:${pinned.span.end}`}
+              key={`${pinned.state}:${pinnedLineId(pinned)}:${pinnedSpan(pinned).start}:${pinnedSpan(pinned).end}`}
               pinned={pinned}
               kept={pinned.state === "prepared" && savedSelectionIds.has(pinned.selection.selectionId)}
               onKeep={keepSelection}
               onClose={closePinned}
+              productionExplanation={productionInteraction?.explanation ?? null}
+              onProductionRetry={(request) => productionInteraction?.onRetry(request)}
             />
           )}
           {prototype?.state === "failed" && (
@@ -223,7 +274,7 @@ export default function LearningResults({
               <code>{prototype.reasonCode}</code>
             </div>
           )}
-          {presentation.mode === "production" && (
+          {presentation.mode === "production" && presentation.explanations.state === "unavailable" && (
             <div
               className="learning-workspace-failure"
               role="status"
@@ -248,7 +299,9 @@ export default function LearningResults({
                 playback.currentTimeMs >= moment.startMs && playback.currentTimeMs < moment.endMs;
               const selectedLineId = pinned?.state === "prepared"
                 ? pinned.selection.lineId
-                : pinned?.moment.lineId;
+                : pinned?.state === "production"
+                  ? pinned.request.lineId
+                  : pinned?.moment.lineId;
               return (
                 <article
                   key={moment.lineId}
@@ -286,11 +339,11 @@ export default function LearningResults({
                           className="cue-src"
                           lang={moment.sourceLanguage}
                           tabIndex={-1}
-                          onPointerUp={prototype
-                            ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget)
+                          onPointerUp={prototype || productionReady
+                            ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget, "source")
                             : undefined}
-                          onTouchEnd={prototype
-                            ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget)
+                          onTouchEnd={prototype || productionReady
+                            ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget, "source")
                             : undefined}
                         >
                           {sourceText(moment, momentSelections, (selection, trigger) => {
@@ -298,7 +351,19 @@ export default function LearningResults({
                           })}
                         </span>
                         {moment.target.state === "available" ? (
-                          <span className="cue-tgt" lang={moment.targetLanguage}>{moment.target.text}</span>
+                          <span
+                            className="cue-tgt"
+                            lang={moment.targetLanguage}
+                            tabIndex={productionReady ? -1 : undefined}
+                            onPointerUp={productionReady
+                              ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget, "target")
+                              : undefined}
+                            onTouchEnd={productionReady
+                              ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget, "target")
+                              : undefined}
+                          >
+                            {moment.target.text}
+                          </span>
                         ) : moment.target.state === "withheld" ? (
                           <span className="cue-withheld">
                             <span className="cue-withheld-mark">withheld</span>
@@ -310,11 +375,11 @@ export default function LearningResults({
                             {moment.target.detail}
                           </span>
                         )}
-                        {fullPrepared && (
+                        {(fullPrepared || productionReady) && (
                           <button
                             type="button"
                             className="learning-sentence-action"
-                            aria-label={`Explain Korean sentence at ${momentClock(moment.startMs)}`}
+                            aria-label={`${presentation.mode === "prototype" ? "Explain Korean sentence" : "Explain source sentence"} at ${momentClock(moment.startMs)}`}
                             onClick={(event) => selectSentence(moment, event.currentTarget)}
                           >
                             Explain sentence
@@ -335,7 +400,11 @@ export default function LearningResults({
   );
 }
 
-function selectedCodePointSpan(sourceElement: HTMLElement, sourceText: string): SelectedLanguageSpan | null {
+function selectedCodePointSpan(
+  sourceElement: HTMLElement,
+  sourceText: string,
+  side: "source" | "target",
+): SelectedLanguageSpan | null {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || selection.rangeCount !== 1) return null;
   const range = selection.getRangeAt(0);
@@ -352,7 +421,7 @@ function selectedCodePointSpan(sourceElement: HTMLElement, sourceText: string): 
     const end = Array.from(beforeEnd.toString()).length;
     const text = codePointSlice(sourceText, start, end);
     if (end <= start || !/\S/u.test(text) || text !== range.toString()) return null;
-    return { side: "source", unit: "unicode_code_point", start, end, text };
+    return { side, unit: "unicode_code_point", start, end, text };
   } catch {
     return null;
   }
@@ -412,23 +481,47 @@ function ExplanationPanel({
   kept,
   onKeep,
   onClose,
+  productionExplanation,
+  onProductionRetry,
 }: {
   pinned: PinnedSelection;
   kept: boolean;
   onKeep: (selection: PreparedLearningSelection) => void;
   onClose: () => void;
+  productionExplanation: LearningExplanationState | null;
+  onProductionRetry: (request: LearningSelectionRequest) => void;
 }) {
-  const moment = pinned.state === "prepared" ? pinned.selection : pinned.moment;
-  const selectedText = pinned.span.text;
+  const matchingProductionState = pinned.state === "production" && productionExplanation &&
+    sameLearningRequest(
+      pinned.request,
+      "request" in productionExplanation ? productionExplanation.request : productionExplanation.selection,
+    )
+    ? productionExplanation
+    : null;
+  const productionSelection = matchingProductionState && "selection" in matchingProductionState
+    ? matchingProductionState.selection
+    : null;
+  const preparedSelection = pinned.state === "prepared" ? pinned.selection : productionSelection;
+  const moment = preparedSelection ?? (pinned.state === "production"
+    ? pinned.request
+    : pinned.state === "prepared"
+      ? pinned.selection
+      : pinned.moment);
+  const span = preparedSelection?.span ?? (pinned.state === "production" ? pinned.request.span : pinned.span);
+  const selectedText = span.text;
   const panelRef = useRef<HTMLElement>(null);
-  const presentedInsights = pinned.state === "prepared"
-    ? orderedPresentedInsights(pinned.selection.facets)
+  const presentedInsights = preparedSelection
+    ? orderedPresentedInsights(preparedSelection.facets)
     : [];
-  const unavailableInsights = pinned.state === "prepared"
-    ? pinned.selection.facets.filter((facet) => facet.availability !== "available")
+  const unavailableInsights = preparedSelection
+    ? preparedSelection.facets.filter((facet) => facet.availability !== "available")
     : [];
-  const isPrototype = pinned.state === "prepared" &&
-    pinned.selection.authority.dataClass === "design_fixture";
+  const isPrototype = preparedSelection?.authority.dataClass === "design_fixture";
+  const panelState = pinned.state === "production"
+    ? `production-${matchingProductionState?.state ?? "loading"}`
+    : preparedSelection
+      ? isPrototype ? "prototype" : "production"
+      : pinned.state;
 
   useEffect(() => {
     panelRef.current?.focus();
@@ -441,12 +534,10 @@ function ExplanationPanel({
       tabIndex={-1}
       aria-label="Pinned language explanation"
       data-pinned-line-id={moment.lineId}
-      data-learning-state={pinned.state === "prepared"
-        ? pinned.selection.authority.dataClass === "design_fixture" ? "prototype" : "production"
-        : pinned.state}
-      data-selected-side={pinned.span.side}
-      data-selected-start={pinned.span.start}
-      data-selected-end={pinned.span.end}
+      data-learning-state={panelState}
+      data-selected-side={span.side}
+      data-selected-start={span.start}
+      data-selected-end={span.end}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -456,9 +547,13 @@ function ExplanationPanel({
     >
       <header className="learning-panel-head">
         <div>
-          <span>{pinned.state === "prepared"
+          <span>{preparedSelection
             ? isPrototype ? "Prepared prototype" : "Verified production explanation"
-            : stateLabel(pinned.state)}</span>
+            : pinned.state === "production"
+              ? productionStateLabel(matchingProductionState)
+              : pinned.state === "unavailable" || pinned.state === "failed"
+                ? stateLabel(pinned.state)
+                : "Verified production explanation"}</span>
           <h3 lang={moment.sourceLanguage}>{selectedText}</h3>
           <p>{momentClock(moment.startMs)} to {momentClock(moment.endMs)}</p>
         </div>
@@ -477,8 +572,17 @@ function ExplanationPanel({
         />
       )}
 
-      {pinned.state === "prepared" ? (
+      {preparedSelection ? (
         <>
+          {pinned.state === "production" && matchingProductionState && "selection" in matchingProductionState ? (
+            <p
+              className="learning-panel-translation"
+              role="status"
+              data-production-explanation-result-state={matchingProductionState.state}
+            >
+              {productionResultStateCopy(matchingProductionState.state)}
+            </p>
+          ) : null}
           <div className="learning-insights">
             {presentedInsights.map((insight) => (
               <section key={insight.kind} className="learning-insight" data-availability="available">
@@ -508,7 +612,7 @@ function ExplanationPanel({
               type="button"
               className="learning-keep"
               disabled={kept}
-              onClick={() => onKeep(pinned.selection)}
+              onClick={() => onKeep(preparedSelection)}
             >
               {kept ? "Kept in My Set" : "Keep in My Set"}
             </button>
@@ -525,14 +629,87 @@ function ExplanationPanel({
             <p>Only meaning, word or phrase, sentence structure, and translation rationale are shown.</p>
           </details>
         </>
-      ) : (
+      ) : pinned.state === "production" ? (
+        <ProductionExplanationRequestState
+          state={matchingProductionState}
+          request={pinned.request}
+          onRetry={onProductionRetry}
+        />
+      ) : pinned.state === "unavailable" || pinned.state === "failed" ? (
         <UnavailableState
           label={pinned.state === "failed" ? "Explanation failed closed" : "Explanation unavailable"}
           reasonCode={pinned.reasonCode}
         />
-      )}
+      ) : null}
     </aside>
   );
+}
+
+function ProductionExplanationRequestState({
+  state,
+  request,
+  onRetry,
+}: {
+  state: LearningExplanationState | null;
+  request: LearningSelectionRequest;
+  onRetry: (request: LearningSelectionRequest) => void;
+}) {
+  if (!state || state.state === "loading") {
+    return (
+      <div className="learning-unavailable" role="status" data-explanation-request-state="loading">
+        <b>Requesting production explanation</b>
+        <p>The runtime host is reopening the exact caption and Unicode code-point span.</p>
+      </div>
+    );
+  }
+  if ("selection" in state) return null;
+  return (
+    <>
+      <UnavailableState
+        label={state.state === "failed" ? "Explanation failed closed" : "Explanation unavailable"}
+        reasonCode={state.reasonCode}
+        detail={state.detail}
+      />
+      {state.state === "failed" && state.retry === "available" ? (
+        <div className="learning-panel-actions">
+          <button type="button" onClick={() => onRetry(request)}>Retry explanation</button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function productionStateLabel(state: LearningExplanationState | null): string {
+  if (!state || state.state === "loading") return "Requesting production explanation";
+  if ("selection" in state) return "Verified production explanation";
+  return state.state === "failed" ? "Production explanation failed closed" : "Production explanation unavailable";
+}
+
+function productionResultStateCopy(state: "available" | "partial" | "withheld" | "unavailable"): string {
+  switch (state) {
+    case "available": return "Production explanation available. All returned facets are shown below.";
+    case "partial": return "Production explanation partial. Only available facets are shown as content.";
+    case "withheld": return "Production explanation withheld. No withheld facet is presented as available content.";
+    case "unavailable": return "Production explanation unavailable. No unavailable facet is presented as content.";
+  }
+}
+
+function sameLearningRequest(left: LearningSelectionRequest, right: LearningSelectionRequest): boolean {
+  return left.lineId === right.lineId && left.startMs === right.startMs && left.endMs === right.endMs &&
+    left.sourceLanguage === right.sourceLanguage && left.targetLanguage === right.targetLanguage &&
+    JSON.stringify(left.source) === JSON.stringify(right.source) &&
+    JSON.stringify(left.target) === JSON.stringify(right.target) &&
+    JSON.stringify(left.span) === JSON.stringify(right.span);
+}
+
+function pinnedLineId(pinned: PinnedSelection): string {
+  if (pinned.state === "prepared") return pinned.selection.lineId;
+  if (pinned.state === "production") return pinned.request.lineId;
+  return pinned.moment.lineId;
+}
+
+function pinnedSpan(pinned: PinnedSelection): SelectedLanguageSpan {
+  return pinned.state === "production" ? pinned.request.span : pinned.span;
 }
 
 function orderedPresentedInsights(facets: LearningFacet[]): AvailableLearningFacet[] {
@@ -645,7 +822,23 @@ function sessionItem(
   };
 }
 
-function stateLabel(state: Exclude<PinnedSelection["state"], "prepared">): string {
+function productionPlaybackMatches(
+  presentation: Extract<LearningPresentation, { mode: "production" }>,
+  playback: LearningPlayback,
+): boolean {
+  if (playback.state !== "available" || playback.authority !== "verified_production_caption") return false;
+  const identity = presentation.source.context.identities;
+  return playback.binding.runtimeId === identity.runId &&
+    playback.binding.sourceArtifactId === identity.sourceArtifactId &&
+    playback.binding.sourceContentId === identity.sourceContentId &&
+    playback.binding.captionJobId === identity.captionJobId &&
+    playback.binding.captionArtifactId === identity.captionArtifactId &&
+    playback.binding.captionContentId === identity.captionContentId &&
+    playback.binding.timestampOrigin.kind === "source_media_zero" &&
+    playback.binding.timestampOrigin.offsetMs === 0;
+}
+
+function stateLabel(state: Exclude<PinnedSelection["state"], "prepared" | "production">): string {
   return state === "failed" ? "Failed closed" : "Unavailable";
 }
 

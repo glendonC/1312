@@ -3,11 +3,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LearningResults from "../learning/LearningResults";
 import { projectProductionLearningPresentation } from "../learning/productionExplanationAdapter";
 import { projectVerifiedProductionLearningSource } from "../learning/productionSourceAdapter";
-import type { LearningPlayback } from "../learning/presentation.ts";
+import {
+  learningRequestKey,
+  type LearningExplanationState,
+  type LearningPlayback,
+  type LearningSelectionRequest,
+} from "../learning/presentation.ts";
 import { PRODUCTION_CAPTION_RESULTS_ID } from "../resultAccess";
 import type { VerifiedCaptionProductionResult } from "../runtime/production/captionProductionAudit";
 import type { LocalRuntimeHostClient } from "./client";
 import ProductionMediaPlayer from "./ProductionMediaPlayer.tsx";
+import { ProductionLearningController } from "./productionLearningController.ts";
 import {
   ProductionPlaybackController,
   type ProductionPlaybackLoadResult,
@@ -56,6 +62,12 @@ function ProductionCaptionResult({
     { state: "loading" },
   );
   const [playback, setPlayback] = useState<LearningPlayback>(PLAYBACK_UNAVAILABLE);
+  const learningController = useMemo(
+    () => client ? new ProductionLearningController(client) : null,
+    [client],
+  );
+  const [explanation, setExplanation] = useState<LearningExplanationState | null>(null);
+  const playbackAvailable = playback.state === "available";
 
   useEffect(() => {
     const controller = controllerRef.current;
@@ -93,6 +105,32 @@ function ProductionCaptionResult({
       controller.invalidate();
     };
   }, [client, playbackEligible, projectionKey, runtimeId, sourceRevisionId]);
+
+  useEffect(() => {
+    setExplanation(null);
+    learningController?.invalidate();
+    return () => learningController?.invalidate();
+  }, [learningController, playbackAvailable, projectionKey]);
+
+  const updateExplanation = (request: LearningSelectionRequest, retry: boolean) => {
+    if (!learningController || !playbackAvailable || sourceProjection.state !== "ready") return;
+    const requestKey = learningRequestKey(sourceProjection.source, request);
+    if (!retry && explanation?.requestKey === requestKey) return;
+    if (
+      retry &&
+      (
+        explanation?.requestKey !== requestKey ||
+        explanation.state !== "failed" ||
+        explanation.retry !== "available"
+      )
+    ) return;
+    setExplanation({ state: "loading", requestKey, request });
+    const input = { runtimeId, source: sourceProjection.source, request };
+    const pending = retry ? learningController.retry(input) : learningController.request(input);
+    void pending.then((next) => {
+      setExplanation((current) => current?.requestKey === requestKey ? next : current);
+    });
+  };
 
   return (
     <article
@@ -141,9 +179,15 @@ function ProductionCaptionResult({
           )}
           <LearningResults
             presentation={projectProductionLearningPresentation(sourceProjection.source, {
-              playbackAvailable: playback.state === "available",
+              playbackAvailable,
+              interactionAvailable: learningController !== null,
             })}
             playback={playback}
+            productionInteraction={playbackAvailable && learningController ? {
+              explanation,
+              onRequest: (request) => updateExplanation(request, false),
+              onRetry: (request) => updateExplanation(request, true),
+            } : undefined}
           />
         </>
       ) : (

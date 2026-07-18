@@ -105,6 +105,14 @@ export type LearningExplanationState =
       selection: PreparedLearningSelection;
     }
   | {
+      state: "unavailable";
+      requestKey: string;
+      request: LearningSelectionRequest;
+      reasonCode: "production_explanation_executor_unavailable";
+      detail: string;
+      retry: "unavailable";
+    }
+  | {
       state: "failed";
       requestKey: string;
       request: LearningSelectionRequest;
@@ -127,15 +135,23 @@ export type LearningPresentation =
   | {
       mode: "production";
       source: Extract<LearningViewingSource, { context: { origin: "verified_production_caption" } }>;
-      explanations: {
-        state: "unavailable";
-        reasonCode:
-          | "production_media_playback_unavailable"
-          | "production_explanation_interaction_unavailable"
-          | "caption_authority_revoked";
-      };
+      explanations:
+        | { state: "ready" }
+        | {
+            state: "unavailable";
+            reasonCode:
+              | "production_media_playback_unavailable"
+              | "production_explanation_interaction_unavailable"
+              | "caption_authority_revoked";
+          };
       savedItems: { state: "unavailable"; reasonCode: "canonical_saved_item_missing" };
     };
+
+export interface ProductionLearningInteraction {
+  explanation: LearningExplanationState | null;
+  onRequest: (request: LearningSelectionRequest) => void;
+  onRetry: (request: LearningSelectionRequest) => void;
+}
 
 export type LearningPlayback =
   | {

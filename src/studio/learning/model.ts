@@ -8,6 +8,7 @@ export type LearningReasonCode =
   | "explanation_not_prepared"
   | "production_media_playback_unavailable"
   | "production_explanation_interaction_unavailable"
+  | "production_explanation_executor_unavailable"
   | "caption_authority_revoked"
   | "generator_abstained"
   | "facet_not_applicable"

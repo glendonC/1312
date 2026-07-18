@@ -19,6 +19,7 @@ import {
 } from "../learning/presentation.ts";
 import { projectVerifiedProductionLearningExplanation } from "../learning/productionExplanationAdapter.ts";
 import { validateLearningViewingSource } from "../learning/sourceAdapters.ts";
+import { RuntimeHostClientError } from "./client/responseGuards.ts";
 
 type ProductionSource = Extract<LearningViewingSource, { context: { origin: "verified_production_caption" } }>;
 
@@ -39,6 +40,7 @@ export interface ProductionLearningControllerInput {
 export class ProductionLearningController {
   private generation = 0;
   private readonly client: ProductionLearningRuntimeClient;
+  private readonly inFlight = new Map<string, Promise<LearningExplanationState>>();
 
   constructor(client: ProductionLearningRuntimeClient) {
     this.client = client;
@@ -46,9 +48,34 @@ export class ProductionLearningController {
 
   invalidate(): void {
     this.generation += 1;
+    this.inFlight.clear();
   }
 
-  async request(input: ProductionLearningControllerInput): Promise<LearningExplanationState> {
+  request(input: ProductionLearningControllerInput): Promise<LearningExplanationState> {
+    return this.coalesce(input, () => this.performRequest(input));
+  }
+
+  retry(input: ProductionLearningControllerInput): Promise<LearningExplanationState> {
+    return this.coalesce(input, () => this.performRetry(input));
+  }
+
+  private coalesce(
+    input: ProductionLearningControllerInput,
+    operation: () => Promise<LearningExplanationState>,
+  ): Promise<LearningExplanationState> {
+    const key = learningRequestKey(input.source, input.request);
+    const existing = this.inFlight.get(key);
+    if (existing) return existing;
+    const pending = operation();
+    this.inFlight.set(key, pending);
+    const remove = () => {
+      if (this.inFlight.get(key) === pending) this.inFlight.delete(key);
+    };
+    pending.then(remove, remove);
+    return pending;
+  }
+
+  private async performRequest(input: ProductionLearningControllerInput): Promise<LearningExplanationState> {
     const generation = ++this.generation;
     const invalid = validateControllerInput(input);
     if (invalid) return invalid;
@@ -63,7 +90,7 @@ export class ProductionLearningController {
     }
   }
 
-  async retry(input: ProductionLearningControllerInput): Promise<LearningExplanationState> {
+  private async performRetry(input: ProductionLearningControllerInput): Promise<LearningExplanationState> {
     const generation = ++this.generation;
     const invalid = validateControllerInput(input);
     if (invalid) return invalid;
@@ -109,6 +136,7 @@ export class ProductionLearningController {
       } catch {
         // Preserve the original closed host failure below.
       }
+      if (unconfiguredExecutor(error)) return unavailableExecutorState(input, error);
       return failedState(input, error, "available");
     }
   }
@@ -271,6 +299,20 @@ function exhaustedState(input: ProductionLearningControllerInput): LearningExpla
   };
 }
 
+function unavailableExecutorState(
+  input: ProductionLearningControllerInput,
+  error: RuntimeHostClientError,
+): LearningExplanationState {
+  return {
+    state: "unavailable",
+    requestKey: learningRequestKey(input.source, input.request),
+    request: input.request,
+    reasonCode: "production_explanation_executor_unavailable",
+    detail: error.message,
+    retry: "unavailable",
+  };
+}
+
 function staleState(input: ProductionLearningControllerInput): LearningExplanationState {
   return {
     state: "failed",
@@ -284,4 +326,8 @@ function staleState(input: ProductionLearningControllerInput): LearningExplanati
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : typeof error === "string" ? error : "Production explanation failed closed.";
+}
+
+function unconfiguredExecutor(error: unknown): error is RuntimeHostClientError {
+  return error instanceof RuntimeHostClientError && error.code === "language_explanation_unavailable";
 }

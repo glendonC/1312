@@ -1,0 +1,183 @@
+{
+  "schema": "studio.learning-prototype-fixture.v1",
+  "dataClass": "design_fixture",
+  "productionAuthority": false,
+  "fixtureId": "learning-prototype:run-006:c01",
+  "binding": {
+    "origin": "recorded_fixture",
+    "runId": "run-006",
+    "sourceId": "Ux-TMWnmntM",
+    "sourceContentId": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+    "captionArtifactId": "captions",
+    "captionContentId": "sha256:45b3ff96cef4a0112586e6bfb6e530e7cb227d48147f90a65e4ace3fd3f6690c",
+    "lineId": "c01",
+    "startMs": 0,
+    "endMs": 1550,
+    "sourceLanguage": "ko",
+    "targetLanguage": "en",
+    "sourceText": "분들이 몇 분 계신데",
+    "target": {
+      "state": "available",
+      "text": "I know a few people."
+    }
+  },
+  "unavailableDemonstration": {
+    "lineId": "c07",
+    "startMs": 12700,
+    "endMs": 13600,
+    "sourceLanguage": "ko",
+    "targetLanguage": "en",
+    "sourceText": "왜요 왜요?",
+    "target": {
+      "state": "withheld",
+      "reasonCode": "recorded_target_withheld",
+      "upstreamReasonCode": "asr_agreement",
+      "detail": "two recognisers agree only 0.50 on this window (< 0.6)"
+    }
+  },
+  "semanticReview": {
+    "state": "not_reviewed",
+    "receiptId": null
+  },
+  "semanticSupport": {
+    "state": "none",
+    "reasonCode": "design_fixture_has_no_semantic_evidence",
+    "claimIds": [],
+    "citationIds": []
+  },
+  "selections": [
+    {
+      "selectionId": "run-006:c01:source:4-7",
+      "side": "source",
+      "span": {
+        "unit": "unicode_code_point",
+        "start": 4,
+        "end": 7,
+        "text": "몇 분"
+      },
+      "insights": [
+        {
+          "kind": "meaning",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sceneMeaning": "Here, 몇 분 means a few people. It is an indefinite amount in this scene, not a direct question asking for a number."
+          }
+        },
+        {
+          "kind": "word",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "form": "몇 분",
+            "sense": "a few people",
+            "role": "몇 supplies an indefinite quantity and 분 counts people respectfully."
+          }
+        },
+        {
+          "kind": "listening_difficulty",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "signal": "분들이 몇 분",
+            "difficulty": "The same sound 분 appears twice in quick succession with different jobs.",
+            "listeningCue": "Listen for 들이 after the first 분 and 몇 before the second one."
+          }
+        }
+      ]
+    },
+    {
+      "selectionId": "run-006:c01:source:0-11",
+      "side": "source",
+      "span": {
+        "unit": "unicode_code_point",
+        "start": 0,
+        "end": 11,
+        "text": "분들이 몇 분 계신데"
+      },
+      "insights": [
+        {
+          "kind": "meaning",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sceneMeaning": "The speaker says there are a few people they know and leaves the thought open for what comes next."
+          }
+        },
+        {
+          "kind": "grammar",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "construction": "분들이 + 몇 분 + 계신데",
+            "explanation": "계시다 is the honorific form used for someone being or existing. The ending 는데 supplies background and signals that more is coming.",
+            "segments": [
+              {
+                "form": "분들이",
+                "role": "people as the topic under discussion"
+              },
+              {
+                "form": "몇 분",
+                "role": "an indefinite number of people"
+              },
+              {
+                "form": "계신데",
+                "role": "honorific existence with an open-ended background connection"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "translation_choice",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sourceChoice": "분들이 몇 분 계신데",
+            "targetChoice": "I know a few people.",
+            "rationale": "The English makes the conversational relationship explicit instead of repeating a respectful person noun and counter."
+          }
+        },
+        {
+          "kind": "culture",
+          "availability": "unavailable",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": "prototype_facet_not_prepared",
+          "claimIds": [],
+          "citationIds": [],
+          "content": null
+        }
+      ]
+    }
+  ],
+  "nonClaims": [
+    "not_runtime_generated",
+    "not_semantically_verified",
+    "not_follow_up_capable",
+    "not_grading_capable"
+  ]
+}

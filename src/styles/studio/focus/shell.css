@@ -196,44 +196,15 @@
   line-height: 1.4;
 }
 
-/*
- * A previewed worker restates the boundary the canvas already set: opening its focus is another
- * moment where "recorded demo" could read as "my source, analysed". Same gold advisory register as
- * the canvas badge, kept compact under the identity.
- */
-.agent-focus-preview-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  width: min(300px, 100%);
-  margin: 16px 0 0;
-  padding: 8px 11px;
-  border: 1px solid var(--gold-line);
-  border-radius: 10px;
-  corner-shape: squircle;
-  background: color-mix(in srgb, var(--gold) 10%, rgba(255, 255, 255, 0.6));
-  color: var(--ink-soft);
-  font-size: 0.7rem;
-  line-height: 1.4;
-}
-
-.agent-focus-preview-dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  margin-top: 4px;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 22%, transparent);
-}
-
 .agent-focus-shell {
   display: grid;
   width: 100%;
   height: min(760px, calc(100vh - 218px));
   min-height: 570px;
   min-width: 0;
-  grid-template-rows: minmax(0, 1fr) 50px;
+  grid-template-rows: auto auto;
+  gap: 6px;
+  align-content: center;
 }
 
 /*
@@ -281,17 +252,13 @@
   right: 0;
   left: 0;
   height: 1px;
-  background: rgba(22, 29, 27, 0.2);
-}
-
-.agent-focus-stage-rule::after {
-  content: "";
-  position: absolute;
-  top: 4px;
-  left: 0;
-  width: 38px;
-  height: 2px;
-  background: color-mix(in srgb, var(--agent-current) 72%, var(--ink));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--agent-current) 62%, rgba(22, 29, 27, 0.24)) 0%,
+    color-mix(in srgb, var(--agent-current) 20%, rgba(22, 29, 27, 0.2)) 42%,
+    rgba(22, 29, 27, 0.13) 76%,
+    transparent 100%
+  );
 }
 
 .agent-focus-body {

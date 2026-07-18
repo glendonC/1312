@@ -14,4 +14,27 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 24px 16px;
   }
+
+  .transport {
+    flex-wrap: wrap;
+  }
+
+  .transport .play,
+  .player-control,
+  .player-rate select {
+    min-height: 44px;
+  }
+
+  .transport .play {
+    width: 44px;
+    height: 44px;
+  }
+
+  .transport .wave {
+    min-width: 180px;
+  }
+
+  .player-sound input {
+    width: 64px;
+  }
 }

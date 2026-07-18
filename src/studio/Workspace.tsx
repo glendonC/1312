@@ -11,9 +11,9 @@
  */
 
 import { motion } from "motion/react";
-import { useState } from "react";
 
 import { clock, pct } from "./format";
+import RecordedMediaPlayer from "./learning/RecordedMediaPlayer";
 import type { AgentView } from "./replay";
 import { useBundle } from "./store";
 import type { RunBundle } from "./transport";
@@ -99,50 +99,14 @@ function Segment({
   );
 }
 
-const HAS_PICTURE = /\.(?:mp4|webm|mov|m4v)$/i;
-
 /**
- * A viewer for the media artifact in this run, not a reconstruction of an agent tool.
- *
- * Native media controls belong to the person reviewing the recording. They do not represent or
- * rewrite autonomous-agent playback.
+ * The same recorded-media player used by final Results. It follows the viewer's page-session
+ * time and preferences; it does not represent or rewrite autonomous-agent playback.
  */
 export function RecordedMedia({ bundle }: { bundle: RunBundle }) {
-  const [failed, setFailed] = useState(false);
-  const media = bundle.run.clip.media;
-  const src = media ? `/demo/runs/${bundle.run.id}/${media}` : null;
-  const picture = Boolean(media && HAS_PICTURE.test(media));
-
   return (
     <section className="env-media" aria-label="Recorded source media">
-      <div className="env-media-frame">
-        {src && picture && (
-          <video
-            src={src}
-            preload="metadata"
-            playsInline
-            controls
-            onError={() => setFailed(true)}
-            aria-label="Recorded source video"
-          />
-        )}
-
-        {src && !picture && (
-          <audio
-            src={src}
-            preload="metadata"
-            controls
-            onError={() => setFailed(true)}
-            aria-label="Recorded source audio"
-          />
-        )}
-
-        {(!src || failed) && (
-          <p className="env-media-unavailable">
-            {failed ? "The recorded media could not be loaded." : "No playable media was recorded."}
-          </p>
-        )}
-      </div>
+      <RecordedMediaPlayer bundle={bundle} surface="workbench" />
     </section>
   );
 }

@@ -9,6 +9,19 @@ export default function RunAct() {
   const complete = useComplete();
   const focused = useStudio((state) => state.selected !== null);
 
+  if (complete) {
+    return (
+      <motion.section
+        className="act act-run act-results"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <Results />
+      </motion.section>
+    );
+  }
+
   return (
     <motion.section
       className="act act-run"
@@ -20,8 +33,6 @@ export default function RunAct() {
         <SwarmGraph />
         <AgentPanel />
       </div>
-
-      {complete && <Results />}
     </motion.section>
   );
 }

@@ -6,7 +6,7 @@ import InputAct from "./InputAct";
 import { presentRecordedSource } from "./previewSession";
 import RunAct from "./RunAct";
 import SourceDisplay from "./SourceDisplay";
-import { replayTransport, useBundle, usePaused, useStage, useStudio } from "./store";
+import { replayTransport, useBundle, useComplete, usePaused, useStage, useStudio } from "./store";
 import useShortcuts from "./useShortcuts";
 
 const DevLab = import.meta.env.DEV ? lazy(() => import("./lab/Lab")) : null;
@@ -15,6 +15,7 @@ export default function StudioApp({ runId }: { runId: string }) {
   const boot = useStudio((s) => s.boot);
   const stage = useStage();
   const bundle = useBundle();
+  const complete = useComplete();
   const paused = usePaused();
   const previewSession = useStudio((s) => s.previewSession);
   const [lab, setLab] = useState(false);
@@ -54,7 +55,7 @@ export default function StudioApp({ runId }: { runId: string }) {
           <img src="/favicon.svg" alt="" width="30" height="30" />
         </a>
 
-        {bundle && stage !== "input" && visibleSource && (
+        {bundle && stage !== "input" && !complete && visibleSource && (
           <div className="top-source">
             <div
               className="top-mid"
@@ -99,7 +100,7 @@ export default function StudioApp({ runId }: { runId: string }) {
         )}
       </AnimatePresence>
 
-      {stage === "run" && <Dock />}
+      {stage === "run" && !complete && <Dock />}
       {lab && DevLab && (
         <Suspense fallback={null}>
           <DevLab defaultRunId={runId} />

@@ -1,5 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
+  lazy,
+  Suspense,
   useEffect,
   useId,
   useRef,
@@ -11,7 +13,6 @@ import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { Play } from "./glyphs";
 import LifecycleBottomBar from "./LifecycleBottomBar";
-import ProductLocalRuntime from "./localRuntime/ProductLocalRuntime";
 import {
   isProcessingMockScenario,
   type ProcessingMockScenario,
@@ -23,6 +24,8 @@ import {
 } from "./preflight/PreparationStages";
 import SourceEntry from "./SourceEntry";
 import { useBundle, useStudio } from "./store";
+
+const ProductLocalRuntime = lazy(() => import("./localRuntime/ProductLocalRuntime"));
 
 type SourceGuideState = "welcome" | "recorded" | "resolving" | "resolved" | "unavailable" | "cancelled";
 
@@ -530,10 +533,19 @@ export default function InputAct() {
       <div className="canvas" aria-hidden="true" />
 
       {ownedSourceOpen && loadStatus === "ready" && (
-        <ProductLocalRuntime
-          processingMock={processingMock}
-          onClose={() => setOwnedSourceOpen(false)}
-        />
+        <Suspense
+          fallback={(
+            <div className="input-status" role="status" aria-live="polite">
+              <span className="input-status-kicker">Owned local source</span>
+              <p>Opening the local production surface…</p>
+            </div>
+          )}
+        >
+          <ProductLocalRuntime
+            processingMock={processingMock}
+            onClose={() => setOwnedSourceOpen(false)}
+          />
+        </Suspense>
       )}
 
       {!ownedSourceOpen && showWelcome && loadStatus === "ready" && (

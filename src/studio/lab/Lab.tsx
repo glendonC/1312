@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 
 import { clock } from "../format";
-import LocalRuntimeLab from "../localRuntime/LocalRuntimeLab";
 import { phaseOf } from "../replay";
 import { replayTransport, useStudio } from "../store";
 import { deriveCheckpoints } from "./checkpoints";
@@ -10,6 +9,8 @@ import { resolveScenarioCursor, SCENARIOS } from "./scenarios";
 import { preflightFixture, PREFLIGHT_SCENARIOS } from "./preflightScenarios";
 
 import "./lab.css";
+
+const LocalRuntimeLab = lazy(() => import("../localRuntime/LocalRuntimeLab"));
 
 export default function Lab({ defaultRunId }: { defaultRunId: string }) {
   const bundle = useStudio((state) => state.bundle);
@@ -28,6 +29,7 @@ export default function Lab({ defaultRunId }: { defaultRunId: string }) {
   const [preflightId, setPreflightId] = useState("");
   const [busy, setBusy] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [runtimeLabOpen, setRuntimeLabOpen] = useState(false);
 
   const total = bundle?.traces.length ?? 0;
   const cursor = stage === "run" ? state.cursor : 0;
@@ -224,7 +226,18 @@ export default function Lab({ defaultRunId }: { defaultRunId: string }) {
             )}
           </details>
 
-          <LocalRuntimeLab />
+          <details
+            className="lab-inspector"
+            open={runtimeLabOpen}
+            onToggle={(event) => setRuntimeLabOpen(event.currentTarget.open)}
+          >
+            <summary>Local runtime host</summary>
+            {runtimeLabOpen && (
+              <Suspense fallback={<p role="status">Opening local runtime tools…</p>}>
+                <LocalRuntimeLab />
+              </Suspense>
+            )}
+          </details>
         </div>
       )}
     </aside>

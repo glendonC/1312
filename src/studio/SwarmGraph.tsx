@@ -300,21 +300,6 @@ function Swarm() {
         {/* the canvas is a canvas: it pans, and the grid is what tells you so */}
         <Background variant={BackgroundVariant.Dots} gap={26} size={1} className="grid" />
 
-        {previewSession && (
-          <Panel position="top-center" className="graph-preview-mark">
-            <div className="graph-preview-badge" role="note">
-              <span className="graph-preview-dot" aria-hidden="true" />
-              <span className="graph-preview-copy">
-                <strong>Recorded preview</strong>
-                <span>
-                  These agents replay a bundled demonstration — your submitted source was not
-                  processed.
-                </span>
-              </span>
-            </div>
-          </Panel>
-        )}
-
         {overviewOpen && overview.needed && (
           <MiniMap<SwarmNode>
             className="graph-overview-map"

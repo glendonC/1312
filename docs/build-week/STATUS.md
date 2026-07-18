@@ -46,10 +46,13 @@ score.
   facets, immutable grant/artifact/receipt lineage, cold audit, authenticated POST/GET, and a strict
   browser client parser. Failed attempts remain immutable and visible while bounded host-numbered
   retries and explicit restart recovery can close transient or interrupted work without inventing
-  output. The default executor is unavailable; real OpenAI execution requires an
-  explicit operator-selected model and flag. Facets remain semantically `not_reviewed`, and Results
-  UI wiring, follow-up, listening/culture/reference producers, learner persistence, grading, SRS,
-  and export are not included.
+  output. Production Results now bind verified captions to content-bound private source playback
+  through a short-lived host-minted grant, and an explicit exact-span selection can request the
+  five facets from that verified media moment with coalesced identical actions, stale-response
+  rejection, and bounded explicit retry. The default executor is unavailable and visibly
+  non-retryable; real OpenAI execution requires an explicit operator-selected model and flag.
+  Facets remain semantically `not_reviewed`, and follow-up, listening/culture/reference producers,
+  learner persistence, grading, SRS, and export are not included.
 - **Bet G first scored capture:** `hard-ko-v1` is frozen and the human-labeled run-007 score receipt
   exists with `judge: null`. It is one benchmark data point, not production semantic QC, calibration,
   or a general quality/improvement claim.

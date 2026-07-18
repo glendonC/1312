@@ -66,3 +66,29 @@ export function createCaptionArtifactId(
     contentId,
   })}`;
 }
+
+export function createLanguageExplanationArtifactId(
+  runId: string,
+  jobId: string,
+  contentId: string,
+): string {
+  return `artifact:${canonicalSha256({
+    runId,
+    jobId,
+    kind: "language-explanation-output",
+    contentId,
+  })}`;
+}
+
+export function createLanguageExplanationReceiptArtifactId(
+  runId: string,
+  jobId: string,
+  contentId: string,
+): string {
+  return `artifact:${canonicalSha256({
+    runId,
+    jobId,
+    kind: "language-explanation-receipt",
+    contentId,
+  })}`;
+}

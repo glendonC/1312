@@ -8,6 +8,7 @@ import {
   OwnedMediaIngestService,
   OpenAiCaptionProductionExecutor,
   OpenAiCurrentRunSpeechRecognizer,
+  OpenAiLanguageExplanationExecutor,
   RecordedCaptionFixtureExecutor,
   RuntimeSourceRegistry,
   RuntimeStartService,
@@ -16,6 +17,7 @@ import {
   createRuntimeHostHttpServer,
   listenRuntimeHost,
 } from "../src/studio/runtime/production/runtimeHost/index.ts";
+import { resolveLanguageExplanationExecutorConfiguration } from "../src/studio/runtime/production/languageExplanations/configuration.ts";
 
 const REPOSITORY = resolve(import.meta.dirname, "..");
 
@@ -74,6 +76,11 @@ if (semanticRecognizerMode !== "unavailable" && semanticRecognizerMode !== "open
 if (semanticRecognizerMode === "openai" && !flag("--allow-real-semantic-evidence")) {
   throw new Error("Real current-run semantic evidence requires --allow-real-semantic-evidence");
 }
+const languageExplanationConfiguration = resolveLanguageExplanationExecutorConfiguration({
+  mode: value("--language-explanation-executor"),
+  allowReal: flag("--allow-real-language-explanation"),
+  model: value("--language-explanation-model"),
+});
 
 async function openAiKey(): Promise<string> {
   const environmentKey = process.env.OPENAI_API_KEY?.trim();
@@ -112,6 +119,12 @@ const captionExecutor = captionExecutorMode === "openai"
 const semanticRecognizer = semanticRecognizerMode === "openai"
   ? new OpenAiCurrentRunSpeechRecognizer({ apiKey: await openAiKey() })
   : undefined;
+const languageExplanationExecutor = languageExplanationConfiguration.mode === "openai"
+  ? new OpenAiLanguageExplanationExecutor({
+      apiKey: await openAiKey(),
+      model: languageExplanationConfiguration.model,
+    })
+  : undefined;
 const service = await RuntimeStartService.open({
   store,
   sources,
@@ -126,6 +139,7 @@ const service = await RuntimeStartService.open({
   }),
   reviewer: { id: reviewerId, label: reviewerLabel },
   captionExecutor,
+  languageExplanationExecutor,
 });
 const token = randomBytes(32).toString("hex");
 const server = createRuntimeHostHttpServer({ service, ownedMediaIngest, token, allowedOrigins });
@@ -153,6 +167,9 @@ process.stdout.write(`${JSON.stringify({
   semanticRecognizer: semanticRecognizerMode === "openai"
     ? "current-run-openai-opt-in"
     : "current-run-unavailable-no-fixture-fallback",
+  languageExplanationExecutor: languageExplanationConfiguration.mode === "openai"
+    ? `current-run-openai-opt-in:${languageExplanationConfiguration.model}`
+    : "unavailable-no-fixture-fallback",
   authorizationToken: token,
 }, null, 2)}\n`);
 

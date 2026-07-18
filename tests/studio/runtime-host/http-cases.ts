@@ -189,6 +189,32 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
     );
     assert.equal(emptyCaptions.status, 200);
     assert.deepEqual((await emptyCaptions.json() as { captions: unknown[] }).captions, []);
+    const emptyExplanations = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/language-explanations`,
+      { headers: authorized },
+    );
+    assert.equal(emptyExplanations.status, 200);
+    const emptyExplanationBody = await emptyExplanations.json() as { schema: string; results: unknown[] };
+    assert.equal(emptyExplanationBody.schema, "studio.local-runtime-language-explanations.v1");
+    assert.deepEqual(emptyExplanationBody.results, []);
+    const explanationWithoutContentType = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/language-explanations`,
+      { method: "POST", headers: authorized, body: "{}" },
+    );
+    assert.equal(explanationWithoutContentType.status, 415);
+    const invalidExplanation = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/language-explanations`,
+      {
+        method: "POST",
+        headers: { ...authorized, "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    assert.equal(invalidExplanation.status, 400);
+    assert.equal(
+      (await invalidExplanation.json() as { error: { code: string } }).error.code,
+      "invalid_language_explanation_request",
+    );
     const createReview = await fetch(
       `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-decisions`,
       {

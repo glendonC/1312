@@ -53,6 +53,7 @@ import type {
 import type { OwnedMediaStudyRecordV2, StudyReadinessRecordV3 } from "./studiesV2.ts";
 import type { OwnedMediaStudyRecordV3, RangePassRecord, StudyReadinessRecordV4 } from "./studiesV3.ts";
 import type { GeneralizedParentAdmissionRecord, GeneralizedParentArtifactReadRecord } from "./studyReportsV2.ts";
+import type { LanguageExplanationRecord } from "./languageExplanations.ts";
 
 export interface RuntimeProjection {
   runId: string;
@@ -84,6 +85,7 @@ export interface RuntimeProjection {
   publishReviewRevocations: Record<string, PublishReviewRevocationRecord>;
   captionProductions: Record<string, CaptionProductionRecord>;
   captionQualityControls: Record<string, CaptionQualityControlRecord>;
+  languageExplanations: Record<string, LanguageExplanationRecord>;
   executions: Record<string, ExecutorRecord>;
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;

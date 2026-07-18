@@ -8,6 +8,8 @@ import type {
   RuntimeHostCaptionQualityControlRequest,
   RuntimeHostCaptionQualityControlResponse,
   RuntimeHostDecisionReceiptResponse,
+  RuntimeHostLanguageExplanationRequest,
+  RuntimeHostLanguageExplanationResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewDecisionRequest,
@@ -29,6 +31,7 @@ import {
   captionQualityControlResponse,
 } from "./captionResponses.ts";
 import { planResponse } from "./planResponse.ts";
+import { languageExplanationResponse } from "./languageExplanationResponses.ts";
 import {
   exact,
   fail,
@@ -316,6 +319,27 @@ export class LocalRuntimeHostClient {
   ): Promise<RuntimeHostCaptionProductionResponse> {
     return captionProductionResponse(
       await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/caption-productions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      }),
+      runtimeId,
+    );
+  }
+
+  async languageExplanations(runtimeId: string): Promise<RuntimeHostLanguageExplanationResponse> {
+    return languageExplanationResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/language-explanations`),
+      runtimeId,
+    );
+  }
+
+  async createLanguageExplanation(
+    runtimeId: string,
+    request: RuntimeHostLanguageExplanationRequest,
+  ): Promise<RuntimeHostLanguageExplanationResponse> {
+    return languageExplanationResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/language-explanations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),

@@ -36,8 +36,11 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
       (artifact.origin.kind === "external_screen_fixture" || artifact.origin.kind === "external_screen_screenshot" ||
         artifact.origin.kind === "external_screen_content" || artifact.origin.kind === "external_screen_action_receipt" ||
         artifact.origin.kind === "external_screen_session_receipt") && event.producer.kind === "computer_use_host";
+    const isAtomicLanguageExplanation =
+      (artifact.origin.kind === "language_explanation_output" || artifact.origin.kind === "language_explanation_receipt") &&
+      event.producer.kind === "language_explanation_host";
     invariant(
-      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicVisualTransition || isAtomicSpeakerOverlap || isAtomicConditionalSeparation || isAtomicResearch || isAtomicComputerUse,
+      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicVisualTransition || isAtomicSpeakerOverlap || isAtomicConditionalSeparation || isAtomicResearch || isAtomicComputerUse || isAtomicLanguageExplanation,
       event,
       "artifact evidence must come from its bounded storage, capability, admission, planning, synthesis, or audit host",
     );
@@ -513,6 +516,63 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
           ]),
         event,
         `artifact ${artifact.id} changed its caption candidate or study/approval lineage`,
+      );
+    } else if (artifact.origin.kind === "language_explanation_output") {
+      const job = next.languageExplanations[artifact.origin.jobId];
+      const caption = job ? next.captionProductions[job.caption.jobId] : null;
+      invariant(job?.status === "started" && caption?.status === "completed", event, `artifact ${artifact.id} has no active explanation or completed caption`);
+      invariant(
+        artifact.producerTaskId === null && artifact.producerAgentId === null &&
+          artifact.origin.captionArtifactId === job.caption.artifactId &&
+          artifact.origin.captionContentId === job.caption.contentId &&
+          artifact.origin.captionReceiptArtifactId === job.caption.receiptArtifactId &&
+          artifact.origin.captionReceiptContentId === job.caption.receiptContentId &&
+          artifact.origin.sourceArtifactId === caption.sourceArtifactId &&
+          artifact.origin.studyArtifactId === caption.study.artifactId &&
+          artifact.origin.readinessArtifactId === caption.readiness.artifactId &&
+          artifact.origin.approvalArtifactId === caption.approvalArtifactId &&
+          artifact.content.contentId !== artifact.origin.receiptContentId &&
+          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([
+            job.caption.artifactId,
+            job.caption.receiptArtifactId,
+            caption.sourceArtifactId,
+            caption.study.artifactId,
+            caption.readiness.artifactId,
+            caption.approvalArtifactId,
+          ]),
+        event,
+        `artifact ${artifact.id} changed its exact caption authority`,
+      );
+    } else if (artifact.origin.kind === "language_explanation_receipt") {
+      const job = next.languageExplanations[artifact.origin.jobId];
+      const caption = job ? next.captionProductions[job.caption.jobId] : null;
+      const explanation = next.artifacts[artifact.origin.explanationArtifactId];
+      invariant(job?.status === "started" && caption?.status === "completed", event, `artifact ${artifact.id} has no active explanation or completed caption`);
+      invariant(
+        artifact.producerTaskId === null && artifact.producerAgentId === null &&
+          explanation?.origin.kind === "language_explanation_output" &&
+          explanation.origin.jobId === job.jobId &&
+          explanation.content.contentId === artifact.origin.explanationContentId &&
+          artifact.origin.captionArtifactId === job.caption.artifactId &&
+          artifact.origin.captionContentId === job.caption.contentId &&
+          artifact.origin.captionReceiptArtifactId === job.caption.receiptArtifactId &&
+          artifact.origin.captionReceiptContentId === job.caption.receiptContentId &&
+          artifact.origin.sourceArtifactId === caption.sourceArtifactId &&
+          artifact.origin.studyArtifactId === caption.study.artifactId &&
+          artifact.origin.readinessArtifactId === caption.readiness.artifactId &&
+          artifact.origin.approvalArtifactId === caption.approvalArtifactId &&
+          artifact.content.contentId === artifact.origin.receiptContentId &&
+          JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify([
+            explanation.id,
+            job.caption.artifactId,
+            job.caption.receiptArtifactId,
+            caption.sourceArtifactId,
+            caption.study.artifactId,
+            caption.readiness.artifactId,
+            caption.approvalArtifactId,
+          ]),
+        event,
+        `artifact ${artifact.id} changed its explanation or exact caption authority`,
       );
     }
     next.artifacts[artifact.id] = artifact;

@@ -68,6 +68,9 @@ import {
   buildCaptionQualityControlArtifact as buildCaptionQualityControlArtifactBuilder,
 } from "./artifactStore/captionArtifacts.ts";
 import {
+  buildLanguageExplanationArtifacts as buildLanguageExplanationArtifactsBuilder,
+} from "./artifactStore/languageExplanationArtifacts.ts";
+import {
   canonicalJson,
   canonicalJsonContentId,
   canonicalSha256,
@@ -79,6 +82,8 @@ export {
   canonicalJsonContentId,
   canonicalSha256,
   createCaptionArtifactId,
+  createLanguageExplanationArtifactId,
+  createLanguageExplanationReceiptArtifactId,
   createSourceArtifactId,
   identifyFile,
 } from "./artifactStore/contentIdentity.ts";
@@ -569,6 +574,12 @@ export class ContentAddressedArtifactStore {
     input: Parameters<typeof buildCaptionQualityControlArtifactBuilder>[0],
   ): ReturnType<typeof buildCaptionQualityControlArtifactBuilder> {
     return buildCaptionQualityControlArtifactBuilder(input);
+  }
+
+  buildLanguageExplanationArtifacts(
+    input: Parameters<typeof buildLanguageExplanationArtifactsBuilder>[0],
+  ): ReturnType<typeof buildLanguageExplanationArtifactsBuilder> {
+    return buildLanguageExplanationArtifactsBuilder(input);
   }
 
   async record(ledger: RuntimeLedger, artifact: RuntimeArtifact, causationId: string | null = null): Promise<void> {

@@ -80,6 +80,11 @@ import type {
   RestudiedOwnedMediaStudyCompletedEvent,
   RestudiedStudyReadinessAuditedEvent,
 } from "./protocol/studyEvents.ts";
+import type {
+  LanguageExplanationCompletedEvent,
+  LanguageExplanationFailedEvent,
+  LanguageExplanationStartedEvent,
+} from "./protocol/languageExplanationEvents.ts";
 
 export * from "./protocol/base.ts";
 export * from "./protocol/executionEvents.ts";
@@ -93,6 +98,7 @@ export * from "./protocol/researchEvents.ts";
 export * from "./protocol/computerUseEvents.ts";
 export * from "./protocol/reviewEvents.ts";
 export * from "./protocol/studyEvents.ts";
+export * from "./protocol/languageExplanationEvents.ts";
 
 export type RuntimeEvent =
   | ArtifactRecordedEvent
@@ -161,6 +167,9 @@ export type RuntimeEvent =
   | CaptionProductionCompletedEvent
   | CaptionProductionFailedEvent
   | CaptionQualityControlDecidedEvent
+  | LanguageExplanationStartedEvent
+  | LanguageExplanationCompletedEvent
+  | LanguageExplanationFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent
   | RootOutputDispositionRecordedEvent

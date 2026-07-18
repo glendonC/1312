@@ -41,6 +41,15 @@ score.
   closed; do not reopen its slices as a new runtime plan.
 - **Runtime modularity:** launcher, validation, projection, protocol, and runtime-host review/caption
   seams are split into cohesive modules; UI catch-up remains next.
+- **Selected-language Apply producer:** an exact verified caption span can now enter a separate
+  private language-explanation host with typed meaning/word/phrase/grammar/translation-choice
+  facets, immutable grant/artifact/receipt lineage, cold audit, authenticated POST/GET, and a strict
+  browser client parser. Failed attempts remain immutable and visible while bounded host-numbered
+  retries and explicit restart recovery can close transient or interrupted work without inventing
+  output. The default executor is unavailable; real OpenAI execution requires an
+  explicit operator-selected model and flag. Facets remain semantically `not_reviewed`, and Results
+  UI wiring, follow-up, listening/culture/reference producers, learner persistence, grading, SRS,
+  and export are not included.
 - **Bet G first scored capture:** `hard-ko-v1` is frozen and the human-labeled run-007 score receipt
   exists with `judge: null`. It is one benchmark data point, not production semantic QC, calibration,
   or a general quality/improvement claim.

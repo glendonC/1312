@@ -743,6 +743,45 @@ tamper rejects the whole read as `stored_content_inconsistent`; the browser neve
 fixture or object-store path. This authenticated private read adds no replay identity, upload, CDN,
 publication, English-quality claim, or score.
 
+The production event union also includes `language.explanation_started`,
+`language.explanation_completed`, and `language.explanation_failed`. This is a private post-caption
+Apply producer, not a child capability and not a new `OutputDepth`. Its closed request contains only
+one exact verified caption job/artifact/content/receipt identity, one caption line id, one selected
+source or target span using Unicode code-point offsets plus exact text, and an ordered subset of the
+closed v1 facet kinds: `meaning`, `word`, `phrase`, `grammar`, and `translation_choice`. The host
+reopens the complete caption and approval lineage, requires authority to remain unrevoked, checks
+the span against stored caption text, derives at most five stored caption-context lines, and mints
+the private grant. Caller captions, explanation prose, prompts, evidence claims, citations, model
+configuration, paths, export controls, and open fields are rejected.
+
+Completion stores private content-addressed `studio.language-explanation.artifact.v1` and
+`studio.language-explanation.receipt.v1` objects with exact source, study, readiness, approval,
+caption, selected-line, timing, availability, executor, prompt-contract, configuration, result, and
+rights lineage. Each requested facet is `available`, `withheld`, or `unavailable` with a closed
+reason. Available prose is `host_receipted`, `not_reviewed`, and
+`caption_context_inference`; external citation ids remain empty because caption context is input,
+not proof of explanation correctness. Output is private and export eligibility is unavailable.
+Fixed bounds are five context lines, five requested facets, three attempts per exact request, 256
+selected code points, 32 KiB per caption snapshot, 8 KiB per explanation text field, 64 KiB
+generator output, 128 KiB provider envelopes and canonical artifacts, 4,000 completion tokens, and
+60 seconds.
+
+`GET /v1/runtimes/:runtimeId/language-explanations` returns
+`studio.local-runtime-language-explanations.v1`; the same resource accepts the closed POST. The GET
+re-hashes both stored objects, reopens the exact production caption recursively, repeats the
+selection/context/authority checks, and rejects the whole response on tamper or mixed identity. It
+returns every immutable attempt as `started`, `completed`, or `failed` plus the artifact and receipt
+body for each completed result. A failed provider attempt remains visible and an identical retry
+receives the next host-derived attempt number up to the fixed three-attempt ceiling; an active or
+completed request cannot execute again. Explicit host recovery closes a process-interrupted
+`started` attempt as failed without inventing output, after which the bounded retry policy applies.
+The strict client re-hashes both bodies and closes attempt, grant, artifact, receipt, caption, span,
+facet, and result identities one-to-one. The
+default executor is explicitly unavailable. The optional OpenAI Responses API executor requires an
+explicit model id and real-execution flag in `scripts/run-runtime-host.ts`; no model id is selected
+by the browser. Follow-up answering, listening diagnosis, culture/reference claims, semantic
+grading, learner persistence, mastery, SRS, and export remain unavailable.
+
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a
 `fixtureOnly` event production evidence. The “projection / surface” column remains future UI work

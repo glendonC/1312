@@ -18,6 +18,7 @@ export type RuntimeProducerKind =
   | "publish_review_host"
   | "caption_production_host"
   | "caption_quality_control_host"
+  | "language_explanation_host"
   | "handoff_host"
   | "admission_host"
   | "artifact_read_host"

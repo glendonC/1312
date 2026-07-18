@@ -11,12 +11,18 @@ import { CAPTION_PRODUCTION_LIMITS } from "../src/studio/runtime/production/mode
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
 import { PublishReviewHost } from "../src/studio/runtime/production/review/publishReviewHost.ts";
 import {
+  DeterministicLanguageExplanationTestExecutor,
   DeterministicRuntimeExecutor,
   DurableRuntimeCommandStore,
   RuntimeSourceRegistry,
   RuntimeStartService,
   deterministicOrchestratorLauncherFactory,
 } from "../src/studio/runtime/production/runtimeHost/index.ts";
+import type { LanguageExplanationExecutor } from "../src/studio/runtime/production/languageExplanations/executor.ts";
+import {
+  createLanguageExplanationGrantId,
+  createLanguageExplanationJobId,
+} from "../src/studio/runtime/production/languageExplanations/identity.ts";
 import type {
   RuntimeHostCaptionProductionRequest,
   RuntimeHostPublishReviewDecisionResponse,
@@ -45,6 +51,7 @@ async function harness(options: {
   executionMode?: "completed" | "failed" | "timed_out" | "interrupted";
   orchestratorMode?: DeterministicOrchestratorMode;
   defaultU4?: boolean;
+  languageExplanationExecutor?: LanguageExplanationExecutor;
 } = {}): Promise<Harness> {
   const directory = await mkdtemp(join(tmpdir(), "studio-caption-production-test-"));
   const sources = await RuntimeSourceRegistry.open({ sourceDirectories: [FIXTURE] });
@@ -56,6 +63,7 @@ async function harness(options: {
     orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory({ mode: options.orchestratorMode }),
     ...(!options.defaultU4 ? { studyContractVersion: "v1" as const } : {}),
     captionExecutor: options.captionExecutor,
+    languageExplanationExecutor: options.languageExplanationExecutor,
     recoverOnOpen: false,
   });
   const source = sources.list()[0];
@@ -629,6 +637,453 @@ test("client rejects tampered verified line bytes", async () => {
     await assert.rejects(client.captionProductionResults(approval.runtimeId), /artifact bytes do not match/);
     const digest = results.results[0].verification.captionContentId.replace("sha256:", "");
     assert.ok((await readFile(join(runtime.store.paths(approval.runtimeId).artifactStoreRoot, "objects", "sha256", digest.slice(0, 2), digest))).byteLength > 0);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+const deterministicLanguageExplanation = new DeterministicLanguageExplanationTestExecutor((input) =>
+  input.grant.facetKinds.map((kind) => {
+    if (kind === "meaning") {
+      return {
+        kind,
+        availability: "available",
+        reasonCode: null,
+        content: { sceneMeaning: "In this caption, the selected word identifies the current moment or run." },
+      };
+    }
+    if (kind === "word") {
+      return {
+        kind,
+        availability: "available",
+        reasonCode: null,
+        content: { form: input.grant.selection.text, sense: "current or present", role: "modifier" },
+      };
+    }
+    return {
+      kind,
+      availability: "unavailable",
+      reasonCode: "insufficient_caption_context",
+      content: null,
+    };
+  }));
+
+test("exact selected caption spans produce private receipted explanations and cold/client replay", async () => {
+  const runtime = await harness({
+    captionExecutor: currentRunCaptionExecutor,
+    languageExplanationExecutor: deterministicLanguageExplanation,
+  });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const captions = await runtime.service.captionProductionResults(approval.runtimeId);
+    const caption = captions.results[0];
+    const line = caption.artifact.lines[0];
+    const response = await runtime.service.createLanguageExplanation(approval.runtimeId, {
+      caption: {
+        jobId: caption.verification.jobId,
+        artifactId: caption.verification.captionArtifactId,
+        contentId: caption.verification.captionContentId,
+        receiptArtifactId: caption.verification.receiptArtifactId,
+        receiptId: caption.verification.receiptId,
+        receiptContentId: caption.verification.receiptContentId,
+      },
+      lineId: line.id,
+      selection: {
+        side: "source",
+        unit: "unicode_code_point",
+        start: 0,
+        end: 2,
+        text: "현재",
+      },
+      facetKinds: ["meaning", "word", "grammar"],
+    });
+    assert.equal(response.results.length, 1);
+    const explanation = response.results[0];
+    assert.equal(explanation.verification.integrity, "stored_explanation_and_receipt_with_verified_current_caption");
+    assert.equal(explanation.artifact.input.line.startMs, line.startMs);
+    assert.equal(explanation.artifact.input.line.endMs, line.endMs);
+    assert.deepEqual(explanation.artifact.input.selection, {
+      side: "source",
+      unit: "unicode_code_point",
+      start: 0,
+      end: 2,
+      text: "현재",
+    });
+    assert.equal(explanation.artifact.executor.classification, "deterministic_test");
+    assert.equal(explanation.artifact.rights.publication, "private");
+    assert.equal(explanation.artifact.rights.exportEligibility, "unavailable");
+    assert.equal(explanation.artifact.semanticReview.state, "not_reviewed");
+    assert.equal(explanation.artifact.result.status, "partial");
+    assert.equal(explanation.artifact.facets[0].availability, "available");
+    assert.equal(explanation.artifact.facets[2].availability, "unavailable");
+    assert.deepEqual(explanation.artifact.facets[0].externalCitationIds, []);
+    assert.ok(explanation.artifact.input.inputContextLineage.semanticEvidenceArtifactIds.length > 0);
+    assert.deepEqual((await runtime.service.languageExplanations(approval.runtimeId)).results, response.results);
+
+    const client = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "language-explanation-test-token",
+      fetch: async () => new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    });
+    const clientResult = await client.languageExplanations(approval.runtimeId);
+    assert.equal(clientResult.results[0].verification.contentId, explanation.verification.contentId);
+
+    const tamperedClientResponse = structuredClone(response);
+    tamperedClientResponse.results[0].verification.caption.contentId = `sha256:${"f".repeat(64)}`;
+    const tamperedClient = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "language-explanation-test-token",
+      fetch: async () => new Response(JSON.stringify(tamperedClientResponse), { status: 200 }),
+    });
+    await assert.rejects(
+      tamperedClient.languageExplanations(approval.runtimeId),
+      /verification identities, selection, executor, or counts do not match/,
+    );
+
+    const tamperedReceiptResponse = structuredClone(response);
+    tamperedReceiptResponse.results[0].verification.receiptId = "language-explanation-receipt:tampered";
+    const tamperedReceiptClient = new LocalRuntimeHostClient({
+      baseUrl: "http://127.0.0.1:4312",
+      token: "language-explanation-test-token",
+      fetch: async () => new Response(JSON.stringify(tamperedReceiptResponse), { status: 200 }),
+    });
+    await assert.rejects(
+      tamperedReceiptClient.languageExplanations(approval.runtimeId),
+      /receipt bytes or closure do not match/,
+    );
+
+    const receiptPath = objectPath(runtime, approval.runtimeId, explanation.verification.receiptContentId);
+    const receiptBytes = await readFile(receiptPath);
+    await writeFile(receiptPath, "{}\n", "utf8");
+    await assert.rejects(
+      runtime.service.languageExplanations(approval.runtimeId),
+      /stored language explanation, receipt, or exact caption lineage failed closed/i,
+    );
+    await writeFile(receiptPath, receiptBytes);
+
+    await writeFile(objectPath(runtime, approval.runtimeId, explanation.verification.contentId), "{}\n", "utf8");
+    await assert.rejects(
+      runtime.service.languageExplanations(approval.runtimeId),
+      /stored language explanation, receipt, or exact caption lineage failed closed/i,
+    );
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("failed language-explanation attempts remain visible and a host-numbered retry can complete once", async () => {
+  let calls = 0;
+  const flaky: LanguageExplanationExecutor = {
+    describe: () => deterministicLanguageExplanation.describe(),
+    async generate(input, signal) {
+      calls += 1;
+      if (calls === 1) throw new Error("transient provider detail must not leak");
+      return deterministicLanguageExplanation.generate(input, signal);
+    },
+  };
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor, languageExplanationExecutor: flaky });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const caption = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+    const request = {
+      caption: {
+        jobId: caption.verification.jobId,
+        artifactId: caption.verification.captionArtifactId,
+        contentId: caption.verification.captionContentId,
+        receiptArtifactId: caption.verification.receiptArtifactId,
+        receiptId: caption.verification.receiptId,
+        receiptContentId: caption.verification.receiptContentId,
+      },
+      lineId: caption.artifact.lines[0].id,
+      selection: { side: "source" as const, unit: "unicode_code_point" as const, start: 0, end: 2, text: "현재" },
+      facetKinds: ["meaning" as const],
+    };
+    await assert.rejects(
+      runtime.service.createLanguageExplanation(approval.runtimeId, request),
+      /generation failed closed/,
+    );
+    const failed = await runtime.service.languageExplanations(approval.runtimeId);
+    assert.deepEqual(failed.results, []);
+    assert.equal(failed.attempts.length, 1);
+    assert.equal(failed.attempts[0].attempt, 0);
+    assert.equal(failed.attempts[0].status, "failed");
+    assert.equal(failed.attempts[0].failure, "Language explanation generation failed closed");
+
+    const completed = await runtime.service.createLanguageExplanation(approval.runtimeId, request);
+    assert.equal(completed.results.length, 1);
+    assert.equal(completed.results[0].artifact.grant.attempt, 1);
+    assert.deepEqual(completed.attempts.map((attempt) => attempt.status).sort(), ["completed", "failed"]);
+    await assert.rejects(
+      runtime.service.createLanguageExplanation(approval.runtimeId, request),
+      /already active or completed/,
+    );
+    assert.equal(calls, 2);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("runtime-host recovery closes an interrupted explanation attempt without inventing a result", async () => {
+  const firstCall = { release: null as (() => void) | null };
+  let calls = 0;
+  const interruptible: LanguageExplanationExecutor = {
+    describe: () => deterministicLanguageExplanation.describe(),
+    async generate(input, signal) {
+      calls += 1;
+      if (calls === 1) await new Promise<void>((resolveWait) => { firstCall.release = resolveWait; });
+      return deterministicLanguageExplanation.generate(input, signal);
+    },
+  };
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor, languageExplanationExecutor: interruptible });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const caption = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+    const request = {
+      caption: {
+        jobId: caption.verification.jobId,
+        artifactId: caption.verification.captionArtifactId,
+        contentId: caption.verification.captionContentId,
+        receiptArtifactId: caption.verification.receiptArtifactId,
+        receiptId: caption.verification.receiptId,
+        receiptContentId: caption.verification.receiptContentId,
+      },
+      lineId: caption.artifact.lines[0].id,
+      selection: { side: "source" as const, unit: "unicode_code_point" as const, start: 0, end: 2, text: "현재" },
+      facetKinds: ["meaning" as const],
+    };
+    const inFlight = runtime.service.createLanguageExplanation(approval.runtimeId, request);
+    const deadline = Date.now() + 3_000;
+    while (Date.now() < deadline) {
+      const loaded = await journal(runtime, approval.runtimeId);
+      if (firstCall.release && Object.values(loaded.state.languageExplanations).some((attempt) => attempt.status === "started")) break;
+      await new Promise((resolveWait) => setTimeout(resolveWait, 10));
+    }
+    assert.ok(firstCall.release, "executor must start before recovery");
+    await runtime.service.recover();
+    firstCall.release();
+    await assert.rejects(inFlight, /generation failed closed/);
+    const recovered = await runtime.service.languageExplanations(approval.runtimeId);
+    assert.equal(recovered.attempts[0].status, "failed");
+    assert.match(recovered.attempts[0].failure ?? "", /explicit runtime-host recovery/);
+    assert.deepEqual(recovered.results, []);
+
+    const retried = await runtime.service.createLanguageExplanation(approval.runtimeId, request);
+    assert.equal(retried.results[0].artifact.grant.attempt, 1);
+    assert.equal(calls, 2);
+  } finally {
+    firstCall.release?.();
+    await cleanup(runtime);
+  }
+});
+
+test("language-explanation retries stop at the fixed per-request ceiling", async () => {
+  let calls = 0;
+  const unavailableProvider: LanguageExplanationExecutor = {
+    describe: () => deterministicLanguageExplanation.describe(),
+    async generate() {
+      calls += 1;
+      throw new Error("transient provider failure");
+    },
+  };
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor, languageExplanationExecutor: unavailableProvider });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const caption = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+    const request = {
+      caption: {
+        jobId: caption.verification.jobId,
+        artifactId: caption.verification.captionArtifactId,
+        contentId: caption.verification.captionContentId,
+        receiptArtifactId: caption.verification.receiptArtifactId,
+        receiptId: caption.verification.receiptId,
+        receiptContentId: caption.verification.receiptContentId,
+      },
+      lineId: caption.artifact.lines[0].id,
+      selection: { side: "source" as const, unit: "unicode_code_point" as const, start: 0, end: 2, text: "현재" },
+      facetKinds: ["meaning" as const],
+    };
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await assert.rejects(runtime.service.createLanguageExplanation(approval.runtimeId, request), /generation failed closed/);
+    }
+    await assert.rejects(
+      runtime.service.createLanguageExplanation(approval.runtimeId, request),
+      /exhausted its bounded retry attempts/,
+    );
+    const response = await runtime.service.languageExplanations(approval.runtimeId);
+    assert.equal(response.attempts.length, 3);
+    assert.ok(response.attempts.every((attempt) => attempt.status === "failed"));
+    assert.equal(calls, 3);
+    const loaded = await journal(runtime, approval.runtimeId);
+    const startedEvents = loaded.events.filter((event) => event.type === "language.explanation_started");
+    const lastStarted = startedEvents.at(-1);
+    assert.ok(lastStarted);
+    const forged = structuredClone(lastStarted);
+    forged.seq = loaded.head + 1;
+    forged.eventId = `event:${approval.runtimeId}:${forged.seq}`;
+    forged.recordedAt = new Date(new Date(lastStarted.recordedAt).getTime() + 1).toISOString();
+    forged.data.grant.attempt = 3;
+    forged.data.grant.grantId = createLanguageExplanationGrantId({
+      runId: approval.runtimeId,
+      requestFingerprint: forged.data.grant.requestFingerprint,
+      caption: forged.data.grant.caption,
+      attempt: forged.data.grant.attempt,
+    });
+    forged.data.jobId = createLanguageExplanationJobId(forged.data.grant.grantId);
+    assert.throws(
+      () => projectRuntimeEvents(approval.runtimeId, [...loaded.events, forged]),
+      /below the fixed retry ceiling/,
+    );
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("translation choice can close as target_unavailable and oversized executor output stores no artifact", async (t) => {
+  await t.test("target unavailable", async () => {
+    const executor = new DeterministicLanguageExplanationTestExecutor((input) => input.grant.facetKinds.map((kind) => ({
+      kind,
+      availability: "unavailable" as const,
+      reasonCode: "target_unavailable" as const,
+      content: null,
+    })));
+    const runtime = await harness({ captionExecutor: incompleteCurrentRunCaptionExecutor, languageExplanationExecutor: executor });
+    try {
+      const approval = await approved(runtime);
+      await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+      const caption = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+      const response = await runtime.service.createLanguageExplanation(approval.runtimeId, {
+        caption: {
+          jobId: caption.verification.jobId,
+          artifactId: caption.verification.captionArtifactId,
+          contentId: caption.verification.captionContentId,
+          receiptArtifactId: caption.verification.receiptArtifactId,
+          receiptId: caption.verification.receiptId,
+          receiptContentId: caption.verification.receiptContentId,
+        },
+        lineId: caption.artifact.lines[0].id,
+        selection: { side: "source", unit: "unicode_code_point", start: 0, end: 2, text: "번역" },
+        facetKinds: ["translation_choice"],
+      });
+      assert.equal(response.results[0].artifact.result.status, "unavailable");
+      assert.equal(response.results[0].artifact.facets[0].reasonCode, "target_unavailable");
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  await t.test("output bound", async () => {
+    const oversized = new DeterministicLanguageExplanationTestExecutor(() => [{
+      kind: "grammar" as const,
+      availability: "available" as const,
+      reasonCode: null,
+      content: {
+        construction: "large bounded construction",
+        explanation: "Each field is bounded, but the combined executor output is not.",
+        segments: Array.from({ length: 16 }, () => ({ form: "f".repeat(4_096), role: "r".repeat(4_096) })),
+      },
+    }]);
+    const runtime = await harness({ captionExecutor: currentRunCaptionExecutor, languageExplanationExecutor: oversized });
+    try {
+      const approval = await approved(runtime);
+      await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+      const caption = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+      await assert.rejects(runtime.service.createLanguageExplanation(approval.runtimeId, {
+        caption: {
+          jobId: caption.verification.jobId,
+          artifactId: caption.verification.captionArtifactId,
+          contentId: caption.verification.captionContentId,
+          receiptArtifactId: caption.verification.receiptArtifactId,
+          receiptId: caption.verification.receiptId,
+          receiptContentId: caption.verification.receiptContentId,
+        },
+        lineId: caption.artifact.lines[0].id,
+        selection: { side: "source", unit: "unicode_code_point", start: 0, end: 2, text: "현재" },
+        facetKinds: ["grammar"],
+      }), /byte ceiling/);
+      const loaded = await journal(runtime, approval.runtimeId);
+      assert.equal(Object.values(loaded.state.languageExplanations)[0].status, "failed");
+      assert.equal(Object.values(loaded.state.artifacts).filter((artifact) =>
+        artifact.origin.kind === "language_explanation_output" || artifact.origin.kind === "language_explanation_receipt").length, 0);
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+});
+
+test("language explanation rejects open prompts, mixed identities, and incorrect code-point spans", async () => {
+  const runtime = await harness({
+    captionExecutor: currentRunCaptionExecutor,
+    languageExplanationExecutor: deterministicLanguageExplanation,
+  });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const caption = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+    const base = {
+      caption: {
+        jobId: caption.verification.jobId,
+        artifactId: caption.verification.captionArtifactId,
+        contentId: caption.verification.captionContentId,
+        receiptArtifactId: caption.verification.receiptArtifactId,
+        receiptId: caption.verification.receiptId,
+        receiptContentId: caption.verification.receiptContentId,
+      },
+      lineId: caption.artifact.lines[0].id,
+      selection: { side: "source" as const, unit: "unicode_code_point" as const, start: 0, end: 2, text: "현재" },
+      facetKinds: ["meaning" as const],
+    };
+    await assert.rejects(
+      runtime.service.createLanguageExplanation(approval.runtimeId, { ...base, prompt: "trust caller prose" }),
+      /invalid or contains open fields/,
+    );
+    await assert.rejects(
+      runtime.service.createLanguageExplanation(approval.runtimeId, {
+        ...base,
+        caption: { ...base.caption, contentId: `sha256:${"a".repeat(64)}` },
+      }),
+      /exact verified production caption result/,
+    );
+    await assert.rejects(
+      runtime.service.createLanguageExplanation(approval.runtimeId, {
+        ...base,
+        selection: { ...base.selection, text: "실행" },
+      }),
+      /does not match the stored caption text/,
+    );
+    assert.deepEqual((await runtime.service.languageExplanations(approval.runtimeId)).results, []);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("language explanation is explicitly unavailable without configured model authority", async () => {
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const caption = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+    await assert.rejects(runtime.service.createLanguageExplanation(approval.runtimeId, {
+      caption: {
+        jobId: caption.verification.jobId,
+        artifactId: caption.verification.captionArtifactId,
+        contentId: caption.verification.captionContentId,
+        receiptArtifactId: caption.verification.receiptArtifactId,
+        receiptId: caption.verification.receiptId,
+        receiptContentId: caption.verification.receiptContentId,
+      },
+      lineId: caption.artifact.lines[0].id,
+      selection: { side: "source", unit: "unicode_code_point", start: 0, end: 2, text: "현재" },
+      facetKinds: ["meaning"],
+    }), /unavailable until a model is explicitly configured/);
+    const loaded = await journal(runtime, approval.runtimeId);
+    assert.equal(Object.keys(loaded.state.languageExplanations).length, 0);
   } finally {
     await cleanup(runtime);
   }

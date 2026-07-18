@@ -33,6 +33,12 @@ import {
 } from "./captionProduction.ts";
 import { validateCaptionQualityControlReceipt } from "./captionQualityControl.ts";
 import {
+  assertLanguageExplanationRequest,
+  validateLanguageExplanationGrant,
+  validateLanguageExplanationInputAuthority,
+  validateLanguageExplanationReceipt,
+} from "./languageExplanations.ts";
+import {
   validateExecutorSpanReceipt,
   validateModelUsageReceipt,
 } from "./execution.ts";
@@ -147,7 +153,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "visual_transition_host", "speaker_host", "separation_host", "research_host", "computer_use_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "visual_transition_host", "speaker_host", "separation_host", "research_host", "computer_use_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "language_explanation_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -660,6 +666,24 @@ export function assertRuntimeEvent(
     string(data.outputArtifactId, context, "event.data.outputArtifactId");
     contentId(data.receiptContentId, context, "event.data.receiptContentId");
     validateCaptionQualityControlReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "language.explanation_started") {
+    exact(data, ["jobId", "request", "grant", "input"], context, "event.data");
+    string(data.jobId, context, "event.data.jobId");
+    assertLanguageExplanationRequest(data.request);
+    validateLanguageExplanationGrant(data.grant, context, "event.data.grant");
+    validateLanguageExplanationInputAuthority(data.input, context, "event.data.input");
+  } else if (type === "language.explanation_completed") {
+    exact(data, ["jobId", "artifactId", "contentId", "receiptArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.jobId, context, "event.data.jobId");
+    string(data.artifactId, context, "event.data.artifactId");
+    contentId(data.contentId, context, "event.data.contentId");
+    string(data.receiptArtifactId, context, "event.data.receiptArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateLanguageExplanationReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "language.explanation_failed") {
+    exact(data, ["jobId", "reason"], context, "event.data");
+    string(data.jobId, context, "event.data.jobId");
+    string(data.reason, context, "event.data.reason");
   } else if (type === "report.submitted") {
     exact(data, ["report"], context, "event.data");
     validateReportRecord(data.report, context, "event.data.report");

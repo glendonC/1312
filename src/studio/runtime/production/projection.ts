@@ -19,6 +19,7 @@ import { applyTaskEvent } from "./projection/taskEvents.ts";
 import { applyStudyReportEvent } from "./projection/studyReportEvents.ts";
 import { applyStudySynthesisEvent } from "./projection/studySynthesisEvents.ts";
 import { applyRestudyEvent } from "./projection/restudyEvents.ts";
+import { applyLanguageExplanationEvent } from "./projection/languageExplanationEvents.ts";
 
 export function initialRuntimeProjection(runId: string): RuntimeProjection {
   if (!runId.trim()) throw new Error("Runtime projection requires a run id");
@@ -52,6 +53,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     publishReviewRevocations: {},
     captionProductions: {},
     captionQualityControls: {},
+    languageExplanations: {},
     executions: {},
     modelUsage: {},
     reports: {},
@@ -96,6 +98,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
   if (applyEvidenceEvent(next, event)) return next;
   if (applyReviewEvent(next, event)) return next;
   if (applyCaptionEvent(next, event)) return next;
+  if (applyLanguageExplanationEvent(next, event)) return next;
   if (applyReportEvent(next, event)) return next;
   if (applyStudyReportEvent(next, event)) return next;
   if (applyRestudyEvent(next, event)) return next;

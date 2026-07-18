@@ -27,6 +27,8 @@ export type {
   RuntimeHostCaptionProductionResponse,
   RuntimeHostCaptionQualityControlResponse,
   RuntimeHostCaptionQualityControlRequest,
+  RuntimeHostLanguageExplanationRequest,
+  RuntimeHostLanguageExplanationResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewDecisionRequest,
@@ -46,6 +48,12 @@ export {
   RuntimeApplicationInterrupted,
 } from "./runtimeApplication.ts";
 export { RuntimeStartService } from "./service.ts";
+export {
+  DeterministicLanguageExplanationTestExecutor,
+  OpenAiLanguageExplanationExecutor,
+  UnavailableLanguageExplanationExecutor,
+  type LanguageExplanationExecutor,
+} from "../languageExplanations/index.ts";
 export {
   OpenAiCaptionProductionExecutor,
   RecordedCaptionFixtureExecutor,

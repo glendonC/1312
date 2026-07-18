@@ -34,6 +34,7 @@ import type {
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewIntakeResponse,
+  RuntimeHostLanguageExplanationResponse,
   RuntimeHostPublishReviewDecisionResponse,
   RuntimeHostStartAcknowledgement,
   RuntimeHostSourceSummary,
@@ -53,6 +54,10 @@ import { parseRuntimeHostStartRequest } from "./validation.ts";
 import { validatePublishReviewOperator } from "../validation/publishReviewDecision.ts";
 import type { PublishReviewOperator } from "../model.ts";
 import { RuntimeReviewCaptionCoordinator } from "./reviewCaptionCoordinator.ts";
+import type { LanguageExplanationExecutor } from "../languageExplanations/executor.ts";
+import { UnavailableLanguageExplanationExecutor } from "../languageExplanations/executor.ts";
+import { RuntimeLanguageExplanationCoordinator } from "./languageExplanationCoordinator.ts";
+import { RuntimeMutationQueue } from "./runtimeMutationQueue.ts";
 
 export interface RuntimeStartServiceOptions {
   store: DurableRuntimeCommandStore;
@@ -66,6 +71,7 @@ export interface RuntimeStartServiceOptions {
   recoverOnOpen?: boolean;
   reviewer?: PublishReviewOperator;
   captionExecutor?: CaptionProductionExecutor;
+  languageExplanationExecutor?: LanguageExplanationExecutor;
   /** Explicit compatibility selector; omitted means the U3 generalized production spine. */
   studyContractVersion?: StudyContractVersion;
 }
@@ -95,6 +101,7 @@ export class RuntimeStartService {
   private readonly lifecycle: RuntimeHostLifecycleCoordinator;
   private readonly queries: RuntimeHostQueries;
   private readonly reviewCaption: RuntimeReviewCaptionCoordinator;
+  private readonly languageExplanation: RuntimeLanguageExplanationCoordinator;
   private readonly studyContractVersion: StudyContractVersion;
   private readonly initializing = new Map<string, Promise<RuntimeHostStartAcknowledgement>>();
 
@@ -117,6 +124,7 @@ export class RuntimeStartService {
       reviewer,
       (record, recovery) => this.lifecycle.reconcile(record, recovery),
     );
+    const mutationQueue = new RuntimeMutationQueue();
     this.reviewCaption = new RuntimeReviewCaptionCoordinator({
       store: this.store,
       sources: this.sources,
@@ -124,6 +132,16 @@ export class RuntimeStartService {
       queries: this.queries,
       reviewer,
       captionExecutor: options.captionExecutor ?? new RecordedCaptionFixtureExecutor(),
+      now: this.now,
+      mutationQueue,
+    });
+    this.languageExplanation = new RuntimeLanguageExplanationCoordinator({
+      store: this.store,
+      sources: this.sources,
+      lifecycle: this.lifecycle,
+      queries: this.queries,
+      executor: options.languageExplanationExecutor ?? new UnavailableLanguageExplanationExecutor(),
+      mutationQueue,
       now: this.now,
     });
   }
@@ -483,13 +501,23 @@ export class RuntimeStartService {
     return this.reviewCaption.createCaptionProduction(runtimeId, value);
   }
 
+  async languageExplanations(runtimeId: string): Promise<RuntimeHostLanguageExplanationResponse> {
+    return this.queries.languageExplanations(runtimeId);
+  }
+
+  async createLanguageExplanation(
+    runtimeId: string,
+    value: unknown,
+  ): Promise<RuntimeHostLanguageExplanationResponse> {
+    return this.languageExplanation.create(runtimeId, value);
+  }
+
   async recover(): Promise<void> {
     for (const record of await this.store.list()) {
-      if (record.lifecycle === "terminal" || record.lifecycle === "failed") {
-        await this.lifecycle.reconcile(record, true);
-        continue;
+      const reconciled = await this.lifecycle.reconcile(record, true);
+      if (reconciled.journalHead > 0) {
+        await this.languageExplanation.recoverInterrupted(record.runtimeId);
       }
-      await this.lifecycle.reconcile(record, true);
     }
   }
 }

@@ -32,6 +32,7 @@ import { RuntimeHostError } from "./errors.ts";
 import { RuntimeHostLifecycleCoordinator } from "./lifecycleCoordinator.ts";
 import { RuntimeHostQueries } from "./runtimeQueries.ts";
 import { RuntimeSourceRegistry } from "./sourceRegistry.ts";
+import { RuntimeMutationQueue } from "./runtimeMutationQueue.ts";
 
 export interface RuntimeReviewCaptionCoordinatorOptions {
   store: DurableRuntimeCommandStore;
@@ -41,6 +42,7 @@ export interface RuntimeReviewCaptionCoordinatorOptions {
   reviewer: PublishReviewOperator;
   captionExecutor: CaptionProductionExecutor;
   now: () => Date;
+  mutationQueue?: RuntimeMutationQueue;
 }
 
 /** Serializes and applies review/caption mutations over verified runtime lineage. */
@@ -52,7 +54,7 @@ export class RuntimeReviewCaptionCoordinator {
   private readonly reviewer: PublishReviewOperator;
   private readonly captionExecutor: CaptionProductionExecutor;
   private readonly now: () => Date;
-  private readonly mutationTails = new Map<string, Promise<unknown>>();
+  private readonly mutationQueue: RuntimeMutationQueue;
 
   constructor(options: RuntimeReviewCaptionCoordinatorOptions) {
     this.store = options.store;
@@ -62,17 +64,11 @@ export class RuntimeReviewCaptionCoordinator {
     this.reviewer = options.reviewer;
     this.captionExecutor = options.captionExecutor;
     this.now = options.now;
+    this.mutationQueue = options.mutationQueue ?? new RuntimeMutationQueue();
   }
 
   private async withMutation<T>(runtimeId: string, operation: () => Promise<T>): Promise<T> {
-    const previous = this.mutationTails.get(runtimeId) ?? Promise.resolve();
-    const next = previous.catch(() => undefined).then(operation);
-    this.mutationTails.set(runtimeId, next);
-    try {
-      return await next;
-    } finally {
-      if (this.mutationTails.get(runtimeId) === next) this.mutationTails.delete(runtimeId);
-    }
+    return this.mutationQueue.run(runtimeId, operation);
   }
 
   private rethrowReviewHostError(error: unknown): never {

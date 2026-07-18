@@ -196,14 +196,27 @@
 
 .activity-chips li {
   padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--agent-current) 18%, transparent);
   border-radius: 6px;
-  color: var(--ink-soft);
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: color-mix(in srgb, var(--agent-current) 72%, var(--ink));
+  background: color-mix(in srgb, var(--agent-current) 9%, rgba(255, 255, 255, 0.34));
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
   white-space: nowrap;
+}
+
+.agent-focus-activity-group li[data-level="gate"] .activity-chips li {
+  border-color: var(--gold-line);
+  color: var(--gold-ink);
+  background: var(--gold-soft);
+}
+
+.agent-focus-activity-group li:is([data-level="warn"], [data-level="error"]) .activity-chips li {
+  border-color: var(--flag-line);
+  color: var(--flag);
+  background: var(--flag-soft);
 }
 
 /* Facets are the structured evidence layer: a soft tint sets them apart from plain note prose. */

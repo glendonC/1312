@@ -6,9 +6,9 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding-top: 4px;
+  justify-content: flex-end;
+  gap: 20px;
+  padding-top: 2px;
 }
 
 .agent-focus-command-group {
@@ -108,36 +108,24 @@
   transform: translateY(-1px);
 }
 
-/*
- * The close control is the one obvious way out, so it reads as a control, not stray text: a bordered
- * squircle chip carrying a spatial ✕, its label, and the Esc shortcut it mirrors.
- */
+/* One exit control. Esc is a shortcut label inside it, not a second nested control. */
 .agent-focus-commands .agent-focus-command-escape {
-  gap: 9px;
-  min-height: 38px;
+  gap: 10px;
+  min-height: 40px;
   padding: 0 15px;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  corner-shape: squircle;
-  color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.52);
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.76),
-    0 1px 2px rgba(18, 32, 28, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--stop);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .agent-focus-commands .agent-focus-command-escape:hover {
-  border-color: var(--accent-line);
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.82);
-}
-
-.agent-focus-escape-x {
-  color: color-mix(in srgb, var(--agent-current) 74%, var(--ink));
-  font-size: 0.82rem;
-  line-height: 1;
+  border-color: transparent;
+  color: #fff;
+  background: var(--stop-hot);
 }
 
 .agent-focus-escape-label {
@@ -148,16 +136,16 @@
 
 .agent-focus-commands kbd {
   display: inline-flex;
-  min-width: 29px;
-  height: 24px;
+  min-width: 0;
+  height: auto;
   align-items: center;
   justify-content: center;
-  padding: 3px 5px;
-  border: 1px solid var(--line-strong);
-  border-radius: 7px;
-  color: var(--ink-muted);
-  background: rgba(255, 255, 255, 0.5);
-  box-shadow: inset 0 -1px rgba(22, 29, 27, 0.06);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: rgba(255, 255, 255, 0.74);
+  background: transparent;
+  box-shadow: none;
   font-family: var(--font-mono);
   font-size: 0.56rem;
 }
@@ -169,11 +157,5 @@
 
   .agent-focus-cycle-current {
     font-size: 1.12rem;
-  }
-}
-
-@media (max-width: 350px) {
-  .agent-focus-escape-label {
-    display: none;
   }
 }

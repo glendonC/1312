@@ -1,7 +1,7 @@
 /** The run's global controls: a reversible pause and an explicit stop. */
 
 import { AnimatePresence, motion } from "motion/react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import DockTrace from "./DockTrace";
 import { Arrow, Hold, Replay } from "./glyphs";
@@ -21,9 +21,12 @@ export default function Dock() {
   const togglePause = useStudio((state) => state.togglePause);
   const pausePending = useStudio((state) => state.pausePending);
   const outcome = useStudio((state) => state.outcome);
+  const selectedAgent = useStudio((state) => state.selected);
+  const selectAgent = useStudio((state) => state.select);
   const { phase, done } = useProgress();
 
   const dock = useRef<HTMLDivElement>(null);
+  const resultFocusObserver = useRef<MutationObserver | null>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const cancelled = outcome?.kind === "cancelled";
   const failed = outcome?.kind === "failed";
@@ -43,9 +46,32 @@ export default function Dock() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => () => {
+    resultFocusObserver.current?.disconnect();
+  }, []);
+
   function clear(): void {
     if (running) cancelRun();
     else reset();
+  }
+
+  function openResults(): void {
+    if (!selectedAgent) {
+      focusResultTarget(RECORDED_RESULTS_ID);
+      return;
+    }
+
+    const focusWhenAgentPanelCloses = () => {
+      if (document.querySelector(".agent-focus")) return;
+      resultFocusObserver.current?.disconnect();
+      resultFocusObserver.current = null;
+      focusResultTarget(RECORDED_RESULTS_ID);
+    };
+    resultFocusObserver.current?.disconnect();
+    resultFocusObserver.current = new MutationObserver(focusWhenAgentPanelCloses);
+    resultFocusObserver.current.observe(document.body, { childList: true, subtree: true });
+    selectAgent(null);
+    focusWhenAgentPanelCloses();
   }
 
   return (
@@ -81,7 +107,7 @@ export default function Dock() {
               <button
                 type="button"
                 className="rail-btn"
-                onClick={() => focusResultTarget(RECORDED_RESULTS_ID)}
+                onClick={openResults}
               >
                 <span className="rail-glyph">
                   <Arrow />

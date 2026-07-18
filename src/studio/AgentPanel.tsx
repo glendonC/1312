@@ -45,7 +45,6 @@ export default function AgentPanel() {
   const history = useAgentHistory(selected);
   const orchestrator = useStudio((state) => state.state.orchestrator);
   const emitted = useStudio((state) => state.state.emitted);
-  const previewSession = useStudio((state) => state.previewSession);
   const cancelled = useStudio((state) => state.outcome?.kind === "cancelled");
   const paused = useStudio((state) => state.paused);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -149,6 +148,7 @@ export default function AgentPanel() {
     if (inspectableIds.length < 2) return;
     const next = (selectedIndex + direction + inspectableIds.length) % inspectableIds.length;
     select(inspectableIds[next]);
+    window.requestAnimationFrame(() => closeButton.current?.focus());
   };
 
   const trapFocus = (event: React.KeyboardEvent<HTMLElement>) => {
@@ -166,6 +166,22 @@ export default function AgentPanel() {
       event.preventDefault();
       first.focus();
     }
+  };
+
+  const handleFocusKeys = (event: React.KeyboardEvent<HTMLElement>) => {
+    trapFocus(event);
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+
+    const target = event.target;
+    if (
+      target instanceof HTMLMediaElement ||
+      (target instanceof HTMLElement && target.matches("input, textarea, select, [role='slider']"))
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    move(event.key === "ArrowLeft" ? -1 : 1);
   };
 
   return (
@@ -190,7 +206,7 @@ export default function AgentPanel() {
         aria-modal="true"
         aria-labelledby="agent-focus-title"
         aria-describedby="agent-focus-state"
-        onKeyDown={trapFocus}
+        onKeyDown={handleFocusKeys}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -240,12 +256,6 @@ export default function AgentPanel() {
                 </dl>
               )}
 
-              {previewSession && (
-                <p className="agent-focus-preview-note" role="note">
-                  <span className="agent-focus-preview-dot" aria-hidden="true" />
-                  <span>Recorded preview — your submitted source was not processed.</span>
-                </p>
-              )}
             </div>
           </motion.section>
 
@@ -293,10 +303,20 @@ export default function AgentPanel() {
             <nav className="agent-focus-commands" aria-label="Agent focus commands">
               <div className="agent-focus-command-group">
                 <div className="agent-focus-cycle-buttons">
-                  <button type="button" onClick={() => move(-1)} aria-label="Previous agent">
+                  <button
+                    type="button"
+                    onClick={() => move(-1)}
+                    aria-label="Previous agent"
+                    aria-keyshortcuts="ArrowLeft"
+                  >
                     <span aria-hidden="true">←</span>
                   </button>
-                  <button type="button" onClick={() => move(1)} aria-label="Next agent">
+                  <button
+                    type="button"
+                    onClick={() => move(1)}
+                    aria-label="Next agent"
+                    aria-keyshortcuts="ArrowRight"
+                  >
                     <span aria-hidden="true">→</span>
                   </button>
                 </div>
@@ -317,7 +337,6 @@ export default function AgentPanel() {
                 onClick={() => select(null)}
                 aria-label="Close agent focus"
               >
-                <span className="agent-focus-escape-x" aria-hidden="true">✕</span>
                 <span className="agent-focus-escape-label">Close</span>
                 <kbd aria-hidden="true">Esc</kbd>
               </button>

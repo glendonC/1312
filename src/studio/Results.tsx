@@ -65,11 +65,9 @@ export default function Results() {
         <span className="result-kicker">Result</span>
         <h2>{run.clip.title}</h2>
         <p className="result-request">
-          <b>{run.pair.source.toUpperCase()} → {target.toUpperCase()}</b>
-          <span aria-hidden="true">·</span>
-          {clock(0)}–{clock(run.clip.duration)}
-          <span aria-hidden="true">·</span>
-          recorded evidence
+          <b className="result-pair">{run.pair.source.toUpperCase()} → {target.toUpperCase()}</b>
+          <span className="result-tag">{clock(0)}–{clock(run.clip.duration)}</span>
+          <span className="result-tag is-quiet">recorded evidence</span>
         </p>
       </header>
 
@@ -88,7 +86,11 @@ export default function Results() {
       <div className="result-completeness">
         <div className="result-completeness-cell">
           <b>Coverage</b>
-          <span>{counts.captioned} captioned · {counts.withheld} withheld · {counts.silent} silent</span>
+          <ul className="count-breakdown">
+            <li><span className="count-n">{counts.captioned}</span> captioned</li>
+            <li><span className="count-n">{counts.withheld}</span> withheld</li>
+            <li><span className="count-n">{counts.silent}</span> silent</li>
+          </ul>
           <small>of {captions.cues.length} lines in range</small>
         </div>
         <div className="result-completeness-cell">
@@ -99,7 +101,14 @@ export default function Results() {
         <div className="result-completeness-cell">
           <b>Source</b>
           <span>{run.clip.source.label}</span>
-          <small>{licence ? `${licence} · recorded` : "recorded evidence"}</small>
+          {licence ? (
+            <small className="source-meta">
+              <span className="source-licence">{licence}</span>
+              <span className="is-quiet">recorded</span>
+            </small>
+          ) : (
+            <small>recorded evidence</small>
+          )}
         </div>
       </div>
 
@@ -144,8 +153,8 @@ function SubmittedSourceResultBoundary({
   const { resolution } = previewSession;
   const request = previewSession.preparation.request;
   const sourceLanguage = request.language.source.mode === "automatic"
-    ? "Automatic requested · detection never started"
-    : `${request.language.source.language} · user declared`;
+    ? { value: "Automatic requested", note: "detection never started" }
+    : { value: request.language.source.language, note: "user declared" };
   return (
     <section
       className="submitted-results-boundary"
@@ -162,9 +171,9 @@ function SubmittedSourceResultBoundary({
       </header>
       <dl>
         <div><dt>Selected range</dt><dd>{clock(request.range.startMs / 1_000)}–{clock(request.range.endMs / 1_000)}</dd></div>
-        <div><dt>Source language</dt><dd>{sourceLanguage}</dd></div>
+        <div><dt>Source language</dt><dd className="dd-stacked"><span>{sourceLanguage.value}</span><small>{sourceLanguage.note}</small></dd></div>
         <div><dt>Requested target</dt><dd>{request.language.target}</dd></div>
-        <div><dt>Artifact status</dt><dd>Unavailable · no runtime receipt</dd></div>
+        <div><dt>Artifact status</dt><dd className="dd-stacked"><span>Unavailable</span><small>no runtime receipt</small></dd></div>
       </dl>
       <p className="submitted-results-identity">
         <span>Preparation identity</span>
@@ -197,7 +206,9 @@ function CueRow({ cue, target }: { cue: Cue; target: string }) {
       <span className="cue-body">
         {cue.silence ? (
           <span className="cue-silence">
-            {(cue.t_end - cue.t_start).toFixed(1)}s of silence · no caption emitted
+            <span className="cue-silence-mark">silence</span>
+            <span className="cue-silence-dur">{(cue.t_end - cue.t_start).toFixed(1)}s</span>
+            <span className="cue-silence-note">no caption emitted</span>
           </span>
         ) : (
           <>
@@ -431,14 +442,18 @@ function Player() {
        */}
       {source.licence && (
         <p className="credit">
-          <span className="credit-title">{title}</span> by {source.label} ·{" "}
-          {source.url ? (
-            <a href={source.url} target="_blank" rel="noreferrer noopener">
-              {source.licence}
-            </a>
-          ) : (
-            source.licence
-          )}
+          <span className="credit-work">
+            <span className="credit-title">{title}</span> by {source.label}
+          </span>
+          <span className="credit-licence">
+            {source.url ? (
+              <a href={source.url} target="_blank" rel="noreferrer noopener">
+                {source.licence}
+              </a>
+            ) : (
+              source.licence
+            )}
+          </span>
         </p>
       )}
     </div>

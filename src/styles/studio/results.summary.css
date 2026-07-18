@@ -28,8 +28,20 @@
   font-size: 0.85rem;
   color: var(--ink-soft, rgba(22, 29, 27, 0.72));
 }
+.result-request { align-items: baseline; }
 .result-request b { font-weight: var(--weight-medium, 500); }
-.result-request span[aria-hidden] { color: var(--ink-muted, rgba(22, 29, 27, 0.5)); }
+.result-pair { color: var(--ink, #161d1b); }
+/* Each metadata fact its own token, echoing the focus feed's .activity-chips — never a middot join. */
+.result-tag {
+  padding: 2px 9px;
+  border-radius: 6px;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  background: color-mix(in srgb, var(--ink, #161d1b) 5%, transparent);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.result-tag.is-quiet { color: var(--ink-muted, rgba(22, 29, 27, 0.5)); }
 
 /* media | transcript */
 .result-main {
@@ -97,6 +109,34 @@
   font-size: 0.72rem;
   color: var(--ink-muted, rgba(22, 29, 27, 0.5));
 }
+
+/* Coverage: three discrete counts, each a number + its label — not a middot-joined line. */
+.count-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+}
+.count-breakdown li { color: var(--ink-soft, rgba(22, 29, 27, 0.72)); }
+.count-n {
+  margin-right: 4px;
+  font-weight: var(--weight-medium, 500);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink, #161d1b);
+}
+
+/* Source meta: licence and provenance as two discrete tokens. */
+.source-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+}
+.source-licence { color: var(--ink-soft, rgba(22, 29, 27, 0.72)); }
+.source-meta .is-quiet { color: var(--ink-muted, rgba(22, 29, 27, 0.5)); }
 
 /* provenance disclosure */
 .result-provenance {

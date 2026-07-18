@@ -8,6 +8,7 @@ import { initialRequest, type AnalysisRequest } from "../preflight/model";
 import {
   ConversationValue,
   PreparationControlShelf,
+  PreparationStagePopover,
   StageConversation,
   TimestampField,
   continueActionLabel,
@@ -126,6 +127,11 @@ export default function ProductLocalRuntime({
   const evidenceDetails = useRef<HTMLDetailsElement | null>(null);
   const runtimeRoot = useRef<HTMLElement | null>(null);
   const setupHeading = useRef<HTMLHeadingElement | null>(null);
+  // The source stage keeps only its spoken heading in the panel; the path note and the
+  // host connect/ingest controls open as popovers from the shelf, matching the standard flow.
+  const [openSourcePopover, setOpenSourcePopover] = useState<"about" | "host" | null>(null);
+  const aboutTrigger = useRef<HTMLButtonElement>(null);
+  const hostTrigger = useRef<HTMLButtonElement>(null);
 
   const selectedSource = sources.find((source) => source.sourceSessionId === sourceId) ?? null;
   const lifecycle = runtime
@@ -848,60 +854,14 @@ export default function ProductLocalRuntime({
                   {setupStage === "source" && (
                     <section className="preflight-preparation preflight-source-stage product-runtime-source">
                       <div className="preflight-source-conversation" role="note" aria-label="Owned local source boundary">
-                        <span className="product-runtime-source-kicker">Local production path · separate from replay</span>
                         <h2 ref={setupHeading} id="preflight-stage-title" tabIndex={-1}>
                           {client
                             ? selectedSource
-                              ? <>I’ve registered <ConversationValue>{selectedSource.label}</ConversationValue>. Choose or replace the owned source, or continue.</>
-                              : "Register media you own or control, then choose its receipted source session."
-                            : "Connect the local source host with a paste-once bearer token to register media you own. Nothing is uploaded to a remote service."}
+                              ? <>I’ve registered <ConversationValue>{selectedSource.label}</ConversationValue>. Open <b>Local host</b> to choose or replace the owned source, or continue.</>
+                              : <>Register media you own or control from <b>Local host</b>, then continue.</>
+                            : <>Connect the local source host with a paste-once bearer token to register media you own — open <b>Connect host</b> to begin. Nothing is uploaded to a remote service.</>}
                         </h2>
                       </div>
-                      <p className="product-runtime-boundary" role="note">
-                        This path registers receipted local media, reviews a real workload-floor forecast, and starts a bounded local runtime. After an exact verified human approval, a separate private caption job may be explicitly requested. Neither path uploads or publishes. Submitted YouTube URLs remain unprocessed recorded previews.
-                      </p>
-                      <details className="product-runtime-operator">
-                        <summary>Local host setup and CLI escape hatch</summary>
-                        <ol>
-                          <li>Start the deterministic host: <code>node scripts/run-runtime-host.ts --executor deterministic</code></li>
-                          <li>Paste the printed bearer token, connect, then add owned media below.</li>
-                          <li>Operator preflight directories remain supported with <code>--source-directory</code>.</li>
-                        </ol>
-                      </details>
-                      <div className="product-runtime-connect">
-                        <label><span>Local host origin</span><input type="url" value={baseUrl} disabled={client !== null} onChange={(event) => { disconnect(); setBaseUrl(event.currentTarget.value); }} /></label>
-                        <label><span>Paste-once bearer token</span><input type="password" value={token} disabled={client !== null} autoComplete="off" spellCheck={false} onChange={(event) => { disconnect(); setToken(event.currentTarget.value); }} /></label>
-                        {client
-                          ? <button type="button" onClick={disconnect}>Disconnect local host</button>
-                          : <button type="button" disabled={busy !== null || token.length === 0} onClick={() => void connect()}>{busy === "connect" ? "Connecting…" : "Connect to local host"}</button>}
-                      </div>
-                      {client && (
-                        <fieldset className="product-runtime-ingest">
-                          <legend>Ingest media you own or control</legend>
-                          <p>The host preserves the selected bytes privately, measures the media, and seals a V1 preflight. This does not authorize redistribution.</p>
-                          <label><span>Owned media file</span><input type="file" accept="audio/*,video/*" disabled={busy === "ingest"} onChange={(event) => { setOwnedFile(event.currentTarget.files?.[0] ?? null); setIngest(null); setError(null); }} /></label>
-                          <div className="product-runtime-ingest-fields">
-                            <label><span>Source label</span><input type="text" value={sourceLabel} maxLength={160} disabled={busy === "ingest"} onChange={(event) => setSourceLabel(event.currentTarget.value)} /></label>
-                            <label><span>Rights holder</span><input type="text" value={rightsHolder} maxLength={160} disabled={busy === "ingest"} onChange={(event) => setRightsHolder(event.currentTarget.value)} /></label>
-                          </div>
-                          <label className="product-runtime-attestation"><input type="checkbox" checked={ownershipAttested} disabled={busy === "ingest"} onChange={(event) => setOwnershipAttested(event.currentTarget.checked)} /><span>I attest that I own or control this media and authorize local processing of this copy.</span></label>
-                          <button type="button" disabled={!ingestValid} onClick={() => void ingestOwnedMedia()}>{busy === "ingest" ? "Ingesting owned media…" : "Confirm ownership and ingest"}</button>
-                          {ingest && <div className="product-runtime-ingest-status" data-state={ingest.status} role="status" aria-live="polite" aria-label="Owned media ingest progress"><b>{ingest.status}</b>{ingest.status === "queued" && <span> · Queued for bounded local upload and probe work.</span>}{ingest.status === "probing" && <span> · Measuring the preserved media.</span>}{ingest.status === "sealing" && <span> · Sealing the immutable V1 preflight.</span>}{ingest.status === "registered" && <span> · The source is registered and selected below.</span>}{ingest.failure && <span> · {ingest.failure.code}: {ingest.failure.message}</span>}</div>}
-                        </fieldset>
-                      )}
-                      {client && sources.length === 0 && !ingest && <p className="product-runtime-empty-source" role="status">No owned source is registered yet. Choose a file and complete the ownership attestation above.</p>}
-                      {client && selectedSource && (
-                        <div className="product-runtime-session">
-                          <label><span>Registered owned source</span><select value={sourceId} onChange={(event) => chooseSource(event.currentTarget.value)}>{sources.map((source) => <option key={source.sourceSessionId} value={source.sourceSessionId}>{source.label} · {seconds(source.durationMs)}</option>)}</select></label>
-                          <dl className="product-runtime-source-facts">
-                            <div><dt>Receipt</dt><dd>Owned/local · {selectedSource.rightsScope.replaceAll("_", " ")}</dd></div>
-                            <div><dt>Measured duration</dt><dd>{seconds(selectedSource.durationMs)}</dd></div>
-                            <div><dt>Measured tracks</dt><dd>{selectedSource.trackCount}</dd></div>
-                            <div><dt>Sealed preflight</dt><dd>{selectedSource.preflightSchema}</dd></div>
-                            <div><dt>Language evidence</dt><dd>{selectedSource.detectedLanguageEvidenceAvailable ? "Receipted ranges available" : "Unavailable"}</dd></div>
-                          </dl>
-                        </div>
-                      )}
                     </section>
                   )}
 
@@ -991,12 +951,101 @@ export default function ProductLocalRuntime({
               back={setupStage !== "source"
                 ? { label: `Back to ${PREPARATION_STAGES[currentSetupStageIndex - 1].label}`, onClick: previousSetupStage }
                 : undefined}
+              parameters={setupStage === "source" ? [
+                {
+                  label: "About this path",
+                  actionLabel: "Open about this local production path",
+                  open: openSourcePopover === "about",
+                  popoverId: "product-runtime-about-popover",
+                  triggerRef: aboutTrigger,
+                  onToggle: () => setOpenSourcePopover((open) => (open === "about" ? null : "about")),
+                },
+                {
+                  label: client ? "Local host" : "Connect host",
+                  actionLabel: client ? "Open local host and owned media" : "Open connect to local host",
+                  open: openSourcePopover === "host",
+                  popoverId: "product-runtime-host-popover",
+                  triggerRef: hostTrigger,
+                  onToggle: () => setOpenSourcePopover((open) => (open === "host" ? null : "host")),
+                },
+              ] : undefined}
               next={{
                 label: setupStage === "confirm" ? "Start" : "Continue",
                 actionLabel: setupStage === "confirm" ? "Accept forecast and start local runtime" : continueActionLabel(setupStage),
                 disabled: setupAdvanceDisabled,
               }}
             />
+
+            {setupStage === "source" && (
+              <>
+                <PreparationStagePopover
+                  id="product-runtime-about-popover"
+                  stage="source"
+                  open={openSourcePopover === "about"}
+                  triggerRef={aboutTrigger}
+                  title="About this path"
+                  onClose={() => setOpenSourcePopover(null)}
+                >
+                  <p className="product-runtime-popover-note">
+                    This path registers receipted local media, reviews a real workload-floor forecast, and starts a bounded local runtime. After an exact verified human approval, a separate private caption job may be explicitly requested. Neither path uploads or publishes. Submitted YouTube URLs remain unprocessed recorded previews.
+                  </p>
+                </PreparationStagePopover>
+
+                <PreparationStagePopover
+                  id="product-runtime-host-popover"
+                  stage="source"
+                  open={openSourcePopover === "host"}
+                  triggerRef={hostTrigger}
+                  title={client ? "Local host" : "Connect local host"}
+                  onClose={() => setOpenSourcePopover(null)}
+                >
+                  <div className="product-runtime-host-panel">
+                    <details className="product-runtime-operator">
+                      <summary>Local host setup and CLI escape hatch</summary>
+                      <ol>
+                        <li>Start the deterministic host: <code>node scripts/run-runtime-host.ts --executor deterministic</code></li>
+                        <li>Paste the printed bearer token, connect, then add owned media below.</li>
+                        <li>Operator preflight directories remain supported with <code>--source-directory</code>.</li>
+                      </ol>
+                    </details>
+                    <div className="product-runtime-connect">
+                      <label><span>Local host origin</span><input type="url" value={baseUrl} disabled={client !== null} onChange={(event) => { disconnect(); setBaseUrl(event.currentTarget.value); }} /></label>
+                      <label><span>Paste-once bearer token</span><input type="password" value={token} disabled={client !== null} autoComplete="off" spellCheck={false} onChange={(event) => { disconnect(); setToken(event.currentTarget.value); }} /></label>
+                      {client
+                        ? <button type="button" onClick={disconnect}>Disconnect local host</button>
+                        : <button type="button" disabled={busy !== null || token.length === 0} onClick={() => void connect()}>{busy === "connect" ? "Connecting…" : "Connect to local host"}</button>}
+                    </div>
+                    {client && (
+                      <fieldset className="product-runtime-ingest">
+                        <legend>Ingest media you own or control</legend>
+                        <p>The host preserves the selected bytes privately, measures the media, and seals a V1 preflight. This does not authorize redistribution.</p>
+                        <label><span>Owned media file</span><input type="file" accept="audio/*,video/*" disabled={busy === "ingest"} onChange={(event) => { setOwnedFile(event.currentTarget.files?.[0] ?? null); setIngest(null); setError(null); }} /></label>
+                        <div className="product-runtime-ingest-fields">
+                          <label><span>Source label</span><input type="text" value={sourceLabel} maxLength={160} disabled={busy === "ingest"} onChange={(event) => setSourceLabel(event.currentTarget.value)} /></label>
+                          <label><span>Rights holder</span><input type="text" value={rightsHolder} maxLength={160} disabled={busy === "ingest"} onChange={(event) => setRightsHolder(event.currentTarget.value)} /></label>
+                        </div>
+                        <label className="product-runtime-attestation"><input type="checkbox" checked={ownershipAttested} disabled={busy === "ingest"} onChange={(event) => setOwnershipAttested(event.currentTarget.checked)} /><span>I attest that I own or control this media and authorize local processing of this copy.</span></label>
+                        <button type="button" disabled={!ingestValid} onClick={() => void ingestOwnedMedia()}>{busy === "ingest" ? "Ingesting owned media…" : "Confirm ownership and ingest"}</button>
+                        {ingest && <div className="product-runtime-ingest-status" data-state={ingest.status} role="status" aria-live="polite" aria-label="Owned media ingest progress"><b>{ingest.status}</b>{ingest.status === "queued" && <span>Queued for bounded local upload and probe work.</span>}{ingest.status === "probing" && <span>Measuring the preserved media.</span>}{ingest.status === "sealing" && <span>Sealing the immutable V1 preflight.</span>}{ingest.status === "registered" && <span>The source is registered and selected below.</span>}{ingest.failure && <span>{ingest.failure.code}: {ingest.failure.message}</span>}</div>}
+                      </fieldset>
+                    )}
+                    {client && sources.length === 0 && !ingest && <p className="product-runtime-empty-source" role="status">No owned source is registered yet. Choose a file and complete the ownership attestation above.</p>}
+                    {client && selectedSource && (
+                      <div className="product-runtime-session">
+                        <label><span>Registered owned source</span><select value={sourceId} onChange={(event) => chooseSource(event.currentTarget.value)}>{sources.map((source) => <option key={source.sourceSessionId} value={source.sourceSessionId}>{source.label} ({seconds(source.durationMs)})</option>)}</select></label>
+                        <dl className="product-runtime-source-facts">
+                          <div><dt>Receipt</dt><dd>Owned / local ({selectedSource.rightsScope.replaceAll("_", " ")})</dd></div>
+                          <div><dt>Measured duration</dt><dd>{seconds(selectedSource.durationMs)}</dd></div>
+                          <div><dt>Measured tracks</dt><dd>{selectedSource.trackCount}</dd></div>
+                          <div><dt>Sealed preflight</dt><dd>{selectedSource.preflightSchema}</dd></div>
+                          <div><dt>Language evidence</dt><dd>{selectedSource.detectedLanguageEvidenceAvailable ? "Receipted ranges available" : "Unavailable"}</dd></div>
+                        </dl>
+                      </div>
+                    )}
+                  </div>
+                </PreparationStagePopover>
+              </>
+            )}
           </form>
 
           <div className="studio-source-dock product-runtime-setup-dock">

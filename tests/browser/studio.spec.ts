@@ -950,7 +950,7 @@ test("a submitted source moves through setup and forecast before the recorded in
   expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(
     (rangePanelBox?.x ?? 0) + (rangePanelBox?.width ?? 0) + 0.5,
   );
-  await expect(page.getByLabel("Entire video · 1:23")).toBeChecked();
+  await expect(page.getByLabel("Entire video, 1:23")).toBeChecked();
   await expect(
     rangePopover.locator('.preflight-range-choice[data-selected="true"] .preflight-range-choice-indicator'),
   ).toBeVisible();
@@ -981,7 +981,7 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
   const changedRangeRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
   expect(changedRangeRequestId).not.toBe(initialRequestId);
-  await page.getByLabel("Entire video · 1:23").check();
+  await page.getByLabel("Entire video, 1:23").check();
 
   await page.getByRole("button", { name: "Continue to Language" }).click();
   await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "language");
@@ -995,7 +995,7 @@ test("a submitted source moves through setup and forecast before the recorded in
   await languageParameter.click();
   const languagePopover = page.getByRole("dialog", { name: "Language options" });
   await expect(languagePopover).toBeVisible();
-  const automaticLanguage = page.getByLabel("Automatic · request detection later");
+  const automaticLanguage = page.getByLabel("Automatic (detection requested later)");
   const declaredLanguage = page.getByLabel("Declare the source language");
   await expect(automaticLanguage).toBeChecked();
   await expect(automaticLanguage).toBeFocused();
@@ -1231,7 +1231,7 @@ test("a long submitted source opens with an explicit editable two-minute request
   await expect(page.getByRole("textbox", { name: "Start timestamp" })).toHaveValue("0:00");
   await expect(page.getByRole("textbox", { name: "End timestamp" })).toHaveValue("2:00");
   // A source longer than the limit makes the Entire option visibly unavailable rather than selectable.
-  await expect(page.getByLabel("Entire video · 3:23 · exceeds 2:00 limit")).toBeDisabled();
+  await expect(page.getByLabel("Entire video, 3:23, exceeds 2:00 limit")).toBeDisabled();
   await expect(page.getByText("Select up to 2:00. No section was recommended.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
 });
@@ -1247,7 +1247,8 @@ test("submitted preview Results reports no submitted artifact before recorded de
     timeout: 30_000,
   });
   await expect(boundary).toContainText("Resolved browser-test video");
-  await expect(boundary).toContainText("Unavailable · no runtime receipt");
+  await expect(boundary).toContainText("Unavailable");
+  await expect(boundary).toContainText("no runtime receipt");
   await expect(boundary).toContainText("Recorded demo Results below");
   await expect(boundary).toContainText("run-006");
   await expect(boundary).toContainText("player, captions, workers, evidence, scores, and timing below belong only");
@@ -1382,7 +1383,7 @@ test("the submitted preparation sequence stays horizontally contained at every s
     await rangeParameter.click();
     const rangePopover = page.getByRole("dialog", { name: "Range options" });
     await expect(rangePopover).toBeVisible();
-    await expect(page.getByLabel("Entire video · 1:23")).toBeVisible();
+    await expect(page.getByLabel("Entire video, 1:23")).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
     const [editedPanelBox, editedControlsBox, editedDockBox, rangePopoverBox] = await Promise.all([
       panel.boundingBox(),

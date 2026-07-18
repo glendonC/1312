@@ -104,8 +104,8 @@ const ownedLocalReceiptAdapter: ReceiptAdapter<OwnedLocalIngestReceipt> = {
       basis: "ownership_attestation",
       label:
         receipt.rights.scope === "redistribution"
-          ? "Owned media · redistribution authorized"
-          : "Owned media · local processing only",
+          ? "Owned media, redistribution authorized"
+          : "Owned media, local processing only",
       attribution: null,
       assertedBy: receipt.rights.asserted_by,
       scope: receipt.rights.scope,

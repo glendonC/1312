@@ -72,12 +72,12 @@
       "kind": "traces",
       "path": "traces.json",
       "content": {
-        "id": "sha256:2499f9be3c6c7c3f18b8951b924c56119981bc9d24af27011feb5e3eb1636e5f",
+        "id": "sha256:aed13dd3fb7f54097719bb06976570f3d9acedb6fe33d0cac47c71e3610a31ce",
         "hash": {
           "algorithm": "sha256",
-          "digest": "2499f9be3c6c7c3f18b8951b924c56119981bc9d24af27011feb5e3eb1636e5f"
+          "digest": "aed13dd3fb7f54097719bb06976570f3d9acedb6fe33d0cac47c71e3610a31ce"
         },
-        "bytes": 39383
+        "bytes": 39359
       },
       "source_artifact_ids": []
     }

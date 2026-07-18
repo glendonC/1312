@@ -25,21 +25,30 @@ export default function RecordedEvidence() {
         <a href={`/demo/runs/${bundle.run.id}/evidence.json`}>evidence.json</a>
       </header>
 
-      <p className="recorded-evidence-summary">
-        {summary.artifacts} hashed artifacts · {summary.decisions.committed} committed · {summary.decisions.withheld} withheld
-        {summary.decisions.dropped > 0 ? ` · ${summary.decisions.dropped} dropped` : ""}
-      </p>
+      <ul className="recorded-evidence-stats">
+        <li><span className="stat-n">{summary.artifacts}</span> hashed artifacts</li>
+        <li><span className="stat-n">{summary.decisions.committed}</span> committed</li>
+        <li><span className="stat-n">{summary.decisions.withheld}</span> withheld</li>
+        {summary.decisions.dropped > 0 && (
+          <li><span className="stat-n">{summary.decisions.dropped}</span> dropped</li>
+        )}
+      </ul>
 
       {decision && (
         <dl>
           <div>
             <dt>Current cue</dt>
-            <dd>{decision.cue_id} · {decision.terminal_state}</dd>
+            <dd className="ev-dd">
+              <code>{decision.cue_id}</code>
+              <span className="ev-state">{decision.terminal_state}</span>
+            </dd>
           </div>
           <div>
             <dt>Terminal effect</dt>
-            <dd>
-              trace {decision.terminal_effect.trace_index} · {decision.terminal_effect.agent_id} · {clock(decision.terminal_effect.at, true)}
+            <dd className="ev-dd">
+              <span className="ev-part">trace {decision.terminal_effect.trace_index}</span>
+              <span className="ev-part">{decision.terminal_effect.agent_id}</span>
+              <span className="ev-part">{clock(decision.terminal_effect.at, true)}</span>
             </dd>
           </div>
           <div>
@@ -49,7 +58,10 @@ export default function RecordedEvidence() {
           {decision.gate && (
             <div>
               <dt>Recorded gate</dt>
-              <dd>{decision.gate.id} · {decision.gate.reason}</dd>
+              <dd className="ev-dd">
+                <code>{decision.gate.id}</code>
+                <span className="ev-reason">{decision.gate.reason}</span>
+              </dd>
             </div>
           )}
         </dl>

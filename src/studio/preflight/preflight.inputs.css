@@ -48,9 +48,17 @@
   flex-direction: column;
 }
 
+/* Scoped to .preflight-form (the shared preparation form) as well as the .preflight
+   container, so reused forms outside the .preflight shell — e.g. the owned-media setup
+   panel — inherit the same control sizing instead of re-implementing it. */
 .preflight input[type="number"],
 .preflight input[type="text"],
-.preflight select {
+.preflight select,
+.preflight-form input[type="number"],
+.preflight-form input[type="text"],
+.preflight-form input[type="url"],
+.preflight-form input[type="password"],
+.preflight-form select {
   min-width: 0;
   height: 34px;
   padding: 0 9px;

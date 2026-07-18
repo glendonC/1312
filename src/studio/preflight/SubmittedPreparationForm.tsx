@@ -465,12 +465,17 @@ function RangeEditor({
         disabled={entireUnavailable}
         onChange={() => update({ rangeMode: "entire", start: 0, end: durationSeconds })}
         label="Entire video"
-        meta={entireUnavailable
-          ? `${formatTimestamp(durationSeconds)} · exceeds ${formatTimestamp(maximumDuration)} limit`
-          : formatTimestamp(durationSeconds)}
+        meta={entireUnavailable ? (
+          <>
+            <span className="preflight-range-dur">{formatTimestamp(durationSeconds)}</span>
+            <span className="preflight-range-flag">exceeds {formatTimestamp(maximumDuration)} limit</span>
+          </>
+        ) : (
+          formatTimestamp(durationSeconds)
+        )}
         accessibleLabel={entireUnavailable
-          ? `Entire video · ${formatTimestamp(durationSeconds)} · exceeds ${formatTimestamp(maximumDuration)} limit`
-          : `Entire video · ${formatTimestamp(durationSeconds)}`}
+          ? `Entire video, ${formatTimestamp(durationSeconds)}, exceeds ${formatTimestamp(maximumDuration)} limit`
+          : `Entire video, ${formatTimestamp(durationSeconds)}`}
       />
       <RangeModeChoice
         name="range"
@@ -531,7 +536,7 @@ function LanguageEditor({
           value="automatic"
           checked={previewSession.sourceLanguage.mode === "automatic"}
           onChange={() => updateSourceLanguage({ mode: "automatic", language: null })}
-          label="Automatic · request detection later"
+          label="Automatic (detection requested later)"
         />
         <Choice
           name="source-language"
@@ -690,7 +695,10 @@ function liveOutputLabel(depth: AnalysisRequest["outputDepth"]): string {
 }
 
 function rangeLabel(request: SubmittedSourcePreparationRequest): string {
-  return `${formatSeconds(request.range.startMs / 1_000)}–${formatSeconds(request.range.endMs / 1_000)} · ${formatSeconds((request.range.endMs - request.range.startMs) / 1_000)}`;
+  const start = formatSeconds(request.range.startMs / 1_000);
+  const end = formatSeconds(request.range.endMs / 1_000);
+  const total = formatSeconds((request.range.endMs - request.range.startMs) / 1_000);
+  return `${start}–${end} (${total})`;
 }
 
 function compactLanguageLabel(request: SubmittedSourcePreparationRequest): string {

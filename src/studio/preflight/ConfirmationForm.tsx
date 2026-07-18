@@ -430,7 +430,7 @@ function RecordedLanguageEditor({
       <div className="preflight-recorded-language">
         <span>Recorded source language</span>
         <b>{languageName(facts.declaredLanguage)}</b>
-        <small>Declared in the recorded clip · not newly detected</small>
+        <small>Declared in the recorded clip, not newly detected</small>
       </div>
       <div className="preflight-recorded-language">
         <span>Translation target</span>

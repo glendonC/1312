@@ -106,11 +106,31 @@
 }
 
 .cue-silence {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 8px;
   color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 0.76rem;
   line-height: 1.5;
 }
+
+/* Mirrors .cue-withheld-mark: the state is a chip, the rest reads as discrete facts. */
+.cue-silence-mark {
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong, rgba(22, 29, 27, 0.16));
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.cue-silence-dur {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.cue-silence-note { color: var(--ink-muted); }
 
 .cue-tags {
   display: flex;

@@ -115,6 +115,15 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* A stage that tucks away more than one panel (the owned-media source setup) lays its
+   two popover buttons and Continue out as an even grid, overriding the single-control
+   centering the source stage otherwise uses. */
+.preflight-control-shelf[data-parameters="2"] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: stretch;
+}
+
 .preflight-control {
   display: inline-flex;
   min-width: 0;
@@ -524,12 +533,24 @@
 }
 
 .preflight-range-choice > small {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: flex-end;
+  align-items: baseline;
   min-width: 0;
   color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 0.54rem;
   line-height: 1.3;
-  text-align: right;
+}
+
+/* The over-limit warning is a discrete flagged token beside the duration, not "dur · exceeds". */
+.preflight-range-flag {
+  padding: 0 5px;
+  border-radius: 4px;
+  color: var(--flag);
+  background: var(--flag-soft);
 }
 
 .preflight-range-choice:not([data-disabled="true"]):hover {

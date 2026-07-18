@@ -157,32 +157,39 @@ export function ConversationValue({
  * The next control is always the form's submit button; its `actionLabel` is the
  * accessible name (e.g. "Continue to Range") the walk-through relies on.
  */
+interface ShelfParameter {
+  label: string;
+  actionLabel: string;
+  open: boolean;
+  popoverId: string;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+  onToggle: () => void;
+}
+
 export function PreparationControlShelf({
   visible,
   stage,
   back,
   parameter,
+  parameters,
   next,
 }: {
   visible: boolean;
   stage: PreparationStage;
   back?: { label: string; onClick: () => void };
-  parameter?: {
-    label: string;
-    actionLabel: string;
-    open: boolean;
-    popoverId: string;
-    triggerRef: RefObject<HTMLButtonElement | null>;
-    onToggle: () => void;
-  };
+  parameter?: ShelfParameter;
+  /** Multiple popover buttons for a stage that tucks away more than one panel. */
+  parameters?: ShelfParameter[];
   next: { label: string; actionLabel: string; disabled?: boolean };
 }) {
+  const paramList = parameters ?? (parameter ? [parameter] : []);
   return (
     <AnimatePresence initial={false}>
       {visible && (
         <motion.div
           className="preflight-control-shelf"
           data-stage={stage}
+          data-parameters={paramList.length}
           role="group"
           aria-label="Preparation controls"
           layout
@@ -204,23 +211,24 @@ export function PreparationControlShelf({
               <span className="preflight-control-label">Back</span>
             </button>
           )}
-          {parameter && (
+          {paramList.map((param) => (
             <button
-              ref={parameter.triggerRef}
+              key={param.popoverId}
+              ref={param.triggerRef}
               type="button"
               className="preflight-control preflight-control-parameter"
-              aria-label={parameter.actionLabel}
+              aria-label={param.actionLabel}
               aria-haspopup="dialog"
-              aria-expanded={parameter.open}
-              aria-controls={parameter.popoverId}
-              onClick={parameter.onToggle}
+              aria-expanded={param.open}
+              aria-controls={param.popoverId}
+              onClick={param.onToggle}
             >
-              <span className="preflight-control-label">{parameter.label}</span>
+              <span className="preflight-control-label">{param.label}</span>
               <span className="preflight-control-icon">
                 <Edit />
               </span>
             </button>
-          )}
+          ))}
           <button
             type="submit"
             className="preflight-control preflight-control-next"
@@ -249,6 +257,7 @@ export function PreparationStagePopover({
   open,
   triggerRef,
   currentValue,
+  title,
   onClose,
   children,
 }: {
@@ -256,7 +265,9 @@ export function PreparationStagePopover({
   stage: PreparationStage;
   open: boolean;
   triggerRef: RefObject<HTMLButtonElement | null>;
-  currentValue: string;
+  currentValue?: string;
+  /** Overrides the stage-derived head label for popovers that aren't a stage parameter. */
+  title?: string;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -414,11 +425,11 @@ export function PreparationStagePopover({
       data-positioned="false"
       popover="auto"
       role="dialog"
-      aria-label={`${PREPARATION_STAGES[preparationStageIndex(stage)].label} options`}
+      aria-label={title ?? `${PREPARATION_STAGES[preparationStageIndex(stage)].label} options`}
     >
       <header className="preflight-popover-head">
-        <span>{PREPARATION_STAGES[preparationStageIndex(stage)].label}</span>
-        {stage !== "range" && <strong>{currentValue}</strong>}
+        <span>{title ?? PREPARATION_STAGES[preparationStageIndex(stage)].label}</span>
+        {stage !== "range" && currentValue && <strong>{currentValue}</strong>}
       </header>
       {children}
     </div>
@@ -455,7 +466,7 @@ export function RangeModeChoice({
   ...input
 }: {
   label: string;
-  meta?: string;
+  meta?: ReactNode;
   accessibleLabel: string;
   name: string;
   value: string;

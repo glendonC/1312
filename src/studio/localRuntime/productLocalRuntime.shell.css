@@ -37,19 +37,24 @@
   align-items: center;
 }
 
-.product-runtime-setup-form {
+/* Match the standard preparation form's 12px gap so the welded control shelf's
+   -13px seam resolves to a -1px overlap (the base .preflight-form is 20px, which
+   would leave a +7px gap and detach the shelf). Ancestor scope wins the cascade. */
+.product-runtime .product-runtime-setup-form {
   width: 100%;
   min-width: 0;
   gap: 12px;
 }
 
+/* The setup stages now carry only their spoken heading (details live in shelf popovers),
+   so the panel sizes to its text content instead of the standard flow's tall min-height. */
 .product-runtime[data-runtime="false"] .preflight-stage-panel {
-  min-height: min(500px, max(300px, calc(100svh - 218px)));
-  max-height: max(300px, calc(100svh - 218px));
+  min-height: 0;
+  max-height: none;
 }
 
 .product-runtime[data-runtime="false"] .preflight-stage-body {
-  min-height: 385px;
+  min-height: 0;
 }
 
 .product-runtime[data-runtime="false"] :is(
@@ -192,9 +197,11 @@
   letter-spacing: -0.025em;
 }
 
-.product-runtime button,
-.product-runtime input,
-.product-runtime select {
+/* Heavier boxed control chrome for the CONNECTED runtime view only. The owned-media
+   setup panel (data-runtime="false") reuses the shared .preflight-form input styling
+   and the standard borderless .preflight-control shelf instead, so it matches the
+   standard preparation flow without any bespoke duplicate styling. */
+.product-runtime[data-runtime="true"] :is(button, input, select) {
   min-height: 40px;
   min-width: 0;
   padding: 8px 11px;
@@ -203,6 +210,19 @@
   color: var(--ink);
   background: rgba(255, 255, 255, 0.84);
   font: inherit;
+}
+
+/* The setup panel's own connect/ingest actions — the one control the standard flow has
+   no equivalent for — as a standard-sized button matching the preparation controls. */
+.product-runtime-setup-form button:not(.preflight-control) {
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.84);
+  font-size: 0.7rem;
 }
 
 .product-runtime button {
@@ -214,7 +234,8 @@
     transform 160ms ease;
 }
 
-.product-runtime button:hover:not(:disabled) {
+.product-runtime[data-runtime="true"] button:hover:not(:disabled),
+.product-runtime-setup-form button:not(.preflight-control):hover:not(:disabled) {
   border-color: var(--accent-line);
   color: var(--accent);
   background: #fff;
@@ -263,6 +284,14 @@
   cursor: pointer;
 }
 
+/* Match the standard .preflight-advanced disclosure: a quiet mono summary, not a
+   large sans heading with a prominent triangle. */
+.product-runtime-operator summary {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+}
+
 .product-runtime-operator ol {
   margin-bottom: 0;
   color: var(--ink-soft);
@@ -274,18 +303,6 @@
 .product-runtime dd,
 .product-runtime-caption-results code {
   overflow-wrap: anywhere;
-}
-
-/* Owned setup conversational chrome — the source stage keeps its functional
-   connect/ingest inputs but leads with the same spoken heading as replay. */
-.product-runtime-source-kicker {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--palette-ink);
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 
 .product-runtime-forecast-kicker {
@@ -314,4 +331,62 @@
 .product-runtime-language-fields > label:last-child {
   grid-column: 1 / -1;
   max-width: 320px;
+}
+
+/* Source-stage shelf popovers: the path note, and the host connect/ingest controls.
+   Content fills the standard popover width and stacks into a single column. */
+.product-runtime-popover-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.product-runtime-host-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Override the connected-view two-column connect layout so the popover fields stack.
+   Prefixed with [data-runtime="false"] to out-specify that grid rule. */
+.product-runtime[data-runtime="false"] .product-runtime-host-panel .product-runtime-connect {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.product-runtime[data-runtime="false"] .product-runtime-host-panel .product-runtime-connect button {
+  grid-column: auto;
+  align-self: flex-start;
+  justify-self: auto;
+}
+
+.product-runtime[data-runtime="false"] .product-runtime-host-panel :is(
+  .product-runtime-ingest,
+  .product-runtime-session,
+  .product-runtime-empty-source
+) {
+  margin: 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.product-runtime[data-runtime="false"] .product-runtime-host-panel .product-runtime-ingest-fields {
+  grid-template-columns: 1fr;
+}
+
+.product-runtime-ingest-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
 }

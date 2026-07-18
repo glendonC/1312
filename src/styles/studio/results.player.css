@@ -94,6 +94,9 @@
 /* ---------- the credit: a term of the licence, not a courtesy ---------- */
 
 .credit {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   margin: 0;
   padding: 0 6px 2px;
   color: var(--ink-muted);
@@ -104,6 +107,10 @@
 
 .credit-title {
   color: var(--ink);
+}
+
+.credit-licence {
+  color: var(--ink-muted);
 }
 
 .credit a {

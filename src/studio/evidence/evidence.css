@@ -61,6 +61,55 @@
   line-height: 1.45;
 }
 
+/* Retrospective counts as discrete stat tokens, not "N artifacts · N committed · N withheld". */
+.recorded-evidence-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recorded-evidence-stats li {
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.stat-n {
+  margin-right: 5px;
+  color: var(--ink);
+  font-weight: var(--weight-medium, 500);
+  font-variant-numeric: tabular-nums;
+}
+
+/* dd rows: identity plus its state/reason as discrete pieces rather than "a · b · c". */
+.recorded-evidence .ev-dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.recorded-evidence .ev-dd code {
+  font-family: var(--font-mono);
+  color: var(--ink-soft);
+}
+
+.recorded-evidence .ev-state,
+.recorded-evidence .ev-part {
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.recorded-evidence .ev-reason { color: var(--ink-soft); }
+
 @media (max-width: 720px) {
   .recorded-evidence header {
     align-items: flex-start;

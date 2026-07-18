@@ -375,7 +375,7 @@
       "agent": "segment-01",
       "action": "report",
       "target": "15 cues",
-      "detail": "timed source lines · empty target slots · 5 hard candidates · 0 unconfirmed speaker",
+      "detail": "timed source lines · target lines empty · 5 hard cue candidates",
       "level": "info",
       "effects": [
         {
@@ -405,7 +405,7 @@
       "agent": "context-01",
       "action": "open",
       "target": "workspace",
-      "detail": "pack ko-v3 · cast opens empty",
+      "detail": "glossary pack ko-v3 · no terms resolved yet",
       "level": "info",
       "effects": [
         {
@@ -526,7 +526,7 @@
       "agent": "context-01",
       "action": "report",
       "target": "glossary",
-      "detail": "7 entries · cast closed at 0 names · 8 gates from ko-v3",
+      "detail": "7 glossary entries · 8 gates from ko-v3",
       "level": "info",
       "effects": [
         {

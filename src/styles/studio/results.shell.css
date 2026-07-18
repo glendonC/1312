@@ -85,6 +85,18 @@
   font-size: 0.69rem;
 }
 
+/* A value and its qualifier as two stacked rows, not "value · qualifier". */
+.submitted-results-boundary .dd-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.submitted-results-boundary .dd-stacked small {
+  color: var(--ink-muted);
+  font-size: 0.6rem;
+}
+
 .submitted-results-identity {
   padding: 12px 0;
 }

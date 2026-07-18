@@ -32,11 +32,27 @@ export interface BoundedRgbPngLimits {
   maxPixels: number;
 }
 
-/** Shared bounded RGB PNG verifier. Domain wrappers retain their own failure vocabulary. */
-export function inspectBoundedRgbPng(
+export interface DecodedBoundedRgbPng {
+  width: number;
+  height: number;
+  /** Ordered row-major RGB24 bytes after PNG scanline filters are reversed. */
+  pixels: Buffer;
+}
+
+function paeth(left: number, above: number, upperLeft: number): number {
+  const estimate = left + above - upperLeft;
+  const leftDistance = Math.abs(estimate - left);
+  const aboveDistance = Math.abs(estimate - above);
+  const upperLeftDistance = Math.abs(estimate - upperLeft);
+  if (leftDistance <= aboveDistance && leftDistance <= upperLeftDistance) return left;
+  return aboveDistance <= upperLeftDistance ? above : upperLeft;
+}
+
+/** Shared bounded RGB PNG decoder. Domain wrappers retain their own failure vocabulary. */
+export function decodeBoundedRgbPng(
   bytes: Buffer,
   limits: BoundedRgbPngLimits,
-): { width: number; height: number } {
+): DecodedBoundedRgbPng {
   if (
     bytes.length < 57 ||
     !bytes.subarray(0, 8).equals(PNG_SIGNATURE)
@@ -104,12 +120,39 @@ export function inspectBoundedRgbPng(
   if (pixels.length !== expectedRawBytes) {
     throw new BoundedRgbPngFailure("invalid_png", "Stored PNG pixel stream has the wrong RGB24 size");
   }
-  const rowBytes = 1 + width * 3;
+  const pixelRowBytes = width * 3;
+  const rowBytes = 1 + pixelRowBytes;
+  const decoded = Buffer.allocUnsafe(height * pixelRowBytes);
   for (let row = 0; row < height; row += 1) {
-    if (pixels[row * rowBytes] > 4) {
+    const filter = pixels[row * rowBytes];
+    if (filter > 4) {
       throw new BoundedRgbPngFailure("invalid_png", "Stored PNG uses an invalid scanline filter");
     }
+    const encodedOffset = row * rowBytes + 1;
+    const decodedOffset = row * pixelRowBytes;
+    const priorOffset = decodedOffset - pixelRowBytes;
+    for (let column = 0; column < pixelRowBytes; column += 1) {
+      const encoded = pixels[encodedOffset + column];
+      const left = column >= 3 ? decoded[decodedOffset + column - 3] : 0;
+      const above = row > 0 ? decoded[priorOffset + column] : 0;
+      const upperLeft = row > 0 && column >= 3 ? decoded[priorOffset + column - 3] : 0;
+      const predictor = filter === 0 ? 0
+        : filter === 1 ? left
+          : filter === 2 ? above
+            : filter === 3 ? Math.floor((left + above) / 2)
+              : paeth(left, above, upperLeft);
+      decoded[decodedOffset + column] = (encoded + predictor) & 0xff;
+    }
   }
+  return { width, height, pixels: decoded };
+}
+
+/** Shared bounded RGB PNG verifier. Domain wrappers retain their own failure vocabulary. */
+export function inspectBoundedRgbPng(
+  bytes: Buffer,
+  limits: BoundedRgbPngLimits,
+): { width: number; height: number } {
+  const { width, height } = decodeBoundedRgbPng(bytes, limits);
   return { width, height };
 }
 

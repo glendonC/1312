@@ -22,7 +22,13 @@ import type { VerifiedOcrAudit } from "../ocrAudit.ts";
 import type { VerifiedSpeakerOverlapAudit } from "../speakerAudit.ts";
 import type { VerifiedResearchSnapshotAudit } from "../research/researchAudit.ts";
 import type { VerifiedComputerUseSession } from "../computerUse/computerUseAudit.ts";
-import { currentRunSpeechCitation, ocrSpanCitation, speakerTurnCitation } from "../evidenceCitations/audit.ts";
+import type { VerifiedVisualTransitionAudit } from "../visualTransitions/visualTransitionAudit.ts";
+import {
+  VISUAL_TRANSITION_LIMITS,
+  isVisualTransitionHostArtifactKind,
+  type VisualTransitionEvidenceCitationInput,
+} from "../model/visualTransitions.ts";
+import { currentRunSpeechCitation, ocrSpanCitation, speakerTurnCitation, visualTransitionCitation } from "../evidenceCitations/audit.ts";
 import { externalDocumentSpanCitation } from "../research/researchCitation.ts";
 import { externalScreenRegionCitation } from "../computerUse/computerUseCitation.ts";
 import { deriveGeneralizedCoverageDecision } from "../admission/generalizedCoveragePolicy.ts";
@@ -31,6 +37,7 @@ import { validateOcrEvidenceCitationInput } from "../validation/ocr.ts";
 import { validateSpeakerOverlapEvidenceCitationInput } from "../validation/speakers.ts";
 import { validateResearchEvidenceCitationInput } from "../validation/research.ts";
 import { validateComputerUseEvidenceCitationInput } from "../validation/computerUse.ts";
+import { validateVisualTransitionEvidenceCitationInput } from "../validation/visualTransitions.ts";
 import { validateCoveragePartition, validateStudyReportArtifact } from "../validation/studyReports.ts";
 import { validateStudyReportArtifactV2 } from "../validation/studyReportsV2.ts";
 import { LauncherFailure } from "./launcherFailure.ts";
@@ -39,6 +46,7 @@ export interface WorkerResult {
   summary: string;
   semanticEvidenceInputs: SemanticEvidenceCitationInput[];
   ocrEvidenceInputs: OcrEvidenceCitationInput[];
+  visualTransitionEvidenceInputs: VisualTransitionEvidenceCitationInput[];
   speakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[];
   researchEvidenceInputs: ResearchEvidenceCitationInput[];
   computerUseEvidenceInputs: ComputerUseEvidenceCitationInput[];
@@ -97,6 +105,8 @@ export function buildStudyReportEnvelopeV2(input: {
   verifiedSemanticEvidence: VerifiedSemanticEvidence[];
   ocrEvidenceInputs: OcrEvidenceCitationInput[];
   verifiedOcrEvidence: VerifiedOcrAudit[];
+  visualTransitionEvidenceInputs?: VisualTransitionEvidenceCitationInput[];
+  verifiedVisualTransitionEvidence?: VerifiedVisualTransitionAudit[];
   speakerEvidenceInputs?: SpeakerOverlapEvidenceCitationInput[];
   verifiedSpeakerEvidence?: VerifiedSpeakerOverlapAudit[];
   researchEvidenceInputs?: ResearchEvidenceCitationInput[];
@@ -108,6 +118,25 @@ export function buildStudyReportEnvelopeV2(input: {
   const { task, output } = input;
   if (!task.parentTaskId || !task.parentAgentId) throw new Error("Root tasks cannot create child study reports");
   const verifiedSpeakerEvidence = input.verifiedSpeakerEvidence ?? [];
+  const verifiedVisualTransitionEvidence = input.verifiedVisualTransitionEvidence ?? [];
+  const verifiedVisualTransitionByOperation = new Map(verifiedVisualTransitionEvidence.map((entry) => [entry.observations.operationId, entry]));
+  for (const citationInput of input.visualTransitionEvidenceInputs ?? []) {
+    const verified = verifiedVisualTransitionByOperation.get(citationInput.operationId);
+    if (!verified || citationInput.observationsArtifactId !== verified.observationsArtifact.id ||
+        citationInput.observationsContentId !== verified.observationsArtifact.content.contentId ||
+        citationInput.receiptArtifactId !== verified.receiptArtifact.id ||
+        citationInput.receiptId !== verified.receipt.receiptId ||
+        citationInput.receiptContentId !== verified.receiptArtifact.content.contentId ||
+        verified.receipt.authorization.taskId !== task.id ||
+        verified.receipt.authorization.agentId !== task.assignedAgentId ||
+        verified.receipt.authorization.executionId !== input.executionId ||
+        JSON.stringify(citationInput.intervalIds) !== JSON.stringify(verified.observations.intervals.map((interval) => interval.intervalId))) {
+      throw new Error(`Study report v2 visual-transition input ${citationInput.operationId} changed authenticated evidence identity`);
+    }
+  }
+  if ((input.visualTransitionEvidenceInputs ?? []).length !== verifiedVisualTransitionEvidence.length) {
+    throw new Error("Study report v2 visual-transition evidence echo does not close every verified operation");
+  }
   const verifiedSpeakerByOperation = new Map(verifiedSpeakerEvidence.map((entry) => [entry.observations.operationId, entry]));
   for (const citationInput of input.speakerEvidenceInputs ?? []) {
     const verified = verifiedSpeakerByOperation.get(citationInput.operationId);
@@ -219,6 +248,23 @@ export function buildStudyReportEnvelopeV2(input: {
     });
   });
   evidenceCitations.push(...ocrCitations);
+  const visualTransitionCitations = (input.visualTransitionEvidenceInputs ?? []).map((citationInput) => {
+    const verified = verifiedVisualTransitionByOperation.get(citationInput.operationId)!;
+    return visualTransitionCitation({
+      verified,
+      intervalIds: citationInput.intervalIds,
+      target: {
+        kind: "media_context",
+        qualifiesMedia: {
+          artifactId: verified.observations.source.artifactId,
+          trackId: verified.observations.source.videoTrackId,
+          startMs: verified.observations.source.grantedRange.startMs,
+          endMs: verified.observations.source.grantedRange.endMs,
+        },
+      },
+    });
+  });
+  evidenceCitations.push(...visualTransitionCitations);
   const verifiedResearchByOperation = new Map(
     (input.verifiedResearchEvidence ?? []).map((entry) => [entry.receipt.operationId, entry]),
   );
@@ -325,9 +371,10 @@ export function validateWorkerResult(
   expectedSpeakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [],
   expectedResearchEvidenceInputs: ResearchEvidenceSourceIdentity[] = [],
   expectedComputerUseEvidenceInputs: ComputerUseEvidenceSourceIdentity[] = [],
+  expectedVisualTransitionEvidenceInputs: VisualTransitionEvidenceCitationInput[] = [],
 ): WorkerResult {
   const item = record(value);
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind) || isComputerUseHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isVisualTransitionHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind) || isComputerUseHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker response failed its output authority contract.",
@@ -335,10 +382,11 @@ export function validateWorkerResult(
   }
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
+  const visualTransitionGranted = task.grants.some((grant) => grant.capability === "media.visual-transitions.analyze");
   const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
   const researchGranted = task.grants.some((grant) => grant.capability === "research.investigate");
   const computerUseGranted = task.grants.some((grant) => grant.capability === "computer.use.readonly");
-  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : [])]);
+  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(visualTransitionGranted ? ["visualTransitionEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : [])]);
   if (!item || Object.keys(item).some((key) => !allowedKeys.has(key))) {
     throw new LauncherFailure(
       "Worker result must contain only summary and outputs",
@@ -417,6 +465,35 @@ export function validateWorkerResult(
     throw new LauncherFailure(
       "Host supplied OCR evidence without a worker grant",
       "Codex worker response failed its OCR evidence citation contract.",
+    );
+  }
+  let visualTransitionEvidenceInputs: VisualTransitionEvidenceCitationInput[] = [];
+  if (visualTransitionGranted) {
+    if (!Array.isArray(item.visualTransitionEvidenceInputs)) {
+      throw new LauncherFailure(
+        "Visual-transition-consuming worker omitted its structured evidence input list",
+        "Codex worker response failed its visual-transition evidence citation contract.",
+      );
+    }
+    try {
+      visualTransitionEvidenceInputs = item.visualTransitionEvidenceInputs.map((input, index) =>
+        validateVisualTransitionEvidenceCitationInput(input, "Worker result", `visualTransitionEvidenceInputs[${index}]`));
+    } catch (error) {
+      throw new LauncherFailure(
+        `Worker visual-transition evidence citation is invalid: ${error instanceof Error ? error.message : "invalid citation"}`,
+        "Codex worker response failed its visual-transition evidence citation contract.",
+      );
+    }
+    if (JSON.stringify(visualTransitionEvidenceInputs) !== JSON.stringify(expectedVisualTransitionEvidenceInputs)) {
+      throw new LauncherFailure(
+        "Worker visual-transition evidence citations do not equal the authenticated current-task intervals",
+        "Codex worker response failed its visual-transition evidence citation contract.",
+      );
+    }
+  } else if (expectedVisualTransitionEvidenceInputs.length !== 0) {
+    throw new LauncherFailure(
+      "Host supplied visual-transition evidence without a worker grant",
+      "Codex worker response failed its visual-transition evidence citation contract.",
     );
   }
   let speakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [];
@@ -603,11 +680,11 @@ export function validateWorkerResult(
       "Codex worker response failed its output contract.",
     );
   }
-  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, speakerEvidenceInputs, researchEvidenceInputs, computerUseEvidenceInputs, outputs };
+  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, visualTransitionEvidenceInputs, speakerEvidenceInputs, researchEvidenceInputs, computerUseEvidenceInputs, outputs };
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
-  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind) || isComputerUseHostArtifactKind(output.artifactKind))) {
+  if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isVisualTransitionHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind) || isComputerUseHostArtifactKind(output.artifactKind))) {
     throw new LauncherFailure(
       "Worker contract requests a host-only frame artifact kind",
       "Codex worker output schema cannot impersonate a host frame artifact.",
@@ -616,6 +693,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
   const required = task.requiredOutputs.filter((output) => output.required);
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
+  const visualTransitionGranted = task.grants.some((grant) => grant.capability === "media.visual-transitions.analyze");
   const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
   const researchGranted = task.grants.some((grant) => grant.capability === "research.investigate");
   const computerUseGranted = task.grants.some((grant) => grant.capability === "computer.use.readonly");
@@ -668,6 +746,25 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         observationIds: { type: "array", minItems: 0, maxItems: OCR_LIMITS.maxTotalBoxes, items: { type: "string", minLength: 1 } },
       },
       required: ["operationId", "artifactId", "contentId", "receiptArtifactId", "receiptId", "receiptContentId", "observationIds"],
+    },
+  };
+  const visualTransitionEvidenceInputs = {
+    type: "array",
+    minItems: 0,
+    maxItems: VISUAL_TRANSITION_LIMITS.maxCalls,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        operationId: { type: "string", minLength: 1 },
+        observationsArtifactId: { type: "string", minLength: 1 },
+        observationsContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        receiptArtifactId: { type: "string", minLength: 1 },
+        receiptId: { type: "string", minLength: 1 },
+        receiptContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        intervalIds: { type: "array", minItems: 1, maxItems: VISUAL_TRANSITION_LIMITS.maxFrames - 1, items: { type: "string", minLength: 1 } },
+      },
+      required: ["operationId", "observationsArtifactId", "observationsContentId", "receiptArtifactId", "receiptId", "receiptContentId", "intervalIds"],
     },
   };
   const speakerEvidenceInputs = {
@@ -820,6 +917,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
       summary: { type: "string", minLength: 1, maxLength: 2_000 },
       ...(semanticGranted ? { semanticEvidenceInputs } : {}),
       ...(ocrGranted ? { ocrEvidenceInputs } : {}),
+      ...(visualTransitionGranted ? { visualTransitionEvidenceInputs } : {}),
       ...(speakerGranted ? { speakerEvidenceInputs } : {}),
       ...(researchGranted ? { researchEvidenceInputs } : {}),
       ...(computerUseGranted ? { computerUseEvidenceInputs } : {}),
@@ -830,7 +928,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         items: outputItems,
       },
     },
-    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : []), "outputs"],
+    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(visualTransitionGranted ? ["visualTransitionEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), ...(computerUseGranted ? ["computerUseEvidenceInputs"] : []), "outputs"],
   };
 }
 
@@ -844,6 +942,8 @@ export function workerPrompt(task: TaskRecord): string {
           ? ["media_frames_sample"]
           : grant.capability === "media.frames.ocr"
             ? ["media_frames_ocr"]
+          : grant.capability === "media.visual-transitions.analyze"
+            ? ["media_visual_transitions_analyze"]
           : grant.capability === "media.speakers.analyze"
             ? ["media_speakers_analyze"]
           : grant.capability === "media.audio.separate"
@@ -872,6 +972,9 @@ export function workerPrompt(task: TaskRecord): string {
     grantedOcr: task.grants
       .filter((grant) => grant.capability === "media.frames.ocr")
       .map((grant) => ({ mediaScope: grant.mediaScope, limits: grant.ocrScope?.limits ?? null })),
+    grantedVisualTransitions: task.grants
+      .filter((grant) => grant.capability === "media.visual-transitions.analyze")
+      .map((grant) => ({ mediaScope: grant.mediaScope, limits: grant.visualTransitionScope?.limits ?? null })),
     grantedAnonymousSpeakers: task.grants
       .filter((grant) => grant.capability === "media.speakers.analyze")
       .map((grant) => ({ mediaScope: grant.mediaScope, limits: grant.speakerScope?.limits ?? null })),
@@ -914,6 +1017,13 @@ export function workerPrompt(task: TaskRecord): string {
           "OCR text is a visual hypothesis, not dialogue, identity, spelling truth, translation, cultural meaning, or person identification. It cannot replace or overwrite speech evidence; below-threshold text is withheld.",
           "Copy the returned operation/artifact/content/receipt identities and all returned observation IDs into the top-level ocrEvidenceInputs list. For empty or truncated OCR, echo the same authenticated entry with an empty observationIds list so the host preserves that upstream state.",
           "Do not label worker-authored output as studio.ocr-observations.v1 or studio.ocr-producer.receipt.v1; those kinds belong only to the host.",
+        ] : []),
+        ...(mediaTools.includes("media_visual_transitions_analyze") ? [
+          "Invoke media_visual_transitions_analyze only after exact completed media_frames_sample and media_frames_ocr operations, passing only their returned operation IDs.",
+          "The host compares adjacent U2 PNGs on a fixed 32x32 RGB grid. Scores at or above the registered threshold are visual-change candidates only, never scenes, shots, cuts, semantic understanding, identities, or right-frame judgments.",
+          "OCR available-hypothesis set changes are retained as secondary lineage only and cannot change the pixel threshold or grant dialogue, caption, or semantic authority.",
+          "Copy the returned operation, observations artifact/content, receipt artifact/id/content, and every returned interval ID into the top-level visualTransitionEvidenceInputs list. These intervals remain cite-only media context.",
+          "Do not label worker-authored output as studio.visual-transition-observations.v1 or studio.visual-transition-producer.receipt.v1; those kinds belong only to the host.",
         ] : []),
         ...(mediaTools.includes("media_speakers_analyze") ? [
           "Invoke media_speakers_analyze exactly once with the closed empty object. The host injects source, audio track, range, task, agent, and grant; paths and selectors are not accepted.",

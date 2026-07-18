@@ -16,6 +16,7 @@ import type {
   StudyReportArtifactV2,
   StudyReportV2Identity,
 } from "../model.ts";
+import type { VisualTransitionOperationRecord } from "../model/visualTransitions.ts";
 import { STUDY_REPORT_V2_LIMITS } from "../model.ts";
 import { auditEvidenceCitation } from "../evidenceCitations/audit.ts";
 import { deriveTaskDialogueScopePolicy } from "../study/dialogueScopeRuntime.ts";
@@ -135,6 +136,14 @@ export class GeneralizedEvidenceAdmissionHost {
         const operation = this.state.ocrOperations[verified.operationId!];
         if (!operation || operation.taskId !== task.id || operation.agentId !== task.assignedAgentId || operation.executionId !== execution.id) {
           throw new Error(`OCR citation ${verified.citationId} is cross-task or cross-executor`);
+        }
+      } else if (verified.evidenceKind === "visual_transition") {
+        const operations = (this.state as RuntimeProjection & {
+          visualTransitionOperations: Record<string, VisualTransitionOperationRecord>;
+        }).visualTransitionOperations;
+        const operation = operations[verified.operationId!];
+        if (!operation || operation.taskId !== task.id || operation.agentId !== task.assignedAgentId || operation.executionId !== execution.id) {
+          throw new Error(`Visual-transition citation ${verified.citationId} is cross-task or cross-executor`);
         }
       } else if (verified.evidenceKind === "speaker_turn") {
         const operation = this.state.speakerOverlapOperations[verified.operationId!];

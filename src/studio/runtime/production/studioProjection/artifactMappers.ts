@@ -69,6 +69,8 @@ export function projectOutputArtifacts(state: RuntimeProjection, reports: readon
         artifact.origin.kind === "frame_sampling_receipt" ||
         artifact.origin.kind === "ocr_observations" ||
         artifact.origin.kind === "ocr_receipt" ||
+        artifact.origin.kind === "visual_transition_observations" ||
+        artifact.origin.kind === "visual_transition_receipt" ||
         artifact.origin.kind === "speaker_overlap_observations" ||
         artifact.origin.kind === "speaker_overlap_receipt"
         || artifact.origin.kind === "separation_stem"

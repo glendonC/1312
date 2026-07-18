@@ -15,6 +15,7 @@
     "acoustic:check": "node --test tests/studio-acoustic-triage.test.ts tests/studio-child-evidence-bridge.test.ts",
     "frames:check": "node --test tests/studio-frame-sampling.test.ts",
     "ocr:check": "node --test tests/studio-ocr-production.test.ts",
+    "visual:check": "node --test tests/studio-visual-transition-production.test.ts",
     "speakers:check": "node --test tests/studio-speaker-overlap-production.test.ts",
     "research:check": "node --test tests/studio-r1-research-production.test.ts tests/studio-r1-research-wiring.test.ts",
     "computer-use:check": "node --test tests/studio-r2-computer-use-production.test.ts tests/studio-r2-computer-use-wiring.test.ts",

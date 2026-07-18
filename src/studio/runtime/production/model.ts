@@ -7,6 +7,7 @@ export * from "./model/execution.ts";
 export * from "./model/frames.ts";
 export * from "./model/media.ts";
 export * from "./model/ocr.ts";
+export * from "./model/visualTransitions.ts";
 export * from "./model/projection.ts";
 export * from "./model/reports.ts";
 export * from "./model/research.ts";

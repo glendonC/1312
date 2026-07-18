@@ -9,6 +9,7 @@ import {
   FRAME_SAMPLING_LIMITS,
   isFrameHostArtifactKind,
   isOcrHostArtifactKind,
+  isVisualTransitionHostArtifactKind,
   isSpeakerOverlapHostArtifactKind,
   isConditionalSeparationHostArtifactKind,
   isComputerUseHostArtifactKind,
@@ -27,6 +28,7 @@ import {
 } from "../model.ts";
 import { validateFrameSamplingGrantScope } from "./frames.ts";
 import { validateOcrGrantScope } from "./ocr.ts";
+import { validateVisualTransitionGrantScope } from "./visualTransitions.ts";
 import { validateSpeakerOverlapGrantScope } from "./speakers.ts";
 import { validateConditionalSeparationGrantScope } from "./separation.ts";
 import { validateResearchGrantScope } from "./research.ts";
@@ -90,11 +92,12 @@ const ROLE_CAPABILITIES: Record<WorkerKind, ReadonlySet<Capability>> = {
     "study.computer-use",
     "study.synthesize",
   ]),
-  media: new Set(["media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.speakers.analyze", "media.audio.separate", "speech.transcribe", "report.submit"]),
+  media: new Set(["media.extract", "media.seek", "media.frames.sample", "media.frames.ocr", "media.visual-transitions.analyze", "media.speakers.analyze", "media.audio.separate", "speech.transcribe", "report.submit"]),
   analysis: new Set([
     "media.seek",
     "media.frames.sample",
     "media.frames.ocr",
+    "media.visual-transitions.analyze",
     "media.speakers.analyze",
     "media.audio.separate",
     "research.investigate",
@@ -230,7 +233,7 @@ function outputs(value: unknown, context: string, path: string): RequiredOutput[
     exact(item, ["name", "artifactKind", "required"], context, `${path}[${index}]`);
     string(item.name, context, `${path}[${index}].name`);
     const artifactKind = string(item.artifactKind, context, `${path}[${index}].artifactKind`);
-    if (isFrameHostArtifactKind(artifactKind) || isOcrHostArtifactKind(artifactKind) || isSpeakerOverlapHostArtifactKind(artifactKind) || isConditionalSeparationHostArtifactKind(artifactKind) || isResearchHostArtifactKind(artifactKind) || isComputerUseHostArtifactKind(artifactKind)) {
+    if (isFrameHostArtifactKind(artifactKind) || isOcrHostArtifactKind(artifactKind) || isVisualTransitionHostArtifactKind(artifactKind) || isSpeakerOverlapHostArtifactKind(artifactKind) || isConditionalSeparationHostArtifactKind(artifactKind) || isResearchHostArtifactKind(artifactKind) || isComputerUseHostArtifactKind(artifactKind)) {
       fail(context, `${path}[${index}].artifactKind`, "is a host-only frame artifact kind reserved for the frame, OCR, speaker/overlap, conditional-separation, research, or computer-use hosts");
     }
     boolean(item.required, context, `${path}[${index}].required`);
@@ -262,6 +265,8 @@ function grant(value: unknown, context: string, path: string): asserts value is 
       ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "frameScope"]
       : capability === "media.frames.ocr"
         ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "ocrScope"]
+        : capability === "media.visual-transitions.analyze"
+          ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "visualTransitionScope"]
         : capability === "media.speakers.analyze"
           ? ["id", "capability", "taskId", "agentId", "mediaScope", "evidenceScope", "assessmentScope", "decisionScope", "speakerScope"]
         : capability === "media.audio.separate"
@@ -286,6 +291,9 @@ function grant(value: unknown, context: string, path: string): asserts value is 
     : null;
   const ocrScope = capability === "media.frames.ocr"
     ? validateOcrGrantScope(item.ocrScope, context, `${path}.ocrScope`)
+    : null;
+  const visualTransitionScope = capability === "media.visual-transitions.analyze"
+    ? validateVisualTransitionGrantScope(item.visualTransitionScope, context, `${path}.visualTransitionScope`)
     : null;
   const speakerScope = capability === "media.speakers.analyze"
     ? validateSpeakerOverlapGrantScope(item.speakerScope, context, `${path}.speakerScope`)
@@ -337,6 +345,13 @@ function grant(value: unknown, context: string, path: string): asserts value is 
     ocrScope === null || ocrScope.limits.maxFrames > OCR_LIMITS.maxFrames
   )) {
     fail(context, path, "media.frames.ocr grants require one bounded video scope and OCR envelope");
+  }
+  if (capability === "media.visual-transitions.analyze" && (
+    mediaScope.length !== 1 ||
+    mediaScope[0].endMs - mediaScope[0].startMs > FRAME_SAMPLING_LIMITS.maxDurationMs ||
+    visualTransitionScope === null
+  )) {
+    fail(context, path, "media.visual-transitions.analyze grants require one bounded video scope and visual-transition envelope");
   }
   if (capability === "media.speakers.analyze" && (
     mediaScope.length !== 1 ||

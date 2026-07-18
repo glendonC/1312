@@ -27,6 +27,7 @@ const KINDS = new Set<EvidenceCitationKind>([
   "acoustic_range",
   "frame_sample",
   "ocr_span",
+  "visual_transition",
   "speaker_turn",
   "external_document_span",
   "external_screen_region",
@@ -254,6 +255,12 @@ export function validateEvidenceCitationEnvelope(
        envelope.receipt.artifactId === null ||
        observations.some((entry) => entry.locator.kind !== "media_point"))) {
     fail(context, path, "OCR hypotheses are audited point identities and remain cite-only media context");
+  }
+  if (evidenceKind === "visual_transition" &&
+      (use !== "cite_only" || foundTarget.kind !== "media_context" || operationId === null ||
+       envelope.receipt.artifactId === null || observations.length === 0 ||
+       observations.some((entry) => entry.state !== "available" || entry.locator.kind !== "temporal_range"))) {
+    fail(context, path, "visual-change candidates are audited temporal measurements and remain cite-only media context");
   }
   if (evidenceKind === "speaker_turn" &&
       (use !== "coverage_qualification" || foundTarget.kind !== "coverage" || operationId === null ||

@@ -122,6 +122,20 @@ score.
   subtitle-perfect aggregation, default visual-specialist/root routing, and U4 denser-frame or
   specialist wiring remain. No UI, face/biometric/person-id, publication, semantic-quality, or
   Bet G claim is included.
+- **U5.1 visual-change candidates: cite-only vertical slice:**
+  `media.visual-transitions.analyze` is now one explicit scheduler grant and task-private
+  launcher/MCP bridge accepting exactly a completed U2 frame operation id plus the completed U5 OCR
+  operation id bound to it. Same task, agent, executor, launch, source, video track, and range are
+  required. The host cold-audits both lineages, then measures every adjacent frame pair on a fixed
+  32 by 32 nearest-cell-center RGB grid. Mean absolute channel delta at or above 250,000 ppm is
+  stored only as `visual_change_candidate`; OCR available-hypothesis set change is secondary
+  lineage and never changes the threshold. Private observation/receipt artifacts close exact
+  frame, U2, U5, producer, limit, score, interval, and nonclaim identities. Cold audit reopens and
+  reruns the producer. U3 accepts selected intervals only as cite-only temporal media context, with
+  no claim or coverage citation ids. One call, 2 to 4 frames, 2 MiB/frame, 8 MiB total, 256 KiB per
+  observation/receipt, and 5 s wall are enforced. Scene/shot/cut claims, semantic visual
+  understanding, right-frame selection, default specialist routing, U4 denser frames, UI,
+  caption/publication authority, and person/object/place/action/mood/cultural claims remain closed.
 - **U6 anonymous speaker/overlap evidence — coverage + typed U4 trigger vertical slices:**
   `media.speakers.analyze` is a one-call scheduler grant and task-private launcher/MCP bridge whose
   child request is exactly `{}`; the host injects the owned source, audio track, range, task, agent,
@@ -222,8 +236,9 @@ indefinite deferrals or a one-day implementation claim:
 4. U4 budgeted multi-pass re-study: attenuated current-run speech, the exact U6.1
    `speaker_overlap` cause/trigger, and one bounded non-speaker padded-audio pass are implemented and
    default-runtime wired; additional delta producers remain closed.
-5. U5 OCR and scene/on-screen context — OCR cite-only vertical slice implemented; scene/shot,
-   default specialist routing, and U4 denser-frame/specialist wiring remain.
+5. U5 OCR and scene/on-screen context: OCR and deterministic cite-only visual-change candidate
+   slices are implemented; scene/shot semantics, default specialist routing, and U4 denser-frame/
+   specialist wiring remain.
 6. U6 anonymous speaker/overlap evidence — one pinned local producer, immutable accounting receipt,
    launcher bridge, U3 coverage qualification, and typed exact-range U4 overlap trigger implemented;
    non-darwin native pins and a diarization quality bench remain.
@@ -292,6 +307,11 @@ indefinite deferrals or a one-day implementation claim:
   prove displayed text is correct, identify a person/place/object, infer script/language,
   translate/culturally interpret text, understand a scene, select the right frame, or improve a
   transcript/caption.
+- U5.1 proves one bounded deterministic adjacent-frame RGB-grid measurement path, exact same-
+  executor U2/U5 lineage, immutable score/classification/interval identities, cold rerun, and
+  cite-only temporal association. It does not prove a scene, shot, cut, semantic change, relevant
+  moment, right frame, person, object, place, action, mood, culture, OCR truth, dialogue, caption
+  correctness, quality, or improvement.
 - U6 proves one bounded local anonymous-clustering execution path, exact owned-audio lineage,
   complete range accounting, immutable hypotheses/receipt, cold audit/tamper closure, U3
   coverage/conflict preservation, and one exact typed overlap-to-attenuated-speech request. It does

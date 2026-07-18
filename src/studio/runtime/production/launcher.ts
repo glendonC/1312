@@ -18,6 +18,10 @@ import type {
   RuntimeArtifact,
   WorkerOutputEnvelope,
 } from "./model.ts";
+import type {
+  VisualTransitionEvidenceCitationInput,
+  VisualTransitionOperationRecord,
+} from "./model/visualTransitions.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
 import { BoundedReportHost } from "./study/reportHost.ts";
 import { BoundedRuntimeScheduler } from "./scheduler.ts";
@@ -25,6 +29,8 @@ import { FfmpegCapabilityHost } from "./mediaHost.ts";
 import { BoundedFrameSamplingHost } from "./frameHost.ts";
 import { BoundedOcrHost } from "./ocrHost.ts";
 import { auditOcr } from "./ocrAudit.ts";
+import { BoundedVisualTransitionHost } from "./visualTransitions/visualTransitionHost.ts";
+import { auditVisualTransition } from "./visualTransitions/visualTransitionAudit.ts";
 import { BoundedSpeakerOverlapHost } from "./speakerHost.ts";
 import { auditSpeakerOverlap } from "./speakerAudit.ts";
 import { BoundedConditionalSeparationHost } from "./separationHost.ts";
@@ -51,6 +57,7 @@ import type { ChildEvidenceDecisionHost } from "./executor/childEvidenceDecision
 import type { ChildMediaCapabilityHost } from "./executor/childMediaBridge.ts";
 import type { ChildFrameSamplingHost } from "./executor/childFrameBridge.ts";
 import type { ChildOcrHost } from "./executor/childOcrBridge.ts";
+import type { ChildVisualTransitionHost } from "./executor/childVisualTransitionBridge.ts";
 import type { ChildSpeakerHost } from "./executor/childSpeakerBridge.ts";
 import type { ChildSeparationHost } from "./executor/childSeparationBridge.ts";
 import type { ChildSemanticEvidenceHost } from "./executor/childSemanticEvidenceBridge.ts";
@@ -108,6 +115,7 @@ export interface CodexWorkerLauncherOptions {
   nextSemanticEvidenceOperationId?: () => string;
   nextFrameOperationId?: () => string;
   nextOcrOperationId?: () => string;
+  nextVisualTransitionOperationId?: () => string;
   nextSpeakerOperationId?: () => string;
   nextSeparationOperationId?: () => string;
   nextResearchOperationId?: () => string;
@@ -115,6 +123,7 @@ export interface CodexWorkerLauncherOptions {
   mediaHost?: ChildMediaCapabilityHost;
   frameHost?: ChildFrameSamplingHost;
   ocrHost?: ChildOcrHost;
+  visualTransitionHost?: ChildVisualTransitionHost;
   ocrRecognizer?: OcrRecognizer;
   ocrFrameDecoder?: FrameDecoder;
   speakerHost?: ChildSpeakerHost;
@@ -133,6 +142,7 @@ export interface CodexWorkerLauncherOptions {
   mediaMcpServerPath?: string;
   frameMcpServerPath?: string;
   ocrMcpServerPath?: string;
+  visualTransitionMcpServerPath?: string;
   speakerMcpServerPath?: string;
   separationMcpServerPath?: string;
   researchMcpServerPath?: string;
@@ -156,12 +166,13 @@ export class CodexExecWorkerLauncher {
   > &
     Pick<
       CodexWorkerLauncherOptions,
-      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextSpeakerOperationId" | "nextSeparationOperationId" | "nextResearchOperationId" | "nextComputerUseOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "speakerMcpServerPath" | "separationMcpServerPath" | "researchMcpServerPath" | "computerUseMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer" | "sourceSeparator" | "researchSearchProvider" | "computerUseDriver"
+      "executableArgsPrefix" | "model" | "temporaryRoot" | "nextMediaOperationId" | "nextEvidenceOperationId" | "nextAssessmentOperationId" | "nextDecisionOperationId" | "nextSemanticEvidenceOperationId" | "nextFrameOperationId" | "nextOcrOperationId" | "nextVisualTransitionOperationId" | "nextSpeakerOperationId" | "nextSeparationOperationId" | "nextResearchOperationId" | "nextComputerUseOperationId" | "mediaMcpServerPath" | "frameMcpServerPath" | "ocrMcpServerPath" | "visualTransitionMcpServerPath" | "speakerMcpServerPath" | "separationMcpServerPath" | "researchMcpServerPath" | "computerUseMcpServerPath" | "evidenceMcpServerPath" | "assessmentMcpServerPath" | "decisionMcpServerPath" | "semanticEvidenceMcpServerPath" | "ocrRecognizer" | "ocrFrameDecoder" | "speakerDiarizer" | "sourceSeparator" | "researchSearchProvider" | "computerUseDriver"
     >;
   private versionPromise: Promise<string> | null = null;
   private readonly mediaHost: ChildMediaCapabilityHost;
   private readonly frameHost: ChildFrameSamplingHost;
   private readonly ocrHost: ChildOcrHost;
+  private readonly visualTransitionHost: ChildVisualTransitionHost;
   private readonly speakerHost: ChildSpeakerHost;
   private readonly separationHost: ChildSeparationHost;
   private readonly evidenceHost: ChildEvidenceReadHost;
@@ -183,6 +194,10 @@ export class CodexExecWorkerLauncher {
     this.mediaHost = options.mediaHost ?? new FfmpegCapabilityHost(ledger, artifacts);
     this.frameHost = options.frameHost ?? new BoundedFrameSamplingHost(ledger, artifacts);
     this.ocrHost = options.ocrHost ?? new BoundedOcrHost(ledger, artifacts, {
+      recognizer: options.ocrRecognizer,
+      frameDecoder: options.ocrFrameDecoder,
+    });
+    this.visualTransitionHost = options.visualTransitionHost ?? new BoundedVisualTransitionHost(ledger, artifacts, {
       recognizer: options.ocrRecognizer,
       frameDecoder: options.ocrFrameDecoder,
     });
@@ -220,6 +235,7 @@ export class CodexExecWorkerLauncher {
       nextSemanticEvidenceOperationId: options.nextSemanticEvidenceOperationId,
       nextFrameOperationId: options.nextFrameOperationId,
       nextOcrOperationId: options.nextOcrOperationId,
+      nextVisualTransitionOperationId: options.nextVisualTransitionOperationId,
       nextSpeakerOperationId: options.nextSpeakerOperationId,
       nextSeparationOperationId: options.nextSeparationOperationId,
       nextResearchOperationId: options.nextResearchOperationId,
@@ -227,6 +243,7 @@ export class CodexExecWorkerLauncher {
       mediaMcpServerPath: options.mediaMcpServerPath,
       frameMcpServerPath: options.frameMcpServerPath,
       ocrMcpServerPath: options.ocrMcpServerPath,
+      visualTransitionMcpServerPath: options.visualTransitionMcpServerPath,
       speakerMcpServerPath: options.speakerMcpServerPath,
       separationMcpServerPath: options.separationMcpServerPath,
       researchMcpServerPath: options.researchMcpServerPath,
@@ -369,6 +386,7 @@ export class CodexExecWorkerLauncher {
           media: this.mediaHost,
           frame: this.frameHost,
           ocr: this.ocrHost,
+          visualTransition: this.visualTransitionHost,
           speaker: this.speakerHost,
           separation: this.separationHost,
           ...(researchHost ? { research: researchHost } : {}),
@@ -387,6 +405,7 @@ export class CodexExecWorkerLauncher {
         semanticEvidenceGrant,
         frameGrant,
         ocrGrant,
+        visualTransitionGrant,
         speakerGrant,
         separationGrant,
         researchGrant,
@@ -473,6 +492,36 @@ export class CodexExecWorkerLauncher {
           receiptId: verified.receipt.receiptId,
           receiptContentId: verified.receiptArtifact.content.contentId,
           observationIds,
+        });
+      }
+      const visualTransitionState = this.ledger.state() as ReturnType<RuntimeLedger["state"]> & {
+        visualTransitionOperations: Record<string, VisualTransitionOperationRecord>;
+      };
+      const completedVisualTransitions = Object.values(visualTransitionState.visualTransitionOperations)
+        .filter((operation) => operation.taskId === task.id && operation.status === "completed")
+        .sort((left, right) => left.id.localeCompare(right.id));
+      if (visualTransitionGrant && completedVisualTransitions.length === 0) {
+        throw new LauncherFailure(
+          "Codex child did not complete its granted visual-transition operation",
+          "Codex child did not complete its required receipted visual-change candidate analysis.",
+        );
+      }
+      const verifiedVisualTransitionEvidence: Awaited<ReturnType<typeof auditVisualTransition>>[] = [];
+      const visualTransitionEvidenceInputs: VisualTransitionEvidenceCitationInput[] = [];
+      for (const operation of completedVisualTransitions) {
+        const verified = await auditVisualTransition(this.ledger.state(), this.artifacts, operation.id, {
+          recognizer: this.options.ocrRecognizer,
+          frameDecoder: this.options.ocrFrameDecoder,
+        });
+        verifiedVisualTransitionEvidence.push(verified);
+        visualTransitionEvidenceInputs.push({
+          operationId: operation.id,
+          observationsArtifactId: verified.observationsArtifact.id,
+          observationsContentId: verified.observationsArtifact.content.contentId,
+          receiptArtifactId: verified.receiptArtifact.id,
+          receiptId: verified.receipt.receiptId,
+          receiptContentId: verified.receiptArtifact.content.contentId,
+          intervalIds: verified.observations.intervals.map((interval) => interval.intervalId),
         });
       }
       const completedSpeaker = Object.values(this.ledger.state().speakerOverlapOperations)
@@ -687,6 +736,7 @@ export class CodexExecWorkerLauncher {
         speakerEvidenceInputs,
         researchEvidenceInputs,
         computerUseEvidenceInputs,
+        visualTransitionEvidenceInputs,
       );
       const prepared = await Promise.all(
         worker.outputs.map(async (output) => {
@@ -700,6 +750,8 @@ export class CodexExecWorkerLauncher {
                   verifiedSemanticEvidence,
                   ocrEvidenceInputs: worker.ocrEvidenceInputs,
                   verifiedOcrEvidence,
+                  visualTransitionEvidenceInputs: worker.visualTransitionEvidenceInputs,
+                  verifiedVisualTransitionEvidence,
                   speakerEvidenceInputs: worker.speakerEvidenceInputs,
                   verifiedSpeakerEvidence,
                   researchEvidenceInputs: worker.researchEvidenceInputs,

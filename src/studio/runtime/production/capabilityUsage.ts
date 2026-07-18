@@ -1,10 +1,20 @@
 import type { RuntimeProjection } from "./model.ts";
+import type { VisualTransitionOperationRecord } from "./model/visualTransitions.ts";
+
+type VisualTransitionProjection = RuntimeProjection & {
+  visualTransitionOperations?: Record<string, VisualTransitionOperationRecord>;
+};
+
+function visualTransitions(state: RuntimeProjection): VisualTransitionOperationRecord[] {
+  return Object.values((state as VisualTransitionProjection).visualTransitionOperations ?? {});
+}
 
 export function capabilityOperationExists(state: RuntimeProjection, operationId: string): boolean {
   return Boolean(
     state.operations[operationId] ||
     state.frameSamples[operationId] ||
     state.ocrOperations[operationId] ||
+    (state as VisualTransitionProjection).visualTransitionOperations?.[operationId] ||
     state.speakerOverlapOperations[operationId] ||
     state.conditionalSeparationOperations[operationId] ||
     state.researchOperations[operationId] ||
@@ -21,6 +31,7 @@ export function taskCapabilityCallCount(state: RuntimeProjection, taskId: string
     ...Object.values(state.operations),
     ...Object.values(state.frameSamples),
     ...Object.values(state.ocrOperations),
+    ...visualTransitions(state),
     ...Object.values(state.speakerOverlapOperations),
     ...Object.values(state.conditionalSeparationOperations),
     ...Object.values(state.researchOperations),
@@ -37,6 +48,7 @@ export function taskHasActiveCapability(state: RuntimeProjection, taskId: string
     ...Object.values(state.operations),
     ...Object.values(state.frameSamples),
     ...Object.values(state.ocrOperations),
+    ...visualTransitions(state),
     ...Object.values(state.speakerOverlapOperations),
     ...Object.values(state.conditionalSeparationOperations),
     ...Object.values(state.researchOperations),

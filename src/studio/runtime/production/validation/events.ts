@@ -9,6 +9,7 @@ import {
   validateFrameSamplingReceipt,
 } from "./frames.ts";
 import { assertOcrRequest, validateOcrLimits, validateOcrReceipt } from "./ocr.ts";
+import { assertVisualTransitionRequest, validateVisualTransitionLimits, validateVisualTransitionReceipt } from "./visualTransitions.ts";
 import { assertSpeakerOverlapRequest, validateSpeakerOverlapLimits, validateSpeakerOverlapReceipt } from "./speakers.ts";
 import { assertConditionalSeparationRequest, validateConditionalSeparationLimits, validateConditionalSeparationReceipt, validateConditionalSeparationTrigger, validateRawStemComparisonReceipt } from "./separation.ts";
 import { assertResearchRequest, validateResearchAllowedDomains, validateResearchExhaustionReceipt, validateResearchGapBinding, validateResearchLimits, validateResearchSearchReceipt, validateResearchSnapshotReceipt, validateRestudiedResearchRequestInput } from "./research.ts";
@@ -146,7 +147,7 @@ export function assertRuntimeEvent(
   exact(producer, ["kind", "id"], context, "event.producer");
   oneOf(
     producer.kind,
-    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "speaker_host", "separation_host", "research_host", "computer_use_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
+    new Set(["scheduler", "registry", "artifact_store", "media_host", "frame_host", "ocr_host", "visual_transition_host", "speaker_host", "separation_host", "research_host", "computer_use_host", "semantic_evidence_host", "evidence_host", "assessment_host", "decision_host", "publish_review_intake_host", "publish_review_host", "caption_production_host", "caption_quality_control_host", "handoff_host", "admission_host", "artifact_read_host", "study_planning_host", "study_restudy_host", "study_synthesis_host", "study_audit_host", "launcher", "recovery_host"]),
     context,
     "event.producer.kind",
   );
@@ -367,6 +368,32 @@ export function assertRuntimeEvent(
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     oneOf(data.reason, new Set(["frame_lineage_unavailable", "input_oversized", "model_unavailable", "runtime_drift", "recognizer_timeout", "recognizer_failed", "artifact_oversized"]), context, "event.data.reason");
+  } else if (type === "media.visual_transitions_started") {
+    exact(data, ["request", "scope", "sourceContentId", "executionId", "launchClaimId", "requestFingerprint", "limits"], context, "event.data");
+    assertVisualTransitionRequest(data.request, context);
+    const scope = object(data.scope, context, "event.data.scope");
+    exact(scope, ["artifactId", "trackId", "startMs", "endMs"], context, "event.data.scope");
+    string(scope.artifactId, context, "event.data.scope.artifactId");
+    string(scope.trackId, context, "event.data.scope.trackId");
+    const startMs = integer(scope.startMs, context, "event.data.scope.startMs");
+    const endMs = integer(scope.endMs, context, "event.data.scope.endMs", 1);
+    if (endMs <= startMs) fail(context, "event.data.scope", "must be a non-empty range");
+    contentId(data.sourceContentId, context, "event.data.sourceContentId");
+    string(data.executionId, context, "event.data.executionId");
+    string(data.launchClaimId, context, "event.data.launchClaimId");
+    string(data.requestFingerprint, context, "event.data.requestFingerprint");
+    validateVisualTransitionLimits(data.limits, context, "event.data.limits");
+  } else if (type === "media.visual_transitions_completed") {
+    exact(data, ["operationId", "outputArtifactId", "receiptArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    string(data.receiptArtifactId, context, "event.data.receiptArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateVisualTransitionReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "media.visual_transitions_failed") {
+    exact(data, ["operationId", "reason"], context, "event.data");
+    string(data.operationId, context, "event.data.operationId");
+    oneOf(data.reason, new Set(["input_lineage_invalid", "frame_set_mismatch", "input_limit_exceeded", "producer_timeout", "producer_failed"]), context, "event.data.reason");
   } else if (type === "media.speakers_started") {
     exact(data, ["request", "scope", "sourceContentId", "executionId", "launchClaimId", "requestFingerprint", "limits"], context, "event.data");
     assertSpeakerOverlapRequest(data.request, context);

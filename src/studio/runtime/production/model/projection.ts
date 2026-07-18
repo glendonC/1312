@@ -15,6 +15,7 @@ import type {
 import type { OperationRecord } from "./media.ts";
 import type { FrameSampleRecord } from "./frames.ts";
 import type { OcrOperationRecord } from "./ocr.ts";
+import type { VisualTransitionOperationRecord } from "./visualTransitions.ts";
 import type { SpeakerOverlapOperationRecord } from "./speakers.ts";
 import type { ConditionalSeparationOperationRecord } from "./separation.ts";
 import type { ResearchExhaustionRecord, ResearchOperationRecord, RestudiedResearchRequestInput } from "./research.ts";
@@ -67,6 +68,7 @@ export interface RuntimeProjection {
   operations: Record<string, OperationRecord>;
   frameSamples: Record<string, FrameSampleRecord>;
   ocrOperations: Record<string, OcrOperationRecord>;
+  visualTransitionOperations: Record<string, VisualTransitionOperationRecord>;
   speakerOverlapOperations: Record<string, SpeakerOverlapOperationRecord>;
   conditionalSeparationOperations: Record<string, ConditionalSeparationOperationRecord>;
   researchOperations: Record<string, ResearchOperationRecord>;

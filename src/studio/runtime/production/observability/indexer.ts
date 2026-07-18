@@ -40,6 +40,9 @@ function receiptValue(event: RuntimeEvent): {
   if (event.type === "media.frames_ocr_completed") {
     return { kind: "ocr", receipt: event.data.receipt, rawReceiptContentId: null };
   }
+  if (event.type === "media.visual_transitions_completed") {
+    return { kind: "visual_transition", receipt: event.data.receipt, rawReceiptContentId: null };
+  }
   if (event.type === "media.speakers_completed") {
     return { kind: "speaker_overlap", receipt: event.data.receipt, rawReceiptContentId: null };
   }
@@ -223,7 +226,7 @@ export async function buildRuntimeObservabilityIndex(
           origin.kind === "external_screen_action_receipt" ||
           (origin.kind === "owned_media_study" || origin.kind === "generalized_owned_media_study"
             ? origin.executorReceiptContentId !== content.contentId
-            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "speaker_overlap_receipt" || origin.kind === "conditional_separation_receipt" || origin.kind === "raw_stem_comparison_receipt" || origin.kind === "research_search_receipt" || origin.kind === "research_snapshot_receipt" || origin.kind === "research_exhaustion_receipt" || origin.kind === "external_screen_session_receipt"
+            : origin.kind === "frame_sampling_receipt" || origin.kind === "ocr_receipt" || origin.kind === "visual_transition_receipt" || origin.kind === "speaker_overlap_receipt" || origin.kind === "conditional_separation_receipt" || origin.kind === "raw_stem_comparison_receipt" || origin.kind === "research_search_receipt" || origin.kind === "research_snapshot_receipt" || origin.kind === "research_exhaustion_receipt" || origin.kind === "external_screen_session_receipt"
               ? artifact.content.contentId !== content.contentId
               : origin.receiptContentId !== content.contentId)
         ) {

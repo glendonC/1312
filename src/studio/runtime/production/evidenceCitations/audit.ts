@@ -10,6 +10,8 @@ import { auditOcr, type VerifiedOcrAudit } from "../ocrAudit.ts";
 import type { OcrRecognizer } from "../ocr/recognizer.ts";
 import { auditSpeakerOverlap, type VerifiedSpeakerOverlapAudit } from "../speakerAudit.ts";
 import type { SpeakerDiarizer } from "../speaker/diarizer.ts";
+import type { VisualTransitionAnalyzer } from "../visualTransitions/analyzer.ts";
+import { auditVisualTransition, type VerifiedVisualTransitionAudit } from "../visualTransitions/visualTransitionAudit.ts";
 import type {
   EvidenceCitationEnvelope,
   EvidenceCitationObservation,
@@ -317,6 +319,56 @@ export function ocrSpanCitation(input: {
   });
 }
 
+export function visualTransitionCitation(input: {
+  verified: VerifiedVisualTransitionAudit;
+  intervalIds: string[];
+  target: Extract<EvidenceCitationTarget, { kind: "media_context" }>;
+}): EvidenceCitationEnvelope {
+  const byId = new Map(input.verified.observations.intervals.map((interval) => [interval.intervalId, interval] as const));
+  const observations = input.intervalIds.map((intervalId): EvidenceCitationObservation => {
+    const interval = byId.get(intervalId);
+    if (!interval) throw new Error(`Visual-transition citation names absent interval ${intervalId}`);
+    return {
+      observationId: interval.intervalId,
+      state: "available",
+      rawState: `${interval.classification}:pixel_difference_ppm=${interval.pixelDifferencePpm}:ocr_hypotheses=${interval.ocrHypotheses.comparison}`,
+      locator: {
+        kind: "temporal_range",
+        media: {
+          artifactId: input.verified.observations.source.artifactId,
+          trackId: input.verified.observations.source.videoTrackId,
+          startMs: interval.startMs,
+          endMs: interval.endMs,
+        },
+      },
+    };
+  });
+  return makeCitation({
+    evidenceKind: "visual_transition",
+    use: "cite_only",
+    target: structuredClone(input.target),
+    operationId: input.verified.observations.operationId,
+    evidence: {
+      artifactId: input.verified.observationsArtifact.id,
+      contentId: input.verified.observationsArtifact.content.contentId,
+    },
+    receipt: {
+      receiptId: input.verified.receipt.receiptId,
+      contentId: input.verified.receiptArtifact.content.contentId,
+      artifactId: input.verified.receiptArtifact.id,
+    },
+    source: {
+      artifactId: input.verified.observations.source.artifactId,
+      contentId: input.verified.observations.source.contentId,
+      trackId: input.verified.observations.source.videoTrackId,
+    },
+    upstreamState: "available",
+    upstreamReason: "deterministic_rgb_grid_pixel_difference_measured",
+    observations,
+    nonClaims: { semanticCorrectness: "not_assessed", truthArbitration: "not_performed" },
+  });
+}
+
 function speakerUpstreamState(verified: VerifiedSpeakerOverlapAudit): EvidenceCitationState {
   if (verified.observations.state === "truncated") return "truncated";
   if (verified.observations.state === "available") return "available";
@@ -391,6 +443,7 @@ export interface EvidenceCitationAuditOptions {
   frameDecoder?: FrameDecoder;
   ocrRecognizer?: OcrRecognizer;
   speakerDiarizer?: SpeakerDiarizer;
+  visualTransitionAnalyzer?: VisualTransitionAnalyzer;
 }
 
 /** Producer-specific cold audit dispatch. Future typed kinds have no adapter and fail closed. */
@@ -443,6 +496,17 @@ export async function auditEvidenceCitation(
     expected = ocrSpanCitation({
       verified,
       observationIds: citation.observations.map((entry) => entry.observationId),
+      target: citation.target as Extract<EvidenceCitationTarget, { kind: "media_context" }>,
+    });
+  } else if (citation.evidenceKind === "visual_transition") {
+    const verified = await auditVisualTransition(state, artifacts, citation.operationId!, {
+      frameDecoder: options.frameDecoder,
+      recognizer: options.ocrRecognizer,
+      analyzer: options.visualTransitionAnalyzer,
+    });
+    expected = visualTransitionCitation({
+      verified,
+      intervalIds: citation.observations.map((entry) => entry.observationId),
       target: citation.target as Extract<EvidenceCitationTarget, { kind: "media_context" }>,
     });
   } else if (citation.evidenceKind === "speaker_turn") {

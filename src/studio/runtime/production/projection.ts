@@ -5,6 +5,7 @@ import { applyCaptionEvent } from "./projection/captionEvents.ts";
 import { applyEvidenceEvent } from "./projection/evidenceEvents.ts";
 import { applyFrameEvent } from "./projection/frameEvents.ts";
 import { applyOcrEvent } from "./projection/ocrEvents.ts";
+import { applyVisualTransitionEvent } from "./projection/visualTransitionEvents.ts";
 import { applySpeakerOverlapEvent } from "./projection/speakerEvents.ts";
 import { applyConditionalSeparationEvent } from "./projection/separationEvents.ts";
 import { applyResearchEvent } from "./projection/researchEvents.ts";
@@ -35,6 +36,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     operations: {},
     frameSamples: {},
     ocrOperations: {},
+    visualTransitionOperations: {},
     speakerOverlapOperations: {},
     conditionalSeparationOperations: {},
     researchOperations: {},
@@ -85,6 +87,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
   if (applyExecutionMediaEvent(next, event)) return next;
   if (applyFrameEvent(next, event)) return next;
   if (applyOcrEvent(next, event)) return next;
+  if (applyVisualTransitionEvent(next, event)) return next;
   if (applySpeakerOverlapEvent(next, event)) return next;
   if (applyConditionalSeparationEvent(next, event)) return next;
   if (applyResearchEvent(next, event)) return next;

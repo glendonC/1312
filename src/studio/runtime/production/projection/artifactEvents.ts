@@ -20,6 +20,9 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
     const isAtomicOcr =
       (artifact.origin.kind === "ocr_observations" || artifact.origin.kind === "ocr_receipt") &&
       event.producer.kind === "ocr_host";
+    const isAtomicVisualTransition =
+      (artifact.origin.kind === "visual_transition_observations" || artifact.origin.kind === "visual_transition_receipt") &&
+      event.producer.kind === "visual_transition_host";
     const isAtomicSpeakerOverlap =
       (artifact.origin.kind === "speaker_overlap_observations" || artifact.origin.kind === "speaker_overlap_receipt") &&
       event.producer.kind === "speaker_host";
@@ -34,7 +37,7 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         artifact.origin.kind === "external_screen_content" || artifact.origin.kind === "external_screen_action_receipt" ||
         artifact.origin.kind === "external_screen_session_receipt") && event.producer.kind === "computer_use_host";
     invariant(
-      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap || isAtomicConditionalSeparation || isAtomicResearch || isAtomicComputerUse,
+      event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicVisualTransition || isAtomicSpeakerOverlap || isAtomicConditionalSeparation || isAtomicResearch || isAtomicComputerUse,
       event,
       "artifact evidence must come from its bounded storage, capability, admission, planning, synthesis, or audit host",
     );
@@ -93,6 +96,37 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
         event,
         `OCR receipt ${artifact.id} changed observations or U2 lineage`,
       );
+    } else if (artifact.origin.kind === "visual_transition_observations") {
+      const operation = next.visualTransitionOperations[artifact.origin.operationId];
+      const frameOperation = next.frameSamples[artifact.origin.frameSamplingOperationId];
+      const ocrOperation = next.ocrOperations[artifact.origin.ocrOperationId];
+      const upstream = operation && frameOperation && ocrOperation ? [
+        operation.sourceArtifactId,
+        frameOperation.manifestArtifactId,
+        frameOperation.receiptArtifactId,
+        ...frameOperation.frameArtifactIds,
+        ocrOperation.outputArtifactId,
+        ocrOperation.receiptArtifactId,
+      ] : [];
+      invariant(operation?.status === "started" && frameOperation?.status === "completed" && ocrOperation?.status === "completed", event, `Visual-transition observations ${artifact.id} have no active operation or completed U2/U5 inputs`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Visual-transition observations ${artifact.id} changed producer`);
+      invariant(JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify(upstream), event, `Visual-transition observations ${artifact.id} changed U2/U5 provenance`);
+    } else if (artifact.origin.kind === "visual_transition_receipt") {
+      const operation = next.visualTransitionOperations[artifact.origin.operationId];
+      const frameOperation = next.frameSamples[artifact.origin.frameSamplingOperationId];
+      const ocrOperation = next.ocrOperations[artifact.origin.ocrOperationId];
+      const upstream = operation && frameOperation && ocrOperation ? [
+        operation.sourceArtifactId,
+        frameOperation.manifestArtifactId,
+        frameOperation.receiptArtifactId,
+        ...frameOperation.frameArtifactIds,
+        ocrOperation.outputArtifactId,
+        ocrOperation.receiptArtifactId,
+        artifact.origin.observationsArtifactId,
+      ] : [];
+      invariant(operation?.status === "started" && frameOperation?.status === "completed" && ocrOperation?.status === "completed", event, `Visual-transition receipt ${artifact.id} has no active operation or completed U2/U5 inputs`);
+      invariant(operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId, event, `Visual-transition receipt ${artifact.id} changed producer`);
+      invariant(next.artifacts[artifact.origin.observationsArtifactId]?.origin.kind === "visual_transition_observations" && JSON.stringify(artifact.sourceArtifactIds) === JSON.stringify(upstream), event, `Visual-transition receipt ${artifact.id} changed observations or U2/U5 provenance`);
     } else if (artifact.origin.kind === "speaker_overlap_observations") {
       const operation = next.speakerOverlapOperations[artifact.origin.operationId];
       invariant(operation?.status === "started", event, `Speaker/overlap observations ${artifact.id} have no active operation`);

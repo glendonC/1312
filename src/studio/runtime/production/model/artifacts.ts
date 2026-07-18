@@ -61,6 +61,24 @@ export interface OcrReceiptArtifactOrigin {
   frameSamplingOperationId: string;
 }
 
+export interface VisualTransitionObservationsArtifactOrigin {
+  kind: "visual_transition_observations";
+  operationId: string;
+  receiptId: string;
+  receiptContentId: string;
+  frameSamplingOperationId: string;
+  ocrOperationId: string;
+}
+
+export interface VisualTransitionReceiptArtifactOrigin {
+  kind: "visual_transition_receipt";
+  operationId: string;
+  receiptId: string;
+  observationsArtifactId: string;
+  frameSamplingOperationId: string;
+  ocrOperationId: string;
+}
+
 export interface SpeakerOverlapObservationsArtifactOrigin {
   kind: "speaker_overlap_observations";
   operationId: string;
@@ -451,6 +469,8 @@ export interface RuntimeArtifact {
     | FrameSamplingReceiptArtifactOrigin
     | OcrObservationsArtifactOrigin
     | OcrReceiptArtifactOrigin
+    | VisualTransitionObservationsArtifactOrigin
+    | VisualTransitionReceiptArtifactOrigin
     | SpeakerOverlapObservationsArtifactOrigin
     | SpeakerOverlapReceiptArtifactOrigin
     | SeparationStemArtifactOrigin

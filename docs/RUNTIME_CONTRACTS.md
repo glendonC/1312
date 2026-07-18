@@ -353,6 +353,34 @@ boundaries, script/language inference, subtitle-perfect aggregation, root-select
 specialists, U4 denser-frame/specialist deltas, UI, face/biometric/person identification, and frame
 publication are not implemented by this slice.
 
+U5.1 adds `media.visual-transitions.analyze` as a separate one-call grant over the same exact
+owned-source video track and range as completed same-task U2 frame sampling and U5 OCR. The
+task-private bridge accepts exactly `{ frameSamplingOperationId, ocrOperationId }`. The scheduler,
+authorization host, and projection require 2 to 4 ordered frames, the U5 operation bound to that
+exact U2 operation, and one active same-task, same-agent, same-executor launch lineage. Duplicate
+canonical work, cross-task inputs, exhausted task calls, and grant reuse fail before production.
+
+The deterministic producer decodes the cold-audited 8-bit RGB PNG bytes, samples the nearest cell
+center on a fixed 32 by 32 grid, and computes the adjacent-frame mean absolute RGB channel
+difference in integer parts per million. A score at or above 250,000 ppm is stored only as
+`visual_change_candidate`; lower scores are `below_visual_change_threshold`. Available OCR
+hypothesis sets are deduplicated, sorted, and fingerprinted per frame. Their changed, unchanged, or
+unavailable comparison is secondary lineage only and cannot change the pixel threshold.
+
+The envelope is one call, 2 to 4 frames, 2 MiB per frame, 8 MiB aggregate input, 256 KiB each for
+observations and receipt, and 5,000 ms wall. Separate private content-addressed observation and
+receipt artifacts retain exact U2 manifest/receipt/PNG identities, U5 observation/receipt
+identities, frame timestamps and dimensions, producer configuration, scores, classifications,
+interval ids, and nonclaims. Cold audit reopens all U2/U5 content and reruns the RGB-grid analyzer.
+Byte, lineage, score, classification, threshold, interval, receipt, or runtime drift fails closed.
+
+`visual_transition` enters U3 only as `cite_only` `media_context` with exact temporal-range
+locators. It never enters claim or coverage citation ids and grants no scene, shot, cut, semantic,
+identity, OCR-truth, dialogue, caption, quality, or publication authority. The default audio-study
+root still requests no frames, OCR, or visual transitions. Scene/shot production, denser-frame U4
+wiring, automatic visual-specialist routing, UI projection, and semantic visual understanding remain
+outside this slice.
+
 U6 adds `media.speakers.analyze` without changing speech or caption claim authority. The scheduler
 issues it only over one owned-source audio-track range of at most 120,000 ms and one call. The
 task-private bridge accepts exactly `{}` and injects operation/task/agent/grant/source/track/range;

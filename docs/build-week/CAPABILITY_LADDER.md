@@ -38,6 +38,7 @@ The first six implementation slices after the UI demo freeze now include: the fa
 **acoustic triage and non-dialogue coverage boundary**, bounded **frame sampling with real child
 image delivery**, additive **multimodal admission with generalized abstention**, and one
 **attenuated and bounded padded-audio current-run speech re-study** slices, a thin **on-screen OCR citation** slice,
+a deterministic **cite-only visual-change candidate** slice,
 and bounded **anonymous speaker/overlap coverage plus an exact overlap-to-U4 trigger**. Their receipts prove bounded execution, exact byte lineage, citation association, state
 preservation, and pass accounting; they do not prove producer accuracy, visual/scene understanding,
 improvement, or semantic quality.
@@ -47,8 +48,9 @@ alternate receipted configurations, and granted specialists remain closed until 
 land. U3
 deliberately keeps U2 frame
 identities cite-only, so no visual finding can affect a study until a later receipted producer exists.
-U5 now has one OCR-only vertical slice; scene/shot boundaries, visual-context specialist routing,
-and denser-frame U4 wiring remain the next parts of that rung. U6 now has one anonymous
+U5 now has OCR plus one bounded adjacent-frame pixel-change vertical slice. Scene/shot boundaries,
+semantic visual-context specialist routing, and denser-frame U4 wiring remain the next parts of that
+rung. U6 now has one anonymous
 speaker/overlap producer, U3 coverage-qualification slice, and closed `speaker_overlap` U4 cause: one
 audited overlap cell may trigger an exact attenuated-speech pass without being mislabeled as recognizer
 disagreement. Web research follows admitted frame/audio evidence
@@ -96,8 +98,10 @@ checklist below:
    copy one exact host-derived `speaker_overlap` cell inside prior broader speech work, or add at most
    2 s of current-run audio context per side around one non-speaker weak range with exact prior speech.
    Other typed delta producers fail closed.
-5. **U5 — OCR and scene context (OCR citation slice implemented 2026-07-17):** derive and cite
-   provisional on-screen text from U2 frames; scene boundaries and specialist routing remain.
+5. **U5: OCR and scene context (OCR citation implemented 2026-07-17; visual-change candidates
+   implemented 2026-07-18):** derive cite-only on-screen text and deterministic adjacent-frame
+   pixel-change intervals from exact U2/U5 lineage. Scene boundaries, semantic understanding, and
+   default specialist routing remain.
 6. **U6 — speaker/overlap evidence (coverage + typed U4 trigger slices implemented 2026-07-17):**
    preserve anonymous turn/overlap hypotheses in U3 coverage/conflicts and let one exact audited
    overlap cell request bounded attenuated speech without granting transcript truth.
@@ -143,10 +147,10 @@ artifact, grant, and audit boundaries are real.
 |---|---|---|---|
 | Owned ingest and preflight | Content-addressed owned bytes, rights receipt, `ffprobe`, pinned VAD speech windows, pinned speech-window language ranges, and additive preflight V4 with separately sealed acoustic observations/receipt | Acoustic/diarization accuracy evaluation, scene, and visual context | [`ARCHITECTURE.md` — source ingest boundary](../ARCHITECTURE.md#source-ingest-boundary) and [`STATUS.md` — backlog boundary](./STATUS.md#post-freeze-backlog-boundary) |
 | Orchestration | A model-executed default root can request bounded children plus host-normalized attenuated speech or one bounded non-speaker padded-audio re-study for an exact weak range/cause, including an exact receipt-backed U6 `speaker_overlap` attenuation. The scheduler derives identities, attenuates or bounds context, enforces scope/budgets/pass caps, and dedupes completed work/configuration | Denser frames, alternate recognizer/segmentation configurations, specialist re-study, and unlimited/distributed execution | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`scheduler.ts`](../../src/studio/runtime/production/scheduler.ts), and [`orchestratorContract.ts`](../../src/studio/runtime/production/executor/orchestratorContract.ts) |
-| Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample`, `media.frames.ocr`, one path-free `media.speakers.analyze` call over an injected audio range, one exact-conflict-gated `research.investigate` grant with path-free search/snapshot tools and cite-only snapshot-span report inputs, one explicitly composed `computer.use.readonly` offline-fixture grant with cite-only screen-region report inputs, `speech.transcribe`, exact reads of pinned VAD/language/U1 evidence, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Scene/shot interpretation, default visual-specialist routing, named/cross-run speakers, stems, unrestricted or automatic live web research, real-provider/freshness authority, and live computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); U6 lives in [`model/speakers.ts`](../../src/studio/runtime/production/model/speakers.ts) and [`speakerHost.ts`](../../src/studio/runtime/production/speakerHost.ts) |
+| Granted media/evidence tools | `media.extract`, bounded `media.seek` audio activity, `media.frames.sample`, `media.frames.ocr`, one exact-U2/U5 `media.visual-transitions.analyze` call, one path-free `media.speakers.analyze` call over an injected audio range, one exact-conflict-gated `research.investigate` grant with path-free search/snapshot tools and cite-only snapshot-span report inputs, one explicitly composed `computer.use.readonly` offline-fixture grant with cite-only screen-region report inputs, `speech.transcribe`, exact reads of pinned VAD/language/U1 evidence, evidence assessment/decision, typed report-up, parent admission/read, study planning, and study synthesis | Scene/shot interpretation, semantic visual understanding, default visual-specialist routing, named/cross-run speakers, stems, unrestricted or automatic live web research, real-provider/freshness authority, and live computer-use | The exact capability union is in [`model/tasks.ts`](../../src/studio/runtime/production/model/tasks.ts); visual transitions live in [`model/visualTransitions.ts`](../../src/studio/runtime/production/model/visualTransitions.ts) and [`visualTransitions/visualTransitionHost.ts`](../../src/studio/runtime/production/visualTransitions/visualTransitionHost.ts) |
 | Current-run speech evidence | A scoped host and bridge exist. With an explicitly enabled recognizer they can produce current-run timed hypotheses; the default unconfigured recognizer honestly returns unavailable | Semantic accuracy/calibration, a guarantee that every run has a live recognizer, alternative segmentation/recognizer passes, and semantic translation QC | [`currentRunSpeechRecognizer.ts`](../../src/studio/runtime/production/semantic/currentRunSpeechRecognizer.ts) and [`run-runtime-host.ts`](../../scripts/run-runtime-host.ts) |
 | Coverage and abstention | Additive report/study contracts preserve supported, unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states. U4 study v3 retains ordered pass history/disagreement; only pass-new exact speech citations support the executed subrange, and exhaustion stays weak without globally blocking unrelated ranges | Semantic correctness/truth arbitration and additional re-study producers | [`rangePassHost.ts`](../../src/studio/runtime/production/study/rangePassHost.ts), [`restudiedStudySynthesisHost.ts`](../../src/studio/runtime/production/study/restudiedStudySynthesisHost.ts), and [`restudiedStudyReadinessHost.ts`](../../src/studio/runtime/production/study/restudiedStudyReadinessHost.ts) |
-| Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks, U5 OCR over completed frame identities, U6 anonymous speaker/overlap analysis whose request is exactly `{}`, R1 `research_search`/`research_document_snapshot`, and the R2 empty-object `computer_use_readonly` tool. R1 and R2 mount only under their exact trigger-gated grants. Only cold-audited snapshot spans and offline screen-region identities can enter a v2 report, both as cite-only context. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Scene/shot interpretation, default visual-specialist routing, unrestricted or automatic research, real-provider/freshness authority, and any live isolated computer-use driver | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`computerUseMcpServer.ts`](../../src/studio/runtime/production/executor/computerUseMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
+| Tool boundary | The launcher exposes only required task-private MCP tools, including U2 PNG image blocks, U5 OCR over completed frame identities, cite-only RGB-grid visual-change candidates over exact U2/U5 operation ids, U6 anonymous speaker/overlap analysis whose request is exactly `{}`, R1 `research_search`/`research_document_snapshot`, and the R2 empty-object `computer_use_readonly` tool. R1 and R2 mount only under their exact trigger-gated grants. Only cold-audited snapshot spans, offline screen-region identities, and visual-change intervals can enter a v2 report, all as cite-only context. Ambient web, shell, apps, memories, remote plugins, and built-in multi-agent tools are disabled | Scene/shot interpretation, semantic visual understanding, default visual-specialist routing, unrestricted or automatic research, real-provider/freshness authority, and any live isolated computer-use driver | [`codexInvocation.ts`](../../src/studio/runtime/production/executor/codexInvocation.ts), [`visualTransitionMcpServer.ts`](../../src/studio/runtime/production/executor/visualTransitionMcpServer.ts), and [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md#durable-agent-directed-orchestration-kernel) |
 | Owned study spine | New owned runs default to evidence-citation v1, report/admission/read v2, the eight-tool U4 root, owned-media-study v3, readiness v4, and approval-gated caption/caption-causality v4. The dormant research tool requires a projected current conflict. Closed v1 planning remains an explicit non-default compatibility selector | Studio UI projection, semantic correctness/truth arbitration, and later evidence producers | [`runtimeApplication.ts`](../../src/studio/runtime/production/runtimeHost/runtimeApplication.ts), [`orchestratorBridge.ts`](../../src/studio/runtime/production/executor/orchestratorBridge.ts), and [`restudiedStudyRuntime.ts`](../../src/studio/runtime/production/study/restudiedStudyRuntime.ts) |
 | Structural versus semantic quality | Caption QC recursively checks current-run lineage, study/readiness causality, availability, and structural completeness. Separately, `hard-ko-v1` is frozen, the human-labeled `run-007` Bet G score exists with `judge: null`, one result-free exact-delta ablation is registered, and its exact input/capture packaging contract is implemented | Runtime semantic QC, calibrated transcription/translation confidence, executed paired captures and scores, variance/generalization evidence, and an independent semantic review path | [`hard-ko-v1/pack.json`](../../bench/packs/hard-ko-v1/pack.json), [`run-007/score.json`](../../bench/scores/run-007/score.json), [`raw-vs-stem registration`](../../bench/ablations/hard-ko-v1-raw-vs-eligible-stem/registration.json), [`raw-vs-stem inputs`](../../bench/ablations/hard-ko-v1-raw-vs-eligible-stem/inputs.json), and [`STATUS.md`](./STATUS.md#honesty-non-claims) |
 | Learning/export | A private owned-media study artifact exists; recorded paths contain partial glossary/correction material | A canonical learner-item artifact, Anki/Quizlet/Feather export, learning sessions, and in-app learning agents | [`STUDIO_PRODUCT_CONTRACT.md` — Results](../STUDIO_PRODUCT_CONTRACT.md#7-results-captions-study-and-evidence--studio); parked in the appendix below |
@@ -379,6 +383,34 @@ their audits.
 - **Existing-spine dependency:** U2 frames, U3 citations, U4 re-study, specialist routing, and study
   conflict/limitation handling.
 
+### U5.1. Visual-change candidates: cite-only slice implemented 2026-07-18
+
+- **Real:** `media.visual-transitions.analyze` is a scheduler grant and task-private bridge whose
+  request is exactly `{ frameSamplingOperationId, ocrOperationId }`. Both inputs must be completed
+  by the same task, agent, executor, launch, source, video track, and range, and U5 must name the
+  exact U2 operation. The host cold-audits source, U2 manifest/receipt/PNGs/decoder, and U5
+  observations/receipt/runtime before measuring adjacent frames on a fixed 32 by 32 nearest-cell-
+  center RGB grid. Mean absolute channel difference is stored in integer ppm; 250,000 ppm or higher
+  is only `visual_change_candidate`. OCR hypothesis-set change is retained as secondary lineage and
+  has no threshold effect. U3 admits exact interval ids only as cite-only temporal media context.
+- **Limits and abstention:** One call, 2 to 4 frames, 2 MiB per frame, 8 MiB total, 256 KiB per
+  observation/receipt, and 5 s wall. Missing or cross-executor U2/U5 lineage, wrong frame count,
+  unordered timestamps, byte overflow, duplicate canonical work, timeout, analyzer failure, and
+  content or receipt drift fail closed. Cold audit reruns the deterministic analyzer from reopened
+  PNG bytes.
+- **Still missing:** Scene, shot, and cut inference; semantic visual understanding; right-frame
+  selection; denser-frame U4 wiring; default visual-specialist routing; visual UI projection; and
+  any path from pixel-change intervals to caption or publication authority.
+- **Slice done-when:** Exact grant/bridge/host/projection/artifact lineage, deterministic scoring,
+  cold replay, cite-only report/admission, worker evidence echo, hard limits, and hostile tamper tests
+  are implemented and green.
+- **Non-goals:** Calling a threshold crossing a scene boundary, inferring what changed, identifying
+  people, objects, places, actions, mood, or cultural meaning, or using OCR change as dialogue truth.
+- **Fake-claim risk:** A large pixel delta is not a scene, shot, cut, relevant moment, or evidence
+  that any model understood the pixels.
+- **Existing-spine dependency:** U2 frame bytes and receipts, U5 OCR lineage, U3 typed cite-only
+  citations, scheduler call budgets, task/executor launch identity, and content-addressed cold audit.
+
 ### U6. Speakers, overlap, and anonymous turns — coverage + typed U4 trigger slices implemented
 
 - **Real:** `media.speakers.analyze` is one exact audio-scope scheduler grant with one task-private
@@ -605,10 +637,11 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    deltas/configurations, scheduler caps/dedupe, attenuation-only citation support, padded weak-state
    preservation, disagreement retention, and terminal exhaustion are wired on the default path.
    Denser frames, alternate configurations, and specialists remain closed.
-5. **OCR/scene evidence — OCR citation slice implemented 2026-07-17.** A pinned bounded local OCR
-   producer over U2 frames now enters U3 only as cite-only media context and abstains on weak,
-   conflicting, truncated, or invalid input. Scene/shot production, one genuinely visual specialist
-   route, and U4 denser-frame/specialist wiring remain.
+5. **OCR/scene evidence: OCR citation implemented 2026-07-17; visual-change candidates implemented
+   2026-07-18.** Pinned bounded OCR plus deterministic adjacent-frame RGB-grid intervals now enter
+   U3 only as cite-only media context with cold U2/U5 lineage. Scene/shot production, semantic visual
+   understanding, one genuinely visual specialist route, and U4 denser-frame/specialist wiring
+   remain.
 6. **Speaker/overlap evidence — coverage + typed U4 trigger slices implemented 2026-07-17.** Pinned local anonymous
    diarization now has path-free grants, immutable complete-range artifacts/receipts, cold audit, and
    U3 coverage/conflict admission. One exact audited overlap cell can now request the existing bounded

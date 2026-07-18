@@ -32,6 +32,12 @@ import {
   type OpenChildOcrBridge,
 } from "../executor/childOcrBridge.ts";
 import {
+  BoundedChildVisualTransitionBridge,
+  openChildVisualTransitionBridge,
+  type ChildVisualTransitionHost,
+  type OpenChildVisualTransitionBridge,
+} from "../executor/childVisualTransitionBridge.ts";
+import {
   BoundedChildSpeakerBridge,
   openChildSpeakerBridge,
   type ChildSpeakerHost,
@@ -77,6 +83,7 @@ export interface LauncherChildCapabilityOptions {
   nextSemanticEvidenceOperationId?: () => string;
   nextFrameOperationId?: () => string;
   nextOcrOperationId?: () => string;
+  nextVisualTransitionOperationId?: () => string;
   nextSpeakerOperationId?: () => string;
   nextSeparationOperationId?: () => string;
   nextResearchOperationId?: () => string;
@@ -84,6 +91,7 @@ export interface LauncherChildCapabilityOptions {
   mediaMcpServerPath?: string;
   frameMcpServerPath?: string;
   ocrMcpServerPath?: string;
+  visualTransitionMcpServerPath?: string;
   speakerMcpServerPath?: string;
   separationMcpServerPath?: string;
   researchMcpServerPath?: string;
@@ -98,6 +106,7 @@ export interface LauncherChildCapabilityHosts {
   media: ChildMediaCapabilityHost;
   frame: ChildFrameSamplingHost;
   ocr: ChildOcrHost;
+  visualTransition?: ChildVisualTransitionHost;
   speaker: ChildSpeakerHost;
   separation: ChildSeparationHost;
   /** Per-launch, per-grant host; the launcher constructs it with the task's exact research grant view. */
@@ -116,6 +125,7 @@ export interface LauncherChildCapabilityContext {
   semanticEvidenceGrant: CapabilityGrant | undefined;
   frameGrant: CapabilityGrant | undefined;
   ocrGrant: CapabilityGrant | undefined;
+  visualTransitionGrant: CapabilityGrant | undefined;
   speakerGrant: CapabilityGrant | undefined;
   separationGrant: CapabilityGrant | undefined;
   researchGrant: CapabilityGrant | undefined;
@@ -125,6 +135,7 @@ export interface LauncherChildCapabilityContext {
   mediaBridge: OpenChildMediaBridge | null;
   frameBridge: OpenChildFrameBridge | null;
   ocrBridge: OpenChildOcrBridge | null;
+  visualTransitionBridge: OpenChildVisualTransitionBridge | null;
   speakerBridge: OpenChildSpeakerBridge | null;
   separationBridge: OpenChildSeparationBridge | null;
   researchBridge: OpenChildResearchBridge | null;
@@ -145,6 +156,7 @@ export function launcherChildCapabilityContext(task: TaskRecord): LauncherChildC
     semanticEvidenceGrant: task.grants.find((grant) => grant.capability === "speech.transcribe"),
     frameGrant: task.grants.find((grant) => grant.capability === "media.frames.sample"),
     ocrGrant: task.grants.find((grant) => grant.capability === "media.frames.ocr"),
+    visualTransitionGrant: task.grants.find((grant) => grant.capability === "media.visual-transitions.analyze"),
     speakerGrant: task.grants.find((grant) => grant.capability === "media.speakers.analyze"),
     separationGrant: task.grants.find((grant) => grant.capability === "media.audio.separate"),
     researchGrant: task.grants.find((grant) => grant.capability === "research.investigate"),
@@ -154,6 +166,7 @@ export function launcherChildCapabilityContext(task: TaskRecord): LauncherChildC
     mediaBridge: null,
     frameBridge: null,
     ocrBridge: null,
+    visualTransitionBridge: null,
     speakerBridge: null,
     separationBridge: null,
     researchBridge: null,
@@ -184,6 +197,12 @@ export async function openLauncherChildCapabilityBridges(
   if (context.ocrGrant) {
     context.ocrBridge = await openChildOcrBridge(new BoundedChildOcrBridge(task, hosts.ocr, {
       nextOperationId: options.nextOcrOperationId,
+    }));
+  }
+  if (context.visualTransitionGrant) {
+    if (!hosts.visualTransition) throw new Error("A visual-transition-granted child requires its bounded visual-transition host");
+    context.visualTransitionBridge = await openChildVisualTransitionBridge(new BoundedChildVisualTransitionBridge(task, hosts.visualTransition, {
+      nextOperationId: options.nextVisualTransitionOperationId,
     }));
   }
   if (context.speakerGrant) {
@@ -326,6 +345,27 @@ export function configureLauncherChildCapabilityMcp(
       `mcp_servers.studio_ocr.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, options.maximumWallMs) / 1_000))}`,
       "-c",
       `mcp_servers.studio_ocr.env_vars=${tomlStrings(["STUDIO_CHILD_OCR_BRIDGE_URL", "STUDIO_CHILD_OCR_BRIDGE_TOKEN"])}`,
+    );
+  }
+  if (context.visualTransitionBridge) {
+    const serverPath = options.visualTransitionMcpServerPath ?? fileURLToPath(
+      new URL("../executor/visualTransitionMcpServer.ts", import.meta.url),
+    );
+    args.push(
+      "-c",
+      `mcp_servers.studio_visual_transitions.command=${tomlString(process.execPath)}`,
+      "-c",
+      `mcp_servers.studio_visual_transitions.args=${tomlStrings([serverPath])}`,
+      "-c",
+      "mcp_servers.studio_visual_transitions.required=true",
+      "-c",
+      `mcp_servers.studio_visual_transitions.enabled_tools=${tomlStrings([context.visualTransitionBridge.manifest.tool.name])}`,
+      "-c",
+      "mcp_servers.studio_visual_transitions.startup_timeout_sec=5",
+      "-c",
+      `mcp_servers.studio_visual_transitions.tool_timeout_sec=${Math.max(1, Math.ceil(Math.min(task.budget.wallMs, options.maximumWallMs) / 1_000))}`,
+      "-c",
+      `mcp_servers.studio_visual_transitions.env_vars=${tomlStrings(["STUDIO_CHILD_VISUAL_TRANSITION_BRIDGE_URL", "STUDIO_CHILD_VISUAL_TRANSITION_BRIDGE_TOKEN"])}`,
     );
   }
   if (context.speakerBridge) {
@@ -486,7 +526,7 @@ export function configureLauncherChildCapabilityMcp(
 export function launcherChildCapabilityEnvironment(
   context: LauncherChildCapabilityContext,
 ): NodeJS.ProcessEnv {
-  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.speakerBridge || context.separationBridge || context.researchBridge || context.computerUseBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
+  return context.mediaBridge || context.frameBridge || context.ocrBridge || context.visualTransitionBridge || context.speakerBridge || context.separationBridge || context.researchBridge || context.computerUseBridge || context.semanticEvidenceBridge || context.evidenceBridge || context.assessmentBridge || context.decisionBridge ? {
     ...process.env,
     ...(context.mediaBridge ? {
       STUDIO_CHILD_MEDIA_BRIDGE_URL: context.mediaBridge.endpoint,
@@ -499,6 +539,10 @@ export function launcherChildCapabilityEnvironment(
     ...(context.ocrBridge ? {
       STUDIO_CHILD_OCR_BRIDGE_URL: context.ocrBridge.endpoint,
       STUDIO_CHILD_OCR_BRIDGE_TOKEN: context.ocrBridge.token,
+    } : {}),
+    ...(context.visualTransitionBridge ? {
+      STUDIO_CHILD_VISUAL_TRANSITION_BRIDGE_URL: context.visualTransitionBridge.endpoint,
+      STUDIO_CHILD_VISUAL_TRANSITION_BRIDGE_TOKEN: context.visualTransitionBridge.token,
     } : {}),
     ...(context.speakerBridge ? {
       STUDIO_CHILD_SPEAKER_BRIDGE_URL: context.speakerBridge.endpoint,
@@ -541,6 +585,7 @@ export async function closeLauncherChildCapabilityBridges(
   if (context.mediaBridge) await context.mediaBridge.close();
   if (context.frameBridge) await context.frameBridge.close();
   if (context.ocrBridge) await context.ocrBridge.close();
+  if (context.visualTransitionBridge) await context.visualTransitionBridge.close();
   if (context.speakerBridge) await context.speakerBridge.close();
   if (context.separationBridge) await context.separationBridge.close();
   if (context.researchBridge) await context.researchBridge.close();

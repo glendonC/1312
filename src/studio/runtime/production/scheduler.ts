@@ -56,6 +56,7 @@ import {
   validateRestudiedResearchTriggerOption,
 } from "./validation/research.ts";
 import { computerUseCandidateId, validateComputerUseDriver, validateComputerUseSurface } from "./validation/computerUse.ts";
+import { VISUAL_TRANSITION_LIMITS } from "./model/visualTransitions.ts";
 
 export interface RuntimeIdentityFactory {
   next(kind: "request" | "task" | "agent" | "grant"): string;
@@ -237,6 +238,14 @@ export class BoundedRuntimeScheduler {
             limits: structuredClone(OCR_LIMITS),
           },
         };
+        if (capability === "media.visual-transitions.analyze") return {
+          ...common,
+          capability,
+          visualTransitionScope: {
+            schema: "studio.visual-transition-grant.v1" as const,
+            limits: structuredClone(VISUAL_TRANSITION_LIMITS),
+          },
+        };
         if (capability === "media.speakers.analyze") return {
           ...common,
           capability,
@@ -310,6 +319,8 @@ export class BoundedRuntimeScheduler {
         input.requiredCapabilities.includes("analysis.evidence.assess")) &&
       (!input.requiredCapabilities.includes("media.frames.ocr") ||
         input.requiredCapabilities.includes("media.frames.sample")) &&
+      (!input.requiredCapabilities.includes("media.visual-transitions.analyze") ||
+        (input.requiredCapabilities.includes("media.frames.sample") && input.requiredCapabilities.includes("media.frames.ocr"))) &&
       (frameScope === undefined || (
         frameScope !== null &&
         frameArtifact?.origin.kind === "ingest" &&
@@ -343,7 +354,7 @@ export class BoundedRuntimeScheduler {
       source.content.contentId !== context.source.contentId ||
       !input.inputArtifactIds.includes(source.id)
     ) return false;
-    if ((input.requiredCapabilities.includes("media.frames.sample") || input.requiredCapabilities.includes("media.frames.ocr") || input.requiredCapabilities.includes("media.speakers.analyze") || input.requiredCapabilities.includes("media.audio.separate")) && (
+    if ((input.requiredCapabilities.includes("media.frames.sample") || input.requiredCapabilities.includes("media.frames.ocr") || input.requiredCapabilities.includes("media.visual-transitions.analyze") || input.requiredCapabilities.includes("media.speakers.analyze") || input.requiredCapabilities.includes("media.audio.separate")) && (
       input.mediaScope.length !== 1 || input.mediaScope[0].artifactId !== source.id
     )) return false;
     if (!input.mediaScope.every((scope) =>

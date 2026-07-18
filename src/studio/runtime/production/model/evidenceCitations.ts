@@ -13,6 +13,7 @@ export type EvidenceCitationKind =
   | "acoustic_range"
   | "frame_sample"
   | "ocr_span"
+  | "visual_transition"
   | "speaker_turn"
   | "external_document_span"
   | "external_screen_region";
@@ -22,6 +23,7 @@ export type LandedEvidenceCitationKind =
   | "acoustic_range"
   | "frame_sample"
   | "ocr_span"
+  | "visual_transition"
   | "speaker_turn";
 
 export type EvidenceCitationState =

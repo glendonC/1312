@@ -7,6 +7,7 @@ import { validateSeparationArtifactOrigin } from "./artifactSeparationOrigins.ts
 import { validateResearchArtifactOrigin } from "./artifactResearchOrigins.ts";
 import { validateStudyArtifactOrigin } from "./artifactStudyOrigins.ts";
 import { validateComputerUseArtifactOrigin } from "./artifactComputerUseOrigins.ts";
+import { validateVisualTransitionArtifactOrigin } from "./artifactVisualTransitionOrigins.ts";
 
 export interface ArtifactOriginValidationInput {
   item: Record<string, unknown>;
@@ -31,5 +32,6 @@ export function validateArtifactOrigin(
   if (validateComputerUseArtifactOrigin(kind, input)) return;
   if (validateStudyArtifactOrigin(kind, input)) return;
   if (validateReviewArtifactOrigin(kind, input)) return;
+  if (validateVisualTransitionArtifactOrigin(kind, input)) return;
   fail(input.context, `${input.path}.origin.kind`, `has unknown value ${kind}`);
 }

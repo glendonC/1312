@@ -4,6 +4,7 @@ import type {
   FrameSamplingStartedEvent,
 } from "./protocol/frameEvents.ts";
 import type { OcrCompletedEvent, OcrFailedEvent, OcrStartedEvent } from "./protocol/ocrEvents.ts";
+import type { VisualTransitionCompletedEvent, VisualTransitionFailedEvent, VisualTransitionStartedEvent } from "./protocol/visualTransitionEvents.ts";
 import type { SpeakerOverlapCompletedEvent, SpeakerOverlapFailedEvent, SpeakerOverlapStartedEvent } from "./protocol/speakerEvents.ts";
 import type { ConditionalSeparationCompletedEvent, ConditionalSeparationFailedEvent, ConditionalSeparationStartedEvent } from "./protocol/separationEvents.ts";
 import type { ResearchExhaustionRecordedEvent, ResearchOperationCompletedEvent, ResearchOperationFailedEvent, ResearchOperationStartedEvent, ResearchRequestInputRecordedEvent } from "./protocol/researchEvents.ts";
@@ -85,6 +86,7 @@ export * from "./protocol/executionEvents.ts";
 export * from "./protocol/evidenceEvents.ts";
 export * from "./protocol/frameEvents.ts";
 export * from "./protocol/ocrEvents.ts";
+export * from "./protocol/visualTransitionEvents.ts";
 export * from "./protocol/speakerEvents.ts";
 export * from "./protocol/separationEvents.ts";
 export * from "./protocol/researchEvents.ts";
@@ -117,6 +119,9 @@ export type RuntimeEvent =
   | OcrStartedEvent
   | OcrCompletedEvent
   | OcrFailedEvent
+  | VisualTransitionStartedEvent
+  | VisualTransitionCompletedEvent
+  | VisualTransitionFailedEvent
   | SpeakerOverlapStartedEvent
   | SpeakerOverlapCompletedEvent
   | SpeakerOverlapFailedEvent

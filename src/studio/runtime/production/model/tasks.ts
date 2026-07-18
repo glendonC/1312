@@ -4,6 +4,7 @@ import type { SpeakerOverlapGrantScope } from "./speakers.ts";
 import type { ConditionalSeparationGrantScope } from "./separation.ts";
 import type { ResearchGrantScope } from "./research.ts";
 import type { ComputerUseGrantScope } from "./computerUse.ts";
+import type { VisualTransitionGrantScope } from "./visualTransitions.ts";
 
 export const CAPABILITIES = [
   "task.spawn.request",
@@ -13,6 +14,7 @@ export const CAPABILITIES = [
   "media.seek",
   "media.frames.sample",
   "media.frames.ocr",
+  "media.visual-transitions.analyze",
   "media.speakers.analyze",
   "media.audio.separate",
   "research.investigate",
@@ -198,6 +200,7 @@ export type CapabilityGrant =
       capability: "media.frames.sample";
       frameScope: FrameSamplingGrantScope;
       ocrScope?: never;
+      visualTransitionScope?: never;
       speakerScope?: never;
       separationScope?: never;
       researchScope?: never;
@@ -207,6 +210,17 @@ export type CapabilityGrant =
       capability: "media.frames.ocr";
       ocrScope: OcrGrantScope;
       frameScope?: never;
+      visualTransitionScope?: never;
+      speakerScope?: never;
+      separationScope?: never;
+      researchScope?: never;
+      computerUseScope?: never;
+    })
+  | (CapabilityGrantBase & {
+      capability: "media.visual-transitions.analyze";
+      visualTransitionScope: VisualTransitionGrantScope;
+      frameScope?: never;
+      ocrScope?: never;
       speakerScope?: never;
       separationScope?: never;
       researchScope?: never;
@@ -217,6 +231,7 @@ export type CapabilityGrant =
       speakerScope: SpeakerOverlapGrantScope;
       frameScope?: never;
       ocrScope?: never;
+      visualTransitionScope?: never;
       separationScope?: never;
       researchScope?: never;
       computerUseScope?: never;
@@ -226,6 +241,7 @@ export type CapabilityGrant =
       separationScope: ConditionalSeparationGrantScope;
       frameScope?: never;
       ocrScope?: never;
+      visualTransitionScope?: never;
       speakerScope?: never;
       researchScope?: never;
       computerUseScope?: never;
@@ -235,6 +251,7 @@ export type CapabilityGrant =
       researchScope: ResearchGrantScope;
       frameScope?: never;
       ocrScope?: never;
+      visualTransitionScope?: never;
       speakerScope?: never;
       separationScope?: never;
       computerUseScope?: never;
@@ -244,6 +261,7 @@ export type CapabilityGrant =
       computerUseScope: ComputerUseGrantScope;
       frameScope?: never;
       ocrScope?: never;
+      visualTransitionScope?: never;
       speakerScope?: never;
       separationScope?: never;
       researchScope?: never;
@@ -251,10 +269,11 @@ export type CapabilityGrant =
   | (CapabilityGrantBase & {
       capability: Exclude<
         Capability,
-        "media.frames.sample" | "media.frames.ocr" | "media.speakers.analyze" | "media.audio.separate" | "research.investigate" | "computer.use.readonly"
+        "media.frames.sample" | "media.frames.ocr" | "media.visual-transitions.analyze" | "media.speakers.analyze" | "media.audio.separate" | "research.investigate" | "computer.use.readonly"
       >;
       frameScope?: never;
       ocrScope?: never;
+      visualTransitionScope?: never;
       speakerScope?: never;
       separationScope?: never;
       researchScope?: never;

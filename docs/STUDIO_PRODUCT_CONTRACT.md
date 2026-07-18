@@ -651,6 +651,12 @@ create a registered V1 source from explicitly attested browser-selected bytes. I
   receipt or older execution destinations remain non-links
 - Explicit UI labels for the production local one-child proof versus recorded demonstration
 
+The runtime also has a production-only `media.visual-transitions.analyze` slice over exact completed
+U2 frame and U5 OCR lineage. It emits cold-audited cite-only temporal pixel-change candidates and
+does not add a Studio UI surface, scene/shot claim, semantic visual result, caption authority, or
+publication state. The existing product projection must continue to omit these private host
+artifacts until a separately specified UI contract lands.
+
 Still open: hosted/link ingest, speech/language detection for browser V1 ingest, operation/tier
 choices, calibrated estimation, and every larger-runtime item below.
 The one-child analysis proof does not produce captions or expose media bytes to the child. A separate
@@ -662,7 +668,7 @@ receipts. It is not a child capability, new detector finding, Results merge, upl
 - Hosted source ingest and hosted runtime service
 - Parent/orchestrator execution beyond the one-child proof
 - Remaining child media operations and detector bridges, acoustic classification, overlap,
-  separation, and visual context
+  separation, and semantic visual context beyond cite-only pixel-change candidates
 - Multi-task dependencies, retries, partial publication, merge, and QC
 - Separate study/upload/publication authorities and exports for production captions
 - Live control acknowledgements plus hosted reconnect, retention, and access policy

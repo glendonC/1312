@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test, { type TestContext } from "node:test";
@@ -17,7 +17,8 @@ import {
   type RuntimeIdentityFactory,
 } from "../src/studio/runtime/production/scheduler.ts";
 import { BoundedResearchHost } from "../src/studio/runtime/production/research/researchHost.ts";
-import { auditResearchSnapshot } from "../src/studio/runtime/production/research/researchAudit.ts";
+import { ResearchExhaustionHost } from "../src/studio/runtime/production/research/researchExhaustionHost.ts";
+import { auditResearchExhaustion, auditResearchSnapshot } from "../src/studio/runtime/production/research/researchAudit.ts";
 import {
   externalDocumentSpanCitation,
   reopenResearchCitationSource,
@@ -361,6 +362,26 @@ function researchChildHost(runtime: WiringHarness, task: TaskRecord, executionId
   );
 }
 
+function emptyResearchChildHost(runtime: WiringHarness, task: TaskRecord, executionId: string, launchClaimId: string): BoundedResearchHost {
+  const grant = task.grants.find((candidate) => candidate.capability === "research.investigate");
+  assert.ok(grant && grant.capability === "research.investigate");
+  return new BoundedResearchHost(
+    runtime.ledger.runId,
+    { taskId: task.id, agentId: task.assignedAgentId, grants: [grant] },
+    runtime.artifacts,
+    {
+      searchProvider: new FixtureResearchProvider({}),
+      now: () => NOW,
+      binding: { ledger: runtime.ledger, execution: { executionId, launchClaimId } },
+    },
+  );
+}
+
+async function tamperStoredObject(root: string, contentId: string, replacement: string): Promise<void> {
+  const digest = contentId.replace(/^sha256:/, "");
+  await writeFile(join(root, "objects", "sha256", digest.slice(0, 2), digest), replacement, "utf8");
+}
+
 test("research admission mints the exact gap grant only through the recorded root tool path", async (t) => {
   const runtime = await harness(t);
   const requestHost = new ResearchRequestExecutionHost(runtime.ledger, runtime.artifacts, runtime.scheduler);
@@ -524,6 +545,119 @@ test("the granted child runs ledger-bound research, projects receipted operation
   const journalLines = (await readFile(runtime.journalPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
   const replayed = projectRuntimeEvents(runtime.ledger.runId, journalLines);
   assert.deepEqual(replayed, runtime.ledger.state());
+});
+
+test("the full empty query budget records one cold-auditable R1-insufficient cause", async (t) => {
+  const runtime = await harness(t);
+  await craftConflictStudy(runtime);
+  const { permit } = await admitResearchChild(runtime);
+  const started = await startTask(runtime, permit, "execution:r1-empty");
+  const grant = started.task.grants.find((candidate) => candidate.capability === "research.investigate")!;
+  assert.ok(grant.capability === "research.investigate");
+  const host = emptyResearchChildHost(runtime, started.task, "execution:r1-empty", started.launchClaimId);
+  for (const [index, query] of ["first bounded query", "second bounded query"].entries()) {
+    const search = await host.search({
+      operationId: `operation:r1:empty:${index + 1}`,
+      taskId: started.task.id,
+      agentId: started.task.assignedAgentId,
+      grantId: grant.id,
+      op: "search",
+      query,
+    });
+    assert.equal(search.receipt.state, "empty");
+  }
+  const exhaustion = await new ResearchExhaustionHost(
+    runtime.ledger.runId,
+    { taskId: started.task.id, agentId: started.task.assignedAgentId, grants: [grant] },
+    runtime.artifacts,
+    { ledger: runtime.ledger, execution: { executionId: "execution:r1-empty", launchClaimId: started.launchClaimId } },
+  ).record();
+  assert.equal(exhaustion.receipt.reason, "query_budget_exhausted_without_results");
+  assert.equal(exhaustion.receipt.outcome, "r1_insufficient");
+  assert.equal(exhaustion.receipt.nonClaims.semanticInsufficiency, "not_assessed");
+  assert.equal(exhaustion.receipt.nonClaims.r2Authorization, "cause_only");
+  const projected = runtime.ledger.state().researchExhaustions[exhaustion.receipt.receiptId];
+  assert.equal(projected.receiptContentId, exhaustion.receiptContentId);
+  assert.deepEqual(projected.operationIds, ["operation:r1:empty:1", "operation:r1:empty:2"]);
+  const audited = await auditResearchExhaustion(runtime.artifacts, runtime.ledger.runId, exhaustion.receiptContentId);
+  assert.equal(audited.receiptArtifactId, exhaustion.receiptArtifactId);
+  assert.equal(audited.searches.length, RESEARCH_LIMITS.maxQueries);
+  await assert.rejects(
+    new ResearchExhaustionHost(
+      runtime.ledger.runId,
+      { taskId: started.task.id, agentId: started.task.assignedAgentId, grants: [grant] },
+      runtime.artifacts,
+      { ledger: runtime.ledger, execution: { executionId: "execution:r1-empty", launchClaimId: started.launchClaimId } },
+    ).record(),
+    /already has a terminal exhaustion cause/,
+  );
+  const replayed = projectRuntimeEvents(runtime.ledger.runId, await runtime.ledger.events());
+  assert.deepEqual(replayed, runtime.ledger.state());
+
+  await tamperStoredObject(join(runtime.directory, "artifacts"), exhaustion.receiptContentId, `${JSON.stringify({ forged: true })}\n`);
+  await assert.rejects(
+    auditResearchExhaustion(runtime.artifacts, runtime.ledger.runId, exhaustion.receiptContentId),
+    /not allowed|exhaustion receipt is not canonical|exhaustion receipt.*valid|must be/,
+  );
+});
+
+test("unused query budget and failed operations cannot upgrade into R1 insufficiency", async (t) => {
+  const runtime = await harness(t);
+  await craftConflictStudy(runtime);
+  const { permit } = await admitResearchChild(runtime);
+  const started = await startTask(runtime, permit, "execution:r1-not-exhausted");
+  const grant = started.task.grants.find((candidate) => candidate.capability === "research.investigate")!;
+  assert.ok(grant.capability === "research.investigate");
+  const host = emptyResearchChildHost(runtime, started.task, "execution:r1-not-exhausted", started.launchClaimId);
+  await host.search({
+    operationId: "operation:r1:one-empty",
+    taskId: started.task.id,
+    agentId: started.task.assignedAgentId,
+    grantId: grant.id,
+    op: "search",
+    query: "one empty query",
+  });
+  await assert.rejects(
+    new ResearchExhaustionHost(
+      runtime.ledger.runId,
+      { taskId: started.task.id, agentId: started.task.assignedAgentId, grants: [grant] },
+      runtime.artifacts,
+      { ledger: runtime.ledger, execution: { executionId: "execution:r1-not-exhausted", launchClaimId: started.launchClaimId } },
+    ).record(),
+    /full query budget/,
+  );
+  const failingHost = new BoundedResearchHost(
+    runtime.ledger.runId,
+    { taskId: started.task.id, agentId: started.task.assignedAgentId, grants: [grant] },
+    runtime.artifacts,
+    {
+      searchProvider: {
+        id: "failing-fixture-provider",
+        version: "1",
+        async search() { throw new Error("fixture failure"); },
+      },
+      now: () => NOW,
+      binding: { ledger: runtime.ledger, execution: { executionId: "execution:r1-not-exhausted", launchClaimId: started.launchClaimId } },
+    },
+  );
+  await assert.rejects(failingHost.search({
+    operationId: "operation:r1:failed-search",
+    taskId: started.task.id,
+    agentId: started.task.assignedAgentId,
+    grantId: grant.id,
+    op: "search",
+    query: "provider failure",
+  }), /provider failed/);
+  await assert.rejects(
+    new ResearchExhaustionHost(
+      runtime.ledger.runId,
+      { taskId: started.task.id, agentId: started.task.assignedAgentId, grants: [grant] },
+      runtime.artifacts,
+      { ledger: runtime.ledger, execution: { executionId: "execution:r1-not-exhausted", launchClaimId: started.launchClaimId } },
+    ).record(),
+    /completed empty searches/,
+  );
+  assert.deepEqual(runtime.ledger.state().researchExhaustions, {});
 });
 
 test("the launcher context mounts child research tools only under the grant", async (t) => {

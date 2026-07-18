@@ -498,6 +498,19 @@ its projected research operation's task, agent, and execution, admits it `cite_o
 context only, and the closed citation validator keeps `claim_support` structurally reserved for
 current-run speech.
 
+`ResearchExhaustionHost` owns the first typed R1 terminal cause. It accepts no caller-authored task,
+grant, gap, operation, or reason. It can record
+`studio.research-exhaustion.receipt.v1` only when the bound active executor used the complete
+registered query budget and every query completed with an empty, cold-audited search receipt. The
+receipt binds the run, grant, task, agent, executor, launch, exact gap, ordered search receipt
+identities, and limits. `research.exhaustion_recorded` projects it into `researchExhaustions` under a
+private content-addressed artifact. Replay rechecks the complete empty-query basis and artifact
+lineage; cold audit reopens every search receipt. The outcome is `r1_insufficient` only in this
+structural sense. Its non-claims keep semantic insufficiency, source truth, entity match, speech,
+claim-support, and caption authority closed; `r2Authorization: "cause_only"` makes it a future
+authorization input, not an R2 grant. Unused query budget or failed operations cannot produce the
+cause. The default v3 root and production research-report path remain disconnected at this slice.
+
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and
 `analysis.evidence.assessment_failed`. A completed event binds its operation to the private

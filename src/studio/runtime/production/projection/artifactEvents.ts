@@ -27,7 +27,7 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
       (artifact.origin.kind === "separation_stem" || artifact.origin.kind === "conditional_separation_receipt" || artifact.origin.kind === "raw_stem_comparison" || artifact.origin.kind === "raw_stem_comparison_receipt") &&
       event.producer.kind === "separation_host";
     const isAtomicResearch =
-      (artifact.origin.kind === "research_search_receipt" || artifact.origin.kind === "research_document_snapshot" || artifact.origin.kind === "research_extraction" || artifact.origin.kind === "research_snapshot_receipt") &&
+      (artifact.origin.kind === "research_search_receipt" || artifact.origin.kind === "research_document_snapshot" || artifact.origin.kind === "research_extraction" || artifact.origin.kind === "research_snapshot_receipt" || artifact.origin.kind === "research_exhaustion_receipt") &&
       event.producer.kind === "research_host";
     invariant(
       event.producer.kind === "artifact_store" || isAtomicParentReceipt || isAtomicStudyReceipt || isAtomicFrameSampling || isAtomicOcr || isAtomicSpeakerOverlap || isAtomicConditionalSeparation || isAtomicResearch,
@@ -170,6 +170,21 @@ export function applyArtifactEvent(next: RuntimeProjection, event: RuntimeEvent)
           next.artifacts[artifact.origin.extractionArtifactId]?.origin.kind === "research_extraction",
         event,
         `Research snapshot receipt ${artifact.id} changed search, document, or extraction lineage`,
+      );
+    } else if (artifact.origin.kind === "research_exhaustion_receipt") {
+      const exhaustionGrantId = artifact.origin.grantId;
+      const operations = artifact.sourceArtifactIds.map((sourceId) => {
+        const source = next.artifacts[sourceId];
+        invariant(source?.origin.kind === "research_search_receipt", event, `Research exhaustion ${artifact.id} names a non-search receipt source`);
+        return next.researchOperations[source.origin.operationId];
+      });
+      invariant(
+        operations.every((operation) =>
+          operation?.status === "completed" && operation.op === "search" &&
+          operation.grantId === exhaustionGrantId && operation.searchResultCount === 0 &&
+          operation.taskId === artifact.producerTaskId && operation.agentId === artifact.producerAgentId),
+        event,
+        `Research exhaustion ${artifact.id} changed empty-search grant or producer lineage`,
       );
     } else if (artifact.origin.kind === "semantic_media_evidence") {
       const operation = next.semanticEvidence[artifact.origin.operationId];

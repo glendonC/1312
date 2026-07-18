@@ -11,7 +11,7 @@ import {
 import { assertOcrRequest, validateOcrLimits, validateOcrReceipt } from "./ocr.ts";
 import { assertSpeakerOverlapRequest, validateSpeakerOverlapLimits, validateSpeakerOverlapReceipt } from "./speakers.ts";
 import { assertConditionalSeparationRequest, validateConditionalSeparationLimits, validateConditionalSeparationReceipt, validateConditionalSeparationTrigger, validateRawStemComparisonReceipt } from "./separation.ts";
-import { assertResearchRequest, validateResearchAllowedDomains, validateResearchGapBinding, validateResearchLimits, validateResearchSearchReceipt, validateResearchSnapshotReceipt } from "./research.ts";
+import { assertResearchRequest, validateResearchAllowedDomains, validateResearchExhaustionReceipt, validateResearchGapBinding, validateResearchLimits, validateResearchSearchReceipt, validateResearchSnapshotReceipt } from "./research.ts";
 import {
   validatePublishReviewIntakeReceipt,
   validateStudyReadinessReceiptIdentity,
@@ -454,6 +454,11 @@ export function assertRuntimeEvent(
     exact(data, ["operationId", "reason"], context, "event.data");
     string(data.operationId, context, "event.data.operationId");
     oneOf(data.reason, new Set(["destination_not_allowed", "private_destination", "scheme_not_allowed", "credentials_in_url", "port_not_allowed", "url_too_long", "redirect_limit_exceeded", "mime_not_allowed", "byte_limit_exceeded", "wall_timeout", "fetch_failed", "provider_result_invalid", "artifact_oversized"]), context, "event.data.reason");
+  } else if (type === "research.exhaustion_recorded") {
+    exact(data, ["outputArtifactId", "receiptContentId", "receipt"], context, "event.data");
+    string(data.outputArtifactId, context, "event.data.outputArtifactId");
+    contentId(data.receiptContentId, context, "event.data.receiptContentId");
+    validateResearchExhaustionReceipt(data.receipt, context, "event.data.receipt");
   } else if (type === "semantic.evidence_started") {
     exact(data, ["request", "grantId", "executionId", "launchClaimId", "sourceContentId", "producer", "limits"], context, "event.data");
     assertSpeechTranscribeRequest(data.request, context);

@@ -144,6 +144,12 @@ export interface ResearchSnapshotReceiptArtifactOrigin {
   extractionArtifactId: string;
 }
 
+export interface ResearchExhaustionReceiptArtifactOrigin {
+  kind: "research_exhaustion_receipt";
+  receiptId: string;
+  grantId: string;
+}
+
 export interface SemanticMediaEvidenceArtifactOrigin {
   kind: "semantic_media_evidence";
   operationId: string;
@@ -402,6 +408,7 @@ export interface RuntimeArtifact {
     | ResearchDocumentSnapshotArtifactOrigin
     | ResearchExtractionArtifactOrigin
     | ResearchSnapshotReceiptArtifactOrigin
+    | ResearchExhaustionReceiptArtifactOrigin
     | SemanticMediaEvidenceArtifactOrigin
     | WorkerOutputArtifactOrigin
     | StudyReportArtifactOrigin

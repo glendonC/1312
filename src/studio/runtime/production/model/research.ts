@@ -5,6 +5,7 @@ export const RESEARCH_HOST_ARTIFACT_KINDS = [
   "studio.research-document-snapshot.v1",
   "studio.research-extraction.v1",
   "studio.research-document-snapshot.receipt.v1",
+  "studio.research-exhaustion.receipt.v1",
 ] as const;
 
 export function isResearchHostArtifactKind(value: string): boolean {
@@ -79,8 +80,7 @@ export interface ResearchGrantScope {
 }
 
 /**
- * Slice-local grant record. The scheduler-issued CapabilityGrant union member for
- * research.investigate is deferred hub wiring; this shape is what that member will carry.
+ * Narrow grant view shared by the scheduler-issued CapabilityGrant union member and research hosts.
  */
 export interface ResearchCapabilityGrant {
   id: string;
@@ -316,4 +316,53 @@ export interface ResearchOperationRecord {
   /** Completed search operations record their result count so snapshot admission stays closed. */
   searchResultCount: number | null;
   failure: ResearchFailureReason | null;
+}
+
+/**
+ * Closed R1 insufficiency cause. It proves that the full search-query budget returned no result
+ * identities to snapshot; it does not claim that any source was semantically irrelevant.
+ */
+export type ResearchExhaustionReason = "query_budget_exhausted_without_results";
+
+export interface ResearchExhaustionOperationBinding {
+  operationId: string;
+  receiptArtifactId: string;
+  receiptId: string;
+  receiptContentId: string;
+}
+
+export interface ResearchExhaustionReceipt {
+  schema: "studio.research-exhaustion.receipt.v1";
+  receiptId: string;
+  runId: string;
+  authorization: Extract<ResearchReceiptAuthorization, { executionId: string }>;
+  gap: ResearchGapBinding;
+  reason: ResearchExhaustionReason;
+  operations: ResearchExhaustionOperationBinding[];
+  limits: ResearchLimits;
+  outcome: "r1_insufficient";
+  nonClaims: {
+    semanticInsufficiency: "not_assessed";
+    sourceTruth: "not_assessed";
+    entityMatch: "not_assessed";
+    speechEvidenceAuthority: "not_granted";
+    claimSupportAuthority: "not_granted";
+    captionAuthority: "not_granted";
+    r2Authorization: "cause_only";
+  };
+}
+
+/** Durable projection record consumed by later R2 authorization. */
+export interface ResearchExhaustionRecord {
+  id: string;
+  taskId: string;
+  agentId: string;
+  grantId: string;
+  executionId: string;
+  launchClaimId: string;
+  gap: ResearchGapBinding;
+  reason: ResearchExhaustionReason;
+  operationIds: string[];
+  outputArtifactId: string;
+  receiptContentId: string;
 }

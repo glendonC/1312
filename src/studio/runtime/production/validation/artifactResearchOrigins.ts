@@ -1,4 +1,5 @@
 import type { ArtifactOriginValidationInput } from "./artifactOrigin.ts";
+import { RESEARCH_LIMITS } from "../model/research.ts";
 import { exact, fail, integer, oneOf, string } from "./primitives.ts";
 
 function privateResearchArtifact(input: ArtifactOriginValidationInput, expected: { kind: string; sources: number }): void {
@@ -39,6 +40,13 @@ export function validateResearchArtifactOrigin(kind: string, input: ArtifactOrig
     exact(origin, ["kind", "operationId", "receiptId", "documentArtifactId", "extractionArtifactId"], context, `${path}.origin`);
     for (const key of ["operationId", "receiptId", "documentArtifactId", "extractionArtifactId"]) string(origin[key], context, `${path}.origin.${key}`);
     privateResearchArtifact(input, { kind: "studio.research-document-snapshot.receipt.v1", sources: 3 });
+    return true;
+  }
+  if (kind === "research_exhaustion_receipt") {
+    exact(origin, ["kind", "receiptId", "grantId"], context, `${path}.origin`);
+    string(origin.receiptId, context, `${path}.origin.receiptId`);
+    string(origin.grantId, context, `${path}.origin.grantId`);
+    privateResearchArtifact(input, { kind: "studio.research-exhaustion.receipt.v1", sources: RESEARCH_LIMITS.maxQueries });
     return true;
   }
   return false;

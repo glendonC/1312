@@ -456,7 +456,11 @@ their audits.
   `research_document_snapshot` per grant over the authenticated loopback bridge, journals
   `research.operation_*` events into a `researchOperations` projection with executor lineage on
   every receipt, records search/snapshot/extraction artifacts under registered research origins,
-  and cold-audits completed operations. `external_document_span` citations from receipted snapshots
+  and cold-audits completed operations. When both registered queries complete with zero results,
+  `ResearchExhaustionHost` records a content-addressed
+  `studio.research-exhaustion.receipt.v1` cause in `researchExhaustions`; the cause is exact-gap and
+  executor bound, cold-auditable, and grants R2 cause identity only, never semantic authority.
+  `external_document_span` citations from receipted snapshots
   admit as cite-only media context; snippets stay routing hints. Ambient codex web search stays
   disabled and the default provider is the offline fixture with an empty domain allowlist, so no
   egress happens without explicit composition policy.
@@ -464,8 +468,10 @@ their audits.
   `study.research`, and trigger derivation reads v1 owned-media studies, which the default v3 spine
   never populates mid-run, so live codex runs surface zero triggers. There is no real search
   provider or allow-real flag, no pinned-socket dialer (the receipts keep disclosing
-  `dnsRebindingWindow: "checked_before_fetch_not_pinned"`), no freshness UI, no research report
-  admitted to a study, and no specialist depth beyond one gap-bound child.
+  `dnsRebindingWindow: "checked_before_fetch_not_pinned"`), no freshness UI, no production worker
+  path carrying research spans into a study report, and no specialist depth beyond one gap-bound
+  child. The only registered typed insufficiency cause is the structurally provable full empty-query
+  case; other terminal cases remain closed.
 - **Done when:** A dedicated host exposes bounded search and document snapshot/read operations under
   explicit grants. It limits queries, results, documents, MIME types, bytes, redirects, domains, and
   wall time; rejects local/private-network/file/authenticated destinations; carries no browser

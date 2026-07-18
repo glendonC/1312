@@ -2,6 +2,7 @@ import { canonicalSha256 } from "../canonicalIdentity.ts";
 import type {
   ContentIdentity,
   ResearchDocumentSnapshotReceipt,
+  ResearchExhaustionReceipt,
   ResearchExtractionMethod,
   ResearchSearchReceipt,
   RuntimeArtifact,
@@ -31,6 +32,10 @@ export function researchExtractionArtifactId(runId: string, operationId: string,
 
 export function researchSnapshotReceiptArtifactId(runId: string, operationId: string, contentId: string): string {
   return researchArtifactId(runId, operationId, "studio.research-document-snapshot.receipt.v1", contentId);
+}
+
+export function researchExhaustionReceiptArtifactId(runId: string, receiptId: string, contentId: string): string {
+  return researchArtifactId(runId, receiptId, "studio.research-exhaustion.receipt.v1", contentId);
 }
 
 interface PreparedResearchObject {
@@ -158,6 +163,29 @@ export function buildResearchSnapshotReceiptArtifact(input: {
       receiptId: input.receipt.receiptId,
       documentArtifactId: input.receipt.document.artifactId,
       extractionArtifactId: input.receipt.extraction.artifactId,
+    },
+  });
+}
+
+export function buildResearchExhaustionReceiptArtifact(input: {
+  runId: string;
+  taskId: string;
+  agentId: string;
+  receipt: ResearchExhaustionReceipt;
+  sourceArtifactIds: string[];
+  prepared: PreparedResearchObject;
+}): RuntimeArtifact {
+  return privateResearchRow({
+    runId: input.runId,
+    taskId: input.taskId,
+    agentId: input.agentId,
+    kind: "studio.research-exhaustion.receipt.v1",
+    prepared: input.prepared,
+    sourceArtifactIds: input.sourceArtifactIds,
+    origin: {
+      kind: "research_exhaustion_receipt",
+      receiptId: input.receipt.receiptId,
+      grantId: input.receipt.authorization.grantId,
     },
   });
 }

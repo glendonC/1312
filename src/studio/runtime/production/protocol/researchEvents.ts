@@ -1,6 +1,7 @@
 import type {
   ResearchDocumentSnapshotReceipt,
   ResearchFailureReason,
+  ResearchExhaustionReceipt,
   ResearchGapBinding,
   ResearchLimits,
   ResearchRequest,
@@ -37,4 +38,13 @@ export interface ResearchOperationCompletedEvent extends RuntimeEventBase {
 export interface ResearchOperationFailedEvent extends RuntimeEventBase {
   type: "research.operation_failed";
   data: { operationId: string; reason: ResearchFailureReason };
+}
+
+export interface ResearchExhaustionRecordedEvent extends RuntimeEventBase {
+  type: "research.exhaustion_recorded";
+  data: {
+    outputArtifactId: string;
+    receiptContentId: string;
+    receipt: ResearchExhaustionReceipt;
+  };
 }

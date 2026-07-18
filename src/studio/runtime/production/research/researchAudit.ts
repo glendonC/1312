@@ -4,6 +4,7 @@ import { ContentAddressedArtifactStore } from "../artifactStore.ts";
 import { canonicalJson, canonicalJsonContentId } from "../artifactStore/contentIdentity.ts";
 import {
   researchDocumentArtifactId,
+  researchExhaustionReceiptArtifactId,
   researchExtractionArtifactId,
   researchSearchReceiptArtifactId,
   researchSnapshotReceiptArtifactId,
@@ -11,11 +12,13 @@ import {
 import {
   RESEARCH_LIMITS,
   type ResearchDocumentSnapshotReceipt,
+  type ResearchExhaustionReceipt,
   type ResearchExtractionArtifact,
   type ResearchSearchReceipt,
 } from "../model/research.ts";
 import {
   validateResearchExtractionArtifact,
+  validateResearchExhaustionReceipt,
   validateResearchSearchReceipt,
   validateResearchSnapshotReceipt,
 } from "../validation/research.ts";
@@ -39,6 +42,13 @@ export interface VerifiedResearchSnapshotAudit {
     contentId: string;
     bytes: number;
   };
+}
+
+export interface VerifiedResearchExhaustionAudit {
+  receipt: ResearchExhaustionReceipt;
+  receiptContentId: string;
+  receiptArtifactId: string;
+  searches: VerifiedResearchSearchAudit[];
 }
 
 function same(left: unknown, right: unknown): boolean {
@@ -158,5 +168,41 @@ export async function auditResearchSnapshot(
       contentId: receipt.extraction.contentId,
       bytes: receipt.extraction.bytes,
     },
+  };
+}
+
+/** Cold audit of a typed R1 insufficiency cause and every empty search receipt it binds. */
+export async function auditResearchExhaustion(
+  artifacts: ContentAddressedArtifactStore,
+  runId: string,
+  receiptContentId: string,
+): Promise<VerifiedResearchExhaustionAudit> {
+  const { value: receipt } = await storedCanonicalJson(
+    artifacts,
+    receiptContentId,
+    "Stored research exhaustion receipt",
+    (value) => validateResearchExhaustionReceipt(value),
+  );
+  if (receipt.runId !== runId) throw new Error("Research exhaustion receipt belongs to another run");
+  const searches: VerifiedResearchSearchAudit[] = [];
+  for (const operation of receipt.operations) {
+    const search = await auditResearchSearch(artifacts, runId, operation.receiptContentId);
+    if (
+      search.receiptArtifactId !== operation.receiptArtifactId ||
+      search.receipt.receiptId !== operation.receiptId ||
+      search.receipt.operationId !== operation.operationId ||
+      search.receipt.state !== "empty" || search.receipt.results.length !== 0 ||
+      !same(search.receipt.authorization, receipt.authorization) ||
+      !same(search.receipt.gap, receipt.gap) || !same(search.receipt.limits, receipt.limits)
+    ) {
+      throw new Error("Research exhaustion changed its empty-search grant lineage");
+    }
+    searches.push(search);
+  }
+  return {
+    receipt,
+    receiptContentId,
+    receiptArtifactId: researchExhaustionReceiptArtifactId(runId, receipt.receiptId, receiptContentId),
+    searches,
   };
 }

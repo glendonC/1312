@@ -5,6 +5,8 @@ import {
   RESEARCH_LIMITS,
   type ResearchAllowedMimeType,
   type ResearchDocumentSnapshotReceipt,
+  type ResearchExhaustionReason,
+  type ResearchExhaustionReceipt,
   type ResearchExtractionArtifact,
   type ResearchExtractionMethod,
   type ResearchGapBinding,
@@ -39,6 +41,7 @@ const LIMIT_KEYS = Object.keys(RESEARCH_LIMITS) as Array<keyof ResearchLimits>;
 const SEARCH_STATES = new Set<ResearchSearchState>(["available", "empty", "truncated"]);
 const MIME_TYPES = new Set<string>(RESEARCH_ALLOWED_MIME_TYPES);
 const EXTRACTION_METHODS = new Set<ResearchExtractionMethod>(["html_text_v1", "plain_text_v1"]);
+const EXHAUSTION_REASONS = new Set<ResearchExhaustionReason>(["query_budget_exhausted_without_results"]);
 
 /** Exact lowercase registrable https hostname. IP literals and wildcards are never domains. */
 const DOMAIN_PATTERN = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
@@ -54,6 +57,11 @@ export function researchReceiptId(
 export function researchRequestReceiptId(value: Omit<ResearchRequestReceipt, "receiptId">): string {
   const { schema: _schema, ...body } = value;
   return `research-request-receipt:${canonicalSha256(body)}`;
+}
+
+export function researchExhaustionReceiptId(value: Omit<ResearchExhaustionReceipt, "receiptId">): string {
+  const { schema: _schema, ...body } = value;
+  return `research-exhaustion-receipt:${canonicalSha256(body)}`;
 }
 
 export function researchTriggerId(value: Omit<ResearchTriggerOption, "triggerId">): string {
@@ -352,6 +360,67 @@ export function validateResearchSnapshotReceipt(
   const receipt = item as unknown as ResearchDocumentSnapshotReceipt;
   const { receiptId: _receiptId, ...withoutId } = receipt;
   if (receipt.receiptId !== researchReceiptId(withoutId)) fail(context, `${path}.receiptId`, "does not close the receipt body");
+  return receipt;
+}
+
+export function validateResearchExhaustionReceipt(
+  value: unknown,
+  context = "Research exhaustion receipt",
+  path = "receipt",
+): ResearchExhaustionReceipt {
+  const item = object(value, context, path);
+  exact(item, [
+    "schema", "receiptId", "runId", "authorization", "gap", "reason", "operations", "limits",
+    "outcome", "nonClaims",
+  ], context, path);
+  literal(item.schema, "studio.research-exhaustion.receipt.v1", context, `${path}.schema`);
+  const receiptIdValue = string(item.receiptId, context, `${path}.receiptId`);
+  string(item.runId, context, `${path}.runId`);
+  validateAuthorization(item.authorization, context, `${path}.authorization`);
+  const authorization = object(item.authorization, context, `${path}.authorization`);
+  if (!("executionId" in authorization) || !("launchClaimId" in authorization)) {
+    fail(context, `${path}.authorization`, "requires bound executor lineage");
+  }
+  validateResearchGapBinding(item.gap, context, `${path}.gap`);
+  const reason = oneOf<ResearchExhaustionReason>(item.reason, EXHAUSTION_REASONS, context, `${path}.reason`);
+  const operations = array(item.operations, context, `${path}.operations`);
+  if (operations.length !== RESEARCH_LIMITS.maxQueries) {
+    fail(context, `${path}.operations`, "must bind the full registered query budget");
+  }
+  const operationIds: string[] = [];
+  for (const [index, value] of operations.entries()) {
+    const operation = object(value, context, `${path}.operations[${index}]`);
+    exact(operation, ["operationId", "receiptArtifactId", "receiptId", "receiptContentId"], context, `${path}.operations[${index}]`);
+    operationIds.push(string(operation.operationId, context, `${path}.operations[${index}].operationId`));
+    string(operation.receiptArtifactId, context, `${path}.operations[${index}].receiptArtifactId`);
+    string(operation.receiptId, context, `${path}.operations[${index}].receiptId`);
+    contentId(operation.receiptContentId, context, `${path}.operations[${index}].receiptContentId`);
+  }
+  if (new Set(operationIds).size !== operationIds.length || operationIds.some((id, index) => index > 0 && id.localeCompare(operationIds[index - 1]) <= 0)) {
+    fail(context, `${path}.operations`, "must contain unique operation identities in canonical order");
+  }
+  validateResearchLimits(item.limits, context, `${path}.limits`);
+  literal(item.outcome, "r1_insufficient", context, `${path}.outcome`);
+  if (reason === "query_budget_exhausted_without_results" && operations.length !== RESEARCH_LIMITS.maxQueries) {
+    fail(context, `${path}.operations`, "must exhaust the query budget");
+  }
+  const nonClaims = object(item.nonClaims, context, `${path}.nonClaims`);
+  exact(nonClaims, [
+    "semanticInsufficiency", "sourceTruth", "entityMatch", "speechEvidenceAuthority",
+    "claimSupportAuthority", "captionAuthority", "r2Authorization",
+  ], context, `${path}.nonClaims`);
+  literal(nonClaims.semanticInsufficiency, "not_assessed", context, `${path}.nonClaims.semanticInsufficiency`);
+  literal(nonClaims.sourceTruth, "not_assessed", context, `${path}.nonClaims.sourceTruth`);
+  literal(nonClaims.entityMatch, "not_assessed", context, `${path}.nonClaims.entityMatch`);
+  literal(nonClaims.speechEvidenceAuthority, "not_granted", context, `${path}.nonClaims.speechEvidenceAuthority`);
+  literal(nonClaims.claimSupportAuthority, "not_granted", context, `${path}.nonClaims.claimSupportAuthority`);
+  literal(nonClaims.captionAuthority, "not_granted", context, `${path}.nonClaims.captionAuthority`);
+  literal(nonClaims.r2Authorization, "cause_only", context, `${path}.nonClaims.r2Authorization`);
+  const receipt = item as unknown as ResearchExhaustionReceipt;
+  const { receiptId: _receiptId, ...withoutId } = receipt;
+  if (receiptIdValue !== researchExhaustionReceiptId(withoutId)) {
+    fail(context, `${path}.receiptId`, "does not close the receipt body");
+  }
   return receipt;
 }
 

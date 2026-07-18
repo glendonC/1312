@@ -1,4 +1,5 @@
 import { capabilityOperationExists, taskCapabilityCallCount } from "../capabilityUsage.ts";
+import { researchExhaustionReceiptArtifactId } from "../artifactStore/researchArtifacts.ts";
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { researchRequestFingerprint } from "../validation/research.ts";
@@ -123,6 +124,83 @@ export function applyResearchEvent(next: RuntimeProjection, event: RuntimeEvent)
     invariant(operation?.status === "started", event, `Research ${event.data.operationId} is not active`);
     operation.status = "failed";
     operation.failure = event.data.reason;
+    return true;
+  }
+  if (event.type === "research.exhaustion_recorded") {
+    invariant(event.producer.kind === "research_host", event, "Research exhaustion must come from its bounded host");
+    const receipt = event.data.receipt;
+    invariant(!next.researchExhaustions[receipt.receiptId], event, `Research exhaustion ${receipt.receiptId} is duplicated`);
+    invariant(
+      !Object.values(next.researchExhaustions).some((entry) => entry.grantId === receipt.authorization.grantId),
+      event,
+      `Research grant ${receipt.authorization.grantId} already has an exhaustion cause`,
+    );
+    const task = next.tasks[receipt.authorization.taskId];
+    const grant = task?.grants.find((candidate) => candidate.id === receipt.authorization.grantId);
+    invariant(
+      task?.status === "working" && task.ownerAgentId === receipt.authorization.agentId &&
+        grant?.capability === "research.investigate" && grant.researchScope,
+      event,
+      `Research exhaustion ${receipt.receiptId} lacks its working task and grant`,
+    );
+    const execution = next.executions[receipt.authorization.executionId];
+    const launch = next.taskLaunches[task.id];
+    invariant(
+      execution?.status === "active" && execution.taskId === task.id && execution.agentId === task.ownerAgentId &&
+        execution.launchClaimId === receipt.authorization.launchClaimId && launch?.id === receipt.authorization.launchClaimId &&
+        launch.executionId === execution.id,
+      event,
+      `Research exhaustion ${receipt.receiptId} lost executor lineage`,
+    );
+    invariant(
+      receipt.runId === next.runId && same(receipt.gap, grant.researchScope.gap) &&
+        same(receipt.limits, grant.researchScope.limits),
+      event,
+      `Research exhaustion ${receipt.receiptId} escaped its granted gap or limits`,
+    );
+    const operations = Object.values(next.researchOperations)
+      .filter((operation) => operation.grantId === grant.id)
+      .sort((left, right) => left.id.localeCompare(right.id));
+    invariant(
+      operations.length === grant.researchScope.limits.maxQueries &&
+        operations.every((operation) => operation.op === "search" && operation.status === "completed" && operation.searchResultCount === 0),
+      event,
+      `Research exhaustion ${receipt.receiptId} does not prove the full empty query budget`,
+    );
+    invariant(
+      same(receipt.operations, operations.map((operation) => ({
+        operationId: operation.id,
+        receiptArtifactId: operation.receiptArtifactId,
+        receiptId: operation.receiptId,
+        receiptContentId: operation.receiptContentId,
+      }))),
+      event,
+      `Research exhaustion ${receipt.receiptId} changed its terminal operation identities`,
+    );
+    const artifact = next.artifacts[event.data.outputArtifactId];
+    invariant(
+      artifact?.origin.kind === "research_exhaustion_receipt" &&
+        artifact.origin.receiptId === receipt.receiptId && artifact.origin.grantId === grant.id &&
+        artifact.content.contentId === event.data.receiptContentId &&
+        artifact.id === researchExhaustionReceiptArtifactId(next.runId, receipt.receiptId, event.data.receiptContentId) &&
+        artifact.producerTaskId === task.id && artifact.producerAgentId === task.ownerAgentId &&
+        same(artifact.sourceArtifactIds, receipt.operations.map((operation) => operation.receiptArtifactId)),
+      event,
+      `Research exhaustion ${receipt.receiptId} changed artifact or search lineage`,
+    );
+    next.researchExhaustions[receipt.receiptId] = {
+      id: receipt.receiptId,
+      taskId: task.id,
+      agentId: task.ownerAgentId,
+      grantId: grant.id,
+      executionId: execution.id,
+      launchClaimId: launch.id,
+      gap: structuredClone(receipt.gap),
+      reason: receipt.reason,
+      operationIds: receipt.operations.map((operation) => operation.operationId),
+      outputArtifactId: artifact.id,
+      receiptContentId: event.data.receiptContentId,
+    };
     return true;
   }
   return false;

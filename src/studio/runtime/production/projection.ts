@@ -37,6 +37,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     speakerOverlapOperations: {},
     conditionalSeparationOperations: {},
     researchOperations: {},
+    researchExhaustions: {},
     semanticEvidence: {},
     evidenceReads: {},
     evidenceAssessments: {},

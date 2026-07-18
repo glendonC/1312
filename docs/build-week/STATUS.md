@@ -162,8 +162,11 @@ score.
   projection with executor lineage on every receipt, and admission accepts
   `external_document_span` citations as cite-only media context. The default provider is the
   offline fixture and the default domain allowlist is empty, so no egress occurs without explicit
-  composition policy; ambient codex web search stays disabled. No default contract holds
-  `study.research`, and no live run produces research.
+  composition policy; ambient codex web search stays disabled. A full two-query budget that returns
+  no results can now produce one exact-gap, executor-bound
+  `studio.research-exhaustion.receipt.v1` projected in `researchExhaustions`; it is an R2 cause only
+  and carries no semantic or caption authority. No default contract holds `study.research`, the v3
+  spine produces no R1 trigger, and no live run produces research.
 
 ## Post-freeze backlog boundary
 
@@ -262,9 +265,11 @@ indefinite deferrals or a one-day implementation claim:
   and speech were cleanly separated.
 - R1 proves trigger-gated grant minting, closed egress policy enforcement, receipted
   search/snapshot/extraction lineage, journal-projected operations with executor binding, cold
-  audit by content identity, and cite-only `external_document_span` admission. It does not prove
+  audit by content identity, cite-only `external_document_span` admission, and one cold-auditable
+  structural exhaustion cause when the full query budget returns no results. It does not prove
   source truth, currency, entity match, semantic correctness, transcript or caption authority, or
-  that any run researched anything: no default run produces research, snippets are never
+  semantic insufficiency. It does not prove that any run researched anything: no default run
+  produces research, snippets are never
   citations, and the snapshot receipts keep disclosing
   `dnsRebindingWindow: "checked_before_fetch_not_pinned"` because the destination address is
   re-resolved between the policy check and the fetch.

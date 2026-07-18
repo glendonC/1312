@@ -2,15 +2,15 @@ import { realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import {
-  loadOwnedSourceSession,
-  type LoadedOwnedSourceSession,
+  loadSourceSession,
+  type LoadedSourceSession,
 } from "../runStart/sourceSessionLoader.ts";
 import type { RuntimeHostSourceSummary } from "./model.ts";
 import { RuntimeHostError } from "./errors.ts";
 
 interface RegisteredEntry {
   directory: string;
-  loaded: LoadedOwnedSourceSession;
+  loaded: LoadedSourceSession;
 }
 
 export interface RuntimeSourceRegistryOptions {
@@ -48,7 +48,7 @@ export class RuntimeSourceRegistry {
         "A registered source directory is outside the configured source root.",
       );
     }
-    const loaded = await loadOwnedSourceSession(directory);
+    const loaded = await loadSourceSession(directory);
     const existing = this.entries.get(loaded.session.sessionId);
     if (existing && existing.loaded.session.revisionId !== loaded.session.revisionId) {
       throw new RuntimeHostError(
@@ -60,11 +60,12 @@ export class RuntimeSourceRegistry {
     return this.summary(loaded);
   }
 
-  private summary(loaded: LoadedOwnedSourceSession): RuntimeHostSourceSummary {
+  private summary(loaded: LoadedSourceSession): RuntimeHostSourceSummary {
     return {
       sourceSessionId: loaded.session.sessionId,
       sourceRevisionId: loaded.session.revisionId,
       sourceContentId: loaded.session.source.contentId,
+      sourceKind: loaded.session.adapterId === "youtube-local-source-adapter.v1" ? "youtube_local" : "owned_local",
       label: loaded.operator.label,
       rightsScope: loaded.operator.rightsScope,
       durationMs: loaded.session.source.durationMs,
@@ -81,18 +82,18 @@ export class RuntimeSourceRegistry {
       .sort((left, right) => left.sourceSessionId.localeCompare(right.sourceSessionId));
   }
 
-  async resolve(sourceSessionId: string, expectedRevisionId: string): Promise<LoadedOwnedSourceSession> {
+  async resolve(sourceSessionId: string, expectedRevisionId: string): Promise<LoadedSourceSession> {
     const entry = this.entries.get(sourceSessionId);
     if (!entry) {
       throw new RuntimeHostError("unknown_source_session", "The source session is not registered.", 404);
     }
-    let loaded: LoadedOwnedSourceSession;
+    let loaded: LoadedSourceSession;
     try {
-      loaded = await loadOwnedSourceSession(entry.directory);
+      loaded = await loadSourceSession(entry.directory);
     } catch (error) {
       throw new RuntimeHostError(
         "source_revalidation_failed",
-        "The registered source no longer passes owned-source and sealed-preflight validation.",
+        "The registered source no longer passes local-source and sealed-preflight validation.",
         409,
         { cause: error },
       );

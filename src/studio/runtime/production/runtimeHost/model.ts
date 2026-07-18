@@ -89,6 +89,7 @@ export interface RuntimeHostSourceSummary {
   sourceSessionId: string;
   sourceRevisionId: string;
   sourceContentId: string;
+  sourceKind: "owned_local" | "youtube_local";
   label: string;
   rightsScope: ProductionSourceSession["sourceReceipt"]["rightsScope"];
   durationMs: number;
@@ -184,6 +185,44 @@ export interface OwnedMediaIngestStatus {
   updatedAt: string;
   source: RuntimeHostSourceSummary | null;
   failure: OwnedMediaIngestFailure | null;
+}
+
+export const YOUTUBE_LOCAL_INGEST_STATES = [
+  "queued",
+  "resolving",
+  "downloading",
+  "probing",
+  "sealing",
+  "registered",
+  "failed",
+] as const;
+
+export type YouTubeLocalIngestState = (typeof YOUTUBE_LOCAL_INGEST_STATES)[number];
+
+export interface YouTubeLocalIngestRequest {
+  url: string;
+  startMs: number;
+  endMs: number;
+  localProcessingConfirmed: true;
+}
+
+export interface YouTubeLocalIngestFailure {
+  code:
+    | "resolution_failed"
+    | "download_failed"
+    | "probe_failed"
+    | "seal_failed"
+    | "registration_failed";
+  message: string;
+}
+
+export interface YouTubeLocalIngestStatus {
+  schema: "studio.youtube-local-ingest.v1";
+  ingestId: string;
+  status: YouTubeLocalIngestState;
+  updatedAt: string;
+  source: RuntimeHostSourceSummary | null;
+  failure: YouTubeLocalIngestFailure | null;
 }
 
 export interface RuntimeHostPlanResponse {

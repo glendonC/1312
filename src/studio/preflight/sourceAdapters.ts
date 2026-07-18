@@ -1,5 +1,10 @@
 import type { RunBundle } from "../transport";
-import type { MediaProbeTrack, OwnedLocalIngestReceipt, YouTubeIngestReceipt } from "../types";
+import type {
+  MediaProbeTrack,
+  OwnedLocalIngestReceipt,
+  YouTubeIngestReceipt,
+  YouTubeLocalIngestReceipt,
+} from "../types";
 import type { PreflightSourceBinding } from "./contracts";
 
 /** Provider-neutral facts consumed by preflight. Provider wire fields stop at this adapter. */
@@ -158,9 +163,9 @@ export function normalizeIngestReceipt(bundle: RunBundle): RecordedSourceFacts |
  * supply equivalent facts; the index never reaches into provider wire fields itself.
  */
 export function preflightSourceBinding(
-  receipt: OwnedLocalIngestReceipt | YouTubeIngestReceipt | null,
+  receipt: OwnedLocalIngestReceipt | YouTubeIngestReceipt | YouTubeLocalIngestReceipt | null,
 ): PreflightSourceBinding | null {
-  if (!receipt || receipt.kind !== "owned_local") return null;
+  if (!receipt || (receipt.kind !== "owned_local" && receipt.kind !== "youtube_local")) return null;
   const probe = receipt.derived_artifacts.find((artifact) => artifact.kind === "media_probe");
   if (!probe) return null;
   return {

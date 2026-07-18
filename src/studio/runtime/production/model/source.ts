@@ -53,9 +53,9 @@ export interface ProductionSourceSession {
   schema: "studio.source-session.v1";
   sessionId: string;
   revisionId: string;
-  adapterId: "owned-local-source-adapter.v1";
+  adapterId: "owned-local-source-adapter.v1" | "youtube-local-source-adapter.v1";
   sourceReceipt: {
-    schema: "studio.ingest.owned-local.v1";
+    schema: "studio.ingest.owned-local.v1" | "studio.ingest.youtube-local.v1";
     receiptId: string;
     contentId: string;
     rightsScope: "local_processing" | "redistribution";

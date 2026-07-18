@@ -36,6 +36,7 @@ const SOURCE: RuntimeHostSourceSummary = {
   sourceSessionId: "source-session:50e48113837e62499233f29f53ab91f5ed591d39bda98879effb02364e2a03a2",
   sourceRevisionId: "source-revision:6800f536f61f5d73dc474443cf0469c823ae94a984a209192940fc28b94afa09",
   sourceContentId: "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+  sourceKind: "owned_local",
   label: "Project-generated Korean conversation fixture",
   rightsScope: "redistribution",
   durationMs: 47_200,

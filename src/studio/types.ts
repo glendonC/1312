@@ -177,11 +177,73 @@ export interface OwnedLocalIngestReceipt {
   note: string;
 }
 
+export interface YouTubeLocalDerivedArtifactReceipt {
+  kind: "media_probe";
+  path: "media-probe.json";
+  schema: "studio.media-probe.v1";
+  producer: "scripts/probe-media.mjs";
+  source_content_ids: string[];
+  content_hash: string;
+}
+
+/**
+ * Private local-processing receipt for an operator-confirmed bounded YouTube download. This is
+ * deliberately distinct from the redistributable recorded-demo receipt above: its bytes may be
+ * consumed only by the local runtime and may never be copied into public/demo.
+ */
+export interface YouTubeLocalIngestReceipt {
+  schema: "studio.ingest.youtube-local.v1";
+  kind: "youtube_local";
+  producer: "studio.youtube-local-ingest-host.v1";
+  receipt_id: string;
+  label: string;
+  origin: {
+    kind: "youtube";
+    canonical_url: string;
+    external_id: string;
+    creator: string | null;
+  };
+  resolution: {
+    schema: "studio.remote-source-resolution.v1";
+    resolution_id: string;
+    content_id: string;
+    producer: "studio.youtube-metadata-resolver";
+    tool: { id: "yt-dlp"; version: string };
+  };
+  content: {
+    id: string;
+    hash: Sha256Hash;
+    bytes: number;
+  };
+  rights: {
+    basis: "operator_local_processing_confirmation";
+    asserted_at: string;
+    scope: "local_processing";
+    redistribution_allowed: false;
+    statement: string;
+  };
+  selection: {
+    provider_start_ms: number;
+    provider_end_ms: number;
+    local_start: 0;
+    local_end: number;
+    duration: number;
+  };
+  raw_media: {
+    path: "raw/youtube-local.mp4";
+    content_id: string;
+    bytes: number;
+    preservation: "provider_bounded_download";
+  };
+  derived_artifacts: YouTubeLocalDerivedArtifactReceipt[];
+  note: string;
+}
+
 /**
  * Closed over producers that actually exist. Add another receipt variant only with the
  * corresponding ingest producer and runtime assertion; do not make provider fields optional.
  */
-export type IngestReceipt = YouTubeIngestReceipt | OwnedLocalIngestReceipt;
+export type IngestReceipt = YouTubeIngestReceipt | OwnedLocalIngestReceipt | YouTubeLocalIngestReceipt;
 
 /** Exact local media facts written by scripts/probe-media.mjs from ffprobe output. */
 export interface MediaProbeTrack {

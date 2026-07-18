@@ -125,11 +125,27 @@ export function assertProductionSourceSession(
   literal(item.schema, "studio.source-session.v1", context, "session.schema");
   string(item.sessionId, context, "session.sessionId");
   string(item.revisionId, context, "session.revisionId");
-  literal(item.adapterId, "owned-local-source-adapter.v1", context, "session.adapterId");
+  oneOf(
+    item.adapterId,
+    new Set(["owned-local-source-adapter.v1", "youtube-local-source-adapter.v1"]),
+    context,
+    "session.adapterId",
+  );
 
   const receipt = object(item.sourceReceipt, context, "session.sourceReceipt");
   exact(receipt, ["schema", "receiptId", "contentId", "rightsScope"], context, "session.sourceReceipt");
-  literal(receipt.schema, "studio.ingest.owned-local.v1", context, "session.sourceReceipt.schema");
+  oneOf(
+    receipt.schema,
+    new Set(["studio.ingest.owned-local.v1", "studio.ingest.youtube-local.v1"]),
+    context,
+    "session.sourceReceipt.schema",
+  );
+  if (
+    (item.adapterId === "owned-local-source-adapter.v1") !==
+    (receipt.schema === "studio.ingest.owned-local.v1")
+  ) {
+    fail(context, "session.sourceReceipt.schema", "does not match the registered source adapter");
+  }
   string(receipt.receiptId, context, "session.sourceReceipt.receiptId");
   contentId(receipt.contentId, context, "session.sourceReceipt.contentId");
   oneOf(

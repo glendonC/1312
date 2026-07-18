@@ -232,7 +232,7 @@ test("source bytes changed after registration fail revalidation before command a
   try {
     const receipt = JSON.parse(await readFile(join(source, "source.json"), "utf8")) as { raw_media: { path: string } };
     await appendFile(join(source, receipt.raw_media.path), "drift");
-    await assert.rejects(runtime.service.start(runtime.request), /no longer passes owned-source/);
+    await assert.rejects(runtime.service.start(runtime.request), /no longer passes local-source/);
     assert.equal((await runtime.store.list()).length, 0);
   } finally {
     await cleanup(runtime);

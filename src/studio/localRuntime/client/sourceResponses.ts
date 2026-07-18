@@ -21,6 +21,7 @@ export function sourceSummary(value: unknown, index: number): RuntimeHostSourceS
     "sourceSessionId",
     "sourceRevisionId",
     "sourceContentId",
+    "sourceKind",
     "label",
     "rightsScope",
     "durationMs",
@@ -31,10 +32,14 @@ export function sourceSummary(value: unknown, index: number): RuntimeHostSourceS
   if (item.rightsScope !== "local_processing" && item.rightsScope !== "redistribution") {
     fail(`${context}.rightsScope`, "is unsupported.");
   }
+  if (item.sourceKind !== "owned_local" && item.sourceKind !== "youtube_local") {
+    fail(`${context}.sourceKind`, "is unsupported.");
+  }
   if (![
     "studio.preflight-bundle.v1",
     "studio.preflight-bundle.v2",
     "studio.preflight-bundle.v3",
+    "studio.preflight-bundle.v4",
   ].includes(item.preflightSchema as string)) {
     fail(`${context}.preflightSchema`, "is unsupported.");
   }
@@ -42,6 +47,7 @@ export function sourceSummary(value: unknown, index: number): RuntimeHostSourceS
     sourceSessionId: identity(item.sourceSessionId, `${context}.sourceSessionId`),
     sourceRevisionId: identity(item.sourceRevisionId, `${context}.sourceRevisionId`),
     sourceContentId: contentId(item.sourceContentId, `${context}.sourceContentId`),
+    sourceKind: item.sourceKind as RuntimeHostSourceSummary["sourceKind"],
     label: string(item.label, `${context}.label`),
     rightsScope: item.rightsScope as RuntimeHostSourceSummary["rightsScope"],
     durationMs: integer(item.durationMs, `${context}.durationMs`, 1),

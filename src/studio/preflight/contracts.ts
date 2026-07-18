@@ -104,7 +104,7 @@ interface PreflightSourceReference {
 
 export interface PreflightBundleV1 {
   schema: "studio.preflight-bundle.v1";
-  producer: "scripts/preflight-owned-media.mjs";
+  producer: "scripts/preflight-owned-media.mjs" | "studio.youtube-local-preflight.v1";
   preflight_id: string;
   source: PreflightSourceReference;
   artifacts: PreflightArtifactV1[];

@@ -351,7 +351,10 @@ function validateV1(
   binding: PreflightSourceBinding,
   context: string,
 ): void {
-  exact(bundle.producer, "scripts/preflight-owned-media.mjs", context, "bundle.producer");
+  const producer = text(bundle.producer, context, "bundle.producer");
+  if (producer !== "scripts/preflight-owned-media.mjs" && producer !== "studio.youtube-local-preflight.v1") {
+    fail(context, "bundle.producer", "has no registered source-only preflight producer");
+  }
   exact(bundle.preflight_id, `preflight:${binding.raw.contentId}`, context, "bundle.preflight_id");
   const { findings } = commonArtifacts(bundle, binding, "v1", 3, context);
   for (const key of ["speech_activity", "language_ranges", "acoustic_ranges", "speaker_overlap", "complexity"] as const) {

@@ -43,6 +43,8 @@ export type {
   RuntimeHostStartAcknowledgement,
   RuntimeHostStartRequest,
   RuntimeHostStatus,
+  YouTubeLocalIngestRequest,
+  YouTubeLocalIngestStatus,
 } from "./model.ts";
 export {
   MAXIMUM_ACTIVE_PRIVATE_PLAYBACK_GRANTS,
@@ -79,5 +81,10 @@ export {
   DEFAULT_OWNED_MEDIA_INGEST_BYTES,
   OwnedMediaIngestService,
 } from "./ownedMediaIngest.ts";
+export {
+  DEFAULT_MAXIMUM_YOUTUBE_LOCAL_RANGE_MS,
+  YouTubeLocalIngestService,
+  type YouTubeLocalDownloader,
+} from "./youtubeLocalIngest.ts";
 export { parseRuntimeHostStartRequest } from "./validation.ts";
 export { adaptAuthenticatedProductionRuntime } from "../authenticatedStudioProjection.ts";

@@ -28,6 +28,7 @@ const SOURCE: RuntimeHostSourceSummary = {
   sourceSessionId: "source-session:fixture",
   sourceRevisionId: "source-revision:fixture",
   sourceContentId: CONTENT,
+  sourceKind: "owned_local",
   label: "Owned fixture clip",
   rightsScope: "redistribution",
   durationMs: 47_200,

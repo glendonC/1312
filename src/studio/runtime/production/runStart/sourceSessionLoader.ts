@@ -10,7 +10,11 @@ import type { AcousticObservations, AcousticTriageReceipt } from "../../../acous
 import { assertPreflightBundle } from "../../../preflight/preflightBundleValidation.ts";
 import { assertSourceReceipts } from "../../../preflight/receiptValidation.ts";
 import { preflightSourceBinding } from "../../../preflight/sourceAdapters.ts";
-import type { MediaProbeReceipt, OwnedLocalIngestReceipt } from "../../../types.ts";
+import type {
+  MediaProbeReceipt,
+  OwnedLocalIngestReceipt,
+  YouTubeLocalIngestReceipt,
+} from "../../../types.ts";
 import {
   assertProductionSourceSession,
   assertSourceArtifactDescriptor,
@@ -26,7 +30,7 @@ import type {
 const PREFLIGHT_FILES = ["preflight-v4.json", "preflight-v3.json", "preflight-v2.json", "preflight.json"] as const;
 const TRACK_KINDS = new Set(["audio", "video", "subtitle", "data", "attachment"]);
 
-export interface LoadedOwnedSourceSession {
+export interface LoadedSourceSession {
   session: ProductionSourceSession;
   descriptor: SourceArtifactDescriptor;
   playbackMimeType: BrowserPlaybackMimeType | null;
@@ -37,6 +41,9 @@ export interface LoadedOwnedSourceSession {
   directory: string;
   evidenceDescriptors: PreflightEvidenceArtifactDescriptor[];
 }
+
+/** Compatibility name for callers written before provider-neutral local source sessions landed. */
+export type LoadedOwnedSourceSession = LoadedSourceSession;
 
 export type BrowserPlaybackMimeType =
   | "audio/flac"
@@ -132,12 +139,82 @@ function contentMatches(measured: ContentIdentity, expected: { id: string; bytes
   }
 }
 
+function assertYouTubeLocalReceipt(
+  value: unknown,
+  probe: MediaProbeReceipt,
+): asserts value is YouTubeLocalIngestReceipt {
+  const source = value as Partial<YouTubeLocalIngestReceipt>;
+  if (
+    !source || typeof source !== "object" || source.schema !== "studio.ingest.youtube-local.v1" ||
+    source.kind !== "youtube_local" || source.producer !== "studio.youtube-local-ingest-host.v1"
+  ) throw new Error("Local source session: YouTube-local receipt has an unsupported producer or schema");
+  const digest = source.content?.hash?.digest;
+  if (
+    source.content?.hash?.algorithm !== "sha256" || typeof digest !== "string" ||
+    !/^[a-f0-9]{64}$/.test(digest) || source.content.id !== `sha256:${digest}` ||
+    !Number.isSafeInteger(source.content.bytes) || source.content.bytes < 1 ||
+    source.receipt_id !== `youtube-local:${digest}`
+  ) throw new Error("Local source session: YouTube-local content identity is invalid");
+  let canonical: URL;
+  try {
+    canonical = new URL(source.origin?.canonical_url ?? "");
+  } catch {
+    throw new Error("Local source session: YouTube-local canonical URL is invalid");
+  }
+  if (
+    canonical.protocol !== "https:" || canonical.hostname !== "www.youtube.com" ||
+    canonical.pathname !== "/watch" || canonical.searchParams.get("v") !== source.origin?.external_id ||
+    canonical.toString() !== `https://www.youtube.com/watch?v=${source.origin?.external_id ?? ""}` ||
+    !/^[A-Za-z0-9_-]+$/.test(source.origin?.external_id ?? "")
+  ) throw new Error("Local source session: YouTube-local provider identity is invalid");
+  if (
+    source.resolution?.schema !== "studio.remote-source-resolution.v1" ||
+    source.resolution.producer !== "studio.youtube-metadata-resolver" ||
+    source.resolution.tool?.id !== "yt-dlp" || !source.resolution.tool.version ||
+    !source.resolution.resolution_id?.startsWith("source-resolution:") ||
+    !/^sha256:[a-f0-9]{64}$/.test(source.resolution.content_id ?? "")
+  ) throw new Error("Local source session: YouTube-local resolution lineage is invalid");
+  if (
+    source.rights?.basis !== "operator_local_processing_confirmation" ||
+    source.rights.scope !== "local_processing" || source.rights.redistribution_allowed !== false ||
+    typeof source.rights.statement !== "string" || !source.rights.statement.includes("local processing only") ||
+    !Number.isFinite(Date.parse(source.rights.asserted_at ?? ""))
+  ) throw new Error("Local source session: YouTube-local processing confirmation is invalid");
+  if (
+    probe.schema !== "studio.media-probe.v1" || probe.producer !== "scripts/probe-media.mjs" ||
+    typeof probe.run !== "string" || !probe.run || !Number.isFinite(probe.duration) || probe.duration <= 0 ||
+    !Array.isArray(probe.tracks) || probe.tracks.length === 0
+  ) throw new Error("Local source session: YouTube-local media probe is invalid");
+  const selection = source.selection;
+  if (
+    !Number.isSafeInteger(selection?.provider_start_ms) || !Number.isSafeInteger(selection?.provider_end_ms) ||
+    selection!.provider_start_ms < 0 || selection!.provider_end_ms <= selection!.provider_start_ms ||
+    selection?.local_start !== 0 || typeof selection.local_end !== "number" ||
+    typeof selection.duration !== "number" || Math.abs(selection.local_end - selection.duration) > 0.001 ||
+    Math.abs(selection.duration - probe.duration) > 0.15
+  ) throw new Error("Local source session: YouTube-local bounded selection is invalid");
+  if (
+    source.raw_media?.path !== "raw/youtube-local.mp4" ||
+    source.raw_media.content_id !== source.content.id || source.raw_media.bytes !== source.content.bytes ||
+    source.raw_media.preservation !== "provider_bounded_download" || probe.media !== source.raw_media.path ||
+    probe.input?.content_id !== source.content.id || probe.input?.bytes !== source.content.bytes
+  ) throw new Error("Local source session: YouTube-local raw byte binding is invalid");
+  const derived = source.derived_artifacts;
+  if (
+    !Array.isArray(derived) || derived.length !== 1 || derived[0]?.kind !== "media_probe" ||
+    derived[0].path !== "media-probe.json" || derived[0].schema !== "studio.media-probe.v1" ||
+    derived[0].producer !== "scripts/probe-media.mjs" ||
+    derived[0].source_content_ids?.length !== 1 || derived[0].source_content_ids[0] !== source.content.id ||
+    !/^sha256:[a-f0-9]{64}$/.test(derived[0].content_hash)
+  ) throw new Error("Local source session: YouTube-local probe lineage is invalid");
+}
+
 /**
- * Load only producer-named files from an owned-media preflight directory. Receipt paths are
+ * Load only producer-named files from a registered local-source preflight directory. Receipt paths are
  * resolved by the host, every indexed byte is re-hashed, and no caller-supplied media path enters
  * the runtime descriptor.
  */
-export async function loadOwnedSourceSession(directoryValue: string): Promise<LoadedOwnedSourceSession> {
+export async function loadSourceSession(directoryValue: string): Promise<LoadedSourceSession> {
   if (!directoryValue.trim()) throw new Error("Local source session: source directory is required");
   const directory = resolve(directoryValue);
   const sourcePath = await containedFile(directory, "source.json", "source.json");
@@ -145,25 +222,25 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
   const sourceValue = await readJson(sourcePath, "source.json");
   const probeValue = await readJson(probePath, "media-probe.json");
   const { name: preflightName, value: preflightValue } = await selectedPreflight(directory);
-  const source = sourceValue as OwnedLocalIngestReceipt;
+  const source = sourceValue as OwnedLocalIngestReceipt | YouTubeLocalIngestReceipt;
   const probe = probeValue as MediaProbeReceipt;
-
-  assertSourceReceipts(
-    sourceValue,
-    probeValue,
-    {
-      runId: probe.run,
-      duration: probe.duration,
-      media: probe.media,
-      source: { kind: "owned_local" },
-    },
-    "Local source session receipts",
-  );
-  if (source.kind !== "owned_local") {
-    throw new Error("Local source session: only the owned/local source adapter is supported");
+  if (source.kind === "owned_local") {
+    assertSourceReceipts(
+      sourceValue,
+      probeValue,
+      {
+        runId: probe.run,
+        duration: probe.duration,
+        media: probe.media,
+        source: { kind: "owned_local" },
+      },
+      "Local source session receipts",
+    );
+  } else {
+    assertYouTubeLocalReceipt(sourceValue, probe);
   }
   const binding = preflightSourceBinding(source);
-  if (!binding) throw new Error("Local source session: owned receipt has no normalized source binding");
+  if (!binding) throw new Error("Local source session: receipt has no normalized source binding");
 
   const preflightSchema = (preflightValue as { schema?: unknown }).schema;
   const speechValue = preflightSchema === "studio.preflight-bundle.v2" || preflightSchema === "studio.preflight-bundle.v3" || preflightSchema === "studio.preflight-bundle.v4"
@@ -211,7 +288,7 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
   }
   const probeContent = measuredArtifacts.get(probeArtifact.artifact_id);
   if (!probeContent || probeContent.contentId !== source.derived_artifacts[0].content_hash) {
-    throw new Error("Local source session: media probe changed after owned ingest");
+    throw new Error("Local source session: media probe changed after ingest");
   }
   const preflightContent = await identifyFile(await containedFile(directory, preflightName, preflightName));
 
@@ -266,10 +343,11 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
         measuredArtifacts.get(preflight.findings.language_ranges)?.contentId
           ?? (() => { throw new Error("Local source session: language finding has no indexed receipt"); })(),
       ];
+  const youtubeLocal = source.kind === "youtube_local";
   const sessionBody = {
-    adapterId: "owned-local-source-adapter.v1" as const,
+    adapterId: youtubeLocal ? "youtube-local-source-adapter.v1" as const : "owned-local-source-adapter.v1" as const,
     sourceReceipt: {
-      schema: "studio.ingest.owned-local.v1" as const,
+      schema: source.schema,
       receiptId: source.receipt_id,
       contentId: sourceReceiptContent.contentId,
       rightsScope: source.rights.scope,
@@ -303,7 +381,7 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
   };
   assertProductionSourceSession(session);
 
-  const rawPath = await containedFile(directory, source.raw_media.path, "owned raw media");
+  const rawPath = await containedFile(directory, source.raw_media.path, "raw media");
   const descriptor: SourceArtifactDescriptor = {
     schema: "studio.source-artifact.v1",
     adapterId: session.adapterId,
@@ -338,3 +416,6 @@ export async function loadOwnedSourceSession(directoryValue: string): Promise<Lo
     evidenceDescriptors,
   };
 }
+
+/** Preserve the owned-specific entry point while all local providers use the same strict loader. */
+export const loadOwnedSourceSession = loadSourceSession;

@@ -13,6 +13,7 @@ import {
   RecordedCaptionFixtureExecutor,
   RuntimeSourceRegistry,
   RuntimeStartService,
+  YouTubeLocalIngestService,
   codexOrchestratorLauncherFactory,
   codexWorkerLauncherFactory,
   createRuntimeHostHttpServer,
@@ -97,7 +98,9 @@ async function openAiKey(): Promise<string> {
 
 const runtimeRoot = resolve(value("--runtime-root") ?? resolve(REPOSITORY, ".studio/runtime-host"));
 const ownedIngestRoot = resolve(value("--owned-ingest-root") ?? resolve(REPOSITORY, ".studio/owned-sources"));
+const youtubeLocalIngestRoot = resolve(value("--youtube-local-ingest-root") ?? resolve(REPOSITORY, ".studio/youtube-local-sources"));
 const maximumOwnedMediaBytes = integer("--maximum-owned-media-bytes", 512 * 1024 * 1024);
+const maximumYouTubeLocalRangeMs = integer("--maximum-youtube-local-range-ms", 120_000);
 const sourceRoot = value("--source-root");
 const reviewerId = value("--reviewer-id") ?? "reviewer:local-operator";
 const reviewerLabel = value("--reviewer-label") ?? "Local review operator";
@@ -114,6 +117,12 @@ const ownedMediaIngest = await OwnedMediaIngestService.open({
   repositoryRoot: REPOSITORY,
   sources,
   maximumBytes: maximumOwnedMediaBytes,
+});
+const youtubeLocalIngest = await YouTubeLocalIngestService.open({
+  root: youtubeLocalIngestRoot,
+  repositoryRoot: REPOSITORY,
+  sources,
+  maximumRangeMs: maximumYouTubeLocalRangeMs,
 });
 const store = await DurableRuntimeCommandStore.open(runtimeRoot);
 const deterministic = executorMode === "deterministic" ? new DeterministicRuntimeExecutor() : null;
@@ -148,7 +157,7 @@ const service = await RuntimeStartService.open({
   languageExplanationExecutor,
 });
 const token = randomBytes(32).toString("hex");
-const server = createRuntimeHostHttpServer({ service, ownedMediaIngest, token, allowedOrigins });
+const server = createRuntimeHostHttpServer({ service, ownedMediaIngest, youtubeLocalIngest, token, allowedOrigins });
 const listening = await listenRuntimeHost(server, {
   host: value("--host") ?? "127.0.0.1",
   port: integer("--port", 4312),
@@ -163,6 +172,11 @@ process.stdout.write(`${JSON.stringify({
   ownedMediaIngest: {
     enabled: true,
     maximumBytes: maximumOwnedMediaBytes,
+  },
+  youtubeLocalIngest: {
+    enabled: true,
+    maximumRangeMs: maximumYouTubeLocalRangeMs,
+    publication: "private-local-processing-only",
   },
   reviewer: { id: reviewerId, label: reviewerLabel },
   runtimeRoot,

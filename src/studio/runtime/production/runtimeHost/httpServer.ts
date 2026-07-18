@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { RuntimeHostError, safeRuntimeHostError } from "./errors.ts";
 import { validatePollCursor } from "./journalPolling.ts";
 import { OwnedMediaIngestService } from "./ownedMediaIngest.ts";
+import { YouTubeLocalIngestService } from "./youtubeLocalIngest.ts";
 import { RuntimeStartService } from "./service.ts";
 import { parsePrivatePlaybackRange } from "./privatePlayback.ts";
 
@@ -12,6 +13,7 @@ export const DEFAULT_RUNTIME_HOST_BODY_BYTES = 64 * 1024;
 export interface RuntimeHostHttpOptions {
   service: RuntimeStartService;
   ownedMediaIngest?: OwnedMediaIngestService;
+  youtubeLocalIngest?: YouTubeLocalIngestService;
   token: string;
   allowedOrigins: string[];
   maximumBodyBytes?: number;
@@ -244,6 +246,30 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
         return;
       }
 
+      if (url.pathname === "/v1/youtube-local-ingests") {
+        if (!options.youtubeLocalIngest) {
+          throw new RuntimeHostError("youtube_local_ingest_unavailable", "Private YouTube-local ingest is not enabled.", 404);
+        }
+        if (request.method !== "POST") {
+          throw new RuntimeHostError("method_not_allowed", "Only POST is supported for this endpoint.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+          throw new RuntimeHostError(
+            "unsupported_content_type",
+            "YouTube-local ingest metadata requires Content-Type: application/json.",
+            415,
+          );
+        }
+        sendJson(
+          response,
+          202,
+          options.youtubeLocalIngest.create(await readJsonBody(request, maximumBytes)),
+          origin,
+        );
+        return;
+      }
+
       const ingestMediaId = routeIdentity(url.pathname, /^\/v1\/owned-media-ingests\/([^/]+)\/media$/);
       if (ingestMediaId !== null) {
         if (!options.ownedMediaIngest) {
@@ -274,6 +300,19 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
         }
         if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
         sendJson(response, 200, options.ownedMediaIngest.status(ingestId), origin);
+        return;
+      }
+
+      const youtubeIngestId = routeIdentity(url.pathname, /^\/v1\/youtube-local-ingests\/([^/]+)$/);
+      if (youtubeIngestId !== null) {
+        if (!options.youtubeLocalIngest) {
+          throw new RuntimeHostError("youtube_local_ingest_unavailable", "Private YouTube-local ingest is not enabled.", 404);
+        }
+        if (request.method !== "GET") {
+          throw new RuntimeHostError("method_not_allowed", "Only GET is supported for this endpoint.", 405);
+        }
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        sendJson(response, 200, options.youtubeLocalIngest.status(youtubeIngestId), origin);
         return;
       }
 

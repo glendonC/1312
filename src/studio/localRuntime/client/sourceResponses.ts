@@ -1,6 +1,7 @@
 import type {
   OwnedMediaIngestStatus,
   RuntimeHostSourceSummary,
+  YouTubeLocalIngestStatus,
 } from "../../runtime/production/runtimeHost/model.ts";
 import {
   boolean,
@@ -94,6 +95,51 @@ export function ingestStatus(value: unknown): OwnedMediaIngestStatus {
   }
   return {
     schema: "studio.owned-media-ingest.v1",
+    ingestId: identity(item.ingestId, `${context}.ingestId`),
+    status,
+    updatedAt: timestamp(item.updatedAt, `${context}.updatedAt`),
+    source,
+    failure,
+  };
+}
+
+const YOUTUBE_INGEST_FAILURE_CODES = new Set([
+  "resolution_failed",
+  "download_failed",
+  "probe_failed",
+  "seal_failed",
+  "registration_failed",
+]);
+
+export function youtubeLocalIngestStatus(value: unknown): YouTubeLocalIngestStatus {
+  const context = "YouTube local ingest";
+  const item = object(value, context);
+  exact(item, ["schema", "ingestId", "status", "updatedAt", "source", "failure"], context);
+  if (item.schema !== "studio.youtube-local-ingest.v1") fail(context, "schema is unsupported.");
+  if (![
+    "queued", "resolving", "downloading", "probing", "sealing", "registered", "failed",
+  ].includes(item.status as string)) fail(`${context}.status`, "is unsupported.");
+  const status = item.status as YouTubeLocalIngestStatus["status"];
+  const source = item.source === null ? null : sourceSummary(item.source, 0);
+  let failure: YouTubeLocalIngestStatus["failure"] = null;
+  if (item.failure !== null) {
+    const detail = object(item.failure, `${context}.failure`);
+    exact(detail, ["code", "message"], `${context}.failure`);
+    if (!YOUTUBE_INGEST_FAILURE_CODES.has(detail.code as string)) fail(`${context}.failure.code`, "is unsupported.");
+    const message = string(detail.message, `${context}.failure.message`);
+    if (message.length > 256) fail(`${context}.failure.message`, "is too long.");
+    failure = {
+      code: detail.code as NonNullable<YouTubeLocalIngestStatus["failure"]>["code"],
+      message,
+    };
+  }
+  if (
+    (status === "registered") !== (source !== null) ||
+    (status === "failed") !== (failure !== null) ||
+    (source !== null && source.sourceKind !== "youtube_local")
+  ) fail(context, "source authority or failure detail does not match the terminal state.");
+  return {
+    schema: "studio.youtube-local-ingest.v1",
     ingestId: identity(item.ingestId, `${context}.ingestId`),
     status,
     updatedAt: timestamp(item.updatedAt, `${context}.updatedAt`),

@@ -412,7 +412,7 @@ export default function ProductionProcessingCanvas({
           <span />
         </div>
         <div>
-          <span className="processing-kicker">Registered owned source</span>
+          <span className="processing-kicker">Registered {source.sourceKind === "youtube_local" ? "YouTube-local" : "owned"} source</span>
           <h2 id="processing-source-title">{source.label}</h2>
           <p>
             {seconds(source.durationMs)} · {source.trackCount} {source.trackCount === 1 ? "track" : "tracks"} · local processing

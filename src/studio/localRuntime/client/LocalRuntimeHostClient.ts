@@ -20,6 +20,8 @@ import type {
   RuntimeHostStartAcknowledgement,
   RuntimeHostStartRequest,
   RuntimeHostStatus,
+  YouTubeLocalIngestRequest,
+  YouTubeLocalIngestStatus,
 } from "../../runtime/production/runtimeHost/model.ts";
 import {
   assessmentAuditResponse,
@@ -46,7 +48,7 @@ import {
   publishReviewIntakeResponse,
 } from "./reviewResponses.ts";
 import { pollResponse, statusResponse } from "./runtimeResponses.ts";
-import { ingestStatus, sourceSummary } from "./sourceResponses.ts";
+import { ingestStatus, sourceSummary, youtubeLocalIngestStatus } from "./sourceResponses.ts";
 import {
   privatePlaybackGrantResponse,
   privatePlaybackRevocationResponse,
@@ -168,6 +170,21 @@ export class LocalRuntimeHostClient {
   async ownedMediaIngestStatus(ingestId: string): Promise<OwnedMediaIngestStatus> {
     const stableId = identity(ingestId, "Owned media ingest id");
     return ingestStatus(await this.request(`/v1/owned-media-ingests/${encodeURIComponent(stableId)}`));
+  }
+
+  async createYouTubeLocalIngest(request: YouTubeLocalIngestRequest): Promise<YouTubeLocalIngestStatus> {
+    return youtubeLocalIngestStatus(await this.request("/v1/youtube-local-ingests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    }));
+  }
+
+  async youtubeLocalIngestStatus(ingestId: string): Promise<YouTubeLocalIngestStatus> {
+    const stableId = identity(ingestId, "YouTube local ingest id");
+    return youtubeLocalIngestStatus(
+      await this.request(`/v1/youtube-local-ingests/${encodeURIComponent(stableId)}`),
+    );
   }
 
   async plan(request: RuntimeHostStartRequest): Promise<RuntimeHostPlanResponse> {

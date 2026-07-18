@@ -36,6 +36,14 @@ const SOURCE: RuntimeHostSourceSummary = {
   preflightSchema: "studio.preflight-bundle.v3",
   detectedLanguageEvidenceAvailable: true,
 };
+const YOUTUBE_SOURCE: RuntimeHostSourceSummary = {
+  ...SOURCE,
+  sourceSessionId: "source-session:youtube-fixture",
+  sourceRevisionId: "source-revision:youtube-fixture",
+  sourceKind: "youtube_local",
+  label: "YouTube local fixture clip",
+  rightsScope: "local_processing",
+};
 const PLAN_FORECAST = createForecastArtifact({
   artifact: {
     artifactId: "artifact:fixture",
@@ -507,6 +515,72 @@ test("browser client rejects ingest responses containing path-like extra fields"
       rightsScope: "local_processing",
       ownershipAttested: true,
     }),
+    (error: unknown) => error instanceof RuntimeHostClientError && error.code === "invalid_host_response",
+  );
+});
+
+test("browser client creates and validates a path-free YouTube-local ingest", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const ingestId = "youtube-ingest:00000000-0000-4000-8000-000000000002";
+  let statusReads = 0;
+  const fetcher = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = String(input);
+    calls.push({ url, init });
+    if (url.endsWith("/v1/youtube-local-ingests") && init?.method === "POST") {
+      return json({
+        schema: "studio.youtube-local-ingest.v1",
+        ingestId,
+        status: "queued",
+        updatedAt: "2026-07-18T12:00:00.000Z",
+        source: null,
+        failure: null,
+      }, 202);
+    }
+    statusReads += 1;
+    return json({
+      schema: "studio.youtube-local-ingest.v1",
+      ingestId,
+      status: "registered",
+      updatedAt: "2026-07-18T12:00:01.000Z",
+      source: YOUTUBE_SOURCE,
+      failure: null,
+    });
+  };
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: fetcher,
+  });
+  const request = {
+    url: "https://www.youtube.com/watch?v=LM03Client",
+    startMs: 12_000,
+    endMs: 42_000,
+    localProcessingConfirmed: true as const,
+  };
+  const queued = await client.createYouTubeLocalIngest(request);
+  const registered = await client.youtubeLocalIngestStatus(queued.ingestId);
+  assert.equal(registered.status, "registered");
+  assert.equal(registered.source?.sourceKind, "youtube_local");
+  assert.equal(statusReads, 1);
+  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), request);
+  assert.equal(calls.every((call) => new Headers(call.init?.headers).get("Authorization") === `Bearer ${"t".repeat(64)}`), true);
+});
+
+test("browser client rejects a YouTube-local terminal response that substitutes owned authority", async () => {
+  const client = new LocalRuntimeHostClient({
+    baseUrl: "http://127.0.0.1:4312",
+    token: "t".repeat(64),
+    fetch: async () => json({
+      schema: "studio.youtube-local-ingest.v1",
+      ingestId: "youtube-ingest:00000000-0000-4000-8000-000000000002",
+      status: "registered",
+      updatedAt: "2026-07-18T12:00:01.000Z",
+      source: SOURCE,
+      failure: null,
+    }),
+  });
+  await assert.rejects(
+    client.youtubeLocalIngestStatus("youtube-ingest:00000000-0000-4000-8000-000000000002"),
     (error: unknown) => error instanceof RuntimeHostClientError && error.code === "invalid_host_response",
   );
 });

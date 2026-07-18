@@ -505,25 +505,6 @@ function StudioSourceOptions({ openLocalSource, selectSample }: StudioWelcomePro
   );
 }
 
-function YouTubeLocalIngestEntry({ onClose }: { onClose: () => void }) {
-  return (
-    <section
-      className="input-status"
-      data-source-mode="youtube-local"
-      role="region"
-      aria-labelledby="youtube-local-ingest-title"
-    >
-      <span className="input-status-kicker">Live local source</span>
-      <strong id="youtube-local-ingest-title">YouTube local ingest</strong>
-      <p>
-        The private runtime-host downloader is not wired in this milestone. No URL was resolved,
-        no media was downloaded, and no recorded run was substituted.
-      </p>
-      <button type="button" className="ghost" onClick={onClose}>Back to source choices</button>
-    </section>
-  );
-}
-
 export default function InputAct() {
   const [processingMock] = useState<ProcessingMockScenario | null>(() => {
     if (!import.meta.env.DEV || typeof window === "undefined") return null;
@@ -568,24 +549,21 @@ export default function InputAct() {
     >
       <div className="canvas" aria-hidden="true" />
 
-      {localSourceMode === "owned" && loadStatus === "ready" && (
+      {localSourceMode !== null && loadStatus === "ready" && (
         <Suspense
           fallback={(
             <div className="input-status" role="status" aria-live="polite">
-              <span className="input-status-kicker">Owned local source</span>
+              <span className="input-status-kicker">{localSourceMode === "youtube" ? "YouTube local source" : "Owned local source"}</span>
               <p>Opening the local production surface…</p>
             </div>
           )}
         >
           <ProductLocalRuntime
             processingMock={processingMock}
+            sourceMode={localSourceMode}
             onClose={() => setLocalSourceMode(null)}
           />
         </Suspense>
-      )}
-
-      {localSourceMode === "youtube" && loadStatus === "ready" && (
-        <YouTubeLocalIngestEntry onClose={() => setLocalSourceMode(null)} />
       )}
 
       {localSourceMode === null && showWelcome && loadStatus === "ready" && (

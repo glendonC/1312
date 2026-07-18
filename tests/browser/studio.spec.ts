@@ -1,8 +1,20 @@
 import { createHash } from "node:crypto";
+import { copyFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { canonicalJsonLine } from "../../src/studio/runtime/production/observability/hash.ts";
+import {
+  DurableRuntimeCommandStore,
+  DeterministicRuntimeExecutor,
+  RuntimeSourceRegistry,
+  RuntimeStartService,
+  YouTubeLocalIngestService,
+  createRuntimeHostHttpServer,
+  listenRuntimeHost,
+} from "../../src/studio/runtime/production/runtimeHost/index.ts";
 
 function sourceResolutionReceipt(url: string, durationMs = 83_000) {
   const payload = {
@@ -223,14 +235,16 @@ test("the default Studio exposes a separate owned-source operator path", async (
 
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await expect(productRuntime).toBeVisible();
-  await expect(productRuntime.getByText("Local production path · separate from replay")).toBeVisible();
+  await productRuntime.getByRole("button", { name: "Open about this local production path" }).click();
   await expect(productRuntime.getByText(/a separate private caption job may be explicitly requested/)).toBeVisible();
   await expect(productRuntime.getByText(/Neither path uploads or publishes/)).toBeVisible();
   await expect(productRuntime.getByText(/Submitted YouTube URLs remain unprocessed recorded previews/)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await productRuntime.getByRole("button", { name: "Open connect to local host" }).click();
   await productRuntime.getByText("Local host setup and CLI escape hatch").click();
   await expect(productRuntime.getByText(/run-runtime-host\.ts --executor deterministic/)).toBeVisible();
   await expect(productRuntime.getByText(/--source-directory/)).toBeVisible();
-  await expect(productRuntime.getByRole("button", { name: "Connect to local host" })).toBeDisabled();
+  await expect(productRuntime.getByRole("button", { name: "Connect to local host", exact: true })).toBeDisabled();
 
   await productRuntime.getByRole("button", { name: "Exit setup" }).click();
   await expect(page.getByRole("button", { name: "Preview YouTube with recorded demo" })).toBeVisible();
@@ -630,26 +644,88 @@ test("source authority options separate live local ingest from recorded preview"
   }
 });
 
-test("YouTube local ingest fails closed without creating a recorded preview", async ({ page }) => {
+test("YouTube local ingest registers exact local bytes and enters the existing plan/start flow without replay", async ({ page }, testInfo) => {
+  test.setTimeout(30_000);
+  test.skip(testInfo.project.name !== "desktop", "one real local-host browser walk is sufficient");
   const metadataRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/studio/source-resolutions")) metadataRequests.push(request.url());
   });
-
+  const directory = await mkdtemp(join(tmpdir(), "studio-youtube-local-browser-"));
+  const sources = await RuntimeSourceRegistry.open({ sourceDirectories: [] });
+  const store = await DurableRuntimeCommandStore.open(join(directory, "runtime"));
+  const executor = new DeterministicRuntimeExecutor();
+  const service = await RuntimeStartService.open({
+    store,
+    sources,
+    launcherFactory: executor.factory(),
+    recoverOnOpen: false,
+  });
+  const youtubeLocalIngest = await YouTubeLocalIngestService.open({
+    root: join(directory, "youtube-sources"),
+    repositoryRoot: resolve("."),
+    sources,
+    maximumRangeMs: 120_000,
+    resolveSource: async (raw) => sourceResolutionReceipt(raw),
+    download: async ({ outputPath }) => copyFile(resolve("public/demo/runs/run-005/clip.m4a"), outputPath),
+  });
+  const token = "b".repeat(64);
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "YouTube local ingest" }).click();
+  const origin = new URL(page.url()).origin;
+  const server = createRuntimeHostHttpServer({
+    service,
+    youtubeLocalIngest,
+    token,
+    allowedOrigins: [origin],
+  });
+  try {
+    const address = await listenRuntimeHost(server, { port: 0 });
+    await page.goto(`/studio/?runtimeHost=${encodeURIComponent(`http://${address.host}:${address.port}`)}`);
+    await page.getByRole("button", { name: "YouTube local ingest" }).click();
 
-  const boundary = page.getByRole("region", { name: "YouTube local ingest" });
-  await expect(boundary).toBeVisible();
-  await expect(boundary).toContainText("No URL was resolved");
-  await expect(boundary).toContainText("no recorded run was substituted");
-  await expect(page.locator(".studio")).toHaveAttribute("data-stage", "input");
-  await expect(page.locator("#top-source-provenance")).toHaveCount(0);
-  await expect(page.getByText("This interface preview uses a recorded run.")).toHaveCount(0);
-  expect(metadataRequests).toEqual([]);
+    const productRuntime = page.getByRole("region", { name: "YouTube local source" });
+    await expect(productRuntime).toBeVisible();
+    await productRuntime.getByRole("button", { name: "Open connect to local host" }).click();
+    await productRuntime.getByRole("textbox", { name: "Paste-once bearer token", exact: true }).fill(token);
+    await productRuntime.getByRole("button", { name: "Connect to local host", exact: true }).click();
+    await productRuntime.getByRole("textbox", { name: "YouTube URL for local processing", exact: true }).fill("https://www.youtube.com/watch?v=fixturevideo");
+    await productRuntime.getByRole("spinbutton", { name: "YouTube start seconds", exact: true }).fill("0");
+    await productRuntime.getByRole("spinbutton", { name: "YouTube end seconds", exact: true }).fill("47.2");
+    const confirm = productRuntime.getByRole("button", { name: "Confirm local processing and ingest" });
+    await expect(confirm).toBeDisabled();
+    await productRuntime.getByLabel(/I confirm this exact YouTube range/).check();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
 
-  await page.getByRole("button", { name: "Back to source choices" }).click();
-  await expect(page.getByRole("button", { name: "Preview YouTube with recorded demo" })).toBeVisible();
+    const progress = productRuntime.getByRole("status", { name: "YouTube local ingest progress" });
+    await expect(progress).toHaveAttribute("data-state", "registered", { timeout: 15_000 });
+    await expect(progress).toContainText("registered and selected");
+    await expect(productRuntime.getByLabel("Registered YouTube local source")).toContainText("Resolved browser-test video");
+    await expect(productRuntime.locator(".product-runtime-source-facts")).toContainText("YouTube / local");
+    await page.keyboard.press("Escape");
+
+    await productRuntime.getByRole("button", { name: "Continue to Range" }).click();
+    await productRuntime.getByRole("button", { name: "Continue to Language" }).click();
+    await productRuntime.getByLabel("Declared source language").fill("ko");
+    await productRuntime.getByRole("button", { name: "Continue to Output" }).click();
+    await productRuntime.getByRole("button", { name: "Continue to Forecast" }).click();
+    await expect(productRuntime.getByRole("region", { name: "Review the local runtime plan" })).toBeVisible();
+    await productRuntime.getByRole("button", { name: "Continue to Review" }).click();
+    await productRuntime.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
+    const status = productRuntime.getByRole("region", { name: "Local runtime status" });
+    await expect(status.getByRole("heading", { name: "Terminal", exact: true })).toBeVisible({ timeout: 10_000 });
+
+    await expect(page.locator(".studio")).toHaveAttribute("data-stage", "input");
+    await expect(page.locator("#top-source-provenance")).toHaveCount(0);
+    await expect(page.getByText("This interface preview uses a recorded run.")).toHaveCount(0);
+    await expect(page.locator('[data-source-run="run-006"]')).toHaveCount(0);
+    expect(metadataRequests).toEqual([]);
+    expect(sources.list()).toHaveLength(1);
+    expect(sources.list()[0].sourceKind).toBe("youtube_local");
+  } finally {
+    await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+  }
 });
 
 test("a failed source check reports directly above the source dock", async ({ page }) => {

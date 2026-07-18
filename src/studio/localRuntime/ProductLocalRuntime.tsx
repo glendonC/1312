@@ -40,6 +40,7 @@ import type {
   RuntimeHostPublishReviewRevocationRequest,
   RuntimeHostSourceSummary,
   RuntimeHostStartRequest,
+  YouTubeLocalIngestStatus,
 } from "../runtime/production/runtimeHost/model";
 // Type-only: the ProductionStudioAdapter *value* pulls the server runtime (node:crypto via the
 // artifact store) which cannot load in the browser. It is instantiated behind a dynamic import at
@@ -69,6 +70,7 @@ import {
 import "./productLocalRuntime.css";
 
 type Busy = "connect" | "ingest" | "plan" | "start" | null;
+export type ProductLocalSourceMode = "owned" | "youtube";
 
 interface ReviewedPlan {
   request: RuntimeHostStartRequest;
@@ -94,9 +96,11 @@ interface RuntimeView {
 export default function ProductLocalRuntime({
   onClose,
   processingMock = null,
+  sourceMode = "owned",
 }: {
   onClose: () => void;
   processingMock?: ProcessingMockScenario | null;
+  sourceMode?: ProductLocalSourceMode;
 }) {
   const [baseUrl, setBaseUrl] = useState(defaultHostUrl);
   const [token, setToken] = useState("");
@@ -107,7 +111,11 @@ export default function ProductLocalRuntime({
   const [sourceLabel, setSourceLabel] = useState("");
   const [rightsHolder, setRightsHolder] = useState("");
   const [ownershipAttested, setOwnershipAttested] = useState(false);
-  const [ingest, setIngest] = useState<OwnedMediaIngestStatus | null>(null);
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeStartSeconds, setYoutubeStartSeconds] = useState(0);
+  const [youtubeEndSeconds, setYoutubeEndSeconds] = useState(120);
+  const [youtubeLocalProcessingConfirmed, setYoutubeLocalProcessingConfirmed] = useState(false);
+  const [ingest, setIngest] = useState<OwnedMediaIngestStatus | YouTubeLocalIngestStatus | null>(null);
   const [analysisRequest, setAnalysisRequest] = useState<AnalysisRequest>(() => initialRequest("en", 0));
   const [sourceLanguage, setSourceLanguage] = useState("");
   const [languagePackId, setLanguagePackId] = useState("");
@@ -133,7 +141,9 @@ export default function ProductLocalRuntime({
   const aboutTrigger = useRef<HTMLButtonElement>(null);
   const hostTrigger = useRef<HTMLButtonElement>(null);
 
-  const selectedSource = sources.find((source) => source.sourceSessionId === sourceId) ?? null;
+  const requiredSourceKind = sourceMode === "youtube" ? "youtube_local" : "owned_local";
+  const visibleSources = sources.filter((source) => source.sourceKind === requiredSourceKind);
+  const selectedSource = visibleSources.find((source) => source.sourceSessionId === sourceId) ?? null;
   const lifecycle = runtime
     ? projectLocalRuntimeLifecycle(runtime.status.lifecycle, runtime.status.reason)
     : null;
@@ -147,13 +157,27 @@ export default function ProductLocalRuntime({
   const languageValid = isLocalRuntimeLanguageTag(sourceLanguage) &&
     isLocalRuntimeLanguageTag(analysisRequest.targetLanguage);
   const requestValid = rangeValid && languageValid;
-  const ingestValid = client !== null &&
+  const ownedIngestValid = sourceMode === "owned" && client !== null &&
     ownedFile !== null &&
     sourceLabel.trim().length > 0 &&
     rightsHolder.trim().length > 0 &&
     ownershipAttested &&
     (ingest === null || ingest.status === "failed") &&
     busy === null;
+  let youtubeUrlValid = false;
+  try {
+    const parsed = new URL(youtubeUrl);
+    youtubeUrlValid = parsed.protocol === "https:" &&
+      new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]).has(parsed.hostname);
+  } catch {
+    youtubeUrlValid = false;
+  }
+  const youtubeIngestValid = sourceMode === "youtube" && client !== null && youtubeUrlValid &&
+    Number.isFinite(youtubeStartSeconds) && Number.isFinite(youtubeEndSeconds) &&
+    youtubeStartSeconds >= 0 && youtubeEndSeconds > youtubeStartSeconds &&
+    youtubeEndSeconds - youtubeStartSeconds <= 120 &&
+    youtubeLocalProcessingConfirmed &&
+    (ingest === null || ingest.status === "failed") && busy === null;
 
   useEffect(() => () => {
     pollGeneration.current += 1;
@@ -206,7 +230,7 @@ export default function ProductLocalRuntime({
       setBaseUrl(nextClient.baseUrl);
       setClient(nextClient);
       setSources(nextSources);
-      const first = nextSources[0] ?? null;
+      const first = nextSources.find((source) => source.sourceKind === requiredSourceKind) ?? null;
       setSourceId(first?.sourceSessionId ?? "");
       setAnalysisRequest(initialRequest("en", (first?.durationMs ?? 0) / 1_000));
     } catch (nextError) {
@@ -220,7 +244,7 @@ export default function ProductLocalRuntime({
   }
 
   function chooseSource(nextId: string): void {
-    const next = sources.find((source) => source.sourceSessionId === nextId);
+    const next = visibleSources.find((source) => source.sourceSessionId === nextId);
     if (!next) return;
     clearReviewedState();
     setSourceId(nextId);
@@ -230,7 +254,7 @@ export default function ProductLocalRuntime({
   }
 
   async function ingestOwnedMedia(): Promise<void> {
-    if (!client || !ownedFile || !ingestValid) return;
+    if (!client || !ownedFile || !ownedIngestValid) return;
     stopPolling();
     productionAdapter.current = null;
     const generation = ++ingestGeneration.current;
@@ -261,6 +285,9 @@ export default function ProductLocalRuntime({
         setIngest(status);
       }
       if (status.status === "failed" || !status.source) return;
+      if (status.source.sourceKind !== "owned_local") {
+        throw new Error("The owned ingest returned a different source authority.");
+      }
 
       const nextSources = await client.listSourceSessions();
       if (generation !== ingestGeneration.current) return;
@@ -281,13 +308,62 @@ export default function ProductLocalRuntime({
     }
   }
 
+  async function ingestYouTubeLocal(): Promise<void> {
+    if (!client || !youtubeIngestValid) return;
+    stopPolling();
+    productionAdapter.current = null;
+    const generation = ++ingestGeneration.current;
+    setBusy("ingest");
+    setError(null);
+    setReviewed(null);
+    setRuntime(null);
+    setIngest(null);
+    try {
+      let status = await client.createYouTubeLocalIngest({
+        url: youtubeUrl,
+        startMs: Math.round(youtubeStartSeconds * 1_000),
+        endMs: Math.round(youtubeEndSeconds * 1_000),
+        localProcessingConfirmed: true,
+      });
+      if (generation !== ingestGeneration.current) return;
+      setIngest(status);
+      while (status.status !== "registered" && status.status !== "failed") {
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+        status = await client.youtubeLocalIngestStatus(status.ingestId);
+        if (generation !== ingestGeneration.current) return;
+        setIngest(status);
+      }
+      if (status.status === "failed" || !status.source) return;
+      if (status.source.sourceKind !== "youtube_local") {
+        throw new Error("The YouTube-local ingest returned a different source authority.");
+      }
+      const nextSources = await client.listSourceSessions();
+      if (generation !== ingestGeneration.current) return;
+      const registered = nextSources.find((source) =>
+        source.sourceKind === "youtube_local" &&
+        source.sourceSessionId === status.source?.sourceSessionId &&
+        source.sourceRevisionId === status.source?.sourceRevisionId
+      );
+      if (!registered) throw new Error("The registered YouTube ingest is absent from the host source list.");
+      setSources(nextSources);
+      setSourceId(registered.sourceSessionId);
+      setSourceLanguage("");
+      setLanguagePackId("");
+      setAnalysisRequest(initialRequest("en", registered.durationMs / 1_000));
+    } catch (nextError) {
+      if (generation === ingestGeneration.current) setError(errorMessage(nextError));
+    } finally {
+      if (generation === ingestGeneration.current) setBusy(null);
+    }
+  }
+
   function updateRequest(update: Partial<AnalysisRequest>): void {
     clearReviewedState();
     setAnalysisRequest((current) => ({ ...current, ...update }));
   }
 
   function buildRequest(): RuntimeHostStartRequest {
-    if (!selectedSource) throw new Error("Select a registered owned source first.");
+    if (!selectedSource) throw new Error("Select a registered local source first.");
     return mapAnalysisRequestToRuntimeStart({
       source: selectedSource,
       analysisRequest,
@@ -707,7 +783,7 @@ export default function ProductLocalRuntime({
   const setupBusyCopy = busy === "connect"
     ? "Connecting local host"
     : busy === "ingest"
-      ? "Ingesting owned media"
+      ? sourceMode === "youtube" ? "Ingesting YouTube range" : "Ingesting owned media"
       : busy === "plan"
         ? "Reviewing local plan"
         : busy === "start"
@@ -723,7 +799,8 @@ export default function ProductLocalRuntime({
       ref={runtimeRoot}
       className="product-runtime"
       data-runtime={runtime !== null}
-      aria-label={runtime ? undefined : "Owned local source"}
+      data-source-mode={sourceMode}
+      aria-label={runtime ? undefined : sourceMode === "youtube" ? "YouTube local source" : "Owned local source"}
       aria-labelledby={runtime ? "product-runtime-title" : undefined}
     >
       {runtime ? (
@@ -731,7 +808,7 @@ export default function ProductLocalRuntime({
           <header className="product-runtime-header">
             <div>
               <span>Local production path · separate from replay</span>
-              <h1 id="product-runtime-title">Owned local source</h1>
+              <h1 id="product-runtime-title">{sourceMode === "youtube" ? "YouTube local source" : "Owned local source"}</h1>
             </div>
             <button type="button" onClick={onClose}>Back to source choices</button>
           </header>
@@ -819,7 +896,7 @@ export default function ProductLocalRuntime({
               </div>
             </div>
             <div className="welcome-guide-copy">
-              <strong>Owned media guide</strong>
+              <strong>{sourceMode === "youtube" ? "YouTube local guide" : "Owned media guide"}</strong>
               <span role="status" aria-live="polite">
                 {client ? selectedSource ? "Source ready" : "Add a source" : "Connect local host"}
               </span>
@@ -855,13 +932,15 @@ export default function ProductLocalRuntime({
                 >
                   {setupStage === "source" && (
                     <section className="preflight-preparation preflight-source-stage product-runtime-source">
-                      <div className="preflight-source-conversation" role="note" aria-label="Owned local source boundary">
+                      <div className="preflight-source-conversation" role="note" aria-label={sourceMode === "youtube" ? "YouTube local source boundary" : "Owned local source boundary"}>
                         <h2 ref={setupHeading} id="preflight-stage-title" tabIndex={-1}>
                           {client
                             ? selectedSource
-                              ? <>I’ve registered <ConversationValue>{selectedSource.label}</ConversationValue>. Open <b>Local host</b> to choose or replace the owned source, or continue.</>
-                              : <>Register media you own or control from <b>Local host</b>, then continue.</>
-                            : <>Connect the local source host with a paste-once bearer token to register media you own — open <b>Connect host</b> to begin. Nothing is uploaded to a remote service.</>}
+                              ? <>I’ve registered <ConversationValue>{selectedSource.label}</ConversationValue>. Open <b>Local host</b> to choose or replace this {sourceMode === "youtube" ? "YouTube-local" : "owned"} source, or continue.</>
+                              : sourceMode === "youtube"
+                                ? <>Submit a bounded YouTube range from <b>Local host</b>, confirm local processing only, then continue.</>
+                                : <>Register media you own or control from <b>Local host</b>, then continue.</>
+                            : <>Connect the local source host with a paste-once bearer token — open <b>Connect host</b> to begin. Nothing is uploaded to a 1321 remote service.</>}
                         </h2>
                       </div>
                     </section>
@@ -922,7 +1001,7 @@ export default function ProductLocalRuntime({
                       <StageConversation headingRef={setupHeading}>
                         I’ve reviewed a <ConversationValue>studio.forecast.v1</ConversationValue> workload floor of{" "}
                         <ConversationValue>{seconds(workload.requestedOperationMediaDurationMs)} across {workload.operationCount} {workload.operationCount === 1 ? "operation" : "operations"}</ConversationValue> for{" "}
-                        <ConversationValue>{selectedSource?.label ?? "the owned source"}</ConversationValue>. Elapsed time, model usage, and cost stay unavailable rather than invented.
+                        <ConversationValue>{selectedSource?.label ?? "the local source"}</ConversationValue>. Elapsed time, model usage, and cost stay unavailable rather than invented.
                       </StageConversation>
                       <p className="product-runtime-forecast-kicker">studio.forecast.v1 · not started or frozen</p>
                       <dl><div><dt>Selected range</dt><dd>{seconds(reviewed.response.forecast.inputs.selectedRange.startMs)}–{seconds(reviewed.response.forecast.inputs.selectedRange.endMs)} · {seconds(workload.selectedMediaDurationMs)}</dd></div><div><dt>Workload floor</dt><dd>{seconds(workload.requestedOperationMediaDurationMs)} across {workload.operationCount} explicit {workload.operationCount === 1 ? "operation" : "operations"}</dd></div><div><dt>Elapsed time</dt><dd>Unavailable</dd></div><div><dt>Model usage</dt><dd>Unavailable</dd></div><div><dt>Estimated API cost</dt><dd>Unavailable · amount and currency are null</dd></div><div><dt>Forecast content</dt><dd>{reviewed.response.forecast.content.contentId}</dd></div></dl>
@@ -964,7 +1043,7 @@ export default function ProductLocalRuntime({
                 },
                 {
                   label: client ? "Local host" : "Connect host",
-                  actionLabel: client ? "Open local host and owned media" : "Open connect to local host",
+                  actionLabel: client ? `Open local host and ${sourceMode === "youtube" ? "YouTube ingest" : "owned media"}` : "Open connect to local host",
                   open: openSourcePopover === "host",
                   popoverId: "product-runtime-host-popover",
                   triggerRef: hostTrigger,
@@ -989,7 +1068,9 @@ export default function ProductLocalRuntime({
                   onClose={() => setOpenSourcePopover(null)}
                 >
                   <p className="product-runtime-popover-note">
-                    This path registers receipted local media, reviews a real workload-floor forecast, and starts a bounded local runtime. After an exact verified human approval, a separate private caption job may be explicitly requested. Neither path uploads or publishes. Submitted YouTube URLs remain unprocessed recorded previews.
+                    {sourceMode === "owned"
+                      ? "This path registers receipted local media, reviews a real workload-floor forecast, and starts a bounded local runtime. After an exact verified human approval, a separate private caption job may be explicitly requested. Neither path uploads or publishes. Submitted YouTube URLs remain unprocessed recorded previews."
+                      : "This path downloads only the explicitly confirmed bounded YouTube range into private local storage, reviews a real workload-floor forecast, and starts the same bounded local runtime. A later caption request stays private. The recorded-preview URL field remains a separate replay-only path; no upload or publication authority is granted."}
                   </p>
                 </PreparationStagePopover>
 
@@ -1006,7 +1087,7 @@ export default function ProductLocalRuntime({
                       <summary>Local host setup and CLI escape hatch</summary>
                       <ol>
                         <li>Start the deterministic host: <code>node scripts/run-runtime-host.ts --executor deterministic</code></li>
-                        <li>Paste the printed bearer token, connect, then add owned media below.</li>
+                        <li>Paste the printed bearer token, connect, then add {sourceMode === "youtube" ? "one bounded YouTube range" : "owned media"} below.</li>
                         <li>Operator preflight directories remain supported with <code>--source-directory</code>.</li>
                       </ol>
                     </details>
@@ -1017,7 +1098,7 @@ export default function ProductLocalRuntime({
                         ? <button type="button" onClick={disconnect}>Disconnect local host</button>
                         : <button type="button" disabled={busy !== null || token.length === 0} onClick={() => void connect()}>{busy === "connect" ? "Connecting…" : "Connect to local host"}</button>}
                     </div>
-                    {client && (
+                    {client && sourceMode === "owned" && (
                       <fieldset className="product-runtime-ingest">
                         <legend>Ingest media you own or control</legend>
                         <p>The host preserves the selected bytes privately, measures the media, and seals a V1 preflight. This does not authorize redistribution.</p>
@@ -1027,16 +1108,30 @@ export default function ProductLocalRuntime({
                           <label><span>Rights holder</span><input type="text" value={rightsHolder} maxLength={160} disabled={busy === "ingest"} onChange={(event) => setRightsHolder(event.currentTarget.value)} /></label>
                         </div>
                         <label className="product-runtime-attestation"><input type="checkbox" checked={ownershipAttested} disabled={busy === "ingest"} onChange={(event) => setOwnershipAttested(event.currentTarget.checked)} /><span>I attest that I own or control this media and authorize local processing of this copy.</span></label>
-                        <button type="button" disabled={!ingestValid} onClick={() => void ingestOwnedMedia()}>{busy === "ingest" ? "Ingesting owned media…" : "Confirm ownership and ingest"}</button>
+                        <button type="button" disabled={!ownedIngestValid} onClick={() => void ingestOwnedMedia()}>{busy === "ingest" ? "Ingesting owned media…" : "Confirm ownership and ingest"}</button>
                         {ingest && <div className="product-runtime-ingest-status" data-state={ingest.status} role="status" aria-live="polite" aria-label="Owned media ingest progress"><b>{ingest.status}</b>{ingest.status === "queued" && <span>Queued for bounded local upload and probe work.</span>}{ingest.status === "probing" && <span>Measuring the preserved media.</span>}{ingest.status === "sealing" && <span>Sealing the immutable V1 preflight.</span>}{ingest.status === "registered" && <span>The source is registered and selected below.</span>}{ingest.failure && <span>{ingest.failure.code}: {ingest.failure.message}</span>}</div>}
                       </fieldset>
                     )}
-                    {client && sources.length === 0 && !ingest && <p className="product-runtime-empty-source" role="status">No owned source is registered yet. Choose a file and complete the ownership attestation above.</p>}
+                    {client && sourceMode === "youtube" && (
+                      <fieldset className="product-runtime-ingest">
+                        <legend>Ingest a private YouTube range</legend>
+                        <p>The host resolves only this URL, downloads at most 120 seconds into private ignored storage, and grants no redistribution or public-demo authority.</p>
+                        <label><span>YouTube URL for local processing</span><input type="url" value={youtubeUrl} disabled={busy === "ingest"} onChange={(event) => { setYoutubeUrl(event.currentTarget.value); setIngest(null); setError(null); }} /></label>
+                        <div className="product-runtime-ingest-fields">
+                          <label><span>YouTube start seconds</span><input type="number" min="0" step="0.001" value={youtubeStartSeconds} disabled={busy === "ingest"} onChange={(event) => { setYoutubeStartSeconds(event.currentTarget.valueAsNumber); setIngest(null); }} /></label>
+                          <label><span>YouTube end seconds</span><input type="number" min="0.001" step="0.001" value={youtubeEndSeconds} disabled={busy === "ingest"} onChange={(event) => { setYoutubeEndSeconds(event.currentTarget.valueAsNumber); setIngest(null); }} /></label>
+                        </div>
+                        <label className="product-runtime-attestation"><input type="checkbox" checked={youtubeLocalProcessingConfirmed} disabled={busy === "ingest"} onChange={(event) => setYoutubeLocalProcessingConfirmed(event.currentTarget.checked)} /><span>I confirm this exact YouTube range is authorized for local processing only. I am not authorizing redistribution or publication.</span></label>
+                        <button type="button" disabled={!youtubeIngestValid} onClick={() => void ingestYouTubeLocal()}>{busy === "ingest" ? "Ingesting YouTube range…" : "Confirm local processing and ingest"}</button>
+                        {ingest && <div className="product-runtime-ingest-status" data-state={ingest.status} role="status" aria-live="polite" aria-label="YouTube local ingest progress"><b>{ingest.status}</b>{ingest.status === "queued" && <span>Queued under the host’s bounded private policy.</span>}{ingest.status === "resolving" && <span>Resolving provider metadata with yt-dlp.</span>}{ingest.status === "downloading" && <span>Preserving the bounded provider bytes privately.</span>}{ingest.status === "probing" && <span>Measuring the downloaded media.</span>}{ingest.status === "sealing" && <span>Sealing source, rights, tool, range, and V1 preflight receipts.</span>}{ingest.status === "registered" && <span>The YouTube-local source is registered and selected below.</span>}{ingest.failure && <span>{ingest.failure.code}: {ingest.failure.message}</span>}</div>}
+                      </fieldset>
+                    )}
+                    {client && visibleSources.length === 0 && !ingest && <p className="product-runtime-empty-source" role="status">{sourceMode === "youtube" ? "No YouTube-local source is registered yet. Submit a bounded URL range and confirm local processing above." : "No owned source is registered yet. Choose a file and complete the ownership attestation above."}</p>}
                     {client && selectedSource && (
                       <div className="product-runtime-session">
-                        <label><span>Registered owned source</span><select value={sourceId} onChange={(event) => chooseSource(event.currentTarget.value)}>{sources.map((source) => <option key={source.sourceSessionId} value={source.sourceSessionId}>{source.label} ({seconds(source.durationMs)})</option>)}</select></label>
+                        <label><span>{sourceMode === "youtube" ? "Registered YouTube local source" : "Registered owned source"}</span><select value={sourceId} onChange={(event) => chooseSource(event.currentTarget.value)}>{visibleSources.map((source) => <option key={source.sourceSessionId} value={source.sourceSessionId}>{source.label} ({seconds(source.durationMs)})</option>)}</select></label>
                         <dl className="product-runtime-source-facts">
-                          <div><dt>Receipt</dt><dd>Owned / local ({selectedSource.rightsScope.replaceAll("_", " ")})</dd></div>
+                          <div><dt>Receipt</dt><dd>{selectedSource.sourceKind === "youtube_local" ? "YouTube / local" : "Owned / local"} ({selectedSource.rightsScope.replaceAll("_", " ")})</dd></div>
                           <div><dt>Measured duration</dt><dd>{seconds(selectedSource.durationMs)}</dd></div>
                           <div><dt>Measured tracks</dt><dd>{selectedSource.trackCount}</dd></div>
                           <div><dt>Sealed preflight</dt><dd>{selectedSource.preflightSchema}</dd></div>

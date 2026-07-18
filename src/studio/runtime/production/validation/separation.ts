@@ -6,11 +6,13 @@ import {
   type ConditionalSeparationLimits,
   type ConditionalSeparationReceipt,
   type ConditionalSeparationRequest,
+  type ConditionalSeparationTrigger,
   type RawStemComparison,
   type RawStemComparisonReceipt,
   type SeparationProducerLineage,
   type SeparationRecognizerResult,
   type SeparationStemOutput,
+  type U1AcousticSeparationTrigger,
   type U6SpeakerOverlapSeparationTrigger,
 } from "../model.ts";
 import { validateCurrentRunRecognizerDescriptor } from "./semanticEvidence.ts";
@@ -53,6 +55,26 @@ export function validateU6SpeakerOverlapSeparationTrigger(value: unknown, contex
   return item as unknown as U6SpeakerOverlapSeparationTrigger;
 }
 
+export function validateU1AcousticSeparationTrigger(value: unknown, context: string, path: string): U1AcousticSeparationTrigger {
+  const item = object(value, context, path);
+  exact(item, ["kind", "observationsArtifactId", "observationsContentId", "receiptId", "receiptContentId", "observationId", "observationIndex", "trackId", "range"], context, path);
+  literal(item.kind, "u1_acoustic_mixed", context, `${path}.kind`);
+  for (const key of ["observationsArtifactId", "receiptId", "observationId", "trackId"]) string(item[key], context, `${path}.${key}`);
+  contentId(item.observationsContentId, context, `${path}.observationsContentId`);
+  contentId(item.receiptContentId, context, `${path}.receiptContentId`);
+  integer(item.observationIndex, context, `${path}.observationIndex`);
+  range(item.range, context, `${path}.range`);
+  return item as unknown as U1AcousticSeparationTrigger;
+}
+
+/** Kind-dispatching validator; the grant-scope, receipt, and event validators call this one seam. */
+export function validateConditionalSeparationTrigger(value: unknown, context: string, path: string): ConditionalSeparationTrigger {
+  const item = object(value, context, path);
+  if (item.kind === "u6_speaker_overlap") return validateU6SpeakerOverlapSeparationTrigger(value, context, path);
+  if (item.kind === "u1_acoustic_mixed") return validateU1AcousticSeparationTrigger(value, context, path);
+  return fail(context, `${path}.kind`, "must be a registered conditional separation trigger kind");
+}
+
 function source(value: unknown, context: string, path: string): ConditionalSeparationGrantScope["source"] {
   const item = object(value, context, path);
   exact(item, ["artifactId", "contentId", "trackId", "range"], context, path);
@@ -69,7 +91,7 @@ export function validateConditionalSeparationGrantScope(value: unknown, context:
   exact(item, ["schema", "source", "trigger", "producerPolicy", "limits"], context, path);
   literal(item.schema, "studio.conditional-separation-grant.v1", context, `${path}.schema`);
   const inputSource = source(item.source, context, `${path}.source`);
-  const trigger = validateU6SpeakerOverlapSeparationTrigger(item.trigger, context, `${path}.trigger`);
+  const trigger = validateConditionalSeparationTrigger(item.trigger, context, `${path}.trigger`);
   if (!same(inputSource.range, trigger.range)) fail(context, `${path}.trigger.range`, "must exactly equal the granted source range");
   const policy = object(item.producerPolicy, context, `${path}.producerPolicy`);
   exact(policy, ["methodId", "methodVersion", "modelId", "modelRevision", "modelContentIds", "configurationContentId", "stemRoles"], context, `${path}.producerPolicy`);
@@ -95,7 +117,7 @@ export function conditionalSeparationRequestFingerprint(input: {
   sourceContentId: string;
   trackId: string;
   range: { startMs: number; endMs: number };
-  trigger: U6SpeakerOverlapSeparationTrigger;
+  trigger: ConditionalSeparationTrigger;
   modelContentIds: string[];
   configurationContentId: string;
 }): string {
@@ -207,7 +229,7 @@ export function validateConditionalSeparationReceipt(value: unknown, context = "
   hash(normalized.content, context, `${path}.source.normalizedAudio.content`);
   if ((normalized.content as { bytes: number }).bytes > CONDITIONAL_SEPARATION_LIMITS.maxNormalizedAudioBytes || normalized.sampleRateHz !== 8_000 || normalized.channels !== 1 || integer(normalized.sampleCount, context, `${path}.source.normalizedAudio.sampleCount`, 1) > CONDITIONAL_SEPARATION_LIMITS.maxDecodedSamples) fail(context, `${path}.source.normalizedAudio`, "changed normalization or exceeded limits");
   literal(normalized.sampleFormat, "pcm_s16le_wav", context, `${path}.source.normalizedAudio.sampleFormat`);
-  validateU6SpeakerOverlapSeparationTrigger(item.trigger, context, `${path}.trigger`);
+  validateConditionalSeparationTrigger(item.trigger, context, `${path}.trigger`);
   validateSeparationProducerLineage(item.producer, context, `${path}.producer`);
   validateConditionalSeparationLimits(item.limits, context, `${path}.limits`);
   const execution = object(item.execution, context, `${path}.execution`);

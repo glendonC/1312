@@ -40,6 +40,7 @@ import { assertOcrRequest, ocrRequestFingerprint } from "./validation/ocr.ts";
 import { SPEAKER_OVERLAP_PINNED_CONTENT_IDS } from "./model.ts";
 import { assertSpeakerOverlapRequest, speakerOverlapRequestFingerprint } from "./validation/speakers.ts";
 import { assertConditionalSeparationRequest, conditionalSeparationRequestFingerprint } from "./validation/separation.ts";
+import { u1AcousticTriggerLineageMatches } from "./separation/acousticSeparationTrigger.ts";
 
 export interface AuthorizedFrameSampling {
   request: FrameSampleRequest;
@@ -335,15 +336,19 @@ export function authorizeConditionalSeparation(state: RuntimeProjection, request
     artifact.content.bytes > grant.separationScope.limits.maxSourceBytes
   ) throw new Error("Conditional separation exceeds its exact source, range, or byte envelope");
   const trigger = grant.separationScope.trigger;
-  const speaker = state.speakerOverlapOperations[trigger.operationId];
-  const observations = state.artifacts[trigger.observationsArtifactId];
-  const receipt = state.artifacts[trigger.receiptArtifactId];
-  if (
-    speaker?.status !== "completed" || speaker.sourceArtifactId !== artifact.id || speaker.trackId !== track.id ||
-    speaker.outputArtifactId !== observations?.id || observations?.origin.kind !== "speaker_overlap_observations" || observations.content.contentId !== trigger.observationsContentId ||
-    speaker.receiptArtifactId !== receipt?.id || receipt?.origin.kind !== "speaker_overlap_receipt" || speaker.receiptId !== trigger.receiptId ||
-    speaker.receiptContentId !== trigger.receiptContentId || receipt.content.contentId !== trigger.receiptContentId
-  ) throw new Error("Conditional separation lost its exact audited U6.1 trigger lineage");
+  if (trigger.kind === "u6_speaker_overlap") {
+    const speaker = state.speakerOverlapOperations[trigger.operationId];
+    const observations = state.artifacts[trigger.observationsArtifactId];
+    const receipt = state.artifacts[trigger.receiptArtifactId];
+    if (
+      speaker?.status !== "completed" || speaker.sourceArtifactId !== artifact.id || speaker.trackId !== track.id ||
+      speaker.outputArtifactId !== observations?.id || observations?.origin.kind !== "speaker_overlap_observations" || observations.content.contentId !== trigger.observationsContentId ||
+      speaker.receiptArtifactId !== receipt?.id || receipt?.origin.kind !== "speaker_overlap_receipt" || speaker.receiptId !== trigger.receiptId ||
+      speaker.receiptContentId !== trigger.receiptContentId || receipt.content.contentId !== trigger.receiptContentId
+    ) throw new Error("Conditional separation lost its exact audited U6.1 trigger lineage");
+  } else if (!u1AcousticTriggerLineageMatches(state.artifacts, trigger, artifact.id, track.id)) {
+    throw new Error("Conditional separation lost its exact audited U1 acoustic trigger lineage");
+  }
   if (taskCapabilityCallCount(state, task.id) >= task.budget.toolCalls) throw new Error("Conditional separation exceeds the task tool-call budget");
   if (Object.values(state.conditionalSeparationOperations).filter((operation) => operation.grantId === grant.id).length >= grant.separationScope.limits.maxCalls) {
     throw new Error("Conditional separation exceeds the grant call budget");

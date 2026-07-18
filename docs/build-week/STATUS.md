@@ -137,19 +137,22 @@ score.
   closed request contains only a host-derived input identity and trigger identity. Ordinary child
   spawn cannot request `media.audio.separate`; the scheduler may issue that one-call child grant
   only for one cold-audited U6.1 `conflicting` overlap cell, with the source track and half-open range
-  copied exactly. No U1 separation trigger is admitted yet because no closed U1 eligibility policy
-  is documented. The replaceable producer seam is backed on this runtime by an explicitly
+  copied exactly. A U7.1 second eligible cause additively admits one cold-audited U1 acoustic cell
+  classified `mixed` (necessarily strong, with both speech and music above support) over its exact
+  half-open range, reusing the same grant/producer/comparison/audit path; ordinary spawn still cannot
+  request the capability and no other acoustic class (music, noise, speech-candidate, unknown)
+  qualifies. The replaceable producer seam is backed on this runtime by an explicitly
   bootstrapped, offline SpeechBrain 1.1.0 SepFormer WSJ02Mix model at immutable revision
   `3a2826343a10e2d2e8a75f79aeab5ff3a2473531`; missing or changed runtime/model bytes fail closed.
   The host preserves the owned raw artifact, seals only the granted range, and stores two anonymous
   private content-addressed derived audio estimates plus canonical separation/comparison receipts.
-  Stem origins directly retain raw source/content/track/range, U6 trigger, method, model, and
-  configuration lineage. One current-run recognizer contract runs over raw and both estimates; the
+  Stem origins directly retain raw source/content/track/range, the trigger kind and observation
+  identity, method, model, and configuration lineage. One current-run recognizer contract runs over raw and both estimates; the
   deterministic result is only `agreement`, `disagreement`, or `abstention` after normalized-text
   comparison. It always carries null semantic preference and no semantic, caption, publication,
   speaker/source-identity, or quality authority. Cold audit reopens raw, both stems, both receipts,
-  the comparison, the U6 trigger, and current producer lineage by stored identities rather than
-  caller paths. No U3 claim-support/caption schema, UI, public stem delivery, human preference,
+  the comparison, the audited trigger cause, and current producer lineage by stored identities
+  rather than caller paths. No U3 claim-support/caption schema, UI, public stem delivery, human preference,
   quality score, R1/R2, or Bet G ablation is included.
 
 ## Post-freeze backlog boundary
@@ -174,9 +177,9 @@ indefinite deferrals or a one-day implementation claim:
    launcher bridge, U3 coverage qualification, and typed exact-range U4 overlap trigger implemented;
    non-darwin native pins and a diarization quality bench remain.
 7. U7 conditional separation and raw/stem comparison — the first U6.1-triggered, pinned local,
-   private-artifact, cold-audited slice is implemented and default-runtime wired; a closed U1
-   eligibility policy, other platforms/models, independent or human semantic preference, and Bet G
-   ablation remain.
+   private-artifact, cold-audited slice is implemented and default-runtime wired, and a U7.1 closed
+   U1 `mixed`-acoustic eligibility trigger now reuses the same path; other platforms/models,
+   independent or human semantic preference, and Bet G ablation remain.
 8. R1 bounded receipted web research.
 9. R2 optional bounded read-only computer-use after media senses and research.
 10. G1 semantic evaluation expansion, registered ablations, repeated captures, variance, and later
@@ -236,11 +239,14 @@ indefinite deferrals or a one-day implementation claim:
   not prove that pass resolved overlap, identify people, link speakers across artifacts or runs, prove
   speaker count/turn boundaries, validate any word or translation, authorize captions,
   perform separation, or establish diarization accuracy.
-- U7 proves one exact U6.1-triggered local separation path, private raw/stem lineage, immutable
-  receipts, same-recognizer structural comparison, and cold replay/tamper closure. It does not prove
-  that either estimate is cleaner or semantically better, that agreement is independent evidence,
-  that any recognized word or translation is correct, or that stems may support claims, captions,
-  publication, speaker identity, source identity, or a quality/improvement score.
+- U7 proves one exact U6.1-triggered and one U7.1 U1-`mixed`-triggered local separation path, private
+  raw/stem lineage, immutable receipts, same-recognizer structural comparison, and cold replay/tamper
+  closure. It does not prove that either estimate is cleaner or semantically better, that agreement is
+  independent evidence, that any recognized word or translation is correct, or that stems may support
+  claims, captions, publication, speaker identity, source identity, or a quality/improvement score.
+  The pinned SepFormer is a two-speaker wsj0-2mix model, so a `mixed` speech-plus-music U1 trigger
+  runs it outside its training domain and claims only raw-versus-stem comparability, never that music
+  and speech were cleanly separated.
 
 ## Where to read what
 

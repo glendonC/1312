@@ -19,9 +19,11 @@ import type {
   TaskStatus,
   RangePassRequestReceipt,
   ConditionalSeparationGrantScope,
-  U6SpeakerOverlapSeparationTrigger,
+  ConditionalSeparationTrigger,
+  RuntimeArtifact,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
+import { u1AcousticTriggerLineageMatches } from "./separation/acousticSeparationTrigger.ts";
 import type { PendingRuntimeEvent } from "./protocol.ts";
 import {
   MAX_EVIDENCE_ASSESSMENTS,
@@ -653,7 +655,7 @@ export class BoundedRuntimeScheduler {
 
   /** Atomic admission for one exact U6.1-triggered separation grant. Not reachable through ordinary spawn. */
   async requestConditionalSeparation(inputValue: {
-    trigger: U6SpeakerOverlapSeparationTrigger;
+    trigger: ConditionalSeparationTrigger;
     child: SpawnRequestInput;
     authorship: { executionId: string; toolCallId: string; taskId: string; agentId: string };
   }): Promise<SpawnDecision> {
@@ -678,18 +680,42 @@ export class BoundedRuntimeScheduler {
         const root = state.tasks[inputValue.authorship.taskId];
         const execution = state.executions[inputValue.authorship.executionId];
         const call = state.orchestratorToolCalls[inputValue.authorship.toolCallId];
-        const speaker = state.speakerOverlapOperations[trigger.operationId];
-        const source = speaker ? state.artifacts[speaker.sourceArtifactId] : undefined;
-        const observations = state.artifacts[trigger.observationsArtifactId];
-        const speakerReceipt = state.artifacts[trigger.receiptArtifactId];
-        const exactRange = trigger.range.endMs > trigger.range.startMs &&
-          trigger.range.startMs >= (speaker?.startMs ?? Number.MAX_SAFE_INTEGER) && trigger.range.endMs <= (speaker?.endMs ?? -1);
-        const scope: ConditionalSeparationGrantScope | null = source && speaker ? {
+        // Per-kind lineage resolution against live ledger state (sync). The deep byte/cell audit
+        // ran in the host inspect and re-ran in request(); here we confirm the grant still binds to
+        // the exact owned source, track, range, and unchanged evidence identity for this kind.
+        let separationSource: RuntimeArtifact | undefined;
+        let resolvedTrackId: string | undefined;
+        let exactRange = false;
+        let lineageValid = false;
+        if (trigger.kind === "u6_speaker_overlap") {
+          const speaker = state.speakerOverlapOperations[trigger.operationId];
+          separationSource = speaker ? state.artifacts[speaker.sourceArtifactId] : undefined;
+          const observations = state.artifacts[trigger.observationsArtifactId];
+          const speakerReceipt = state.artifacts[trigger.receiptArtifactId];
+          resolvedTrackId = speaker?.trackId;
+          exactRange = trigger.range.endMs > trigger.range.startMs &&
+            trigger.range.startMs >= (speaker?.startMs ?? Number.MAX_SAFE_INTEGER) && trigger.range.endMs <= (speaker?.endMs ?? -1);
+          lineageValid = speaker?.status === "completed" && separationSource?.origin.kind === "ingest" &&
+            observations?.origin.kind === "speaker_overlap_observations" && observations.content.contentId === trigger.observationsContentId &&
+            speaker.outputArtifactId === observations.id && speaker.receiptArtifactId === trigger.receiptArtifactId &&
+            speaker.receiptId === trigger.receiptId && speaker.receiptContentId === trigger.receiptContentId &&
+            speakerReceipt?.origin.kind === "speaker_overlap_receipt" && speakerReceipt.content.contentId === trigger.receiptContentId;
+        } else if (trigger.kind === "u1_acoustic_mixed") {
+          const acoustic = state.artifacts[trigger.observationsArtifactId];
+          separationSource = acoustic && acoustic.sourceArtifactIds.length === 1 ? state.artifacts[acoustic.sourceArtifactIds[0]] : undefined;
+          const track = separationSource?.tracks.find((candidate) => candidate.id === trigger.trackId && candidate.kind === "audio");
+          resolvedTrackId = trigger.trackId;
+          exactRange = trigger.range.endMs > trigger.range.startMs &&
+            trigger.range.endMs - trigger.range.startMs <= CONDITIONAL_SEPARATION_LIMITS.maxRangeMs;
+          lineageValid = separationSource?.origin.kind === "ingest" && Boolean(track) &&
+            u1AcousticTriggerLineageMatches(state.artifacts, trigger, separationSource.id, trigger.trackId);
+        }
+        const scope: ConditionalSeparationGrantScope | null = separationSource && resolvedTrackId !== undefined && lineageValid ? {
           schema: "studio.conditional-separation-grant.v1",
           source: {
-            artifactId: source.id,
-            contentId: source.content.contentId,
-            trackId: speaker.trackId,
+            artifactId: separationSource.id,
+            contentId: separationSource.content.contentId,
+            trackId: resolvedTrackId,
             range: structuredClone(trigger.range),
           },
           trigger,
@@ -714,9 +740,12 @@ export class BoundedRuntimeScheduler {
           input.requiredCapabilities.length === 2 && input.requiredCapabilities[0] === "media.audio.separate" &&
           input.requiredCapabilities[1] === "report.submit" && input.dependencies.length === 0 &&
           input.budget.wallMs === CONDITIONAL_SEPARATION_LIMITS.maxWallMs && input.budget.toolCalls === 1;
+        // Duplicate-work: same content-addressed observation OR the same exact (source, track,
+        // range). The second clause is kind-agnostic, so a U1 and a U6 trigger for the identical
+        // range collapse to one work item.
         let rejection: SpawnRejection | null = Object.values(state.conditionalSeparationOperations).some((operation) =>
           operation.trigger.observationId === trigger.observationId ||
-          (operation.sourceArtifactId === source?.id && operation.trackId === speaker?.trackId && operation.startMs === trigger.range.startMs && operation.endMs === trigger.range.endMs))
+          (operation.sourceArtifactId === separationSource?.id && operation.trackId === resolvedTrackId && operation.startMs === trigger.range.startMs && operation.endMs === trigger.range.endMs))
           ? "separation_duplicate_work"
           : this.violation(state, inputValue.authorship.taskId, inputValue.authorship.agentId, input, true);
         if (
@@ -724,12 +753,7 @@ export class BoundedRuntimeScheduler {
           execution?.status !== "active" || execution.taskId !== root.id || execution.agentId !== root.ownerAgentId ||
           !root.grants.some((grant) => grant.capability === "study.separate") ||
           call?.tool !== "study_separation_request" || call.executionId !== execution.id || call.taskId !== root.id ||
-          speaker?.status !== "completed" || source?.origin.kind !== "ingest" ||
-          observations?.origin.kind !== "speaker_overlap_observations" || observations.content.contentId !== trigger.observationsContentId ||
-          speaker.outputArtifactId !== observations.id || speaker.receiptArtifactId !== trigger.receiptArtifactId ||
-          speaker.receiptId !== trigger.receiptId || speaker.receiptContentId !== trigger.receiptContentId ||
-          speakerReceipt?.origin.kind !== "speaker_overlap_receipt" || speakerReceipt.content.contentId !== trigger.receiptContentId ||
-          !exactRange || trigger.kind !== "u6_speaker_overlap" || !childMatches
+          !exactRange || !lineageValid || !childMatches
         ) rejection = "requester_not_authorized";
         if (rejection || !scope || !root) {
           return {

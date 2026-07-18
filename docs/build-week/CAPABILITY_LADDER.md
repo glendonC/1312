@@ -99,9 +99,10 @@ checklist below:
 6. **U6 — speaker/overlap evidence (coverage + typed U4 trigger slices implemented 2026-07-17):**
    preserve anonymous turn/overlap hypotheses in U3 coverage/conflicts and let one exact audited
    overlap cell request bounded attenuated speech without granting transcript truth.
-7. **U7 — conditional separation and comparison (first U6.1-triggered slice implemented
+7. **U7 — conditional separation and comparison (U6.1 slice + U7.1 U1-`mixed` trigger implemented
    2026-07-17):** preserve raw media, receipt private derived stems, and compare raw/stem hypotheses
-   only for one exact audited overlap range. U1 eligibility and semantic preference remain closed.
+   only for one exact audited overlap range or one cold-audited acoustic `mixed` cell. Semantic
+   preference and Bet G ablation remain closed.
 8. **R1 — bounded web research:** add safe search plus document snapshot/span citations for exact
    unresolved context gaps.
 9. **R2 — optional bounded computer-use:** after media senses and R1, inspect dynamic external
@@ -212,7 +213,9 @@ their audits.
   truncated, or unavailable evidence becomes unknown/withheld/unavailable and may trigger U4
   re-study. Caption production preserves those states rather than manufacturing lines.
 - **Non-goals:** Lyric transcription, speaker identity, source separation, semantic quality, or one
-  clip-level “has music” label.
+  clip-level “has music” label. (U1 itself performs no separation; U7.1 lets a cold-audited `mixed`
+  cell trigger the separate U7 grant/producer/comparison path, and U1 still makes no separation,
+  quality, or preference claim.)
 - **Fake-claim risk:** A VAD or acoustic class is a fallible hypothesis. “Non-speech” does not prove
   silence, and “music” does not prove there are no lyrics. The safe outcome of disagreement is
   abstention or re-study, not fake dialogue.
@@ -392,37 +395,49 @@ their audits.
 - **Existing-spine dependency:** U1 acoustic scope, U3 evidence/abstention, U4 pass requests, and the
   existing semantic evidence/report path.
 
-### U7. Conditional separation and raw-versus-stem comparison — first U6.1-triggered slice implemented
+### U7. Conditional separation and raw-versus-stem comparison — U6.1 and U7.1 U1-`mixed` triggers implemented
 
 - **Real:** `study_separation_request` exposes only exact host-derived U6.1 conflicting overlap
-  cells. The caller can copy only `inputId` and `triggerId`; ordinary spawn cannot acquire
-  `media.audio.separate`. The scheduler fixes one exact source/content/audio-track/range grant,
-  one-call limits, and the pinned producer policy. The replaceable `SourceSeparator` seam uses local
-  offline SpeechBrain SepFormer WSJ02Mix on the qualified macOS-arm64 runtime. The host keeps the raw
-  artifact unchanged and stores two anonymous private `studio.separated-audio-stem.v1` derived
-  artifacts plus canonical separation and comparison receipts. Direct origin fields and receipts
-  close method/model/configuration/raw source/range/U6 trigger lineage. The same current-run
-  recognizer contract runs over raw and both stems; deterministic NFC/whitespace-normalized text
-  yields only agreement, disagreement, or abstention. Cold audit reopens raw, stems, receipts,
-  comparison, U6 evidence, and current producer lineage without accepting caller paths or rerunning
-  separation. The result has null semantic preference and no caption or semantic authority.
-- **Still missing:** No closed U1 separation-eligibility policy exists, so U1 evidence cannot trigger
-  this slice. Non-darwin runtime pins, alternate models, a separation-quality bench, independent
-  evidence or human semantic preference, UI projection, public delivery, and the registered Bet G
-  raw-versus-stem ablation remain open. The default recognizer may honestly abstain when no live
-  current-run recognizer is configured.
-- **Slice done-when:** The landed U6.1 path proves exact trigger/grant/range closure, raw preservation,
-  private content-addressed stems, pinned replaceable execution, same-recognizer comparison,
-  immutable receipts, cold audit/tamper rejection, hard limits, duplicate rejection, typed
-  unavailable failure, and no caption-authority upgrade. The full U7 rung remains open for a typed U1
-  trigger policy and the quality/human-review work above.
+  cells and U7.1 U1 acoustic `mixed` cells. The caller can copy only `inputId` and `triggerId`;
+  ordinary spawn cannot acquire `media.audio.separate`. The scheduler fixes one exact
+  source/content/audio-track/range grant, one-call limits, and the pinned producer policy. The
+  replaceable `SourceSeparator` seam uses local offline SpeechBrain SepFormer WSJ02Mix on the
+  qualified macOS-arm64 runtime. The host keeps the raw artifact unchanged and stores two anonymous
+  private `studio.separated-audio-stem.v1` derived artifacts plus canonical separation and comparison
+  receipts. Direct origin fields and receipts close method/model/configuration/raw source/range and
+  trigger-kind lineage. The same current-run recognizer contract runs over raw and both stems;
+  deterministic NFC/whitespace-normalized text yields only agreement, disagreement, or abstention.
+  Cold audit reopens raw, stems, receipts, comparison, the audited trigger evidence, and current
+  producer lineage without accepting caller paths or rerunning separation. The result has null
+  semantic preference and no caption or semantic authority.
+- **U7.1 U1 trigger:** A second eligible cause admits one cold-audited acoustic cell classified
+  `mixed` — which by the U1 validator necessarily means strong certainty with both speech and music
+  above the support threshold, i.e. two provably co-present source families in one exact range. The
+  host reopens and content-verifies the preflight acoustic observations and producer receipt, copies
+  the exact source/track/half-open cell range, and mints the same grant. No other acoustic class
+  (music, noise, speech-candidate, unknown) and no VAD/policy state qualifies; identical U1 and U6
+  ranges dedupe to one work item; and the receipt keeps null semantic preference and `not_granted`
+  caption/semantic authority.
+- **Still missing:** The only U1 separation-eligibility class is `mixed`; every other acoustic class
+  and all VAD/policy states stay non-triggering. Non-darwin runtime pins, alternate models, a
+  separation-quality bench, independent evidence or human semantic preference, UI projection, public
+  delivery, and the registered Bet G raw-versus-stem ablation remain open. The default recognizer may
+  honestly abstain when no live current-run recognizer is configured.
+- **Slice done-when:** The landed U6.1 and U7.1 paths prove exact trigger/grant/range closure, raw
+  preservation, private content-addressed stems, pinned replaceable execution, same-recognizer
+  comparison, immutable receipts, cold audit/tamper rejection, hard limits, duplicate rejection, typed
+  unavailable failure, and no caption-authority upgrade. The typed U1 `mixed` trigger policy has
+  landed additively; the full U7 rung remains open for the quality/human-review and platform work
+  above.
 - **Non-goals:** Default separation of every clip, publishing stems, “cleaner sounds better” as a
   metric, or treating same-recognizer agreement on related audio as independent truth.
 - **Fake-claim risk:** Separation can create artifacts. A clean-sounding stem may delete speech or
-  invent recognizer confidence without improving meaning.
-- **Existing-spine dependency:** This slice uses U6.1 audited overlap evidence, U4 pass/study context,
-  derived artifact origins, and raw-source preservation. U1 eligibility and Bet G ablation are later
-  consumers, not evidence claimed by this slice.
+  invent recognizer confidence without improving meaning. `mixed` proves two co-present acoustic
+  families, not two intelligible or separable streams, and the pinned two-speaker wsj0-2mix model is
+  out of its training domain on speech-plus-music, so the U1 trigger may claim only comparability.
+- **Existing-spine dependency:** This rung uses U6.1 audited overlap evidence, U1 cold-audited
+  acoustic evidence, U4 pass/study context, derived artifact origins, and raw-source preservation.
+  Bet G ablation is a later consumer, not evidence claimed by this slice.
 
 ## External context rungs
 
@@ -529,11 +544,12 @@ the ordering expresses dependencies, not a promise that every rung ships togethe
    U3 coverage/conflict admission. One exact audited overlap cell can now request the existing bounded
    attenuated-speech pass under the closed `speaker_overlap` cause; no person identity and no automatic
    transcript truth comes from speaker labels.
-7. **Conditional separation + comparison — first U6.1-triggered slice implemented 2026-07-17.** One
-   exact audited conflicting overlap cell may receive the pinned private separation grant; raw audio,
-   anonymous stems, lineage receipts, cold audit, and same-recognizer comparability are closed. U1
-   triggers remain unavailable. Run a registered Bet G ablation and require independent evidence or
-   human review before any preference or improvement claim.
+7. **Conditional separation + comparison — U6.1 slice + U7.1 U1-`mixed` trigger implemented 2026-07-17.**
+   One exact audited conflicting overlap cell, or one cold-audited acoustic `mixed` cell, may receive
+   the pinned private separation grant; raw audio, anonymous stems, lineage receipts, cold audit, and
+   same-recognizer comparability are closed. U1 `mixed`-acoustic triggers now reuse the same path
+   additively; no other acoustic class qualifies. Run a registered Bet G ablation and require
+   independent evidence or human review before any preference or improvement claim.
 8. **Receipted web research.** Add safe bounded search + snapshot/read tools, typed span citations,
    freshness/provenance, and one exact gap-triggered context specialist. No ambient web or fixed
    research-worker count.

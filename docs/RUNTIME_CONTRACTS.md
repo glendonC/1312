@@ -400,9 +400,18 @@ state is `conflicting`, kind is `overlap`, and uncertainty reason is
 owned-source content id, audio track, and half-open range into one `media.audio.separate` grant.
 Ordinary model-authored spawn cannot request that capability, and the child-facing separation tool
 accepts exactly `{}`. Missing root grant, model-authored range/model/path fields, a changed U6
-identity, widening or narrowing, duplicate work, or a non-triggered range fails closed. This first
-slice intentionally has no U1 trigger: no closed U1 separation-eligibility policy is currently
-documented, so U1 evidence cannot grant separation by implication.
+identity, widening or narrowing, duplicate work, or a non-triggered range fails closed. U7.1 adds a
+second closed eligible cause on the same tool and the same one grant/producer/comparison path: the
+request host also reopens and content-verifies the preflight `acoustic_ranges` observations and their
+producer receipt (via `reopenAcousticCitationSource`) and exposes only cells classified `mixed`,
+which by the U1 acoustic contract necessarily means strong certainty with both speech and music above
+the support threshold, i.e. a `u1_acoustic_mixed` trigger over that exact cell's owned-source content
+id, audio track, and half-open range. The trigger kind is an additive discriminated union beside
+`u6_speaker_overlap`; no other acoustic class or VAD/policy state grants separation, a forged
+class/range/observation id fails the closed `{ inputId, triggerId }` echo, and identical U1 and U6
+ranges dedupe to one work item. Because SepFormer is a two-speaker wsj0-2mix model, a speech-plus-music
+`mixed` cell runs it out of domain and the receipt still carries null semantic preference and
+`not_granted` caption/semantic authority.
 
 The replaceable producer seam is `SourceSeparator`. The qualified local implementation is
 `speechbrain-sepformer-wsj02mix` version 1 on macOS arm64, Python 3.14, SpeechBrain 1.1.0, Torch and
@@ -444,9 +453,9 @@ Stem results are not U3 citation inputs and cannot become `claim_support`, study
 text through this contract.
 
 Cold `auditConditionalSeparation` starts from the completed journal operation and reopens the raw
-artifact, both private stems, separation receipt, comparison, comparison receipt, exact U6 trigger,
-and current producer lineage by content identity; caller paths are not authority and separation is
-not rerun. Derivable artifact/receipt ids, canonical bytes, authorization, source/range/trigger,
+artifact, both private stems, separation receipt, comparison, comparison receipt, the exact audited
+trigger cause for its kind (the U6 overlap cell or the U1 `mixed` acoustic cell), and current producer
+lineage by content identity; caller paths are not authority and separation is not rerun. Derivable artifact/receipt ids, canonical bytes, authorization, source/range/trigger,
 method/model/configuration, recognizer, and explicit non-claims must all agree. A clean-sounding
 estimate, same-recognizer agreement on related audio, or successful separation is not independent
 truth, transcription/translation correctness, speaker/source identity, quality, improvement,

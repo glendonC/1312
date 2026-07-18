@@ -69,10 +69,33 @@ export interface U6SpeakerOverlapSeparationTrigger {
   range: { startMs: number; endMs: number };
 }
 
+/**
+ * U7.1 second eligible cause. A cold-audited acoustic cell classified `mixed` proves two
+ * co-present source families (strong speech and music above support) in one exact range. Lineage
+ * anchors on the preflight acoustic-observations artifact and its content-addressed producer
+ * receipt (there is no acoustic ledger operation and no separate receipt artifact, unlike U6).
+ * `observationId` is the content-addressed acoustic observation identity; `observationIndex` locates
+ * the exact partition cell on reopen; `trackId` lets the synchronous scheduler resolve the audio
+ * track without reparsing the receipt.
+ */
+export interface U1AcousticSeparationTrigger {
+  kind: "u1_acoustic_mixed";
+  observationsArtifactId: string;
+  observationsContentId: string;
+  receiptId: string;
+  receiptContentId: string;
+  observationId: string;
+  observationIndex: number;
+  trackId: string;
+  range: { startMs: number; endMs: number };
+}
+
+export type ConditionalSeparationTrigger = U6SpeakerOverlapSeparationTrigger | U1AcousticSeparationTrigger;
+
 export interface ConditionalSeparationTriggerOption {
   triggerId: string;
   source: ConditionalSeparationGrantScope["source"];
-  trigger: U6SpeakerOverlapSeparationTrigger;
+  trigger: ConditionalSeparationTrigger;
 }
 
 export interface ConditionalSeparationRequestInput {
@@ -91,7 +114,7 @@ export interface ConditionalSeparationGrantScope {
     trackId: string;
     range: { startMs: number; endMs: number };
   };
-  trigger: U6SpeakerOverlapSeparationTrigger;
+  trigger: ConditionalSeparationTrigger;
   producerPolicy: {
     methodId: typeof SEPARATION_METHOD.id;
     methodVersion: typeof SEPARATION_METHOD.version;
@@ -174,7 +197,7 @@ export interface ConditionalSeparationReceipt {
     sourceBytes: number;
     normalizedAudio: { content: ContentIdentity; sampleRateHz: 8_000; channels: 1; sampleFormat: "pcm_s16le_wav"; sampleCount: number };
   };
-  trigger: U6SpeakerOverlapSeparationTrigger;
+  trigger: ConditionalSeparationTrigger;
   producer: SeparationProducerLineage;
   limits: ConditionalSeparationLimits;
   execution: { wallMs: number; measuredBeforeReceiptMs: number; wallAccounting: "full_grant_charged_before_atomic_completion" };
@@ -255,7 +278,7 @@ export interface ConditionalSeparationOperationRecord {
   startMs: number;
   endMs: number;
   requestFingerprint: string;
-  trigger: U6SpeakerOverlapSeparationTrigger;
+  trigger: ConditionalSeparationTrigger;
   limits: ConditionalSeparationLimits;
   status: "started" | "completed" | "failed";
   stemArtifactIds: string[];

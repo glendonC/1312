@@ -10,7 +10,7 @@ import {
 } from "./frames.ts";
 import { assertOcrRequest, validateOcrLimits, validateOcrReceipt } from "./ocr.ts";
 import { assertSpeakerOverlapRequest, validateSpeakerOverlapLimits, validateSpeakerOverlapReceipt } from "./speakers.ts";
-import { assertConditionalSeparationRequest, validateConditionalSeparationLimits, validateConditionalSeparationReceipt, validateRawStemComparisonReceipt, validateU6SpeakerOverlapSeparationTrigger } from "./separation.ts";
+import { assertConditionalSeparationRequest, validateConditionalSeparationLimits, validateConditionalSeparationReceipt, validateConditionalSeparationTrigger, validateRawStemComparisonReceipt } from "./separation.ts";
 import {
   validatePublishReviewIntakeReceipt,
   validateStudyReadinessReceiptIdentity,
@@ -403,7 +403,7 @@ export function assertRuntimeEvent(
     string(data.executionId, context, "event.data.executionId");
     string(data.launchClaimId, context, "event.data.launchClaimId");
     string(data.requestFingerprint, context, "event.data.requestFingerprint");
-    validateU6SpeakerOverlapSeparationTrigger(data.trigger, context, "event.data.trigger");
+    validateConditionalSeparationTrigger(data.trigger, context, "event.data.trigger");
     validateConditionalSeparationLimits(data.limits, context, "event.data.limits");
   } else if (type === "media.conditional_separation_completed") {
     exact(data, ["operationId", "stemArtifactIds", "receiptArtifactId", "receiptContentId", "receipt", "comparisonArtifactId", "comparisonReceiptArtifactId", "comparisonReceiptContentId", "comparisonReceipt"], context, "event.data");

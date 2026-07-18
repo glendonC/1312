@@ -32,6 +32,7 @@ import { UnavailableCurrentRunSpeechRecognizer } from "./semantic/currentRunSpee
 import type { SourceSeparator } from "./separation/separator.ts";
 import { SourceSeparatorFailure } from "./separation/separator.ts";
 import { SpeechbrainSepformerSeparator } from "./separation/speechbrainSepformerSeparator.ts";
+import { reauditU1AcousticSeparationTrigger } from "./separation/acousticSeparationTriggerAudit.ts";
 import type { SpeakerDiarizer } from "./speaker/diarizer.ts";
 import { auditSpeakerOverlap } from "./speakerAudit.ts";
 import {
@@ -164,13 +165,20 @@ export class BoundedConditionalSeparationHost {
     const deadlineAtMs = startedAt + maximumWallMs;
     let temporaryDirectory: string | null = null;
     try {
-      const auditedTrigger = await auditSpeakerOverlap(this.ledger.state(), this.artifacts, grant.separationScope.trigger.operationId, { diarizer: this.speakerDiarizer });
-      const triggerCell = auditedTrigger.observations.accounting.find((cell) => cell.observationId === grant.separationScope.trigger.observationId);
-      if (
-        !triggerCell || triggerCell.state !== "conflicting" || triggerCell.kind !== "overlap" || triggerCell.uncertainty.reason !== "overlap_hypothesis_requires_speech_restudy" ||
-        triggerCell.startMs !== scope.startMs || triggerCell.endMs !== scope.endMs || auditedTrigger.observationsArtifact.id !== grant.separationScope.trigger.observationsArtifactId ||
-        auditedTrigger.receiptArtifact.id !== grant.separationScope.trigger.receiptArtifactId
-      ) throw new SeparationHostFailure("trigger_invalid", "Conditional separation trigger no longer cold-audits to one exact U6.1 overlap cell");
+      const trigger = grant.separationScope.trigger;
+      if (trigger.kind === "u6_speaker_overlap") {
+        const auditedTrigger = await auditSpeakerOverlap(this.ledger.state(), this.artifacts, trigger.operationId, { diarizer: this.speakerDiarizer });
+        const triggerCell = auditedTrigger.observations.accounting.find((cell) => cell.observationId === trigger.observationId);
+        if (
+          !triggerCell || triggerCell.state !== "conflicting" || triggerCell.kind !== "overlap" || triggerCell.uncertainty.reason !== "overlap_hypothesis_requires_speech_restudy" ||
+          triggerCell.startMs !== scope.startMs || triggerCell.endMs !== scope.endMs || auditedTrigger.observationsArtifact.id !== trigger.observationsArtifactId ||
+          auditedTrigger.receiptArtifact.id !== trigger.receiptArtifactId
+        ) throw new SeparationHostFailure("trigger_invalid", "Conditional separation trigger no longer cold-audits to one exact U6.1 overlap cell");
+      } else {
+        const valid = await reauditU1AcousticSeparationTrigger(this.ledger.state(), this.artifacts, trigger, { startMs: scope.startMs, endMs: scope.endMs, trackId: scope.trackId })
+          .catch((cause) => { throw new SeparationHostFailure("trigger_invalid", "Conditional separation U1 acoustic trigger failed cold audit", { cause }); });
+        if (!valid) throw new SeparationHostFailure("trigger_invalid", "Conditional separation trigger no longer cold-audits to one exact U1 mixed acoustic cell");
+      }
       temporaryDirectory = await mkdtemp(join(this.temporaryRoot, "studio-separation-"));
       const registeredSourcePath = await this.artifacts.resolveVerified(source).catch((cause) => { throw new SeparationHostFailure("source_unavailable", "Raw source failed content verification", { cause }); });
       const sealedSourcePath = join(temporaryDirectory, "authorized-source.media");

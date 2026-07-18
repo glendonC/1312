@@ -3,9 +3,9 @@ import type {
   ConditionalSeparationLimits,
   ConditionalSeparationReceipt,
   ConditionalSeparationRequest,
+  ConditionalSeparationTrigger,
   MediaScope,
   RawStemComparisonReceipt,
-  U6SpeakerOverlapSeparationTrigger,
 } from "../model.ts";
 import type { RuntimeEventBase } from "./base.ts";
 
@@ -18,7 +18,7 @@ export interface ConditionalSeparationStartedEvent extends RuntimeEventBase {
     executionId: string;
     launchClaimId: string;
     requestFingerprint: string;
-    trigger: U6SpeakerOverlapSeparationTrigger;
+    trigger: ConditionalSeparationTrigger;
     limits: ConditionalSeparationLimits;
   };
 }

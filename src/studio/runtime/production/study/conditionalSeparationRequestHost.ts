@@ -3,6 +3,7 @@ import type { ContentAddressedArtifactStore } from "../artifactStore.ts";
 import type { RuntimeLedger } from "../journal.ts";
 import { CONDITIONAL_SEPARATION_LIMITS, type ConditionalSeparationRequestInput, type ConditionalSeparationTriggerOption } from "../model.ts";
 import type { BoundedRuntimeScheduler, SpawnDecision } from "../scheduler.ts";
+import { deriveU1AcousticSeparationTriggerBodies } from "../separation/acousticSeparationTriggerAudit.ts";
 import type { SpeakerDiarizer } from "../speaker/diarizer.ts";
 import { auditSpeakerOverlap } from "../speakerAudit.ts";
 import { exact, object, string } from "../validation/primitives.ts";
@@ -71,6 +72,9 @@ export class ConditionalSeparationRequestHost {
         };
         triggers.push({ triggerId: triggerId(body), ...body });
       }
+    }
+    for (const body of await deriveU1AcousticSeparationTriggerBodies(state, this.artifacts)) {
+      triggers.push({ triggerId: triggerId(body), ...body });
     }
     const body: Omit<ConditionalSeparationRequestInput, "inputId"> = {
       schema: "studio.separation-request-input.v1",

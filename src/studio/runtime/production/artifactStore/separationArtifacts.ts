@@ -1,6 +1,7 @@
 import { canonicalSha256 } from "../canonicalIdentity.ts";
 import type {
   ConditionalSeparationReceipt,
+  ConditionalSeparationTrigger,
   ContentIdentity,
   RawStemComparison,
   RawStemComparisonReceipt,
@@ -8,6 +9,17 @@ import type {
   SeparationStemOutput,
 } from "../model.ts";
 import { assertRuntimeArtifact } from "../validation/artifacts.ts";
+
+/**
+ * Ordered provenance artifact ids for a trigger. U6 links the speaker overlap observations plus its
+ * separate receipt artifact; U1 acoustic evidence has no receipt artifact (the producer receipt is
+ * content-addressed only), so it links the observations artifact alone.
+ */
+function triggerProvenanceArtifactIds(trigger: ConditionalSeparationTrigger): string[] {
+  return trigger.kind === "u6_speaker_overlap"
+    ? [trigger.observationsArtifactId, trigger.receiptArtifactId]
+    : [trigger.observationsArtifactId];
+}
 
 export interface PreparedSeparationObject {
   artifactId: string;
@@ -52,7 +64,7 @@ export function buildSeparationStemArtifact(input: {
     storageKey: input.prepared.storageKey,
     durationMs: input.output.durationMs,
     tracks: [{ id: input.output.trackId, index: 0, kind: "audio", codec: "pcm_s16le", durationMs: input.output.durationMs }],
-    sourceArtifactIds: [source.artifactId, trigger.observationsArtifactId, trigger.receiptArtifactId],
+    sourceArtifactIds: [source.artifactId, ...triggerProvenanceArtifactIds(trigger)],
     producerTaskId: input.taskId,
     producerAgentId: input.agentId,
     origin: {
@@ -66,7 +78,7 @@ export function buildSeparationStemArtifact(input: {
       trackId: source.trackId,
       startMs: source.range.startMs,
       endMs: source.range.endMs,
-      triggerOperationId: trigger.operationId,
+      triggerKind: trigger.kind,
       triggerObservationId: trigger.observationId,
       methodId: producer.adapter.id,
       modelContentIds: producer.model.files.map((file) => file.content.contentId),
@@ -95,7 +107,7 @@ export function buildConditionalSeparationReceiptArtifact(input: {
     storageKey: input.prepared.storageKey,
     durationMs: null,
     tracks: [],
-    sourceArtifactIds: [input.receipt.source.artifactId, input.receipt.trigger.observationsArtifactId, input.receipt.trigger.receiptArtifactId, ...input.receipt.outputs.map((output) => output.artifactId)],
+    sourceArtifactIds: [input.receipt.source.artifactId, ...triggerProvenanceArtifactIds(input.receipt.trigger), ...input.receipt.outputs.map((output) => output.artifactId)],
     producerTaskId: input.taskId,
     producerAgentId: input.agentId,
     origin: {

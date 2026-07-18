@@ -12,6 +12,7 @@ import {
 import type { ConditionalSeparationReceipt, RawStemComparison, RawStemComparisonReceipt, RuntimeArtifact, RuntimeProjection } from "./model.ts";
 import type { SourceSeparator } from "./separation/separator.ts";
 import { SpeechbrainSepformerSeparator } from "./separation/speechbrainSepformerSeparator.ts";
+import { reauditU1AcousticSeparationTrigger } from "./separation/acousticSeparationTriggerAudit.ts";
 import type { SpeakerDiarizer } from "./speaker/diarizer.ts";
 import { auditSpeakerOverlap } from "./speakerAudit.ts";
 import { conditionalSeparationReceiptId, rawStemComparisonReceiptId, validateConditionalSeparationReceipt, validateRawStemComparison, validateRawStemComparisonReceipt } from "./validation/separation.ts";
@@ -70,10 +71,17 @@ export async function auditConditionalSeparation(
     ...stems.map((artifact) => artifacts.resolveVerified(artifact)),
   ]);
   const stemArtifacts = stems as [RuntimeArtifact, RuntimeArtifact];
-  const auditedTrigger = await auditSpeakerOverlap(state, artifacts, operation.trigger.operationId, { diarizer: options.speakerDiarizer, maxWallMs: options.maxWallMs });
-  const triggerCell = auditedTrigger.observations.accounting.find((cell) => cell.observationId === operation.trigger.observationId);
+  let triggerValid: boolean;
+  if (operation.trigger.kind === "u6_speaker_overlap") {
+    const auditedTrigger = await auditSpeakerOverlap(state, artifacts, operation.trigger.operationId, { diarizer: options.speakerDiarizer, maxWallMs: options.maxWallMs });
+    const triggerCell = auditedTrigger.observations.accounting.find((cell) => cell.observationId === operation.trigger.observationId);
+    triggerValid = Boolean(triggerCell) && triggerCell!.state === "conflicting" && triggerCell!.kind === "overlap" &&
+      triggerCell!.startMs === operation.startMs && triggerCell!.endMs === operation.endMs;
+  } else {
+    triggerValid = await reauditU1AcousticSeparationTrigger(state, artifacts, operation.trigger, { startMs: operation.startMs, endMs: operation.endMs, trackId: operation.trackId });
+  }
   if (
-    !triggerCell || triggerCell.state !== "conflicting" || triggerCell.kind !== "overlap" || triggerCell.startMs !== operation.startMs || triggerCell.endMs !== operation.endMs ||
+    !triggerValid ||
     receipt.operationId !== operation.id || receipt.receiptId !== operation.receiptId || receiptArtifact.content.contentId !== operation.receiptContentId ||
     receipt.authorization.grantId !== operation.grantId || receipt.authorization.taskId !== operation.taskId || receipt.authorization.agentId !== operation.agentId ||
     receipt.authorization.executionId !== operation.executionId || receipt.authorization.launchClaimId !== operation.launchClaimId ||

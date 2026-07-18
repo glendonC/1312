@@ -86,7 +86,7 @@ export interface SeparationStemArtifactOrigin {
   trackId: string;
   startMs: number;
   endMs: number;
-  triggerOperationId: string;
+  triggerKind: "u6_speaker_overlap" | "u1_acoustic_mixed";
   triggerObservationId: string;
   methodId: "speechbrain-sepformer-wsj02mix";
   modelContentIds: string[];

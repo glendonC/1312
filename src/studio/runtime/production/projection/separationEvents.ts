@@ -3,6 +3,7 @@ import type { RuntimeProjection } from "../model.ts";
 import { SEPARATION_METHOD } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { conditionalSeparationRequestFingerprint } from "../validation/separation.ts";
+import { u1AcousticTriggerLineageMatches } from "../separation/acousticSeparationTrigger.ts";
 import { invariant } from "./shared.ts";
 
 function same(left: unknown, right: unknown): boolean {
@@ -30,14 +31,22 @@ export function applyConditionalSeparationEvent(next: RuntimeProjection, event: 
       `Conditional separation ${request.operationId} changed immutable raw source`,
     );
     invariant(track?.kind === "audio" && scope.endMs <= (source.durationMs ?? 0) && scope.endMs - scope.startMs <= grant.separationScope.limits.maxRangeMs, event, `Conditional separation ${request.operationId} has no bounded exact audio range`);
-    const speaker = next.speakerOverlapOperations[trigger.operationId];
-    invariant(
-      speaker?.status === "completed" && speaker.sourceArtifactId === source.id && speaker.trackId === track.id &&
-      speaker.outputArtifactId === trigger.observationsArtifactId && speaker.receiptArtifactId === trigger.receiptArtifactId &&
-      speaker.receiptId === trigger.receiptId && speaker.receiptContentId === trigger.receiptContentId,
-      event,
-      `Conditional separation ${request.operationId} lost its U6.1 trigger`,
-    );
+    if (trigger.kind === "u6_speaker_overlap") {
+      const speaker = next.speakerOverlapOperations[trigger.operationId];
+      invariant(
+        speaker?.status === "completed" && speaker.sourceArtifactId === source.id && speaker.trackId === track.id &&
+        speaker.outputArtifactId === trigger.observationsArtifactId && speaker.receiptArtifactId === trigger.receiptArtifactId &&
+        speaker.receiptId === trigger.receiptId && speaker.receiptContentId === trigger.receiptContentId,
+        event,
+        `Conditional separation ${request.operationId} lost its U6.1 trigger`,
+      );
+    } else {
+      invariant(
+        u1AcousticTriggerLineageMatches(next.artifacts, trigger, source.id, track.id),
+        event,
+        `Conditional separation ${request.operationId} lost its U1 acoustic trigger`,
+      );
+    }
     const fingerprint = conditionalSeparationRequestFingerprint({
       sourceContentId: source.content.contentId,
       trackId: track.id,

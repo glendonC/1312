@@ -245,8 +245,10 @@ export function validateEvidenceCitationEnvelope(
   if (evidenceKind === "current_run_speech" && operationId === null) {
     fail(context, `${path}.operationId`, "current-run speech must name its exact operation");
   }
-  if (evidenceKind === "external_document_span" && observations.some((entry) => entry.locator.kind !== "document_span")) {
-    fail(context, `${path}.observations`, "external document evidence requires explicit document spans and qualified media");
+  if (evidenceKind === "external_document_span" &&
+      (use !== "cite_only" || operationId === null || envelope.receipt.artifactId === null ||
+       observations.length === 0 || observations.some((entry) => entry.locator.kind !== "document_span"))) {
+    fail(context, path, "external document evidence remains cite-only over explicit receipted document spans");
   }
   const { schema: _schema, citationId: _citationId, ...body } = envelope;
   if (envelope.citationId !== evidenceCitationId(body)) {

@@ -17,6 +17,7 @@ import type {
   EvidenceCitationTarget,
   RuntimeProjection,
 } from "../model.ts";
+import { externalDocumentSpanCitation, reopenResearchCitationSource } from "../research/researchCitation.ts";
 import { reopenSemanticEvidence, type VerifiedSemanticEvidence } from "../semantic/semanticEvidenceAudit.ts";
 import {
   evidenceCitationId,
@@ -449,6 +450,18 @@ export async function auditEvidenceCitation(
     expected = speakerTurnCitation({
       verified,
       target: citation.target as Extract<EvidenceCitationTarget, { kind: "coverage" }>,
+    });
+  } else if (citation.evidenceKind === "external_document_span") {
+    const verified = await reopenResearchCitationSource(artifacts, state.runId, citation.receipt.contentId);
+    expected = externalDocumentSpanCitation({
+      verified,
+      target: citation.target as Extract<EvidenceCitationTarget, { kind: "media_context" }>,
+      spans: citation.observations.map((entry) => {
+        if (entry.locator.kind !== "document_span") {
+          throw new Error("External document citation requires document_span locators");
+        }
+        return { start: entry.locator.document.start, end: entry.locator.document.end };
+      }),
     });
   } else {
     throw new Error(`Evidence citation kind ${citation.evidenceKind} has no registered producer or audit adapter`);

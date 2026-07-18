@@ -95,7 +95,7 @@ export default function SourceEntry({
       ref={control}
       layout
       transition={SPRING}
-      aria-label="Source setup"
+      aria-label="Recorded preview source setup"
     >
       <AnimatePresence mode="popLayout" initial={false}>
         {!open ? (
@@ -114,7 +114,7 @@ export default function SourceEntry({
             transition={{ duration: 0.15 }}
             layout
           >
-            Input Source
+            Preview YouTube with recorded demo
           </motion.button>
         ) : (
           <motion.form
@@ -139,8 +139,8 @@ export default function SourceEntry({
                 inputMode="url"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Paste a link"
-                aria-label="Clip link"
+                placeholder="Paste a YouTube link for recorded preview"
+                aria-label="YouTube link for recorded preview"
                 value={url}
                 onChange={(event) => {
                   dismissPreflight();
@@ -165,7 +165,7 @@ export default function SourceEntry({
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <button type="submit" className="dock-go" aria-label="Resolve source metadata">
+              <button type="submit" className="dock-go" aria-label="Resolve metadata for recorded preview">
                 <Arrow />
               </button>
             </motion.span>

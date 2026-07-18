@@ -1,7 +1,7 @@
 # Studio Product Contract
 
 Status: shared UI/runtime contract and implementation inventory
-Last updated: 2026-07-16
+Last updated: 2026-07-18
 
 ## Purpose
 
@@ -88,7 +88,7 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 
 - The recorded URL/demo side of default `/studio/` is hard-wired to `run-006` in
   `src/pages/studio/index.astro` and boots a `ReplayTransport` in `src/studio/StudioApp.tsx` and
-  `src/studio/store.ts`. A separate **Use owned local source** product control now opens the local
+  `src/studio/store.ts`. A separate **Owned file local ingest** product control now opens the local
   host path without changing the replay store or projecting production events as replay agents.
 - `ReplayTransport` reads `public/demo/runs/<id>/` files. The recorded URL/demo loop does not create
   a runtime job, start `scripts/run-clip.mjs`, start `scripts/run-local-worker.ts`, or load a
@@ -97,6 +97,11 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 - A submitted YouTube URL creates a `StudioPreviewSession` with `dataSource: "recorded_run"`.
   It starts the recorded run and displays: “This interface preview uses a recorded run. Your
   source was not processed.”
+- Source entry now separates **YouTube local ingest**, **Owned file local ingest**, **Explore run-006 recorded
+  demo**, and the recorded YouTube preview field. The YouTube local action currently stops at an
+  explicit unavailable boundary: it resolves no URL, downloads no media, creates no preview
+  session, and never substitutes recorded evidence. Runtime-host download and registration remain
+  separate runtime and product wiring work.
 - `run-005` and `run-006` contain recorded artifacts used by the Studio and lab. `run-005` is also
   the content-addressed owned-media validator fixture consumed by local runtime tests.
 - A local runtime-start host now exists under
@@ -224,7 +229,7 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 
 | Step | Required user-visible outcome | Today | Class / status | Required runtime boundary |
 |---|---|---|---|---|
-| 1. Add source | User supplies a supported link or owned clip | A valid YouTube link starts an explicit recorded preview; **Use owned local source** connects to the loopback host, accepts browser-selected owned bytes only after explicit ownership/control attestation, and keeps CLI preflight registration as an escape hatch | A+B / recorded preview plus real browser-owned source path | Hosted/link ingest remains missing; local browser ingest is development-only |
+| 1. Add source | User supplies a supported link or owned clip | Source choices explicitly separate a fail-closed **YouTube local ingest** entry, **Owned file local ingest**, **Explore run-006 recorded demo**, and a recorded-preview URL field. The YouTube local entry performs no resolution, download, preview, or replay yet. The owned entry connects to the loopback host, accepts browser-selected owned bytes only after explicit ownership/control attestation, and keeps CLI preflight registration as an escape hatch | A+B+C / explicit recorded preview, real browser-owned source path, and honest unavailable YouTube-local entry | Hosted/link ingest remains missing; local browser ingest is development-only |
 | 2. Validate and probe | Access, rights, duration, tracks, speech, languages, and known gaps | Browser-owned ingest preserves bytes under ignored `.studio/`, runs the existing ffprobe producer, seals V1 preflight, hot-registers the session, and exposes real queued/probing/sealing/registered/failed state. Speech/language findings remain unavailable for this V1 path. Submitted links are not probed | B / real and wired for browser-owned source; detector and hosted-link gaps remain | Add detectors only through their sealed producer chain; do not infer findings from media or filename |
 | 3. Choose range | Suggested, detected-language, whole, or custom time window | Owned-source numeric range is bounded by host-reported measured duration; replay custom changes remain blocked; recommendation is absent | A+B+C / real local custom range; replay and missing recommendation boundaries retained | Add measured selection affordance/recommender without inventing findings |
 | 4. Choose result | Target language, captions/evidence depth, relevant advanced options | Owned-source path maps explicit declared/target language, optional pack, range, and output contract into `studio.analysis-request.v1`; this does not imply a corresponding output producer | B / real and wired request mapping | Extend only when producers support more options |
@@ -244,17 +249,19 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 
 | ID | Visible datum or control | What it does today | Source today | Target semantics | Class / status |
 |---|---|---|---|---|---|
-| `source.input.open` | **Input Source** | Opens the URL entry control | Client state | Open source selection; no job starts | C / UI contract only |
-| `source.url` | **Paste a link** | Parses presentation details client-side | `presentSource()` | Accept supported URL; upload/owned-file selection remains a separate adapter | C / UI contract only |
+| `source.input.open` | **Preview YouTube with recorded demo** | Opens the recorded-preview URL entry control | Client state | Keep recorded preview separate from live local ingest; no job starts | A / recorded preview entry |
+| `source.url` | **Paste a YouTube link for recorded preview** | Parses presentation details client-side | `presentSource()` | Feed only the explicit recorded-preview path; live local YouTube uses a separate host action | A / recorded preview entry |
 | `source.edit` | Source review/edit button | Returns to URL editing | Client state | Edit before submission; invalidate any stale probe/plan | C / UI contract only |
-| `source.submit` | Arrow, labelled **Launch investigation** | For a valid YouTube URL, creates a UI-only preview and starts `run-006` replay when loaded | `previewSession.ts`, recorded bundle | Rename or redesign so preview and real submission are never the same unlabelled action; real action should create a source session and begin bounded probe only | A / recorded replay |
+| `source.submit` | Arrow, labelled **Resolve metadata for recorded preview** | For a valid YouTube URL, creates a UI-only preview and later starts `run-006` replay when explicitly confirmed | `previewSession.ts`, recorded bundle | Preserve the recorded label and not-processed warning; never call live ingest from this action | A / recorded replay |
 | `source.preview.notice` | Submitted-source provenance note | Says the submitted source was not processed | `StudioPreviewSession.dataSource` | Must remain visible anywhere a submitted URL is displayed over recorded evidence | A / recorded replay |
-| `source.owned.open` | **Use owned local source** | Opens the separate product-facing loopback-host path; it does not submit the URL field or start replay | Client state | Preserve the explicit replay/production boundary | B / real local path entry |
-| `demo.open` | **Run Demo** | Opens recorded-source preflight for the loaded bundle | `run-006` | Explicit entry into recorded demonstration | A / recorded replay |
+| `source.youtube-local.open` | **YouTube local ingest** | Opens an explicit fail-closed local-ingest boundary that states no URL was resolved, no media was downloaded, and no recorded run was substituted | Client state | Start authenticated runtime-host ingest only after its private producer is wired; never create `StudioPreviewSession` or call replay `start()` | C / honest unavailable local path entry |
+| `source.owned.open` | **Owned file local ingest** | Opens the separate product-facing loopback-host path; it does not submit the recorded-preview URL field or start replay | Client state | Preserve the explicit replay/production boundary | B / real local path entry |
+| `demo.open` | **Explore run-006 recorded demo** | Opens recorded-source preflight for the loaded bundle | `run-006` | Explicit entry into recorded demonstration | A / recorded replay |
 | `bundle.retry` | **Retry loading** | Reloads recorded bundle after a fetch/validation failure | `ReplayTransport` | Retry the current source of truth only; never imply runtime retry | A / recorded replay |
 
 Required states: recorded bundle loading, load failure, empty source, invalid URL, unsupported URL,
-submitted-source preview, hosted probe unavailable, and explicit recorded demo.
+submitted-source preview, YouTube-local ingest unavailable, hosted probe unavailable, and explicit
+recorded demo.
 
 ### 2. Source facts and preflight — `/studio/`
 

@@ -56,12 +56,14 @@ const KOREAN_SAMPLES = [
 ] as const;
 
 interface StudioWelcomeProps {
-  openOwnedMedia: () => void;
+  openLocalSource: (mode: LocalSourceMode) => void;
   selectSample: (url: string) => void;
 }
 
+type LocalSourceMode = "owned" | "youtube";
+
 /** The orchestrator's invitation, before any runtime or evidence state exists. */
-function StudioWelcome({ openOwnedMedia, selectSample }: StudioWelcomeProps) {
+function StudioWelcome({ openLocalSource, selectSample }: StudioWelcomeProps) {
   const preflight = useStudio((state) => state.preflight);
   const previewSession = useStudio((state) => state.previewSession);
   const sourceGuideState: SourceGuideState = !previewSession
@@ -177,7 +179,7 @@ function StudioWelcome({ openOwnedMedia, selectSample }: StudioWelcomeProps) {
             <AnimatePresence initial={false}>
               {!sourceGuideActive && (
                 <StudioSourceOptions
-                  openOwnedMedia={openOwnedMedia}
+                  openLocalSource={openLocalSource}
                   selectSample={selectSample}
                 />
               )}
@@ -328,7 +330,7 @@ function StudioSourceDock({
   );
 }
 
-function StudioSourceOptions({ openOwnedMedia, selectSample }: StudioWelcomeProps) {
+function StudioSourceOptions({ openLocalSource, selectSample }: StudioWelcomeProps) {
   const bundle = useBundle();
   const openRecordedPreflight = useStudio((state) => state.openRecordedPreflight);
   const [samplesOpen, setSamplesOpen] = useState(false);
@@ -406,26 +408,38 @@ function StudioSourceOptions({ openOwnedMedia, selectSample }: StudioWelcomeProp
       <div
         className="studio-source-option-track"
         role="group"
-        aria-label="More source options"
+        aria-label="Live local and recorded source options"
       >
         <button
           type="button"
           className="studio-source-option"
-          data-palette="peach"
-          onClick={openRecordedPreflight}
-          disabled={!bundle}
+          data-palette="teal"
+          data-source-authority="live-local"
+          onClick={() => openLocalSource("youtube")}
         >
-          <span>Explore recorded demo</span>
-          <Play />
+          YouTube local ingest
         </button>
 
         <button
           type="button"
           className="studio-source-option"
           data-palette="blue"
-          onClick={openOwnedMedia}
+          data-source-authority="live-local"
+          onClick={() => openLocalSource("owned")}
         >
-          Add owned media
+          Owned file local ingest
+        </button>
+
+        <button
+          type="button"
+          className="studio-source-option"
+          data-palette="peach"
+          data-source-authority="recorded"
+          onClick={openRecordedPreflight}
+          disabled={!bundle}
+        >
+          <span>Explore run-006 recorded demo</span>
+          <Play />
         </button>
 
         <button
@@ -433,6 +447,7 @@ function StudioSourceOptions({ openOwnedMedia, selectSample }: StudioWelcomeProp
           type="button"
           className="studio-source-option"
           data-palette="coral"
+          data-source-authority="recorded"
           aria-haspopup="menu"
           aria-expanded={samplesOpen}
           aria-controls={samplesOpen ? sampleMenuId : undefined}
@@ -446,7 +461,7 @@ function StudioSourceOptions({ openOwnedMedia, selectSample }: StudioWelcomeProp
             openSamples(event.key === "ArrowUp" ? KOREAN_SAMPLES.length - 1 : 0);
           }}
         >
-          Korean samples
+          Recorded YouTube samples
         </button>
       </div>
 
@@ -456,14 +471,14 @@ function StudioSourceOptions({ openOwnedMedia, selectSample }: StudioWelcomeProp
             id={sampleMenuId}
             className="studio-sample-popover"
             role="menu"
-            aria-label="Saved Korean samples"
+            aria-label="Recorded YouTube samples"
             initial={{ opacity: 0, y: -5, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             onKeyDown={handleSampleKeys}
           >
-            <p>Choose a link to review in the source bar.</p>
+            <p>Choose a link for the recorded preview source bar.</p>
             <div className="studio-sample-list">
               {KOREAN_SAMPLES.map((sample, index) => (
                 <button
@@ -479,7 +494,7 @@ function StudioSourceOptions({ openOwnedMedia, selectSample }: StudioWelcomeProp
                   }}
                 >
                   <span>{sample.label}</span>
-                  <small>YouTube link</small>
+                  <small>Recorded preview link</small>
                 </button>
               ))}
             </div>
@@ -490,13 +505,34 @@ function StudioSourceOptions({ openOwnedMedia, selectSample }: StudioWelcomeProp
   );
 }
 
+function YouTubeLocalIngestEntry({ onClose }: { onClose: () => void }) {
+  return (
+    <section
+      className="input-status"
+      data-source-mode="youtube-local"
+      role="region"
+      aria-labelledby="youtube-local-ingest-title"
+    >
+      <span className="input-status-kicker">Live local source</span>
+      <strong id="youtube-local-ingest-title">YouTube local ingest</strong>
+      <p>
+        The private runtime-host downloader is not wired in this milestone. No URL was resolved,
+        no media was downloaded, and no recorded run was substituted.
+      </p>
+      <button type="button" className="ghost" onClick={onClose}>Back to source choices</button>
+    </section>
+  );
+}
+
 export default function InputAct() {
   const [processingMock] = useState<ProcessingMockScenario | null>(() => {
     if (!import.meta.env.DEV || typeof window === "undefined") return null;
     const requested = new URLSearchParams(window.location.search).get("processingMock");
     return isProcessingMockScenario(requested) ? requested : null;
   });
-  const [ownedSourceOpen, setOwnedSourceOpen] = useState(processingMock !== null);
+  const [localSourceMode, setLocalSourceMode] = useState<LocalSourceMode | null>(
+    processingMock === null ? null : "owned",
+  );
   const [sourceEntryOpen, setSourceEntryOpen] = useState(false);
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceFocusRequest, setSourceFocusRequest] = useState(0);
@@ -532,7 +568,7 @@ export default function InputAct() {
     >
       <div className="canvas" aria-hidden="true" />
 
-      {ownedSourceOpen && loadStatus === "ready" && (
+      {localSourceMode === "owned" && loadStatus === "ready" && (
         <Suspense
           fallback={(
             <div className="input-status" role="status" aria-live="polite">
@@ -543,15 +579,19 @@ export default function InputAct() {
         >
           <ProductLocalRuntime
             processingMock={processingMock}
-            onClose={() => setOwnedSourceOpen(false)}
+            onClose={() => setLocalSourceMode(null)}
           />
         </Suspense>
       )}
 
-      {!ownedSourceOpen && showWelcome && loadStatus === "ready" && (
+      {localSourceMode === "youtube" && loadStatus === "ready" && (
+        <YouTubeLocalIngestEntry onClose={() => setLocalSourceMode(null)} />
+      )}
+
+      {localSourceMode === null && showWelcome && loadStatus === "ready" && (
         <>
           <StudioWelcome
-            openOwnedMedia={() => setOwnedSourceOpen(true)}
+            openLocalSource={setLocalSourceMode}
             selectSample={selectSample}
           />
           <StudioSourceDock
@@ -564,14 +604,14 @@ export default function InputAct() {
         </>
       )}
 
-      {!ownedSourceOpen && preflightStatus === "idle" && loadStatus === "loading" && (
+      {localSourceMode === null && preflightStatus === "idle" && loadStatus === "loading" && (
         <div className="input-status" role="status" aria-live="polite">
           <span className="input-status-kicker">Recorded evidence</span>
           <p>Loading the run bundle…</p>
         </div>
       )}
 
-      {!ownedSourceOpen && preflightStatus === "idle" && loadStatus === "failed" && (
+      {localSourceMode === null && preflightStatus === "idle" && loadStatus === "failed" && (
         <div className="input-status" role="alert">
           <span className="input-status-kicker">Run unavailable</span>
           <p>The recorded evidence could not be loaded. Nothing has been replayed.</p>

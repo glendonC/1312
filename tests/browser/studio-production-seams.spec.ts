@@ -8,7 +8,7 @@ function productStudioUrl(): string {
 async function openCompletedDeterministicProjection(page: Page, endSeconds?: number): Promise<Locator> {
   const token = process.env.STUDIO_RUNTIME_HOST_TOKEN ?? "";
   await page.goto(productStudioUrl());
-  await page.getByRole("button", { name: "Add owned media" }).click();
+  await page.getByRole("button", { name: "Owned file local ingest" }).click();
 
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await productRuntime.getByRole("button", { name: "Open connect to local host" }).click();

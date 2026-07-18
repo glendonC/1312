@@ -1,6 +1,6 @@
 # Build Week status
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 
 ## Document roles
 
@@ -170,8 +170,10 @@ score.
   journals `studio.research-request-input.v2` with the exact root, admission/read/pass basis and
   conflicting coverage evidence. `artifact_read` exposes that candidate, and only a current exact
   conflict echo can mint the bounded child. Empty trigger lists grant nothing and research is never
-  automatic. The production worker path still cannot carry receipted research spans into its v2
-  report.
+  automatic. A research-granted worker can now echo only exact cold-audited snapshot/extraction
+  identities plus sorted bounded UTF-8 byte spans into its v2 report. The launcher-owned builder
+  emits those spans only as cite-only media context; searches/snippets cannot enter the list, and
+  research cannot become claim support or supported coverage.
 
 ## Post-freeze backlog boundary
 
@@ -199,9 +201,10 @@ indefinite deferrals or a one-day implementation claim:
    U1 `mixed`-acoustic eligibility trigger now reuses the same path; other platforms/models,
    independent or human semantic preference, and Bet G ablation remain.
 8. R1 bounded receipted web research — the first trigger-gated slice (grant, scheduler admission,
-   launcher tools, journaled operations, cite-only span admission) is wired offline; a real
+   launcher tools, journaled operations, production v2 report construction, cite-only span admission)
+   is wired offline; a real
    provider behind an explicit allow flag, DNS pinning, freshness/provenance depth, and
-   study-admitted research reports remain. Default v3 conflict derivation is wired but dormant.
+   deeper context-specialist synthesis remain. Default v3 conflict derivation is wired but dormant.
 9. R2 optional bounded read-only computer-use after media senses and research.
 10. G1 semantic evaluation expansion, registered ablations, repeated captures, variance, and later
     packs; structural QC remains separate.
@@ -270,8 +273,9 @@ indefinite deferrals or a one-day implementation claim:
   and speech were cleanly separated.
 - R1 proves trigger-gated grant minting, closed egress policy enforcement, receipted
   search/snapshot/extraction lineage, journal-projected operations with executor binding, cold
-  audit by content identity, cite-only `external_document_span` admission, and one cold-auditable
-  structural exhaustion cause when the full query budget returns no results. It does not prove
+  audit by content identity, exact snapshot-span worker echoes, cite-only `external_document_span`
+  report construction/admission, and one cold-auditable structural exhaustion cause when the full
+  query budget returns no results. It does not prove
   source truth, currency, entity match, semantic correctness, transcript or caption authority, or
   semantic insufficiency. It does not prove that any run researched anything: no default run
   produces research, snippets are never

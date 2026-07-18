@@ -188,6 +188,21 @@ export interface ResearchExtractionArtifact {
   text: string;
 }
 
+/** Closed worker echo for selecting cite-only spans from one cold-audited snapshot extraction. */
+export const RESEARCH_CITATION_MAX_SPANS = 64;
+
+export interface ResearchEvidenceCitationInput {
+  operationId: string;
+  receiptArtifactId: string;
+  receiptContentId: string;
+  extractionArtifactId: string;
+  extractionContentId: string;
+  spans: Array<{ start: number; end: number }>;
+}
+
+/** Host-derived snapshot identity offered to the worker-result validator; search receipts never qualify. */
+export type ResearchEvidenceSourceIdentity = Omit<ResearchEvidenceCitationInput, "spans">;
+
 export interface ResearchDocumentSnapshotReceipt {
   schema: "studio.research-document-snapshot.receipt.v1";
   receiptId: string;

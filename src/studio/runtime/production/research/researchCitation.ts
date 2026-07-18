@@ -5,6 +5,7 @@ import type {
   EvidenceCitationObservation,
   EvidenceCitationTarget,
 } from "../model/evidenceCitations.ts";
+import { RESEARCH_CITATION_MAX_SPANS } from "../model/research.ts";
 import {
   evidenceCitationId,
   validateEvidenceCitationEnvelope,
@@ -57,16 +58,19 @@ export function externalDocumentSpanCitation(input: {
   ) {
     throw new Error("External document citation target escapes its granted research gap");
   }
-  if (spans.length === 0) {
-    throw new Error("External document citation requires at least one exact document span");
+  if (spans.length === 0 || spans.length > RESEARCH_CITATION_MAX_SPANS) {
+    throw new Error(`External document citation requires 1-${RESEARCH_CITATION_MAX_SPANS} exact document spans`);
   }
+  let previousEnd = -1;
   const observations = spans.map((span): EvidenceCitationObservation => {
     if (
       !Number.isSafeInteger(span.start) || !Number.isSafeInteger(span.end) ||
-      span.start < 0 || span.end <= span.start || span.end > verified.extraction.envelope.unitCount
+      span.start < 0 || span.end <= span.start || span.end > verified.extraction.envelope.unitCount ||
+      span.start < previousEnd
     ) {
-      throw new Error("External document citation span escapes the stored extraction");
+      throw new Error("External document citation span escapes the stored extraction or its ordered non-overlapping contract");
     }
+    previousEnd = span.end;
     return {
       observationId: researchObservationId({
         operationId: receipt.operationId,

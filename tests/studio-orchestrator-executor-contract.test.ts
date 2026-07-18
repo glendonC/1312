@@ -48,8 +48,8 @@ if (isRoot) {
   }
   const modelIndex = args.indexOf("--model");
   if (args[modelIndex + 1] !== "owned-swarm-test-model") throw new Error("root model was not explicit");
-  const expectedRootToolCount = restudied ? 7 : 6;
-  if (!prompt.includes("exactly " + expectedRootToolCount + " closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext") || (restudied && (!prompt.includes("study_restudy_request") || !prompt.includes("study_separation_request")))) {
+  const expectedRootToolCount = restudied ? 8 : 6;
+  if (!prompt.includes("exactly " + expectedRootToolCount + " closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext") || (restudied && (!prompt.includes("study_restudy_request") || !prompt.includes("study_separation_request") || !prompt.includes("study_research_request")))) {
     throw new Error("closed root prompt contract is missing");
   }
   const root = JSON.parse(prompt.split("\\n\\n").at(-1));
@@ -272,7 +272,7 @@ test("Codex root launcher exposes the closed planning/synthesis tools and receip
   }
 });
 
-test("default Codex launcher closes the seven-tool U7 report-to-readiness spine", async () => {
+test("default Codex launcher closes the eight-tool research-aware report-to-readiness spine", async () => {
   const directory = await mkdtemp(join(tmpdir(), "studio-orchestrator-u3-default-"));
   try {
     const loadedSource = await loadOwnedSourceSession(resolve("public/demo/runs/run-005"));

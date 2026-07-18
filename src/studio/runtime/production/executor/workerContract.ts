@@ -1,9 +1,11 @@
-import { isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind, isOcrHostArtifactKind, isResearchHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
+import { isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind, isOcrHostArtifactKind, isResearchHostArtifactKind, isSpeakerOverlapHostArtifactKind, OCR_LIMITS, RESEARCH_CITATION_MAX_SPANS, RESEARCH_LIMITS, SPEAKER_OVERLAP_LIMITS, STUDY_REPORT_LIMITS, STUDY_REPORT_V2_LIMITS } from "../model.ts";
 import type {
   GeneralizedCoverageReasonCode,
   GeneralizedCoverageRange,
   GeneralizedStudyClaim,
   OcrEvidenceCitationInput,
+  ResearchEvidenceCitationInput,
+  ResearchEvidenceSourceIdentity,
   SemanticEvidenceCitationInput,
   SpeakerOverlapEvidenceCitationInput,
   StudyClaim,
@@ -16,11 +18,14 @@ import type { DialogueScopePolicy } from "../../../acoustic/dialogueScopePolicy.
 import type { VerifiedSemanticEvidence } from "../semantic/semanticEvidenceAudit.ts";
 import type { VerifiedOcrAudit } from "../ocrAudit.ts";
 import type { VerifiedSpeakerOverlapAudit } from "../speakerAudit.ts";
+import type { VerifiedResearchSnapshotAudit } from "../research/researchAudit.ts";
 import { currentRunSpeechCitation, ocrSpanCitation, speakerTurnCitation } from "../evidenceCitations/audit.ts";
+import { externalDocumentSpanCitation } from "../research/researchCitation.ts";
 import { deriveGeneralizedCoverageDecision } from "../admission/generalizedCoveragePolicy.ts";
 import { validateSemanticEvidenceCitationInput } from "../validation/semanticEvidence.ts";
 import { validateOcrEvidenceCitationInput } from "../validation/ocr.ts";
 import { validateSpeakerOverlapEvidenceCitationInput } from "../validation/speakers.ts";
+import { validateResearchEvidenceCitationInput } from "../validation/research.ts";
 import { validateCoveragePartition, validateStudyReportArtifact } from "../validation/studyReports.ts";
 import { validateStudyReportArtifactV2 } from "../validation/studyReportsV2.ts";
 import { LauncherFailure } from "./launcherFailure.ts";
@@ -30,6 +35,7 @@ export interface WorkerResult {
   semanticEvidenceInputs: SemanticEvidenceCitationInput[];
   ocrEvidenceInputs: OcrEvidenceCitationInput[];
   speakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[];
+  researchEvidenceInputs: ResearchEvidenceCitationInput[];
   outputs: WorkerResultOutput[];
 }
 
@@ -87,6 +93,8 @@ export function buildStudyReportEnvelopeV2(input: {
   verifiedOcrEvidence: VerifiedOcrAudit[];
   speakerEvidenceInputs?: SpeakerOverlapEvidenceCitationInput[];
   verifiedSpeakerEvidence?: VerifiedSpeakerOverlapAudit[];
+  researchEvidenceInputs?: ResearchEvidenceCitationInput[];
+  verifiedResearchEvidence?: VerifiedResearchSnapshotAudit[];
   dialogueScopePolicy: DialogueScopePolicy | null;
 }): StudyReportArtifactV2 {
   const { task, output } = input;
@@ -203,6 +211,48 @@ export function buildStudyReportEnvelopeV2(input: {
     });
   });
   evidenceCitations.push(...ocrCitations);
+  const verifiedResearchByOperation = new Map(
+    (input.verifiedResearchEvidence ?? []).map((entry) => [entry.receipt.operationId, entry]),
+  );
+  const seenResearchOperations = new Set<string>();
+  const researchCitations = (input.researchEvidenceInputs ?? []).map((candidate, index) => {
+    const citationInput = validateResearchEvidenceCitationInput(
+      candidate,
+      "Study report v2 research input",
+      `researchEvidenceInputs[${index}]`,
+    );
+    if (seenResearchOperations.has(citationInput.operationId)) {
+      throw new Error(`Study report v2 research input ${citationInput.operationId} is duplicated`);
+    }
+    seenResearchOperations.add(citationInput.operationId);
+    const verified = verifiedResearchByOperation.get(citationInput.operationId);
+    const authorization = verified?.receipt.authorization;
+    if (!verified ||
+        citationInput.receiptArtifactId !== verified.receiptArtifactId ||
+        citationInput.receiptContentId !== verified.receiptContentId ||
+        citationInput.extractionArtifactId !== verified.extraction.artifactId ||
+        citationInput.extractionContentId !== verified.extraction.contentId ||
+        !authorization || !("executionId" in authorization) ||
+        authorization.taskId !== task.id || authorization.agentId !== task.assignedAgentId ||
+        authorization.executionId !== input.executionId) {
+      throw new Error(`Study report v2 research input ${citationInput.operationId} changed authenticated snapshot identity`);
+    }
+    const qualifiesMedia = verified.receipt.gap.media;
+    return externalDocumentSpanCitation({
+      verified,
+      target: {
+        kind: "media_context",
+        qualifiesMedia: {
+          artifactId: qualifiesMedia.artifactId,
+          trackId: qualifiesMedia.trackId,
+          startMs: qualifiesMedia.startMs,
+          endMs: qualifiesMedia.endMs,
+        },
+      },
+      spans: citationInput.spans,
+    });
+  });
+  evidenceCitations.push(...researchCitations);
   const sourceMap = new Map<string, string>([[task.jobContext.source.artifactId, task.jobContext.source.contentId]]);
   for (const citation of evidenceCitations) {
     sourceMap.set(citation.evidence.artifactId, citation.evidence.contentId);
@@ -235,6 +285,7 @@ export function validateWorkerResult(
   expectedSemanticEvidenceInputs: SemanticEvidenceCitationInput[] = [],
   expectedOcrEvidenceInputs: OcrEvidenceCitationInput[] = [],
   expectedSpeakerEvidenceInputs: SpeakerOverlapEvidenceCitationInput[] = [],
+  expectedResearchEvidenceInputs: ResearchEvidenceSourceIdentity[] = [],
 ): WorkerResult {
   const item = record(value);
   if (task.requiredOutputs.some((output) => isFrameHostArtifactKind(output.artifactKind) || isOcrHostArtifactKind(output.artifactKind) || isSpeakerOverlapHostArtifactKind(output.artifactKind) || isConditionalSeparationHostArtifactKind(output.artifactKind) || isResearchHostArtifactKind(output.artifactKind))) {
@@ -246,7 +297,8 @@ export function validateWorkerResult(
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
   const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
-  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : [])]);
+  const researchGranted = task.grants.some((grant) => grant.capability === "research.investigate");
+  const allowedKeys = new Set(["summary", "outputs", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : [])]);
   if (!item || Object.keys(item).some((key) => !allowedKeys.has(key))) {
     throw new LauncherFailure(
       "Worker result must contain only summary and outputs",
@@ -356,6 +408,57 @@ export function validateWorkerResult(
       "Codex worker response failed its speaker/overlap evidence citation contract.",
     );
   }
+  let researchEvidenceInputs: ResearchEvidenceCitationInput[] = [];
+  if (researchGranted) {
+    if (!Array.isArray(item.researchEvidenceInputs)) {
+      throw new LauncherFailure(
+        "Research-consuming worker omitted its structured snapshot evidence input list",
+        "Codex worker response failed its research evidence citation contract.",
+      );
+    }
+    if (item.researchEvidenceInputs.length > RESEARCH_LIMITS.maxDocuments) {
+      throw new LauncherFailure(
+        "Worker research evidence citations exceed the closed snapshot count",
+        "Codex worker response failed its research evidence citation contract.",
+      );
+    }
+    try {
+      researchEvidenceInputs = item.researchEvidenceInputs.map((input, index) =>
+        validateResearchEvidenceCitationInput(input, "Worker result", `researchEvidenceInputs[${index}]`));
+    } catch (error) {
+      throw new LauncherFailure(
+        `Worker research evidence citation is invalid: ${error instanceof Error ? error.message : "invalid citation"}`,
+        "Codex worker response failed its research evidence citation contract.",
+      );
+    }
+    const expectedByOperation = new Map(expectedResearchEvidenceInputs.map((entry) => [entry.operationId, entry]));
+    if (expectedByOperation.size !== expectedResearchEvidenceInputs.length) {
+      throw new LauncherFailure(
+        "Host supplied duplicate research snapshot identities",
+        "Codex worker response failed its research evidence citation contract.",
+      );
+    }
+    const seenOperations = new Set<string>();
+    for (const input of researchEvidenceInputs) {
+      const expected = expectedByOperation.get(input.operationId);
+      if (seenOperations.has(input.operationId) || !expected ||
+          input.receiptArtifactId !== expected.receiptArtifactId ||
+          input.receiptContentId !== expected.receiptContentId ||
+          input.extractionArtifactId !== expected.extractionArtifactId ||
+          input.extractionContentId !== expected.extractionContentId) {
+        throw new LauncherFailure(
+          "Worker research evidence citations do not name unique authenticated current-task snapshots",
+          "Codex worker response failed its research evidence citation contract.",
+        );
+      }
+      seenOperations.add(input.operationId);
+    }
+  } else if (expectedResearchEvidenceInputs.length !== 0) {
+    throw new LauncherFailure(
+      "Host supplied research evidence without a worker grant",
+      "Codex worker response failed its research evidence citation contract.",
+    );
+  }
   const required = task.requiredOutputs.filter((output) => output.required);
   if (item.outputs.length !== required.length) {
     throw new LauncherFailure(
@@ -432,7 +535,7 @@ export function validateWorkerResult(
       "Codex worker response failed its output contract.",
     );
   }
-  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, speakerEvidenceInputs, outputs };
+  return { summary: item.summary, semanticEvidenceInputs, ocrEvidenceInputs, speakerEvidenceInputs, researchEvidenceInputs, outputs };
 }
 
 export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
@@ -446,6 +549,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
   const semanticGranted = task.grants.some((grant) => grant.capability === "speech.transcribe");
   const ocrGranted = task.grants.some((grant) => grant.capability === "media.frames.ocr");
   const speakerGranted = task.grants.some((grant) => grant.capability === "media.speakers.analyze");
+  const researchGranted = task.grants.some((grant) => grant.capability === "research.investigate");
   const semanticEvidenceInputs = {
     type: "array",
     minItems: 1,
@@ -513,6 +617,37 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         receiptContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
       },
       required: ["operationId", "artifactId", "contentId", "receiptArtifactId", "receiptId", "receiptContentId"],
+    },
+  };
+  const researchEvidenceInputs = {
+    type: "array",
+    minItems: 0,
+    maxItems: RESEARCH_LIMITS.maxDocuments,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        operationId: { type: "string", minLength: 1 },
+        receiptArtifactId: { type: "string", minLength: 1 },
+        receiptContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        extractionArtifactId: { type: "string", minLength: 1 },
+        extractionContentId: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        spans: {
+          type: "array",
+          minItems: 1,
+          maxItems: RESEARCH_CITATION_MAX_SPANS,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              start: { type: "integer", minimum: 0 },
+              end: { type: "integer", minimum: 1 },
+            },
+            required: ["start", "end"],
+          },
+        },
+      },
+      required: ["operationId", "receiptArtifactId", "receiptContentId", "extractionArtifactId", "extractionContentId", "spans"],
     },
   };
   const coverage = {
@@ -590,6 +725,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
       ...(semanticGranted ? { semanticEvidenceInputs } : {}),
       ...(ocrGranted ? { ocrEvidenceInputs } : {}),
       ...(speakerGranted ? { speakerEvidenceInputs } : {}),
+      ...(researchGranted ? { researchEvidenceInputs } : {}),
       outputs: {
         type: "array",
         minItems: required.length,
@@ -597,7 +733,7 @@ export function workerOutputSchema(task: TaskRecord): Record<string, unknown> {
         items: outputItems,
       },
     },
-    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), "outputs"],
+    required: ["summary", ...(semanticGranted ? ["semanticEvidenceInputs"] : []), ...(ocrGranted ? ["ocrEvidenceInputs"] : []), ...(speakerGranted ? ["speakerEvidenceInputs"] : []), ...(researchGranted ? ["researchEvidenceInputs"] : []), "outputs"],
   };
 }
 
@@ -753,6 +889,7 @@ export function workerPrompt(task: TaskRecord): string {
         "research_search accepts one bounded query string; the host injects task, agent, grant, provider, and budgets. Returned snippets are routing hints, never citations, and never evidence.",
         "research_document_snapshot accepts only a completed searchOperationId plus a resultIndex; URLs and paths are never accepted. The host enforces the domain allowlist, byte and redirect ceilings, and stores receipted document and extraction artifacts.",
         "A snapshot proves only what a public destination served at retrieval time. It is cite-only external context for the granted gap: it never becomes claim support, dialogue, caption text, transcript authority, entity identification, currency, or truth.",
+        "To cite a completed document_snapshot, copy only its exact operation, snapshot receipt artifact/content, and extraction artifact/content identities into the top-level researchEvidenceInputs list, then select sorted non-overlapping UTF-8 byte spans within the returned extraction. Search results and snippets never belong in this list. You may leave the list empty.",
         "Do not label worker-authored output as any studio research receipt, snapshot, or extraction artifact kind; those belong only to the host.",
       ].join(" ");
   const decisionScope = task.grants

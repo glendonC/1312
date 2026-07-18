@@ -19,10 +19,6 @@ import {
 import { BoundedResearchHost } from "../src/studio/runtime/production/research/researchHost.ts";
 import { ResearchExhaustionHost } from "../src/studio/runtime/production/research/researchExhaustionHost.ts";
 import { auditResearchExhaustion, auditResearchSnapshot } from "../src/studio/runtime/production/research/researchAudit.ts";
-import {
-  externalDocumentSpanCitation,
-  reopenResearchCitationSource,
-} from "../src/studio/runtime/production/research/researchCitation.ts";
 import { FixtureResearchProvider } from "../src/studio/runtime/production/research/provider.ts";
 import type { ResearchFetcher } from "../src/studio/runtime/production/research/egressPolicy.ts";
 import { ResearchRequestExecutionHost } from "../src/studio/runtime/production/study/researchRequestExecutionHost.ts";
@@ -44,18 +40,20 @@ import { BoundedEvidenceReadHost } from "../src/studio/runtime/production/eviden
 import { BoundedEvidenceAssessmentHost } from "../src/studio/runtime/production/evidenceAssessmentHost.ts";
 import { BoundedEvidenceDecisionHost } from "../src/studio/runtime/production/evidenceDecisionHost.ts";
 import { SpeechTranscribeCapabilityHost } from "../src/studio/runtime/production/semantic/semanticEvidenceHost.ts";
+import {
+  buildStudyReportEnvelopeV2,
+  validateWorkerResult,
+} from "../src/studio/runtime/production/executor/workerContract.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
 import {
   OWNED_MEDIA_STUDY_LIMITS,
   RESEARCH_LIMITS,
-  STUDY_REPORT_V2_LIMITS,
   type LaunchPermit,
   type MediaScope,
   type OwnedMediaStudyArtifact,
   type OwnedMediaStudyExecutorReceipt,
   type RuntimeArtifact,
   type StudyPlanningDecisionReceipt,
-  type StudyReportArtifactV2,
   type TaskRecord,
 } from "../src/studio/runtime/production/model.ts";
 import type { PendingRuntimeEvent } from "../src/studio/runtime/production/protocol.ts";
@@ -724,7 +722,7 @@ test("the launcher context mounts child research tools only under the grant", as
   }
 });
 
-test("wired external_document_span citations admit cite-only and never upgrade", async (t) => {
+test("production worker report construction admits snapshot spans as cite-only and never upgrades", async (t) => {
   const runtime = await harness(t);
   await craftConflictStudy(runtime);
   const { permit } = await admitResearchChild(runtime);
@@ -740,62 +738,113 @@ test("wired external_document_span citations admit cite-only and never upgrade",
     grantId: grant.id, op: "document_snapshot", searchOperationId: "operation:r1:search:a", resultIndex: 1,
   });
 
-  const verified = await reopenResearchCitationSource(runtime.artifacts, runtime.ledger.runId, snapshot.receiptContentId);
-  assert.ok(grant.capability === "research.investigate");
-  const gap = grant.researchScope.gap;
-  const citation = externalDocumentSpanCitation({
-    verified,
-    target: {
-      kind: "media_context",
-      qualifiesMedia: { artifactId: gap.media.artifactId, trackId: gap.media.trackId, startMs: gap.media.startMs, endMs: gap.media.endMs },
-    },
-    spans: [{ start: 0, end: 19 }],
-  });
-  assert.equal(citation.use, "cite_only");
-
-  const report: StudyReportArtifactV2 = {
-    schema: "studio.study-report.v2",
-    runId: runtime.ledger.runId,
-    task: { taskId: started.task.id, agentId: started.task.assignedAgentId, executionId: "execution:r1-admit", jobContextId: started.task.jobContext.contextId },
-    parent: { taskId: runtime.root.id, agentId: runtime.root.assignedAgentId },
-    assignment: { source: { artifactId: runtime.source.id, contentId: runtime.source.content.contentId }, mediaScope: [runtime.scope] },
-    coverage: [{
-      ...runtime.scope,
-      state: "withheld",
-      claimIds: [],
-      citationIds: [],
-      rawStates: ["worker_withheld"],
-      reason: { code: "worker_withheld", detail: "Research context qualifies this range without claiming dialogue support." },
-    }],
-    claims: [],
-    evidenceCitations: [citation],
-    sourceArtifacts: (() => {
-      const expected = new Map<string, string>([[runtime.source.id, runtime.source.content.contentId]]);
-      expected.set(citation.evidence.artifactId, citation.evidence.contentId);
-      if (citation.receipt.artifactId) expected.set(citation.receipt.artifactId, citation.receipt.contentId);
-      return [...expected.entries()]
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([artifactId, contentId]) => ({ artifactId, contentId }));
-    })(),
-    limits: STUDY_REPORT_V2_LIMITS,
-    nonClaims: {
-      correctness: "not_assessed",
-      completeness: "partition_only",
-      semanticQuality: "not_assessed",
-      modalityReliabilityEquivalence: "not_claimed",
-      independentCorroboration: "not_assessed",
-    },
+  const verified = await auditResearchSnapshot(runtime.artifacts, runtime.ledger.runId, snapshot.receiptContentId);
+  const expectedIdentity = {
+    operationId: verified.receipt.operationId,
+    receiptArtifactId: verified.receiptArtifactId,
+    receiptContentId: verified.receiptContentId,
+    extractionArtifactId: verified.extraction.artifactId,
+    extractionContentId: verified.extraction.contentId,
   };
+  const researchEvidenceInput = { ...expectedIdentity, spans: [{ start: 0, end: 19 }] };
+  const workerValue = {
+    summary: "The snapshot supplies cite-only context for the exact unresolved range.",
+    researchEvidenceInputs: [researchEvidenceInput],
+    outputs: [{
+      name: started.task.requiredOutputs[0].name,
+      kind: "studio.study-report.v2",
+      coverage: [{
+        ...runtime.scope,
+        claimIds: [],
+        reason: { code: "worker_withheld", detail: "External context cannot support a media claim." },
+      }],
+      claims: [],
+    }],
+  };
+  const worker = validateWorkerResult(workerValue, started.task, [], [], [], [expectedIdentity]);
+  const output = worker.outputs[0];
+  assert.equal(output.kind, "studio.study-report.v2");
+  if (output.kind !== "studio.study-report.v2" || !("coverage" in output)) throw new Error("Expected a v2 study report");
+  const report = buildStudyReportEnvelopeV2({
+    task: started.task,
+    executionId: "execution:r1-admit",
+    output,
+    semanticEvidenceInputs: [],
+    verifiedSemanticEvidence: [],
+    ocrEvidenceInputs: [],
+    verifiedOcrEvidence: [],
+    researchEvidenceInputs: worker.researchEvidenceInputs,
+    verifiedResearchEvidence: [verified],
+    dialogueScopePolicy: null,
+  });
+  assert.equal(report.coverage[0].state, "withheld");
+  assert.deepEqual(report.coverage[0].claimIds, []);
+  assert.deepEqual(report.coverage[0].citationIds, []);
+  assert.deepEqual(report.claims, []);
+  assert.equal(report.evidenceCitations.length, 1);
+  const citation = report.evidenceCitations[0];
+  assert.equal(citation.evidenceKind, "external_document_span");
+  assert.equal(citation.use, "cite_only");
+  assert.equal(citation.evidence.artifactId, expectedIdentity.extractionArtifactId);
+  assert.equal(citation.evidence.contentId, expectedIdentity.extractionContentId);
+  assert.equal(citation.receipt.artifactId, expectedIdentity.receiptArtifactId);
+  assert.equal(citation.receipt.contentId, expectedIdentity.receiptContentId);
+
   const admitted = await new GeneralizedEvidenceAdmissionHost(runtime.ledger.state(), runtime.artifacts).admit(report);
   const admittedCitation = admitted.reportEnvelope.evidenceCitations[0];
   assert.equal(admittedCitation.evidenceKind, "external_document_span");
   assert.equal(admittedCitation.use, "cite_only");
 
-  const upgraded: StudyReportArtifactV2 = structuredClone(report);
+  const upgraded = structuredClone(report);
   (upgraded.evidenceCitations[0] as unknown as Record<string, unknown>).use = "claim_support";
   await assert.rejects(
     new GeneralizedEvidenceAdmissionHost(runtime.ledger.state(), runtime.artifacts).admit(upgraded),
     /claim support requires available current-run speech|canonical|identity/,
+  );
+
+  const forged = structuredClone(workerValue);
+  forged.researchEvidenceInputs[0].extractionArtifactId = "artifact:forged-extraction";
+  assert.throws(
+    () => validateWorkerResult(forged, started.task, [], [], [], [expectedIdentity]),
+    /unique authenticated current-task snapshots/,
+  );
+  const searchEcho = structuredClone(workerValue);
+  searchEcho.researchEvidenceInputs[0].operationId = "operation:r1:search:a";
+  assert.throws(
+    () => validateWorkerResult(searchEcho, started.task, [], [], [], [expectedIdentity]),
+    /unique authenticated current-task snapshots/,
+  );
+  const duplicate = structuredClone(workerValue);
+  duplicate.researchEvidenceInputs.push(structuredClone(duplicate.researchEvidenceInputs[0]));
+  assert.throws(
+    () => validateWorkerResult(duplicate, started.task, [], [], [], [expectedIdentity]),
+    /unique authenticated current-task snapshots/,
+  );
+  const overlapping = structuredClone(workerValue);
+  overlapping.researchEvidenceInputs[0].spans = [{ start: 0, end: 10 }, { start: 9, end: 19 }];
+  assert.throws(
+    () => validateWorkerResult(overlapping, started.task, [], [], [], [expectedIdentity]),
+    /sorted and non-overlapping/,
+  );
+  const outOfRangeValue = structuredClone(workerValue);
+  outOfRangeValue.researchEvidenceInputs[0].spans = [{ start: 0, end: verified.extraction.envelope.unitCount + 1 }];
+  const outOfRangeWorker = validateWorkerResult(outOfRangeValue, started.task, [], [], [], [expectedIdentity]);
+  const outOfRangeOutput = outOfRangeWorker.outputs[0];
+  if (outOfRangeOutput.kind !== "studio.study-report.v2" || !("coverage" in outOfRangeOutput)) throw new Error("Expected a v2 study report");
+  assert.throws(
+    () => buildStudyReportEnvelopeV2({
+      task: started.task,
+      executionId: "execution:r1-admit",
+      output: outOfRangeOutput,
+      semanticEvidenceInputs: [],
+      verifiedSemanticEvidence: [],
+      ocrEvidenceInputs: [],
+      verifiedOcrEvidence: [],
+      researchEvidenceInputs: outOfRangeWorker.researchEvidenceInputs,
+      verifiedResearchEvidence: [verified],
+      dialogueScopePolicy: null,
+    }),
+    /span escapes the stored extraction/,
   );
 
   const foreign = structuredClone(runtime.ledger.state());

@@ -11,6 +11,7 @@ import type {
   LaunchPermit,
   ModelUsageReceipt,
   OcrEvidenceCitationInput,
+  ResearchEvidenceSourceIdentity,
   SpeakerOverlapEvidenceCitationInput,
   ReportRecord,
   RuntimeArtifact,
@@ -492,17 +493,48 @@ export class CodexExecWorkerLauncher {
           "Codex child did not complete at least one receipted research operation under its gap grant.",
         );
       }
+      const verifiedResearchEvidence: Awaited<ReturnType<typeof auditResearchSnapshot>>[] = [];
+      const researchEvidenceInputs: ResearchEvidenceSourceIdentity[] = [];
       for (const operation of completedResearch) {
         if (!operation.receiptContentId) {
           throw new LauncherFailure("Research operation lost its receipt identity", "A completed research operation has no content-addressed receipt.");
         }
+        if (operation.executionId !== executionId || operation.launchClaimId !== launchClaim.claim.id) {
+          throw new LauncherFailure("Research operation belongs to another executor", "Research evidence must be produced by this exact task execution.");
+        }
         if (operation.op === "search") {
-          await auditResearchSearch(this.artifacts, this.ledger.runId, operation.receiptContentId);
+          const verified = await auditResearchSearch(this.artifacts, this.ledger.runId, operation.receiptContentId);
+          const authorization = verified.receipt.authorization;
+          if (verified.receipt.operationId !== operation.id || verified.receiptArtifactId !== operation.receiptArtifactId ||
+              verified.receipt.receiptId !== operation.receiptId || !("executionId" in authorization) ||
+              authorization.grantId !== operation.grantId || authorization.taskId !== task.id ||
+              authorization.agentId !== task.assignedAgentId || authorization.executionId !== executionId ||
+              authorization.launchClaimId !== launchClaim.claim.id) {
+            throw new LauncherFailure("Research search changed its executor lineage", "Research search receipt identity is not owned by this exact task execution.");
+          }
         } else {
           const verified = await auditResearchSnapshot(this.artifacts, this.ledger.runId, operation.receiptContentId);
+          const authorization = verified.receipt.authorization;
+          if (verified.receipt.operationId !== operation.id || verified.receiptArtifactId !== operation.receiptArtifactId ||
+              verified.receipt.receiptId !== operation.receiptId ||
+              verified.receipt.document.artifactId !== operation.documentArtifactId ||
+              verified.extraction.artifactId !== operation.extractionArtifactId ||
+              !("executionId" in authorization) || authorization.grantId !== operation.grantId ||
+              authorization.taskId !== task.id || authorization.agentId !== task.assignedAgentId ||
+              authorization.executionId !== executionId || authorization.launchClaimId !== launchClaim.claim.id) {
+            throw new LauncherFailure("Research snapshot changed its executor lineage", "Research snapshot identity is not owned by this exact task execution.");
+          }
           if (verified.receipt.nonClaims.speechEvidenceAuthority !== "not_granted") {
             throw new LauncherFailure("Research attempted an authority upgrade", "Research snapshots are cite-only external context and cannot authorize speech evidence.");
           }
+          verifiedResearchEvidence.push(verified);
+          researchEvidenceInputs.push({
+            operationId: operation.id,
+            receiptArtifactId: verified.receiptArtifactId,
+            receiptContentId: verified.receiptContentId,
+            extractionArtifactId: verified.extraction.artifactId,
+            extractionContentId: verified.extraction.contentId,
+          });
         }
       }
       if (evidenceGrant?.evidenceScope.some((scope) =>
@@ -554,7 +586,14 @@ export class CodexExecWorkerLauncher {
           "Codex worker response failed its output contract.",
         );
       }
-      const worker = validateWorkerResult(workerValue, task, semanticEvidenceInputs, ocrEvidenceInputs, speakerEvidenceInputs);
+      const worker = validateWorkerResult(
+        workerValue,
+        task,
+        semanticEvidenceInputs,
+        ocrEvidenceInputs,
+        speakerEvidenceInputs,
+        researchEvidenceInputs,
+      );
       const prepared = await Promise.all(
         worker.outputs.map(async (output) => {
           if ((output.kind === "studio.study-report.v1" || output.kind === "studio.study-report.v2") && "coverage" in output) {
@@ -569,6 +608,8 @@ export class CodexExecWorkerLauncher {
                   verifiedOcrEvidence,
                   speakerEvidenceInputs: worker.speakerEvidenceInputs,
                   verifiedSpeakerEvidence,
+                  researchEvidenceInputs: worker.researchEvidenceInputs,
+                  verifiedResearchEvidence,
                   dialogueScopePolicy: await deriveTaskDialogueScopePolicy(this.ledger.state(), this.artifacts, task.id),
                 })
               : buildStudyReportEnvelope(task, output, worker.semanticEvidenceInputs);

@@ -519,8 +519,18 @@ structural sense. Its non-claims keep semantic insufficiency, source truth, enti
 claim-support, and caption authority closed; `r2Authorization: "cause_only"` makes it a future
 authorization input, not an R2 grant. Unused query budget or failed operations cannot produce the
 cause. The default v3 root now holds dormant request authority and can mint one child only from a
-current projected conflict; research is never automatic. The production worker-to-v2-report path
-for receipted research spans remains disconnected at this slice.
+current projected conflict; research is never automatic.
+
+The production worker-to-v2-report path now retains each cold-audited snapshot through worker-result
+validation. A research-granted worker may return only a closed `researchEvidenceInputs` list naming
+the exact snapshot receipt artifact/content and extraction artifact/content identities plus sorted,
+non-overlapping UTF-8 byte spans. The list may select a subset of completed snapshots or stay empty;
+search operations, snippets, URLs, document text, and caller-authored targets are never accepted.
+The launcher rejects identity or executor drift before report construction. The v2 builder then uses
+the existing `externalDocumentSpanCitation` constructor over the retained audit object and the
+grant-owned media target. These citations enter only the report-level evidence list as `cite_only`;
+they never enter claim or supported-coverage citation ids and grant no speech, caption, source-truth,
+entity-match, freshness, or quality authority.
 
 The production event union now includes
 `analysis.evidence.assessment_started`, `analysis.evidence.assessment_completed`, and

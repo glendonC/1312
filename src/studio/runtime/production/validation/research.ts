@@ -2,9 +2,11 @@ import { canonicalSha256 } from "../canonicalIdentity.ts";
 import {
   RESEARCH_ALLOWED_MIME_TYPES,
   RESEARCH_CAPABILITY,
+  RESEARCH_CITATION_MAX_SPANS,
   RESEARCH_LIMITS,
   type ResearchAllowedMimeType,
   type ResearchDocumentSnapshotReceipt,
+  type ResearchEvidenceCitationInput,
   type ResearchExhaustionReason,
   type ResearchExhaustionReceipt,
   type ResearchExtractionArtifact,
@@ -278,6 +280,50 @@ export function validateResearchExtractionArtifact(
   if (measured !== unitCount) fail(context, `${path}.unitCount`, "must equal the extracted UTF-8 byte length");
   if (unitCount > RESEARCH_LIMITS.maxExtractionUnits) fail(context, `${path}.text`, "exceeds the closed extraction size");
   return item as unknown as ResearchExtractionArtifact;
+}
+
+/**
+ * Validates only the worker-selectable portion of an external citation. Snapshot lineage and the
+ * extraction byte ceiling are checked later against the launcher's cold-audited source object.
+ */
+export function validateResearchEvidenceCitationInput(
+  value: unknown,
+  context = "Research evidence citation input",
+  path = "input",
+): ResearchEvidenceCitationInput {
+  const item = object(value, context, path);
+  exact(item, [
+    "operationId",
+    "receiptArtifactId",
+    "receiptContentId",
+    "extractionArtifactId",
+    "extractionContentId",
+    "spans",
+  ], context, path);
+  const spans = array(item.spans, context, `${path}.spans`);
+  if (spans.length === 0 || spans.length > RESEARCH_CITATION_MAX_SPANS) {
+    fail(context, `${path}.spans`, `must contain 1-${RESEARCH_CITATION_MAX_SPANS} exact spans`);
+  }
+  let previousEnd = -1;
+  const validatedSpans = spans.map((span, index) => {
+    const spanPath = `${path}.spans[${index}]`;
+    const range = object(span, context, spanPath);
+    exact(range, ["start", "end"], context, spanPath);
+    const start = integer(range.start, context, `${spanPath}.start`);
+    const end = integer(range.end, context, `${spanPath}.end`, 1);
+    if (end <= start) fail(context, spanPath, "must be a non-empty UTF-8 byte range");
+    if (start < previousEnd) fail(context, spanPath, "must be sorted and non-overlapping");
+    previousEnd = end;
+    return { start, end };
+  });
+  return {
+    operationId: string(item.operationId, context, `${path}.operationId`),
+    receiptArtifactId: string(item.receiptArtifactId, context, `${path}.receiptArtifactId`),
+    receiptContentId: contentId(item.receiptContentId, context, `${path}.receiptContentId`),
+    extractionArtifactId: string(item.extractionArtifactId, context, `${path}.extractionArtifactId`),
+    extractionContentId: contentId(item.extractionContentId, context, `${path}.extractionContentId`),
+    spans: validatedSpans,
+  };
 }
 
 function validateRedirectHop(value: unknown, context: string, path: string): ResearchRedirectHop {

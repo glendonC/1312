@@ -211,6 +211,7 @@ test("the lab is opt-in during development", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Local runtime host" })).toHaveCount(0);
 
   await openLab(page);
+  await page.getByText("Local runtime host", { exact: true }).click();
   await expect(page.getByRole("region", { name: "Local runtime host" })).toBeVisible();
   await expect(page.getByText("development-only · separate from replay")).toBeVisible();
   await expect(page.getByRole("button", { name: "Connect to local host" })).toBeDisabled();
@@ -430,6 +431,7 @@ test("the lab starts and polls an explicitly running deterministic host without 
   test.skip(!token, "requires an operator-started deterministic runtime host");
 
   await openLab(page);
+  await page.getByText("Local runtime host", { exact: true }).click();
   const localRuntime = page.getByRole("region", { name: "Local runtime host" });
   if (process.env.STUDIO_RUNTIME_HOST_URL) {
     await localRuntime.getByLabel("Host origin").fill(process.env.STUDIO_RUNTIME_HOST_URL);
@@ -1458,45 +1460,47 @@ test("submitted preview Results reports no submitted artifact before recorded de
   await startSubmittedPreview(page);
 
   const boundary = page.locator(".submitted-results-boundary");
-  await expect(boundary.getByRole("heading", { name: "No submitted-source artifact exists" })).toBeVisible({
+  await expect(boundary.getByRole("heading", { name: "Submitted source was not processed" })).toBeVisible({
     timeout: 30_000,
   });
   await expect(boundary).toContainText("Resolved browser-test video");
+  await expect(boundary).toContainText("The viewer below shows only the recorded demo run-006");
+  const submittedDetails = boundary.getByText("Submitted request details");
+  await expect(submittedDetails).toBeVisible();
+  await expect(boundary.getByText("Unavailable", { exact: true })).not.toBeVisible();
+  await submittedDetails.click();
   await expect(boundary).toContainText("Unavailable");
   await expect(boundary).toContainText("no runtime receipt");
-  await expect(boundary).toContainText("Recorded demo Results below");
-  await expect(boundary).toContainText("run-006");
-  await expect(boundary).toContainText("player, captions, workers, evidence, scores, and timing below belong only");
   await expect(boundary).toHaveAttribute("data-submitted-preparation-request-id", /^submitted-preparation:/);
-  await expect(page.locator('.dock[data-outcome="complete"]')).toBeVisible();
-  await expect(page.locator(".dock-status")).toHaveText("Done");
+  await expect(page.locator('.dock[data-outcome="complete"]')).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Learning viewer" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
 });
 
-test("completed recorded runs expose Results from the terminal dock", async ({ page }) => {
+test("completed recorded runs transition directly into the learning viewer", async ({ page }) => {
   await openLab(page);
   await scenario(page).selectOption("unscored-complete");
-  await page.locator(".studio-lab").evaluate((element) => element.remove());
+  await page.locator(".studio-lab").evaluate((element) => {
+    (element as HTMLElement).style.display = "none";
+  });
 
   const results = page.locator("#studio-recorded-results");
   await expect(results).toBeVisible();
   await expect(results).toHaveAccessibleName(/Result/);
-  const openResults = page.getByRole("button", { name: "Open Results" });
-  await expect(openResults).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run again", exact: true })).toBeVisible();
-
-  await page.getByRole("button", { name: /^orchestrator,/ }).click();
-  const focus = page.getByRole("dialog", { name: "Orchestrator" });
-  await expect(focus).toBeVisible();
-  await openResults.click();
-  await expect(focus).toHaveCount(0);
-  await expect(page.locator(".agent-focus-backdrop")).toHaveCount(0);
-  await expect(page.locator(".stage")).not.toHaveAttribute("data-agent-focus", "true");
-  await expect(results).toBeFocused();
-  await expect.poll(() => results.evaluate((element) => {
-    const bounds = element.getBoundingClientRect();
-    return bounds.top >= 0 && bounds.top < window.innerHeight;
-  })).toBe(true);
+  await expect(page.getByRole("button", { name: "Open Results" })).toHaveCount(0);
+  await expect(page.locator(".stage")).toHaveCount(0);
+  await expect(page.locator(".dock-well")).toHaveCount(0);
+  await expect(results.getByRole("button", { name: "Run again", exact: true })).toHaveCount(0);
+  const viewer = results.getByRole("region", { name: "Learning viewer" });
+  await expect(viewer).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Study" })).toHaveAttribute("aria-pressed", "true");
+  await expect(viewer.getByRole("button", { name: "Theater" })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Full screen" })).toBeVisible();
+  await expect(viewer.getByRole("slider", { name: "Volume" })).toBeVisible();
+  await expect(viewer.getByRole("combobox", { name: "Playback speed" })).toBeVisible();
+  await expect(results.getByText("Run details", { exact: true })).toBeVisible();
+  await expect(results.getByText("11 captioned", { exact: true })).toBeVisible();
+  await expect(results.locator(".result-details-list")).not.toBeVisible();
 });
 
 test("a remote metadata failure keeps duration and range controls unavailable", async ({ page }) => {

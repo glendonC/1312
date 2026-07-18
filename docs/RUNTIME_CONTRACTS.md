@@ -39,6 +39,10 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   run pinned local Tesseract.js/core 7.0.0 over the real PNG bytes with vendored Korean+English
   `tessdata_fast` 4.1.0 models, and atomically store private content-addressed observation/receipt
   artifacts under fixed count/byte/text/wall/call ceilings;
+- a separate path-free `media_visual_transitions_analyze` bridge and deterministic visual-change
+  host that accept only exact completed same-task U2 frame and U5 OCR operation identities, cold-audit
+  both lineages, and atomically store cite-only adjacent-frame RGB-grid candidates plus immutable
+  observation/receipt artifacts under fixed frame/byte/wall/call ceilings;
 - a separate path-free `media_speakers_analyze` bridge and bounded speaker/overlap host whose child
   request is exactly `{}`, injects the one scheduler-owned source/audio-track/range, seals mono-16 kHz
   PCM, runs a pinned local anonymous-clustering producer, and atomically stores complete-range

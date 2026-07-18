@@ -34,12 +34,13 @@ be “more agents,” “faster captions,” or “we are a caption app.” It s
 duration truthfully accounted for by evidence that a bounded specialist actually inspected, with weak
 regions restudied or abstained rather than guessed.
 
-The first six implementation slices after the UI demo freeze now include: the fail-closed
-**acoustic triage and non-dialogue coverage boundary**, bounded **frame sampling with real child
-image delivery**, additive **multimodal admission with generalized abstention**, and one
-**attenuated and bounded padded-audio current-run speech re-study** slices, a thin **on-screen OCR citation** slice,
-a deterministic **cite-only visual-change candidate** slice,
-and bounded **anonymous speaker/overlap coverage plus an exact overlap-to-U4 trigger**. Their receipts prove bounded execution, exact byte lineage, citation association, state
+The landed implementation slices after the UI demo freeze now include the fail-closed
+**acoustic triage and non-dialogue coverage boundary**; bounded **frame sampling with real child
+image delivery**; additive **multimodal admission with generalized abstention**; one
+**attenuated and bounded padded-audio current-run speech re-study** slice; a thin **on-screen OCR
+citation** slice; a deterministic **cite-only visual-change candidate** slice; and bounded
+**anonymous speaker/overlap coverage plus an exact overlap-to-U4 trigger**. Their receipts prove
+bounded execution, exact byte lineage, citation association, state
 preservation, and pass accounting; they do not prove producer accuracy, visual/scene understanding,
 improvement, or semantic quality.
 
@@ -353,7 +354,7 @@ their audits.
   attenuation, observability, and abstention. It extends the closed spine with new evidence requests
   and pass events rather than reusing v1 planning or replacing history.
 
-### U5. OCR and scene/on-screen context — OCR citation slice implemented
+### U5. OCR and scene/on-screen context: OCR citation and visual-change slices implemented
 
 - **Real:** `media.frames.ocr` is a scheduler grant and task-private bridge over one completed,
   same-task U2 frame-sampling operation; the child supplies only that operation identity. The host

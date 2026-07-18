@@ -3,7 +3,7 @@ import type { CaptionProductionLine } from "../runtime/production/model/captions
 import { validateCaptionProductionArtifact } from "../runtime/production/validation/captionProduction.ts";
 import type {
   LearningSourceContext,
-  LearningSourceProjection,
+  LearningViewingSource,
   PresentedMoment,
   PresentedText,
   ProductionPresentedMoment,
@@ -125,12 +125,18 @@ function validatedVerifiedProductionResult(
 /** Accept only the audited in-memory result returned by reopenCaptionProductionResults. */
 export function projectVerifiedProductionLearningSource(
   input: VerifiedCaptionProductionResult,
-): LearningSourceProjection {
+):
+  | {
+      state: "ready";
+      source: Extract<LearningViewingSource, { context: { origin: "verified_production_caption" } }>;
+    }
+  | { state: "failed"; reasonCode: "invalid_source_binding" } {
   const verified = validatedVerifiedProductionResult(input);
   if (!verified) return { state: "failed", reasonCode: "invalid_source_binding" };
   const { verification, artifact } = verified;
   const context: Extract<LearningSourceContext, { origin: "verified_production_caption" }> = {
     origin: "verified_production_caption",
+    authorityState: verification.authorityState,
     identities: {
       runId: artifact.runId,
       sourceArtifactId: verification.source.artifactId,
@@ -143,6 +149,10 @@ export function projectVerifiedProductionLearningSource(
       readinessArtifactId: verification.readiness.artifactId,
       readinessReceiptId: verification.readiness.receiptId,
       readinessReceiptContentId: verification.readiness.receiptContentId,
+      approvalReviewId: verification.approval.reviewId,
+      approvalArtifactId: verification.approval.artifactId,
+      approvalReceiptId: verification.approval.receiptId,
+      approvalReceiptContentId: verification.approval.receiptContentId,
       captionJobId: verification.jobId,
       captionArtifactId: verification.captionArtifactId,
       captionContentId: verification.captionContentId,

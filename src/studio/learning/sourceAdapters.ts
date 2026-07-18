@@ -15,7 +15,8 @@ import {
   stringArray,
 } from "./sourceAdapterPrimitives.ts";
 
-const SOURCE_CONTEXT_KEYS = new Set(["origin", "identities", "rights", "nonClaims"]);
+const RECORDED_SOURCE_CONTEXT_KEYS = new Set(["origin", "identities", "rights", "nonClaims"]);
+const PRODUCTION_SOURCE_CONTEXT_KEYS = new Set(["origin", "authorityState", "identities", "rights", "nonClaims"]);
 const RIGHTS_KEYS = new Set(["basis", "licence", "attribution", "mediaExport", "textExport"]);
 const EXPORT_STATE_KEYS = new Set(["state", "reasonCode"]);
 const RECORDED_IDENTITY_KEYS = new Set([
@@ -38,6 +39,10 @@ const PRODUCTION_IDENTITY_KEYS = new Set([
   "readinessArtifactId",
   "readinessReceiptId",
   "readinessReceiptContentId",
+  "approvalReviewId",
+  "approvalArtifactId",
+  "approvalReceiptId",
+  "approvalReceiptContentId",
   "captionJobId",
   "captionArtifactId",
   "captionContentId",
@@ -96,7 +101,9 @@ function recordedTarget(cue: Cue, targetLanguage: string): PresentedText {
   };
 }
 
-export function projectRecordedLearningSource(bundle: RunBundle): LearningViewingSource {
+export function projectRecordedLearningSource(
+  bundle: RunBundle,
+): Extract<LearningViewingSource, { context: { origin: "recorded_fixture" } }> {
   const captionsArtifact = bundle.evidence?.artifacts.find((artifact) => artifact.kind === "captions") ?? null;
   const sourceReceipt = bundle.ingestReceipt?.kind === "youtube" ? bundle.ingestReceipt : null;
   const context: Extract<LearningSourceContext, { origin: "recorded_fixture" }> = {
@@ -146,7 +153,7 @@ export function projectRecordedLearningSource(bundle: RunBundle): LearningViewin
 
 export function validateLearningSourceContext(input: unknown): LearningSourceContext {
   if (
-    !record(input) || !exactKeys(input, SOURCE_CONTEXT_KEYS) || !record(input.identities) ||
+    !record(input) || !record(input.identities) ||
     !record(input.rights) || !exactKeys(input.rights, RIGHTS_KEYS) ||
     !record(input.rights.mediaExport) || !exactKeys(input.rights.mediaExport, EXPORT_STATE_KEYS) ||
     !record(input.rights.textExport) || !exactKeys(input.rights.textExport, EXPORT_STATE_KEYS) ||
@@ -156,7 +163,10 @@ export function validateLearningSourceContext(input: unknown): LearningSourceCon
     throw new Error("Learning source context has mixed or invalid authority fields");
   }
   if (input.origin === "recorded_fixture") {
-    if (!exactKeys(input.identities, RECORDED_IDENTITY_KEYS)) {
+    if (
+      !exactKeys(input, RECORDED_SOURCE_CONTEXT_KEYS) ||
+      !exactKeys(input.identities, RECORDED_IDENTITY_KEYS)
+    ) {
       throw new Error("Recorded learning source context contains production authority fields");
     }
     if (
@@ -182,7 +192,10 @@ export function validateLearningSourceContext(input: unknown): LearningSourceCon
     return input as unknown as LearningSourceContext;
   }
   if (input.origin === "verified_production_caption") {
-    if (!exactKeys(input.identities, PRODUCTION_IDENTITY_KEYS)) {
+    if (
+      !exactKeys(input, PRODUCTION_SOURCE_CONTEXT_KEYS) ||
+      !exactKeys(input.identities, PRODUCTION_IDENTITY_KEYS)
+    ) {
       throw new Error("Production learning source context contains recorded authority fields");
     }
     for (const [key, value] of Object.entries(input.identities)) {
@@ -191,6 +204,7 @@ export function validateLearningSourceContext(input: unknown): LearningSourceCon
       }
     }
     if (
+      (input.authorityState !== "unrevoked" && input.authorityState !== "revoked_after_completion") ||
       input.rights.basis !== "production_private_source_policy" ||
       input.rights.licence !== null || input.rights.attribution !== null ||
       input.rights.textExport.state !== "unavailable" ||

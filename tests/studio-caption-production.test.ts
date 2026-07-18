@@ -36,6 +36,9 @@ import {
   validateCaptionProductionArtifact,
 } from "../src/studio/runtime/production/validation/captionProduction.ts";
 import { LocalRuntimeHostClient } from "../src/studio/localRuntime/client.ts";
+import { productionSelectionRequest } from "../src/studio/localRuntime/productionLearningController.ts";
+import { projectVerifiedProductionLearningExplanation } from "../src/studio/learning/productionExplanationAdapter.ts";
+import { projectVerifiedProductionLearningSource } from "../src/studio/learning/productionSourceAdapter.ts";
 
 const FIXTURE = resolve("public/demo/runs/run-005");
 
@@ -732,6 +735,29 @@ test("exact selected caption spans produce private receipted explanations and co
     const clientResult = await client.languageExplanations(approval.runtimeId);
     assert.equal(clientResult.results[0].verification.contentId, explanation.verification.contentId);
 
+    const learningSource = projectVerifiedProductionLearningSource(caption);
+    assert.equal(learningSource.state, "ready");
+    if (learningSource.state === "ready") {
+      const learningRequest = productionSelectionRequest(learningSource.source, line.id, {
+        side: "source",
+        unit: "unicode_code_point",
+        start: 0,
+        end: 2,
+        text: "현재",
+      });
+      const presented = projectVerifiedProductionLearningExplanation(
+        learningSource.source,
+        learningRequest,
+        clientResult.results[0],
+      );
+      assert.equal(presented.state, "partial");
+      if (presented.state === "partial") {
+        assert.equal(presented.selection.authority.executionAuthority, "host_receipted");
+        assert.equal(presented.selection.authority.semanticReviewState, "not_reviewed");
+        assert.equal(JSON.stringify(presented).includes("design_fixture"), false);
+      }
+    }
+
     const tamperedClientResponse = structuredClone(response);
     tamperedClientResponse.results[0].verification.caption.contentId = `sha256:${"f".repeat(64)}`;
     const tamperedClient = new LocalRuntimeHostClient({
@@ -823,6 +849,42 @@ test("failed language-explanation attempts remain visible and a host-numbered re
       /already active or completed/,
     );
     assert.equal(calls, 2);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("revoked caption authority cannot mint a new language-explanation attempt", async () => {
+  const runtime = await harness({
+    captionExecutor: currentRunCaptionExecutor,
+    languageExplanationExecutor: deterministicLanguageExplanation,
+  });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const caption = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+    await runtime.service.createPublishReviewRevocation(approval.runtimeId, {
+      approval: approval.request.approval,
+      reviewer: {
+        id: approval.response.reviewer.id,
+        attestation: approval.response.reviewer.revocationAttestation,
+      },
+      revocation: { reasonCodes: ["new_review_required"], note: null },
+    });
+    await assert.rejects(runtime.service.createLanguageExplanation(approval.runtimeId, {
+      caption: {
+        jobId: caption.verification.jobId,
+        artifactId: caption.verification.captionArtifactId,
+        contentId: caption.verification.captionContentId,
+        receiptArtifactId: caption.verification.receiptArtifactId,
+        receiptId: caption.verification.receiptId,
+        receiptContentId: caption.verification.receiptContentId,
+      },
+      lineId: caption.artifact.lines[0].id,
+      selection: { side: "source", unit: "unicode_code_point", start: 0, end: 2, text: "현재" },
+      facetKinds: ["meaning"],
+    }), /cannot be produced after caption authority is revoked/);
+    assert.deepEqual((await runtime.service.languageExplanations(approval.runtimeId)).attempts, []);
   } finally {
     await cleanup(runtime);
   }
@@ -1056,6 +1118,13 @@ test("language explanation rejects open prompts, mixed identities, and incorrect
         selection: { ...base.selection, text: "실행" },
       }),
       /does not match the stored caption text/,
+    );
+    await assert.rejects(
+      runtime.service.createLanguageExplanation(approval.runtimeId, {
+        ...base,
+        facetKinds: ["meaning", "culture"],
+      } as never),
+      /invalid|facet/i,
     );
     assert.deepEqual((await runtime.service.languageExplanations(approval.runtimeId)).results, []);
   } finally {

@@ -5,6 +5,7 @@ import { clock } from "./format";
 import RecordedEvidence from "./evidence/RecordedEvidence";
 import LearningResults from "./learning/LearningResults";
 import RecordedMediaPlayer from "./learning/RecordedMediaPlayer";
+import { projectPrototypeLearningPresentation } from "./learning/prototypeAdapter";
 import { learningPrototypeFixture } from "./learning/prototypeFixture";
 import { projectRecordedLearningSource } from "./learning/sourceAdapters";
 import { RECORDED_RESULTS_ID } from "./resultAccess";
@@ -22,6 +23,8 @@ export default function Results() {
   const bundle = useBundle();
   const outputDepth = useStudio((s) => s.outputDepth);
   const previewSession = useStudio((s) => s.previewSession);
+  const clipT = useStudio((s) => s.clipT);
+  const setClipT = useStudio((s) => s.setClipT);
   const viewerRef = useRef<HTMLElement>(null);
   const [viewerMode, setViewerMode] = useState<"study" | "theater">("study");
   const [fullscreen, setFullscreen] = useState(false);
@@ -41,6 +44,10 @@ export default function Results() {
   const target = run.pair.target;
   const showEvidence = outputDepth === "evidence";
   const learningSource = projectRecordedLearningSource(bundle);
+  const learningPresentation = projectPrototypeLearningPresentation(
+    learningSource,
+    learningPrototypeFixture,
+  );
 
   // Real per-line accounting, straight from the recorded cues. A refusal and a silence are
   // different facts and are counted as different things; neither is an error.
@@ -148,7 +155,14 @@ export default function Results() {
         {viewerNotice && <p className="result-viewer-notice" role="status">{viewerNotice}</p>}
         <div className="result-main">
           <RecordedMediaPlayer bundle={bundle} surface="results" />
-          <LearningResults source={learningSource} prototypeFixture={learningPrototypeFixture} />
+          <LearningResults
+            presentation={learningPresentation}
+            playback={{
+              state: "available",
+              currentTimeMs: clipT * 1_000,
+              onSeek: (timeMs) => setClipT(timeMs / 1_000),
+            }}
+          />
         </div>
       </section>
 

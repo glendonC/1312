@@ -6,14 +6,20 @@ export type LearningReasonCode =
   | "production_caption_withheld"
   | "production_caption_unavailable"
   | "explanation_not_prepared"
-  | "prototype_facet_not_prepared"
-  | "follow_up_producer_missing"
-  | "practice_checker_missing"
+  | "production_media_playback_unavailable"
+  | "caption_authority_revoked"
+  | "generator_abstained"
+  | "facet_not_applicable"
+  | "insufficient_caption_context"
+  | "target_unavailable"
+  | "explanation_request_failed"
+  | "explanation_retry_exhausted"
   | "canonical_saved_item_missing"
   | "export_adapter_missing"
   | "media_export_excluded_from_p0"
   | "invalid_source_binding"
   | "invalid_fixture_binding"
+  | "invalid_explanation_binding"
   | "mixed_authority";
 
 export type PresentedText =
@@ -66,6 +72,7 @@ export type LearningSourceContext =
     }
   | {
       origin: "verified_production_caption";
+      authorityState: "unrevoked" | "revoked_after_completion";
       identities: {
         runId: string;
         sourceArtifactId: string;
@@ -78,6 +85,10 @@ export type LearningSourceContext =
         readinessArtifactId: string;
         readinessReceiptId: string;
         readinessReceiptContentId: string;
+        approvalReviewId: string;
+        approvalArtifactId: string;
+        approvalReceiptId: string;
+        approvalReceiptContentId: string;
         captionJobId: string;
         captionArtifactId: string;
         captionContentId: string;
@@ -148,111 +159,6 @@ export interface SelectedLanguageSpan {
   start: number;
   end: number;
   text: string;
-}
-
-export type LearningInsightKind =
-  | "meaning"
-  | "word"
-  | "phrase"
-  | "grammar"
-  | "register"
-  | "pragmatics"
-  | "relationship"
-  | "translation_choice"
-  | "listening_difficulty"
-  | "culture"
-  | "reference";
-
-export interface InsightContentByKind {
-  meaning: { sceneMeaning: string };
-  word: { form: string; sense: string; role: string };
-  phrase: { form: string; function: string };
-  grammar: {
-    construction: string;
-    explanation: string;
-    segments: Array<{ form: string; role: string }>;
-  };
-  register: { observation: string; implication: string };
-  pragmatics: { observation: string; implication: string };
-  relationship: { observation: string; implication: string };
-  translation_choice: { sourceChoice: string; targetChoice: string; rationale: string };
-  listening_difficulty: { signal: string; difficulty: string; listeningCue: string };
-  culture: { context: string; sourceLabel: string | null };
-  reference: { context: string; sourceLabel: string };
-}
-
-interface LearningInsightAuthority {
-  authority: "design_fixture" | "producer_verified";
-  semanticReviewState: "not_reviewed" | "reviewed";
-  claimIds: string[];
-  citationIds: string[];
-}
-
-export type AvailableLearningInsight = {
-  [Kind in LearningInsightKind]: LearningInsightAuthority & {
-    kind: Kind;
-    availability: "available";
-    reasonCode: null;
-    content: InsightContentByKind[Kind];
-  };
-}[LearningInsightKind];
-
-export interface MissingLearningInsight extends LearningInsightAuthority {
-  kind: LearningInsightKind;
-  availability: "withheld" | "unavailable";
-  reasonCode: LearningReasonCode;
-  content: null;
-}
-
-export type LearningInsight = AvailableLearningInsight | MissingLearningInsight;
-
-export interface PreparedLearningSelection {
-  selectionId: string;
-  lineId: string;
-  startMs: number;
-  endMs: number;
-  sourceLanguage: string;
-  targetLanguage: string;
-  source: PresentedText;
-  target: PresentedText;
-  span: SelectedLanguageSpan;
-  insights: LearningInsight[];
-  authority: {
-    dataClass: "design_fixture";
-    productionAuthority: false;
-    semanticReviewState: "not_reviewed";
-    semanticReviewReceiptId: null;
-  };
-  nonClaims: readonly string[];
-}
-
-export type LearningPrototypeProjection =
-  | {
-      state: "ready";
-      context: Extract<LearningSourceContext, { origin: "recorded_fixture" }>;
-      selections: PreparedLearningSelection[];
-      unavailableDemonstrationLineId: string;
-    }
-  | {
-      state: "failed";
-      reasonCode: "invalid_source_binding" | "invalid_fixture_binding" | "mixed_authority";
-    };
-
-export interface SessionSavedSelection {
-  dataClass: "learner_owned_session_state";
-  id: string;
-  sourceOrigin: LearningSourceContext["origin"];
-  lineId: string;
-  startMs: number;
-  endMs: number;
-  sourceLanguage: string;
-  targetLanguage: string;
-  sourceText: string;
-  target: PresentedText;
-  selection: SelectedLanguageSpan;
-  insightKinds: LearningInsightKind[];
-  practice: { state: "unavailable"; reasonCode: "practice_checker_missing" };
-  export: { state: "unavailable"; reasonCode: "canonical_saved_item_missing" };
 }
 
 export function codePointSlice(text: string, start: number, end: number): string {

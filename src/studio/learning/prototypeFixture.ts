@@ -1,15 +1,16 @@
 import fixtureData from "./fixtures/run-006.learning-prototype.json" with { type: "json" };
 import {
   codePointSlice,
-  type LearningInsight,
-  type LearningInsightKind,
-  type LearningPrototypeProjection,
-  type LearningReasonCode,
   type LearningViewingSource,
-  type PreparedLearningSelection,
   type PresentedText,
   type SelectedLanguageSpan,
 } from "./model.ts";
+import type {
+  LearningFacet,
+  LearningFacetKind,
+  LearningPrototypeProjection,
+  PreparedLearningSelection,
+} from "./presentation.ts";
 import { validateLearningViewingSource } from "./sourceAdapters.ts";
 
 export interface LearningPrototypeFixtureV1 {
@@ -32,20 +33,6 @@ export interface LearningPrototypeFixtureV1 {
     sourceText: string;
     target: { state: "available"; text: string };
   };
-  unavailableDemonstration: {
-    lineId: string;
-    startMs: number;
-    endMs: number;
-    sourceLanguage: string;
-    targetLanguage: string;
-    sourceText: string;
-    target: {
-      state: "withheld";
-      reasonCode: "recorded_target_withheld";
-      upstreamReasonCode: string;
-      detail: string;
-    };
-  };
   semanticReview: { state: "not_reviewed"; receiptId: null };
   semanticSupport: {
     state: "none";
@@ -57,41 +44,17 @@ export interface LearningPrototypeFixtureV1 {
     selectionId: string;
     side: "source";
     span: Omit<SelectedLanguageSpan, "side">;
-    insights: LearningInsight[];
+    insights: LearningFacet[];
   }>;
   nonClaims: string[];
 }
 
-const INSIGHT_KINDS = new Set<LearningInsightKind>([
+const INSIGHT_KINDS = new Set<LearningFacetKind>([
   "meaning",
   "word",
   "phrase",
   "grammar",
-  "register",
-  "pragmatics",
-  "relationship",
   "translation_choice",
-  "listening_difficulty",
-  "culture",
-  "reference",
-]);
-const LEARNING_REASON_CODES = new Set<LearningReasonCode>([
-  "recorded_silence",
-  "recorded_source_text_missing",
-  "recorded_target_withheld",
-  "recorded_target_text_missing",
-  "production_caption_withheld",
-  "production_caption_unavailable",
-  "explanation_not_prepared",
-  "prototype_facet_not_prepared",
-  "follow_up_producer_missing",
-  "practice_checker_missing",
-  "canonical_saved_item_missing",
-  "export_adapter_missing",
-  "media_export_excluded_from_p0",
-  "invalid_source_binding",
-  "invalid_fixture_binding",
-  "mixed_authority",
 ]);
 const NON_CLAIMS = new Set([
   "not_runtime_generated",
@@ -129,7 +92,7 @@ function stringFields(value: unknown, fields: readonly string[], context: string
   return fields.every((field) => typeof value[field] === "string" && value[field].length > 0);
 }
 
-function validContent(kind: LearningInsightKind, value: unknown): boolean {
+function validContent(kind: LearningFacetKind, value: unknown): boolean {
   switch (kind) {
     case "meaning":
       return stringFields(value, ["sceneMeaning"], `${kind} content`);
@@ -137,22 +100,8 @@ function validContent(kind: LearningInsightKind, value: unknown): boolean {
       return stringFields(value, ["form", "sense", "role"], `${kind} content`);
     case "phrase":
       return stringFields(value, ["form", "function"], `${kind} content`);
-    case "register":
-    case "pragmatics":
-    case "relationship":
-      return stringFields(value, ["observation", "implication"], `${kind} content`);
     case "translation_choice":
       return stringFields(value, ["sourceChoice", "targetChoice", "rationale"], `${kind} content`);
-    case "listening_difficulty":
-      return stringFields(value, ["signal", "difficulty", "listeningCue"], `${kind} content`);
-    case "culture": {
-      if (!record(value)) return false;
-      exactKeys(value, ["context", "sourceLabel"], `${kind} content`);
-      return typeof value.context === "string" && value.context.length > 0 &&
-        (value.sourceLabel === null || typeof value.sourceLabel === "string");
-    }
-    case "reference":
-      return stringFields(value, ["context", "sourceLabel"], `${kind} content`);
     case "grammar": {
       if (!record(value)) return false;
       exactKeys(value, ["construction", "explanation", "segments"], `${kind} content`);
@@ -167,7 +116,7 @@ function validContent(kind: LearningInsightKind, value: unknown): boolean {
   }
 }
 
-function insight(value: unknown, context: string): LearningInsight {
+function insight(value: unknown, context: string): LearningFacet {
   if (!record(value)) throw new Error(`${context} must be an object`);
   exactKeys(value, [
     "kind",
@@ -179,28 +128,19 @@ function insight(value: unknown, context: string): LearningInsight {
     "citationIds",
     "content",
   ], context);
-  if (typeof value.kind !== "string" || !INSIGHT_KINDS.has(value.kind as LearningInsightKind)) {
+  if (typeof value.kind !== "string" || !INSIGHT_KINDS.has(value.kind as LearningFacetKind)) {
     throw new Error(`${context}.kind is invalid`);
   }
-  const kind = value.kind as LearningInsightKind;
+  const kind = value.kind as LearningFacetKind;
   if (value.authority !== "design_fixture" || value.semanticReviewState !== "not_reviewed") {
     throw new Error(`${context} cannot claim producer or semantic-review authority`);
   }
   emptyStrings(value.claimIds, `${context}.claimIds`);
   emptyStrings(value.citationIds, `${context}.citationIds`);
-  if (value.availability === "available") {
-    if (value.reasonCode !== null || !validContent(kind, value.content)) {
-      throw new Error(`${context} has invalid available content`);
-    }
-  } else if (value.availability === "unavailable") {
-    if (
-      value.content !== null || value.reasonCode !== "prototype_facet_not_prepared" ||
-      !LEARNING_REASON_CODES.has(value.reasonCode)
-    ) throw new Error(`${context} must keep missing content null with a closed reason`);
-  } else {
-    throw new Error(`${context}.availability is invalid`);
+  if (value.availability !== "available" || value.reasonCode !== null || !validContent(kind, value.content)) {
+    throw new Error(`${context} must contain prepared content for a supported facet`);
   }
-  return value as unknown as LearningInsight;
+  return value as unknown as LearningFacet;
 }
 
 export function readLearningPrototypeFixture(value: unknown): LearningPrototypeFixtureV1 {
@@ -211,7 +151,6 @@ export function readLearningPrototypeFixture(value: unknown): LearningPrototypeF
     "productionAuthority",
     "fixtureId",
     "binding",
-    "unavailableDemonstration",
     "semanticReview",
     "semanticSupport",
     "selections",
@@ -261,43 +200,6 @@ export function readLearningPrototypeFixture(value: unknown): LearningPrototypeF
   exactKeys(value.binding.target, ["state", "text"], "Learning prototype target");
   if (value.binding.target.state !== "available") throw new Error("Learning prototype target state is invalid");
   nonEmptyString(value.binding.target.text, "Learning prototype target text");
-
-  if (!record(value.unavailableDemonstration)) {
-    throw new Error("Learning prototype unavailable demonstration must be an object");
-  }
-  exactKeys(value.unavailableDemonstration, [
-    "lineId",
-    "startMs",
-    "endMs",
-    "sourceLanguage",
-    "targetLanguage",
-    "sourceText",
-    "target",
-  ], "Learning prototype unavailable demonstration");
-  for (const field of ["lineId", "sourceLanguage", "targetLanguage", "sourceText"] as const) {
-    nonEmptyString(value.unavailableDemonstration[field], `Learning prototype unavailable demonstration.${field}`);
-  }
-  integer(value.unavailableDemonstration.startMs, "Learning prototype unavailable demonstration.startMs");
-  integer(value.unavailableDemonstration.endMs, "Learning prototype unavailable demonstration.endMs");
-  if (
-    value.unavailableDemonstration.startMs < 0 ||
-    value.unavailableDemonstration.endMs <= value.unavailableDemonstration.startMs
-  ) throw new Error("Learning prototype unavailable demonstration range is invalid");
-  if (!record(value.unavailableDemonstration.target)) {
-    throw new Error("Learning prototype unavailable target must be an object");
-  }
-  exactKeys(value.unavailableDemonstration.target, [
-    "state",
-    "reasonCode",
-    "upstreamReasonCode",
-    "detail",
-  ], "Learning prototype unavailable target");
-  if (
-    value.unavailableDemonstration.target.state !== "withheld" ||
-    value.unavailableDemonstration.target.reasonCode !== "recorded_target_withheld"
-  ) throw new Error("Learning prototype unavailable target state is invalid");
-  nonEmptyString(value.unavailableDemonstration.target.upstreamReasonCode, "Learning prototype unavailable upstream reason");
-  nonEmptyString(value.unavailableDemonstration.target.detail, "Learning prototype unavailable detail");
 
   if (!record(value.semanticReview)) throw new Error("Learning prototype semantic review must be an object");
   exactKeys(value.semanticReview, ["state", "receiptId"], "Learning prototype semantic review");
@@ -373,7 +275,6 @@ export function readLearningPrototypeFixture(value: unknown): LearningPrototypeF
   return {
     ...value,
     binding: value.binding as unknown as LearningPrototypeFixtureV1["binding"],
-    unavailableDemonstration: value.unavailableDemonstration as unknown as LearningPrototypeFixtureV1["unavailableDemonstration"],
     semanticReview: value.semanticReview as unknown as LearningPrototypeFixtureV1["semanticReview"],
     semanticSupport: value.semanticSupport as unknown as LearningPrototypeFixtureV1["semanticSupport"],
     selections,
@@ -419,21 +320,6 @@ export function bindLearningPrototypeFixture(
     !samePresentedText(binding.target, moment.target)
   ) return { state: "failed", reasonCode: "invalid_fixture_binding" };
 
-  const unavailable = source.moments.find((candidate) =>
-    candidate.lineId === fixture.unavailableDemonstration.lineId);
-  const unavailableBinding = fixture.unavailableDemonstration;
-  if (
-    !unavailable || unavailable.startMs !== unavailableBinding.startMs ||
-    unavailable.endMs !== unavailableBinding.endMs ||
-    unavailable.sourceLanguage !== unavailableBinding.sourceLanguage ||
-    unavailable.targetLanguage !== unavailableBinding.targetLanguage ||
-    unavailable.source.state !== "available" || unavailable.source.text !== unavailableBinding.sourceText ||
-    unavailable.target.state !== unavailableBinding.target.state ||
-    unavailable.target.reasonCode !== unavailableBinding.target.reasonCode ||
-    unavailable.target.upstreamReasonCode !== unavailableBinding.target.upstreamReasonCode ||
-    unavailable.target.detail !== unavailableBinding.target.detail
-  ) return { state: "failed", reasonCode: "invalid_fixture_binding" };
-
   const selections: PreparedLearningSelection[] = fixture.selections.map((selection) => ({
     selectionId: selection.selectionId,
     lineId: moment.lineId,
@@ -444,20 +330,22 @@ export function bindLearningPrototypeFixture(
     source: moment.source,
     target: moment.target,
     span: { side: selection.side, ...selection.span },
-    insights: selection.insights,
+    facets: selection.insights,
     authority: {
       dataClass: "design_fixture",
       productionAuthority: false,
+      executionAuthority: null,
       semanticReviewState: "not_reviewed",
-      semanticReviewReceiptId: null,
+      artifactId: null,
+      contentId: null,
+      receiptId: null,
+      receiptContentId: null,
     },
     nonClaims: fixture.nonClaims,
   }));
   return {
     state: "ready",
-    context: source.context,
     selections,
-    unavailableDemonstrationLineId: unavailable.lineId,
   };
 }
 

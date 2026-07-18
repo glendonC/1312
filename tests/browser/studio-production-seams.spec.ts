@@ -127,6 +127,12 @@ test("attested approval explicitly produces private bounded captions without pub
   );
   await expect(productionResults.locator('[data-production-results-job-id]')).toHaveCount(1, { timeout: 10_000 });
   await expect(productionResults.locator('[data-production-results-line-id]')).toHaveCount(16);
+  const productionLearning = productionResults.getByRole("region", { name: "Language learning workspace" });
+  await expect(productionLearning).toHaveAttribute("data-learning-mode", "production");
+  await expect(productionLearning).toContainText("Production learning unavailable");
+  await expect(productionLearning).toContainText("production_media_playback_unavailable");
+  await expect(productionLearning.getByText("Prepared prototype")).toHaveCount(0);
+  await expect(productionLearning.getByRole("button", { name: /Explain|My Set/ })).toHaveCount(0);
   await expect(productionResults).toContainText("not replay Results identity");
   await expect(productionResults).toContainText("does not claim transcription accuracy, English quality, or a Bet G score");
   await expect(processingCanvas.getByRole("heading", { name: "Caption candidate withheld" })).toBeVisible();

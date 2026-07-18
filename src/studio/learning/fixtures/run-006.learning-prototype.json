@@ -21,20 +21,6 @@
       "text": "I know a few people."
     }
   },
-  "unavailableDemonstration": {
-    "lineId": "c07",
-    "startMs": 12700,
-    "endMs": 13600,
-    "sourceLanguage": "ko",
-    "targetLanguage": "en",
-    "sourceText": "왜요 왜요?",
-    "target": {
-      "state": "withheld",
-      "reasonCode": "recorded_target_withheld",
-      "upstreamReasonCode": "asr_agreement",
-      "detail": "two recognisers agree only 0.50 on this window (< 0.6)"
-    }
-  },
   "semanticReview": {
     "state": "not_reviewed",
     "receiptId": null
@@ -80,20 +66,6 @@
             "form": "몇 분",
             "sense": "a few people",
             "role": "몇 supplies an indefinite quantity and 분 counts people respectfully."
-          }
-        },
-        {
-          "kind": "listening_difficulty",
-          "availability": "available",
-          "authority": "design_fixture",
-          "semanticReviewState": "not_reviewed",
-          "reasonCode": null,
-          "claimIds": [],
-          "citationIds": [],
-          "content": {
-            "signal": "분들이 몇 분",
-            "difficulty": "The same sound 분 appears twice in quick succession with different jobs.",
-            "listeningCue": "Listen for 들이 after the first 분 and 몇 before the second one."
           }
         }
       ]
@@ -160,16 +132,6 @@
             "targetChoice": "I know a few people.",
             "rationale": "The English makes the conversational relationship explicit instead of repeating a respectful person noun and counter."
           }
-        },
-        {
-          "kind": "culture",
-          "availability": "unavailable",
-          "authority": "design_fixture",
-          "semanticReviewState": "not_reviewed",
-          "reasonCode": "prototype_facet_not_prepared",
-          "claimIds": [],
-          "citationIds": [],
-          "content": null
         }
       ]
     }

@@ -8,6 +8,7 @@ import {
   learningPrototypeFixture,
   readLearningPrototypeFixture,
 } from "../src/studio/learning/prototypeFixture.ts";
+import { projectPrototypeLearningPresentation } from "../src/studio/learning/prototypeAdapter.ts";
 import {
   projectRecordedLearningSource,
   validateLearningSourceContext,
@@ -172,8 +173,12 @@ test("design fixture binds exact code-point selections to the recorded c01 momen
       authority: {
         dataClass: "design_fixture",
         productionAuthority: false,
+        executionAuthority: null,
         semanticReviewState: "not_reviewed",
-        semanticReviewReceiptId: null,
+        artifactId: null,
+        contentId: null,
+        receiptId: null,
+        receiptContentId: null,
       },
     },
     {
@@ -187,37 +192,46 @@ test("design fixture binds exact code-point selections to the recorded c01 momen
       authority: {
         dataClass: "design_fixture",
         productionAuthority: false,
+        executionAuthority: null,
         semanticReviewState: "not_reviewed",
-        semanticReviewReceiptId: null,
+        artifactId: null,
+        contentId: null,
+        receiptId: null,
+        receiptContentId: null,
       },
     },
   ]);
-  const culture = projection.selections[1].insights.find((insight) => insight.kind === "culture");
-  assert.deepEqual(culture, {
-    kind: "culture",
-    availability: "unavailable",
-    authority: "design_fixture",
-    semanticReviewState: "not_reviewed",
-    reasonCode: "prototype_facet_not_prepared",
-    claimIds: [],
-    citationIds: [],
-    content: null,
-  });
+  assert.deepEqual(projection.selections.map((selection) => selection.facets.map((facet) => facet.kind)), [
+    ["meaning", "word"],
+    ["meaning", "grammar", "translation_choice"],
+  ]);
+  assert.equal(JSON.stringify(projection).includes("listening_difficulty"), false);
+  assert.equal(JSON.stringify(projection).includes("culture"), false);
 });
 
-test("fixture validation rejects offset drift, prose in unavailable facets, and fabricated support", () => {
+test("fixture validation rejects offset drift, unsupported facets, and fabricated support", () => {
   const offsetDrift = structuredClone(learningPrototypeFixture);
   offsetDrift.selections[0].span.start = 3;
   assert.throws(() => readLearningPrototypeFixture(offsetDrift), /does not reconstruct/);
 
-  const unavailableProse = structuredClone(learningPrototypeFixture);
-  (unavailableProse.selections[1].insights[3] as unknown as Record<string, unknown>).content = {
-    context: "Unsupported prose",
-    sourceLabel: null,
+  const unsupportedFacet = structuredClone(learningPrototypeFixture) as unknown as {
+    selections: Array<{ insights: Array<Record<string, unknown>> }>;
   };
-  assert.throws(() => readLearningPrototypeFixture(unavailableProse), /missing content null/);
+  unsupportedFacet.selections[0].insights.push({
+    kind: "culture",
+    availability: "available",
+    authority: "design_fixture",
+    semanticReviewState: "not_reviewed",
+    reasonCode: null,
+    claimIds: [],
+    citationIds: [],
+    content: { context: "Unsupported prose", sourceLabel: null },
+  });
+  assert.throws(() => readLearningPrototypeFixture(unsupportedFacet), /kind is invalid/);
 
-  const fabricatedClaim = structuredClone(learningPrototypeFixture);
+  const fabricatedClaim = structuredClone(learningPrototypeFixture) as unknown as {
+    selections: Array<{ insights: Array<{ claimIds: string[] }> }>;
+  };
   fabricatedClaim.selections[0].insights[0].claimIds.push("claim:not-real");
   assert.throws(() => readLearningPrototypeFixture(fabricatedClaim), /claimIds must be empty/);
 
@@ -236,6 +250,15 @@ test("fixture validation rejects offset drift, prose in unavailable facets, and 
     span: { unit: "unicode_code_point", start: 6, end: 7, text: "분" },
   });
   assert.throws(() => readLearningPrototypeFixture(overlappingInline), /inline selections overlap/);
+});
+
+test("prototype presentation is selected explicitly and retains fixture-only authority", () => {
+  const source = projectRecordedLearningSource(recordedBundle());
+  const presentation = projectPrototypeLearningPresentation(source, learningPrototypeFixture);
+  assert.equal(presentation.mode, "prototype");
+  assert.deepEqual(presentation.savedItems, { state: "session" });
+  assert.equal(presentation.explanations.state, "ready");
+  assert.equal(JSON.stringify(presentation).includes("host_receipted"), false);
 });
 
 test("fixture binding fails closed when recorded content identity changes", () => {

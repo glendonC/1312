@@ -1,25 +1,23 @@
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
-import { useStudio } from "../store";
 import {
   codePointSlice,
   fullCodePointSpan,
-  type AvailableLearningInsight,
-  type LearningInsight,
-  type LearningInsightKind,
-  type LearningPrototypeProjection,
   type LearningReasonCode,
-  type LearningViewingSource,
-  type PreparedLearningSelection,
   type PresentedMoment,
-  type SessionSavedSelection,
   type SelectedLanguageSpan,
 } from "./model";
-import {
-  bindLearningPrototypeFixture,
-  type LearningPrototypeFixtureV1,
-} from "./prototypeFixture.ts";
+import type {
+  AvailableLearningFacet,
+  LearningFacet,
+  LearningFacetKind,
+  LearningPlayback,
+  LearningPresentation,
+  LearningPrototypeProjection,
+  PreparedLearningSelection,
+  SessionSavedSelection,
+} from "./presentation.ts";
 
 type PinnedSelection =
   | { state: "prepared"; selection: PreparedLearningSelection; span: SelectedLanguageSpan }
@@ -36,18 +34,12 @@ type PinnedSelection =
       reasonCode: Extract<LearningPrototypeProjection, { state: "failed" }>["reasonCode"];
     };
 
-const INSIGHT_LABELS: Record<LearningInsightKind, string> = {
+const INSIGHT_LABELS: Record<LearningFacetKind, string> = {
   meaning: "Meaning in this scene",
   word: "Word meaning",
   phrase: "Phrase function",
   grammar: "Sentence structure",
-  register: "Register",
-  pragmatics: "Pragmatics",
-  relationship: "Relationship implication",
   translation_choice: "Why the English fits",
-  listening_difficulty: "Why this is difficult to hear",
-  culture: "Cultural context",
-  reference: "Reference context",
 };
 
 const PRESENTED_INSIGHT_ORDER = [
@@ -56,7 +48,7 @@ const PRESENTED_INSIGHT_ORDER = [
   "phrase",
   "grammar",
   "translation_choice",
-] as const satisfies readonly LearningInsightKind[];
+] as const satisfies readonly LearningFacetKind[];
 
 const REASON_LABELS: Record<LearningReasonCode, string> = {
   recorded_silence: "No language was recorded for this interval.",
@@ -66,34 +58,50 @@ const REASON_LABELS: Record<LearningReasonCode, string> = {
   production_caption_withheld: "The verified production caption was withheld.",
   production_caption_unavailable: "The verified production caption is unavailable.",
   explanation_not_prepared: "No contextual explanation is prepared for this language moment.",
-  prototype_facet_not_prepared: "This explanation facet was not prepared for the prototype.",
-  follow_up_producer_missing: "Grounded follow-up answers are not implemented.",
-  practice_checker_missing: "Response checking is not implemented.",
+  production_media_playback_unavailable: "Private production media playback is not connected to the browser learning surface.",
+  caption_authority_revoked: "Caption authority was revoked after completion, so no new explanation may be requested.",
+  generator_abstained: "The production explanation generator abstained.",
+  facet_not_applicable: "This facet does not apply to the selected span.",
+  insufficient_caption_context: "The verified caption context is insufficient for this facet.",
+  target_unavailable: "The verified target caption is unavailable for this facet.",
+  explanation_request_failed: "The production explanation request failed closed.",
+  explanation_retry_exhausted: "The fixed production explanation retry ceiling is exhausted.",
   canonical_saved_item_missing: "A canonical private saved-language item is not implemented.",
   export_adapter_missing: "No verified export adapter is implemented.",
   media_export_excluded_from_p0: "Media export is outside this prototype.",
   invalid_source_binding: "The prepared explanation does not bind to this recorded source.",
   invalid_fixture_binding: "The prepared explanation does not bind to this exact caption moment.",
+  invalid_explanation_binding: "The production explanation does not bind to this exact verified caption span.",
   mixed_authority: "Recorded and production authority cannot be combined in one source projection.",
 };
 
 export default function LearningResults({
-  source,
-  prototypeFixture,
+  presentation,
+  playback,
 }: {
-  source: LearningViewingSource;
-  prototypeFixture: LearningPrototypeFixtureV1;
+  presentation: LearningPresentation;
+  playback: LearningPlayback;
 }) {
-  const clipT = useStudio((state) => state.clipT);
-  const setClipT = useStudio((state) => state.setClipT);
+  const { source } = presentation;
   const [pinned, setPinned] = useState<PinnedSelection | null>(null);
   const [saved, setSaved] = useState<SessionSavedSelection[]>([]);
   const [view, setView] = useState<"captions" | "my_set">("captions");
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
-  const prototype = bindLearningPrototypeFixture(source, prototypeFixture);
+  const captionGuideId = useId();
+  const prototype = presentation.mode === "prototype" ? presentation.explanations : null;
+  const sourceKey = presentation.mode === "prototype"
+    ? `${source.context.identities.runId}:${source.context.identities.captionContentId ?? "none"}`
+    : `${source.context.identities.runId}:${source.context.identities.captionContentId}`;
 
-  const selections = prototype.state === "ready" ? prototype.selections : [];
+  const selections = prototype?.state === "ready" ? prototype.selections : [];
   const savedSelectionIds = new Set(saved.map((item) => item.id));
+
+  useEffect(() => {
+    setPinned(null);
+    setSaved([]);
+    setView("captions");
+    setReturnFocus(null);
+  }, [sourceKey]);
 
   const openPinned = (next: PinnedSelection, trigger: HTMLElement) => {
     setReturnFocus(trigger);
@@ -103,6 +111,7 @@ export default function LearningResults({
   const selectSentence = (moment: PresentedMoment, trigger: HTMLElement) => {
     if (moment.source.state !== "available") return;
     const fullSpan = fullCodePointSpan(moment.source.text, "source");
+    if (!prototype) return;
     if (prototype.state === "failed") {
       openPinned({ state: "failed", moment, span: fullSpan, reasonCode: prototype.reasonCode }, trigger);
       return;
@@ -126,6 +135,7 @@ export default function LearningResults({
     const span = selectedCodePointSpan(sourceElement, moment.source.text);
     if (!span) return;
 
+    if (!prototype) return;
     if (prototype.state === "failed") {
       openPinned({ state: "failed", moment, span, reasonCode: prototype.reasonCode }, sourceElement);
     } else {
@@ -149,15 +159,20 @@ export default function LearningResults({
   };
 
   const keepSelection = (selection: PreparedLearningSelection) => {
+    if (presentation.mode !== "prototype" || selection.authority.dataClass !== "design_fixture") return;
     setSaved((current) => {
       if (current.some((item) => item.id === selection.selectionId)) return current;
-      return [...current, sessionItem(source, selection)];
+      return [...current, sessionItem(presentation.source, selection)];
     });
   };
 
   return (
-    <section className="learning-workspace" aria-label="Language learning workspace">
-      <nav className="learning-view-switch" aria-label="Language workspace views">
+    <section
+      className="learning-workspace"
+      aria-label="Language learning workspace"
+      data-learning-mode={presentation.mode}
+    >
+      {presentation.mode === "prototype" && <nav className="learning-view-switch" aria-label="Language workspace views">
         <button
           type="button"
           aria-pressed={view === "captions"}
@@ -173,13 +188,18 @@ export default function LearningResults({
           My Set ({saved.length})
         </button>
         <span className="learning-session-note">Session only</span>
-      </nav>
+      </nav>}
 
       {view === "captions" ? (
         <>
-          <p className="learning-caption-guide" id="learning-caption-guide">
-            <b>Prepared prototype.</b> Tap highlighted language, select a phrase, or choose Explain sentence.
-            Selection does not seek or pause playback.
+          <p className="learning-caption-guide" id={captionGuideId}>
+            {presentation.mode === "prototype" ? (
+              <><b>Prepared prototype.</b> Tap highlighted language, select a phrase, or choose Explain sentence.
+                Selection does not seek or pause playback.</>
+            ) : (
+              <><b>Verified production captions.</b> Learning selection is unavailable until this private media can
+                play in the browser. No prototype explanation is substituted.</>
+            )}
           </p>
           {pinned && (
             <ExplanationPanel
@@ -190,26 +210,36 @@ export default function LearningResults({
               onClose={closePinned}
             />
           )}
-          {prototype.state === "failed" && (
+          {prototype?.state === "failed" && (
             <div className="learning-workspace-failure" role="status" data-reason-code={prototype.reasonCode}>
               <b>Prepared explanation unavailable</b>
               <p>{REASON_LABELS[prototype.reasonCode]}</p>
               <code>{prototype.reasonCode}</code>
             </div>
           )}
+          {presentation.mode === "production" && (
+            <div
+              className="learning-workspace-failure"
+              role="status"
+              data-reason-code={presentation.explanations.reasonCode}
+            >
+              <b>Production learning unavailable</b>
+              <p>{REASON_LABELS[presentation.explanations.reasonCode]}</p>
+              <code>{presentation.explanations.reasonCode}</code>
+            </div>
+          )}
           <div
             className="cues"
-            aria-label="Korean to English transcript"
-            aria-describedby="learning-caption-guide"
+            aria-label={`${source.moments[0]?.sourceLanguage ?? "Source"} to ${source.moments[0]?.targetLanguage ?? "target"} transcript`}
+            aria-describedby={captionGuideId}
           >
             {source.moments.length === 0 ? (
               <p className="cues-empty">No caption cues were recorded. No transcript or result is implied.</p>
             ) : source.moments.map((moment) => {
               const momentSelections = selections.filter((candidate) => candidate.lineId === moment.lineId);
               const fullPrepared = preparedSentence(moment, momentSelections);
-              const unavailableDemonstration = prototype.state === "ready" &&
-                prototype.unavailableDemonstrationLineId === moment.lineId;
-              const active = clipT * 1_000 >= moment.startMs && clipT * 1_000 < moment.endMs;
+              const active = playback.state === "available" &&
+                playback.currentTimeMs >= moment.startMs && playback.currentTimeMs < moment.endMs;
               const selectedLineId = pinned?.state === "prepared"
                 ? pinned.selection.lineId
                 : pinned?.moment.lineId;
@@ -218,18 +248,21 @@ export default function LearningResults({
                   key={moment.lineId}
                   className={`cue${active ? " is-active" : ""}${selectedLineId === moment.lineId ? " is-pinned" : ""}`}
                   data-learning-line-id={moment.lineId}
+                  data-production-results-line-id={presentation.mode === "production" ? moment.lineId : undefined}
                   data-learning-pinned={selectedLineId === moment.lineId ? "true" : undefined}
                   data-withheld={moment.target.state === "withheld" ? "true" : undefined}
                   data-silence={moment.source.reasonCode === "recorded_silence" ? "true" : undefined}
                 >
-                  <button
-                    type="button"
-                    className="cue-t cue-seek"
-                    aria-label={`Seek to ${momentClock(moment.startMs)}`}
-                    onClick={() => setClipT(moment.startMs / 1_000)}
-                  >
-                    {momentClock(moment.startMs)}
-                  </button>
+                  {playback.state === "available" ? (
+                    <button
+                      type="button"
+                      className="cue-t cue-seek"
+                      aria-label={`Seek to ${momentClock(moment.startMs)}`}
+                      onClick={() => playback.onSeek(moment.startMs)}
+                    >
+                      {momentClock(moment.startMs)}
+                    </button>
+                  ) : <span className="cue-t">{momentClock(moment.startMs)}</span>}
                   <span className="cue-body">
                     {moment.source.state !== "available" ? (
                       <span className="cue-silence">
@@ -247,8 +280,12 @@ export default function LearningResults({
                           className="cue-src"
                           lang={moment.sourceLanguage}
                           tabIndex={-1}
-                          onPointerUp={(event) => selectCaptionRange(moment, momentSelections, event.currentTarget)}
-                          onTouchEnd={(event) => selectCaptionRange(moment, momentSelections, event.currentTarget)}
+                          onPointerUp={prototype
+                            ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget)
+                            : undefined}
+                          onTouchEnd={prototype
+                            ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget)
+                            : undefined}
                         >
                           {sourceText(moment, momentSelections, (selection, trigger) => {
                             openPinned({ state: "prepared", selection, span: selection.span }, trigger);
@@ -267,16 +304,14 @@ export default function LearningResults({
                             {moment.target.detail}
                           </span>
                         )}
-                        {(fullPrepared || unavailableDemonstration) && (
+                        {fullPrepared && (
                           <button
                             type="button"
-                            className={`learning-sentence-action${unavailableDemonstration && !fullPrepared ? " is-unavailable" : ""}`}
-                            aria-label={fullPrepared
-                              ? `Explain Korean sentence at ${momentClock(moment.startMs)}`
-                              : `View unavailable explanation at ${momentClock(moment.startMs)}`}
+                            className="learning-sentence-action"
+                            aria-label={`Explain Korean sentence at ${momentClock(moment.startMs)}`}
                             onClick={(event) => selectSentence(moment, event.currentTarget)}
                           >
-                            {fullPrepared ? "Explain sentence" : "Explanation unavailable"}
+                            Explain sentence
                           </button>
                         )}
                       </>
@@ -287,9 +322,9 @@ export default function LearningResults({
             })}
           </div>
         </>
-      ) : (
+      ) : presentation.mode === "prototype" ? (
         <MySet saved={saved} onRemove={(id) => setSaved((current) => current.filter((item) => item.id !== id))} />
-      )}
+      ) : null}
     </section>
   );
 }
@@ -381,11 +416,13 @@ function ExplanationPanel({
   const selectedText = pinned.span.text;
   const panelRef = useRef<HTMLElement>(null);
   const presentedInsights = pinned.state === "prepared"
-    ? orderedPresentedInsights(pinned.selection.insights)
+    ? orderedPresentedInsights(pinned.selection.facets)
     : [];
   const unavailableInsights = pinned.state === "prepared"
-    ? pinned.selection.insights.filter((insight) => insight.availability !== "available")
+    ? pinned.selection.facets.filter((facet) => facet.availability !== "available")
     : [];
+  const isPrototype = pinned.state === "prepared" &&
+    pinned.selection.authority.dataClass === "design_fixture";
 
   useEffect(() => {
     panelRef.current?.focus();
@@ -398,7 +435,9 @@ function ExplanationPanel({
       tabIndex={-1}
       aria-label="Pinned language explanation"
       data-pinned-line-id={moment.lineId}
-      data-learning-state={pinned.state === "prepared" ? "prototype" : pinned.state}
+      data-learning-state={pinned.state === "prepared"
+        ? pinned.selection.authority.dataClass === "design_fixture" ? "prototype" : "production"
+        : pinned.state}
       data-selected-side={pinned.span.side}
       data-selected-start={pinned.span.start}
       data-selected-end={pinned.span.end}
@@ -411,7 +450,9 @@ function ExplanationPanel({
     >
       <header className="learning-panel-head">
         <div>
-          <span>{pinned.state === "prepared" ? "Prepared prototype" : stateLabel(pinned.state)}</span>
+          <span>{pinned.state === "prepared"
+            ? isPrototype ? "Prepared prototype" : "Verified production explanation"
+            : stateLabel(pinned.state)}</span>
           <h3 lang={moment.sourceLanguage}>{selectedText}</h3>
           <p>{momentClock(moment.startMs)} to {momentClock(moment.endMs)}</p>
         </div>
@@ -456,7 +497,7 @@ function ExplanationPanel({
               ))}
             </details>
           )}
-          <div className="learning-panel-actions">
+          {isPrototype && <div className="learning-panel-actions">
             <button
               type="button"
               className="learning-keep"
@@ -465,13 +506,16 @@ function ExplanationPanel({
             >
               {kept ? "Kept in My Set" : "Keep in My Set"}
             </button>
-          </div>
+          </div>}
           <details className="learning-prototype-boundary">
             <summary>About this explanation</summary>
-            <p>
-              This is prepared design-fixture content bound to the exact recorded cue and selected code-point span.
-              It was not generated by the runtime and has no semantic-review receipt or evidence citations.
-            </p>
+            {isPrototype ? <p>
+                This is prepared design-fixture content bound to the exact recorded cue and selected code-point span.
+                It was not generated by the runtime and has no semantic-review receipt or evidence citations.
+              </p> : <p>
+                This private explanation is projected from a host-receipted runtime artifact bound to the exact
+                verified production-caption span. Its semantic correctness has not been reviewed.
+              </p>}
             <p>Only meaning, word or phrase, sentence structure, and translation rationale are shown.</p>
           </details>
         </>
@@ -485,14 +529,14 @@ function ExplanationPanel({
   );
 }
 
-function orderedPresentedInsights(insights: LearningInsight[]): AvailableLearningInsight[] {
+function orderedPresentedInsights(facets: LearningFacet[]): AvailableLearningFacet[] {
   return PRESENTED_INSIGHT_ORDER.flatMap((kind) => {
-    const insight = insights.find((candidate) => candidate.kind === kind && candidate.availability === "available");
-    return insight ? [insight as AvailableLearningInsight] : [];
+    const facet = facets.find((candidate) => candidate.kind === kind && candidate.availability === "available");
+    return facet ? [facet as AvailableLearningFacet] : [];
   });
 }
 
-function InsightBody({ insight }: { insight: AvailableLearningInsight }) {
+function InsightBody({ insight }: { insight: AvailableLearningFacet }) {
   switch (insight.kind) {
     case "meaning":
       return <p>{insight.content.sceneMeaning}</p>;
@@ -518,10 +562,6 @@ function InsightBody({ insight }: { insight: AvailableLearningInsight }) {
           </dl>
         </>
       );
-    case "register":
-    case "pragmatics":
-    case "relationship":
-      return <><p>{insight.content.observation}</p><p>{insight.content.implication}</p></>;
     case "translation_choice":
       return (
         <dl>
@@ -530,18 +570,6 @@ function InsightBody({ insight }: { insight: AvailableLearningInsight }) {
           <div><dt>Rationale</dt><dd>{insight.content.rationale}</dd></div>
         </dl>
       );
-    case "listening_difficulty":
-      return (
-        <dl>
-          <div><dt>Signal</dt><dd>{insight.content.signal}</dd></div>
-          <div><dt>Difficulty</dt><dd>{insight.content.difficulty}</dd></div>
-          <div><dt>Listen for</dt><dd>{insight.content.listeningCue}</dd></div>
-        </dl>
-      );
-    case "culture":
-      return <><p>{insight.content.context}</p>{insight.content.sourceLabel && <p>Source: {insight.content.sourceLabel}</p>}</>;
-    case "reference":
-      return <><p>{insight.content.context}</p><p>Source: {insight.content.sourceLabel}</p></>;
   }
 }
 
@@ -591,7 +619,10 @@ function MySet({ saved, onRemove }: { saved: SessionSavedSelection[]; onRemove: 
   );
 }
 
-function sessionItem(source: LearningViewingSource, selection: PreparedLearningSelection): SessionSavedSelection {
+function sessionItem(
+  source: Extract<LearningPresentation, { mode: "prototype" }>["source"],
+  selection: PreparedLearningSelection,
+): SessionSavedSelection {
   return {
     dataClass: "learner_owned_session_state",
     id: selection.selectionId,
@@ -604,9 +635,7 @@ function sessionItem(source: LearningViewingSource, selection: PreparedLearningS
     sourceText: selection.source.state === "available" ? selection.source.text : "",
     target: selection.target,
     selection: selection.span,
-    insightKinds: selection.insights.map((insight) => insight.kind),
-    practice: { state: "unavailable", reasonCode: "practice_checker_missing" },
-    export: { state: "unavailable", reasonCode: "canonical_saved_item_missing" },
+    facetKinds: selection.facets.map((facet) => facet.kind),
   };
 }
 

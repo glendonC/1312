@@ -69,30 +69,14 @@ test("prepared language stays pinned, saves explicitly, and closes unsupported s
     "Sentence structure",
     "Why the English fits",
   ]);
-  const unavailableFacets = panel.locator(".learning-unavailable-facets");
-  await expect(unavailableFacets.getByText("1 unavailable facet")).toBeVisible();
+  await expect(panel.locator(".learning-unavailable-facets")).toHaveCount(0);
   await expect(panel.getByRole("heading", { name: "Cultural context" })).not.toBeVisible();
-  await unavailableFacets.getByText("1 unavailable facet").click();
-  await expect(panel.getByRole("heading", { name: "Cultural context" })).toBeVisible();
-  await expect(panel).toContainText("prototype_facet_not_prepared");
 
   const c07 = workspace.locator('[data-learning-line-id="c07"]');
-  await c07.getByRole("button", { name: "View unavailable explanation at 0:12.7" }).click();
-  await expect(panel).toHaveAttribute("data-pinned-line-id", "c07");
-  await expect(panel).toHaveAttribute("data-learning-state", "unavailable");
-  await expect(panel).toHaveAttribute("data-selected-side", "source");
-  await expect(panel).toHaveAttribute("data-selected-start", "0");
-  await expect(panel).toHaveAttribute("data-selected-end", "6");
-  await expect(panel).toContainText("Target withheld");
-  await expect(panel).toContainText("recorded_target_withheld");
-  await expect(panel).toContainText("Explanation unavailable");
-  await expect(panel).toContainText("explanation_not_prepared");
-  await expect(panel).not.toContainText("Why?");
-  await expect(panel.getByRole("button", { name: "Keep in My Set" })).toHaveCount(0);
+  await panel.getByRole("button", { name: "Close explanation" }).click();
+  await expect(c07).toContainText("withheld");
+  await expect(c07.getByRole("button", { name: /Explain|View unavailable explanation/ })).toHaveCount(0);
 
-  await expect(panel).toBeFocused();
-  await panel.press("Escape");
-  await expect(c07.getByRole("button", { name: "View unavailable explanation at 0:12.7" })).toBeFocused();
   await preparedWord.focus();
   await preparedWord.press("Enter");
   await expect(panel).toBeFocused();

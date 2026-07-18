@@ -160,10 +160,6 @@
   color: var(--ink, #161d1b);
 }
 
-.learning-sentence-action.is-unavailable {
-  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
-}
-
 .learning-view-switch button:focus-visible,
 .cue-seek:focus-visible,
 .learning-span:focus-visible,

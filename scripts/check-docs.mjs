@@ -23,10 +23,12 @@ const LEGACY_HARD_BREAKS = new Set([
   "docs/PRODUCT.md:**Codename:** 1321 (Build Week Jul 13–21, 2026)",
   "docs/PRODUCT.md:**Category:** Language intelligence for real-world media",
 ]);
+const COMMUNITY_FILES = ["CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "SECURITY.md"];
 
 const REQUIRED_FILES = [
   "README.md",
   "AGENTS.md",
+  ...COMMUNITY_FILES,
   "docs/README.md",
   "docs/PRODUCT.md",
   "docs/build-week/STATUS.md",
@@ -257,6 +259,7 @@ const docsMarkdown = walkFiles(DOCS_ROOT)
 const publicMarkdown = [
   resolve(ROOT, "README.md"),
   agentsPath,
+  ...COMMUNITY_FILES.map((path) => resolve(ROOT, path)),
   resolve(ROOT, "bench/README.md"),
   resolve(ROOT, "bench/ADJUDICATION.md"),
   ...docsMarkdown,
@@ -307,7 +310,11 @@ for (const legacyKey of LEGACY_HARD_BREAKS) {
   if (uses !== 1) addError(`legacy hard-break exception has ${uses} matches: ${legacyKey}`);
 }
 
-for (const policyPath of [agentsPath, resolve(DOCS_ROOT, "README.md")]) {
+for (const policyPath of [
+  agentsPath,
+  resolve(DOCS_ROOT, "README.md"),
+  ...COMMUNITY_FILES.map((path) => resolve(ROOT, path)),
+]) {
   if (existsSync(policyPath) && readFileSync(policyPath, "utf8").includes("\u2014")) {
     addError(`${displayPath(policyPath)} contains an em dash`);
   }
@@ -322,8 +329,12 @@ if (existsSync(registryPath)) {
     if (resolved) registryTargets.add(resolved.targetPath);
   }
 
-  for (const path of docsMarkdown) {
-    if (path !== registryPath && !registryTargets.has(path)) {
+  const registeredPublicDocs = [
+    ...docsMarkdown.filter((path) => path !== registryPath),
+    ...COMMUNITY_FILES.map((path) => resolve(ROOT, path)),
+  ];
+  for (const path of registeredPublicDocs) {
+    if (!registryTargets.has(path)) {
       addError(`docs/README.md does not register ${displayPath(path)}`);
     }
   }

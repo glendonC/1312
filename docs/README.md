@@ -32,6 +32,9 @@ reference. `STUDIO_AUTONOMY.md` preserves decisions and context, not current sta
 | Document | Owns |
 |---|---|
 | [`../README.md`](../README.md) | Repository entry point, problem, product response, and local start |
+| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contribution scope, workflow, and verification expectations |
+| [`../CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) | Community conduct and private conduct reporting |
+| [`../SECURITY.md`](../SECURITY.md) | Supported security surface and private vulnerability reporting |
 | [`../AGENTS.md`](../AGENTS.md) | IDE and CLI agent operations in this repository |
 | [`../bench/README.md`](../bench/README.md) | Evaluation-domain layout, commands, packs, and score artifacts |
 | [`../bench/ADJUDICATION.md`](../bench/ADJUDICATION.md) | Human gold-review procedure |

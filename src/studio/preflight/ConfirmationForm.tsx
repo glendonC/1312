@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { LayoutGroup } from "motion/react";
 import { useCallback, useRef, useState, type RefObject } from "react";
 
 import { Edit } from "../glyphs";
@@ -17,6 +17,7 @@ import {
   Choice,
   ConversationValue,
   PreparationControlShelf,
+  PreparationStagePanel,
   PreparationStagePopover,
   StageConversation,
   continueActionLabel,
@@ -52,6 +53,8 @@ export default function ConfirmationForm({
   const selectPreparationStage = useStudio((state) => state.selectPreparationStage);
   const advancePreparationStage = useStudio((state) => state.advancePreparationStage);
   const [editingStage, setEditingStage] = useState<PreparationStage | null>(null);
+  // +1 when moving toward Review, -1 when moving back; drives the stage body's directional entrance.
+  const [direction, setDirection] = useState(1);
   const stageHeading = useRef<HTMLHeadingElement>(null);
   const parameterTrigger = useRef<HTMLButtonElement>(null);
   // The element the open editor popover anchors to — the shelf pill or the
@@ -76,6 +79,7 @@ export default function ConfirmationForm({
 
   function selectStage(nextStage: PreparationStage): void {
     setEditingStage(null);
+    setDirection(preparationStageIndex(nextStage) >= currentStageIndex ? 1 : -1);
     selectPreparationStage(nextStage);
   }
 
@@ -87,11 +91,13 @@ export default function ConfirmationForm({
     }
     if (stage === "range" && !assessment?.canReplay) return;
     setEditingStage(null);
+    setDirection(1);
     advancePreparationStage();
   }
 
   function previousStage(): void {
     setEditingStage(null);
+    setDirection(-1);
     selectPreparationStage(PREPARATION_STAGES[currentStageIndex - 1].id);
   }
 
@@ -115,92 +121,80 @@ export default function ConfirmationForm({
         selectStage={selectStage}
       />
 
-      <motion.section
-        className="preflight-stage-panel"
-        aria-labelledby="preflight-stage-title"
-        layout
-        transition={{ layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
-      >
-          <motion.div
-            key={stage}
-            className="preflight-stage-body"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            onAnimationComplete={() => stageHeading.current?.focus({ preventScroll: true })}
-          >
-            {stage === "source" && <RecordedSourceStage headingRef={stageHeading} facts={facts} />}
+      <LayoutGroup>
+        <PreparationStagePanel stage={stage} direction={direction}>
+          {stage === "source" && <RecordedSourceStage headingRef={stageHeading} facts={facts} />}
 
-            {stage === "range" && (
-              <RecordedRangeStage
-                headingRef={stageHeading}
-                facts={facts}
-                request={request}
-                assessment={assessment}
-                onEdit={(anchor) => openStageEditor("range", anchor)}
-              />
-            )}
+          {stage === "range" && (
+            <RecordedRangeStage
+              headingRef={stageHeading}
+              facts={facts}
+              request={request}
+              assessment={assessment}
+              onEdit={(anchor) => openStageEditor("range", anchor)}
+            />
+          )}
 
-            {stage === "language" && (
-              <RecordedLanguageStage
-                headingRef={stageHeading}
-                facts={facts}
-                request={request}
-                onEdit={(anchor) => openStageEditor("language", anchor)}
-              />
-            )}
+          {stage === "language" && (
+            <RecordedLanguageStage
+              headingRef={stageHeading}
+              facts={facts}
+              request={request}
+              onEdit={(anchor) => openStageEditor("language", anchor)}
+            />
+          )}
 
-            {stage === "output" && (
-              <RecordedOutputStage
-                headingRef={stageHeading}
-                request={request}
-                onEdit={(anchor) => openStageEditor("output", anchor)}
-              />
-            )}
+          {stage === "output" && (
+            <RecordedOutputStage
+              headingRef={stageHeading}
+              request={request}
+              onEdit={(anchor) => openStageEditor("output", anchor)}
+            />
+          )}
 
-            {stage === "forecast" && (
-              <RecordedForecast
-                headingRef={stageHeading}
-                facts={facts}
-                request={request}
-                forecast={bundle.forecast ?? null}
-                selectStage={selectStage}
-              />
-            )}
+          {stage === "forecast" && (
+            <RecordedForecast
+              headingRef={stageHeading}
+              facts={facts}
+              request={request}
+              forecast={bundle.forecast ?? null}
+              selectStage={selectStage}
+            />
+          )}
 
-            {stage === "confirm" && (
-              <RecordedConfirmation
-                headingRef={stageHeading}
-                facts={facts}
-                request={request}
-                selectStage={selectStage}
-              />
-            )}
-          </motion.div>
-      </motion.section>
+          {stage === "confirm" && (
+            <RecordedConfirmation
+              headingRef={stageHeading}
+              facts={facts}
+              request={request}
+              selectStage={selectStage}
+            />
+          )}
+        </PreparationStagePanel>
 
-      <PreparationControlShelf
-        visible={initialization === null}
-        stage={stage}
-        back={stage !== "source"
-          ? { label: `Back to ${PREPARATION_STAGES[currentStageIndex - 1].label}`, onClick: previousStage }
-          : undefined}
-        parameter={stage !== "source"
-          ? {
-              label: recordedParameterLabel(stage, facts, request),
-              actionLabel: recordedParameterActionLabel(stage, facts, request),
-              open: editingStage === stage,
-              popoverId: `preflight-${stage}-popover`,
-              triggerRef: parameterTrigger,
-              onToggle: toggleStageEditor,
-            }
-          : undefined}
-        next={{
-          label: stage === "confirm" ? "Replay" : "Continue",
-          actionLabel: stage === "confirm" ? "Replay recorded analysis" : continueActionLabel(stage),
-          disabled: advanceDisabled,
-        }}
-      />
+        <PreparationControlShelf
+          visible={initialization === null}
+          stage={stage}
+          back={stage !== "source"
+            ? { label: `Back to ${PREPARATION_STAGES[currentStageIndex - 1].label}`, onClick: previousStage }
+            : undefined}
+          parameter={stage !== "source"
+            ? {
+                label: recordedParameterLabel(stage, facts, request),
+                actionLabel: recordedParameterActionLabel(stage, facts, request),
+                open: editingStage === stage,
+                popoverId: `preflight-${stage}-popover`,
+                triggerRef: parameterTrigger,
+                onToggle: toggleStageEditor,
+              }
+            : undefined}
+          next={{
+            label: stage === "confirm" ? "Replay" : "Continue",
+            actionLabel: stage === "confirm" ? "Replay recorded analysis" : continueActionLabel(stage),
+            disabled: advanceDisabled,
+          }}
+        />
+      </LayoutGroup>
 
       {stage !== "source" && initialization === null && (
         <PreparationStagePopover

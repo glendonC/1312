@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { LayoutGroup } from "motion/react";
 import { useCallback, useRef, useState, type RefObject } from "react";
 
 import { Edit } from "../glyphs";
@@ -20,6 +20,7 @@ import {
   Choice,
   ConversationValue,
   PreparationControlShelf,
+  PreparationStagePanel,
   PreparationStagePopover,
   RangeModeChoice,
   StageConversation,
@@ -60,6 +61,8 @@ export default function SubmittedPreparationForm({
   const selectPreparationStage = useStudio((state) => state.selectPreparationStage);
   const advancePreparationStage = useStudio((state) => state.advancePreparationStage);
   const [editingStage, setEditingStage] = useState<PreparationStage | null>(null);
+  // +1 when moving toward Review, -1 when moving back; drives the stage body's directional entrance.
+  const [direction, setDirection] = useState(1);
   const stageHeading = useRef<HTMLHeadingElement>(null);
   const parameterTrigger = useRef<HTMLButtonElement>(null);
   // The element the open editor popover anchors to — the shelf pill or the
@@ -88,6 +91,7 @@ export default function SubmittedPreparationForm({
 
   function selectStage(nextStage: PreparationStage): void {
     setEditingStage(null);
+    setDirection(preparationStageIndex(nextStage) >= currentStageIndex ? 1 : -1);
     selectPreparationStage(nextStage);
   }
 
@@ -103,11 +107,13 @@ export default function SubmittedPreparationForm({
     }
 
     setEditingStage(null);
+    setDirection(1);
     advancePreparationStage();
   }
 
   function previousStage(): void {
     setEditingStage(null);
+    setDirection(-1);
     selectPreparationStage(PREPARATION_STAGES[currentStageIndex - 1].id);
   }
 
@@ -135,98 +141,86 @@ export default function SubmittedPreparationForm({
         selectStage={selectStage}
       />
 
-      <motion.section
-        className="preflight-stage-panel"
-        aria-labelledby="preflight-stage-title"
-        layout
-        transition={{ layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
-      >
-          <motion.div
-            key={stage}
-            className="preflight-stage-body"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            onAnimationComplete={() => stageHeading.current?.focus({ preventScroll: true })}
-          >
-            {stage === "source" && (
-              <SubmittedSourceStage
-                headingRef={stageHeading}
-                resolution={resolution}
-              />
-            )}
+      <LayoutGroup>
+        <PreparationStagePanel stage={stage} direction={direction}>
+          {stage === "source" && (
+            <SubmittedSourceStage
+              headingRef={stageHeading}
+              resolution={resolution}
+            />
+          )}
 
-            {stage === "range" && (
-              <SubmittedRangeStage
-                headingRef={stageHeading}
-                durationSeconds={durationSeconds}
-                session={session}
-                preparationStatus={preparation.status}
-                blockingMessage={blockingMessage}
-                onEdit={(anchor) => openStageEditor("range", anchor)}
-              />
-            )}
+          {stage === "range" && (
+            <SubmittedRangeStage
+              headingRef={stageHeading}
+              durationSeconds={durationSeconds}
+              session={session}
+              preparationStatus={preparation.status}
+              blockingMessage={blockingMessage}
+              onEdit={(anchor) => openStageEditor("range", anchor)}
+            />
+          )}
 
-            {stage === "language" && (
-              <SubmittedLanguageStage
-                headingRef={stageHeading}
-                previewSession={previewSession}
-                session={session}
-                blockingMessage={blockingMessage}
-                onEdit={(anchor) => openStageEditor("language", anchor)}
-              />
-            )}
+          {stage === "language" && (
+            <SubmittedLanguageStage
+              headingRef={stageHeading}
+              previewSession={previewSession}
+              session={session}
+              blockingMessage={blockingMessage}
+              onEdit={(anchor) => openStageEditor("language", anchor)}
+            />
+          )}
 
-            {stage === "output" && (
-              <SubmittedOutputStage
-                headingRef={stageHeading}
-                session={session}
-                onEdit={(anchor) => openStageEditor("output", anchor)}
-              />
-            )}
+          {stage === "output" && (
+            <SubmittedOutputStage
+              headingRef={stageHeading}
+              session={session}
+              onEdit={(anchor) => openStageEditor("output", anchor)}
+            />
+          )}
 
-            {stage === "forecast" && preparation.status === "ready" && (
-              <SubmittedForecast
-                headingRef={stageHeading}
-                resolution={resolution}
-                request={preparation.request}
-                selectStage={selectStage}
-              />
-            )}
+          {stage === "forecast" && preparation.status === "ready" && (
+            <SubmittedForecast
+              headingRef={stageHeading}
+              resolution={resolution}
+              request={preparation.request}
+              selectStage={selectStage}
+            />
+          )}
 
-            {stage === "confirm" && preparation.status === "ready" && (
-              <SubmittedConfirmation
-                headingRef={stageHeading}
-                resolution={resolution}
-                request={preparation.request}
-                selectStage={selectStage}
-              />
-            )}
-          </motion.div>
-      </motion.section>
+          {stage === "confirm" && preparation.status === "ready" && (
+            <SubmittedConfirmation
+              headingRef={stageHeading}
+              resolution={resolution}
+              request={preparation.request}
+              selectStage={selectStage}
+            />
+          )}
+        </PreparationStagePanel>
 
-      <PreparationControlShelf
-        visible={initialization === null}
-        stage={stage}
-        back={stage !== "source"
-          ? { label: `Back to ${PREPARATION_STAGES[currentStageIndex - 1].label}`, onClick: previousStage }
-          : undefined}
-        parameter={stage !== "source"
-          ? {
-              label: stageParameterLabel(stage, previewSession, session, durationSeconds),
-              actionLabel: stageParameterActionLabel(stage, previewSession, session, durationSeconds),
-              open: editingStage === stage,
-              popoverId: `preflight-${stage}-popover`,
-              triggerRef: parameterTrigger,
-              onToggle: toggleStageEditor,
-            }
-          : undefined}
-        next={{
-          label: stage === "confirm" ? "Preview" : "Continue",
-          actionLabel: stage === "confirm" ? "Preview run-006 recorded processing" : continueActionLabel(stage),
-          disabled: advanceDisabled,
-        }}
-      />
+        <PreparationControlShelf
+          visible={initialization === null}
+          stage={stage}
+          back={stage !== "source"
+            ? { label: `Back to ${PREPARATION_STAGES[currentStageIndex - 1].label}`, onClick: previousStage }
+            : undefined}
+          parameter={stage !== "source"
+            ? {
+                label: stageParameterLabel(stage, previewSession, session, durationSeconds),
+                actionLabel: stageParameterActionLabel(stage, previewSession, session, durationSeconds),
+                open: editingStage === stage,
+                popoverId: `preflight-${stage}-popover`,
+                triggerRef: parameterTrigger,
+                onToggle: toggleStageEditor,
+              }
+            : undefined}
+          next={{
+            label: stage === "confirm" ? "Preview" : "Continue",
+            actionLabel: stage === "confirm" ? "Preview run-006 recorded processing" : continueActionLabel(stage),
+            disabled: advanceDisabled,
+          }}
+        />
+      </LayoutGroup>
 
       {stage !== "source" && initialization === null && (
         <PreparationStagePopover

@@ -13,8 +13,16 @@
 }
 
 .preflight-stage-nav ol {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  /*
+   * Content-sized chips spread edge to edge, not six forced-equal columns. In a fixed-width
+   * form, equal columns pin the border a fixed distance from a centered label, so extra padding
+   * can only shrink the text box — it never buys the long labels ("Language", "Forecast") any
+   * breathing room. Sizing each chip to its own content lets the padding below become the real,
+   * uniform gap between border and text. `gap` is the floor `space-between` never undercuts, so
+   * chips keep clearance even when the row overflows and scrolls on narrow layouts.
+   */
+  display: flex;
+  justify-content: space-between;
   gap: 6px;
   min-width: 0;
   margin: 0;
@@ -24,12 +32,12 @@
 
 .preflight-stage-nav button {
   display: flex;
-  width: 100%;
+  flex: 0 0 auto;
   min-height: 40px;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 8px;
+  padding: 8px 14px;
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   corner-shape: squircle;

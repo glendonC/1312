@@ -45,6 +45,7 @@ export default function AgentPanel() {
   const history = useAgentHistory(selected);
   const orchestrator = useStudio((state) => state.state.orchestrator);
   const emitted = useStudio((state) => state.state.emitted);
+  const previewSession = useStudio((state) => state.previewSession);
   const cancelled = useStudio((state) => state.outcome?.kind === "cancelled");
   const paused = useStudio((state) => state.paused);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -238,6 +239,13 @@ export default function AgentPanel() {
                   ))}
                 </dl>
               )}
+
+              {previewSession && (
+                <p className="agent-focus-preview-note" role="note">
+                  <span className="agent-focus-preview-dot" aria-hidden="true" />
+                  <span>Recorded preview — your submitted source was not processed.</span>
+                </p>
+              )}
             </div>
           </motion.section>
 
@@ -293,10 +301,11 @@ export default function AgentPanel() {
                   </button>
                 </div>
                 <span className="agent-focus-cycle-label">
-                  Cycle agents
-                  <span aria-hidden="true">·</span>
-                  <span className="agent-focus-command-position" aria-live="polite">
-                    {selectedIndex + 1}/{inspectableIds.length}
+                  <span className="agent-focus-cycle-eyebrow">Cycle agents</span>
+                  <span className="agent-focus-cycle-position" aria-live="polite">
+                    <span className="agent-focus-visually-hidden">Agent </span>
+                    <span className="agent-focus-cycle-current">{selectedIndex + 1}</span>
+                    <span className="agent-focus-cycle-of">of {inspectableIds.length}</span>
                   </span>
                 </span>
               </div>
@@ -308,8 +317,9 @@ export default function AgentPanel() {
                 onClick={() => select(null)}
                 aria-label="Close agent focus"
               >
+                <span className="agent-focus-escape-x" aria-hidden="true">✕</span>
+                <span className="agent-focus-escape-label">Close</span>
                 <kbd aria-hidden="true">Esc</kbd>
-                <span>Close</span>
               </button>
             </nav>
           </motion.div>

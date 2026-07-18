@@ -196,6 +196,37 @@
   line-height: 1.4;
 }
 
+/*
+ * A previewed worker restates the boundary the canvas already set: opening its focus is another
+ * moment where "recorded demo" could read as "my source, analysed". Same gold advisory register as
+ * the canvas badge, kept compact under the identity.
+ */
+.agent-focus-preview-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: min(300px, 100%);
+  margin: 16px 0 0;
+  padding: 8px 11px;
+  border: 1px solid var(--gold-line);
+  border-radius: 10px;
+  corner-shape: squircle;
+  background: color-mix(in srgb, var(--gold) 10%, rgba(255, 255, 255, 0.6));
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.agent-focus-preview-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 22%, transparent);
+}
+
 .agent-focus-shell {
   display: grid;
   width: 100%;
@@ -205,11 +236,17 @@
   grid-template-rows: minmax(0, 1fr) 50px;
 }
 
+/*
+ * Source title, a rule, the evidence body, a rule. The body row is content-sized (not stretched to
+ * fill) and the whole block self-centres in the shell, so a short evidence pair floats balanced in
+ * the panel instead of pinned to the top over a well of dead space.
+ */
 .agent-focus-environment {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: auto 12px minmax(0, 1fr) 12px;
+  grid-template-rows: auto 12px auto 12px;
+  align-self: center;
 }
 
 .agent-focus-source-head {
@@ -265,7 +302,10 @@
   margin: 0 auto;
   grid-template-columns: minmax(420px, 1.75fr) minmax(300px, 1fr);
   gap: clamp(42px, 4.5vw, 74px);
-  align-items: center;
+  /* Stretch the columns to a shared height so the media and the feed are the same size with their
+     tops level — the feed contributes no intrinsic height (its content is absolutely placed), so the
+     media sets that height and the feed matches it exactly. */
+  align-items: stretch;
 }
 
 .agent-focus-commands button:focus-visible {

@@ -61,6 +61,10 @@ function Swarm() {
   const layout = useLayout();
   const focused = useStudio((s) => s.selected !== null);
   const select = useStudio((s) => s.select);
+  // A submitted URL opens this same recorded swarm as a preview. The header carries a quiet
+  // provenance note, but a worker that pops in over the user's own source chip is the moment the
+  // boundary is easiest to miss — so the canvas states it plainly, right where the agents appear.
+  const previewSession = useStudio((s) => s.previewSession);
   const graph = useRef<HTMLDivElement>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [overview, setOverview] = useState({ needed: false, offscreen: 0 });
@@ -272,7 +276,7 @@ function Swarm() {
   const types = useMemo(() => ({ worker: WorkerNode, hub: HubNode }), []);
 
   return (
-    <div className="graph" ref={graph}>
+    <div className="graph" ref={graph} data-preview={previewSession ? "recorded" : undefined}>
       <ReactFlow<SwarmNode>
         nodes={nodes}
         edges={edges}
@@ -295,6 +299,21 @@ function Swarm() {
       >
         {/* the canvas is a canvas: it pans, and the grid is what tells you so */}
         <Background variant={BackgroundVariant.Dots} gap={26} size={1} className="grid" />
+
+        {previewSession && (
+          <Panel position="top-center" className="graph-preview-mark">
+            <div className="graph-preview-badge" role="note">
+              <span className="graph-preview-dot" aria-hidden="true" />
+              <span className="graph-preview-copy">
+                <strong>Recorded preview</strong>
+                <span>
+                  These agents replay a bundled demonstration — your submitted source was not
+                  processed.
+                </span>
+              </span>
+            </div>
+          </Panel>
+        )}
 
         {overviewOpen && overview.needed && (
           <MiniMap<SwarmNode>

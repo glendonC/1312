@@ -9,6 +9,26 @@ import {
   type RefObject,
 } from "react";
 
+/**
+ * One motion language for the whole preparation surface. The panel resizes, its content changes,
+ * and the shelf welded to its underside all share this ease and layout timing so a stage change
+ * reads as a single coordinated breath — not three elements animating past each other. See
+ * `PreparationStagePanel` (content + panel resize) and `PreparationControlShelf` (`layout`), wrapped
+ * together in a `LayoutGroup` by each form so the shelf tracks the panel's new height in lockstep.
+ */
+const PREP_EASE = [0.22, 1, 0.36, 1] as const;
+export const PREP_LAYOUT_TRANSITION = { layout: { duration: 0.36, ease: PREP_EASE } };
+
+/**
+ * The stage body enters from the direction of travel and the outgoing one leaves the opposite way:
+ * forward (Continue) rises up and in, back (Back) drops down and in. `dir` is +1 forward, -1 back.
+ */
+const STAGE_BODY_VARIANTS = {
+  enter: (dir: number) => ({ opacity: 0, y: dir >= 0 ? 14 : -14 }),
+  center: { opacity: 1, y: 0 },
+  exit: (dir: number) => ({ opacity: 0, y: dir >= 0 ? -12 : 12 }),
+};
+
 import { Check, CornerDownLeft, CornerDownRight, Edit } from "../glyphs";
 import {
   PREPARATION_STAGES,
@@ -42,6 +62,61 @@ export function StageConversation({
     <div className="preflight-stage-conversation">
       <h2 ref={headingRef} id="preflight-stage-title" tabIndex={-1}>{children}</h2>
     </div>
+  );
+}
+
+/**
+ * The resizing panel that holds one stage's body. The old sentence animates out in the direction of
+ * travel, then the new one animates in — one body is ever mounted, so sentences never overlap or
+ * pile up (a `wait` handoff). As the incoming body settles it drives a new height, which the panel
+ * `layout`-animates instead of snapping; each form wraps this and the shelf in a `LayoutGroup` so the
+ * shelf tracks that height in lockstep and stays welded to the panel's underside.
+ *
+ * Focus lands on the freshly-arrived heading once it settles, read from the *entering* body via a
+ * null-ignoring callback ref that always points at the live one.
+ */
+export function PreparationStagePanel({
+  stage,
+  direction,
+  children,
+}: {
+  stage: string;
+  direction: number;
+  children: ReactNode;
+}) {
+  const activeBody = useRef<HTMLDivElement | null>(null);
+
+  return (
+    <motion.section
+      className="preflight-stage-panel"
+      aria-labelledby="preflight-stage-title"
+      layout
+      transition={PREP_LAYOUT_TRANSITION}
+    >
+      <AnimatePresence mode="wait" initial={false} custom={direction}>
+        <motion.div
+          key={stage}
+          ref={(node) => {
+            if (node) activeBody.current = node;
+          }}
+          className="preflight-stage-body"
+          custom={direction}
+          variants={STAGE_BODY_VARIANTS}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.28, ease: PREP_EASE }}
+          onAnimationComplete={(definition) => {
+            if (definition !== "center") return;
+            activeBody.current
+              ?.querySelector<HTMLElement>("#preflight-stage-title")
+              ?.focus({ preventScroll: true });
+          }}
+        >
+          {children}
+        </motion.div>
+      </AnimatePresence>
+    </motion.section>
   );
 }
 
@@ -110,10 +185,11 @@ export function PreparationControlShelf({
           data-stage={stage}
           role="group"
           aria-label="Preparation controls"
+          layout
           initial={{ opacity: 0, y: -5, scale: 0.985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.985 }}
-          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.2, ease: PREP_EASE, ...PREP_LAYOUT_TRANSITION }}
         >
           {back && (
             <button

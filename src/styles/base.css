@@ -1,3 +1,8 @@
+/*
+ * Document reset and base typography for public pages.
+ * Keep route and feature layout rules out of this file.
+ */
+
 *,
 *::before,
 *::after {

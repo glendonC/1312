@@ -770,7 +770,7 @@ export class BoundedRuntimeScheduler {
     return transaction.result;
   }
 
-  /** Atomic admission for one exact U6.1-triggered separation grant. Not reachable through ordinary spawn. */
+  /** Atomic admission for one exact host-derived separation grant (U6.1 speaker_overlap or U7.1 mixed acoustic). Not reachable through ordinary spawn. */
   async requestConditionalSeparation(inputValue: {
     trigger: ConditionalSeparationTrigger;
     child: SpawnRequestInput;

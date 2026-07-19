@@ -11,7 +11,7 @@ if (!endpoint || !token) throw new Error("The bounded conditional separation bri
 const manifest = await fetchChildSeparationManifest(endpoint, token);
 const server = new McpServer(
   { name: "studio-conditional-source-separation", version: "1" },
-  { instructions: "Call media_audio_separate exactly once with {}. The host injects the audited U6.1 trigger and exact raw range. Report only agreement, disagreement, or abstention. Never prefer stem text or claim quality, truth, caption, identity, or publication authority." },
+  { instructions: "Call media_audio_separate exactly once with {}. The host injects the audited separation trigger (exact U6.1 speaker_overlap or U7.1 mixed acoustic cell) and exact raw range. Report only agreement, disagreement, or abstention. Never prefer stem text or claim quality, truth, caption, identity, or publication authority." },
 );
 
 server.registerTool(

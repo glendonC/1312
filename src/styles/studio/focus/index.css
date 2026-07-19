@@ -1,3 +1,7 @@
+/*
+ * Studio agent-focus surface index: shell, commands, evidence, and activity panes.
+ */
+
 @import "./shell.css";
 @import "./commands.css";
 @import "./evidence.css";

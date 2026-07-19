@@ -1,3 +1,9 @@
+/*
+ * Global design tokens for the public site and shared chrome.
+ * Owns color, type, spacing, and motion variables. Feature and Studio styles consume these;
+ * they do not redefine the public brand palette here.
+ */
+
 :root {
   color-scheme: light;
 

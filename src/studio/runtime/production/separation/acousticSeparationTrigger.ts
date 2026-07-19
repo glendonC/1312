@@ -3,13 +3,14 @@ import { CONDITIONAL_SEPARATION_LIMITS } from "../model.ts";
 import type { RuntimeArtifact, U1AcousticSeparationTrigger } from "../model.ts";
 
 /**
- * Closed U7.1 eligibility predicate. A representable acoustic cell is `mixed` only when the
- * classifier proved strong certainty and both speech and music families cleared the support
- * threshold (see acoustic/validation.ts: weak forces `unknown`, and `mixed` requires
- * `supported_speech_and_music`). It is therefore the one acoustic state that is a host-derived fact
- * of two co-present source families, not a guess. We additionally require a complete partition and
- * the shared U7 range cap. This proves co-presence only; it never asserts the streams are separable
- * or that separation improves meaning.
+ * Closed U7.1 (acoustic mixed-cell separation trigger) eligibility predicate.
+ * A representable acoustic cell is `mixed` only when the classifier proved strong certainty and
+ * both speech and music families cleared the support threshold (see acoustic/validation.ts: weak
+ * forces `unknown`, and `mixed` requires `supported_speech_and_music`). It is therefore the one
+ * acoustic state that is a host-derived fact of two co-present source families, not a guess. We
+ * additionally require a complete partition and the shared U7 (conditional separation) range cap.
+ * This proves co-presence only; it never asserts the streams are separable or that separation
+ * improves meaning.
  */
 export function isEligibleU1AcousticMixedCell(
   observations: AcousticObservations,

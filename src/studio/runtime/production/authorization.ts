@@ -345,7 +345,7 @@ export function authorizeConditionalSeparation(state: RuntimeProjection, request
       speaker.outputArtifactId !== observations?.id || observations?.origin.kind !== "speaker_overlap_observations" || observations.content.contentId !== trigger.observationsContentId ||
       speaker.receiptArtifactId !== receipt?.id || receipt?.origin.kind !== "speaker_overlap_receipt" || speaker.receiptId !== trigger.receiptId ||
       speaker.receiptContentId !== trigger.receiptContentId || receipt.content.contentId !== trigger.receiptContentId
-    ) throw new Error("Conditional separation lost its exact audited U6.1 trigger lineage");
+    ) throw new Error("Conditional separation lost its exact audited U6.1 (speaker_overlap) trigger lineage");
   } else if (!u1AcousticTriggerLineageMatches(state.artifacts, trigger, artifact.id, track.id)) {
     throw new Error("Conditional separation lost its exact audited U1 acoustic trigger lineage");
   }

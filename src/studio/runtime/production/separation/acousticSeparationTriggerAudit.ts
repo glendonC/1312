@@ -30,9 +30,10 @@ function triggerBody(
 }
 
 /**
- * Host-derived, cold-audited list of exact U7.1 mixed acoustic cells eligible for U7. Mirrors the
- * U6.1 loop in ConditionalSeparationRequestHost: enumerate the preflight acoustic artifacts, reopen
- * and re-verify their bytes/receipt lineage, and surface one option per `mixed` cell. A broken or
+ * Host-derived, cold-audited list of exact U7.1 (acoustic mixed-cell) triggers eligible for U7
+ * (conditional separation). Mirrors the U6.1 (speaker_overlap) loop in
+ * ConditionalSeparationRequestHost: enumerate the preflight acoustic artifacts, reopen and
+ * re-verify their bytes/receipt lineage, and surface one option per `mixed` cell. A broken or
  * tampered artifact reopens to an error and is skipped (fail closed by offering no trigger).
  */
 export async function deriveU1AcousticSeparationTriggerBodies(

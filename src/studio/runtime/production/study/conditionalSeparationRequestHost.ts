@@ -16,7 +16,7 @@ function inputId(value: Omit<ConditionalSeparationRequestInput, "inputId">): str
   return `separation-request-input:${canonicalSha256(value)}`;
 }
 
-/** Host-derived, cold-audited list of exact U6.1 overlap cells eligible for U7. */
+/** Host-derived, cold-audited U6.1 (speaker_overlap) cells eligible for U7 conditional separation. */
 export class ConditionalSeparationRequestHost {
   private readonly ledger: RuntimeLedger;
   private readonly artifacts: ContentAddressedArtifactStore;

@@ -1,3 +1,8 @@
+/*
+ * Fixed public-site navigation chrome.
+ * Owns header layout and nav interaction; page heroes own their own composition.
+ */
+
 .site-header {
   position: fixed;
   top: clamp(16px, 2.4vw, 30px);

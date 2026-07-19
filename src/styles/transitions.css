@@ -1,3 +1,8 @@
+/*
+ * Shared public-site motion primitives.
+ * Prefer intentional entrance hierarchy over decorative noise.
+ */
+
 @keyframes fade-up {
   from {
     opacity: 0;

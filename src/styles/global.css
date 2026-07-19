@@ -1,3 +1,8 @@
+/*
+ * Public-site style entry. Imports only shared chrome layers.
+ * Studio product styles load from studio.css on /studio/ only.
+ */
+
 @import "./base.css";
 @import "./transitions.css";
 @import "./header.css";

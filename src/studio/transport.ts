@@ -4,7 +4,7 @@
  * Everything above this file consumes an ordered stream of typed agent events and
  * a static bundle of run artifacts. It does not know or care where they came from.
  *
- *   ReplayTransport  reads a recorded run from /demo/runs/<id>/  (what ships today)
+ *   ReplayTransport  reads a recorded run from /demo/runs/<id>/ (default Studio demo path)
  *   LiveTransport    reads the same events off a socket from a real orchestrator
  *
  * Swapping one for the other is a one-line change in the store. No component, no

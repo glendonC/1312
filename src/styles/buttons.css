@@ -1,3 +1,8 @@
+/*
+ * Shared public-site button primitives.
+ * Variant classes here must match implemented markup only.
+ */
+
 .button {
   position: relative;
   z-index: 0;

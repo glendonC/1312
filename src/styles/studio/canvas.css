@@ -1,8 +1,9 @@
-/* The canvas: the swarm's stage, agent identities, and the wires between them. */
+/*
+ * Studio canvas: swarm stage, agent identities, and connection wires.
+ * Edge-to-edge during the run; Results below keep page margins.
+ */
 
-/* ---------- ACT 2: the run (swarm stays on screen, result appears under it) ---------- */
-
-/* the canvas runs edge to edge; the result below it keeps a page's margins */
+/* Run composition: swarm remains on screen while Results mount beneath */
 .act-run {
   align-items: center;
   padding: 0;

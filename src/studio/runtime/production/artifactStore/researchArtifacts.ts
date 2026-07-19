@@ -10,9 +10,9 @@ import type {
 import { assertRuntimeArtifact } from "../validation/artifacts.ts";
 
 /**
- * Content-addressed research artifact identities. The derivation matches
- * ContentAddressedArtifactStore.prepareDerived ({runId, operationId, kind, contentId}), so the
- * ids stay stable when the deferred projection origin wiring lands after the U7.1 lane.
+ * Content-addressed research artifact identities. Derivation matches
+ * ContentAddressedArtifactStore.prepareDerived ({runId, operationId, kind, contentId}) so ids stay
+ * stable across projection origin wiring without mutating closed content hashes.
  */
 function researchArtifactId(runId: string, operationId: string, kind: string, contentId: string): string {
   return `artifact:${canonicalSha256({ runId, operationId, kind, contentId })}`;

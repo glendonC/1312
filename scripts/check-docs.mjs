@@ -1,3 +1,10 @@
+/**
+ * Public documentation policy check.
+ * Owns required owner files, root-only AGENTS.md size, local link closure, no public links into
+ * docs/local/, trailing whitespace rules, and the em-dash ban on selected policy surfaces.
+ * Run via `npm run docs:check`.
+ */
+
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
@@ -337,6 +344,29 @@ if (existsSync(registryPath)) {
     if (!registryTargets.has(path)) {
       addError(`docs/README.md does not register ${displayPath(path)}`);
     }
+  }
+}
+
+const OWNER_CONTROL_BLOCK_DOCS = [
+  "docs/README.md",
+  "docs/PRODUCT.md",
+  "docs/build-week/STATUS.md",
+  "docs/build-week/CAPABILITY_LADDER.md",
+  "docs/ARCHITECTURE.md",
+  "docs/RUNTIME_CONTRACTS.md",
+  "docs/STUDIO_PRODUCT_CONTRACT.md",
+  "docs/STUDIO_AUTONOMY.md",
+  "docs/CODEX.md",
+  "docs/rfcs/0001-miss-to-gold-conveyor.md",
+  "bench/README.md",
+  "bench/ADJUDICATION.md",
+];
+for (const file of OWNER_CONTROL_BLOCK_DOCS) {
+  const path = resolve(ROOT, file);
+  if (!existsSync(path)) continue;
+  const head = readFileSync(path, "utf8").split("\n").slice(0, 24).join("\n");
+  if (!/^- Lifecycle:\s+\S+/m.test(head)) {
+    addError(`${file} is missing a Lifecycle control-block line near the top`);
   }
 }
 

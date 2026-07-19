@@ -1,3 +1,8 @@
+/*
+ * Studio dock index: source entry, run controls, and dock layout parts.
+ * Each imported file owns its selectors and responsive rules.
+ */
+
 @import "./dock.shell.css";
 @import "./dock.run-controls.css";
 @import "./dock.layout.css";

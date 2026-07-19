@@ -70,13 +70,14 @@ export interface U6SpeakerOverlapSeparationTrigger {
 }
 
 /**
- * U7.1 second eligible cause. A cold-audited acoustic cell classified `mixed` proves two
- * co-present source families (strong speech and music above support) in one exact range. Lineage
- * anchors on the preflight acoustic-observations artifact and its content-addressed producer
- * receipt (there is no acoustic ledger operation and no separate receipt artifact, unlike U6).
- * `observationId` is the content-addressed acoustic observation identity; `observationIndex` locates
- * the exact partition cell on reopen; `trackId` lets the synchronous scheduler resolve the audio
- * track without reparsing the receipt.
+ * U7.1 (acoustic mixed-cell) second eligible cause for U7 conditional separation.
+ * A cold-audited acoustic cell classified `mixed` proves two co-present source families (strong
+ * speech and music above support) in one exact range. Lineage anchors on the preflight
+ * acoustic-observations artifact and its content-addressed producer receipt (there is no acoustic
+ * ledger operation and no separate receipt artifact, unlike U6 speaker/overlap). `observationId` is
+ * the content-addressed acoustic observation identity; `observationIndex` locates the exact
+ * partition cell on reopen; `trackId` lets the synchronous scheduler resolve the audio track
+ * without reparsing the receipt.
  */
 export interface U1AcousticSeparationTrigger {
   kind: "u1_acoustic_mixed";

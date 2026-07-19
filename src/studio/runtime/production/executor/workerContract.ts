@@ -1081,7 +1081,7 @@ export function workerPrompt(task: TaskRecord, options: WorkerPromptOptions = {}
           "Do not label worker-authored output as studio.speaker-overlap-observations.v1 or studio.speaker-overlap-producer.receipt.v1; those kinds belong only to the host.",
         ] : []),
         ...(mediaTools.includes("media_audio_separate") ? [
-          "Invoke media_audio_separate exactly once with the closed empty object. The host injects the audited U6.1 trigger, raw source, exact range, model, configuration, task, agent, and grant; paths and selectors are not accepted.",
+          "Invoke media_audio_separate exactly once with the closed empty object. The host injects the audited separation trigger (exact U6.1 speaker_overlap or U7.1 mixed acoustic cell), raw source, exact range, model, configuration, task, agent, and grant; paths and selectors are not accepted.",
           "The returned anonymous stems and raw/stem comparison are private host artifacts. Agreement, disagreement, or abstention establishes only that the same recognizer contract was compared over related inputs. It is not independent corroboration and grants no semantic preference, claim support, caption text, quality score, identity, truth, or publication authority.",
           "Your studio.study-report.v2 must retain the assigned range as unknown or withheld with no claims and no evidence citations. Do not echo stem hypotheses as dialogue and do not label worker output as any studio separated-stem or raw-stem-comparison artifact kind.",
         ] : []),

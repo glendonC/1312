@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * Cold-audit one completed U7 operation and materialize both fixed anonymous-stem captures.
- * The tool produces structural, unscored captures only. Existing bench guards require later human
- * labels and score receipts for both files before the repository can return green.
+ * Cold-audit one completed U7 (conditional separation) operation and materialize both fixed
+ * anonymous-stem captures. Produces structural, unscored captures only. Bench guards require later
+ * human labels and score receipts for both files before the repository can return green.
  */
 
 import { dirname, join, resolve } from "node:path";

@@ -1,3 +1,8 @@
+/*
+ * Landing hero composition shell and media plane.
+ * First-viewport brand layout lives here; downstream sections stay in feature styles.
+ */
+
 .hero-shell {
   position: relative;
   min-height: 100svh;

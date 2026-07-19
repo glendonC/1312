@@ -1,3 +1,8 @@
+/*
+ * Studio worker workspace index: environment, media, cell, and responsive density.
+ * Compact cell and expanded focus must show the same field set at different density.
+ */
+
 @import "./workspace.environment.css";
 @import "./workspace.media.css";
 @import "./workspace.responsive.css";

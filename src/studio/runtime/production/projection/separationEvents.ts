@@ -38,7 +38,7 @@ export function applyConditionalSeparationEvent(next: RuntimeProjection, event: 
         speaker.outputArtifactId === trigger.observationsArtifactId && speaker.receiptArtifactId === trigger.receiptArtifactId &&
         speaker.receiptId === trigger.receiptId && speaker.receiptContentId === trigger.receiptContentId,
         event,
-        `Conditional separation ${request.operationId} lost its U6.1 trigger`,
+        `Conditional separation ${request.operationId} lost its U6.1 (speaker_overlap) trigger`,
       );
     } else {
       invariant(

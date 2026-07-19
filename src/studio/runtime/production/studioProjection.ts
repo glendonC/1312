@@ -46,6 +46,10 @@ import {
   projectStudyPlanningDecisions,
   projectStudyReadiness,
 } from "./studioProjection/studySynthesisMappers.ts";
+import {
+  projectAgentRecoveries,
+  projectExecutorFailureClassifications,
+} from "./studioProjection/recoveryMappers.ts";
 
 export * from "./studioProjection/model.ts";
 
@@ -61,6 +65,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
   const reportWaits = projectReportWaits(state);
   const orchestratorDecisions = projectOrchestratorDecisions(state);
   const operations = projectOperations(state);
+  const executorFailureClassifications = projectExecutorFailureClassifications(state);
+  const agentRecoveries = projectAgentRecoveries(state);
   const semanticEvidence = projectSemanticEvidence(state);
   const evidenceReads = projectEvidenceReads(state);
   const evidenceAssessments = projectEvidenceAssessments(state);
@@ -102,6 +108,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
     orchestratorDecisions,
     rootOutputDispositions,
     operations,
+    executorFailureClassifications,
+    agentRecoveries,
     semanticEvidence,
     evidenceReads,
     evidenceAssessments,
@@ -138,6 +146,8 @@ export function adaptProductionRuntime(state: RuntimeProjection): ProductionStud
       orchestratorDecisions: orchestratorDecisions.length,
       rootOutputDispositions: rootOutputDispositions.length,
       operations: operations.length,
+      executorFailureClassifications: executorFailureClassifications.length,
+      agentRecoveries: agentRecoveries.length,
       semanticEvidence: semanticEvidence.length,
       evidenceReads: evidenceReads.length,
       evidenceAssessments: evidenceAssessments.length,

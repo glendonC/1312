@@ -42,12 +42,17 @@ import type {
   ProductionStudioOutputArtifactView,
   ProductionStudioSourceArtifactView,
 } from "./artifactViews.ts";
+import type {
+  ProductionStudioAgentRecoveryView,
+  ProductionStudioExecutorFailureClassificationView,
+} from "./recoveryViews.ts";
 
 export * from "./executionViews.ts";
 export * from "./evidenceViews.ts";
 export * from "./reviewViews.ts";
 export * from "./studyViews.ts";
 export * from "./artifactViews.ts";
+export * from "./recoveryViews.ts";
 
 export interface ProductionStudioProjection {
   schema: "studio.production-projection.v1";
@@ -69,6 +74,8 @@ export interface ProductionStudioProjection {
   orchestratorDecisions: ProductionStudioOrchestratorDecisionView[];
   rootOutputDispositions: ProductionStudioRootOutputDispositionView[];
   operations: ProductionStudioOperationView[];
+  executorFailureClassifications: ProductionStudioExecutorFailureClassificationView[];
+  agentRecoveries: ProductionStudioAgentRecoveryView[];
   /** Present on real production projections; optional only for older typed UI fixtures. */
   semanticEvidence?: ProductionStudioSemanticEvidenceView[];
   evidenceReads: ProductionStudioEvidenceReadView[];
@@ -106,6 +113,8 @@ export interface ProductionStudioProjection {
     orchestratorDecisions: number;
     rootOutputDispositions: number;
     operations: number;
+    executorFailureClassifications: number;
+    agentRecoveries: number;
     semanticEvidence?: number;
     evidenceReads: number;
     evidenceAssessments: number;

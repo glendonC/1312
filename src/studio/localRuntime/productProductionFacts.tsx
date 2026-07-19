@@ -11,6 +11,7 @@ import type {
 } from "../runtime/production/runtimeHost/model";
 import type { ProductionStudioProjection } from "../runtime/production/studioProjection";
 import { ProductionCaptionFacts } from "./productProductionFacts/captionFacts";
+import { ProductionAgentRecoveryFacts } from "./productProductionFacts/agentRecoveryFacts";
 import { buildProductionFactsContext } from "./productProductionFacts/context";
 import { ProductionDecisionFacts } from "./productProductionFacts/decisionFacts";
 import { ProductionEvidenceFacts } from "./productProductionFacts/evidenceFacts";
@@ -76,6 +77,7 @@ export function ProductionJournalFacts({
       </header>
 
       <ProductionSourceWorkFacts context={context} />
+      <ProductionAgentRecoveryFacts context={context} />
       <ProductionSemanticEvidenceFacts context={context} />
       <ProductionEvidenceFacts context={context} />
       <ProductionDecisionFacts context={context} />

@@ -15,6 +15,10 @@ function identity(value: string | null): ReactNode {
   return value ? <code>{value}</code> : <span className="processing-receipt-missing">Not recorded</span>;
 }
 
+function allocation(value: { wallMs: number; toolCalls: number }): string {
+  return `${value.wallMs.toLocaleString("en-US")} ms / ${value.toolCalls} calls`;
+}
+
 function mediaScope(
   scopes: readonly { artifactId: string; trackId: string; startMs: number; endMs: number }[],
 ): ReactNode {
@@ -206,9 +210,66 @@ export default function ProductionCoordinationLedger({
           ))}
         </section>
 
-        <section className="processing-receipt-panel" aria-labelledby="processing-media-ledger-title">
+        <section className="processing-receipt-panel processing-receipt-panel-wide" aria-labelledby="processing-recovery-ledger-title">
           <header>
             <span className="processing-receipt-index">03</span>
+            <div><h4 id="processing-recovery-ledger-title">Initial-coverage recovery</h4><p>Classified execution faults and exact replacement authority.</p></div>
+          </header>
+          {production.executorFailureClassifications.length === 0 && production.agentRecoveries.length === 0 ? (
+            <p className="processing-receipt-empty" data-production-live-empty="agent-recovery">
+              No failure-classification, recovery-authorization, or recovery-terminal receipt is
+              present. Failed tasks do not imply a replacement.
+            </p>
+          ) : (
+            <div className="processing-receipt-list">
+              {production.executorFailureClassifications.map((classification) => (
+                <article
+                  key={classification.receiptId}
+                  data-production-live-failure-classification-id={classification.receiptId}
+                  data-retryability={classification.retryability}
+                >
+                  <header><h5>Executor failure classified</h5><span>{sentence(classification.retryability)}</span></header>
+                  <dl>
+                    <div><dt>Receipt</dt><dd>{identity(classification.receiptId)} · {identity(classification.contentId)}</dd></div>
+                    <div><dt>Failure</dt><dd>{sentence(classification.code)} · {classification.safeReason}</dd></div>
+                    <div><dt>Task / worker</dt><dd>{identity(classification.taskId)} · {identity(classification.agentId)}</dd></div>
+                    <div><dt>Execution</dt><dd>{identity(classification.executionId)}</dd></div>
+                    <div><dt>Authority</dt><dd>{classification.retryability === "replaceable" ? "Eligible for scheduler policy review only" : "Terminal; no replacement authority"}</dd></div>
+                  </dl>
+                </article>
+              ))}
+              {production.agentRecoveries.map((recovery) => (
+                <article
+                  key={recovery.workId}
+                  data-production-live-recovery-id={recovery.workId}
+                  data-recovery-state={recovery.state}
+                >
+                  <header><h5>Authorized replacement lineage</h5><span>{sentence(recovery.state)}</span></header>
+                  <dl>
+                    <div><dt>Work</dt><dd>{identity(recovery.workId)}</dd></div>
+                    <div><dt>Authorization</dt><dd>{identity(recovery.authorization.receiptId)} · {identity(recovery.authorization.contentId)}</dd></div>
+                    <div data-recovery-attempt="0"><dt>Attempt 0 · failed</dt><dd>{identity(recovery.authorization.failedAttempt.taskId)} · {identity(recovery.authorization.failedAttempt.agentId)} · {sentence(recovery.authorization.failedAttempt.failureCode)}</dd></div>
+                    <div data-recovery-attempt="1"><dt>Attempt 1 · replacement</dt><dd>{identity(recovery.authorization.replacement.taskId)} · {identity(recovery.authorization.replacement.agentId)}</dd></div>
+                    <div><dt>Replacement allocation ceiling</dt><dd>{allocation(recovery.authorization.reservedSpend)} · not a forecast</dd></div>
+                    <div><dt>Run contingency ceiling</dt><dd>{allocation(recovery.authorization.policy.recoveryContingency)} · not a forecast</dd></div>
+                    <div><dt>Terminal receipt</dt><dd>{identity(recovery.terminal?.receiptId ?? null)}</dd></div>
+                    <div><dt>Outcome</dt><dd>{recovery.state === "authorized" ? "Unavailable until a terminal recovery receipt is validated" : sentence(recovery.state)}</dd></div>
+                    <div><dt>Attempts consumed / remaining</dt><dd>{recovery.terminal ? `${recovery.terminal.attemptsConsumed} / ${recovery.terminal.remainingAttempts}` : "Unavailable / unavailable"}</dd></div>
+                    <div><dt>Report</dt><dd>{recovery.terminal?.replacementReportId ? identity(recovery.terminal.replacementReportId) : recovery.state === "exhausted" ? "None; root withheld" : "Unavailable"}</dd></div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          )}
+          <p className="processing-receipt-boundary" data-production-live-recovery-boundary>
+            Allocation limits are ceilings, not forecasts. This lane performs no best-of-K selection
+            or quality retry, authorizes no attempt 2, and does not recover root, caption, or Learning work.
+          </p>
+        </section>
+
+        <section className="processing-receipt-panel" aria-labelledby="processing-media-ledger-title">
+          <header>
+            <span className="processing-receipt-index">04</span>
             <div><h4 id="processing-media-ledger-title">Media and perception receipts</h4><p>Only operations that reached the journal.</p></div>
           </header>
           {production.operations.length === 0 && semanticEvidence.length === 0 && production.evidenceReads.length === 0 ? (
@@ -291,7 +352,7 @@ export default function ProductionCoordinationLedger({
 
         <section className="processing-receipt-panel processing-receipt-panel-wide" aria-labelledby="processing-caption-ledger-title">
           <header>
-            <span className="processing-receipt-index">04</span>
+            <span className="processing-receipt-index">05</span>
             <div><h4 id="processing-caption-ledger-title">Caption candidate lineage and QC</h4><p>Candidate production and independent structural disposition.</p></div>
           </header>
           {production.captionProductions.length === 0 ? (

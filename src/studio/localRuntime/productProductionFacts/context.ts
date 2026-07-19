@@ -41,6 +41,7 @@ export function buildProductionFactsContext({
   ]);
   const taskIds = new Set(projection.tasks.map((task) => task.taskId));
   const workerIds = new Set(projection.workers.map((worker) => worker.agentId));
+  const reportIds = new Set(projection.reports.map((report) => report.reportId));
   const readReceiptIds = new Set(projection.evidenceReads.flatMap((read) =>
     read.receiptId && read.status === "completed" ? [read.receiptId] : []));
   const visibleAssessmentAudits = assessmentAudits.filter((audit) =>
@@ -121,6 +122,7 @@ export function buildProductionFactsContext({
     operationIds,
     taskIds,
     workerIds,
+    reportIds,
     readReceiptIds,
     visibleAssessmentAudits,
     visibleDecisionReceipts,

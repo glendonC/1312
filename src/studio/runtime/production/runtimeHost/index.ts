@@ -57,6 +57,7 @@ export {
   initializeRuntimeApplication,
   runBoundedRuntimeApplication,
   RuntimeApplicationInterrupted,
+  type RunBoundedRuntimeApplicationOptions,
 } from "./runtimeApplication.ts";
 export { RuntimeStartService } from "./service.ts";
 export {

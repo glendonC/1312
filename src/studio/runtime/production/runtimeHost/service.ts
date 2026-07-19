@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 
 import {
   canonicalSha256,
@@ -10,6 +11,11 @@ import {
   type CaptionProductionExecutor,
 } from "../captions/captionProductionExecutor.ts";
 import { RuntimeJournalConflict } from "../journal.ts";
+import {
+  loadMemoryReviewArtifacts,
+  recordMemoryConsumptionReceipt,
+} from "../memory/ledgerStore.ts";
+import type { MemoryConsumptionReceipt } from "../memory/model.ts";
 import { createProductionAnalysisRequest } from "../runStart/analysisRequest.ts";
 import {
   createRuntimePlan,
@@ -77,6 +83,8 @@ export interface RuntimeStartServiceOptions {
   languageExplanationExecutor?: LanguageExplanationExecutor;
   /** Explicit compatibility selector; omitted means the U3 generalized production spine. */
   studyContractVersion?: StudyContractVersion;
+  /** Host-owned memory/review store root. Defaults to cwd `memory/review`. */
+  reviewedMemoryStore?: string;
 }
 
 function deterministicRuntimeId(commandId: string): string {
@@ -107,6 +115,7 @@ export class RuntimeStartService {
   private readonly languageExplanation: RuntimeLanguageExplanationCoordinator;
   private readonly privatePlayback: RuntimePrivatePlaybackService;
   private readonly studyContractVersion: StudyContractVersion;
+  private readonly reviewedMemoryStore: string;
   private readonly initializing = new Map<string, Promise<RuntimeHostStartAcknowledgement>>();
 
   private constructor(options: RuntimeStartServiceOptions) {
@@ -115,6 +124,7 @@ export class RuntimeStartService {
     this.launcherFactory = options.launcherFactory;
     this.orchestratorLauncherFactory = options.orchestratorLauncherFactory ?? deterministicOrchestratorLauncherFactory();
     this.studyContractVersion = options.studyContractVersion ?? "v2";
+    this.reviewedMemoryStore = options.reviewedMemoryStore ?? join(process.cwd(), "memory/review");
     this.acceptedBy = options.acceptedBy ?? "operator:local-runtime-host";
     this.now = options.now ?? (() => new Date());
     this.runtimeIdForCommand = options.runtimeIdForCommand ?? deterministicRuntimeId;
@@ -189,6 +199,7 @@ export class RuntimeStartService {
     loadedSource: Awaited<ReturnType<RuntimeSourceRegistry["resolve"]>>;
     analysisRequest: ReturnType<typeof createProductionAnalysisRequest>;
     plan: ReturnType<typeof createRuntimePlan>;
+    materializationId: string | null;
   }> {
     let request;
     try {
@@ -201,6 +212,24 @@ export class RuntimeStartService {
         400,
         { cause: error },
       );
+    }
+    const materializationId = request.materializationId ?? null;
+    if (materializationId !== null) {
+      const artifacts = await loadMemoryReviewArtifacts(this.reviewedMemoryStore);
+      const present = artifacts.some(
+        (artifact) =>
+          artifact !== null &&
+          typeof artifact === "object" &&
+          !Array.isArray(artifact) &&
+          (artifact as { materialization_id?: unknown }).materialization_id === materializationId,
+      );
+      if (!present) {
+        throw new RuntimeHostError(
+          "invalid_start_request",
+          "The requested memory materialization is not present in the host memory review store.",
+          400,
+        );
+      }
     }
     const loadedSource = await this.sources.resolve(request.sourceSessionId, request.sourceRevisionId);
     let analysisRequest;
@@ -221,7 +250,7 @@ export class RuntimeStartService {
         { cause: error },
       );
     }
-    const command = createRuntimeStartCommand(loadedSource.session, analysisRequest);
+    const command = createRuntimeStartCommand(loadedSource.session, analysisRequest, { materializationId });
     const runtimeId = this.runtimeIdForCommand(command.commandId);
     const sourceArtifactId = createSourceArtifactId(runtimeId, loadedSource.descriptor);
     const plan = createRuntimePlan({
@@ -229,8 +258,9 @@ export class RuntimeStartService {
       sourceSession: loadedSource.session,
       sourceArtifactId,
       analysisRequest,
+      materializationId,
     });
-    return { loadedSource, analysisRequest, plan };
+    return { loadedSource, analysisRequest, plan, materializationId };
   }
 
   async plan(value: unknown): Promise<RuntimeHostPlanResponse> {
@@ -258,6 +288,7 @@ export class RuntimeStartService {
       prepared.plan,
       prepared.loadedSource,
       prepared.analysisRequest,
+      prepared.materializationId,
     );
     this.initializing.set(prepared.plan.commandId, acceptance);
     try {
@@ -271,6 +302,7 @@ export class RuntimeStartService {
     plan: ReturnType<typeof createRuntimePlan>,
     loadedSource: Awaited<ReturnType<RuntimeSourceRegistry["resolve"]>>,
     analysisRequest: ReturnType<typeof createProductionAnalysisRequest>,
+    materializationId: string | null,
   ): Promise<RuntimeHostStartAcknowledgement> {
     const acceptedAt = this.now().toISOString();
     const requestContentId = `sha256:${canonicalSha256({
@@ -278,6 +310,7 @@ export class RuntimeStartService {
       analysisRequest,
       workPlan: plan.workPlan,
       forecastContentId: plan.forecast.content.contentId,
+      materializationId,
     })}`;
     const proposed: RuntimeHostCommandRecord = {
       schema: "studio.local-runtime-command.v1",
@@ -323,6 +356,7 @@ export class RuntimeStartService {
         startedAt: record.acceptedAt,
         loadedSource,
         analysisRequest,
+        materializationId,
       });
       if (
         initialized.sourceArtifact.id !== plan.sourceArtifactId ||
@@ -361,16 +395,33 @@ export class RuntimeStartService {
       return this.acknowledgement(await this.lifecycle.statusFromRecord(record));
     }
 
-    void this.execute(record, initialized).catch(() => undefined);
+    void this.execute(record, initialized, materializationId).catch(() => undefined);
     return this.acknowledgement(await this.lifecycle.statusFromRecord(record));
   }
 
   private async execute(
     record: RuntimeHostCommandRecord,
     initialized: InitializedRuntimeApplication,
+    materializationId: string | null,
   ): Promise<void> {
     try {
-      await runBoundedRuntimeApplication(initialized, this.launcherFactory, this.orchestratorLauncherFactory, this.studyContractVersion);
+      const reviewedMemory = materializationId === null
+        ? undefined
+        : {
+          artifacts: await loadMemoryReviewArtifacts(this.reviewedMemoryStore),
+          materializationId,
+          consumedAt: this.now().toISOString(),
+          record: async (receipt: MemoryConsumptionReceipt) => {
+            await recordMemoryConsumptionReceipt(this.reviewedMemoryStore, receipt);
+          },
+        };
+      await runBoundedRuntimeApplication(
+        initialized,
+        this.launcherFactory,
+        this.orchestratorLauncherFactory,
+        this.studyContractVersion,
+        reviewedMemory ? { reviewedMemory } : {},
+      );
       await this.lifecycle.reconcile(record, false);
     } catch (error) {
       const current = await this.store.read(record.commandId);

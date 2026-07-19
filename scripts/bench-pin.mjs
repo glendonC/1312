@@ -52,6 +52,12 @@ const traces = read("traces.json");
 const source = normalizeSourceReceipt(read("source.json"));
 const glossary = read("glossary.json");
 const corrections = read("corrections.json");
+let reviewedMemory = null;
+try {
+  reviewedMemory = read("reviewed-memory.json");
+} catch {
+  reviewedMemory = null;
+}
 
 const prep = score.paths[RUN];
 const cold = score.paths.cold;
@@ -157,6 +163,12 @@ const capture = {
         gates: "universal.asr_agreement, universal.repetition, ko.address_form, ko.entity_support",
         agreement_floor: 0.6,
         abstention: "fail closed on a measured disagreement; abstain where the cross-check produced no words at all",
+        ...(reviewedMemory
+          ? {
+              reviewed_memory_consumption_id: reviewedMemory.consumption_id,
+              reviewed_memory_materialization_id: reviewedMemory.materialization_id,
+            }
+          : { reviewed_memory: "none" }),
       },
     },
     {
@@ -167,6 +179,7 @@ const capture = {
         translator: "gpt-4o",
         glossary: "none",
         gates: "none",
+        reviewed_memory: "none",
         note: "One-shot. It is handed the prepped path's windows for free, so it is a foil for translation, entities and honesty, NOT for segmentation.",
       },
     },

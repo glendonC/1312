@@ -100,6 +100,8 @@ export interface ProductionAnalysisRequest {
 
 export interface RuntimeStartRecord {
   schema: "studio.runtime-start.v1";
+  /** Present only when this start consumes a reviewed memory materialization. */
+  materializationId?: string | null;
   producer: { id: "studio.local-runtime-start"; version: "1" };
   commandId: string;
   runtimeId: string;

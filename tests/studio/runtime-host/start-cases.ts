@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { appendFile, cp, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { appendFile, cp, mkdtemp, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { identifyFile } from "../../../src/studio/runtime/production/artifactStore.ts";
+import { FileEventJournal, RuntimeLedger } from "../../../src/studio/runtime/production/journal.ts";
+import { parseRuntimeHostStartRequest } from "../../../src/studio/runtime/production/runtimeHost/validation.ts";
 import {
   DurableRuntimeCommandStore,
   DeterministicExecutionControl,
@@ -14,6 +16,15 @@ import {
 } from "../../../src/studio/runtime/production/runtimeHost/index.ts";
 import type { RuntimeHostStartRequest } from "../../../src/studio/runtime/production/runtimeHost/model.ts";
 import { cleanup, FIXTURE, hostHarness, waitForLifecycle } from "./harness.ts";
+
+async function copyReviewedMemoryStore(destination: string): Promise<string> {
+  const sourceRoot = resolve("memory/review");
+  for (const collection of ["proposals", "decisions", "legacy", "materializations"] as const) {
+    await cp(join(sourceRoot, collection), join(destination, collection), { recursive: true });
+  }
+  await mkdir(join(destination, "consumptions"), { recursive: true });
+  return destination;
+}
 
 test("reviewed plan is read-only and start freezes the exact studio.forecast.v1 content", async () => {
   const runtime = await hostHarness();
@@ -237,5 +248,110 @@ test("source bytes changed after registration fail revalidation before command a
   } finally {
     await cleanup(runtime);
     await rm(source, { recursive: true, force: true });
+  }
+});
+
+test("start request accepts optional null materializationId and rejects malformed identities", () => {
+  const base = {
+    sourceSessionId: "source-session:test",
+    sourceRevisionId: "source-revision:test",
+    range: { startMs: 0, endMs: 1_000 },
+    requestedSourceLanguage: { mode: "declared" as const, languages: ["ko"] as [string], reason: null },
+    targetLanguage: "en",
+    selectedLanguagePackId: "ko-v3",
+    outputDepth: "evidence" as const,
+  };
+  assert.equal(parseRuntimeHostStartRequest({ ...base, materializationId: null }).materializationId, null);
+  assert.equal(parseRuntimeHostStartRequest(base).materializationId, undefined);
+  assert.throws(
+    () => parseRuntimeHostStartRequest({ ...base, materializationId: "memory-materialization:missing" }),
+    /materializationId/,
+  );
+});
+
+test("host start consumes a reviewed materialization into root jobContext and durable consumptions", async () => {
+  const memoryStore = await mkdtemp(join(tmpdir(), "studio-runtime-memory-store-"));
+  await copyReviewedMemoryStore(memoryStore);
+  const materializationNames = await readdir(join(memoryStore, "materializations"));
+  assert.ok(materializationNames.length >= 1);
+  const materialization = JSON.parse(
+    await readFile(join(memoryStore, "materializations", materializationNames[0]), "utf8"),
+  ) as { materialization_id: string; entries: Array<{ key: string }> };
+  const runtime = await hostHarness({
+    reviewedMemoryStore: memoryStore,
+    orchestratorMode: "empty_research_synthesis_only",
+  });
+  try {
+    const acknowledgement = await runtime.service.start({
+      ...runtime.request,
+      materializationId: materialization.materialization_id,
+    });
+    await waitForLifecycle(runtime.service, acknowledgement.commandId, "terminal");
+    const journalPath = runtime.store.paths(acknowledgement.runtimeId).journalPath;
+    const ledger = await RuntimeLedger.open(
+      acknowledgement.runtimeId,
+      new FileEventJournal(journalPath),
+    );
+    const root = Object.values(ledger.state().tasks).find((task) => task.parentTaskId === null)!;
+    assert.equal(root.jobContext.reviewedMemory?.materializationId, materialization.materialization_id);
+    assert.equal(root.jobContext.reviewedMemory?.entries[0]?.key, materialization.entries[0]?.key);
+    const consumptionNames = await readdir(join(memoryStore, "consumptions"));
+    assert.equal(consumptionNames.length, 1);
+    const consumption = JSON.parse(
+      await readFile(join(memoryStore, "consumptions", consumptionNames[0]), "utf8"),
+    ) as { run_id: string; snapshot: { materialization_id: string } };
+    assert.equal(consumption.run_id, acknowledgement.runtimeId);
+    assert.equal(consumption.snapshot.materialization_id, materialization.materialization_id);
+  } finally {
+    await cleanup(runtime);
+    await rm(memoryStore, { recursive: true, force: true });
+  }
+});
+
+test("host start fails closed when the requested materialization is absent from the memory store", async () => {
+  const memoryStore = await mkdtemp(join(tmpdir(), "studio-runtime-memory-empty-"));
+  await mkdir(join(memoryStore, "materializations"), { recursive: true });
+  const runtime = await hostHarness({ reviewedMemoryStore: memoryStore });
+  try {
+    await assert.rejects(
+      () => runtime.service.start({
+        ...runtime.request,
+        materializationId: `memory-materialization:sha256:${"0".repeat(64)}`,
+      }),
+      /not present in the host memory review store/,
+    );
+    assert.equal((await runtime.store.list()).length, 0);
+  } finally {
+    await cleanup(runtime);
+    await rm(memoryStore, { recursive: true, force: true });
+  }
+});
+
+test("memory-bound and unbound starts remain distinct durable commands", async () => {
+  const memoryStore = await mkdtemp(join(tmpdir(), "studio-runtime-memory-distinct-"));
+  await copyReviewedMemoryStore(memoryStore);
+  const materializationNames = await readdir(join(memoryStore, "materializations"));
+  const materialization = JSON.parse(
+    await readFile(join(memoryStore, "materializations", materializationNames[0]), "utf8"),
+  ) as { materialization_id: string };
+  const runtime = await hostHarness({
+    reviewedMemoryStore: memoryStore,
+    orchestratorMode: "empty_research_synthesis_only",
+  });
+  try {
+    const unbound = await runtime.service.start(runtime.request);
+    const bound = await runtime.service.start({
+      ...runtime.request,
+      materializationId: materialization.materialization_id,
+    });
+    assert.notEqual(unbound.commandId, bound.commandId);
+    assert.notEqual(unbound.runtimeId, bound.runtimeId);
+    await Promise.all([
+      waitForLifecycle(runtime.service, unbound.commandId, "terminal"),
+      waitForLifecycle(runtime.service, bound.commandId, "terminal"),
+    ]);
+  } finally {
+    await cleanup(runtime);
+    await rm(memoryStore, { recursive: true, force: true });
   }
 });

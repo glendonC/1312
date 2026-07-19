@@ -2,6 +2,12 @@
  * The orchestrator. It runs a real ko->en pipeline over a real clip and records what it did.
  *
  *   node scripts/run-clip.mjs --run run-006
+ *   node scripts/run-clip.mjs --run run-008 --bench-pack hard-ko-v1 \
+ *     --materialization-id memory-materialization:sha256:<digest>
+ *
+ * Optional `--materialization-id` consumes a reviewed materialization before any model call,
+ * writes `memory/review/consumptions/`, and injects accepted glossary entries into the prepped
+ * path. Cold path stays memory-free. Absent the flag, reviewed memory stays unavailable.
  *
  * It does NOT author a run. It performs one, and every number that lands in the run folder is
  * something this process actually measured:
@@ -51,6 +57,11 @@ import { detectPhenomena, entityGate, PACK_GATES } from "./packs/ko-v3.mjs";
 import { contentIdForJson } from "./lib/immutable-receipts.mjs";
 import { acceptedHead, loadLedger, recordProposal } from "./lib/memory-review.mjs";
 import { normalizeSourceReceipt } from "./lib/source-receipts.mjs";
+import { consumeAcceptedMemorySnapshotForRun } from "../src/studio/runtime/production/memory/consumption.ts";
+import {
+  loadMemoryReviewArtifacts,
+  recordMemoryConsumptionReceipt,
+} from "../src/studio/runtime/production/memory/ledgerStore.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -77,6 +88,8 @@ function arg(name, fallback = null) {
 
 const RUN = arg("run", "run-006");
 const BENCH_PACK = arg("bench-pack");
+const MATERIALIZATION_ID = arg("materialization-id");
+const MEMORY_STORE = join(ROOT, "memory/review");
 const DIR = join(ROOT, "public/demo/runs", RUN);
 
 function die(msg) {
@@ -279,6 +292,33 @@ function repetition(text) {
 /* =================================================================== RUN == */
 
 async function main() {
+  /* -- optional reviewed-memory consume (before any model spend) ---------- */
+
+  let reviewedMemory = null;
+  if (MATERIALIZATION_ID) {
+    const artifacts = await loadMemoryReviewArtifacts(MEMORY_STORE);
+    const snapshot = await consumeAcceptedMemorySnapshotForRun(
+      artifacts,
+      {
+        runId: RUN,
+        materializationId: MATERIALIZATION_ID,
+        consumedAt: new Date().toISOString(),
+      },
+      async (receipt) => {
+        await recordMemoryConsumptionReceipt(MEMORY_STORE, receipt);
+      },
+    );
+    reviewedMemory = {
+      consumption_id: snapshot.receipt.consumption_id,
+      materialization_id: snapshot.receipt.snapshot.materialization_id,
+      snapshot_content_id: snapshot.receipt.snapshot.snapshot_content_id,
+      materialization_receipt_content_id: snapshot.receipt.snapshot.materialization_receipt_content_id,
+      entry_count: snapshot.receipt.snapshot.entry_count,
+      policy: snapshot.receipt.policy,
+      entries: snapshot.entries,
+    };
+  }
+
   /* -- orchestrator inspects the real inputs ------------------------------ */
 
   const bytes = readFileSync(wav).length;
@@ -289,6 +329,22 @@ async function main() {
     `${source.selection.duration}s · ${source.rights.label} · 16k mono · ${(bytes / 1024).toFixed(0)} KB · ${wave.peaks.length} peaks`,
     { effects: [agentFx("orchestrator", "working")] },
   );
+  if (reviewedMemory) {
+    emit(
+      "orchestrator",
+      "inspect",
+      "reviewed-memory",
+      `${reviewedMemory.entry_count} accepted entries · ${reviewedMemory.consumption_id}`,
+      {
+        view: {
+          reviewed_memory: {
+            consumption_id: reviewedMemory.consumption_id,
+            materialization_id: reviewedMemory.materialization_id,
+          },
+        },
+      },
+    );
+  }
 
   emit("orchestrator", "spawn", "segment-01", "one recogniser call covers 40s · one segmenter", {
     effects: [agentFx("segment-01", "spawning")],
@@ -495,7 +551,28 @@ async function main() {
     source: `${TRANSLATOR} · ${RUN} term resolution`,
   }));
 
-  for (const g of glossary) {
+  if (reviewedMemory) {
+    for (const entry of reviewedMemory.entries.filter((item) => item.kind === "glossary")) {
+      const value = entry.value && typeof entry.value === "object" ? entry.value : {};
+      const kind = pack.entity_kinds.includes(value.kind) ? value.kind : "term";
+      const injected = {
+        term: entry.key,
+        lang: typeof value.language === "string" ? value.language : "ko",
+        gloss: typeof value.gloss === "string" ? value.gloss : String(value.gloss ?? ""),
+        kind,
+        source: `reviewed-memory · ${reviewedMemory.consumption_id}`,
+        reviewed_memory: true,
+      };
+      const existing = glossary.findIndex((row) => row.term === injected.term);
+      if (existing >= 0) glossary.splice(existing, 1);
+      glossary.unshift(injected);
+      emit("context-01", "resolve", injected.term, `reviewed-memory · ${injected.kind} · ${injected.gloss}`, {
+        view: { gloss: { term: injected.term, gloss: injected.gloss } },
+      });
+    }
+  }
+
+  for (const g of glossary.filter((row) => row.reviewed_memory !== true)) {
     emit("context-01", "resolve", g.term, `${g.kind} · ${g.gloss}`, {
       view: { gloss: { term: g.term, gloss: g.gloss } },
     });
@@ -951,12 +1028,44 @@ async function main() {
   // approve its own output and overwriting prior values without a decision receipt. Preserve
   // that historical file as legacy input, but future runs stop here until a separate reviewer
   // records a reasoned decision through scripts/memory-review.mjs.
+  if (reviewedMemory) {
+    write("reviewed-memory.json", {
+      schema: "studio.memory.run-binding.v1",
+      run: RUN,
+      clip: clip.id,
+      consumption_id: reviewedMemory.consumption_id,
+      materialization_id: reviewedMemory.materialization_id,
+      snapshot_content_id: reviewedMemory.snapshot_content_id,
+      materialization_receipt_content_id: reviewedMemory.materialization_receipt_content_id,
+      entry_count: reviewedMemory.entry_count,
+      policy: reviewedMemory.policy,
+      entries: reviewedMemory.entries.map((entry) => ({
+        namespace: entry.namespace,
+        kind: entry.kind,
+        key: entry.key,
+        proposal_id: entry.proposal_id,
+        decision_id: entry.decision_id,
+      })),
+      note: "Host-consumed reviewed materialization for this run. Cold path did not receive these entries. Consumption is not a score win.",
+    });
+  }
+
   write("glossary.json", {
     run: RUN,
     clip: clip.id,
     pack: pack.id,
     scope: "run",
     promoted_to: null,
+    ...(reviewedMemory
+      ? {
+          reviewed_memory: {
+            consumption_id: reviewedMemory.consumption_id,
+            materialization_id: reviewedMemory.materialization_id,
+            entry_count: reviewedMemory.entry_count,
+            note: "Accepted glossary entries were injected into the prepped path after durable consumption.",
+          },
+        }
+      : {}),
     ...(BENCH_PACK
       ? {
           routing: {

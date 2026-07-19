@@ -128,6 +128,31 @@ export interface LanguageJobContext {
   detectedLanguageEvidenceContentIds: string[];
 }
 
+/**
+ * Host-injected reviewed memory for one run. Present only after a durable consumption receipt.
+ * Null means unavailable for this run; never infer accepted memory from a materialization alone.
+ */
+export interface ReviewedMemoryJobBinding {
+  consumptionId: string;
+  materializationId: string;
+  snapshotContentId: string;
+  materializationReceiptContentId: string;
+  entryCount: number;
+  policy: {
+    promotion: "reviewed_materialization_only";
+    legacy_unreviewed: "excluded";
+    unavailable: "fail_closed";
+  };
+  entries: Array<{
+    namespace: string;
+    kind: "glossary" | "correction" | "rule";
+    key: string;
+    value: unknown;
+    proposalId: string;
+    decisionId: string;
+  }>;
+}
+
 /** Path-free, content-addressed authority inherited or attenuated by the scheduler. */
 export interface TaskJobContext {
   schema: "studio.task-job-context.v1";
@@ -159,6 +184,7 @@ export interface TaskJobContext {
     contentId: string;
     evidenceKind: EvidenceKind;
   }>;
+  reviewedMemory: ReviewedMemoryJobBinding | null;
 }
 
 export interface TaskRecord {

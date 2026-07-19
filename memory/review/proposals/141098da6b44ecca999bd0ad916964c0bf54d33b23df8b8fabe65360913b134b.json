@@ -1,0 +1,36 @@
+{
+  "proposal_id": "memory-proposal:sha256:141098da6b44ecca999bd0ad916964c0bf54d33b23df8b8fabe65360913b134b",
+  "schema": "studio.memory.proposal.v1",
+  "namespace": "language/ko/glossary",
+  "kind": "glossary",
+  "key": "오빠",
+  "value": {
+    "gloss": "address form, not a brother",
+    "language": "ko",
+    "kind": "address_form"
+  },
+  "proposed_by": "producer:il02-run-005",
+  "created_at": "2026-07-19T12:08:59.134Z",
+  "source": {
+    "run_id": "run-005",
+    "clip_id": "ko-clip-01",
+    "candidates_manifest": "bench/candidates/run-005/candidates.json",
+    "routing": "training",
+    "miss_signal": "ko.kinship_address",
+    "note": "IL-02 first reviewed glossary promotion from a training-routed clip"
+  },
+  "evidence": [
+    {
+      "path": "public/demo/runs/run-005/glossary.json",
+      "content_id": "sha256:680f155e8023f6a4aa1073c4e3d54d37f974621224f319a98430e9b5fbd99611",
+      "bytes": 1136
+    },
+    {
+      "path": "public/demo/runs/run-005/corrections.json",
+      "content_id": "sha256:3a1ac5144b9f2a6f86098cae7a84c9feedc76ad4396a6f15d334e7ecf0dfc77a",
+      "bytes": 2522
+    }
+  ],
+  "supersedes": null,
+  "review_requirements": null
+}

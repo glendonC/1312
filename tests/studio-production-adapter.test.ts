@@ -98,6 +98,7 @@ function jobContext(contentId: string, range: { startMs: number; endMs: number }
     selectedLanguagePackId: null,
     outputDepth: "evidence" as const,
     detectorEvidence: [],
+    reviewedMemory: null,
   };
   return { schema: "studio.task-job-context.v1", contextId: `job-context:${canonicalSha256(body)}`, ...body };
 }

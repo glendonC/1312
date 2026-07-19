@@ -9,7 +9,9 @@ import {
   DeterministicRuntimeExecutor,
   RuntimeSourceRegistry,
   RuntimeStartService,
+  deterministicOrchestratorLauncherFactory,
 } from "../../../src/studio/runtime/production/runtimeHost/index.ts";
+import type { DeterministicOrchestratorMode } from "../../../src/studio/runtime/production/runtimeHost/deterministicOrchestrator.ts";
 import type { RuntimeHostStartRequest } from "../../../src/studio/runtime/production/runtimeHost/model.ts";
 
 export const FIXTURE = resolve("public/demo/runs/run-005");
@@ -41,6 +43,8 @@ export async function hostHarness(options: {
   mode?: "completed" | "failed" | "timed_out" | "interrupted";
   sourceDirectory?: string;
   recoverOnOpen?: boolean;
+  reviewedMemoryStore?: string;
+  orchestratorMode?: DeterministicOrchestratorMode;
 } = {}): Promise<HostHarness> {
   const directory = await mkdtemp(join(tmpdir(), "studio-runtime-host-test-"));
   const sources = await RuntimeSourceRegistry.open({
@@ -52,8 +56,14 @@ export async function hostHarness(options: {
     store,
     sources,
     launcherFactory: executor.factory(),
+    orchestratorLauncherFactory: options.orchestratorMode
+      ? deterministicOrchestratorLauncherFactory({ mode: options.orchestratorMode })
+      : undefined,
     runtimeIdForCommand: runtimeIds(),
     recoverOnOpen: options.recoverOnOpen ?? false,
+    ...(options.reviewedMemoryStore === undefined
+      ? {}
+      : { reviewedMemoryStore: options.reviewedMemoryStore }),
   });
   const source = sources.list()[0];
   return {

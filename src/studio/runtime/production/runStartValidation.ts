@@ -21,8 +21,14 @@ function object(value: unknown, context: string, path: string): Record<string, u
   return value as Record<string, unknown>;
 }
 
-function exact(item: Record<string, unknown>, keys: readonly string[], context: string, path: string): void {
-  const allowed = new Set(keys);
+function exact(
+  item: Record<string, unknown>,
+  keys: readonly string[],
+  context: string,
+  path: string,
+  optional: readonly string[] = [],
+): void {
+  const allowed = new Set([...keys, ...optional]);
   for (const key of Object.keys(item)) {
     if (!allowed.has(key)) fail(context, `${path}.${key}`, "is not allowed");
   }
@@ -90,6 +96,7 @@ export function assertRuntimeStartRecord(
     ],
     context,
     "start",
+    ["materializationId"],
   );
   literal(item.schema, "studio.runtime-start.v1", context, "start.schema");
   const producer = object(item.producer, context, "start.producer");
@@ -172,10 +179,20 @@ export function assertRuntimeStartRecord(
   if (!same(item.frozenForecast, rebuilt)) {
     fail(context, "start.frozenForecast", "does not match the accepted forecast and run start");
   }
+  let materializationId: string | null = null;
+  if (item.materializationId !== undefined) {
+    if (item.materializationId !== null) {
+      materializationId = text(item.materializationId, context, "start.materializationId");
+      if (!/^memory-materialization:sha256:[a-f0-9]{64}$/.test(materializationId)) {
+        fail(context, "start.materializationId", "must be a memory-materialization content identity or null");
+      }
+    }
+  }
   const expectedCommandId = `runtime-start:${canonicalSha256({
     sourceRevisionId: session.revisionId,
     analysisRequestId: request.requestId,
     workPlan: item.workPlan,
+    ...(materializationId ? { materializationId } : {}),
   })}`;
   if (item.commandId !== expectedCommandId) {
     fail(context, "start.commandId", "does not match the accepted source, request, and forecast identities");

@@ -60,6 +60,7 @@ const JOB_CONTEXT = {
   selectedLanguagePackId: "ko-v3",
   outputDepth: "evidence" as const,
   detectorEvidence: [],
+  reviewedMemory: null,
 };
 
 function failureFor(scenario: ProcessingMockScenario): RuntimeHostFailureReason | null {

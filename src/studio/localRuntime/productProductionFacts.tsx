@@ -18,6 +18,7 @@ import { ProductionEvidenceFacts } from "./productProductionFacts/evidenceFacts"
 import { ProductionOutputFacts } from "./productProductionFacts/outputFacts";
 import { ProductionReviewFacts } from "./productProductionFacts/reviewFacts";
 import { ProductionSemanticEvidenceFacts } from "./productProductionFacts/semanticEvidenceFacts";
+import { ProductionReviewedMemoryFacts } from "./productProductionFacts/reviewedMemoryFacts";
 import { ProductionSourceWorkFacts } from "./productProductionFacts/sourceWorkFacts";
 
 export function ProductionJournalFacts({
@@ -77,6 +78,7 @@ export function ProductionJournalFacts({
       </header>
 
       <ProductionSourceWorkFacts context={context} />
+      <ProductionReviewedMemoryFacts context={context} />
       <ProductionAgentRecoveryFacts context={context} />
       <ProductionSemanticEvidenceFacts context={context} />
       <ProductionEvidenceFacts context={context} />

@@ -145,6 +145,15 @@ function options(value: unknown, context: string, path: string): Partial<Product
   return result;
 }
 
+function materializationId(value: unknown, context: string, path: string): string | null {
+  if (value === null) return null;
+  const result = string(value, context, path, 120);
+  if (!/^memory-materialization:sha256:[a-f0-9]{64}$/.test(result)) {
+    fail(context, path, "must be a memory-materialization content identity or null");
+  }
+  return result;
+}
+
 export function parseRuntimeHostStartRequest(value: unknown): RuntimeHostStartRequest {
   const context = "Runtime start request";
   const item = object(value, context, "request");
@@ -156,7 +165,7 @@ export function parseRuntimeHostStartRequest(value: unknown): RuntimeHostStartRe
     "targetLanguage",
     "selectedLanguagePackId",
     "outputDepth",
-  ], ["options", "clientRequestId"], context, "request");
+  ], ["options", "clientRequestId", "materializationId"], context, "request");
   const range = object(item.range, context, "request.range");
   exact(range, ["startMs", "endMs"], [], context, "request.range");
   const startMs = integer(range.startMs, context, "request.range.startMs");
@@ -175,6 +184,9 @@ export function parseRuntimeHostStartRequest(value: unknown): RuntimeHostStartRe
     outputDepth: item.outputDepth,
     ...(item.options === undefined ? {} : { options: options(item.options, context, "request.options") }),
     ...(item.clientRequestId === undefined ? {} : { clientRequestId: identity(item.clientRequestId, context, "request.clientRequestId") }),
+    ...(item.materializationId === undefined
+      ? {}
+      : { materializationId: materializationId(item.materializationId, context, "request.materializationId") }),
   };
 }
 

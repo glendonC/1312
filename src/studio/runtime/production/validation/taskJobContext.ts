@@ -1,5 +1,5 @@
 import { expectedTaskJobContextId } from "../jobContext.ts";
-import type { TaskJobContext } from "../model.ts";
+import type { ReviewedMemoryJobBinding, TaskJobContext } from "../model.ts";
 import {
   array,
   boolean,
@@ -14,6 +14,74 @@ import {
 } from "./primitives.ts";
 
 const EVIDENCE_KINDS = new Set(["speech_activity", "language_ranges", "acoustic_ranges"]);
+const MEMORY_KINDS = new Set(["glossary", "correction", "rule"]);
+
+function reviewedMemoryBinding(
+  value: unknown,
+  context: string,
+  path: string,
+): ReviewedMemoryJobBinding {
+  const item = object(value, context, path);
+  exact(item, [
+    "consumptionId",
+    "materializationId",
+    "snapshotContentId",
+    "materializationReceiptContentId",
+    "entryCount",
+    "policy",
+    "entries",
+  ], context, path);
+  const consumptionId = string(item.consumptionId, context, `${path}.consumptionId`);
+  if (!/^memory-consumption:sha256:[a-f0-9]{64}$/.test(consumptionId)) {
+    fail(context, `${path}.consumptionId`, "is malformed");
+  }
+  const materializationId = string(item.materializationId, context, `${path}.materializationId`);
+  if (!/^memory-materialization:sha256:[a-f0-9]{64}$/.test(materializationId)) {
+    fail(context, `${path}.materializationId`, "is malformed");
+  }
+  const snapshotContentId = string(item.snapshotContentId, context, `${path}.snapshotContentId`);
+  if (snapshotContentId !== materializationId.slice("memory-materialization:".length)) {
+    fail(context, `${path}.snapshotContentId`, "does not match the materialization snapshot identity");
+  }
+  const materializationReceiptContentId = contentId(
+    item.materializationReceiptContentId,
+    context,
+    `${path}.materializationReceiptContentId`,
+  );
+  const entryCount = integer(item.entryCount, context, `${path}.entryCount`, 0);
+  const policy = object(item.policy, context, `${path}.policy`);
+  exact(policy, ["promotion", "legacy_unreviewed", "unavailable"], context, `${path}.policy`);
+  oneOf(policy.promotion, new Set(["reviewed_materialization_only"]), context, `${path}.policy.promotion`);
+  oneOf(policy.legacy_unreviewed, new Set(["excluded"]), context, `${path}.policy.legacy_unreviewed`);
+  oneOf(policy.unavailable, new Set(["fail_closed"]), context, `${path}.policy.unavailable`);
+  const entries = array(item.entries, context, `${path}.entries`);
+  if (entries.length !== entryCount) fail(context, `${path}.entryCount`, "does not match entries length");
+  const bindingEntries = entries.map((entry, index) => {
+    const row = object(entry, context, `${path}.entries[${index}]`);
+    exact(row, ["namespace", "kind", "key", "value", "proposalId", "decisionId"], context, `${path}.entries[${index}]`);
+    return {
+      namespace: string(row.namespace, context, `${path}.entries[${index}].namespace`),
+      kind: oneOf<"glossary" | "correction" | "rule">(row.kind, MEMORY_KINDS, context, `${path}.entries[${index}].kind`),
+      key: string(row.key, context, `${path}.entries[${index}].key`),
+      value: structuredClone(row.value),
+      proposalId: string(row.proposalId, context, `${path}.entries[${index}].proposalId`),
+      decisionId: string(row.decisionId, context, `${path}.entries[${index}].decisionId`),
+    };
+  });
+  return {
+    consumptionId,
+    materializationId,
+    snapshotContentId,
+    materializationReceiptContentId,
+    entryCount,
+    policy: {
+      promotion: "reviewed_materialization_only",
+      legacy_unreviewed: "excluded",
+      unavailable: "fail_closed",
+    },
+    entries: bindingEntries,
+  };
+}
 
 function languageTag(value: unknown, context: string, path: string): string {
   const result = string(value, context, path);
@@ -41,7 +109,7 @@ export function assertTaskJobContext(
   const item = object(value, context, path);
   exact(item, [
     "schema", "contextId", "source", "analysisRequest", "requestedSourceLanguagePolicy",
-    "targetLanguage", "selectedLanguagePackId", "outputDepth", "detectorEvidence",
+    "targetLanguage", "selectedLanguagePackId", "outputDepth", "detectorEvidence", "reviewedMemory",
   ], context, path);
   if (item.schema !== "studio.task-job-context.v1") fail(context, `${path}.schema`, "is unsupported");
   const contextIdValue = string(item.contextId, context, `${path}.contextId`);
@@ -90,6 +158,9 @@ export function assertTaskJobContext(
     oneOf(evidenceItem.evidenceKind, EVIDENCE_KINDS, context, `${path}.detectorEvidence[${index}].evidenceKind`);
   }
   if (new Set(evidenceIds).size !== evidenceIds.length) fail(context, `${path}.detectorEvidence`, "must not repeat artifacts");
+  if (item.reviewedMemory !== null) {
+    reviewedMemoryBinding(item.reviewedMemory, context, `${path}.reviewedMemory`);
+  }
   if (contextIdValue !== expectedTaskJobContextId(item as unknown as TaskJobContext)) {
     fail(context, `${path}.contextId`, "does not match the immutable context body");
   }

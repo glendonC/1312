@@ -65,6 +65,7 @@ export function recoveryAuthorityContract(
       selectedLanguagePackId: task.jobContext.selectedLanguagePackId,
       outputDepth: task.jobContext.outputDepth,
       detectorEvidence: task.jobContext.detectorEvidence,
+      reviewedMemory: task.jobContext.reviewedMemory,
     },
     objective: input.objective,
     workerKind: input.workerKind,

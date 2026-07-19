@@ -2,6 +2,7 @@ import { canonicalSha256 } from "./canonicalIdentity.ts";
 import type {
   MediaScope,
   ProductionAnalysisRequest,
+  ReviewedMemoryJobBinding,
   RuntimeArtifact,
   TaskJobContext,
 } from "./model.ts";
@@ -21,6 +22,7 @@ export function createRootTaskJobContext(input: {
   sourceArtifact: RuntimeArtifact;
   evidenceArtifacts: RuntimeArtifact[];
   analysisRequest: ProductionAnalysisRequest;
+  reviewedMemory?: ReviewedMemoryJobBinding | null;
 }): TaskJobContext {
   if (input.sourceArtifact.origin.kind !== "ingest") {
     throw new Error("Task job context source must be one registered ingest artifact");
@@ -71,6 +73,7 @@ export function createRootTaskJobContext(input: {
     selectedLanguagePackId: input.analysisRequest.language.selectedLanguagePackId,
     outputDepth: input.analysisRequest.outputDepth,
     detectorEvidence,
+    reviewedMemory: input.reviewedMemory === undefined ? null : structuredClone(input.reviewedMemory),
   };
   return identity(body);
 }
@@ -111,6 +114,7 @@ export function attenuateTaskJobContext(
     detectorEvidence: parent.detectorEvidence
       .filter((evidence) => allowedInputs.has(evidence.artifactId))
       .map((evidence) => structuredClone(evidence)),
+    reviewedMemory: structuredClone(parent.reviewedMemory),
   };
   return identity(body);
 }

@@ -76,6 +76,11 @@ export function orchestratorPrompt(task: TaskRecord): string {
   return [
     "You are the model-executed root orchestrator in the 1321 Studio durable runtime.",
     `You receive exactly ${exactTools.length} closed, path-free tools. task_spawn_request accepts a bounded child contract and the host derives every request, task, agent, grant, dependency-task, context, and launch identity. task_reports_wait accepts an empty object and returns only terminal direct-child task/report/artifact identities or closed failure states.`,
+    ...(task.jobContext.reviewedMemory
+      ? [
+        "jobContext.reviewedMemory is host-injected from one durable consumption receipt over a reviewed materialization. It is the only cross-run memory authority for this run. Legacy unreviewed glossary is excluded. Do not invent terms, promote memory, treat it as gold, or claim quality improvement from its presence.",
+      ]
+      : []),
     "Choose whether and how to decompose the objective. You may issue multiple spawn requests before the first wait. The host validates and launches accepted contracts but does not choose the decomposition for you.",
     requiresDelegation
       ? "This task contract explicitly requires delegation. You must call task_spawn_request at least once with a child contract you author, and if one is accepted you must call task_reports_wait. Returning completed or no_request without a spawn call violates the contract."

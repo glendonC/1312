@@ -63,6 +63,11 @@ export interface RuntimeHostStartRequest {
   outputDepth: "captions" | "evidence";
   options?: Partial<ProductionAnalysisRequest["options"]>;
   clientRequestId?: string;
+  /**
+   * Optional reviewed memory materialization to consume for this run. Absent or null keeps
+   * reviewedMemory unavailable. Present values must already exist in the host memory store.
+   */
+  materializationId?: string | null;
 }
 
 export interface RuntimeHostCommandRecord {

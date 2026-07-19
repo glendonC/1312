@@ -139,6 +139,14 @@ export function ProductionSourceWorkFacts({ context }: { context: ProductionFact
                       )).join("; ") || "None in task contract"}
                     </dd>
                   </div>
+                  <div>
+                    <dt>Reviewed memory</dt>
+                    <dd>
+                      {task.jobContext.reviewedMemory === null
+                        ? "Unavailable for this task"
+                        : `${task.jobContext.reviewedMemory.consumptionId} · ${task.jobContext.reviewedMemory.entryCount} entries`}
+                    </dd>
+                  </div>
                 </dl>
               </article>
             ))}

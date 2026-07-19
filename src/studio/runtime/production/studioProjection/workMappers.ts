@@ -39,6 +39,24 @@ export function projectTasks(state: RuntimeProjection) {
         selectedLanguagePackId: task.jobContext.selectedLanguagePackId,
         outputDepth: task.jobContext.outputDepth,
         detectorEvidence: structuredClone(task.jobContext.detectorEvidence),
+        reviewedMemory: task.jobContext.reviewedMemory === null
+          ? null
+          : {
+              consumptionId: task.jobContext.reviewedMemory.consumptionId,
+              materializationId: task.jobContext.reviewedMemory.materializationId,
+              snapshotContentId: task.jobContext.reviewedMemory.snapshotContentId,
+              materializationReceiptContentId:
+                task.jobContext.reviewedMemory.materializationReceiptContentId,
+              entryCount: task.jobContext.reviewedMemory.entryCount,
+              policy: structuredClone(task.jobContext.reviewedMemory.policy),
+              entries: task.jobContext.reviewedMemory.entries.map((entry) => ({
+                namespace: entry.namespace,
+                kind: entry.kind,
+                key: entry.key,
+                proposalId: entry.proposalId,
+                decisionId: entry.decisionId,
+              })),
+            },
       },
       mediaScope: structuredClone(task.mediaScope),
       inputArtifactIds: [...task.inputArtifactIds],

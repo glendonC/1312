@@ -1,0 +1,11 @@
+{
+  "decision_id": "memory-decision:sha256:9bf7a6ff14e91baa492e2a4ca52858c79fc8252b7162142cd2133d8c14671126",
+  "schema": "studio.memory.decision.v1",
+  "proposal_id": "memory-proposal:sha256:141098da6b44ecca999bd0ad916964c0bf54d33b23df8b8fabe65360913b134b",
+  "proposal_content_id": "sha256:7c90fe782377cbc83957f2d1c67e76d6b1fbc108325ceab64bd8fd9e1cd36301",
+  "action": "accept",
+  "decided_by": "reviewer:il02-human",
+  "reason": "Run-005 glossary and kinship correction evidence support promoting 오빠 as an address form for ko-clip-01. Actor differs from proposer. Clip is training-routed and not held by any gold pack.",
+  "created_at": "2026-07-19T12:08:59.236Z",
+  "benchmark_receipt": null
+}

@@ -240,9 +240,13 @@ async function lifecycle() {
 
 test("memory inspection preserves its exact public export surface", () => {
   assert.deepEqual(Object.keys(memoryInspection).sort(), [
+    "bindReviewedMemoryForRun",
     "consumeAcceptedMemorySnapshotForRun",
     "inspectMemoryReviewArtifacts",
+    "loadMemoryReviewArtifacts",
     "memoryContentId",
+    "recordMemoryConsumptionReceipt",
+    "reviewedMemoryJobBindingFromConsumption",
   ]);
 });
 

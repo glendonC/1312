@@ -36,6 +36,30 @@ export interface ProductionStudioTaskView {
     selectedLanguagePackId: string | null;
     outputDepth: "captions" | "evidence";
     detectorEvidence: Array<{ artifactId: string; contentId: string; evidenceKind: EvidenceKind }>;
+    /**
+     * Host-injected reviewed memory after a durable consumption receipt.
+     * Null means unavailable for this task; never infer from materialization alone.
+     * Entry values are omitted; keys and receipt identities are enough for product facts.
+     */
+    reviewedMemory: null | {
+      consumptionId: string;
+      materializationId: string;
+      snapshotContentId: string;
+      materializationReceiptContentId: string;
+      entryCount: number;
+      policy: {
+        promotion: "reviewed_materialization_only";
+        legacy_unreviewed: "excluded";
+        unavailable: "fail_closed";
+      };
+      entries: Array<{
+        namespace: string;
+        kind: "glossary" | "correction" | "rule";
+        key: string;
+        proposalId: string;
+        decisionId: string;
+      }>;
+    };
   };
   mediaScope: MediaScope[];
   inputArtifactIds: string[];

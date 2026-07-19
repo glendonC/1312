@@ -19,6 +19,7 @@ interface StartInput {
   sourceSession: ProductionSourceSession;
   sourceArtifactId: string;
   analysisRequest: ProductionAnalysisRequest;
+  materializationId?: string | null;
 }
 
 export interface RuntimePlanInput {
@@ -26,6 +27,8 @@ export interface RuntimePlanInput {
   sourceSession: ProductionSourceSession;
   sourceArtifactId: string;
   analysisRequest: ProductionAnalysisRequest;
+  /** Optional reviewed memory binding; null/absent keeps the prior command identity. */
+  materializationId?: string | null;
 }
 
 export interface RuntimePlan {
@@ -45,6 +48,7 @@ export interface RuntimeStartCommand {
 export function createRuntimeStartCommand(
   sourceSession: ProductionSourceSession,
   analysisRequest: ProductionAnalysisRequest,
+  options: { materializationId?: string | null } = {},
 ): RuntimeStartCommand {
   assertProductionSourceSession(sourceSession);
   assertProductionAnalysisRequest(analysisRequest);
@@ -71,10 +75,12 @@ export function createRuntimeStartCommand(
     ],
   };
   return {
+    // Omit unbound memory from the hash so existing unbound command identities stay stable.
     commandId: `runtime-start:${canonicalSha256({
       sourceRevisionId: sourceSession.revisionId,
       analysisRequestId: analysisRequest.requestId,
       workPlan,
+      ...(options.materializationId ? { materializationId: options.materializationId } : {}),
     })}`,
     workPlan,
   };
@@ -87,7 +93,9 @@ export function createRuntimeStartCommand(
 export function createRuntimePlan(input: RuntimePlanInput): RuntimePlan {
   assertProductionSourceSession(input.sourceSession);
   assertProductionAnalysisRequest(input.analysisRequest);
-  const command = createRuntimeStartCommand(input.sourceSession, input.analysisRequest);
+  const command = createRuntimeStartCommand(input.sourceSession, input.analysisRequest, {
+    materializationId: input.materializationId ?? null,
+  });
   const forecast = createForecastArtifact({
     artifact: {
       artifactId: input.sourceArtifactId,
@@ -123,6 +131,7 @@ export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
     sourceSession: input.sourceSession,
     sourceArtifactId: input.sourceArtifactId,
     analysisRequest: input.analysisRequest,
+    materializationId: input.materializationId ?? null,
   });
   const frozenForecast = freezeForecastArtifact(plan.forecast, {
     runId: input.runId,
@@ -142,6 +151,7 @@ export function createRuntimeStart(input: StartInput): RuntimeStartRecord {
     forecast: plan.forecast,
     frozenForecast,
     startedAt: input.startedAt,
+    ...(input.materializationId ? { materializationId: input.materializationId } : {}),
   };
   assertRuntimeStartRecord(start);
   return start;

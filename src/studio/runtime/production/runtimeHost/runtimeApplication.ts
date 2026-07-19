@@ -38,9 +38,17 @@ import { createRuntimeStart } from "../runStart/runtimeStart.ts";
 import { writeRuntimeStartReceipt } from "../runStart/receiptWriter.ts";
 import { BoundedRuntimeScheduler } from "../scheduler.ts";
 import { createRootTaskJobContext } from "../jobContext.ts";
+import {
+  bindReviewedMemoryForRun,
+  type ReviewedMemoryConsumeRequest,
+} from "../memory/runBinding.ts";
 import type { LoadedOwnedSourceSession } from "../runStart/sourceSessionLoader.ts";
 import type { InitializedRuntimeApplication } from "./model.ts";
 import { createAgentRecoveryPolicy } from "../recovery/agentRecoveryPolicy.ts";
+
+export interface RunBoundedRuntimeApplicationOptions {
+  reviewedMemory?: ReviewedMemoryConsumeRequest;
+}
 
 export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 2,
@@ -131,6 +139,8 @@ export interface InitializeRuntimeApplicationInput {
   startedAt: string;
   loadedSource: LoadedOwnedSourceSession;
   analysisRequest: ProductionAnalysisRequest;
+  /** Optional reviewed memory binding included in the durable start command identity. */
+  materializationId?: string | null;
 }
 
 /**
@@ -154,6 +164,7 @@ export async function initializeRuntimeApplication(
     sourceSession: input.loadedSource.session,
     sourceArtifactId: sourceArtifact.id,
     analysisRequest: input.analysisRequest,
+    materializationId: input.materializationId ?? null,
   });
   await writeRuntimeStartReceipt(input.runStartPath, runStart);
   const journal = await open(input.journalPath, "wx", 0o600);
@@ -185,6 +196,7 @@ export async function runBoundedRuntimeApplication(
   workerLauncherFactory: BoundedWorkerLauncherFactory,
   orchestratorLauncherFactory: BoundedOrchestratorLauncherFactory,
   studyContractVersion: StudyContractVersion = "v2",
+  options: RunBoundedRuntimeApplicationOptions = {},
 ): Promise<void> {
   const journal = new FileEventJournal(initialized.journalPath);
   const ledger = await RuntimeLedger.open(initialized.runStart.runtimeId, journal);
@@ -196,6 +208,9 @@ export async function runBoundedRuntimeApplication(
   for (const evidenceArtifact of initialized.evidenceArtifacts) {
     await artifacts.record(ledger, evidenceArtifact);
   }
+  const reviewedMemory = options.reviewedMemory
+    ? await bindReviewedMemoryForRun(initialized.runStart.runtimeId, options.reviewedMemory)
+    : null;
   const audioTrack = initialized.sourceArtifact.tracks.find((track) => track.kind === "audio");
   if (!audioTrack) throw new Error("Bounded runtime application requires one registered audio track");
   const mediaScope = [{
@@ -235,6 +250,7 @@ export async function runBoundedRuntimeApplication(
     sourceArtifact: initialized.sourceArtifact,
     evidenceArtifacts: initialized.evidenceArtifacts,
     analysisRequest: initialized.runStart.analysisRequest,
+    reviewedMemory,
   }));
   const reports = new BoundedReportHost(ledger, undefined, artifacts);
   const mediaHost = new FfmpegCapabilityHost(ledger, artifacts);

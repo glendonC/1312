@@ -34,6 +34,7 @@ function task(): TaskRecord {
     selectedLanguagePackId: null,
     outputDepth: "evidence" as const,
     detectorEvidence: [],
+    reviewedMemory: null,
   };
   return {
     id: "task:worker-contract",

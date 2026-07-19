@@ -59,6 +59,8 @@ run artifacts (withholds, uncorroborated commits, phenomenon hits, cold/prepped 
   -> score       scripts/score-run.mjs fills per_line/trail/delta_vs_cold + score receipt
   -> compare     scripts/compare-scores.mjs rederives one without/with clip pair
   -> register    scripts/register-rule-change.mjs freezes one rule and the complete run grid
+  -> certify     scripts/certify-rule-change-release.mjs freezes exact path-free host context
+  -> execute     scripts/run-rule-change-attempt.mjs commits one charge, invokes closed adapter, binds capture
   -> evaluate    scripts/qualify-rule-change.mjs measures or refuses the complete grid
 ```
 
@@ -70,7 +72,9 @@ test data.
 
 The schemas live in `bench/schemas/` (`gold.schema.json`, `adjudication.schema.json`,
 `ablation.schema.json`, `paired-score-v2.schema.json`, `rule-change-registration.schema.json`,
-`rule-change-result.schema.json`, and `u7-ablation-inputs.schema.json`). Candidate, pack, freeze,
+`rule-change-result.schema.json`, `rule-change-result-v2.schema.json`,
+`certified-release.schema.json`, `capture-executor.schema.json`, the execution receipt schemas, and
+`u7-ablation-inputs.schema.json`). Candidate, pack, freeze,
 output-label, score, ablation, rule-change, and U7 packaging invariants are enforced by
 `scripts/lib/bench-gold.mjs`, `scripts/lib/bench-ablation.mjs`,
 `scripts/lib/bench-rule-change.mjs`, `scripts/lib/bench-u7-ablation.mjs`, and `check-bench`. The
@@ -146,7 +150,7 @@ Partial text from a truncated result is never emitted. The capture binding keeps
 judge, and preference null. If captures enter `bench/runs/`, score-everything deliberately keeps the
 repository red until blinded human labels and a score receipt exist for each capture.
 
-### `studio.bench.rule-change-registration.v1` and `studio.bench.rule-change-result.v1`
+### Rule-change registration, certified execution, and result contracts
 
 The registration is a result-free plan for one behavioral rule proposal. It cold-binds the exact
 proposal and rule bytes, a training-routed candidates manifest, a validated redistributable YouTube
@@ -161,16 +165,50 @@ before a committed result.
 The result accepts only the complete preregistered run grid. It reopens each paired receipt, score,
 and capture, checks exact baseline and variant configs, rejects score reuse and unplanned matching
 captures, and rederives aggregate four-way outcomes. The variance floor is the maximum repeated-run
-rate range observed within either condition for any clip. Future qualification requires a preregistered
+rate range observed within either condition for any clip. Qualification requires a preregistered
 minimum effect of at least 0.25, an effect strictly greater than that floor, no increase in total
 catastrophic errors, and no newly catastrophic critical unit. V1 cannot establish that only one
 attempt ran or that the declared configuration produced the capture bytes. Those checks are pinned
 false, so every V1 result is `refused` and `ineligible` even when the measured effect clears the
-preregistered floor and variance. It does not accept a memory proposal, consume reviewed memory,
-inject a production rule, grade its own outputs, or prove improvement on a later pack. The existing
-memory ledger acceptance path is not yet dependent on this result. A future bench-owned
-single-attempt host and certified-release resolver must close those boundaries before eligibility
-or runtime deployment can support a self-improvement claim.
+preregistered floor and variance. V1 remains immutable historical refusal evidence.
+
+`studio.bench.certified-release.v1` cold-reopens the registration and candidate proposal, then
+compiles the selected side into `studio.bench.certified-host-context.v1`. The compiler accepts one
+closed `{ instruction }` rule value, removes evidence paths, rejects filesystem authority in the
+host context, and content-addresses the exact config and rule bytes. The release also resolves the
+exact evaluation media from each frozen-pack clip. A hard-pack source requires a canonical prompt
+authority committed before the freeze, and that authority must bind the media named by the exact
+candidates-bound run receipt. V1 certified releases are only for rule-change qualification and pin
+`runtime_deployable` false.
+
+The bench-owned single-attempt host writes `studio.bench.execution-input.v1`, then charges the
+canonical preregistered slot with `studio.bench.single-attempt-charge.v1`. Its journal binds the
+charge and current `HEAD`, then the host commits the exact input, charge, and journal files before
+invoking the adapter. Committed charge history makes a deleted attempt remain spent. The host
+accepts no media path from the caller. It resolves the frozen media from the certified release and
+hashes the exact in-memory buffer before passing immutable base64 bytes with the path-free host
+context. Cold verification reopens the coordinator and adapter from the journal's precharge commit,
+so a later host version cannot reinterpret an older proof.
+
+`studio.bench.capture-executor.v1` binds the exact single-attempt coordinator and one closed
+host-owned adapter. The host does not load caller-supplied code. Current adapters are deterministic
+contract fixtures that produce one output or fail once, with zero retries and no selection. They
+have no provider or product-runtime authority. The host writes the returned capture with an
+exclusive create, records `studio.bench.execution-attribution.v1`, and commits both exact files in
+one outcome commit. An adapter failure leaves the slot charged. Retry, overwrite, deleted charge,
+duplicate identity, source substitution, host substitution, adapter substitution, and pre-commit
+capture replacement fail closed. Repository checks require the charge commit after release and
+executor certification, and the outcome commit after the charge.
+
+`studio.bench.rule-change-result.v2` optionally binds those attribution receipts per side and run.
+Missing any proof keeps `single_attempt_proven` and `execution_attribution_proven` false. Complete
+proofs are cold-reopened through release, input, charge, source, and score-bound capture bytes. Only
+then can the existing mechanical checks yield `eligible_for_human_review`. V2 does not accept a
+memory proposal, deploy a production rule, grade its own outputs, prove a real score win, or prove
+improvement on a later pack. The existing memory ledger acceptance path is not yet dependent on
+this result, and runtime deployment has no certified-release injection proof. The closed V1
+adapters have no provider or product-runtime authority. A future provider adapter needs a narrow
+host-owned one-call seam and receipt before provider-backed captures can enter this proof chain.
 
 ## Honesty invariants (each mechanical, each fail-closed)
 
@@ -190,10 +228,11 @@ or runtime deployment can support a self-improvement claim.
    PRODUCT.md core-loop wording ("misses → bench + glossary + …"): one miss feeds **either**
    the bench **or** the learning stream, never both. That is the price of an honest curve.
 4. **Score-everything.** Every capture pinned into `bench/runs/` after a pack freeze must have a
-   score receipt or `check-bench` fails. This catches committed omissions, but it cannot see a local
-   attempt discarded or overwritten before commit. Behavioral-rule V1 therefore pins
-   `single_attempt_proven` false. A future bench-owned host must charge one immutable attempt before
-   invocation and forbid retries.
+   score receipt or `check-bench` fails. Behavioral-rule V1 pins `single_attempt_proven` false. V2
+   accepts only the bench-owned host receipt chain. Before invoking a closed host-owned adapter, the
+   host charges one canonical slot and commits the exact charge evidence. The current adapters
+   produce one deterministic output or fail once. The host never retries, commits the exact outcome,
+   and treats a failed or locally deleted slot as spent.
 5. **Variance floor.** Behavioral-rule registration requires at least three repetitions per clip.
    Qualification refuses an effect that does not strictly exceed the maximum within-condition clip
    range. At the initial pack size (~40–60 units), a preregistered minimum such as 0.25 is a
@@ -255,13 +294,21 @@ or runtime deployment can support a self-improvement claim.
    bytes before capture, rederives the complete paired grid, measures repeated-run spread, and
    refuses eligibility because single-attempt and execution attribution are not yet provable. No
    committed campaign result exists.
+8. ✅ IL-02-eligibility certified execution in `scripts/lib/bench-certified-release.mjs` and
+   `scripts/lib/bench-single-attempt.mjs`. Additive V2 results cold-reopen exact qualification-only
+   release, frozen source, closed host and adapter, input, charge journal, outcome commit,
+   attribution, and capture bytes. Missing proofs remain refused. Deterministic tests prove retry,
+   overwrite, deleted or duplicate attempt id, caller executable rejection, stale config, source
+   substitution, and pre-commit capture replacement refusal. No real campaign result, provider
+   adapter, or runtime deployment authority was created.
 
 Post-week update: `hard-ko-v1` is frozen at three clips and run-007 is scored from human labels with
 `judge: null`. One raw-versus-eligible-stem experiment is pre-registered, its frozen inputs are
 content-bound, and its cold-audit packager is implemented with no captures or results. The
 paired-score comparator and behavioral-rule evaluation spine are implemented. They preserve
 four-way outcome deltas, cold-rederive stored receipts, preregister exact repeated-run grids, and
-refuse effects below observed spread or with catastrophic increase. No committed behavioral-rule
+refuse effects below observed spread or with catastrophic increase. The bench now has certified
+qualification releases and a journaled closed-adapter capture host. No committed behavioral-rule
 registration, with-side score, or eligible result exists. The runtime has no accepted
 certified-release injection proof. Next are real training-routed proposals, registered paired
 captures and human labels, then a later independently frozen pack before any generalization claim.
@@ -272,7 +319,7 @@ captures and human labels, then a later independently frozen pack before any gen
 |---|---|
 | Self-graded gold (drafter == judge) | agents draft candidates only; two blinded human receipts freeze; candidates structurally unscoreable |
 | Knowledge-level contamination | clip/episode-level guard + exclusive routing (invariants 2–3) |
-| Best-of-K curve mining | V1 refuses eligibility; a future host must charge one attempt before invocation (invariant 4) |
+| Best-of-K curve mining | V1 refuses eligibility; V2 commits one charge per slot and admits only closed host adapters with one deterministic output (invariant 4) |
 | Noise sold as progress | preregistered minimum effect plus observed repeated-run floor (invariant 5) |
 | Skeleton-key rule promotion | ablation-bound acceptance (invariant 6) |
 | Teach-to-the-test pack drift | control clips + pack versioning (invariant 7) |

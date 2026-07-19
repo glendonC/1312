@@ -15,6 +15,7 @@
     "side",
     "system_id",
     "configuration",
+    "evaluation_sources",
     "reviewed_memory",
     "host_context"
   ],
@@ -42,6 +43,21 @@
       "properties": {
         "config_id": { "type": "string", "pattern": "^bench-config:sha256:[a-f0-9]{64}$" },
         "config": { "type": "object", "minProperties": 1 }
+      }
+    },
+    "evaluation_sources": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["clip_id", "authority", "artifact"],
+        "properties": {
+          "clip_id": { "type": "string", "minLength": 1 },
+          "authority": { "$ref": "#/$defs/fileBinding" },
+          "artifact": { "$ref": "#/$defs/fileBinding" }
+        }
       }
     },
     "reviewed_memory": {

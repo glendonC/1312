@@ -11,6 +11,7 @@
     "attempt_id",
     "registration",
     "release",
+    "executor",
     "plan",
     "source",
     "host_context_id"
@@ -36,6 +37,24 @@
       "properties": {
         "receipt": { "$ref": "#/$defs/fileBinding" },
         "release_id": { "type": "string", "pattern": "^bench-certified-release:sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "executor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt", "executor_id", "adapter_id", "host_content_id", "implementation_content_id"],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "executor_id": { "type": "string", "pattern": "^bench-capture-executor:sha256:[a-f0-9]{64}$" },
+        "adapter_id": {
+          "enum": [
+            "deterministic_fixture_v1",
+            "deterministic_fixture_failure_v1",
+            "deterministic_fixture_stale_config_v1"
+          ]
+        },
+        "host_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "implementation_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
       }
     },
     "plan": {

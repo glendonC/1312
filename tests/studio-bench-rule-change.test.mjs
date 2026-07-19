@@ -7,9 +7,17 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
+  CAPTURE_ADAPTER_IMPLEMENTATIONS,
+  CAPTURE_HOST_IMPLEMENTATION_PATH,
+  captureExecutorPath,
+  materializeCaptureExecutor,
+} from "../scripts/lib/bench-capture-executor.mjs";
+import {
   certifiedReleasePath,
   materializeCertifiedRelease,
+  resolveCertifiedEvaluationSources,
   resolveCertifiedRelease,
+  validateCertifiedPromptMedia,
 } from "../scripts/lib/bench-certified-release.mjs";
 import {
   auditSingleAttemptCharges,
@@ -135,6 +143,13 @@ async function fixture({
 
   const packId = "fixture-pack";
   const evaluationClip = "evaluation-clip";
+  const evaluationSourcePath = "bench/inputs/evaluation-clip.bin";
+  await mkdir(dirname(join(workspace, evaluationSourcePath)), { recursive: true });
+  await writeFile(join(workspace, evaluationSourcePath), "synthetic evaluation media bytes\n");
+  const evaluationSourceBinding = await fileReceipt(
+    join(workspace, evaluationSourcePath),
+    evaluationSourcePath,
+  );
   const gold = {
     schema: "studio.bench.gold.v1",
     pack_id: packId,
@@ -219,7 +234,11 @@ async function fixture({
         role: "hard",
         status: "frozen",
         clip_id: evaluationClip,
-        source: { kind: "owned", note: "Synthetic test source." },
+        source: {
+          kind: "owned",
+          note: "Synthetic test source.",
+          local_copy: evaluationSourceBinding,
+        },
         gold_path: "fixture-gold.json",
         candidates_manifest: null,
       },
@@ -432,6 +451,34 @@ async function fixture({
     }
   }
 
+  for (const implementationPath of [
+    CAPTURE_HOST_IMPLEMENTATION_PATH,
+    ...Object.values(CAPTURE_ADAPTER_IMPLEMENTATIONS),
+  ]) {
+    await mkdir(dirname(join(workspace, implementationPath)), { recursive: true });
+    await writeFile(
+      join(workspace, implementationPath),
+      await readFile(join(ROOT, implementationPath)),
+    );
+  }
+  const executor = await materializeCaptureExecutor(
+    {
+      adapterId: "deterministic_fixture_v1",
+      notes: "Synthetic executor for deterministic contract tests only.",
+    },
+    { workspaceRoot: workspace },
+  );
+  const executorPath = captureExecutorPath(executor);
+  await writeImmutableJson(join(workspace, executorPath), executor);
+
+  const fixtureGit = (...args) => execFileSync("git", args, { cwd: workspace, stdio: "pipe" }).toString().trim();
+  fixtureGit("init");
+  fixtureGit("config", "user.name", "Rule Change Fixture");
+  fixtureGit("config", "user.email", "rule-change@example.test");
+  fixtureGit("config", "commit.gpgsign", "false");
+  fixtureGit("add", "--", "bench", "memory", "public", "scripts");
+  fixtureGit("commit", "-m", "Create fixture prerequisites");
+
   return {
     workspace,
     draft,
@@ -442,6 +489,8 @@ async function fixture({
     variantConfig,
     captureAndScore,
     makeCapture,
+    executorPath,
+    git: fixtureGit,
   };
 }
 
@@ -456,13 +505,20 @@ async function certifyFixtureSide(held, side, createdAt = "2026-07-19T01:00:00.0
   );
   const path = certifiedReleasePath(release);
   await writeImmutableJson(join(held.workspace, path), release);
+  held.git("add", "--", path);
+  held.git("commit", "-m", `Certify ${side} fixture release`);
   return { release, path };
 }
 
-async function fixtureSourceInput(held) {
-  const path = "bench/inputs/evaluation-clip.bin";
-  await mkdir(dirname(join(held.workspace, path)), { recursive: true });
-  await writeFile(join(held.workspace, path), "synthetic evaluation media bytes\n");
+async function installFixtureExecutor(held, adapterId, name) {
+  const executor = await materializeCaptureExecutor(
+    { adapterId, notes: `Synthetic ${name} adapter for hostile contract tests.` },
+    { workspaceRoot: held.workspace },
+  );
+  const path = captureExecutorPath(executor);
+  await writeImmutableJson(join(held.workspace, path), executor);
+  held.git("add", "--", path);
+  held.git("commit", "-m", `Install ${name} fixture executor`);
   return path;
 }
 
@@ -500,29 +556,71 @@ test("certified releases cold-reopen exact candidate rule and path-free host con
   );
 });
 
-test("single-attempt host charges before invocation and makes retry or overwrite impossible", async (t) => {
+test("certified source resolution reopens hard-ko-v1 redistributed media", async () => {
+  const packPath = "bench/packs/hard-ko-v1/pack.json";
+  const freezePath = "bench/packs/hard-ko-v1/freeze.json";
+  const sources = await resolveCertifiedEvaluationSources(
+    {
+      pack: {
+        manifest: await fileReceipt(join(ROOT, packPath), packPath),
+        freeze: await fileReceipt(join(ROOT, freezePath), freezePath),
+      },
+      capture_plan: [{ clip_id: "Ux-TMWnmntM" }],
+    },
+    ROOT,
+  );
+  assert.deepEqual(sources, [
+    {
+      clip_id: "Ux-TMWnmntM",
+      authority: await fileReceipt(
+        join(ROOT, "bench/prompts/gold-drafter-v1/manifest.json"),
+        "bench/prompts/gold-drafter-v1/manifest.json",
+      ),
+      artifact: await fileReceipt(
+        join(ROOT, "public/demo/runs/run-006/clip.mp4"),
+        "public/demo/runs/run-006/clip.mp4",
+      ),
+    },
+  ]);
+
+  const promptPath = "bench/prompts/gold-drafter-v1/manifest.json";
+  const candidatesPath = "bench/candidates/run-006/candidates.json";
+  const candidatesManifest = await json(join(ROOT, candidatesPath));
+  const prompt = await json(join(ROOT, promptPath));
+  const mediaIndex = prompt.inputs.findIndex((input) => input.role === "media");
+  prompt.inputs[mediaIndex] = {
+    role: "media",
+    ...await fileReceipt(
+      join(ROOT, "public/demo/runs/run-007/clip.mp4"),
+      "public/demo/runs/run-007/clip.mp4",
+    ),
+  };
+  prompt.prompt_id = receiptIdFor("bench-gold-prompt", prompt, "prompt_id");
+  await assert.rejects(
+    validateCertifiedPromptMedia(prompt, {
+      clipId: "Ux-TMWnmntM",
+      packId: "hard-ko-v1",
+      candidates: await fileReceipt(join(ROOT, candidatesPath), candidatesPath),
+      candidatesManifest,
+      workspaceRoot: ROOT,
+    }),
+    /media differs from the frozen candidates run receipt/,
+  );
+});
+
+test("single-attempt host commits its exact outcome and makes retry or overwrite impossible", async (t) => {
   const held = await fixture({ buildGrid: false });
   t.after(() => rm(held.workspace, { recursive: true, force: true }));
   const without = await certifyFixtureSide(held, "without");
-  const sourcePath = await fixtureSourceInput(held);
   const plan = held.registration.capture_plan[0];
-  let invocations = 0;
   const run = plan.without_run;
   const state = await runSingleAttempt(
     {
       registrationPath: held.registrationPath,
       releasePath: without.path,
+      executorManifestPath: held.executorPath,
       run,
       side: "without",
-      sourcePath,
-      executor: async (input) => {
-        invocations += 1;
-        await access(join(held.workspace, singleAttemptPaths(run).charge));
-        assert.equal(Object.isFrozen(input), true);
-        assert.equal(Object.isFrozen(input.hostContext), true);
-        assert.equal("path" in input.source, false);
-        return { capture: held.makeCapture(run, held.baselineConfig) };
-      },
     },
     {
       workspaceRoot: held.workspace,
@@ -531,7 +629,7 @@ test("single-attempt host charges before invocation and makes retry or overwrite
       validateRegistration: validateRuleChangeRegistration,
     },
   );
-  assert.equal(invocations, 1);
+  await access(join(held.workspace, singleAttemptPaths(run).charge));
   const proof = await verifyExecutionAttribution(state.paths.attribution, {
     workspaceRoot: held.workspace,
     registration: held.registration,
@@ -551,72 +649,110 @@ test("single-attempt host charges before invocation and makes retry or overwrite
       {
         registrationPath: held.registrationPath,
         releasePath: without.path,
+        executorManifestPath: held.executorPath,
         run,
         side: "without",
-        sourcePath,
-        executor: async () => {
-          invocations += 1;
-          return { capture: held.makeCapture(run, held.baselineConfig) };
-        },
       },
       { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
     ),
-    /slot is spent/,
+    /slot is spent|already charged/,
   );
-  assert.equal(invocations, 1);
 
   const overwriteRun = held.registration.capture_plan[1].without_run;
   const overwritePaths = singleAttemptPaths(overwriteRun);
   await writeJson(join(held.workspace, overwritePaths.capture), { sentinel: true });
-  let overwriteInvocations = 0;
   await assert.rejects(
     runSingleAttempt(
       {
         registrationPath: held.registrationPath,
         releasePath: without.path,
+        executorManifestPath: held.executorPath,
         run: overwriteRun,
         side: "without",
-        sourcePath,
-        executor: async () => {
-          overwriteInvocations += 1;
-          return { capture: held.makeCapture(overwriteRun, held.baselineConfig) };
-        },
       },
       { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
     ),
     /capture already exists/,
   );
-  assert.equal(overwriteInvocations, 0);
   assert.deepEqual(await json(join(held.workspace, overwritePaths.capture)), { sentinel: true });
+
+  await writeFile(
+    join(held.workspace, CAPTURE_HOST_IMPLEMENTATION_PATH),
+    `${await readFile(join(ROOT, CAPTURE_HOST_IMPLEMENTATION_PATH), "utf8")}\n// later compatible host version\n`,
+  );
+  held.git("add", "--", CAPTURE_HOST_IMPLEMENTATION_PATH);
+  held.git("commit", "-m", "Upgrade fixture capture host");
+  const reopenedAfterHostUpgrade = await verifyExecutionAttribution(state.paths.attribution, {
+    workspaceRoot: held.workspace,
+    registration: held.registration,
+    expectedRegistration: await fileReceipt(
+      join(held.workspace, held.registrationPath),
+      held.registrationPath,
+    ),
+    expectedRun: run,
+    expectedSide: "without",
+    expectedCapture: await fileReceipt(join(held.workspace, state.paths.capture), state.paths.capture),
+    validateRegistration: validateRuleChangeRegistration,
+  });
+  assert.equal(reopenedAfterHostUpgrade.attempt_id, state.attribution.attempt_id);
+
+  const forgedCapture = await json(join(held.workspace, state.paths.capture));
+  forgedCapture.units[0].outputs[held.registration.subject.system_id].text = "Forged after invocation.";
+  await writeJson(join(held.workspace, state.paths.capture), forgedCapture);
+  const forgedCaptureBinding = await fileReceipt(join(held.workspace, state.paths.capture), state.paths.capture);
+  const forgedAttribution = await json(join(held.workspace, state.paths.attribution));
+  forgedAttribution.capture = { ...forgedCaptureBinding, id: forgedCapture.capture_id };
+  const { attribution_id: _forgedId, ...forgedAttributionBody } = forgedAttribution;
+  forgedAttribution.attribution_id = `bench-execution-attribution:${contentIdForJson({
+    attribution_id: null,
+    ...forgedAttributionBody,
+  })}`;
+  await writeJson(join(held.workspace, state.paths.attribution), forgedAttribution);
+  await assert.rejects(
+    verifyExecutionAttribution(state.paths.attribution, {
+      workspaceRoot: held.workspace,
+      registration: held.registration,
+      expectedRegistration: await fileReceipt(
+        join(held.workspace, held.registrationPath),
+        held.registrationPath,
+      ),
+      expectedRun: run,
+      expectedSide: "without",
+      expectedCapture: forgedCaptureBinding,
+      validateRegistration: validateRuleChangeRegistration,
+    }),
+    /uncommitted or changed after its evidence commit/,
+  );
+
 });
 
 test("failed single attempt remains charged and duplicate attempt ids fail closed", async (t) => {
   const held = await fixture({ buildGrid: false });
   t.after(() => rm(held.workspace, { recursive: true, force: true }));
   const without = await certifyFixtureSide(held, "without");
-  const sourcePath = await fixtureSourceInput(held);
+  const failingExecutorPath = await installFixtureExecutor(
+    held,
+    "deterministic_fixture_failure_v1",
+    "failing-single-attempt",
+  );
   const run = held.registration.capture_plan[0].without_run;
-  let invocations = 0;
   await assert.rejects(
     runSingleAttempt(
       {
         registrationPath: held.registrationPath,
         releasePath: without.path,
+        executorManifestPath: failingExecutorPath,
         run,
         side: "without",
-        sourcePath,
-        executor: async () => {
-          invocations += 1;
-          throw new Error("synthetic executor failure");
-        },
       },
       {
         workspaceRoot: held.workspace,
         chargedAt: "2026-07-20T00:00:00.000Z",
+        completedAt: "2026-07-20T00:01:00.000Z",
         validateRegistration: validateRuleChangeRegistration,
       },
     ),
-    /synthetic executor failure/,
+    /deterministic fixture executor failed after charge/,
   );
   const paths = singleAttemptPaths(run);
   await access(join(held.workspace, paths.charge));
@@ -626,19 +762,14 @@ test("failed single attempt remains charged and duplicate attempt ids fail close
       {
         registrationPath: held.registrationPath,
         releasePath: without.path,
+        executorManifestPath: held.executorPath,
         run,
         side: "without",
-        sourcePath,
-        executor: async () => {
-          invocations += 1;
-          return { capture: held.makeCapture(run, held.baselineConfig) };
-        },
       },
       { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
     ),
-    /slot is spent/,
+    /slot is spent|already charged/,
   );
-  assert.equal(invocations, 1);
 
   const duplicateRun = `${run}-duplicate`;
   const duplicatePath = singleAttemptPaths(duplicateRun).charge;
@@ -647,22 +778,153 @@ test("failed single attempt remains charged and duplicate attempt ids fail close
     auditSingleAttemptCharges({ workspaceRoot: held.workspace }),
     /duplicate attempt id/,
   );
+  await rm(join(held.workspace, dirname(duplicatePath)), { recursive: true, force: true });
+  await rm(join(held.workspace, dirname(paths.charge)), { recursive: true, force: true });
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run,
+        side: "without",
+      },
+      { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
+    ),
+    /names a deleted charge/,
+  );
+});
+
+test("single-attempt host refuses tampered frozen media, host, and adapter bytes before invocation", async (t) => {
+  const held = await fixture({ buildGrid: false });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const sourcePath = "bench/inputs/evaluation-clip.bin";
+  const firstRun = held.registration.capture_plan[0].without_run;
+  const unrelatedPath = "bench/inputs/unrelated.bin";
+  await writeFile(join(held.workspace, unrelatedPath), "unrelated bytes\n");
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run: firstRun,
+        side: "without",
+        sourcePath: unrelatedPath,
+      },
+      { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
+    ),
+    /keys must be exactly/,
+  );
+  await writeFile(join(held.workspace, sourcePath), "substituted evaluation media bytes\n");
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run: firstRun,
+        side: "without",
+      },
+      { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
+    ),
+    /evaluation source|no longer matches its recorded bytes/,
+  );
+  await assert.rejects(access(join(held.workspace, singleAttemptPaths(firstRun).charge)));
+
+  await writeFile(join(held.workspace, sourcePath), "synthetic evaluation media bytes\n");
+  await writeFile(
+    join(held.workspace, CAPTURE_HOST_IMPLEMENTATION_PATH),
+    `${await readFile(join(ROOT, CAPTURE_HOST_IMPLEMENTATION_PATH), "utf8")}\n// substituted after certification\n`,
+  );
+  const secondRun = held.registration.capture_plan[1].without_run;
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run: secondRun,
+        side: "without",
+      },
+      { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
+    ),
+    /capture executor host|no longer matches its recorded bytes/,
+  );
+  await assert.rejects(access(join(held.workspace, singleAttemptPaths(secondRun).charge)));
+  await writeFile(
+    join(held.workspace, CAPTURE_HOST_IMPLEMENTATION_PATH),
+    await readFile(join(ROOT, CAPTURE_HOST_IMPLEMENTATION_PATH)),
+  );
+
+  const fixtureAdapterPath = CAPTURE_ADAPTER_IMPLEMENTATIONS.deterministic_fixture_v1;
+  await writeFile(
+    join(held.workspace, fixtureAdapterPath),
+    `${await readFile(join(ROOT, fixtureAdapterPath), "utf8")}\n// substituted after certification\n`,
+  );
+  const thirdRun = held.registration.capture_plan[2].without_run;
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run: thirdRun,
+        side: "without",
+      },
+      { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
+    ),
+    /capture executor implementation|no longer matches its recorded bytes/,
+  );
+  await assert.rejects(access(join(held.workspace, singleAttemptPaths(thirdRun).charge)));
+});
+
+test("single-attempt host refuses caller-supplied executable authority", async (t) => {
+  const held = await fixture({ buildGrid: false });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const hostileExecutor = await json(join(held.workspace, held.executorPath));
+  hostileExecutor.module = {
+    path: "scripts/bench-executors/hostile.mjs",
+    content_id: `sha256:${"f".repeat(64)}`,
+    bytes: 1,
+  };
+  await writeJson(join(held.workspace, held.executorPath), hostileExecutor);
+  const run = held.registration.capture_plan[0].without_run;
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run,
+        side: "without",
+      },
+      {
+        workspaceRoot: held.workspace,
+        chargedAt: "2026-07-20T00:00:00.000Z",
+        completedAt: "2026-07-20T00:01:00.000Z",
+        validateRegistration: validateRuleChangeRegistration,
+      },
+    ),
+    /additional properties|capture executor/i,
+  );
+  await assert.rejects(access(join(held.workspace, singleAttemptPaths(run).charge)));
 });
 
 test("execution attribution refuses a missing charge", async (t) => {
   const held = await fixture({ buildGrid: false });
   t.after(() => rm(held.workspace, { recursive: true, force: true }));
   const without = await certifyFixtureSide(held, "without");
-  const sourcePath = await fixtureSourceInput(held);
   const run = held.registration.capture_plan[0].without_run;
   const state = await runSingleAttempt(
     {
       registrationPath: held.registrationPath,
       releasePath: without.path,
+      executorManifestPath: held.executorPath,
       run,
       side: "without",
-      sourcePath,
-      executor: async () => ({ capture: held.makeCapture(run, held.baselineConfig) }),
     },
     {
       workspaceRoot: held.workspace,
@@ -694,7 +956,6 @@ test("rule change V2 qualifies only when every capture has certified execution p
   t.after(() => rm(held.workspace, { recursive: true, force: true }));
   const withoutRelease = await certifyFixtureSide(held, "without");
   const withRelease = await certifyFixtureSide(held, "with", "2026-07-19T01:01:00.000Z");
-  const sourcePath = await fixtureSourceInput(held);
   const proofPaths = [];
   const pairPaths = [];
 
@@ -703,12 +964,9 @@ test("rule change V2 qualifies only when every capture has certified execution p
       {
         registrationPath: held.registrationPath,
         releasePath: withoutRelease.path,
+        executorManifestPath: held.executorPath,
         run: plan.without_run,
         side: "without",
-        sourcePath,
-        executor: async () => ({
-          capture: held.makeCapture(plan.without_run, held.baselineConfig),
-        }),
       },
       {
         workspaceRoot: held.workspace,
@@ -721,12 +979,9 @@ test("rule change V2 qualifies only when every capture has certified execution p
       {
         registrationPath: held.registrationPath,
         releasePath: withRelease.path,
+        executorManifestPath: held.executorPath,
         run: plan.with_run,
         side: "with",
-        sourcePath,
-        executor: async () => ({
-          capture: held.makeCapture(plan.with_run, held.variantConfig),
-        }),
       },
       {
         workspaceRoot: held.workspace,
@@ -801,21 +1056,25 @@ test("single-attempt host refuses a capture carrying a stale configuration", asy
   const held = await fixture({ buildGrid: false });
   t.after(() => rm(held.workspace, { recursive: true, force: true }));
   const without = await certifyFixtureSide(held, "without");
-  const sourcePath = await fixtureSourceInput(held);
+  const staleExecutorPath = await installFixtureExecutor(
+    held,
+    "deterministic_fixture_stale_config_v1",
+    "stale-config-single-attempt",
+  );
   const run = held.registration.capture_plan[0].without_run;
   await assert.rejects(
     runSingleAttempt(
       {
         registrationPath: held.registrationPath,
         releasePath: without.path,
+        executorManifestPath: staleExecutorPath,
         run,
         side: "without",
-        sourcePath,
-        executor: async () => ({ capture: held.makeCapture(run, held.variantConfig) }),
       },
       {
         workspaceRoot: held.workspace,
         chargedAt: "2026-07-20T00:00:00.000Z",
+        completedAt: "2026-07-20T00:01:00.000Z",
         validateRegistration: validateRuleChangeRegistration,
       },
     ),
@@ -823,6 +1082,25 @@ test("single-attempt host refuses a capture carrying a stale configuration", asy
   );
   await access(join(held.workspace, singleAttemptPaths(run).charge));
   await assert.rejects(access(join(held.workspace, singleAttemptPaths(run).capture)));
+});
+
+test("historical V1 rule-change results cold-rederive with their original bytes", async (t) => {
+  const held = await fixture();
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const result = await materializeRuleChangeResult(
+    {
+      registrationPath: held.registrationPath,
+      pairPaths: held.pairPaths,
+      resultSchema: RULE_CHANGE_SCHEMAS.resultV1,
+    },
+    { workspaceRoot: held.workspace, evaluatedAt: "2026-07-22T00:00:00.000Z" },
+  );
+  assert.equal(
+    result.notes,
+    "Mechanical evaluation only. V1 refuses promotion because no host-owned single-attempt and execution-attribution receipt exists. This receipt does not prove a later run consumed the rule.",
+  );
+  assert.equal(result.qualification.checks.single_attempt_proven, false);
+  await verifyRuleChangeResult(result, { workspaceRoot: held.workspace });
 });
 
 test("rule change registration is result-free, contamination-guarded, and exact-change bound", async (t) => {

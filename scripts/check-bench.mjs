@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import { validateAblationRegistration } from "./lib/bench-ablation.mjs";
+import { readCaptureExecutorManifest } from "./lib/bench-capture-executor.mjs";
 import { resolveCertifiedRelease } from "./lib/bench-certified-release.mjs";
 import {
   compareSubjectScores,
@@ -302,9 +303,11 @@ const ruleChangeResultV2Schema = JSON.parse(
 );
 const validateRuleChangeResultV2Schema = ajv.compile(ruleChangeResultV2Schema);
 for (const schemaName of [
+  "capture-executor.schema.json",
   "certified-release.schema.json",
   "execution-input.schema.json",
   "single-attempt-charge.schema.json",
+  "single-attempt-journal.schema.json",
   "execution-attribution.schema.json",
 ]) {
   ajv.compile(JSON.parse(readFileSync(new URL(`../bench/schemas/${schemaName}`, import.meta.url), "utf8")));
@@ -689,9 +692,20 @@ if (existsSync(releasesDir)) {
     certifiedReleasesChecked += 1;
   }
 }
-const singleAttemptCharges = await auditSingleAttemptCharges({ workspaceRoot: ROOT });
+const executorsDir = join(ROOT, "bench/executors");
+let captureExecutorsChecked = 0;
+if (existsSync(executorsDir)) {
+  for (const entry of readdirSync(executorsDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    await readCaptureExecutorManifest(`bench/executors/${entry.name}`, { workspaceRoot: ROOT });
+    captureExecutorsChecked += 1;
+  }
+}
+const singleAttemptCharges = await auditSingleAttemptCharges({
+  workspaceRoot: ROOT,
+});
 console.log(
-  `certified execution check passed: ${certifiedReleasesChecked} release(s), ${singleAttemptCharges.length} charged attempt(s)`,
+  `certified execution check passed: ${certifiedReleasesChecked} release(s), ${captureExecutorsChecked} executor(s), ${singleAttemptCharges.length} charged attempt(s)`,
 );
 
 const ruleChangesDir = join(ROOT, "bench/rule-changes");
@@ -760,6 +774,22 @@ try {
 }
 for (const historical of new Set(ruleChangeHistory)) {
   assert(existsSync(join(ROOT, historical)), `committed rule change artifact ${historical} was deleted`);
+}
+let certifiedExecutionHistory = [];
+try {
+  certifiedExecutionHistory = execSync(
+    "git log --diff-filter=A --name-only --format= -- bench/attempts bench/releases bench/executors scripts/lib/bench-single-attempt.mjs scripts/lib/bench-adapters",
+    { cwd: ROOT, stdio: "pipe" },
+  )
+    .toString()
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+} catch {
+  console.log("certified execution history unverified: not a git checkout or git unavailable");
+}
+for (const historical of new Set(certifiedExecutionHistory)) {
+  assert(existsSync(join(ROOT, historical)), `committed certified execution artifact ${historical} was deleted`);
 }
 
 if (existsSync(ruleChangesDir)) {
@@ -830,6 +860,10 @@ if (existsSync(ruleChangesDir)) {
             workspaceRoot: ROOT,
             context: `rule change ${entry.name} ${side} attempt charge`,
           });
+          const journalCommit = immutableArtifactCommit(attribution.charge_journal.path, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} attempt charge journal`,
+          });
           const input = await readJsonFile(
             join(ROOT, attribution.execution_input.path),
             `rule change ${entry.name} ${side} execution input`,
@@ -842,7 +876,74 @@ if (existsSync(ruleChangesDir)) {
               context: `rule change ${entry.name} ${side} certified release`,
             },
           );
-          executionCommits.push(attributionCommit, inputCommit, chargeCommit, releaseCommit);
+          const journalHead = attribution.charge_journal.head_commit;
+          assert(
+            inputCommit === chargeCommit &&
+              chargeCommit === journalCommit &&
+              journalCommit === attribution.charge_journal.charge_commit,
+            `rule change ${entry.name} ${side} input, charge, and journal must share the recorded charge commit`,
+          );
+          if (releaseCommit !== journalHead) {
+            assertCommitDescends(releaseCommit, journalHead, {
+              workspaceRoot: ROOT,
+              context: `rule change ${entry.name} ${side} pre-invocation charge anchor`,
+            });
+          }
+          assertCommitDescends(journalHead, inputCommit, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} execution input chronology`,
+          });
+          assertCommitDescends(journalHead, chargeCommit, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} attempt charge chronology`,
+          });
+          assertCommitDescends(journalHead, journalCommit, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} attempt journal chronology`,
+          });
+          assertCommitDescends(chargeCommit, captureCommit, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} capture chronology`,
+          });
+          if (captureCommit !== attributionCommit) {
+            assertCommitDescends(captureCommit, attributionCommit, {
+              workspaceRoot: ROOT,
+              context: `rule change ${entry.name} ${side} execution attribution chronology`,
+            });
+          }
+          const executorCommit = immutableArtifactCommit(input.executor.receipt.path, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} capture executor manifest`,
+          });
+          const executor = await readJsonFile(
+            join(ROOT, input.executor.receipt.path),
+            `rule change ${entry.name} ${side} capture executor manifest`,
+          );
+          const executorImplementationCommit = immutableArtifactCommit(executor.implementation.path, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} host-owned capture adapter`,
+          });
+          if (executorCommit !== journalHead) {
+            assertCommitDescends(executorCommit, journalHead, {
+              workspaceRoot: ROOT,
+              context: `rule change ${entry.name} ${side} capture executor chronology`,
+            });
+          }
+          if (executorImplementationCommit !== journalHead) {
+            assertCommitDescends(executorImplementationCommit, journalHead, {
+              workspaceRoot: ROOT,
+              context: `rule change ${entry.name} ${side} host-owned capture adapter chronology`,
+            });
+          }
+          executionCommits.push(
+            attributionCommit,
+            inputCommit,
+            chargeCommit,
+            journalCommit,
+            releaseCommit,
+            executorCommit,
+            executorImplementationCommit,
+          );
         }
       }
     }

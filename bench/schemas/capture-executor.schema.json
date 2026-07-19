@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/capture-executor.schema.json",
+  "title": "studio.bench.capture-executor.v1",
+  "description": "Content-addressed name for one closed host-owned capture adapter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "executor_id", "adapter_id", "host", "implementation", "attempt_policy", "notes"],
+  "properties": {
+    "schema": { "const": "studio.bench.capture-executor.v1" },
+    "executor_id": { "type": "string", "pattern": "^bench-capture-executor:sha256:[a-f0-9]{64}$" },
+    "adapter_id": {
+      "enum": [
+        "deterministic_fixture_v1",
+        "deterministic_fixture_failure_v1",
+        "deterministic_fixture_stale_config_v1"
+      ]
+    },
+    "host": { "$ref": "#/$defs/hostBinding" },
+    "implementation": { "$ref": "#/$defs/fileBinding" },
+    "attempt_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host_invocations", "retries", "selection"],
+      "properties": {
+        "host_invocations": { "const": 1 },
+        "retries": { "const": 0 },
+        "selection": { "const": "none" }
+      }
+    },
+    "notes": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "hostBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "const": "scripts/lib/bench-single-attempt.mjs" },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": {
+          "enum": [
+            "scripts/lib/bench-adapters/deterministic-fixture-v1.mjs",
+            "scripts/lib/bench-adapters/deterministic-fixture-failure-v1.mjs",
+            "scripts/lib/bench-adapters/deterministic-fixture-stale-config-v1.mjs"
+          ]
+        },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

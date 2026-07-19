@@ -35,7 +35,10 @@ bench/
     adjudication.schema.json  # one blinded human decision, bound to exact candidate bytes
     ablation.schema.json      # result-free plan for one exact config delta on frozen bytes
     paired-score-v2.schema.json # cold-rederived per-clip compare with regression detail
-    rule-change-*.schema.json # preregistered campaign and fail-closed evaluation
+    rule-change-*.schema.json # preregistered campaign plus V1 and V2 evaluation
+    certified-release.schema.json # exact qualification config and path-free rule context
+    capture-executor.schema.json # closed host-owned adapter identity and implementation bytes
+    *attempt*.schema.json     # charged execution input and capture attribution
     u7-ablation-inputs.schema.json # exact pre-capture source identities for one U7 ablation
   examples/
     unscored-report.json      # honest sample rendered by /benchmarks/
@@ -49,6 +52,9 @@ bench/
   runs/                       # pinned captures (bench-pin.mjs)
   scores/                     # human-labelled score receipts (studio.bench.score.v1)
   ablations/<slug>/           # immutable result-free registrations and pre-capture inputs
+  releases/                   # content-addressed qualification-only certified releases
+  executors/                  # content-addressed bench capture executor manifests
+  attempts/<run>/             # immutable input, charge, and attribution receipts
 ```
 
 ## State progression
@@ -87,7 +93,9 @@ Agents draft; humans decide; code freezes; nothing scores itself.
 | Freeze | `scripts/freeze-pack.mjs` | Freezing without two blinded accept receipts per clip from reviewers with distinct declared names AND git identities, neither the drafter; a control clip mined from our own misses; a training-routed clip |
 | Register | `scripts/register-ablation.mjs` | An unfrozen or byte-drifted pack; operator-authored ids or timestamps; more than one config leaf delta; fewer than three paired repetitions; non-null results or model judge; structural diagnostics with semantic authority |
 | Register rule | `scripts/register-rule-change.mjs` | A non-rule proposal; gold-routed or pack-contaminated origin; invalid YouTube identity; absent exact media bytes; result-bearing registration; more than one config leaf delta; fewer than three preregistered pairs per clip |
-| Evaluate rule | `scripts/qualify-rule-change.mjs` | A partial or substituted run grid; capture config drift; unplanned matching captures; post-hoc pairing; invented pair deltas; model judge. V1 always refuses promotion because no host-owned single-attempt or execution-attribution receipt exists. |
+| Certify rule input | `scripts/certify-rule-change-release.mjs` and `scripts/certify-rule-change-executor.mjs` | Registration, proposal, media, or executor byte drift; an unbounded candidate rule; config substitution; a filesystem-bearing host context; any claim of runtime deployment authority |
+| Execute rule capture | `scripts/run-rule-change-attempt.mjs` | Missing pre-invocation charge; retry; duplicate attempt id; deleted charge; existing destination; caller-supplied media path; stale config; executor, capture, input, release, or charge substitution |
+| Evaluate rule | `scripts/qualify-rule-change.mjs` | A partial or substituted run grid; capture config drift; unplanned matching captures; post-hoc pairing; invented pair deltas; model judge; missing or mismatched certified execution proof |
 | Package U7 | `scripts/package-u7-ablation.mjs` | An unregistered clip or source byte drift; a non-auditable runtime operation; changed raw/stem configs; one selected anonymous stem; partial output from an unavailable, unknown, or truncated recognizer; any semantic label, score, judge, or preference |
 | Score | `scripts/score-run.mjs` | Non-frozen or amended gold; a capture dated on or before the freeze day (pre-registration); an emitted line with no human label; a label for a line nothing emitted; any LLM judge (`judge` is pinned null) |
 | Check | `scripts/check-bench.mjs` | Route conflicts; a memory proposal drawing on a pack or gold-routed clip (clip-level, not byte-level); a post-freeze capture without a score receipt (score-everything); stale or result-bearing ablation registrations; byte drift in anything a receipt bound |
@@ -124,7 +132,8 @@ primitive does not establish exact configuration control, repetition variance, o
 qualification. No committed with-side score receipt exists yet.
 
 Behavioral rule campaigns use the additive
-`studio.bench.rule-change-registration.v1` and `studio.bench.rule-change-result.v1` contracts.
+`studio.bench.rule-change-registration.v1`, `studio.bench.rule-change-result.v1`, and
+`studio.bench.rule-change-result.v2` contracts.
 Registration binds one training-routed proposal to a validated redistributable YouTube identity,
 the exact recorded media bytes, exact rule bytes, the frozen pack, the fixed
 `/reviewed_memory/rule_content_id` leaf change, and every run id in the clip and repetition grid
@@ -134,10 +143,28 @@ rejects unplanned matching captures, measures the maximum within-condition clip 
 eligibility unless the critical meaning effect meets the preregistered floor of at least 0.25,
 exceeds observed spread, does not increase catastrophic count, and introduces no newly
 catastrophic critical unit. Repository checks require registration, capture, labels, score, pair,
-and result to land in that git ancestry order. V1 always returns `refused` and `ineligible`: the
-repository has no host-owned receipt that proves a single attempt or binds the declared
-configuration to execution and capture bytes. It does not promote memory or prove a later run
-consumed it. No committed rule-change registration or result exists yet.
+and result to land in that git ancestry order. Historical V1 remains permanently `refused` and
+`ineligible`. V2 accepts optional `studio.bench.execution-attribution.v1` receipts. Each receipt
+cold-reopens the canonical execution input, pre-invocation charge, qualification-only certified
+release, frozen-pack media, closed host adapter, exact coordinator and adapter bytes, and score-bound
+capture. Hard-pack media is accepted only through a canonical prompt authority that predates the
+freeze and binds the media named by the candidates-bound run receipt. The bench host owns attempt
+identity and destinations. Its journal binds the charge bytes and current Git `HEAD`. The host
+commits the exact input, charge, and journal files in one evidence commit before invoking the
+adapter, then commits the exact capture and attribution together after invocation. Repository
+validation requires those commits after the certified release and executor in that order. Committed
+charge history makes a failed or deleted attempt remain spent. Replay reopens coordinator and
+adapter bytes from the journal's precharge commit, so a later host version cannot reinterpret an
+older proof. The host hashes the exact source buffer passed to the adapter against the release.
+
+The host does not execute caller-supplied code. `studio.bench.capture-executor.v1` binds the exact
+single-attempt coordinator and selects one closed adapter with exact implementation bytes. The
+current adapters are deterministic contract fixtures that produce one output or fail once. They
+have no provider or product-runtime authority and cannot perform best-of-K. A failed adapter spends
+the preregistered slot, and the host never retries. Missing any grid proof keeps both execution
+checks false. Complete proofs can unlock only `eligible_for_human_review`; they do not accept or
+deploy the rule, prove a later run consumed it, or establish generalization. No committed
+rule-change registration or result exists yet.
 
 **What still cannot happen, and why:** the committed raw-versus-eligible-stem registration and input
 registry contain no outputs or results. The packager can materialize only both fixed anonymous-stem
@@ -148,9 +175,12 @@ structural producer success into semantic quality, or establish variance. Execut
 least three paired repetitions of every frozen clip, human labels for every emitted line, and score
 receipts for every capture. A with-memory second capture of the same frozen clip is still required
 before any Improve Loop win claim, but that later deployment proof is separate from this
-pre-promotion rule experiment. A bench-owned single-attempt host, next-run runtime injection, and
-exact prompt receipt are not implemented by the bench evaluator. Later packs are still required
-before eligibility or a generalization claim.
+pre-promotion rule experiment. The bench-owned host now binds exact frozen media, executor bytes,
+and certified host context to each capture, but its releases pin `runtime_deployable` false. The
+closed V1 adapters have no provider or product-runtime authority. A future provider or product
+adapter needs its own narrow host-owned one-call seam and receipt before its captures can use this
+qualification path. Next-run runtime injection is not certified by this contract. Later
+independently frozen packs are still required before any generalization claim.
 
 Two dating anchors are honest-but-incomplete in v1 and documented rather than pretended:
 `frozen_at` is stamped by the tool (never operator-supplied) and cannot predate its adjudication
@@ -169,7 +199,9 @@ ablation and rule-change registration, every rule-change result, and every U7 in
 committed capture pair. Focused tests reject forged ids, byte drift, premature timestamps, multiple
 config deltas, low repetition, non-null judge or results, structural semantic authority,
 best-stem selection, hidden ineligible outputs, incomplete anonymous-stem pairs, incomplete or
-unplanned rule-change grids, effects below observed spread, catastrophic increases, and deletion
+unplanned rule-change grids, effects below observed spread, catastrophic increases, missing charges,
+retry, overwrite, deleted or duplicate attempt ids, caller-selected media, caller-supplied
+executable authority, stale configuration, release or capture tamper, and deletion
 of committed registration or result artifacts. The existing
 conveyor drills continue to reject invalid freezes, labels, routes, contamination, and unscored
 post-freeze captures. Planned report slots cannot claim sources or annotations, system and result

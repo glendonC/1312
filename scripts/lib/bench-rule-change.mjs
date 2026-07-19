@@ -963,7 +963,7 @@ async function deriveRuleChangeResult({
     judge: null,
     notes:
       resultSchema === RULE_CHANGE_SCHEMAS.resultV1
-        ? "Mechanical evaluation only. Historical V1 refuses promotion because no host-owned single-attempt and execution-attribution receipt exists. This receipt does not prove a later run consumed the rule."
+        ? "Mechanical evaluation only. V1 refuses promotion because no host-owned single-attempt and execution-attribution receipt exists. This receipt does not prove a later run consumed the rule."
         : "Mechanical evaluation only. V2 verifies certified single-attempt execution when every capture carries a cold-reopenable proof. Eligibility is only for later human review and does not prove deployment, generalization, or a later run consuming the rule.",
   };
   const result = { result_id: resultId(body), ...body };
@@ -972,7 +972,7 @@ async function deriveRuleChangeResult({
 }
 
 export async function materializeRuleChangeResult(
-  { registrationPath, pairPaths, proofPaths = [] },
+  { registrationPath, pairPaths, proofPaths = [], resultSchema = RULE_CHANGE_SCHEMAS.result },
   { workspaceRoot = process.cwd(), evaluatedAt = new Date().toISOString() } = {},
 ) {
   if (!Array.isArray(pairPaths) || pairPaths.length === 0) fail("rule change result requires pair paths");
@@ -1000,6 +1000,7 @@ export async function materializeRuleChangeResult(
     proofBindings,
     evaluatedAt,
     workspaceRoot,
+    resultSchema,
   });
 }
 

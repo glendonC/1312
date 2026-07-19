@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/single-attempt-journal.schema.json",
+  "title": "studio.bench.single-attempt-journal.v1",
+  "description": "Portable bytes mirrored by the host's durable pre-invocation Git ref.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "attempt_id", "head_commit", "charge"],
+  "properties": {
+    "schema": { "const": "studio.bench.single-attempt-journal.v1" },
+    "attempt_id": { "type": "string", "pattern": "^bench-attempt:sha256:[a-f0-9]{64}$" },
+    "head_commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "charge": { "$ref": "#/$defs/fileBinding" }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

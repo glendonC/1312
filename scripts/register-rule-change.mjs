@@ -12,7 +12,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 function usage(message = null) {
   if (message) console.error(`\n  ${message}\n`);
   console.error(`Usage:
-  node scripts/register-rule-change.mjs --draft <draft.json> --out <registration.json>
+  node scripts/register-rule-change.mjs --draft <draft.json> --out <registration.json> \\
+    [--campaign-approval <approval.json>]
 `);
   process.exit(1);
 }
@@ -32,7 +33,10 @@ async function main() {
   const draftPath = arg("draft", { required: true });
   const out = arg("out", { required: true });
   const draft = JSON.parse(await readFile(resolve(ROOT, draftPath), "utf8"));
-  const registration = await materializeRuleChangeRegistration(draft, { workspaceRoot: ROOT });
+  const registration = await materializeRuleChangeRegistration(draft, {
+    workspaceRoot: ROOT,
+    campaignApprovalPath: arg("campaign-approval"),
+  });
   const state = await writeImmutableJson(resolve(ROOT, out), registration);
   console.log(`${registration.registration_id}\n${out} (${state})`);
 }

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/rule-change-campaign-approval.schema.json",
+  "title": "studio.bench.rule-change-campaign-approval.v1",
+  "description": "Human approval of exact rule proposal bytes for result-free campaign registration only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "approval_id",
+    "approved_at",
+    "action",
+    "proposal_draft",
+    "proposal_id",
+    "proposal_content_id",
+    "approved_by",
+    "live_capture_authorized",
+    "notes"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.rule-change-campaign-approval.v1" },
+    "approval_id": {
+      "type": "string",
+      "pattern": "^bench-rule-change-campaign-approval:sha256:[a-f0-9]{64}$"
+    },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "action": { "const": "approve_result_free_registration" },
+    "proposal_draft": { "$ref": "#/$defs/fileBinding" },
+    "proposal_id": {
+      "type": "string",
+      "pattern": "^memory-proposal:sha256:[a-f0-9]{64}$"
+    },
+    "proposal_content_id": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "approved_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "git_identity"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "git_identity": { "type": "string", "minLength": 1 }
+      }
+    },
+    "live_capture_authorized": { "const": false },
+    "notes": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^bench/rule-changes/[a-z0-9]+(?:-[a-z0-9]+)*/proposal-draft\\.json$" },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

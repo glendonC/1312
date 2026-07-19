@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/rule-change-campaign-draft.schema.json",
+  "title": "studio.bench.rule-change-campaign-draft.v1",
+  "description": "Non-authoritative, result-free campaign package awaiting a canonical reviewed rule proposal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "proposal_draft",
+    "canonical_proposal_path",
+    "registration_input",
+    "executor",
+    "origin",
+    "pack",
+    "capture_plan",
+    "budget",
+    "captures",
+    "labels",
+    "results",
+    "blockers",
+    "notes"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.rule-change-campaign-draft.v1" },
+    "status": { "const": "draft_pending_human_rule_proposal" },
+    "proposal_draft": { "$ref": "#/$defs/fileBinding" },
+    "canonical_proposal_path": {
+      "type": "string",
+      "pattern": "^memory/review/proposals/[a-f0-9]{64}\\.json$"
+    },
+    "registration_input": { "$ref": "#/$defs/fileBinding" },
+    "executor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt", "executor_id"],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "executor_id": {
+          "type": "string",
+          "pattern": "^bench-capture-executor:sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidates_manifest",
+        "manifest_id",
+        "run_id",
+        "clip_id",
+        "route",
+        "source_receipt",
+        "run_receipt",
+        "media_artifact",
+        "source_kind",
+        "media_class"
+      ],
+      "properties": {
+        "candidates_manifest": { "$ref": "#/$defs/fileBinding" },
+        "manifest_id": {
+          "type": "string",
+          "pattern": "^bench-candidates:sha256:[a-f0-9]{64}$"
+        },
+        "run_id": { "type": "string", "minLength": 1 },
+        "clip_id": { "type": "string", "minLength": 1 },
+        "route": { "const": "training" },
+        "source_receipt": { "$ref": "#/$defs/fileBinding" },
+        "run_receipt": { "$ref": "#/$defs/fileBinding" },
+        "media_artifact": { "$ref": "#/$defs/fileBinding" },
+        "source_kind": { "const": "owned_local" },
+        "media_class": { "const": "owned_local_recorded_bytes" }
+      }
+    },
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack_id", "manifest", "freeze"],
+      "properties": {
+        "pack_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "manifest": { "$ref": "#/$defs/fileBinding" },
+        "freeze": { "$ref": "#/$defs/fileBinding" }
+      }
+    },
+    "capture_plan": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["clip_id", "repetition", "without_run", "with_run"],
+        "properties": {
+          "clip_id": { "type": "string", "minLength": 1 },
+          "repetition": { "type": "integer", "minimum": 1 },
+          "without_run": { "type": "string", "minLength": 1 },
+          "with_run": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_calls", "media_seconds", "max_wall_time_seconds"],
+      "properties": {
+        "provider_calls": { "type": "integer", "minimum": 1 },
+        "media_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "max_wall_time_seconds": { "type": "null" }
+      }
+    },
+    "captures": { "type": "null" },
+    "labels": { "type": "null" },
+    "results": { "type": "null" },
+    "blockers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "canonical_rule_proposal",
+          "content_bound_human_registration_approval",
+          "result_free_registration",
+          "certified_releases",
+          "provider_media_egress_authority",
+          "operator_live_capture_authorization",
+          "complete_provider_capture_grid",
+          "blinded_human_labels",
+          "scores_and_paired_scores",
+          "rule_change_qualification"
+        ]
+      }
+    },
+    "notes": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

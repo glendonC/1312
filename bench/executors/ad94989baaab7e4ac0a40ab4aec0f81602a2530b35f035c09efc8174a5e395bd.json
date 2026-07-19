@@ -1,0 +1,21 @@
+{
+  "executor_id": "bench-capture-executor:sha256:ad94989baaab7e4ac0a40ab4aec0f81602a2530b35f035c09efc8174a5e395bd",
+  "schema": "studio.bench.capture-executor.v2",
+  "adapter_id": "openai_audio_translation_v1",
+  "host": {
+    "path": "scripts/lib/bench-single-attempt.mjs",
+    "content_id": "sha256:e8bfd13eba0fd7354602ce9c9aa4e0ecc5bc07068d22c99b689d95d9c5191e88",
+    "bytes": 51033
+  },
+  "implementation": {
+    "path": "scripts/lib/bench-adapters/openai-audio-translation-v1.mjs",
+    "content_id": "sha256:812e445bd67ef511fc15833c7c934f12bcc5a03dfeb473dc72ef15b2e48006f9",
+    "bytes": 20242
+  },
+  "attempt_policy": {
+    "host_invocations": 1,
+    "retries": 0,
+    "selection": "none"
+  },
+  "notes": "IL-03 provider campaign executor. One host invocation, no adapter retries, no output selection, exact Creative Commons provider-media authority checked before live charge, and no product runtime authority."
+}

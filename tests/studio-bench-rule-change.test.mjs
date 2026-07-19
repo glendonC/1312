@@ -28,8 +28,11 @@ import {
 } from "../scripts/lib/bench-single-attempt.mjs";
 import {
   materializeRuleChangeRegistration,
+  materializeRuleChangeCampaignApproval,
   materializeRuleChangeResult,
   RULE_CHANGE_SCHEMAS,
+  ruleChangeCampaignApprovalPath,
+  validateRuleChangeCampaignDraft,
   validateRuleChangeRegistration,
   validateRuleChangeResult,
   verifyRuleChangeResult,
@@ -72,6 +75,15 @@ function resealRegistration(registration) {
   return registration;
 }
 
+function resealCampaignApproval(approval) {
+  const { approval_id: _id, ...body } = approval;
+  approval.approval_id = `bench-rule-change-campaign-approval:${contentIdForJson({
+    approval_id: null,
+    ...body,
+  })}`;
+  return approval;
+}
+
 function resealResult(result) {
   const { result_id: _id, ...body } = result;
   result.result_id = `bench-rule-change-result:${contentIdForJson({ result_id: null, ...body })}`;
@@ -83,6 +95,8 @@ async function fixture({
   variantCatastrophic = [0, 0, 0],
   buildGrid = true,
   providerAdapter = false,
+  providerMediaAuthorized = true,
+  ownedLocalOrigin = false,
 } = {}) {
   const workspace = await mkdtemp(join(tmpdir(), "studio-rule-change-"));
   const runId = "training-origin-run";
@@ -94,24 +108,58 @@ async function fixture({
     clip: { id: originClip, duration: 30, media: mediaName },
   });
   const runBinding = await fileReceipt(join(workspace, runPath), runPath);
-  const sourcePath = `public/demo/runs/${runId}/source.json`;
-  await writeJson(join(workspace, sourcePath), {
-    kind: "youtube",
-    label: "Synthetic YouTube contract fixture",
-    channel: "Fixture channel",
-    url: `https://www.youtube.com/watch?v=${originClip}`,
-    video_id: originClip,
-    licence: "Creative Commons Attribution license (reuse allowed)",
-    window: { start: "00:00:00", end: "00:00:30" },
-    duration: 30,
-    attribution: "Synthetic fixture by Fixture channel.",
-    note: "Synthetic source shape for contract tests only. Never real benchmark evidence.",
-  });
-  const sourceBinding = await fileReceipt(join(workspace, sourcePath), sourcePath);
   const mediaPath = `public/demo/runs/${runId}/${mediaName}`;
   await mkdir(dirname(join(workspace, mediaPath)), { recursive: true });
   await writeFile(join(workspace, mediaPath), "synthetic media bytes for contract tests\n");
   const mediaBinding = await fileReceipt(join(workspace, mediaPath), mediaPath);
+  const sourcePath = `public/demo/runs/${runId}/source.json`;
+  const mediaDigest = mediaBinding.content_id.slice("sha256:".length);
+  await writeJson(
+    join(workspace, sourcePath),
+    ownedLocalOrigin
+      ? {
+          schema: "studio.ingest.owned-local.v1",
+          kind: "owned_local",
+          producer: "scripts/ingest-owned-media.mjs",
+          receipt_id: `owned-local:${mediaDigest}`,
+          label: "Synthetic owned-local contract fixture",
+          origin: { kind: "local_file", filename: mediaName, path_disclosure: "basename_only" },
+          content: {
+            id: mediaBinding.content_id,
+            hash: { algorithm: "sha256", digest: mediaDigest },
+            bytes: mediaBinding.bytes,
+          },
+          rights: {
+            basis: "ownership_attestation",
+            asserted_by: "Fixture owner",
+            asserted_at: "2026-07-18T00:00:00.000Z",
+            scope: "redistribution",
+            statement: "Fixture owner owns or controls the media rights and authorizes redistribution.",
+          },
+          selection: { start: 0, end: 30, duration: 30 },
+          raw_media: {
+            path: mediaName,
+            content_id: mediaBinding.content_id,
+            bytes: mediaBinding.bytes,
+            preservation: "adopted_existing_bytes",
+          },
+          derived_artifacts: [{ kind: "fixture", path: "fixture.json" }],
+          note: "Synthetic owned-local source shape for contract tests only.",
+        }
+      : {
+          kind: "youtube",
+          label: "Synthetic YouTube contract fixture",
+          channel: "Fixture channel",
+          url: `https://www.youtube.com/watch?v=${originClip}`,
+          video_id: originClip,
+          licence: "Creative Commons Attribution license (reuse allowed)",
+          window: { start: "00:00:00", end: "00:00:30" },
+          duration: 30,
+          attribution: "Synthetic fixture by Fixture channel.",
+          note: "Synthetic source shape for contract tests only. Never real benchmark evidence.",
+        },
+  );
+  const sourceBinding = await fileReceipt(join(workspace, sourcePath), sourcePath);
   const manifestBody = {
     schema: "studio.bench.candidates.v1",
     run: runId,
@@ -119,7 +167,9 @@ async function fixture({
     routing: { route: "training", reason: "Synthetic test origin is isolated from evaluation." },
     status: "candidate",
     scorable: false,
-    source_artifacts: [runBinding, sourceBinding, mediaBinding],
+    source_artifacts: ownedLocalOrigin
+      ? [runBinding, sourceBinding]
+      : [runBinding, sourceBinding, mediaBinding],
     candidates: [
       {
         t_start: 0,
@@ -238,16 +288,29 @@ async function fixture({
         role: "hard",
         status: "frozen",
         clip_id: evaluationClip,
-        source: {
-          kind: "owned",
-          note: "Synthetic test source.",
-          duration: 30,
-          url: "https://example.test/evaluation-fixture",
-          channel: "fixture",
-          licence: "Owned fixture",
-          attribution: "Fixture owner",
-          local_copy: evaluationSourceBinding,
-        },
+        source: providerMediaAuthorized
+          ? {
+              kind: "youtube",
+              note: "Synthetic Creative Commons provider-egress fixture.",
+              duration: 30,
+              url: "https://www.youtube.com/watch?v=provider001",
+              channel: "Fixture channel",
+              licence: "Creative Commons Attribution license (reuse allowed)",
+              attribution: "Synthetic fixture by Fixture channel.",
+              local_copy: evaluationSourceBinding,
+            }
+          : {
+              schema: "studio.bench.source.local-eval-youtube.v1",
+              kind: "local_eval_youtube",
+              note: "Synthetic local-only provider-egress refusal fixture.",
+              duration: 30,
+              url: "https://www.youtube.com/watch?v=localOnly01",
+              channel: "fixture",
+              licence: "Standard YouTube licence, local evaluation only, not redistributable",
+              attribution: "Fixture source credited for local evaluation only.",
+              local_copy: evaluationSourceBinding,
+              redistribution: { allowed: false, public_path: null },
+            },
         gold_path: "fixture-gold.json",
         candidates_manifest: null,
       },
@@ -272,6 +335,24 @@ async function fixture({
     workspaceRoot: workspace,
   });
   const proposalPath = relative(workspace, proposalState.path);
+  let campaignApprovalPath = null;
+  if (ownedLocalOrigin) {
+    const proposalDraftPath = "bench/rule-changes/fixture-rule-change/proposal-draft.json";
+    await writeJson(join(workspace, proposalDraftPath), proposalState.proposal);
+    const approval = await materializeRuleChangeCampaignApproval(
+      {
+        proposalDraftPath,
+        approvedBy: {
+          name: "Fixture Human Reviewer",
+          git_identity: "Fixture Human Reviewer <fixture-reviewer@example.test>",
+        },
+        notes: "Synthetic human registration approval fixture. This does not authorize live capture.",
+      },
+      { workspaceRoot: workspace, approvedAt: "2026-07-18T12:00:00.000Z" },
+    );
+    campaignApprovalPath = ruleChangeCampaignApprovalPath(approval);
+    await writeImmutableJson(join(workspace, campaignApprovalPath), approval);
+  }
   const ruleContentId = contentIdForJson(proposalState.proposal.value);
   const providerConfig = {
     id: "openai",
@@ -302,7 +383,9 @@ async function fixture({
         reviewed_memory: { rule_content_id: ruleContentId },
       };
   const draft = {
-    schema: RULE_CHANGE_SCHEMAS.registration,
+    schema: ownedLocalOrigin
+      ? RULE_CHANGE_SCHEMAS.registrationOwnedLocal
+      : RULE_CHANGE_SCHEMAS.registration,
     slug: "fixture-rule-change",
     status: "registered",
     hypothesis: "The exact reviewed rule improves critical meaning beyond repeated-run spread.",
@@ -338,6 +421,7 @@ async function fixture({
   const registration = await materializeRuleChangeRegistration(draft, {
     workspaceRoot: workspace,
     registeredAt: "2026-07-19T00:00:00.000Z",
+    campaignApprovalPath,
   });
   const registrationPath = "bench/rule-changes/fixture-rule-change/registration.json";
   await writeImmutableJson(join(workspace, registrationPath), registration);
@@ -513,6 +597,7 @@ async function fixture({
     draft,
     registration,
     registrationPath,
+    campaignApprovalPath,
     pairPaths,
     baselineConfig,
     variantConfig,
@@ -953,6 +1038,43 @@ test("provider adapter is gated before charge and test transport cannot become l
   assert.equal(calls, 1);
 });
 
+test("provider media without egress authority is refused before the host charges a slot", async (t) => {
+  const held = await fixture({
+    buildGrid: false,
+    providerAdapter: true,
+    providerMediaAuthorized: false,
+  });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const run = held.registration.capture_plan[0].without_run;
+  const paths = singleAttemptPaths(run);
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run,
+        side: "without",
+      },
+      {
+        workspaceRoot: held.workspace,
+        chargedAt: "2026-07-20T00:00:00.000Z",
+        validateRegistration: validateRuleChangeRegistration,
+        providerExecution: {
+          mode: "live",
+          allowLive: true,
+          environment: "live",
+          apiKey: "test-key-never-sent",
+        },
+      },
+    ),
+    /provider media egress is not authorized/,
+  );
+  await assert.rejects(access(join(held.workspace, paths.input)));
+  await assert.rejects(access(join(held.workspace, paths.charge)));
+});
+
 test("provider failure commits its exact receipt and leaves the charged slot spent", async (t) => {
   const held = await fixture({ buildGrid: false, providerAdapter: true });
   t.after(() => rm(held.workspace, { recursive: true, force: true }));
@@ -1347,6 +1469,183 @@ test("historical V1 rule-change results cold-rederive with their original bytes"
   await verifyRuleChangeResult(result, { workspaceRoot: held.workspace });
 });
 
+test("committed IL-03 campaign draft is result-free and cold-bound to its exact grid", async () => {
+  const campaignPath = join(
+    ROOT,
+    "bench/rule-changes/ko-kinship-address-context/campaign-draft.json",
+  );
+  const campaign = await json(campaignPath);
+  await validateRuleChangeCampaignDraft(campaign, { workspaceRoot: ROOT });
+  assert.equal(campaign.captures, null);
+  assert.equal(campaign.labels, null);
+  assert.equal(campaign.results, null);
+  assert.equal(campaign.capture_plan.length, 9);
+  assert.equal(campaign.budget.provider_calls, 18);
+
+  const forgedBudget = structuredClone(campaign);
+  forgedBudget.budget.provider_calls += 1;
+  await assert.rejects(
+    validateRuleChangeCampaignDraft(forgedBudget, { workspaceRoot: ROOT }),
+    /budget does not match/,
+  );
+
+  const fakeCaptures = structuredClone(campaign);
+  fakeCaptures.captures = [];
+  await assert.rejects(
+    validateRuleChangeCampaignDraft(fakeCaptures, { workspaceRoot: ROOT }),
+    /campaign draft failed schema validation/,
+  );
+
+  const hiddenEgressBlocker = structuredClone(campaign);
+  hiddenEgressBlocker.blockers = hiddenEgressBlocker.blockers.filter(
+    (blocker) => blocker !== "provider_media_egress_authority",
+  );
+  await assert.rejects(
+    validateRuleChangeCampaignDraft(hiddenEgressBlocker, { workspaceRoot: ROOT }),
+    /blockers must name the exact remaining authority and evidence gates/,
+  );
+});
+
+test("owned-local registration V2 binds training route, rights, and exact raw media", async (t) => {
+  const held = await fixture({ buildGrid: false, ownedLocalOrigin: true });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  await validateRuleChangeRegistration(held.registration, { workspaceRoot: held.workspace });
+  assert.equal(held.registration.schema, RULE_CHANGE_SCHEMAS.registrationOwnedLocal);
+  assert.equal(held.registration.change.origin.source_kind, "owned_local");
+  assert.equal(held.registration.change.origin.media_class, "owned_local_recorded_bytes");
+  assert.equal(held.registration.change.origin.route, "training");
+  assert.equal(held.registration.results, null);
+  assert.match(
+    held.registration.campaign_approval.approval_id,
+    /^bench-rule-change-campaign-approval:sha256:/,
+  );
+  const approval = await json(join(held.workspace, held.campaignApprovalPath));
+  assert.equal(approval.action, "approve_result_free_registration");
+  assert.equal(approval.live_capture_authorized, false);
+  await assert.rejects(
+    materializeRuleChangeRegistration(held.draft, {
+      workspaceRoot: held.workspace,
+      registeredAt: "2026-07-19T00:00:00.000Z",
+    }),
+    /campaign approval path must be a non-empty string/,
+  );
+  const manifest = await json(join(held.workspace, held.draft.candidates_manifest_path));
+  assert.equal(
+    manifest.source_artifacts.some(
+      (artifact) => artifact.path === held.registration.change.origin.media_artifact.path,
+    ),
+    false,
+  );
+
+  await writeFile(
+    join(held.workspace, held.registration.change.origin.media_artifact.path),
+    "substituted owned-local bytes\n",
+  );
+  await assert.rejects(
+    validateRuleChangeRegistration(held.registration, { workspaceRoot: held.workspace }),
+    /no longer matches its recorded bytes/,
+  );
+
+  const localOnly = await fixture({ buildGrid: false, ownedLocalOrigin: true });
+  t.after(() => rm(localOnly.workspace, { recursive: true, force: true }));
+  const localManifest = await json(join(localOnly.workspace, localOnly.draft.candidates_manifest_path));
+  const localSourcePath = `public/demo/runs/${localManifest.run}/source.json`;
+  const localSource = await json(join(localOnly.workspace, localSourcePath));
+  localSource.rights.scope = "local_processing";
+  localSource.rights.statement = "Fixture owner owns or controls the media rights and authorizes local processing.";
+  await writeJson(join(localOnly.workspace, localSourcePath), localSource);
+  localManifest.source_artifacts = localManifest.source_artifacts.map((artifact) =>
+    artifact.path === localSourcePath
+      ? null
+      : artifact,
+  );
+  localManifest.source_artifacts = [
+    ...localManifest.source_artifacts.filter(Boolean),
+    await fileReceipt(join(localOnly.workspace, localSourcePath), localSourcePath),
+  ];
+  const { manifest_id: _localManifestId, ...localManifestBody } = localManifest;
+  localManifest.manifest_id = candidatesManifestId(localManifestBody);
+  await writeJson(join(localOnly.workspace, localOnly.draft.candidates_manifest_path), localManifest);
+  await assert.rejects(
+    materializeRuleChangeRegistration(localOnly.draft, {
+      workspaceRoot: localOnly.workspace,
+      registeredAt: "2026-07-19T00:00:00.000Z",
+      campaignApprovalPath: localOnly.campaignApprovalPath,
+    }),
+    /redistribution authority/,
+  );
+});
+
+test("owned-local registration refuses a canonical proposal with unapproved bytes", async (t) => {
+  const held = await fixture({ buildGrid: false, ownedLocalOrigin: true });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const proposalPath = join(held.workspace, held.draft.proposal_path);
+  const proposal = await json(proposalPath);
+  await writeFile(proposalPath, JSON.stringify(proposal));
+  await assert.rejects(
+    materializeRuleChangeRegistration(held.draft, {
+      workspaceRoot: held.workspace,
+      registeredAt: "2026-07-19T00:00:00.000Z",
+      campaignApprovalPath: held.campaignApprovalPath,
+    }),
+    /does not bind the exact canonical proposal bytes/,
+  );
+});
+
+test("campaign approval refuses agent self-approval and impossible chronology", async (t) => {
+  const held = await fixture({ buildGrid: false, ownedLocalOrigin: true });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const approval = await json(join(held.workspace, held.campaignApprovalPath));
+  await assert.rejects(
+    materializeRuleChangeCampaignApproval(
+      {
+        proposalDraftPath: approval.proposal_draft.path,
+        approvedBy: {
+          name: "agent:fixture-proposer",
+          git_identity: "agent:fixture-proposer",
+        },
+        notes: "Invalid self-approval fixture.",
+      },
+      { workspaceRoot: held.workspace, approvedAt: "2026-07-18T12:00:00.000Z" },
+    ),
+    /declared human who differs from the proposal drafter/,
+  );
+  await assert.rejects(
+    materializeRuleChangeCampaignApproval(
+      {
+        proposalDraftPath: approval.proposal_draft.path,
+        approvedBy: {
+          name: "Fixture Human Reviewer",
+          git_identity: "Fixture Human Reviewer <fixture-reviewer@example.test>",
+        },
+        notes: "Invalid chronology fixture.",
+      },
+      { workspaceRoot: held.workspace, approvedAt: "2026-07-17T00:00:00.000Z" },
+    ),
+    /must postdate the proposal creation time/,
+  );
+
+  const forgedApproval = resealCampaignApproval({
+    ...approval,
+    approved_at: "2026-07-17T00:00:00.000Z",
+  });
+  const forgedDigest = forgedApproval.approval_id.slice(
+    "bench-rule-change-campaign-approval:sha256:".length,
+  );
+  const forgedPath = `bench/reviews/rule-change-campaign/${forgedDigest}.json`;
+  await writeJson(join(held.workspace, forgedPath), forgedApproval);
+  const forgedRegistration = structuredClone(held.registration);
+  forgedRegistration.campaign_approval = {
+    receipt: await fileReceipt(join(held.workspace, forgedPath), forgedPath),
+    approval_id: forgedApproval.approval_id,
+  };
+  resealRegistration(forgedRegistration);
+  await assert.rejects(
+    validateRuleChangeRegistration(forgedRegistration, { workspaceRoot: held.workspace }),
+    /must postdate the proposal creation time/,
+  );
+});
+
 test("rule change registration is result-free, contamination-guarded, and exact-change bound", async (t) => {
   const held = await fixture();
   t.after(() => rm(held.workspace, { recursive: true, force: true }));
@@ -1472,7 +1771,7 @@ test("rule change registration is result-free, contamination-guarded, and exact-
       workspaceRoot: held.workspace,
       registeredAt: "2026-07-19T00:00:00.000Z",
     }),
-    /valid redistributable YouTube source|matching YouTube source identity/,
+    /source receipt is invalid|matching YouTube source identity/,
   );
 
   source.kind = "youtube";

@@ -50,12 +50,12 @@ function invocation({ withRule = false, config = null } = {}) {
       lang: "ko",
       pair: "ko->en",
       source: {
-        kind: "owned",
-        url: "https://example.test/provider-contract",
-        channel: "fixture",
-        licence: "Owned fixture",
+        kind: "youtube",
+        url: "https://www.youtube.com/watch?v=provider001",
+        channel: "Fixture channel",
+        licence: "Creative Commons Attribution license (reuse allowed)",
         window: null,
-        attribution: "Fixture owner",
+        attribution: "Synthetic fixture by Fixture channel.",
       },
     },
     hostContext: {
@@ -241,4 +241,34 @@ test("provider adapter refuses missing live gates and incompatible certified mod
     }),
     /outside the closed audio translation contract/,
   );
+  const noEgress = invocation();
+  noEgress.clip.source.kind = "local_eval_youtube";
+  noEgress.clip.source.licence = "Standard YouTube licence — local evaluation copy only; NOT redistributable";
+  assert.throws(
+    () => preflightOpenAIAudioTranslation(noEgress, {
+      mode: "live",
+      allowLive: true,
+      environment: "live",
+      apiKey: "test-key-never-sent",
+    }),
+    /provider media egress is not authorized/,
+  );
+  const falseOwnershipClaim = invocation();
+  falseOwnershipClaim.clip.source.kind = "owned";
+  falseOwnershipClaim.clip.source.licence = "not owned by operator";
+  assert.throws(
+    () => preflightOpenAIAudioTranslation(falseOwnershipClaim, {
+      mode: "live",
+      allowLive: true,
+      environment: "live",
+      apiKey: "test-key-never-sent",
+    }),
+    /provider media egress is not authorized/,
+  );
+  assert.doesNotThrow(() => preflightOpenAIAudioTranslation(invocation(), {
+    mode: "live",
+    allowLive: true,
+    environment: "live",
+    apiKey: "test-key-never-sent",
+  }));
 });

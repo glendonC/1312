@@ -72,8 +72,10 @@ test data.
 
 The schemas live in `bench/schemas/` (`gold.schema.json`, `adjudication.schema.json`,
 `ablation.schema.json`, `paired-score-v2.schema.json`, `rule-change-registration.schema.json`,
+`rule-change-registration-v2.schema.json`, `rule-change-campaign-approval.schema.json`,
+`rule-change-campaign-draft.schema.json`,
 `rule-change-result.schema.json`, `rule-change-result-v2.schema.json`,
-`certified-release.schema.json`, `capture-executor.schema.json`, the execution receipt schemas, and
+`certified-release.schema.json`, both capture-executor schemas, the execution receipt schemas, and
 `u7-ablation-inputs.schema.json`). Candidate, pack, freeze,
 output-label, score, ablation, rule-change, and U7 packaging invariants are enforced by
 `scripts/lib/bench-gold.mjs`, `scripts/lib/bench-ablation.mjs`,
@@ -191,14 +193,25 @@ context. Cold verification reopens the coordinator and adapter from the journal'
 so a later host version cannot reinterpret an older proof.
 
 `studio.bench.capture-executor.v1` binds the exact single-attempt coordinator and one closed
-host-owned adapter. The host does not load caller-supplied code. Current adapters are deterministic
-contract fixtures that produce one output or fail once, with zero retries and no selection. They
-have no provider or product-runtime authority. The host writes the returned capture with an
-exclusive create, records `studio.bench.execution-attribution.v1`, and commits both exact files in
-one outcome commit. An adapter failure leaves the slot charged. Retry, overwrite, deleted charge,
-duplicate identity, source substitution, host substitution, adapter substitution, and pre-commit
-capture replacement fail closed. Repository checks require the charge commit after release and
-executor certification, and the outcome commit after the charge.
+deterministic fixture adapter. Additive `studio.bench.capture-executor.v2` binds the same host to the
+closed OpenAI audio-translation adapter. The host does not load caller-supplied code. The provider
+adapter accepts one exact certified media buffer and path-free host context, builds one deterministic
+multipart request, invokes one transport, and performs no retry or output selection. Live execution
+requires an explicit CLI flag, live environment value, API key, and a certified `whisper-1` config
+before the slot is charged. Injected transports are test-only and cannot verify as live execution.
+The provider receipt binds requested provider and model identity, media, prompt, exact request bytes,
+available response bytes, provider request id, status, closed failure code, and zero retries. Empty
+responses retain their canonical zero-byte SHA-256 identity. Failed receipts are cold-audited against
+the charged input, certified source, prompt, rule, executor, and immutable outcome commit. None of
+this grants product-runtime authority.
+
+On success, the host records additive `studio.bench.execution-attribution.v2` with the provider-call
+receipt and capture in one outcome commit. A provider failure commits its exact available response
+identity and failure receipt without capture or attribution, and the slot remains charged. Retry,
+overwrite, deleted charge, duplicate identity, source substitution, host substitution, adapter
+substitution, caller-supplied live timestamps, and pre-commit capture replacement fail closed.
+Repository checks require the charge commit after release and executor certification, and the
+outcome commit after the charge.
 
 `studio.bench.rule-change-result.v2` optionally binds those attribution receipts per side and run.
 Missing any proof keeps `single_attempt_proven` and `execution_attribution_proven` false. Complete
@@ -206,9 +219,9 @@ proofs are cold-reopened through release, input, charge, source, and score-bound
 then can the existing mechanical checks yield `eligible_for_human_review`. V2 does not accept a
 memory proposal, deploy a production rule, grade its own outputs, prove a real score win, or prove
 improvement on a later pack. The existing memory ledger acceptance path is not yet dependent on
-this result, and runtime deployment has no certified-release injection proof. The closed V1
-adapters have no provider or product-runtime authority. A future provider adapter needs a narrow
-host-owned one-call seam and receipt before provider-backed captures can enter this proof chain.
+this result, and runtime deployment has no certified-release injection proof. The provider seam can
+carry a future authorized capture into this proof chain, but no live provider-backed campaign or
+score exists.
 
 ## Honesty invariants (each mechanical, each fail-closed)
 
@@ -230,9 +243,10 @@ host-owned one-call seam and receipt before provider-backed captures can enter t
 4. **Score-everything.** Every capture pinned into `bench/runs/` after a pack freeze must have a
    score receipt or `check-bench` fails. Behavioral-rule V1 pins `single_attempt_proven` false. V2
    accepts only the bench-owned host receipt chain. Before invoking a closed host-owned adapter, the
-   host charges one canonical slot and commits the exact charge evidence. The current adapters
-   produce one deterministic output or fail once. The host never retries, commits the exact outcome,
-   and treats a failed or locally deleted slot as spent.
+   host charges one canonical slot and commits the exact charge evidence. Fixture adapters produce
+   one deterministic output or fail once. The provider adapter makes one bounded transport call and
+   records its exact outcome. The host never retries and treats a failed or locally deleted slot as
+   spent.
 5. **Variance floor.** Behavioral-rule registration requires at least three repetitions per clip.
    Qualification refuses an effect that does not strictly exceed the maximum within-condition clip
    range. At the initial pack size (~40–60 units), a preregistered minimum such as 0.25 is a
@@ -299,8 +313,21 @@ host-owned one-call seam and receipt before provider-backed captures can enter t
    release, frozen source, closed host and adapter, input, charge journal, outcome commit,
    attribution, and capture bytes. Missing proofs remain refused. Deterministic tests prove retry,
    overwrite, deleted or duplicate attempt id, caller executable rejection, stale config, source
-   substitution, and pre-commit capture replacement refusal. No real campaign result, provider
-   adapter, or runtime deployment authority was created.
+   substitution, and pre-commit capture replacement refusal. No real campaign result or runtime
+   deployment authority was created.
+9. ✅ IL-03 provider campaign foundation adds the host-owned one-call OpenAI audio-translation
+   adapter, provider call receipts, test-only injected transport, hostile failure tests, and
+   owned-local rule-change registration V2. The result-free
+   `bench/rule-changes/ko-kinship-address-context/campaign-draft.json` binds a training-routed miss,
+   exact owned media, frozen `hard-ko-v1`, certified provider executor, closed config delta, and the
+   full 18-call grid. Owned-local registration V2 also requires a content-addressed human approval
+   receipt for the exact proposal bytes. It rejects an agent actor, proposal-drafter self-approval,
+   and approval at or before proposal creation, and it always withholds live capture authority.
+   The declared human name and Git identity are review metadata, not authenticated identity.
+   It remains a draft because no such approval or canonical human-reviewed rule proposal exists.
+   Two local-evaluation control clips do not authorize provider egress, so adapter preflight blocks
+   12 of the 18 planned calls before charge and the frozen grid is not live-ready. No live call,
+   capture, label, score, qualification, accepted memory, or product runtime deployment exists.
 
 Post-week update: `hard-ko-v1` is frozen at three clips and run-007 is scored from human labels with
 `judge: null`. One raw-versus-eligible-stem experiment is pre-registered, its frozen inputs are
@@ -309,9 +336,11 @@ paired-score comparator and behavioral-rule evaluation spine are implemented. Th
 four-way outcome deltas, cold-rederive stored receipts, preregister exact repeated-run grids, and
 refuse effects below observed spread or with catastrophic increase. The bench now has certified
 qualification releases and a journaled closed-adapter capture host. No committed behavioral-rule
-registration, with-side score, or eligible result exists. The runtime has no accepted
-certified-release injection proof. Next are real training-routed proposals, registered paired
-captures and human labels, then a later independently frozen pack before any generalization claim.
+registration, provider-backed capture, with-side score, or eligible result exists. The runtime has
+no accepted certified-release injection proof. Next are exact-byte human review of the drafted
+training-routed rule, a separately frozen provider-authorized pack and newly bound campaign package,
+result-free registration and releases, separately authorized captures, and blinded human labels,
+then a later independently frozen pack before any generalization claim.
 
 ## Failure modes
 

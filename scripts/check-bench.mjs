@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import { validateAblationRegistration } from "./lib/bench-ablation.mjs";
-import { readCaptureExecutorManifest } from "./lib/bench-capture-executor.mjs";
+import { resolveCaptureExecutor } from "./lib/bench-capture-executor.mjs";
 import { resolveCertifiedRelease } from "./lib/bench-certified-release.mjs";
 import {
   compareSubjectScores,
@@ -16,6 +16,7 @@ import {
 } from "./lib/bench-paired-score.mjs";
 import {
   RULE_CHANGE_SCHEMAS,
+  validateRuleChangeCampaignDraft,
   validateRuleChangeRegistration,
   validateRuleChangeResult,
   verifyRuleChangeResult,
@@ -294,6 +295,10 @@ const ruleChangeRegistrationSchema = JSON.parse(
   readFileSync(new URL("../bench/schemas/rule-change-registration.schema.json", import.meta.url), "utf8"),
 );
 const validateRuleChangeRegistrationSchema = ajv.compile(ruleChangeRegistrationSchema);
+const ruleChangeRegistrationV2Schema = JSON.parse(
+  readFileSync(new URL("../bench/schemas/rule-change-registration-v2.schema.json", import.meta.url), "utf8"),
+);
+const validateRuleChangeRegistrationV2Schema = ajv.compile(ruleChangeRegistrationV2Schema);
 const ruleChangeResultSchema = JSON.parse(
   readFileSync(new URL("../bench/schemas/rule-change-result.schema.json", import.meta.url), "utf8"),
 );
@@ -313,6 +318,8 @@ for (const schemaName of [
   "execution-attribution.schema.json",
   "execution-attribution-v2.schema.json",
   "provider-call.schema.json",
+  "rule-change-campaign-approval.schema.json",
+  "rule-change-campaign-draft.schema.json",
 ]) {
   ajv.compile(JSON.parse(readFileSync(new URL(`../bench/schemas/${schemaName}`, import.meta.url), "utf8")));
 }
@@ -701,7 +708,7 @@ let captureExecutorsChecked = 0;
 if (existsSync(executorsDir)) {
   for (const entry of readdirSync(executorsDir, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-    await readCaptureExecutorManifest(`bench/executors/${entry.name}`, { workspaceRoot: ROOT });
+    await resolveCaptureExecutor(`bench/executors/${entry.name}`, { workspaceRoot: ROOT });
     captureExecutorsChecked += 1;
   }
 }
@@ -716,18 +723,44 @@ console.log(
 const ruleChangesDir = join(ROOT, "bench/rule-changes");
 let ruleChangeRegistrationsChecked = 0;
 let ruleChangeResultsChecked = 0;
+let ruleChangeDraftsChecked = 0;
 if (existsSync(ruleChangesDir)) {
   for (const entry of readdirSync(ruleChangesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const registrationPath = join(ruleChangesDir, entry.name, "registration.json");
-    assert(existsSync(registrationPath), `rule change directory ${entry.name} has no registration.json`);
+    if (!existsSync(registrationPath)) {
+      const campaignDraftPath = join(ruleChangesDir, entry.name, "campaign-draft.json");
+      assert(existsSync(campaignDraftPath), `rule change directory ${entry.name} has no registration or campaign draft`);
+      const allowedDraftFiles = new Set([
+        "README.md",
+        "campaign-draft.json",
+        "proposal-draft.json",
+        "registration-input.json",
+      ]);
+      const unexpected = readdirSync(join(ruleChangesDir, entry.name), { withFileTypes: true })
+        .filter((item) => !item.isFile() || !allowedDraftFiles.has(item.name))
+        .map((item) => item.name);
+      assert(
+        unexpected.length === 0,
+        `rule change campaign draft ${entry.name} has unregistered sidecars: ${unexpected.join(", ")}`,
+      );
+      await validateRuleChangeCampaignDraft(
+        await readJsonFile(campaignDraftPath, `rule change campaign draft ${entry.name}`),
+        { workspaceRoot: ROOT, context: `rule change campaign draft ${entry.name}` },
+      );
+      ruleChangeDraftsChecked += 1;
+      continue;
+    }
     const registration = await validateRuleChangeRegistration(
       await readJsonFile(registrationPath, `rule change registration ${entry.name}`),
       { workspaceRoot: ROOT, context: `rule change registration ${entry.name}` },
     );
+    const validateRegistrationSchema = registration.schema === RULE_CHANGE_SCHEMAS.registrationOwnedLocal
+      ? validateRuleChangeRegistrationV2Schema
+      : validateRuleChangeRegistrationSchema;
     assert(
-      validateRuleChangeRegistrationSchema(registration),
-      `rule change registration ${entry.name} schema: ${ajv.errorsText(validateRuleChangeRegistrationSchema.errors)}`,
+      validateRegistrationSchema(registration),
+      `rule change registration ${entry.name} schema: ${ajv.errorsText(validateRegistrationSchema.errors)}`,
     );
     assert(registration.slug === entry.name, `rule change directory ${entry.name} holds ${registration.slug}`);
     ruleChangeRegistrationsChecked += 1;
@@ -762,7 +795,7 @@ if (existsSync(ruleChangesDir)) {
   }
 }
 console.log(
-  `rule change check passed: ${ruleChangeRegistrationsChecked} result-free registration(s), ${ruleChangeResultsChecked} qualified or refused result(s)`,
+  `rule change check passed: ${ruleChangeDraftsChecked} campaign draft(s), ${ruleChangeRegistrationsChecked} result-free registration(s), ${ruleChangeResultsChecked} qualified or refused result(s)`,
 );
 let ruleChangeHistory = [];
 try {
@@ -773,7 +806,13 @@ try {
     .toString()
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.endsWith("/registration.json") || line.endsWith("/result.json"));
+    .filter((line) =>
+      line.endsWith("/registration.json") ||
+      line.endsWith("/result.json") ||
+      line.endsWith("/campaign-draft.json") ||
+      line.endsWith("/proposal-draft.json") ||
+      line.endsWith("/registration-input.json"),
+    );
 } catch {
   console.log("rule change history unverified: not a git checkout or git unavailable");
 }

@@ -1,0 +1,141 @@
+{
+  "schema": "studio.bench.rule-change-campaign-draft.v1",
+  "status": "draft_pending_human_rule_proposal",
+  "proposal_draft": {
+    "path": "bench/rule-changes/ko-kinship-address-context/proposal-draft.json",
+    "content_id": "sha256:125328f5eb983e33bb16feb357327f93b81c11f2258a0d3039fa96c677a709c8",
+    "bytes": 1471
+  },
+  "canonical_proposal_path": "memory/review/proposals/f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3.json",
+  "registration_input": {
+    "path": "bench/rule-changes/ko-kinship-address-context/registration-input.json",
+    "content_id": "sha256:0a5a08c6c0192a9eaf44a050a7c39344608080c96d2526db84c3afd8c5815da4",
+    "bytes": 2521
+  },
+  "executor": {
+    "receipt": {
+      "path": "bench/executors/ad94989baaab7e4ac0a40ab4aec0f81602a2530b35f035c09efc8174a5e395bd.json",
+      "content_id": "sha256:0a66548858882504f9e62b5edb36420efb01aab60f669ff24f4081f07b9f33ad",
+      "bytes": 923
+    },
+    "executor_id": "bench-capture-executor:sha256:ad94989baaab7e4ac0a40ab4aec0f81602a2530b35f035c09efc8174a5e395bd"
+  },
+  "origin": {
+    "candidates_manifest": {
+      "path": "bench/candidates/run-005/candidates.json",
+      "content_id": "sha256:adcd75122f72f9fc635cd0bc3b2cc7578d740b055e64309c223d9f6de8aaf950",
+      "bytes": 11856
+    },
+    "manifest_id": "bench-candidates:sha256:394b8ee145092dee189d5d75a5a93998055d9e24b0e558c2340d74b78feafa17",
+    "run_id": "run-005",
+    "clip_id": "ko-clip-01",
+    "route": "training",
+    "source_receipt": {
+      "path": "public/demo/runs/run-005/source.json",
+      "content_id": "sha256:ced8e654d0bba45d118d73276d76c12d4fb45dae17a25a8a0cf9fb843dc96735",
+      "bytes": 1854
+    },
+    "run_receipt": {
+      "path": "public/demo/runs/run-005/run.json",
+      "content_id": "sha256:720f301605c4419f8ba8b4d53c33492e589ea836cc584f594c32511f73cc17a8",
+      "bytes": 2114
+    },
+    "media_artifact": {
+      "path": "public/demo/runs/run-005/clip.m4a",
+      "content_id": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+      "bytes": 329662
+    },
+    "source_kind": "owned_local",
+    "media_class": "owned_local_recorded_bytes"
+  },
+  "pack": {
+    "pack_id": "hard-ko-v1",
+    "manifest": {
+      "path": "bench/packs/hard-ko-v1/pack.json",
+      "content_id": "sha256:12041b80b72c3d6135a26fc68eb6820288dd345cc2d9ed1921ac5226700e3adb",
+      "bytes": 4839
+    },
+    "freeze": {
+      "path": "bench/packs/hard-ko-v1/freeze.json",
+      "content_id": "sha256:8feeac2614a08ecfc21f98ca1e8cf725106a3b94332a5e46823cf72222a1aec8",
+      "bytes": 4931
+    }
+  },
+  "capture_plan": [
+    {
+      "clip_id": "local-eval-ko-control-01",
+      "repetition": 1,
+      "without_run": "rule-change-ko-kinship-address-context-c1-r1-without",
+      "with_run": "rule-change-ko-kinship-address-context-c1-r1-with"
+    },
+    {
+      "clip_id": "local-eval-ko-control-01",
+      "repetition": 2,
+      "without_run": "rule-change-ko-kinship-address-context-c1-r2-without",
+      "with_run": "rule-change-ko-kinship-address-context-c1-r2-with"
+    },
+    {
+      "clip_id": "local-eval-ko-control-01",
+      "repetition": 3,
+      "without_run": "rule-change-ko-kinship-address-context-c1-r3-without",
+      "with_run": "rule-change-ko-kinship-address-context-c1-r3-with"
+    },
+    {
+      "clip_id": "local-eval-ko-control-02",
+      "repetition": 1,
+      "without_run": "rule-change-ko-kinship-address-context-c2-r1-without",
+      "with_run": "rule-change-ko-kinship-address-context-c2-r1-with"
+    },
+    {
+      "clip_id": "local-eval-ko-control-02",
+      "repetition": 2,
+      "without_run": "rule-change-ko-kinship-address-context-c2-r2-without",
+      "with_run": "rule-change-ko-kinship-address-context-c2-r2-with"
+    },
+    {
+      "clip_id": "local-eval-ko-control-02",
+      "repetition": 3,
+      "without_run": "rule-change-ko-kinship-address-context-c2-r3-without",
+      "with_run": "rule-change-ko-kinship-address-context-c2-r3-with"
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "repetition": 1,
+      "without_run": "rule-change-ko-kinship-address-context-c3-r1-without",
+      "with_run": "rule-change-ko-kinship-address-context-c3-r1-with"
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "repetition": 2,
+      "without_run": "rule-change-ko-kinship-address-context-c3-r2-without",
+      "with_run": "rule-change-ko-kinship-address-context-c3-r2-with"
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "repetition": 3,
+      "without_run": "rule-change-ko-kinship-address-context-c3-r3-without",
+      "with_run": "rule-change-ko-kinship-address-context-c3-r3-with"
+    }
+  ],
+  "budget": {
+    "provider_calls": 18,
+    "media_seconds": 606.078,
+    "max_wall_time_seconds": null
+  },
+  "captures": null,
+  "labels": null,
+  "results": null,
+  "blockers": [
+    "canonical_rule_proposal",
+    "content_bound_human_registration_approval",
+    "result_free_registration",
+    "certified_releases",
+    "provider_media_egress_authority",
+    "operator_live_capture_authorization",
+    "complete_provider_capture_grid",
+    "blinded_human_labels",
+    "scores_and_paired_scores",
+    "rule_change_qualification"
+  ],
+  "notes": "Result-free IL-03 campaign draft. It binds the training origin, frozen pack, exact provider executor, configurations, and full 18-call grid. It contains no capture, label, score, qualification, promotion, or product runtime authority."
+}

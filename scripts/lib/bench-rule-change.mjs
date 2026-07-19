@@ -13,6 +13,8 @@ import { isAbsolute, join, resolve } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import { benchConfigId } from "./bench-ablation.mjs";
+import { assertOpenAIProviderMediaAuthority } from "./bench-adapters/openai-audio-translation-v1.mjs";
+import { resolveCaptureExecutor } from "./bench-capture-executor.mjs";
 import {
   contaminationGuard,
   loadCandidatesManifests,
@@ -38,10 +40,25 @@ import { validateProposal } from "./memory-review.mjs";
 import { normalizeSourceReceipt } from "./source-receipts.mjs";
 
 export const RULE_CHANGE_SCHEMAS = Object.freeze({
+  campaignApproval: "studio.bench.rule-change-campaign-approval.v1",
+  campaignDraft: "studio.bench.rule-change-campaign-draft.v1",
   registration: "studio.bench.rule-change-registration.v1",
+  registrationOwnedLocal: "studio.bench.rule-change-registration.v2",
   resultV1: "studio.bench.rule-change-result.v1",
   result: "studio.bench.rule-change-result.v2",
 });
+
+const CAMPAIGN_DRAFT_BLOCKERS = Object.freeze([
+  "canonical_rule_proposal",
+  "content_bound_human_registration_approval",
+  "result_free_registration",
+  "certified_releases",
+  "operator_live_capture_authorization",
+  "complete_provider_capture_grid",
+  "blinded_human_labels",
+  "scores_and_paired_scores",
+  "rule_change_qualification",
+]);
 
 function fail(message) {
   throw new Error(`bench rule change: ${message}`);
@@ -70,6 +87,14 @@ function requiredText(value, context) {
 
 function resolveFile(path, workspaceRoot) {
   return isAbsolute(path) ? path : resolve(workspaceRoot, path);
+}
+
+function exactBinding(left, right) {
+  return (
+    left?.path === right?.path &&
+    left?.content_id === right?.content_id &&
+    left?.bytes === right?.bytes
+  );
 }
 
 function repositoryPath(path, context) {
@@ -138,6 +163,23 @@ function resultId(value) {
   return `bench-rule-change-result:${contentIdForJson({ result_id: null, ...body })}`;
 }
 
+function campaignApprovalId(value) {
+  const { approval_id: _id, ...body } = value;
+  return `bench-rule-change-campaign-approval:${contentIdForJson({ approval_id: null, ...body })}`;
+}
+
+function assertCampaignApprovalActorAndChronology(approval, proposal, context) {
+  const actors = [approval.approved_by.name, approval.approved_by.git_identity];
+  if (
+    actors.some((actor) => actor === proposal.proposed_by || /^agent:/i.test(actor.trim()))
+  ) {
+    fail(`${context} actor must be a declared human who differs from the proposal drafter`);
+  }
+  if (Date.parse(approval.approved_at) <= Date.parse(proposal.created_at)) {
+    fail(`${context} must postdate the proposal creation time`);
+  }
+}
+
 function expectedCapturePlan(slug, clipIds, repetitions) {
   return [...clipIds]
     .sort((left, right) => left.localeCompare(right))
@@ -166,15 +208,21 @@ async function validators() {
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/,
       );
       ajv.addFormat("date", /^\d{4}-\d{2}-\d{2}$/);
-      const [registration, resultV1, result, capture] = await Promise.all([
+      const [campaignApproval, campaignDraft, registration, registrationOwnedLocal, resultV1, result, capture] = await Promise.all([
+        readJsonFile(new URL("../../bench/schemas/rule-change-campaign-approval.schema.json", import.meta.url)),
+        readJsonFile(new URL("../../bench/schemas/rule-change-campaign-draft.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/rule-change-registration.schema.json", import.meta.url)),
+        readJsonFile(new URL("../../bench/schemas/rule-change-registration-v2.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/rule-change-result.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/rule-change-result-v2.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/capture.schema.json", import.meta.url)),
       ]);
       return {
         ajv,
+        campaignApproval: ajv.compile(campaignApproval),
+        campaignDraft: ajv.compile(campaignDraft),
         registration: ajv.compile(registration),
+        registrationOwnedLocal: ajv.compile(registrationOwnedLocal),
         resultV1: ajv.compile(resultV1),
         result: ajv.compile(result),
         capture: ajv.compile(capture),
@@ -192,7 +240,56 @@ async function schemaCheck(value, name, context) {
   }
 }
 
+export async function validateRuleChangeCampaignApproval(
+  approval,
+  context = "rule change campaign approval",
+) {
+  await schemaCheck(approval, "campaignApproval", context);
+  exactTimestamp(approval.approved_at, `${context}.approved_at`);
+  if (approval.approval_id !== campaignApprovalId(approval)) {
+    fail(`${context} approval_id does not match its immutable contents`);
+  }
+  return approval;
+}
+
+export function ruleChangeCampaignApprovalPath(approval) {
+  const digest = approval.approval_id.slice(
+    "bench-rule-change-campaign-approval:sha256:".length,
+  );
+  return `bench/reviews/rule-change-campaign/${digest}.json`;
+}
+
+export async function materializeRuleChangeCampaignApproval(
+  { proposalDraftPath, approvedBy, notes },
+  { workspaceRoot = process.cwd(), approvedAt = new Date().toISOString() } = {},
+) {
+  const proposalPath = repositoryPath(proposalDraftPath, "campaign approval proposal draft path");
+  exactKeys(approvedBy, ["name", "git_identity"], "campaign approval reviewer");
+  requiredText(approvedBy.name, "campaign approval reviewer name");
+  requiredText(approvedBy.git_identity, "campaign approval reviewer git identity");
+  const proposal = validateProposal(
+    await readJsonFile(resolveFile(proposalPath, workspaceRoot), "campaign approval proposal draft"),
+  );
+  if (proposal.kind !== "rule") fail("campaign approval proposal draft is not a behavioral rule");
+  const body = {
+    schema: RULE_CHANGE_SCHEMAS.campaignApproval,
+    approved_at: exactTimestamp(approvedAt, "campaign approval time"),
+    action: "approve_result_free_registration",
+    proposal_draft: await fileReceipt(resolveFile(proposalPath, workspaceRoot), proposalPath),
+    proposal_id: proposal.proposal_id,
+    proposal_content_id: contentIdForJson(proposal),
+    approved_by: approvedBy,
+    live_capture_authorized: false,
+    notes: requiredText(notes, "campaign approval notes"),
+  };
+  assertCampaignApprovalActorAndChronology(body, proposal, "campaign approval");
+  return validateRuleChangeCampaignApproval(
+    { approval_id: campaignApprovalId(body), ...body },
+  );
+}
+
 async function verifiedRegistrationInputs(registration, workspaceRoot, context) {
+  const ownedLocal = registration.schema === RULE_CHANGE_SCHEMAS.registrationOwnedLocal;
   repositoryPath(registration.change.proposal.path, `${context} proposal path`);
   await verifiedBinding(registration.change.proposal, workspaceRoot, `${context} proposal`);
   const proposal = validateProposal(
@@ -214,6 +311,54 @@ async function verifiedRegistrationInputs(registration, workspaceRoot, context) 
   for (const [index, evidence] of proposal.evidence.entries()) {
     repositoryPath(evidence.path, `${context} proposal evidence ${index} path`);
     await verifiedBinding(evidence, workspaceRoot, `${context} proposal evidence ${index}`);
+  }
+  let campaignApproval = null;
+  if (ownedLocal) {
+    repositoryPath(registration.campaign_approval.receipt.path, `${context} campaign approval path`);
+    await verifiedBinding(
+      registration.campaign_approval.receipt,
+      workspaceRoot,
+      `${context} campaign approval`,
+    );
+    campaignApproval = await validateRuleChangeCampaignApproval(
+      await readJsonFile(
+        resolveFile(registration.campaign_approval.receipt.path, workspaceRoot),
+        `${context} campaign approval`,
+      ),
+      `${context} campaign approval`,
+    );
+    if (
+      registration.campaign_approval.approval_id !== campaignApproval.approval_id ||
+      registration.campaign_approval.receipt.path !== ruleChangeCampaignApprovalPath(campaignApproval)
+    ) {
+      fail(`${context} campaign approval does not use its content-addressed canonical path`);
+    }
+    await verifiedBinding(
+      campaignApproval.proposal_draft,
+      workspaceRoot,
+      `${context} campaign approval proposal draft`,
+    );
+    const approvedProposal = validateProposal(
+      await readJsonFile(
+        resolveFile(campaignApproval.proposal_draft.path, workspaceRoot),
+        `${context} campaign approval proposal draft`,
+      ),
+    );
+    assertCampaignApprovalActorAndChronology(
+      campaignApproval,
+      approvedProposal,
+      `${context} campaign approval`,
+    );
+    if (
+      campaignApproval.proposal_id !== proposal.proposal_id ||
+      campaignApproval.proposal_content_id !== contentIdForJson(proposal) ||
+      contentIdForJson(approvedProposal) !== contentIdForJson(proposal) ||
+      campaignApproval.proposal_draft.content_id !== registration.change.proposal.content_id ||
+      campaignApproval.proposal_draft.bytes !== registration.change.proposal.bytes ||
+      campaignApproval.live_capture_authorized !== false
+    ) {
+      fail(`${context} campaign approval does not bind the exact canonical proposal bytes`);
+    }
   }
 
   await verifiedBinding(registration.change.origin.candidates_manifest, workspaceRoot, `${context} candidates manifest`);
@@ -245,15 +390,34 @@ async function verifiedRegistrationInputs(registration, workspaceRoot, context) 
   } catch (error) {
     fail(`${context} source receipt is not a valid redistributable source: ${error.message}`);
   }
+  const sourceManifestBinding = manifest.source_artifacts.find(
+    (artifact) => artifact.path === expectedSourcePath,
+  );
   if (
     origin.source_receipt.path !== expectedSourcePath ||
+    !exactBinding(origin.source_receipt, sourceManifestBinding) ||
+    normalizedSource.selection.duration !== manifest.clip.duration_s
+  ) {
+    fail(`${context} origin source does not match its training-routed candidates manifest`);
+  }
+  if (ownedLocal) {
+    if (
+      normalizedSource.kind !== "owned_local" ||
+      normalizedSource.rights.scope !== "redistribution" ||
+      normalizedSource.contentId !== source.raw_media?.content_id ||
+      source.content?.bytes !== source.raw_media?.bytes ||
+      origin.source_kind !== "owned_local" ||
+      origin.media_class !== "owned_local_recorded_bytes"
+    ) {
+      fail(`${context} owned-local origin lacks exact owned bytes and redistribution authority`);
+    }
+  } else if (
     normalizedSource.kind !== "youtube" ||
     !/^[A-Za-z0-9_-]{11}$/.test(normalizedSource.sourceId) ||
     youtubeVideoId(normalizedSource.locator.url, `${context} source URL`) !== normalizedSource.sourceId ||
     normalizedSource.rights.label !== "Creative Commons Attribution license (reuse allowed)" ||
     !normalizedSource.rights.attribution.includes(normalizedSource.creator) ||
     normalizedSource.sourceId !== origin.clip_id ||
-    normalizedSource.selection.duration !== manifest.clip.duration_s ||
     origin.source_kind !== "youtube" ||
     origin.media_class !== "recorded_youtube_bytes"
   ) {
@@ -262,9 +426,13 @@ async function verifiedRegistrationInputs(registration, workspaceRoot, context) 
   repositoryPath(origin.run_receipt.path, `${context} run receipt path`);
   await verifiedBinding(origin.run_receipt, workspaceRoot, `${context} run receipt`);
   const expectedRunPath = `public/demo/runs/${origin.run_id}/run.json`;
+  const runManifestBinding = manifest.source_artifacts.find(
+    (artifact) => artifact.path === expectedRunPath,
+  );
   const run = await readJsonFile(resolveFile(origin.run_receipt.path, workspaceRoot), `${context} run receipt`);
   if (
     origin.run_receipt.path !== expectedRunPath ||
+    !exactBinding(origin.run_receipt, runManifestBinding) ||
     run.id !== origin.run_id ||
     run.clip?.id !== origin.clip_id ||
     run.clip?.duration !== manifest.clip.duration_s ||
@@ -279,6 +447,22 @@ async function verifiedRegistrationInputs(registration, workspaceRoot, context) 
   const expectedMediaPath = `public/demo/runs/${origin.run_id}/${run.clip.media}`;
   if (origin.media_artifact.path !== expectedMediaPath) {
     fail(`${context} media artifact path must be ${expectedMediaPath}`);
+  }
+  if (ownedLocal) {
+    if (
+      source.raw_media?.path !== run.clip.media ||
+      source.raw_media?.content_id !== origin.media_artifact.content_id ||
+      source.raw_media?.bytes !== origin.media_artifact.bytes
+    ) {
+      fail(`${context} owned-local media differs from the source receipt raw_media binding`);
+    }
+  } else {
+    const mediaManifestBinding = manifest.source_artifacts.find(
+      (artifact) => artifact.path === expectedMediaPath,
+    );
+    if (!exactBinding(origin.media_artifact, mediaManifestBinding)) {
+      fail(`${context} YouTube media differs from the candidates manifest binding`);
+    }
   }
   const expectedManifestPath = `bench/candidates/${origin.run_id}/candidates.json`;
   if (origin.candidates_manifest.path !== expectedManifestPath) {
@@ -342,15 +526,23 @@ async function verifiedRegistrationInputs(registration, workspaceRoot, context) 
     resolveRunClip: (run) => runClips.get(run) ?? null,
   });
 
-  return { proposal, manifest, pack, freeze };
+  return { proposal, campaignApproval, manifest, pack, freeze };
 }
 
 export async function validateRuleChangeRegistration(
   registration,
   { workspaceRoot = process.cwd(), context = "rule change registration" } = {},
 ) {
-  await schemaCheck(registration, "registration", context);
-  if (registration.schema !== RULE_CHANGE_SCHEMAS.registration) fail(`${context} schema is not registered`);
+  const schemaName = registration?.schema === RULE_CHANGE_SCHEMAS.registrationOwnedLocal
+    ? "registrationOwnedLocal"
+    : "registration";
+  await schemaCheck(registration, schemaName, context);
+  if (
+    registration.schema !== RULE_CHANGE_SCHEMAS.registration &&
+    registration.schema !== RULE_CHANGE_SCHEMAS.registrationOwnedLocal
+  ) {
+    fail(`${context} schema is not registered`);
+  }
   exactTimestamp(registration.registered_at, `${context}.registered_at`);
   if (registration.registration_id !== registrationId(registration)) {
     fail(`${context} registration_id does not match its immutable contents`);
@@ -382,6 +574,12 @@ export async function validateRuleChangeRegistration(
   if (Date.parse(registration.registered_at) <= Date.parse(inputs.proposal.created_at)) {
     fail(`${context} must be registered after the proposal was created`);
   }
+  if (
+    inputs.campaignApproval &&
+    Date.parse(registration.registered_at) <= Date.parse(inputs.campaignApproval.approved_at)
+  ) {
+    fail(`${context} must be registered after the human campaign approval`);
+  }
   const expectedPlan = expectedCapturePlan(
     registration.slug,
     inputs.freeze.clips.map((clip) => clip.clip_id),
@@ -393,10 +591,7 @@ export async function validateRuleChangeRegistration(
   return registration;
 }
 
-export async function materializeRuleChangeRegistration(
-  draft,
-  { workspaceRoot = process.cwd(), registeredAt = new Date().toISOString() } = {},
-) {
+function validateRegistrationDraftShape(draft) {
   exactKeys(
     draft,
     [
@@ -419,11 +614,64 @@ export async function materializeRuleChangeRegistration(
   exactKeys(draft.subject.baseline, ["config"], "rule change draft baseline");
   exactKeys(draft.subject.variant, ["config"], "rule change draft variant");
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft.slug)) fail("rule change draft slug is malformed");
+}
+
+export async function materializeRuleChangeRegistration(
+  draft,
+  {
+    workspaceRoot = process.cwd(),
+    registeredAt = new Date().toISOString(),
+    campaignApprovalPath = null,
+  } = {},
+) {
+  validateRegistrationDraftShape(draft);
+  const ownedLocal = draft.schema === RULE_CHANGE_SCHEMAS.registrationOwnedLocal;
+  if (!ownedLocal && draft.schema !== RULE_CHANGE_SCHEMAS.registration) {
+    fail("rule change draft schema is not registered");
+  }
 
   const proposalPath = requiredText(draft.proposal_path, "rule change draft proposal_path");
   repositoryPath(proposalPath, "rule change draft proposal_path");
   const proposal = validateProposal(await readJsonFile(resolveFile(proposalPath, workspaceRoot), "rule change proposal"));
   if (proposal.kind !== "rule") fail("rule change proposal is not a behavioral rule");
+  let campaignApproval = null;
+  let campaignApprovalBinding = null;
+  if (ownedLocal) {
+    const approvalPath = repositoryPath(
+      requiredText(campaignApprovalPath, "rule change campaign approval path"),
+      "rule change campaign approval path",
+    );
+    campaignApproval = await validateRuleChangeCampaignApproval(
+      await readJsonFile(resolveFile(approvalPath, workspaceRoot), "rule change campaign approval"),
+    );
+    if (approvalPath !== ruleChangeCampaignApprovalPath(campaignApproval)) {
+      fail(`rule change campaign approval path must be ${ruleChangeCampaignApprovalPath(campaignApproval)}`);
+    }
+    campaignApprovalBinding = await fileReceipt(resolveFile(approvalPath, workspaceRoot), approvalPath);
+    await verifiedBinding(
+      campaignApproval.proposal_draft,
+      workspaceRoot,
+      "rule change campaign approval proposal draft",
+    );
+    const approvedProposal = validateProposal(
+      await readJsonFile(
+        resolveFile(campaignApproval.proposal_draft.path, workspaceRoot),
+        "rule change campaign approval proposal draft",
+      ),
+    );
+    const canonicalProposalBinding = await fileReceipt(resolveFile(proposalPath, workspaceRoot), proposalPath);
+    if (
+      campaignApproval.proposal_id !== proposal.proposal_id ||
+      campaignApproval.proposal_content_id !== contentIdForJson(proposal) ||
+      contentIdForJson(approvedProposal) !== contentIdForJson(proposal) ||
+      campaignApproval.proposal_draft.content_id !== canonicalProposalBinding.content_id ||
+      campaignApproval.proposal_draft.bytes !== canonicalProposalBinding.bytes
+    ) {
+      fail("rule change campaign approval does not bind the exact canonical proposal bytes");
+    }
+  } else if (campaignApprovalPath !== null) {
+    fail("rule change V1 does not accept a campaign approval option");
+  }
   const manifestPath = requiredText(draft.candidates_manifest_path, "rule change draft candidates_manifest_path");
   repositoryPath(manifestPath, "rule change draft candidates_manifest_path");
   const manifest = validateCandidatesManifest(
@@ -442,9 +690,19 @@ export async function materializeRuleChangeRegistration(
   try {
     normalizedSource = normalizeSourceReceipt(source);
   } catch (error) {
-    fail(`rule change v1 requires a valid redistributable YouTube source: ${error.message}`);
+    fail(`rule change source receipt is invalid: ${error.message}`);
   }
-  if (
+  if (ownedLocal) {
+    if (
+      normalizedSource.kind !== "owned_local" ||
+      normalizedSource.rights.scope !== "redistribution" ||
+      normalizedSource.selection.duration !== manifest.clip.duration_s ||
+      normalizedSource.contentId !== source.raw_media?.content_id ||
+      source.content?.bytes !== source.raw_media?.bytes
+    ) {
+      fail("rule change v2 requires exact owned-local media with redistribution authority");
+    }
+  } else if (
     normalizedSource.kind !== "youtube" ||
     !/^[A-Za-z0-9_-]{11}$/.test(normalizedSource.sourceId) ||
     youtubeVideoId(normalizedSource.locator.url, "rule change source URL") !== normalizedSource.sourceId ||
@@ -470,8 +728,20 @@ export async function materializeRuleChangeRegistration(
     fail("rule change origin run does not match the candidates manifest and media filename");
   }
   const mediaPath = `public/demo/runs/${manifest.run}/${run.clip.media}`;
-  const mediaBinding = manifest.source_artifacts.find((artifact) => artifact.path === mediaPath);
+  const mediaBinding = ownedLocal
+    ? await fileReceipt(resolve(workspaceRoot, mediaPath), mediaPath)
+    : manifest.source_artifacts.find((artifact) => artifact.path === mediaPath);
   if (!mediaBinding) fail(`rule change origin candidates manifest does not bind ${mediaPath}`);
+  if (
+    ownedLocal &&
+    (
+      source.raw_media?.path !== run.clip.media ||
+      source.raw_media?.content_id !== mediaBinding.content_id ||
+      source.raw_media?.bytes !== mediaBinding.bytes
+    )
+  ) {
+    fail("rule change v2 media bytes differ from the owned-local source receipt");
+  }
   const differences = leafDifferences(draft.subject.baseline.config, draft.subject.variant.config);
   if (differences.length !== 1) fail(`rule change draft must change exactly one scalar config leaf; found ${differences.length}`);
   const [delta] = differences;
@@ -497,9 +767,17 @@ export async function materializeRuleChangeRegistration(
         run_receipt: runBinding,
         media_artifact: mediaBinding,
         source_kind: source.kind,
-        media_class: "recorded_youtube_bytes",
+        media_class: ownedLocal ? "owned_local_recorded_bytes" : "recorded_youtube_bytes",
       },
     },
+    ...(ownedLocal
+      ? {
+          campaign_approval: {
+            receipt: campaignApprovalBinding,
+            approval_id: campaignApproval.approval_id,
+          },
+        }
+      : {}),
     pack: {
       pack_id: pack.pack_id,
       manifest: await fileReceipt(resolve(workspaceRoot, packPath), packPath),
@@ -529,6 +807,259 @@ export async function materializeRuleChangeRegistration(
   };
   const registration = { registration_id: registrationId(body), ...body };
   return validateRuleChangeRegistration(registration, { workspaceRoot });
+}
+
+export async function validateRuleChangeCampaignDraft(
+  campaign,
+  { workspaceRoot = process.cwd(), context = "rule change campaign draft" } = {},
+) {
+  await schemaCheck(campaign, "campaignDraft", context);
+  for (const [binding, label] of [
+    [campaign.proposal_draft, "proposal draft"],
+    [campaign.registration_input, "registration input"],
+    [campaign.executor.receipt, "executor"],
+    [campaign.origin.candidates_manifest, "candidates manifest"],
+    [campaign.origin.source_receipt, "source receipt"],
+    [campaign.origin.run_receipt, "run receipt"],
+    [campaign.origin.media_artifact, "media artifact"],
+    [campaign.pack.manifest, "pack manifest"],
+    [campaign.pack.freeze, "freeze receipt"],
+  ]) {
+    repositoryPath(binding.path, `${context} ${label} path`);
+    await verifiedBinding(binding, workspaceRoot, `${context} ${label}`);
+  }
+  const proposal = validateProposal(
+    await readJsonFile(resolveFile(campaign.proposal_draft.path, workspaceRoot), `${context} proposal draft`),
+  );
+  if (proposal.kind !== "rule") fail(`${context} proposal draft is not a behavioral rule`);
+  for (const [index, evidence] of proposal.evidence.entries()) {
+    repositoryPath(evidence.path, `${context} proposal evidence ${index} path`);
+    await verifiedBinding(evidence, workspaceRoot, `${context} proposal evidence ${index}`);
+  }
+  const proposalDigest = proposal.proposal_id.slice("memory-proposal:sha256:".length);
+  const expectedCanonicalPath = `memory/review/proposals/${proposalDigest}.json`;
+  if (campaign.canonical_proposal_path !== expectedCanonicalPath) {
+    fail(`${context} canonical proposal path must be ${expectedCanonicalPath}`);
+  }
+  const draft = await readJsonFile(
+    resolveFile(campaign.registration_input.path, workspaceRoot),
+    `${context} registration input`,
+  );
+  validateRegistrationDraftShape(draft);
+  if (
+    draft.schema !== RULE_CHANGE_SCHEMAS.registrationOwnedLocal ||
+    draft.status !== "registered" ||
+    draft.proposal_path !== expectedCanonicalPath ||
+    draft.candidates_manifest_path !== campaign.origin.candidates_manifest.path ||
+    draft.pack_id !== campaign.pack.pack_id ||
+    draft.results !== null
+  ) {
+    fail(`${context} registration input is not the closed owned-local result-free draft`);
+  }
+  const manifest = validateCandidatesManifest(
+    await readJsonFile(
+      resolveFile(campaign.origin.candidates_manifest.path, workspaceRoot),
+      `${context} candidates manifest`,
+    ),
+  );
+  const origin = campaign.origin;
+  if (
+    origin.candidates_manifest.path !== `bench/candidates/${origin.run_id}/candidates.json` ||
+    manifest.manifest_id !== origin.manifest_id ||
+    manifest.run !== origin.run_id ||
+    manifest.clip.id !== origin.clip_id ||
+    manifest.routing.route !== "training"
+  ) {
+    fail(`${context} origin is not the exact training-routed candidates manifest`);
+  }
+  const expectedSourcePath = `public/demo/runs/${origin.run_id}/source.json`;
+  const sourceManifestBinding = manifest.source_artifacts.find(
+    (artifact) => artifact.path === expectedSourcePath,
+  );
+  if (
+    origin.source_receipt.path !== expectedSourcePath ||
+    !exactBinding(origin.source_receipt, sourceManifestBinding)
+  ) {
+    fail(`${context} source receipt differs from the candidates manifest`);
+  }
+  const source = await readJsonFile(resolveFile(origin.source_receipt.path, workspaceRoot), `${context} source receipt`);
+  let normalizedSource;
+  try {
+    normalizedSource = normalizeSourceReceipt(source);
+  } catch (error) {
+    fail(`${context} source receipt is invalid: ${error.message}`);
+  }
+  if (
+    normalizedSource.kind !== "owned_local" ||
+    normalizedSource.rights.scope !== "redistribution" ||
+    normalizedSource.selection.duration !== manifest.clip.duration_s ||
+    normalizedSource.contentId !== source.raw_media?.content_id ||
+    source.content?.bytes !== source.raw_media?.bytes
+  ) {
+    fail(`${context} source does not authorize the exact owned-local campaign media`);
+  }
+  const expectedRunPath = `public/demo/runs/${origin.run_id}/run.json`;
+  const runManifestBinding = manifest.source_artifacts.find(
+    (artifact) => artifact.path === expectedRunPath,
+  );
+  if (origin.run_receipt.path !== expectedRunPath || !exactBinding(origin.run_receipt, runManifestBinding)) {
+    fail(`${context} run receipt differs from the candidates manifest`);
+  }
+  const run = await readJsonFile(resolveFile(origin.run_receipt.path, workspaceRoot), `${context} run receipt`);
+  const expectedMediaPath = `public/demo/runs/${origin.run_id}/${run.clip?.media}`;
+  if (
+    run.id !== origin.run_id ||
+    run.clip?.id !== origin.clip_id ||
+    run.clip?.duration !== manifest.clip.duration_s ||
+    origin.media_artifact.path !== expectedMediaPath ||
+    source.raw_media?.path !== run.clip.media ||
+    source.raw_media?.content_id !== origin.media_artifact.content_id ||
+    source.raw_media?.bytes !== origin.media_artifact.bytes
+  ) {
+    fail(`${context} media artifact differs from the source and run receipts`);
+  }
+  const pack = validatePack(
+    await readJsonFile(resolveFile(campaign.pack.manifest.path, workspaceRoot), `${context} pack manifest`),
+  );
+  const freeze = validateFreezeReceipt(
+    await readJsonFile(resolveFile(campaign.pack.freeze.path, workspaceRoot), `${context} freeze receipt`),
+  );
+  if (
+    !pack.frozen ||
+    !pack.freeze_receipt ||
+    pack.pack_id !== campaign.pack.pack_id ||
+    campaign.pack.manifest.path !== `bench/packs/${pack.pack_id}/pack.json` ||
+    campaign.pack.freeze.path !== `bench/packs/${pack.pack_id}/${pack.freeze_receipt}` ||
+    freeze.pack_id !== pack.pack_id ||
+    pack.clips.some((clip) => clip.clip_id === origin.clip_id)
+  ) {
+    fail(`${context} does not bind one uncontaminated frozen evaluation pack`);
+  }
+  const providerEgressBlocked = pack.clips.some((clip) => {
+    const source = clip.source;
+    try {
+      assertOpenAIProviderMediaAuthority({
+        kind: typeof source.kind === "string" ? source.kind : "",
+        url: typeof source.url === "string" ? source.url : "",
+        channel: typeof source.channel === "string" ? source.channel : "",
+        licence: typeof source.licence === "string" ? source.licence : "",
+        window: source.window && typeof source.window === "object" ? source.window : null,
+        attribution: typeof source.attribution === "string" ? source.attribution : "",
+      });
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  const expectedBlockers = providerEgressBlocked
+    ? [
+        ...CAMPAIGN_DRAFT_BLOCKERS.slice(0, 4),
+        "provider_media_egress_authority",
+        ...CAMPAIGN_DRAFT_BLOCKERS.slice(4),
+      ]
+    : CAMPAIGN_DRAFT_BLOCKERS;
+  if (canonicalJson(campaign.blockers) !== canonicalJson(expectedBlockers)) {
+    fail(`${context} blockers must name the exact remaining authority and evidence gates`);
+  }
+  const differences = leafDifferences(draft.subject.baseline.config, draft.subject.variant.config);
+  const ruleContentId = contentIdForJson(proposal.value);
+  if (
+    differences.length !== 1 ||
+    differences[0].path !== "/reviewed_memory/rule_content_id" ||
+    differences[0].baseline !== null ||
+    differences[0].variant !== ruleContentId
+  ) {
+    fail(`${context} registration input does not change only the draft rule content id`);
+  }
+  const expectedPlan = expectedCapturePlan(
+    draft.slug,
+    freeze.clips.map((clip) => clip.clip_id),
+    draft.capture_policy.repetitions_per_clip,
+  );
+  if (canonicalJson(campaign.capture_plan) !== canonicalJson(expectedPlan)) {
+    fail(`${context} capture plan does not cover the full repeated frozen-pack grid`);
+  }
+  const previewBody = {
+    schema: draft.schema,
+    slug: draft.slug,
+    status: draft.status,
+    registered_at: "9999-12-31T23:59:59.999Z",
+    hypothesis: draft.hypothesis,
+    change: {
+      proposal: campaign.proposal_draft,
+      proposal_id: proposal.proposal_id,
+      proposal_content_id: contentIdForJson(proposal),
+      rule_content_id: ruleContentId,
+      origin,
+    },
+    campaign_approval: {
+      receipt: {
+        path: `bench/reviews/rule-change-campaign/${"0".repeat(64)}.json`,
+        content_id: `sha256:${"0".repeat(64)}`,
+        bytes: 1,
+      },
+      approval_id: `bench-rule-change-campaign-approval:sha256:${"0".repeat(64)}`,
+    },
+    pack: campaign.pack,
+    subject: {
+      system_id: draft.subject.system_id,
+      baseline: {
+        config_id: benchConfigId(draft.subject.baseline.config),
+        config: draft.subject.baseline.config,
+      },
+      variant: {
+        config_id: benchConfigId(draft.subject.variant.config),
+        config: draft.subject.variant.config,
+      },
+    },
+    delta: differences[0],
+    capture_policy: draft.capture_policy,
+    capture_plan: campaign.capture_plan,
+    qualification_policy: draft.qualification_policy,
+    results: null,
+    notes: draft.notes,
+  };
+  await schemaCheck(
+    { registration_id: registrationId(previewBody), ...previewBody },
+    "registrationOwnedLocal",
+    `${context} registration preview`,
+  );
+  const executor = await resolveCaptureExecutor(campaign.executor.receipt.path, { workspaceRoot });
+  if (
+    campaign.executor.executor_id !== executor.executor.executor_id ||
+    !exactBinding(campaign.executor.receipt, executor.binding) ||
+    executor.executor.adapter_id !== "openai_audio_translation_v1"
+  ) {
+    fail(`${context} does not bind the certified provider capture executor`);
+  }
+  const providerCalls = expectedPlan.length * 2;
+  const mediaSeconds = pack.clips.reduce((total, clip) => total + clip.source.duration, 0)
+    * draft.capture_policy.repetitions_per_clip
+    * 2;
+  if (
+    campaign.budget.provider_calls !== providerCalls ||
+    Math.abs(campaign.budget.media_seconds - mediaSeconds) > 0.000001
+  ) {
+    fail(`${context} budget does not match the exact preregistered provider grid`);
+  }
+  if (
+    !proposal.source ||
+    proposal.source.run_id !== origin.run_id ||
+    proposal.source.clip_id !== origin.clip_id
+  ) {
+    fail(`${context} proposal source differs from the training-routed origin`);
+  }
+  const manifests = await loadCandidatesManifests(resolve(workspaceRoot, "bench/candidates"), workspaceRoot);
+  const packClips = pack.clips.map((clip) => ({ pack_id: pack.pack_id, clip_id: clip.clip_id }));
+  const runClips = new Map(manifests.map(({ manifest: item }) => [item.run, item.clip.id]));
+  if (!runClips.has(origin.run_id)) runClips.set(origin.run_id, origin.clip_id);
+  contaminationGuard({
+    proposals: [proposal],
+    manifests,
+    packClips,
+    resolveRunClip: (runId) => runClips.get(runId) ?? null,
+  });
+  return campaign;
 }
 
 function rateRange(values) {

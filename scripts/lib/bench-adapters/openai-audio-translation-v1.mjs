@@ -197,6 +197,17 @@ function invocationShape(invocation) {
   return sourceBytes;
 }
 
+export function assertOpenAIProviderMediaAuthority(source) {
+  exactKeys(source, ["kind", "url", "channel", "licence", "window", "attribution"], "provider media source");
+  const redistributableYouTube =
+    source.kind === "youtube" &&
+    source.licence === "Creative Commons Attribution license (reuse allowed)";
+  if (!redistributableYouTube) {
+    fail("provider media egress is not authorized by the registered source receipt");
+  }
+  return source;
+}
+
 export function buildOpenAIAudioTranslationRequest(invocation) {
   const sourceBytes = invocationShape(invocation);
   const config = configuration(invocation);
@@ -244,6 +255,7 @@ export function preflightOpenAIAudioTranslation(invocation, execution) {
   ) {
     fail("live provider execution requires the explicit flag, live environment, and API key");
   }
+  assertOpenAIProviderMediaAuthority(invocation.clip.source);
   return { executionMode: "live_openai" };
 }
 

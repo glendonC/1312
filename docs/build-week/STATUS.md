@@ -85,6 +85,18 @@ score.
   anonymous-stem capture drafts, preserves the exact registered configs, maps absent output only to
   missing or withheld, and keeps semantic fields null. No registered capture, label, variance, or
   result exists yet.
+- **Bet G IL-03 provider campaign foundation:** additive capture-executor, execution-input, and
+  execution-attribution V2 contracts bind one host-owned OpenAI audio-translation call and its exact
+  provider receipt. The adapter has no retries or output selection, requires explicit live gates
+  and provider-media authority before charging, and keeps injected transports test-only.
+  Owned-local rule-change registration V2 binds exact training media only when ownership authorizes
+  redistribution and requires a human approval receipt for the exact proposal bytes. That receipt
+  never authorizes live capture. The result-free Korean kinship-address campaign draft binds
+  `run-005`, frozen `hard-ko-v1`, the certified provider executor, the sole rule-content delta, and
+  all 18 planned calls. It is not registered because the behavioral rule is only a draft pending
+  human review. The two local-evaluation controls also block provider egress for 12 planned calls,
+  so this frozen grid is not live-ready. No live provider call, capture, label, score, qualification,
+  accepted memory, runtime deployment, or product improvement result exists.
 
 Rung IDs below (`U1`…`U7`, including slice labels such as `U6.1` and `U7.1`) are defined in
 [`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md). This section records acceptance state; done-when
@@ -324,6 +336,11 @@ indefinite deferrals. Status here is a summary; ladder done-when and non-claims 
    the exact packager, then obtain exact-byte-bound blinded human labels and score all 18 captures.
    The follow-through audit is the structural checklist, not a semantic result. Measure variance
    later without recasting run-007 or structural diagnostics as runtime semantic QC.
+4. Review the IL-03 behavioral-rule draft and record the exact-byte registration approval. Replace
+   the campaign package with one bound to a separately frozen provider-authorized pack instead of
+   mutating `hard-ko-v1`. Only then materialize and commit its result-free registration and both
+   certified releases. Live capture remains a separate operator authorization gate, followed by
+   blinded human labels and qualification.
 
 ## Honesty non-claims
 
@@ -335,6 +352,9 @@ indefinite deferrals. Status here is a summary; ladder done-when and non-claims 
 - Recorded replay fixtures are not the owned-path swarm. The run-007 Bet G score exists with a null
   model judge; one human-labeled capture does not establish calibration, generalization, or that the
   prepped path is better.
+- The IL-03 provider adapter and campaign draft are an evaluation seam, not a provider-backed result.
+  A campaign draft is not a registration, eligibility is not deployment, accepted memory is not
+  runtime consumption, and none of these facts proves a product self-improvement win.
 - U1 proves bounded execution, lineage, authorization, full-duration accounting, and abstention. It
   does not prove acoustic classification accuracy, complete speech detection, lyric understanding,
   transcription/translation correctness, or semantic caption QC.

@@ -147,6 +147,100 @@ export function LinkSource() {
   );
 }
 
+export function Volume({ muted }: { muted: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path d="M2.5 6v4h2.3L8 12.6V3.4L4.8 6z" fill="currentColor" />
+      {muted ? (
+        <path
+          d="m10.4 6.4 3.2 3.2m0-3.2-3.2 3.2"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.35"
+          strokeLinecap="round"
+        />
+      ) : (
+        <path
+          d="M10.6 5.8a3 3 0 0 1 0 4.4M12.4 4.3a5.2 5.2 0 0 1 0 7.4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.35"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+export function Expand() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M6 2.6H2.6V6M14 6V2.6h-3.4M10.6 13.4H14V10M2.6 10v3.4H6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function Compress() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M2.6 5.6H6V2.2M13.4 5.6H10V2.2M10 13.8V10.4h3.4M6 13.8V10.4H2.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function Info() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="8" cy="5.1" r="0.95" fill="currentColor" />
+      <path d="M8 7.4v4.1" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function Coverage() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M3 13V7M8 13V3.2M13 13V9.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function Chevron() {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+      <path
+        d="M4 6.5 8 10.5l4-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function Edit() {
   return (
     <svg className="edit" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">

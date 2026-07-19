@@ -2,9 +2,8 @@ import {
   LEARNING_LENS_KINDS,
   LEARNING_TEMPERATURES,
   type LearningLensKind,
-  type LearningPrepProjection,
+  type LearningPrepInteraction,
   type LearningTemperature,
-  type ProductionLearningPrepInteraction,
 } from "./presentation.ts";
 
 export const LEARNING_LENS_LABELS: Record<LearningLensKind, string> = {
@@ -34,8 +33,9 @@ const PREP_REASON_COPY: Record<string, string> = {
  * The Customize learning face. Arming lenses and preparing are explicit learner actions; the armed
  * temperature only caps how much prepared help may surface and never invents availability.
  */
-export default function LearningFineTuneFace({ interaction }: { interaction: ProductionLearningPrepInteraction }) {
+export default function LearningFineTuneFace({ interaction }: { interaction: LearningPrepInteraction }) {
   const { draft, prep, availability } = interaction;
+  const recorded = interaction.sourceAuthority === "recorded_fixture";
   const busy = prep.state === "loading";
   const controlsDisabled = availability.state === "unavailable" || busy;
   const prepared = prep.state === "ready";
@@ -53,6 +53,7 @@ export default function LearningFineTuneFace({ interaction }: { interaction: Pro
     <section
       className="learning-fine-tune"
       aria-label="Customize learning"
+      data-learning-prep-authority={interaction.sourceAuthority}
       data-learning-prep-state={prep.state}
       data-learning-prep-result-state={prepared ? prep.resultState : undefined}
       data-armed-lenses={draft.armedLenses.join(",")}
@@ -60,15 +61,15 @@ export default function LearningFineTuneFace({ interaction }: { interaction: Pro
     >
       <header className="learning-fine-tune-head">
         <div>
-          <span>Optional learning overlay</span>
+          <span>{recorded ? "Recorded learning overlay" : "Optional learning overlay"}</span>
           <h4>Customize learning</h4>
         </div>
         <b data-learning-prep-state-label="">{prepStateLabel}</b>
       </header>
       <p className="learning-fine-tune-boundary" role="note">
-        Watching stays first. Arming lenses prepares moments from this clip's verified captions;
-        prepared notes are unreviewed caption-context inference, never verified culture or history,
-        and moments without justified help stay silent.
+        {recorded
+          ? "This recorded demo uses run-bound design-fixture notes. They were not generated from your media, are not production output, and are not semantically verified."
+          : "Watching stays first. Arming lenses prepares moments from this clip's verified captions; prepared notes are unreviewed caption-context inference, never verified culture or history, and moments without justified help stay silent."}
       </p>
 
       <fieldset className="learning-fine-tune-lenses" disabled={controlsDisabled}>
@@ -129,7 +130,11 @@ export default function LearningFineTuneFace({ interaction }: { interaction: Pro
       ) : null}
 
       {prepared ? (
-        <div className="learning-fine-tune-summary" data-prep-artifact-id={prep.authority.artifactId}>
+        <div
+          className="learning-fine-tune-summary"
+          data-prep-artifact-id={prep.authority.artifactId ?? undefined}
+          data-prep-fixture-id={prep.authority.fixtureId ?? undefined}
+        >
           <p>
             {prep.resultState === "unavailable"
               ? "Every armed lens honestly abstained or withheld for this clip. Nothing will surface while watching."
@@ -152,8 +157,9 @@ export default function LearningFineTuneFace({ interaction }: { interaction: Pro
             ))}
           </ul>
           <p className="learning-fine-tune-nonclaim">
-            Host-receipted and not reviewed. External citations are empty; caption context is input,
-            not culture or history authority. This prep is private and grants no export.
+            {recorded
+              ? "Recorded design fixture, not runtime-generated and not reviewed. It demonstrates the shared result UI without claiming production authority."
+              : "Host-receipted and not reviewed. External citations are empty; caption context is input, not culture or history authority. This prep is private and grants no export."}
           </p>
         </div>
       ) : null}

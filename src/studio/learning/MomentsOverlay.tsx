@@ -32,6 +32,7 @@ export default function MomentsOverlay({
       className="learning-moments-overlay"
       aria-label="Learning moments overlay"
       data-moments-overlay-state="active"
+      data-moments-overlay-authority={active.dataClass}
       data-moments-lens={active.lens}
       data-moments-line-id={active.lineId}
     >
@@ -49,7 +50,9 @@ export default function MomentsOverlay({
       ) : (
         <p><b>{active.content.referent}</b>{active.content.note}</p>
       )}
-      <span className="learning-moments-review-state">unreviewed note</span>
+      <span className="learning-moments-review-state">
+        {active.dataClass === "design_fixture" ? "recorded fixture · not reviewed" : "unreviewed note"}
+      </span>
     </aside>
   );
 }

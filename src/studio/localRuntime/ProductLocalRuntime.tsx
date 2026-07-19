@@ -74,7 +74,6 @@ import "./productLocalRuntime.forecast.css";
 import "./productLocalRuntime.processing-canvas.css";
 import "./productLocalRuntime.coordination-ledger.css";
 import "./productLocalRuntime.captions-qc.css";
-import "./productLocalRuntime.learning-prep.css";
 import "./productLocalRuntime.responsive.css";
 
 type Busy = "connect" | "ingest" | "plan" | "start" | null;
@@ -737,11 +736,11 @@ export default function ProductLocalRuntime({
 
   function openRecordedEvidence(): void {
     const details = evidenceDetails.current;
-    if (!details) return;
-    details.open = true;
     const hasCaptionResults = (runtime?.captionResults.length ?? 0) > 0;
     window.requestAnimationFrame(() => {
       if (hasCaptionResults && focusResultTarget(PRODUCTION_CAPTION_RESULTS_ID)) return;
+      if (!details) return;
+      details.open = true;
       details.scrollIntoView({ block: "start", behavior: "smooth" });
     });
   }
@@ -885,13 +884,14 @@ export default function ProductLocalRuntime({
               onPublishReviewRevocation={submitPublishReviewRevocation}
               onCaptionProduction={submitCaptionProduction}
             />
-            <ProductionCaptionResults
-              client={client}
-              runtimeId={runtime.status.runtimeId}
-              sourceRevisionId={runtime.status.sourceRevisionId}
-              results={runtime.captionResults}
-            />
           </details>
+
+          <ProductionCaptionResults
+            client={client}
+            runtimeId={runtime.status.runtimeId}
+            sourceRevisionId={runtime.status.sourceRevisionId}
+            results={runtime.captionResults}
+          />
         </section>
           )}
         </>

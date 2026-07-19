@@ -9,6 +9,7 @@ import {
   readLearningPrototypeFixture,
 } from "../src/studio/learning/prototypeFixture.ts";
 import { projectPrototypeLearningPresentation } from "../src/studio/learning/prototypeAdapter.ts";
+import { projectRecordedLearningPrep } from "../src/studio/learning/recordedLearningPrepAdapter.ts";
 import {
   projectRecordedLearningSource,
   validateLearningSourceContext,
@@ -207,6 +208,60 @@ test("design fixture binds exact code-point selections to the recorded c01 momen
   ]);
   assert.equal(JSON.stringify(projection).includes("listening_difficulty"), false);
   assert.equal(JSON.stringify(projection).includes("culture"), false);
+});
+
+test("recorded learning prep projects the shared overlay with design-fixture authority", () => {
+  const source = projectRecordedLearningSource(recordedBundle());
+  const projection = projectRecordedLearningPrep(source, learningPrototypeFixture, {
+    armedLenses: ["grammar_salience", "situating", "culture_reference"],
+    temperature: "medium",
+  });
+
+  assert.equal(projection.state, "ready");
+  if (projection.state !== "ready") return;
+  assert.deepEqual(projection.authority, {
+    dataClass: "design_fixture",
+    productionAuthority: false,
+    executionAuthority: null,
+    semanticReviewState: "not_reviewed",
+    fixtureId: "learning-prototype:run-006:c01",
+    artifactId: null,
+    contentId: null,
+    receiptId: null,
+    receiptContentId: null,
+  });
+  assert.equal(projection.resultState, "partial");
+  assert.deepEqual(projection.moments.map((moment) => ({
+    lens: moment.lens,
+    availability: moment.availability,
+    dataClass: moment.dataClass,
+    productionAuthority: moment.productionAuthority,
+    executionAuthority: moment.executionAuthority,
+  })), [
+    {
+      lens: "grammar_salience",
+      availability: "available",
+      dataClass: "design_fixture",
+      productionAuthority: false,
+      executionAuthority: null,
+    },
+    {
+      lens: "situating",
+      availability: "available",
+      dataClass: "design_fixture",
+      productionAuthority: false,
+      executionAuthority: null,
+    },
+    {
+      lens: "culture_reference",
+      availability: "unavailable",
+      dataClass: "design_fixture",
+      productionAuthority: false,
+      executionAuthority: null,
+    },
+  ]);
+  assert.equal(JSON.stringify(projection).includes("host_receipted"), false);
+  assert.equal(JSON.stringify(projection).includes("runtime_artifact"), false);
 });
 
 test("fixture validation rejects offset drift, unsupported facets, and fabricated support", () => {

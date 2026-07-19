@@ -40,28 +40,143 @@
 }
 .result-main .cue { width: 100%; }
 
-/* Split is the hero view: the video and the caption panel share one tall row so the video is a real
-   player, not a short strip, and there is no dead space beside a taller transcript column. */
+/* The left column of the split: the clip and, directly beneath it, the wired coverage + attribution
+   meta (ResultMediaMeta). One flex column so the meta rides under the video as a credit line, not a
+   stranded strip. In cinema and on a phone the same column stacks in the single-column grid; in full
+   screen it is the media column and its meta is hidden (results below). */
+.result-media-col {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The under-video meta: line coverage on the left, source attribution on the right. Understated, so it
+   reads as a credit line rather than a second panel; both halves are real bundle facts. */
+.result-media-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 20px;
+  padding: 1px 4px 0;
+}
+
+.result-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  margin: 0;
+}
+
+.result-coverage > div {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.result-coverage > div::before {
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.result-coverage > div[data-kind="captioned"] { color: var(--accent, #2f746e); }
+.result-coverage > div[data-kind="withheld"] { color: var(--flag, #8c342a); }
+.result-coverage > div[data-kind="silent"] { color: var(--ink-muted, rgba(22, 29, 27, 0.5)); }
+
+.result-coverage dt {
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.result-coverage dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-coverage-total {
+  margin: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+}
+
+.result-attribution {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.result-attribution-title {
+  color: var(--ink-soft);
+  font-weight: var(--weight-medium, 500);
+}
+
+.result-attribution-source::before {
+  color: var(--ink-muted);
+  content: " · ";
+}
+
+.result-attribution a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Split is the hero view. The row height is tied to the viewport WIDTH, not its height: the media
+   column is as tall as the clip's 16:9 needs at the current column width (so a tall window no longer
+   floats the picture in a letterbox void), and it no longer depends on how tall the window is. The
+   media column fills it as video + the wired meta beneath; the transcript panel matches and scrolls. */
 @media (min-width: 821px) {
   .result-viewer[data-view-mode="split"] .result-main {
     align-items: stretch;
-    height: min(58vh, 620px);
+    height: clamp(452px, calc(30vw + 84px), 588px);
   }
 
-  .result-viewer[data-view-mode="split"] .result-main > .player,
+  .result-viewer[data-view-mode="split"] .result-media-col .player {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .result-viewer[data-view-mode="split"] .result-media-col .player[data-overlay-controls] .screen {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .result-viewer[data-view-mode="split"] .result-media-col .player[data-overlay-controls] .screen-video {
+    height: 100%;
+    max-height: none;
+  }
+
   .result-viewer[data-view-mode="split"] .result-main .learning-workspace {
     height: 100%;
     max-height: none;
   }
 
-  .result-viewer[data-view-mode="split"] .result-main .player[data-overlay-controls] .screen {
-    flex: 1;
-    min-height: 0;
+  /* A wider video (narrower panel) needs a taller row to stay 16:9; a narrower video needs a shorter
+     one. The base is tuned for the default m split; s/l track the changed column width. */
+  .result-viewer[data-view-mode="split"][data-panel-size="s"] .result-main {
+    height: clamp(500px, calc(34vw + 84px), 648px);
   }
 
-  .result-viewer[data-view-mode="split"] .result-main .player[data-overlay-controls] .screen-video {
-    height: 100%;
-    max-height: none;
+  .result-viewer[data-view-mode="split"][data-panel-size="l"] .result-main {
+    height: clamp(408px, calc(25vw + 84px), 508px);
   }
 
   /* Panel width in Split (m is the base 1.5fr:1fr set on .result-main): narrower gives the video more
@@ -114,6 +229,18 @@
   min-height: 0;
   flex: 1;
   gap: 0;
+}
+
+/* Full screen is edge to edge: the media column is just the clip filling the frame, and its under-video
+   coverage/attribution meta is suppressed so nothing prints over the picture. */
+.result-viewer[data-view-mode="fullscreen"] .result-media-col {
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+}
+
+.result-viewer[data-view-mode="fullscreen"] .result-media-meta {
+  display: none;
 }
 
 /* Docked: video takes the display, the panel is a narrow right column. The row is stretched to the
@@ -177,6 +304,12 @@
 
   .result-main .cues {
     max-height: none;
+  }
+
+  /* Stacked single column: the attribution reads left, aligned with the coverage above it, rather than
+     right-aligning a wrapped credit against the screen edge. */
+  .result-attribution {
+    text-align: left;
   }
 
   /* On a phone the display is too narrow to float a legible panel over the video, so both placements

@@ -1,20 +1,25 @@
 import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 
 import { clock } from "./format";
-import { CinemaView, Compress, Expand, PanelDock, PanelNarrower, PanelOverlay, PanelWider, SplitView } from "./glyphs";
-import LearningResults from "./learning/LearningResults";
 import RecordedMediaPlayer from "./learning/RecordedMediaPlayer";
 import { projectPrototypeLearningPresentation } from "./learning/prototypeAdapter";
 import { learningPrototypeFixture } from "./learning/prototypeFixture";
 import { projectRecordedLearningSource } from "./learning/sourceAdapters";
+import { useRecordedLearningPrep } from "./learning/useRecordedLearningPrep";
 import { RECORDED_RESULTS_ID } from "./resultAccess";
 import { useBundle, useStudio } from "./store";
+import type { RunBundle } from "./transport";
+import LearningResultExperience from "./viewer/LearningResultExperience";
 
 /**
  * The result of a run: the media you can watch, and the timed Korean→English transcript it will
  * stand behind. Lines it cannot stand behind are shown as labelled gaps — withheld with a reason,
  * or silence — never a guess. Coverage, receipts, and raw files sit under progressive disclosure.
+ *
+ * The composition itself is the shared ResultViewerShell; this surface contributes the recorded
+ * authority: the replay-clock player, the fixture-bound prototype learning presentation, and the
+ * "Recorded demo" badge. Title, Details, and Run details stay in the floating header chrome.
  *
  * Deliberately absent: accuracy scores, cold/diff comparison, timing, and agent/worker counts.
  * None of those are produced for a real request — they belong to the benchmark lane, not here.
@@ -24,170 +29,44 @@ export default function Results() {
   const previewSession = useStudio((s) => s.previewSession);
   const clipT = useStudio((s) => s.clipT);
   const setClipT = useStudio((s) => s.setClipT);
-  const viewerRef = useRef<HTMLElement>(null);
-  const [viewerMode, setViewerMode] = useState<"split" | "cinema">("split");
-  const [fullscreen, setFullscreen] = useState(false);
-  const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
-  // Where the Learning panel sits once the viewer is full screen, and how wide it reads. Both are
-  // sticky for the session so the choice survives leaving and re-entering full screen.
-  const [panelPlacement, setPanelPlacement] = useState<"docked" | "overlay">("docked");
-  const [panelSize, setPanelSize] = useState<"s" | "m" | "l">("m");
-  const [viewerNotice, setViewerNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    const syncFullscreen = () => setFullscreen(document.fullscreenElement === viewerRef.current);
-    setFullscreenAvailable(document.fullscreenEnabled && typeof viewerRef.current?.requestFullscreen === "function");
-    document.addEventListener("fullscreenchange", syncFullscreen);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
-  }, [bundle]);
 
   if (!bundle) return null;
 
+  return (
+    <RecordedResult
+      bundle={bundle}
+      previewSession={previewSession}
+      clipT={clipT}
+      setClipT={setClipT}
+    />
+  );
+}
+
+function RecordedResult({
+  bundle,
+  previewSession,
+  clipT,
+  setClipT,
+}: {
+  bundle: RunBundle;
+  previewSession: ReturnType<typeof useStudio.getState>["previewSession"];
+  clipT: number;
+  setClipT: (time: number) => void;
+}) {
+
   const { run } = bundle;
-  const learningSource = projectRecordedLearningSource(bundle);
+  const learningSource = useMemo(() => projectRecordedLearningSource(bundle), [bundle]);
   const learningPresentation = projectPrototypeLearningPresentation(
     learningSource,
     learningPrototypeFixture,
   );
-
-  const chooseViewerMode = async (mode: "split" | "cinema") => {
-    try {
-      if (document.fullscreenElement === viewerRef.current) await document.exitFullscreen();
-      setViewerMode(mode);
-      setViewerNotice(null);
-    } catch {
-      setViewerNotice("The viewing mode could not be changed.");
-    }
+  const prepInteraction = useRecordedLearningPrep(learningSource, learningPrototypeFixture);
+  const playback = {
+    state: "available" as const,
+    authority: "recorded_fixture" as const,
+    currentTimeMs: clipT * 1_000,
+    onSeek: (timeMs: number) => setClipT(timeMs / 1_000),
   };
-
-  const toggleFullscreen = async () => {
-    try {
-      if (document.fullscreenElement === viewerRef.current) {
-        await document.exitFullscreen();
-      } else if (viewerRef.current && fullscreenAvailable) {
-        await viewerRef.current.requestFullscreen();
-      }
-      setViewerNotice(null);
-    } catch {
-      setViewerNotice("Full screen is unavailable in this browser.");
-    }
-  };
-
-  const PANEL_SIZES = ["s", "m", "l"] as const;
-  const stepPanelSize = (direction: -1 | 1) => {
-    const index = PANEL_SIZES.indexOf(panelSize);
-    const next = PANEL_SIZES[Math.min(PANEL_SIZES.length - 1, Math.max(0, index + direction))];
-    if (next !== panelSize) setPanelSize(next);
-  };
-  // The learning panel is only a side panel in Split and in full screen; Cinema stacks it below the
-  // video, where a width control has nothing to act on, so the width stepper is hidden there.
-  const panelHasWidth = fullscreen || viewerMode === "split";
-
-  // The viewing modes live on the video's control bar, YouTube-style, as one coherent icon control:
-  // each glyph depicts the layout it selects (Split and Cinema divide the frame; Full screen is the
-  // universal expand). No orphan control, no words sitting on the picture. Every button carries an
-  // aria-label and a hover/focus tooltip, so the meaning is one pointer-hover or one screen reader away
-  // and keyboard reachable (focus reveals the bar). In full screen a second pair chooses where the
-  // Learning panel sits: Docked beside the video, or Overlay floating on it.
-  const modeControls = (
-    <div className="player-modes">
-      <span className="player-modes-seg" role="group" aria-label="Viewing mode">
-        <button
-          type="button"
-          className="pm-btn pm-view"
-          aria-label="Split"
-          aria-pressed={!fullscreen && viewerMode === "split"}
-          onClick={() => void chooseViewerMode("split")}
-        >
-          <SplitView />
-          <span className="pm-tip" aria-hidden="true">Split</span>
-        </button>
-        <button
-          type="button"
-          className="pm-btn pm-view"
-          aria-label="Cinema"
-          aria-pressed={!fullscreen && viewerMode === "cinema"}
-          onClick={() => void chooseViewerMode("cinema")}
-        >
-          <CinemaView />
-          <span className="pm-tip" aria-hidden="true">Cinema</span>
-        </button>
-        <button
-          type="button"
-          className="pm-btn pm-fs"
-          aria-label="Full screen"
-          aria-pressed={fullscreen}
-          disabled={!fullscreenAvailable}
-          onClick={() => void toggleFullscreen()}
-        >
-          {fullscreen ? <Compress /> : <Expand />}
-          <span className="pm-tip" aria-hidden="true">Full screen</span>
-        </button>
-      </span>
-    </div>
-  );
-
-  // The panel-facing settings live in the top-right pill next to the caption controls, not on the
-  // transport bar: how wide the Learning panel reads (Split and full screen), and where it sits once
-  // full screen (Docked beside the video, or Overlay floating on it).
-  const panelControls = (
-    <>
-      {panelHasWidth && (
-        <>
-          <span className="pcap-div" aria-hidden="true" />
-          <span className="pcap-group pcap-panel" role="group" aria-label="Panel width">
-            <button
-              type="button"
-              className="pcap-btn"
-              aria-label="Narrower panel"
-              disabled={panelSize === "s"}
-              onClick={() => stepPanelSize(-1)}
-            >
-              <PanelNarrower />
-              <span className="pm-tip" aria-hidden="true">Narrower panel</span>
-            </button>
-            <button
-              type="button"
-              className="pcap-btn"
-              aria-label="Wider panel"
-              disabled={panelSize === "l"}
-              onClick={() => stepPanelSize(1)}
-            >
-              <PanelWider />
-              <span className="pm-tip" aria-hidden="true">Wider panel</span>
-            </button>
-          </span>
-        </>
-      )}
-      {fullscreen && (
-        <>
-          <span className="pcap-div" aria-hidden="true" />
-          <span className="pcap-group pcap-panel" role="group" aria-label="Panel placement">
-            <button
-              type="button"
-              className="pcap-btn"
-              aria-label="Docked"
-              aria-pressed={panelPlacement === "docked"}
-              onClick={() => setPanelPlacement("docked")}
-            >
-              <PanelDock />
-              <span className="pm-tip" aria-hidden="true">Docked</span>
-            </button>
-            <button
-              type="button"
-              className="pcap-btn"
-              aria-label="Overlay"
-              aria-pressed={panelPlacement === "overlay"}
-              onClick={() => setPanelPlacement("overlay")}
-            >
-              <PanelOverlay />
-              <span className="pm-tip" aria-hidden="true">Overlay</span>
-            </button>
-          </span>
-        </>
-      )}
-    </>
-  );
 
   return (
     <motion.div
@@ -208,29 +87,65 @@ export default function Results() {
         />
       )}
 
-      <section
-        className="result-viewer"
-        ref={viewerRef}
-        aria-label="Learning viewer"
-        data-view-mode={fullscreen ? "fullscreen" : viewerMode}
-        data-fs-panel={fullscreen ? panelPlacement : undefined}
-        data-panel-size={panelSize}
-      >
-        {viewerNotice && <p className="result-viewer-notice" role="status">{viewerNotice}</p>}
-        <div className="result-main">
+      <LearningResultExperience
+        authority="recorded_demo"
+        media={({ modeControls, panelControls }) => (
           <RecordedMediaPlayer bundle={bundle} surface="results" modeControls={modeControls} panelControls={panelControls} />
-          <LearningResults
-            presentation={learningPresentation}
-            playback={{
-              state: "available",
-              authority: "recorded_fixture",
-              currentTimeMs: clipT * 1_000,
-              onSeek: (timeMs) => setClipT(timeMs / 1_000),
-            }}
-          />
-        </div>
-      </section>
+        )}
+        mediaMeta={<ResultMediaMeta bundle={bundle} />}
+        presentation={learningPresentation}
+        playback={playback}
+        prepInteraction={prepInteraction}
+      />
     </motion.div>
+  );
+}
+
+/**
+ * The wired strip beneath the clip: line coverage (captioned / withheld / silent of the lines in range)
+ * and the source attribution the licence requires. Both are real bundle facts, not filler, and match the
+ * header Details accounting exactly. It fills the space directly under the video that the fixed-height
+ * split otherwise left as a void, and puts the creative credit on the page the clip actually plays on.
+ */
+function ResultMediaMeta({ bundle }: { bundle: RunBundle }) {
+  const { run, captions } = bundle;
+  const { source, title } = run.clip;
+
+  const counts = { captioned: 0, withheld: 0, silent: 0 };
+  for (const cue of captions.cues) {
+    if (cue.silence) {
+      counts.silent += 1;
+      continue;
+    }
+    const target = cue.targets.find((candidate) => candidate.lang === run.pair.target);
+    if (target?.withheld) counts.withheld += 1;
+    else if (target?.text) counts.captioned += 1;
+  }
+  const total = captions.cues.length;
+
+  return (
+    <div className="result-media-meta">
+      <dl className="result-coverage" aria-label="Line coverage in range">
+        <div data-kind="captioned"><dt>Captioned</dt><dd>{counts.captioned}</dd></div>
+        <div data-kind="withheld"><dt>Withheld</dt><dd>{counts.withheld}</dd></div>
+        <div data-kind="silent"><dt>Silent</dt><dd>{counts.silent}</dd></div>
+        <p className="result-coverage-total">of {total} {total === 1 ? "line" : "lines"} in range</p>
+      </dl>
+      <p className="result-attribution">
+        <span className="result-attribution-title">{title}</span>
+        <span className="result-attribution-source">
+          {source.label}
+          {source.licence ? (
+            <>
+              {" · "}
+              {source.url ? (
+                <a href={source.url} target="_blank" rel="noreferrer noopener">{source.licence}</a>
+              ) : source.licence}
+            </>
+          ) : null}
+        </span>
+      </p>
+    </div>
   );
 }
 

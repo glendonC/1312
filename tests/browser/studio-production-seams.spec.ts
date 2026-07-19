@@ -26,7 +26,10 @@ async function openCompletedDeterministicProjection(
 ): Promise<Locator> {
   const token = connection?.token ?? process.env.STUDIO_RUNTIME_HOST_TOKEN ?? "";
   await page.goto(connection ? `/studio/?runtimeHost=${encodeURIComponent(connection.url)}` : productStudioUrl());
-  await page.getByRole("button", { name: "Owned file local ingest" }).click();
+  await page.getByRole("button", { name: "Choose source: local or recorded" }).click();
+  await page.getByRole("dialog", { name: "Choose a Studio source" })
+    .getByRole("button", { name: "Process a file I own locally" })
+    .click();
 
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await productRuntime.getByRole("button", { name: "Open connect to local host" }).click();
@@ -327,6 +330,23 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(productionResults.locator('[data-production-results-line-id]')).toHaveCount(6);
   const productionLearning = productionResults.getByRole("region", { name: "Language learning workspace" });
   await expect(productionLearning).toHaveAttribute("data-learning-mode", "production");
+
+  const productionViewer = productionResults.getByRole("region", { name: "Learning viewer" });
+  await expect(productionViewer).toHaveAttribute("data-result-authority", "production_clip");
+  await expect(productionViewer.locator(".result-authority-badge")).toHaveText("Your clip");
+  await expect(productionViewer.getByRole("button", { name: "Split" })).toHaveAttribute("aria-pressed", "true");
+  const resultJobId = await productionResults
+    .locator("[data-production-results-job-id]")
+    .getAttribute("data-production-results-job-id");
+  await productionResults.getByRole("button", { name: "Run details" }).click();
+  const runDetailsPanel = productionResults.getByRole("dialog", { name: "Production run details" });
+  await expect(runDetailsPanel).toBeVisible();
+  await expect(runDetailsPanel).toContainText("studio.caption-production.artifact.v1");
+  await expect(runDetailsPanel).toContainText(resultJobId ?? "missing-production-job-id");
+  await expect(runDetailsPanel).toContainText("Executor classification");
+  await page.keyboard.press("Escape");
+  await expect(runDetailsPanel).toBeHidden();
+
   const privatePlayer = productionResults.getByRole("region", { name: "Private production media playback" });
   await expect(privatePlayer).toHaveCount(1);
   await expect(privatePlayer).toHaveAttribute("data-private-playback-state", "ready", { timeout: 10_000 });
@@ -787,6 +807,7 @@ test("armed fine-tune prepares a receipted moments overlay that stays silent wit
       await expect(productionResults.locator("[data-production-results-job-id]")).toHaveCount(1, { timeout: 15_000 });
 
       const face = productionResults.getByRole("region", { name: "Customize learning" });
+      await expect(face).toHaveAttribute("data-learning-prep-authority", "verified_production_caption");
       await expect(face).toHaveAttribute("data-learning-prep-state", "not_requested");
       await expect(face).toContainText("never verified culture or history");
       const prepare = face.locator('[data-fine-tune-action="prepare"]');

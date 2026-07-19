@@ -96,7 +96,6 @@ export default function LearningResults({
   const [saved, setSaved] = useState<SessionSavedSelection[]>([]);
   const [savedOpen, setSavedOpen] = useState(false);
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
-  const captionGuideId = useId();
   const savedId = useId();
   const prototype = presentation.mode === "prototype" ? presentation.explanations : null;
   const productionReady = presentation.mode === "production" &&
@@ -234,25 +233,13 @@ export default function LearningResults({
           <Bookmark filled={saved.length > 0} />
           <span>Saved{saved.length > 0 ? ` (${saved.length})` : ""}</span>
         </button>
+        {/* A one-line affordance cue, not the old instruction paragraph: the tappable language is already
+            highlighted in the transcript, so this only names the gesture. */}
+        <span className="learning-bar-hint" aria-hidden="true">Tap highlighted language to explain</span>
         <span className="learning-session-note">Session only</span>
       </div>}
 
       <>
-          <p className="learning-caption-guide" id={captionGuideId}>
-            {presentation.mode === "prototype" ? (
-              <><b>Prepared prototype.</b> Tap highlighted language, select a phrase, or choose Explain sentence.
-                Selection does not seek or pause playback.</>
-            ) : (
-              productionReady ? (
-                <><b>Verified production playback.</b> Caption seeking follows the exact private source timeline.
-                  Select an available source or target span, or choose Explain source sentence. No prototype
-                  explanation is substituted.</>
-              ) : (
-                <><b>Verified production captions.</b> Learning selection is unavailable until this private media can
-                  play in the browser. No prototype explanation is substituted.</>
-              )
-            )}
-          </p>
           {pinned && (
             <ExplanationPanel
               key={`${pinned.state}:${pinnedLineId(pinned)}:${pinnedSpan(pinned).start}:${pinnedSpan(pinned).end}`}
@@ -285,7 +272,6 @@ export default function LearningResults({
           <div
             className="cues"
             aria-label={`${source.moments[0]?.sourceLanguage ?? "Source"} to ${source.moments[0]?.targetLanguage ?? "target"} transcript`}
-            aria-describedby={captionGuideId}
           >
             {source.moments.length === 0 ? (
               <p className="cues-empty">No caption cues were recorded. No transcript or result is implied.</p>

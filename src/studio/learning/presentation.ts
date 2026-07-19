@@ -237,11 +237,19 @@ export interface LearningPrepContentByLens {
   historical_reference: { referent: string; note: string };
 }
 
-interface LearningPrepMomentAuthority {
+type LearningPrepMomentAuthority = {
+  dataClass: "runtime_artifact";
+  productionAuthority: true;
   executionAuthority: "host_receipted";
   semanticReviewState: "not_reviewed";
   externalCitationIds: [];
-}
+} | {
+  dataClass: "design_fixture";
+  productionAuthority: false;
+  executionAuthority: null;
+  semanticReviewState: "not_reviewed";
+  externalCitationIds: [];
+};
 
 export type AvailableLearningPrepMoment = {
   [Lens in LearningLensKind]: LearningPrepMomentAuthority & {
@@ -256,16 +264,20 @@ export type AvailableLearningPrepMoment = {
   };
 }[LearningLensKind];
 
-export interface MissingLearningPrepMoment extends LearningPrepMomentAuthority {
+export type MissingLearningPrepMoment = LearningPrepMomentAuthority & {
   lens: LearningLensKind;
   lineId: string;
   startMs: number;
   endMs: number;
   availability: "withheld" | "unavailable";
-  reasonCode: "generator_abstained" | "insufficient_caption_context" | "external_grounding_unavailable";
+  reasonCode:
+    | "generator_abstained"
+    | "insufficient_caption_context"
+    | "external_grounding_unavailable"
+    | "design_fixture_not_prepared";
   grounding: "none";
   content: null;
-}
+};
 
 export type LearningPrepMoment = AvailableLearningPrepMoment | MissingLearningPrepMoment;
 
@@ -307,19 +319,34 @@ export type LearningPrepProjection =
       segmentation: LearningPrepSegmentationView;
       moments: LearningPrepMoment[];
       lenses: LearningPrepLensSummary[];
-      authority: {
-        dataClass: "runtime_artifact";
-        executionAuthority: "host_receipted";
-        semanticReviewState: "not_reviewed";
-        artifactId: string;
-        contentId: string;
-        receiptId: string;
-        receiptContentId: string;
-      };
+      authority:
+        | {
+            dataClass: "runtime_artifact";
+            productionAuthority: true;
+            executionAuthority: "host_receipted";
+            semanticReviewState: "not_reviewed";
+            fixtureId: null;
+            artifactId: string;
+            contentId: string;
+            receiptId: string;
+            receiptContentId: string;
+          }
+        | {
+            dataClass: "design_fixture";
+            productionAuthority: false;
+            executionAuthority: null;
+            semanticReviewState: "not_reviewed";
+            fixtureId: string;
+            artifactId: null;
+            contentId: null;
+            receiptId: null;
+            receiptContentId: null;
+          };
       nonClaims: readonly string[];
     };
 
-export interface ProductionLearningPrepInteraction {
+export interface LearningPrepInteraction {
+  sourceAuthority: "recorded_fixture" | "verified_production_caption";
   draft: LearningFineTuneDraft;
   prep: LearningPrepProjection;
   availability:

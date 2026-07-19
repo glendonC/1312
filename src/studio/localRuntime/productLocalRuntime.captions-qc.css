@@ -155,54 +155,41 @@
   border-top: 1px solid var(--line);
 }
 
-.product-runtime-caption-result-list > article > header {
+/* Size the granted-player chain (frame > section > .player) so the picture fills the viewer
+   shell's media column in Split and Full screen. */
+.result-media-col .learning-player-frame {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
-.product-runtime-caption-result-list h4 {
-  margin-top: 4px;
-  font-size: 0.86rem;
-  font-weight: var(--weight-medium);
-}
-
-.product-runtime-caption-result-identities {
-  margin-top: 14px;
-}
-
-.product-runtime-private-player {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.product-runtime-private-player > header,
-.product-runtime-private-player-controls {
+.learning-player-frame .product-runtime-private-player {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.product-runtime-private-player h5 {
-  margin-top: 3px;
-  font-size: 0.76rem;
-  font-weight: var(--weight-medium);
+.product-runtime-private-player .player {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
-.product-runtime-private-player audio,
-.product-runtime-private-player video {
+/* Audio-only grants keep the minimal transport; there is no picture to chrome. */
+.product-runtime-private-player audio {
   display: none;
 }
 
 .product-runtime-private-player-controls {
+  display: flex;
+  align-items: center;
   justify-content: flex-start;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -210,16 +197,22 @@
   min-width: 64px;
 }
 
-.product-runtime-private-player-controls output,
-.product-runtime-private-player > header code {
+.product-runtime-private-player-controls output {
   font-family: var(--font-mono);
   font-size: 0.6rem;
 }
 
 .product-runtime-private-player-controls span,
-.product-runtime-private-player > p {
+.product-runtime-private-player > p[role="status"] {
+  margin: 0;
   color: var(--ink-muted);
   font-size: 0.64rem;
+}
+
+/* Full screen is the picture edge to edge; data-private-playback-state stays machine-readable on
+   the section in every mode. */
+.result-viewer[data-view-mode="fullscreen"] .product-runtime-private-player > p[role="status"] {
+  display: none;
 }
 
 .product-runtime-caption-lines {

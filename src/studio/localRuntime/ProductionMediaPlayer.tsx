@@ -1,6 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import type { ProductionPresentedMoment } from "../learning/model";
 import type { LearningPlayback } from "../learning/presentation.ts";
+import { useViewerSession } from "../learning/viewerSession";
+import {
+  CAPTION_SCALE_STEPS,
+  CaptionBurn,
+  type CaptionBurnState,
+  PlayerOverlayBar,
+  PlayerSettingsPill,
+} from "../viewer/playerChrome";
 import type { ProductionPlaybackBinding } from "./productionPlaybackController.ts";
 
 type PlaybackState =
@@ -43,12 +52,26 @@ function availablePlayback(
   };
 }
 
+/**
+ * The verified production clip in the same player chrome as the recorded demo. This component
+ * still owns the private-grant lifecycle unchanged — content-bound src, expiry, fail-closed close,
+ * dispose — and every transport action stays inside the verified analysis range. The shared chrome
+ * only presents that state; it grants nothing. The burned caption line comes from the verified
+ * caption moments, so withheld lines stay labelled gaps on the picture exactly as in the rail.
+ */
 export default function ProductionMediaPlayer({
   binding,
   onPlaybackChange,
+  moments,
+  modeControls,
+  panelControls,
 }: {
   binding: ProductionPlaybackBinding;
   onPlaybackChange: (playback: LearningPlayback) => void;
+  /** Verified caption moments for the burned-in line. Presentation input, not new authority. */
+  moments: readonly ProductionPresentedMoment[];
+  modeControls?: ReactNode;
+  panelControls?: ReactNode;
 }) {
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const closeRef = useRef<(detail: string) => void>(() => undefined);
@@ -58,6 +81,21 @@ export default function ProductionMediaPlayer({
   });
   const [currentTimeMs, setCurrentTimeMs] = useState(binding.analysisRange.startMs);
   const [playing, setPlaying] = useState(false);
+
+  // No activePlayerId arbitration: this player is never mounted beside the recorded or workbench
+  // players (input act vs run act), so there is no playback ownership to contest.
+  const muted = useViewerSession((state) => state.muted);
+  const volume = useViewerSession((state) => state.volume);
+  const playbackRate = useViewerSession((state) => state.playbackRate);
+  const captionScale = useViewerSession((state) => state.captionScale);
+  const captionsVisible = useViewerSession((state) => state.captionsVisible);
+  const setMuted = useViewerSession((state) => state.setMuted);
+  const setVolume = useViewerSession((state) => state.setVolume);
+  const setPlaybackRate = useViewerSession((state) => state.setPlaybackRate);
+  const setCaptionScale = useViewerSession((state) => state.setCaptionScale);
+  const setCaptionsVisible = useViewerSession((state) => state.setCaptionsVisible);
+
+  const ready = playbackState.state === "ready";
 
   const seek = (timeMs: number) => {
     const media = mediaRef.current;
@@ -167,7 +205,98 @@ export default function ProductionMediaPlayer({
     };
   }, [binding]);
 
-  const MediaElement = binding.handle.mimeType.startsWith("video/") ? "video" : "audio";
+  useEffect(() => {
+    const media = mediaRef.current;
+    if (!media) return;
+    media.muted = muted;
+    media.volume = volume;
+  }, [muted, volume, ready]);
+
+  useEffect(() => {
+    const media = mediaRef.current;
+    if (media) media.playbackRate = playbackRate;
+  }, [playbackRate, ready]);
+
+  const togglePlay = (): void => {
+    const media = mediaRef.current;
+    if (!media || !ready) return;
+    if (media.paused) {
+      void media.play().catch(() => {
+        closeRef.current("The browser refused private source playback.");
+      });
+    } else {
+      media.pause();
+    }
+  };
+
+  const toggleMuted = (): void => {
+    if (muted || volume === 0) {
+      if (volume === 0) setVolume(0.8);
+      setMuted(false);
+    } else {
+      setMuted(true);
+    }
+  };
+
+  const stepCaptionScale = (direction: -1 | 1): void => {
+    const index = CAPTION_SCALE_STEPS.indexOf(captionScale);
+    const next = CAPTION_SCALE_STEPS[Math.min(CAPTION_SCALE_STEPS.length - 1, Math.max(0, index + direction))];
+    if (next !== captionScale) setCaptionScale(next);
+  };
+
+  const rangeStartMs = binding.analysisRange.startMs;
+  const rangeEndMs = Math.min(binding.analysisRange.endMs, binding.handle.source.durationMs);
+  const picture = binding.handle.mimeType.startsWith("video/");
+
+  const activeMoment = captionsVisible && ready
+    ? moments.find((moment) => currentTimeMs >= moment.startMs && currentTimeMs < moment.endMs)
+    : undefined;
+  const burn: CaptionBurnState | null = activeMoment
+    ? activeMoment.target.state === "available"
+      ? { path: "prepped", text: activeMoment.target.text }
+      : activeMoment.target.state === "withheld"
+        ? { path: "withheld", reason: activeMoment.target.detail }
+        : null
+    : null;
+
+  const overlayBar = (
+    <PlayerOverlayBar
+      transport={{
+        progress: {
+          min: rangeStartMs / 1_000,
+          max: rangeEndMs / 1_000,
+          value: currentTimeMs / 1_000,
+          disabled: !ready,
+          ariaValueText: `${clock(currentTimeMs)} of ${clock(rangeEndMs)}`,
+          onSeek: (seconds) => seek(seconds * 1_000),
+        },
+        play: {
+          playing,
+          disabled: !ready,
+          playLabel: "Play private source",
+          pauseLabel: "Pause private source",
+          onToggle: togglePlay,
+        },
+        volume: {
+          muted,
+          volume,
+          disabled: !ready,
+          onToggleMuted: toggleMuted,
+          onVolume: (nextVolume) => {
+            setVolume(nextVolume);
+            setMuted(nextVolume === 0);
+          },
+        },
+        timeLabel: `${clock(currentTimeMs)} / ${clock(rangeEndMs)}`,
+        speed: {
+          rate: playbackRate,
+          disabled: !ready,
+          onRate: setPlaybackRate,
+        },
+      }}
+      modeControls={modeControls}
+    />
+  );
 
   return (
     <section
@@ -179,41 +308,58 @@ export default function ProductionMediaPlayer({
       data-private-playback-caption-artifact-id={binding.captionArtifactId}
       data-private-playback-timestamp-origin={binding.timestampOrigin.kind}
     >
-      <header>
-        <div>
-          <span>Content-bound private source</span>
-          <h5>Verified production playback</h5>
-        </div>
-        <code>{binding.handle.mimeType}</code>
-      </header>
-      <MediaElement
-        ref={(element) => { mediaRef.current = element; }}
-        data-private-production-media="true"
-        aria-label="Verified private source media"
-      />
-      <div className="product-runtime-private-player-controls">
-        <button
-          type="button"
-          disabled={playbackState.state !== "ready"}
-          aria-label={playing ? "Pause private source" : "Play private source"}
-          onClick={() => {
-            const media = mediaRef.current;
-            if (!media) return;
-            if (media.paused) {
-              void media.play().catch(() => {
-                closeRef.current("The browser refused private source playback.");
-              });
-            } else {
-              media.pause();
-            }
-          }}
-        >
-          {playing ? "Pause" : "Play"}
-        </button>
-        <output aria-label="Private source current time">{clock(currentTimeMs)}</output>
-        <span>
-          Verified range {clock(binding.analysisRange.startMs)} to {clock(binding.analysisRange.endMs)}
-        </span>
+      <div
+        className="player"
+        data-player-surface="production"
+        data-overlay-controls={picture || undefined}
+        data-playing={playing ? "true" : "false"}
+      >
+        {picture ? (
+          <figure className="screen" data-caption-scale={captionScale}>
+            <video
+              ref={(element) => { mediaRef.current = element; }}
+              className="screen-video"
+              data-private-production-media="true"
+              aria-label="Verified private source media"
+              playsInline
+              onClick={togglePlay}
+            />
+            <CaptionBurn burn={burn} />
+            <PlayerSettingsPill
+              captions={{
+                visible: captionsVisible,
+                scale: captionScale,
+                onToggleVisible: () => setCaptionsVisible(!captionsVisible),
+                onStepScale: stepCaptionScale,
+              }}
+              panelControls={panelControls}
+            />
+            <div className="player-controls">{overlayBar}</div>
+          </figure>
+        ) : (
+          <>
+            <audio
+              ref={(element) => { mediaRef.current = element; }}
+              data-private-production-media="true"
+              aria-label="Verified private source media"
+            />
+            {modeControls}
+            <div className="product-runtime-private-player-controls">
+              <button
+                type="button"
+                disabled={!ready}
+                aria-label={playing ? "Pause private source" : "Play private source"}
+                onClick={togglePlay}
+              >
+                {playing ? "Pause" : "Play"}
+              </button>
+              <output aria-label="Private source current time">{clock(currentTimeMs)}</output>
+              <span>
+                Verified range {clock(rangeStartMs)} to {clock(rangeEndMs)}
+              </span>
+            </div>
+          </>
+        )}
       </div>
       <p role="status" data-private-playback-detail={playbackState.state}>{playbackState.detail}</p>
     </section>

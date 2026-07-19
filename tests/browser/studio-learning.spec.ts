@@ -22,6 +22,35 @@ test("the dev skip-to-results shortcut lands straight on the recorded learning v
   await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
 });
 
+test("recorded results use the shared learning overlay and customization face", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop shared-result composition coverage");
+  await openCompletedRun006(page);
+
+  const results = page.getByRole("region", { name: "Result" });
+  const face = results.getByRole("region", { name: "Customize learning" });
+  await expect(face).toHaveAttribute("data-learning-prep-authority", "recorded_fixture");
+  await expect(face).toHaveAttribute("data-learning-prep-state", "ready");
+  await expect(face.locator("[data-prep-fixture-id]")).toHaveAttribute(
+    "data-prep-fixture-id",
+    "learning-prototype:run-006:c01",
+  );
+  await expect(face).toContainText("not production output");
+
+  const overlay = results.locator('[data-moments-overlay-state="active"]');
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toHaveAttribute("data-moments-overlay-authority", "design_fixture");
+  await expect(overlay).toHaveAttribute("data-moments-lens", "grammar_salience");
+  await expect(overlay).toContainText("recorded fixture · not reviewed");
+
+  await face.locator('[data-fine-tune-lens="historical_reference"] input').check();
+  await expect(face).toHaveAttribute("data-learning-prep-state", "not_requested");
+  await expect(overlay).toHaveCount(0);
+  await face.locator('[data-fine-tune-action="prepare"]').click();
+  await expect(face).toHaveAttribute("data-learning-prep-state", "ready");
+  await expect(face).toHaveAttribute("data-learning-prep-result-state", "partial");
+  await expect(overlay).toBeVisible();
+});
+
 test("prepared language stays pinned, saves explicitly, and closes unsupported states", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Desktop interaction and pinned-state coverage");
   await openCompletedRun006(page);

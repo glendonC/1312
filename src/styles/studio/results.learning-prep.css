@@ -1,8 +1,7 @@
+/* Shared learning-prep face and Moments overlay. Authority-specific result adapters provide the
+   data; this sheet owns the identical recorded/production presentation. */
 
-/* Customize learning face and the Moments overlay. Watch-first: the overlay floats in a non-caption
-   corner of the private player and stays silent whenever no prepared moment is justified. */
-
-.product-runtime-player-frame {
+.learning-player-frame {
   position: relative;
 }
 
@@ -25,11 +24,11 @@
 .learning-moments-overlay .learning-moments-lens {
   display: inline-block;
   margin-bottom: 4px;
+  color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 0.54rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-muted);
 }
 
 .learning-moments-overlay p {
@@ -43,9 +42,9 @@
 .learning-moments-overlay .learning-moments-review-state {
   display: inline-block;
   margin-top: 4px;
+  color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 0.5rem;
-  color: var(--ink-muted);
 }
 
 .learning-fine-tune {
@@ -65,11 +64,11 @@
 
 .learning-fine-tune-head span {
   display: block;
+  color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 0.54rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-muted);
 }
 
 .learning-fine-tune-head h4 {
@@ -78,34 +77,34 @@
 }
 
 .learning-fine-tune-head b {
+  color: var(--ink-muted);
   font-size: 0.68rem;
   font-weight: var(--weight-medium);
-  color: var(--ink-muted);
 }
 
 .learning-fine-tune-boundary {
   margin: 10px 0 0;
-  font-size: 0.68rem;
   color: var(--ink-muted);
+  font-size: 0.68rem;
 }
 
 .learning-fine-tune fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   margin: 14px 0 0;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
 }
 
 .learning-fine-tune legend {
   padding: 0 6px;
+  color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 0.54rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-muted);
 }
 
 .learning-fine-tune fieldset label {
@@ -116,15 +115,15 @@
 }
 
 .learning-fine-tune-actions {
-  margin-top: 12px;
   display: flex;
   gap: 10px;
+  margin-top: 12px;
 }
 
 .learning-fine-tune-unavailable {
   margin: 12px 0 0;
-  font-size: 0.68rem;
   color: var(--ink-muted);
+  font-size: 0.68rem;
 }
 
 .learning-fine-tune-unavailable code {
@@ -143,12 +142,12 @@
 }
 
 .learning-fine-tune-lens-outcomes {
-  margin: 10px 0 0;
-  padding: 0;
-  list-style: none;
   display: flex;
   flex-wrap: wrap;
   gap: 6px 14px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .learning-fine-tune-lens-outcomes li {
@@ -160,12 +159,12 @@
 
 .learning-fine-tune-lens-outcomes li code {
   margin-left: 4px;
-  font-size: 0.54rem;
   color: var(--ink-muted);
+  font-size: 0.54rem;
 }
 
 .learning-fine-tune-nonclaim {
   margin: 10px 0 0;
-  font-size: 0.62rem;
   color: var(--ink-muted);
+  font-size: 0.62rem;
 }

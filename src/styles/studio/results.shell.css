@@ -19,13 +19,18 @@
 }
 
 /* A completed run becomes the viewer. Processing chrome does not remain as a second product
-   underneath it, and the media/learning workspace gets the full Studio viewport. */
+   underneath it, and the media/learning workspace gets the full Studio viewport. The viewer is a
+   width-anchored composition (its height follows the clip's 16:9), so it cannot fill a tall screen
+   without letterboxing; instead it sits centred in the viewport screen, so the leftover height reads
+   as balanced framing rather than a dead band below the fold. `safe` keeps it from clipping under the
+   floating header on short windows, where .act-run scrolls. */
 .act-results .results {
   width: 100%;
   min-height: 100svh;
   margin-top: 0;
   padding: 84px clamp(20px, 4vw, 64px) 48px;
   border-top: 0;
+  justify-content: safe center;
 }
 
 .submitted-results-boundary {

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import LearningFineTuneFace from "../learning/LearningFineTuneFace";
-import LearningResults from "../learning/LearningResults";
-import MomentsOverlay from "../learning/MomentsOverlay";
+import { Coverage } from "../glyphs";
+import type { ProductionPresentedMoment } from "../learning/model";
 import { projectProductionLearningPresentation } from "../learning/productionExplanationAdapter";
 import { projectVerifiedProductionLearningSource } from "../learning/productionSourceAdapter";
 import {
@@ -14,10 +13,12 @@ import {
   type LearningPlayback,
   type LearningPrepProjection,
   type LearningSelectionRequest,
-  type ProductionLearningPrepInteraction,
+  type LearningPrepInteraction,
 } from "../learning/presentation.ts";
 import { PRODUCTION_CAPTION_RESULTS_ID } from "../resultAccess";
 import type { VerifiedCaptionProductionResult } from "../runtime/production/captionProductionAudit";
+import ChromePanel from "../viewer/chromePanel";
+import LearningResultExperience from "../viewer/LearningResultExperience";
 import type { LocalRuntimeHostClient } from "./client";
 import ProductionMediaPlayer from "./ProductionMediaPlayer.tsx";
 import { ProductionLearningController } from "./productionLearningController.ts";
@@ -31,6 +32,64 @@ const PLAYBACK_UNAVAILABLE: LearningPlayback = {
   state: "unavailable",
   reasonCode: "production_media_playback_unavailable",
 };
+
+function rangeClock(timeMs: number): string {
+  const totalSeconds = Math.max(0, timeMs) / 1_000;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds - minutes * 60;
+  return `${minutes}:${seconds.toFixed(1).padStart(4, "0")}`;
+}
+
+/**
+ * The wired strip beneath the verified clip: line coverage of the verified caption moments and the
+ * verified analysis range. Both are facts of the host-verified artifact — the production mirror of
+ * the recorded surface's coverage + attribution strip, with no attribution invented for a private
+ * source.
+ */
+function ProductionMediaMeta({
+  moments,
+  rangeStartMs,
+  rangeEndMs,
+}: {
+  moments: readonly ProductionPresentedMoment[];
+  rangeStartMs: number;
+  rangeEndMs: number;
+}) {
+  const counts = { captioned: 0, withheld: 0, unavailable: 0, silent: 0 };
+  for (const moment of moments) {
+    if (moment.source.state !== "available") {
+      counts.silent += 1;
+    } else if (moment.target.state === "available") {
+      counts.captioned += 1;
+    } else if (moment.target.state === "withheld") {
+      counts.withheld += 1;
+    } else {
+      counts.unavailable += 1;
+    }
+  }
+
+  return (
+    <div className="result-media-meta">
+      <dl className="result-coverage" aria-label="Line coverage in range">
+        <div data-kind="captioned"><dt>Captioned</dt><dd>{counts.captioned}</dd></div>
+        <div data-kind="withheld"><dt>Withheld</dt><dd>{counts.withheld}</dd></div>
+        {counts.unavailable > 0 && (
+          <div data-kind="unavailable"><dt>Unavailable</dt><dd>{counts.unavailable}</dd></div>
+        )}
+        <div data-kind="silent"><dt>Silent</dt><dd>{counts.silent}</dd></div>
+        <p className="result-coverage-total">
+          of {moments.length} {moments.length === 1 ? "line" : "lines"} in range
+        </p>
+      </dl>
+      <p className="result-attribution">
+        <span className="result-attribution-title">Verified range</span>
+        <span className="result-attribution-source">
+          {rangeClock(rangeStartMs)} to {rangeClock(rangeEndMs)}
+        </span>
+      </p>
+    </div>
+  );
+}
 
 function ProductionCaptionResult({
   client,
@@ -156,7 +215,8 @@ function ProductionCaptionResult({
     });
   };
 
-  const prepInteraction: ProductionLearningPrepInteraction = {
+  const prepInteraction: LearningPrepInteraction = {
+    sourceAuthority: "verified_production_caption",
     draft: fineTuneDraft,
     prep,
     availability: sourceProjection.state === "ready" && sourceProjection.source.context.authorityState !== "unrevoked"
@@ -196,26 +256,18 @@ function ProductionCaptionResult({
     });
   };
 
-  return (
-    <article
-      data-production-results-job-id={verification.jobId}
-      data-caption-authority-state={verification.authorityState}
-      data-caption-integrity={verification.integrity}
+  // Authority loss is never folded behind a disclosure; only identities and receipts are.
+  const runDetails = (
+    <ChromePanel
+      label="Run details"
+      icon={<Coverage />}
+      panelLabel="Production run details"
+      className="result-panel-run"
     >
-      <header>
-        <div>
-          <span>studio.caption-production.artifact.v1</span>
-          <h4>Timed KO / EN projection</h4>
-        </div>
-        <b>{verification.authorityState}</b>
-      </header>
-      {verification.authorityState === "revoked_after_completion" ? (
-        <p role="note">
-          Approval was revoked after completion. The already-completed private artifact remains
-          visible; the revocation grants no new production authority.
-        </p>
-      ) : null}
-      <dl className="product-runtime-caption-result-identities">
+      <dl className="result-panel-list">
+        <div><dt>Projection</dt><dd>Timed KO / EN projection</dd></div>
+        <div><dt>Artifact schema</dt><dd>studio.caption-production.artifact.v1</dd></div>
+        <div><dt>Authority state</dt><dd>{verification.authorityState}</dd></div>
         <div><dt>Local runtime</dt><dd>{artifact.runId}</dd></div>
         <div><dt>Caption job</dt><dd>{verification.jobId}</dd></div>
         <div><dt>Caption artifact</dt><dd>{verification.captionArtifactId}</dd></div>
@@ -225,39 +277,66 @@ function ProductionCaptionResult({
         <div><dt>Receipt content</dt><dd>{verification.receiptContentId}</dd></div>
         <div><dt>Executor classification</dt><dd>{verification.executor.classification}</dd></div>
       </dl>
+    </ChromePanel>
+  );
+
+  return (
+    <article
+      data-production-results-job-id={verification.jobId}
+      data-caption-authority-state={verification.authorityState}
+      data-caption-integrity={verification.integrity}
+    >
+      {verification.authorityState === "revoked_after_completion" ? (
+        <p role="note">
+          Approval was revoked after completion. The already-completed private artifact remains
+          visible; the revocation grants no new production authority.
+        </p>
+      ) : null}
       {sourceProjection.state === "ready" ? (
-        <>
-          {loadResult.state === "available" ? (
-            <div className="product-runtime-player-frame">
-              <ProductionMediaPlayer binding={loadResult.binding} onPlaybackChange={setPlayback} />
-              <MomentsOverlay prep={prep} playback={playback} />
-            </div>
-          ) : (
-            <p
-              className="product-runtime-unavailable"
-              role="status"
-              data-private-playback-load-state={loadResult.state}
-              data-reason-code={loadResult.state === "unavailable" ? loadResult.reasonCode : undefined}
-            >
-              {loadResult.state === "loading"
-                ? "Verifying one content-bound private playback handle."
-                : loadResult.detail}
-            </p>
-          )}
-          <LearningFineTuneFace interaction={prepInteraction} />
-          <LearningResults
+        <LearningResultExperience
+            authority="production_clip"
+            chrome={runDetails}
+            media={({ modeControls, panelControls }) => (
+              loadResult.state === "available" ? (
+                <ProductionMediaPlayer
+                  binding={loadResult.binding}
+                  onPlaybackChange={setPlayback}
+                  moments={sourceProjection.source.moments}
+                  modeControls={modeControls}
+                  panelControls={panelControls}
+                />
+              ) : (
+                <p
+                  className="product-runtime-unavailable"
+                  role="status"
+                  data-private-playback-load-state={loadResult.state}
+                  data-reason-code={loadResult.state === "unavailable" ? loadResult.reasonCode : undefined}
+                >
+                  {loadResult.state === "loading"
+                    ? "Verifying one content-bound private playback handle."
+                    : loadResult.detail}
+                </p>
+              )
+            )}
+            mediaMeta={
+              <ProductionMediaMeta
+                moments={sourceProjection.source.moments}
+                rangeStartMs={sourceProjection.source.context.timeline.analysisRange.startMs}
+                rangeEndMs={sourceProjection.source.context.timeline.analysisRange.endMs}
+              />
+            }
             presentation={projectProductionLearningPresentation(sourceProjection.source, {
               playbackAvailable,
               interactionAvailable: learningController !== null,
             })}
             playback={playback}
-            productionInteraction={playbackAvailable && learningController ? {
+            learningInteraction={playbackAvailable && learningController ? {
               explanation,
               onRequest: (request) => updateExplanation(request, false),
               onRetry: (request) => updateExplanation(request, true),
             } : undefined}
+            prepInteraction={prepInteraction}
           />
-        </>
       ) : (
         <p className="product-runtime-unavailable" data-reason-code={sourceProjection.reasonCode}>
           Verified production captions failed closed before learning projection. No fixture content was substituted.

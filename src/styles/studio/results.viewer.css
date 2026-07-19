@@ -1,0 +1,70 @@
+/*
+ * Shared result-viewer shell chrome: the authority bar above the media/learning composition.
+ * Owns: .result-shell-bar, .result-shell-chrome, .result-authority-badge.
+ * Must not: .result-main layout and view modes (results.summary.css); player chrome
+ * (results.player.css); disclosure panels (results.chrome.css).
+ */
+
+/* The one always-on authority line above the viewer: the badge on the left, and any surface-owned
+   chrome (title, Details, Run details) on the right. It reads as a caption to the instrument, not a
+   second toolbar. */
+.result-shell-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  width: min(1520px, 100%);
+  margin-bottom: 10px;
+}
+
+.result-shell-chrome {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+}
+
+/* Which authority stands behind the playing media. A quiet mono chip in the coverage-strip voice:
+   the recorded demo keeps an archival ink dot, the learner's own verified clip carries the accent. */
+.result-authority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.result-authority-badge::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.result-authority-badge[data-result-authority="recorded_demo"]::before {
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+}
+
+.result-authority-badge[data-result-authority="production_clip"]::before {
+  color: var(--accent, #2f746e);
+}
+
+/* Full screen is edge to edge for the picture; the bar would either overlay the clip or push the
+   media row past 100dvh, so it steps out. data-result-authority stays on the section in every mode. */
+.result-viewer[data-view-mode="fullscreen"] .result-shell-bar {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .result-shell-bar {
+    flex-wrap: wrap;
+  }
+}

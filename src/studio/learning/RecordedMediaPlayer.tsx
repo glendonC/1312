@@ -4,13 +4,17 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 // a CSS @import barrel can serve stale CSS until HMR.
 import "../../styles/studio/results.player.css";
 import { clock } from "../format";
-import { Captions, Hold, Volume } from "../glyphs";
 import { useStudio } from "../store";
 import type { RunBundle } from "../transport";
-import { type CaptionScale, useViewerSession } from "./viewerSession";
+import {
+  CAPTION_SCALE_STEPS,
+  CaptionBurn,
+  PlayerOverlayBar,
+  PlayerSettingsPill,
+} from "../viewer/playerChrome";
+import { useViewerSession } from "./viewerSession";
 
 const HAS_PICTURE = /\.(mp4|webm|mov|m4v)$/i;
-const CAPTION_STEPS: readonly CaptionScale[] = ["sm", "md", "lg"];
 
 function CaptionOverlay({ bundle }: { bundle: RunBundle }) {
   const clipT = useStudio((state) => state.clipT);
@@ -20,21 +24,9 @@ function CaptionOverlay({ bundle }: { bundle: RunBundle }) {
   if (!cue || cue.silence) return null;
 
   const target = cue.targets.find((candidate) => candidate.lang === bundle.run.pair.target);
-  if (target?.withheld) {
-    return (
-      <figcaption className="burn" data-path="withheld">
-        <span className="burn-mark">withheld</span>
-        {target.withheld.reason}
-      </figcaption>
-    );
-  }
+  if (target?.withheld) return <CaptionBurn burn={{ path: "withheld", reason: target.withheld.reason }} />;
   if (!target?.text) return null;
-
-  return (
-    <figcaption className="burn" data-path="prepped">
-      {target.text}
-    </figcaption>
-  );
+  return <CaptionBurn burn={{ path: "prepped", text: target.text }} />;
 }
 
 export default function RecordedMediaPlayer({
@@ -177,159 +169,68 @@ export default function RecordedMediaPlayer({
   // YouTube-style: revealed on hover/focus, always shown while paused and on touch. The workbench
   // surface keeps the plain below-frame transport, so agent-focus playback is unchanged.
   const overlayControls = surface === "results" && picture && Boolean(src);
-  const progressPct = duration > 0 ? Math.min(100, (clipT / duration) * 100) : 0;
 
   const stepCaptionScale = (direction: -1 | 1): void => {
-    const index = CAPTION_STEPS.indexOf(captionScale);
-    const next = CAPTION_STEPS[Math.min(CAPTION_STEPS.length - 1, Math.max(0, index + direction))];
+    const index = CAPTION_SCALE_STEPS.indexOf(captionScale);
+    const next = CAPTION_SCALE_STEPS[Math.min(CAPTION_SCALE_STEPS.length - 1, Math.max(0, index + direction))];
     if (next !== captionScale) setCaptionScale(next);
   };
 
-  // A YouTube-style settings pill over the top-right of the picture. The caption controls a learner
-  // reaches for (show/hide the burned line, size it) sit here, and the panel settings share the pill so
-  // nothing crowds the transport bar. It reveals with the rest of the chrome, keeping the frame clean.
+  const controlsDisabled = !src || mediaFailed;
+
   const settingsPill = (
-    <div className="player-settings-pill">
-      <span className="pcap-group" role="group" aria-label="Caption display">
-        <button
-          type="button"
-          className="pcap-btn pcap-cc"
-          aria-label={captionsVisible ? "Hide captions" : "Show captions"}
-          aria-pressed={captionsVisible}
-          onClick={() => setCaptionsVisible(!captionsVisible)}
-        >
-          <Captions off={!captionsVisible} />
-          <span className="pm-tip" aria-hidden="true">{captionsVisible ? "Hide captions" : "Show captions"}</span>
-        </button>
-        <button
-          type="button"
-          className="pcap-btn pcap-step"
-          aria-label="Smaller captions"
-          disabled={!captionsVisible || captionScale === "sm"}
-          onClick={() => stepCaptionScale(-1)}
-        >
-          A<small>-</small>
-        </button>
-        <button
-          type="button"
-          className="pcap-btn pcap-step"
-          aria-label="Larger captions"
-          disabled={!captionsVisible || captionScale === "lg"}
-          onClick={() => stepCaptionScale(1)}
-        >
-          A<small>+</small>
-        </button>
-      </span>
-      {panelControls}
-    </div>
+    <PlayerSettingsPill
+      captions={{
+        visible: captionsVisible,
+        scale: captionScale,
+        onToggleVisible: () => setCaptionsVisible(!captionsVisible),
+        onStepScale: stepCaptionScale,
+      }}
+      panelControls={panelControls}
+    />
   );
 
-  const speedSelect = (
-    <select
-      className={overlayControls ? "pspeed" : undefined}
-      aria-label="Playback speed"
-      value={playbackRate}
-      disabled={!src || mediaFailed}
-      onChange={(event) => setPlaybackRate(Number(event.currentTarget.value))}
-    >
-      <option value={0.5}>0.5×</option>
-      <option value={0.75}>0.75×</option>
-      <option value={1}>1×</option>
-      <option value={1.25}>1.25×</option>
-      <option value={1.5}>1.5×</option>
-      <option value={2}>2×</option>
-    </select>
-  );
-
-  // The YouTube-familiar control surface for Results: a full-width progress bar (played fill, draggable
-  // knob, faint music/silence shading), then one row — play, volume, time on the left; speed and the
-  // viewing modes on the right.
   const overlayBar = (
-    <div className="pbar-wrap">
-      <div className="pbar" data-empty={duration <= 0 || undefined}>
-        <div className="pbar-track">
-          {duration > 0 && (
-            <div className="pbar-regions" aria-hidden="true">
-              {music.map(([start, end], index) => (
-                <span
-                  key={`music-${index}`}
-                  className="pbar-region"
-                  data-kind="music"
-                  style={{ left: `${(start / duration) * 100}%`, width: `${((end - start) / duration) * 100}%` }}
-                />
-              ))}
-              {silence.map(([start, end], index) => (
-                <span
-                  key={`silence-${index}`}
-                  className="pbar-region"
-                  data-kind="silence"
-                  style={{ left: `${(start / duration) * 100}%`, width: `${((end - start) / duration) * 100}%` }}
-                />
-              ))}
-            </div>
-          )}
-          <div className="pbar-fill" style={{ width: `${progressPct}%` }} aria-hidden="true" />
-          <span className="pbar-knob" style={{ left: `${progressPct}%` }} aria-hidden="true" />
-        </div>
-        <input
-          type="range"
-          className="pbar-input"
-          min={0}
-          max={duration || 0}
-          step={0.1}
-          value={clipT}
-          onChange={(event) => seek(event.currentTarget.valueAsNumber)}
-          aria-label="Seek through clip"
-          aria-valuetext={`${clock(clipT)} of ${clock(duration)}`}
-          disabled={!src || mediaFailed}
-        />
-      </div>
-      <div className="pctl">
-        <div className="pctl-left">
-          <button
-            type="button"
-            className="pbtn pbtn-play"
-            onClick={togglePlayback}
-            disabled={!src || mediaFailed}
-            aria-label={activelyPlaying ? "Pause" : "Play"}
-          >
-            <Hold paused={!activelyPlaying} />
-          </button>
-          <div className="pvol">
-            <button
-              type="button"
-              className="pbtn"
-              onClick={toggleMuted}
-              disabled={!src || mediaFailed}
-              aria-label={muted || volume === 0 ? "Unmute" : "Mute"}
-              aria-pressed={muted || volume === 0}
-            >
-              <Volume muted={muted || volume === 0} />
-            </button>
-            <input
-              type="range"
-              className="pvol-slider"
-              min={0}
-              max={1}
-              step={0.05}
-              value={muted ? 0 : volume}
-              aria-label="Volume"
-              disabled={!src || mediaFailed}
-              onChange={(event) => {
-                const nextVolume = event.currentTarget.valueAsNumber;
-                setVolume(nextVolume);
-                setMuted(nextVolume === 0);
-              }}
-            />
-          </div>
-          <span className="ptime">{clock(clipT)} / {clock(duration)}</span>
-        </div>
-        <div className="pctl-right">
-          {speedSelect}
-          {modeControls}
-        </div>
-      </div>
-    </div>
+    <PlayerOverlayBar
+      transport={{
+        progress: {
+          min: 0,
+          max: duration,
+          value: clipT,
+          disabled: controlsDisabled,
+          ariaValueText: `${clock(clipT)} of ${clock(duration)}`,
+          onSeek: seek,
+          regions: [
+            ...music.map(([start, end]) => ({ kind: "music" as const, start, end })),
+            ...silence.map(([start, end]) => ({ kind: "silence" as const, start, end })),
+          ],
+        },
+        play: {
+          playing: activelyPlaying,
+          disabled: controlsDisabled,
+          playLabel: "Play",
+          pauseLabel: "Pause",
+          onToggle: togglePlayback,
+        },
+        volume: {
+          muted,
+          volume,
+          disabled: controlsDisabled,
+          onToggleMuted: toggleMuted,
+          onVolume: (nextVolume) => {
+            setVolume(nextVolume);
+            setMuted(nextVolume === 0);
+          },
+        },
+        timeLabel: `${clock(clipT)} / ${clock(duration)}`,
+        speed: {
+          rate: playbackRate,
+          disabled: controlsDisabled,
+          onRate: setPlaybackRate,
+        },
+      }}
+      modeControls={modeControls}
+    />
   );
 
   const transport = (

@@ -95,8 +95,7 @@
   }
 
   .product-runtime-header,
-  .product-runtime-connect,
-  .product-runtime-caption-result-list > article > header {
+  .product-runtime-connect {
     align-items: stretch;
     flex-direction: column;
   }

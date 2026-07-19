@@ -8,7 +8,11 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef } from "react";
 
-import "../styles/studio/focus/index.css";
+// Direct leaf imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
+import "../styles/studio/focus/shell.css";
+import "../styles/studio/focus/commands.css";
+import "../styles/studio/focus/evidence.css";
+import "../styles/studio/focus/activity.css";
 import AgentMark from "./AgentMark";
 import { agentIdentityStyle, createAgentIdentityMap } from "./agentIdentity";
 import { isAgentThinking } from "./agentMeshRenderer";

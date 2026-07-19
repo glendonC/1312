@@ -2,7 +2,7 @@
  * Studio product style entry: page shell plus leaf sheets.
  * Owns: .studio route shell, floating .top header, act layout, Results header seats.
  * Must not: grow into Results/Dock/player god rules; nest CSS @import indexes (stale HMR).
- * Agent focus loads from AgentPanel.tsx via styles/studio/focus/index.css.
+ * Agent focus loads from AgentPanel.tsx via direct focus/*.css leaf imports.
  */
 
 /* Dock leaves */

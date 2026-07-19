@@ -392,16 +392,16 @@ indefinite deferrals. Status here is a summary; ladder done-when and non-claims 
 
 ## Where to read what
 
-- [`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md) — post–Build Week media senses, budgeted re-study,
-  external context, quality boundaries, and a parked later-learning appendix.
-- [`PRODUCT.md`](../PRODUCT.md) — product identity, loop, Build Week proof bar, and route map.
-- [`ARCHITECTURE.md`](../ARCHITECTURE.md) — structural boundaries, chosen stack, and dependency
+- [`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md): media-understanding rung order, done-when,
+  external context bounds, quality non-claims, and a parked later-learning appendix.
+- [`PRODUCT.md`](../PRODUCT.md): product identity, loop, proof bar, and route map.
+- [`ARCHITECTURE.md`](../ARCHITECTURE.md): structural boundaries, chosen stack, and dependency
   direction; not the current roadmap.
-- [`STUDIO_AUTONOMY.md`](../STUDIO_AUTONOMY.md) — deep runtime design and implementation ledger; use
+- [`STUDIO_AUTONOMY.md`](../STUDIO_AUTONOMY.md): deep runtime design and implementation ledger; use
   this status page for what is done and next.
-- [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md) — exact production contract references plus
+- [`RUNTIME_CONTRACTS.md`](../RUNTIME_CONTRACTS.md): exact production contract references plus
   deliberately inert historical proposal shapes.
-- [`STUDIO_PRODUCT_CONTRACT.md`](../STUDIO_PRODUCT_CONTRACT.md) — UI/runtime authority, product-flow,
+- [`STUDIO_PRODUCT_CONTRACT.md`](../STUDIO_PRODUCT_CONTRACT.md): UI/runtime authority, product-flow,
   data, and action contracts.
-- [`0001-miss-to-gold-conveyor.md`](../rfcs/0001-miss-to-gold-conveyor.md) — Bet G evaluation design and
-  conveyor history; current frozen pack and score artifacts live under `bench/`.
+- [`0001-miss-to-gold-conveyor.md`](../rfcs/0001-miss-to-gold-conveyor.md): Bet G evaluation design and
+  conveyor invariants; current frozen pack and score artifacts live under `bench/`.

@@ -36,9 +36,9 @@ situation.
 ### What it is not
 
 - Not a caption app, subtitle SaaS, or “faster live translate”
-- Not “we investigate hard Korean clips” as the product name (that is a Build Week proof bar)
-- Not Netflix DRM miracles, multilingual hive-mind v1, accounts-required v1, or Mac overlay as the submission
-- Not rebuilding Feather / Learning OS this week (learning is a later use of understanding)
+- Not “we investigate hard Korean clips” as the product name (that is a proof bar, not the category)
+- Not Netflix DRM miracles, multilingual hive-mind v1, accounts-required v1, or Mac overlay as the core product
+- Not a learning-OS rebuild as the foundation claim (learning is a later use of understanding)
 
 ---
 

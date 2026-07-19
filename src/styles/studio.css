@@ -1,10 +1,7 @@
 /*
- * Studio: paste a clip, watch it get studied, read captions it will stand behind.
- *
- * This file is the shell and the index — the page frame, and the parts it is made of.
- * Each part owns its own component AND its own responsive rules, so there is one place
- * to look for anything about the dock, the canvas, agent focus, the workspace, or the
- * result, and no single file that has to be read to understand any of them.
+ * Studio product style entry: page shell plus part indexes.
+ * Each imported part owns its component selectors and responsive rules (dock, canvas,
+ * agent focus, workspace, Results, pause). Do not grow route-level god rules here.
  */
 
 @import "./studio/dock.css";

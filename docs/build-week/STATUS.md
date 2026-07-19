@@ -40,7 +40,8 @@ score.
   planning/synthesis, and study-causal captions with independent structural QC. The campaign is
   closed; do not reopen its slices as a new runtime plan.
 - **Runtime modularity:** launcher, validation, projection, protocol, and runtime-host review/caption
-  seams are split into cohesive modules; UI catch-up remains next.
+  seams are split into cohesive modules. The initial-coverage recovery read model and production-facts
+  UI are included.
 - **Bounded initial-coverage recovery — contract slice:** one terminal, typed execution fault in a
   required generalized initial-coverage worker can authorize one host-owned exact replacement in the
   same durable runtime. Content-addressed classification, authorization, and terminal receipts keep
@@ -50,9 +51,12 @@ score.
   remains a separate 1,220,000 ms/32-call ceiling; the recovery contingency is 480,000 ms/4 calls;
   the total ceiling is 1,700,000 ms/36 calls. Deterministic hostile tests cover five replaceable fault
   classes, tamper, stale authority, crash-after-authorization interruption, healthy-sibling
-  preservation, full contingency consumption, and no evidence-quality retry. This slice includes no
-  Results UI, root/caption/Learning recovery, live provider proof, restart liveness, semantic success,
-  correctness, quality, or cost-reduction claim.
+  preservation, full contingency consumption, and no evidence-quality retry. Studio production facts
+  now project validated failure classifications, authorization, failed attempt 0, replacement attempt
+  1, and reported or exhausted terminal lineage, with an explicit unavailable state when those
+  receipts are absent. Allocation values are shown as ceilings, not forecasts. This slice includes no
+  Results UI, best-of-K selection, quality retry, root/caption/Learning recovery, live provider proof,
+  restart liveness, semantic success, correctness, quality, or cost-reduction claim.
 - **Selected-language Apply producer:** an exact verified caption span can now enter a separate
   private language-explanation host with typed meaning/word/phrase/grammar/translation-choice
   facets, immutable grant/artifact/receipt lineage, cold audit, authenticated POST/GET, and a strict

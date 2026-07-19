@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/single-attempt-charge.schema.json",
+  "title": "studio.bench.single-attempt-charge.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "attempt_id", "charged_at", "slot", "execution_input"],
+  "properties": {
+    "schema": { "const": "studio.bench.single-attempt-charge.v1" },
+    "attempt_id": { "type": "string", "pattern": "^bench-attempt:sha256:[a-f0-9]{64}$" },
+    "charged_at": { "type": "string", "format": "date-time" },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registration_id", "run", "side"],
+      "properties": {
+        "registration_id": { "type": "string", "pattern": "^bench-rule-change-registration:sha256:[a-f0-9]{64}$" },
+        "run": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "side": { "enum": ["without", "with"] }
+      }
+    },
+    "execution_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt", "execution_input_id"],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "execution_input_id": { "type": "string", "pattern": "^bench-execution-input:sha256:[a-f0-9]{64}$" }
+      }
+    }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

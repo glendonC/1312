@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/certified-release.schema.json",
+  "title": "studio.bench.certified-release.v1",
+  "description": "Content-addressed qualification release resolving one preregistered configuration and exact candidate-rule bytes into a path-free host context.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "release_id",
+    "created_at",
+    "purpose",
+    "runtime_deployable",
+    "registration",
+    "side",
+    "system_id",
+    "configuration",
+    "reviewed_memory",
+    "host_context"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.certified-release.v1" },
+    "release_id": { "type": "string", "pattern": "^bench-certified-release:sha256:[a-f0-9]{64}$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "purpose": { "const": "rule_change_qualification" },
+    "runtime_deployable": { "const": false },
+    "registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt", "registration_id"],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "registration_id": { "type": "string", "pattern": "^bench-rule-change-registration:sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "side": { "enum": ["without", "with"] },
+    "system_id": { "type": "string", "minLength": 1 },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_id", "config"],
+      "properties": {
+        "config_id": { "type": "string", "pattern": "^bench-config:sha256:[a-f0-9]{64}$" },
+        "config": { "type": "object", "minProperties": 1 }
+      }
+    },
+    "reviewed_memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted_materialization", "candidate_rule"],
+      "properties": {
+        "accepted_materialization": { "type": "null" },
+        "candidate_rule": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "proposal",
+                "proposal_id",
+                "proposal_content_id",
+                "rule_content_id",
+                "namespace",
+                "key",
+                "value"
+              ],
+              "properties": {
+                "proposal": { "$ref": "#/$defs/fileBinding" },
+                "proposal_id": { "type": "string", "pattern": "^memory-proposal:sha256:[a-f0-9]{64}$" },
+                "proposal_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+                "rule_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+                "namespace": { "type": "string", "minLength": 1 },
+                "key": { "type": "string", "minLength": 1 },
+                "value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["instruction"],
+                  "properties": { "instruction": { "type": "string", "minLength": 1 } }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "host_context": { "$ref": "#/$defs/hostContext" }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "hostContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "context_id", "system_id", "config_id", "config", "reviewed_memory"],
+      "properties": {
+        "schema": { "const": "studio.bench.certified-host-context.v1" },
+        "context_id": { "type": "string", "pattern": "^bench-host-context:sha256:[a-f0-9]{64}$" },
+        "system_id": { "type": "string", "minLength": 1 },
+        "config_id": { "type": "string", "pattern": "^bench-config:sha256:[a-f0-9]{64}$" },
+        "config": { "type": "object", "minProperties": 1 },
+        "reviewed_memory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["accepted_materialization", "entries"],
+          "properties": {
+            "accepted_materialization": { "type": "null" },
+            "entries": {
+              "type": "array",
+              "maxItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["namespace", "kind", "key", "value", "proposal_id", "rule_content_id", "status"],
+                "properties": {
+                  "namespace": { "type": "string", "minLength": 1 },
+                  "kind": { "const": "rule" },
+                  "key": { "type": "string", "minLength": 1 },
+                  "value": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["instruction"],
+                    "properties": { "instruction": { "type": "string", "minLength": 1 } }
+                  },
+                  "proposal_id": { "type": "string", "pattern": "^memory-proposal:sha256:[a-f0-9]{64}$" },
+                  "rule_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+                  "status": { "const": "qualification_candidate" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,11 +1,22 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import {
+  certifiedReleasePath,
+  materializeCertifiedRelease,
+  resolveCertifiedRelease,
+} from "../scripts/lib/bench-certified-release.mjs";
+import {
+  auditSingleAttemptCharges,
+  runSingleAttempt,
+  singleAttemptPaths,
+  verifyExecutionAttribution,
+} from "../scripts/lib/bench-single-attempt.mjs";
 import {
   materializeRuleChangeRegistration,
   materializeRuleChangeResult,
@@ -58,7 +69,11 @@ function resealResult(result) {
   return result;
 }
 
-async function fixture({ variantRates = [1, 1, 1], variantCatastrophic = [0, 0, 0] } = {}) {
+async function fixture({
+  variantRates = [1, 1, 1],
+  variantCatastrophic = [0, 0, 0],
+  buildGrid = true,
+} = {}) {
   const workspace = await mkdtemp(join(tmpdir(), "studio-rule-change-"));
   const runId = "training-origin-run";
   const originClip = "Trn0r1g1nID";
@@ -283,9 +298,8 @@ async function fixture({ variantRates = [1, 1, 1], variantCatastrophic = [0, 0, 
     `bench/packs/${packId}/freeze.json`,
   );
 
-  async function captureAndScore(run, config, rate, catastrophic) {
-    const capturePath = `bench/runs/${run}/capture.json`;
-    const capture = {
+  function makeCapture(run, config) {
+    return {
       schema_version: "0.1.0",
       kind: "capture",
       capture_id: run,
@@ -335,6 +349,11 @@ async function fixture({ variantRates = [1, 1, 1], variantCatastrophic = [0, 0, 
       ],
       notes: "Synthetic capture fixture. Semantic labels live in the score receipt.",
     };
+  }
+
+  async function captureAndScore(run, config, rate, catastrophic) {
+    const capturePath = `bench/runs/${run}/capture.json`;
+    const capture = makeCapture(run, config);
     await writeJson(join(workspace, capturePath), capture);
     const correct = rate === 1;
     const captureBinding = await fileReceipt(join(workspace, capturePath), capturePath);
@@ -388,25 +407,27 @@ async function fixture({ variantRates = [1, 1, 1], variantCatastrophic = [0, 0, 
   }
 
   const pairPaths = [];
-  for (const [index, plan] of registration.capture_plan.entries()) {
-    const without = await captureAndScore(plan.without_run, baselineConfig, 0, 0);
-    const withSide = await captureAndScore(
-      plan.with_run,
-      variantConfig,
-      variantRates[index],
-      variantCatastrophic[index],
-    );
-    const pair = compareSubjectScores({
-      withoutScore: without.score,
-      withScore: withSide.score,
-      withoutBinding: await fileReceipt(join(workspace, without.scorePath), without.scorePath),
-      withBinding: await fileReceipt(join(workspace, withSide.scorePath), withSide.scorePath),
-      subjectSystemId: "1321-rule-subject",
-      comparedAt: "2026-07-21T00:00:00.000Z",
-    });
-    const pairPath = `bench/scores/pairs/${plan.without_run}.json`;
-    await writeJson(join(workspace, pairPath), pair);
-    pairPaths.push(pairPath);
+  if (buildGrid) {
+    for (const [index, plan] of registration.capture_plan.entries()) {
+      const without = await captureAndScore(plan.without_run, baselineConfig, 0, 0);
+      const withSide = await captureAndScore(
+        plan.with_run,
+        variantConfig,
+        variantRates[index],
+        variantCatastrophic[index],
+      );
+      const pair = compareSubjectScores({
+        withoutScore: without.score,
+        withScore: withSide.score,
+        withoutBinding: await fileReceipt(join(workspace, without.scorePath), without.scorePath),
+        withBinding: await fileReceipt(join(workspace, withSide.scorePath), withSide.scorePath),
+        subjectSystemId: "1321-rule-subject",
+        comparedAt: "2026-07-21T00:00:00.000Z",
+      });
+      const pairPath = `bench/scores/pairs/${plan.without_run}.json`;
+      await writeJson(join(workspace, pairPath), pair);
+      pairPaths.push(pairPath);
+    }
   }
 
   return {
@@ -417,8 +438,253 @@ async function fixture({ variantRates = [1, 1, 1], variantCatastrophic = [0, 0, 
     pairPaths,
     baselineConfig,
     captureAndScore,
+    makeCapture,
   };
 }
+
+async function certifyFixtureSide(held, side, createdAt = "2026-07-19T01:00:00.000Z") {
+  const release = await materializeCertifiedRelease(
+    { registrationPath: held.registrationPath, side },
+    {
+      workspaceRoot: held.workspace,
+      createdAt,
+      validateRegistration: validateRuleChangeRegistration,
+    },
+  );
+  const path = certifiedReleasePath(release);
+  await writeImmutableJson(join(held.workspace, path), release);
+  return { release, path };
+}
+
+async function fixtureSourceInput(held) {
+  const path = "bench/inputs/evaluation-clip.bin";
+  await mkdir(dirname(join(held.workspace, path)), { recursive: true });
+  await writeFile(join(held.workspace, path), "synthetic evaluation media bytes\n");
+  return path;
+}
+
+test("certified releases cold-reopen exact candidate rule and path-free host context", async (t) => {
+  const held = await fixture({ buildGrid: false });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const withSide = await certifyFixtureSide(held, "with", "2026-07-19T01:01:00.000Z");
+
+  assert.equal(without.release.reviewed_memory.candidate_rule, null);
+  assert.deepEqual(without.release.host_context.reviewed_memory.entries, []);
+  assert.equal(withSide.release.runtime_deployable, false);
+  assert.equal(
+    withSide.release.reviewed_memory.candidate_rule.rule_content_id,
+    held.registration.change.rule_content_id,
+  );
+  assert.equal(withSide.release.host_context.reviewed_memory.entries.length, 1);
+  assert.doesNotMatch(JSON.stringify(withSide.release.host_context), /"(?:path|file|directory|root|cwd|workspace)"/i);
+
+  const reopened = await resolveCertifiedRelease(withSide.path, {
+    workspaceRoot: held.workspace,
+    validateRegistration: validateRuleChangeRegistration,
+  });
+  assert.deepEqual(reopened.hostContext, withSide.release.host_context);
+
+  const tampered = structuredClone(withSide.release);
+  tampered.host_context.reviewed_memory.entries[0].value.instruction = "Substituted rule bytes.";
+  await writeJson(join(held.workspace, withSide.path), tampered);
+  await assert.rejects(
+    resolveCertifiedRelease(withSide.path, {
+      workspaceRoot: held.workspace,
+      validateRegistration: validateRuleChangeRegistration,
+    }),
+    /release_id does not match|host context id does not match/,
+  );
+});
+
+test("single-attempt host charges before invocation and makes retry or overwrite impossible", async (t) => {
+  const held = await fixture({ buildGrid: false });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const sourcePath = await fixtureSourceInput(held);
+  const plan = held.registration.capture_plan[0];
+  let invocations = 0;
+  const run = plan.without_run;
+  const state = await runSingleAttempt(
+    {
+      registrationPath: held.registrationPath,
+      releasePath: without.path,
+      run,
+      side: "without",
+      sourcePath,
+      executor: async (input) => {
+        invocations += 1;
+        await access(join(held.workspace, singleAttemptPaths(run).charge));
+        assert.equal(Object.isFrozen(input), true);
+        assert.equal(Object.isFrozen(input.hostContext), true);
+        assert.equal("path" in input.source, false);
+        return { capture: held.makeCapture(run, held.baselineConfig) };
+      },
+    },
+    {
+      workspaceRoot: held.workspace,
+      chargedAt: "2026-07-20T00:00:00.000Z",
+      completedAt: "2026-07-20T00:01:00.000Z",
+      validateRegistration: validateRuleChangeRegistration,
+    },
+  );
+  assert.equal(invocations, 1);
+  const proof = await verifyExecutionAttribution(state.paths.attribution, {
+    workspaceRoot: held.workspace,
+    registration: held.registration,
+    expectedRegistration: await fileReceipt(
+      join(held.workspace, held.registrationPath),
+      held.registrationPath,
+    ),
+    expectedRun: run,
+    expectedSide: "without",
+    expectedCapture: await fileReceipt(join(held.workspace, state.paths.capture), state.paths.capture),
+    validateRegistration: validateRuleChangeRegistration,
+  });
+  assert.equal(proof.attempt_id, state.attribution.attempt_id);
+
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        run,
+        side: "without",
+        sourcePath,
+        executor: async () => {
+          invocations += 1;
+          return { capture: held.makeCapture(run, held.baselineConfig) };
+        },
+      },
+      { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
+    ),
+    /slot is spent/,
+  );
+  assert.equal(invocations, 1);
+
+  const overwriteRun = held.registration.capture_plan[1].without_run;
+  const overwritePaths = singleAttemptPaths(overwriteRun);
+  await writeJson(join(held.workspace, overwritePaths.capture), { sentinel: true });
+  let overwriteInvocations = 0;
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        run: overwriteRun,
+        side: "without",
+        sourcePath,
+        executor: async () => {
+          overwriteInvocations += 1;
+          return { capture: held.makeCapture(overwriteRun, held.baselineConfig) };
+        },
+      },
+      { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
+    ),
+    /capture already exists/,
+  );
+  assert.equal(overwriteInvocations, 0);
+  assert.deepEqual(await json(join(held.workspace, overwritePaths.capture)), { sentinel: true });
+});
+
+test("failed single attempt remains charged and duplicate attempt ids fail closed", async (t) => {
+  const held = await fixture({ buildGrid: false });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const sourcePath = await fixtureSourceInput(held);
+  const run = held.registration.capture_plan[0].without_run;
+  let invocations = 0;
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        run,
+        side: "without",
+        sourcePath,
+        executor: async () => {
+          invocations += 1;
+          throw new Error("synthetic executor failure");
+        },
+      },
+      {
+        workspaceRoot: held.workspace,
+        chargedAt: "2026-07-20T00:00:00.000Z",
+        validateRegistration: validateRuleChangeRegistration,
+      },
+    ),
+    /synthetic executor failure/,
+  );
+  const paths = singleAttemptPaths(run);
+  await access(join(held.workspace, paths.charge));
+  await assert.rejects(access(join(held.workspace, paths.attribution)));
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        run,
+        side: "without",
+        sourcePath,
+        executor: async () => {
+          invocations += 1;
+          return { capture: held.makeCapture(run, held.baselineConfig) };
+        },
+      },
+      { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
+    ),
+    /slot is spent/,
+  );
+  assert.equal(invocations, 1);
+
+  const duplicateRun = `${run}-duplicate`;
+  const duplicatePath = singleAttemptPaths(duplicateRun).charge;
+  await writeJson(join(held.workspace, duplicatePath), await json(join(held.workspace, paths.charge)));
+  await assert.rejects(
+    auditSingleAttemptCharges({ workspaceRoot: held.workspace }),
+    /duplicate attempt id/,
+  );
+});
+
+test("execution attribution refuses a missing charge", async (t) => {
+  const held = await fixture({ buildGrid: false });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const sourcePath = await fixtureSourceInput(held);
+  const run = held.registration.capture_plan[0].without_run;
+  const state = await runSingleAttempt(
+    {
+      registrationPath: held.registrationPath,
+      releasePath: without.path,
+      run,
+      side: "without",
+      sourcePath,
+      executor: async () => ({ capture: held.makeCapture(run, held.baselineConfig) }),
+    },
+    {
+      workspaceRoot: held.workspace,
+      chargedAt: "2026-07-20T00:00:00.000Z",
+      completedAt: "2026-07-20T00:01:00.000Z",
+      validateRegistration: validateRuleChangeRegistration,
+    },
+  );
+  await rm(join(held.workspace, state.paths.charge));
+  await assert.rejects(
+    verifyExecutionAttribution(state.paths.attribution, {
+      workspaceRoot: held.workspace,
+      registration: held.registration,
+      expectedRegistration: await fileReceipt(
+        join(held.workspace, held.registrationPath),
+        held.registrationPath,
+      ),
+      expectedRun: run,
+      expectedSide: "without",
+      expectedCapture: await fileReceipt(join(held.workspace, state.paths.capture), state.paths.capture),
+      validateRegistration: validateRuleChangeRegistration,
+    }),
+    /not readable JSON|ENOENT|single-attempt charge/,
+  );
+});
 
 test("rule change registration is result-free, contamination-guarded, and exact-change bound", async (t) => {
   const held = await fixture();

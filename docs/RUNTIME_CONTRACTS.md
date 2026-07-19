@@ -852,6 +852,47 @@ explicit model id and real-execution flag in `scripts/run-runtime-host.ts`; no m
 by the browser. Follow-up answering, listening diagnosis, culture/reference claims, semantic
 grading, learner persistence, mastery, SRS, and export remain unavailable.
 
+The production event union also includes `learning.prep_started`, `learning.prep_completed`, and
+`learning.prep_failed`. This is a second private post-caption Apply producer for optional learner
+fine-tuning, not a child capability, caption authority, or course generator. Its closed request
+contains only one exact verified caption job/artifact/content/receipt identity plus a typed
+`studio.learning-fine-tune.v1` value: an ordered non-empty subset of the closed lens vocabulary
+`word_order`, `grammar_salience`, `situating`, `culture_reference`, and `historical_reference`,
+plus one closed temperature `low`, `medium`, or `high`. The host reopens the complete caption and
+approval lineage, requires authority to remain unrevoked, snapshots every stored caption line, and
+mints the private grant. Caller beats, candidates, prompts, prose, citations, model configuration,
+paths, and open fields are rejected.
+
+Completion stores private content-addressed `studio.learning-prep.artifact.v1` and
+`studio.learning-prep.receipt.v1` objects with exact source, study, readiness, approval, caption,
+line-snapshot, fine-tune, segmentation, candidate, executor, and rights lineage. Segmentation is
+either an ordered contiguous complete beat partition of the caption lines with host-derived beat
+identities and times or an explicit `watch_through` reason. Every candidate anchors one exact
+caption line with stored media times and is `available`, `withheld`, or `unavailable` with a closed
+reason; every armed lens without candidates records a closed lens abstention. Available notes are
+`host_receipted`, `not_reviewed`, and `caption_context_inference`; external citation ids remain
+empty because no external grounding contract exists, and caption context is never culture or
+history authority. Temperature maps only to fixed surfaced-candidate ceilings and can never turn a
+withheld or unavailable candidate into an available one. Output is private and export eligibility
+is unavailable. Fixed bounds are 64 caption lines, 12 beats, 24 candidates, 2 KiB per candidate
+text field, three attempts per exact request, 64 KiB generator output, 128 KiB provider envelopes,
+256 KiB canonical artifacts, 4,000 completion tokens, and 60 seconds.
+
+`GET /v1/runtimes/:runtimeId/learning-preps` returns `studio.local-runtime-learning-preps.v1`; the
+same resource accepts the closed POST. The GET re-hashes both stored objects, reopens the exact
+production caption recursively, re-derives line snapshots, segmentation, anchors, lens outcomes,
+and ceilings, and rejects the whole response on tamper or mixed identity. Every immutable attempt
+remains visible as `started`, `completed`, or `failed`; an identical retry receives the next
+host-derived attempt number up to the fixed three-attempt ceiling, and explicit host recovery
+closes a process-interrupted `started` attempt as failed without inventing output. The default
+executor is explicitly unavailable, and no real or deterministic learning-prep executor is
+reachable from the host command line; deterministic executors are injected only through in-process
+service options in tests. The strict browser client re-hashes both stored objects and closes
+attempt, grant, artifact, receipt, caption, fine-tune, lens, and result identities one-to-one, and
+the production Customize learning face plus the watch-first Moments overlay project only
+host-derived states over that verified read. Prep availability never claims verified culture truth,
+alignment evidence, semantic quality, learner persistence, mastery, SRS, or export.
+
 The “producer” column below names the component this fixture shape originally required. Some now
 have equivalents in the separate production protocol described above, but none can make a
 `fixtureOnly` event production evidence. The “projection / surface” column remains future UI work

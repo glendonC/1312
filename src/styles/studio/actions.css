@@ -1,0 +1,46 @@
+/*
+ * Shared Studio action chips used by preflight and input recovery.
+ * Owns: .ghost, .cta.
+ * Must not: Results header chrome; learning workspace; invent scorecard UI here.
+ */
+
+.ghost {
+  padding: 10px 15px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  corner-shape: squircle;
+  color: var(--ink-soft);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.ghost:hover {
+  color: var(--ink);
+  background: var(--paper-soft);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 17px;
+  border-radius: 10px;
+  corner-shape: squircle;
+  color: #f7faf8;
+  background: var(--ink);
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.cta:hover {
+  background: #0b120f;
+  transform: translateY(-1px);
+}

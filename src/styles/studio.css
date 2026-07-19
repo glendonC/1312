@@ -28,7 +28,8 @@
 @import "./studio/results.captions.css";
 @import "./studio/results.learning.css";
 @import "./studio/results.summary.css";
-@import "./studio/results.scores.css";
+/* Shared Studio .ghost / .cta action chips (preflight + input recovery). */
+@import "./studio/actions.css";
 @import "./studio/results.responsive.css";
 
 @import "./studio/pause.css";

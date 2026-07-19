@@ -7,23 +7,6 @@
   .env-context-list {
     grid-template-columns: 1fr;
   }
-
-  .env-media-frame {
-    min-height: 188px;
-  }
-
-  .env-media-transport {
-    grid-template-columns: auto auto auto 1fr;
-  }
-
-  .env-media-transport input {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .env-media-transport time {
-    justify-self: end;
-  }
 }
 
 @media (min-width: 721px) and (max-height: 560px) {
@@ -31,28 +14,6 @@
     gap: 7px;
   }
 
-  .env-media-frame {
-    min-height: 74px;
-    border-radius: 12px;
-  }
-
-  .env-media-caption {
-    right: 8px;
-    bottom: 7px;
-    left: 8px;
-    padding: 5px 8px;
-  }
-
-  .env-media-caption p {
-    margin-top: 2px;
-    font-size: 0.62rem;
-  }
-
-  .env-media-transport button {
-    height: 26px;
-  }
-
-  .env-media-boundary,
   .env[data-scale="focus"] .env-wave,
   .env[data-scale="focus"] .env-marks {
     display: none;

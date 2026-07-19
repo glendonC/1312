@@ -25,11 +25,6 @@
     padding-left: 7px;
   }
 
-  .dock-bar-source {
-    width: fit-content;
-    max-width: 92vw;
-  }
-
   .dock-state .dock-status {
     min-width: 0;
     flex: 1;

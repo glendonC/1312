@@ -73,29 +73,6 @@
   line-height: 1.5;
 }
 
-.cue-cold {
-  display: flex;
-  gap: 8px;
-  color: var(--flag);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.cue-cold::before {
-  content: "cold";
-  flex: none;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.06em;
-  line-height: 2;
-  text-transform: uppercase;
-}
-
-.results[data-accuracy="unscored"] .cue-cold {
-  color: var(--ink-soft);
-}
-
 .cue-withheld {
   display: inline-flex;
   align-self: flex-start;
@@ -136,34 +113,3 @@
   font-variant-numeric: tabular-nums;
 }
 .cue-silence-note { color: var(--ink-muted); }
-
-.cue-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.tag {
-  padding: 2px 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.57rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.tag[data-kind="fixed"] {
-  border-color: var(--accent-line);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.tag[data-kind="withheld"],
-.tag[data-kind="regression"] {
-  border-color: var(--flag-line);
-  color: var(--flag);
-  background: var(--flag-soft);
-}

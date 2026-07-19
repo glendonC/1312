@@ -2,7 +2,10 @@
 import GlassNav from "../components/GlassNav.astro";
 import MethodProcess from "../features/method/MethodProcess";
 import SiteLayout from "../layouts/SiteLayout.astro";
-import "../features/method/styles/index.css";
+// Direct leaf imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
+import "../features/method/styles/layout.css";
+import "../features/method/styles/cards.css";
+import "../features/method/styles/responsive.css";
 ---
 
 <SiteLayout

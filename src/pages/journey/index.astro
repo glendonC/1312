@@ -4,7 +4,10 @@ import GlassNav from "../../components/GlassNav.astro";
 import { formatLogDate } from "../../features/journey/format";
 import JourneyAtmosphere from "../../features/journey/JourneyAtmosphere.astro";
 import SiteLayout from "../../layouts/SiteLayout.astro";
-import "../../features/journey/styles/index.css";
+// Direct leaf imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
+import "../../features/journey/styles/overview.css";
+import "../../features/journey/styles/article.css";
+import "../../features/journey/styles/responsive.css";
 
 const posts = (await getCollection("journey", ({ data }) => !data.draft)).sort(
   (a, b) => a.data.date.valueOf() - b.data.date.valueOf(),

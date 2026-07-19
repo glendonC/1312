@@ -1,0 +1,190 @@
+{
+  "registration_id": "bench-rule-change-registration:sha256:222b65152093755812937f287139756e185b2bef94fc9556edcc4cee3b95ca8f",
+  "schema": "studio.bench.rule-change-registration.v2",
+  "slug": "ko-kinship-address-context-provider-authorized",
+  "status": "registered",
+  "registered_at": "2026-07-19T20:23:59.536Z",
+  "hypothesis": "The candidate rule improves critical meaning on hard-ko-provider-authorized-v1 by preventing unsupported family relationships while preserving explicitly supported kinship, with an effect of at least 0.25 that exceeds repeated-run variation and introduces no catastrophic unit.",
+  "change": {
+    "proposal": {
+      "path": "memory/review/proposals/f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3.json",
+      "content_id": "sha256:125328f5eb983e33bb16feb357327f93b81c11f2258a0d3039fa96c677a709c8",
+      "bytes": 1471
+    },
+    "proposal_id": "memory-proposal:sha256:f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3",
+    "proposal_content_id": "sha256:09856cd6d4d5a006c607bfa8b11e1adc5dad6f1b93aa27cf0f5c2acc87730d2b",
+    "rule_content_id": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7",
+    "origin": {
+      "candidates_manifest": {
+        "path": "bench/candidates/run-005/candidates.json",
+        "content_id": "sha256:adcd75122f72f9fc635cd0bc3b2cc7578d740b055e64309c223d9f6de8aaf950",
+        "bytes": 11856
+      },
+      "manifest_id": "bench-candidates:sha256:394b8ee145092dee189d5d75a5a93998055d9e24b0e558c2340d74b78feafa17",
+      "run_id": "run-005",
+      "clip_id": "ko-clip-01",
+      "route": "training",
+      "source_receipt": {
+        "path": "public/demo/runs/run-005/source.json",
+        "content_id": "sha256:ced8e654d0bba45d118d73276d76c12d4fb45dae17a25a8a0cf9fb843dc96735",
+        "bytes": 1854
+      },
+      "run_receipt": {
+        "path": "public/demo/runs/run-005/run.json",
+        "content_id": "sha256:720f301605c4419f8ba8b4d53c33492e589ea836cc584f594c32511f73cc17a8",
+        "bytes": 2114
+      },
+      "media_artifact": {
+        "path": "public/demo/runs/run-005/clip.m4a",
+        "content_id": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+        "bytes": 329662
+      },
+      "source_kind": "owned_local",
+      "media_class": "owned_local_recorded_bytes"
+    }
+  },
+  "campaign_approval": {
+    "receipt": {
+      "path": "bench/reviews/rule-change-campaign/26947adc9c71e9ae4965f46a309438ec48be5b360349a451e1d66abf28c72ace.json",
+      "content_id": "sha256:b6c68cfc67c8a1ee34b4ede23ba14b23f53f9b6f8af90612f80d064a76370408",
+      "bytes": 949
+    },
+    "approval_id": "bench-rule-change-campaign-approval:sha256:26947adc9c71e9ae4965f46a309438ec48be5b360349a451e1d66abf28c72ace"
+  },
+  "pack": {
+    "pack_id": "hard-ko-provider-authorized-v1",
+    "manifest": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/pack.json",
+      "content_id": "sha256:e3115116111c404488253c71bf1dae6a4213551e5f71571ae9cead672fe592cb",
+      "bytes": 4258
+    },
+    "freeze": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/freeze.json",
+      "content_id": "sha256:3b1ca65b87a912119c3b85a70962256cdd94a8721e6dfed8ec6cef065e27c962",
+      "bytes": 4907
+    }
+  },
+  "subject": {
+    "system_id": "1321-openai-audio-translation-rule-change",
+    "baseline": {
+      "config_id": "bench-config:sha256:c0182300de81ad3de5ba588ccee6a25e60a23ed2a928299e0c9ab67f842b8206",
+      "config": {
+        "model": "whisper-1",
+        "provider": {
+          "id": "openai",
+          "operation": "audio_translation",
+          "response_format": "verbose_json",
+          "temperature": 0,
+          "timeout_ms": 120000,
+          "max_response_bytes": 1048576
+        },
+        "reviewed_memory": {
+          "rule_content_id": null
+        }
+      }
+    },
+    "variant": {
+      "config_id": "bench-config:sha256:28ef658e553a684152d1a4de0e1ba99cc28705b0b7b78ebb84ffa2086e86cf9b",
+      "config": {
+        "model": "whisper-1",
+        "provider": {
+          "id": "openai",
+          "operation": "audio_translation",
+          "response_format": "verbose_json",
+          "temperature": 0,
+          "timeout_ms": 120000,
+          "max_response_bytes": 1048576
+        },
+        "reviewed_memory": {
+          "rule_content_id": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7"
+        }
+      }
+    }
+  },
+  "delta": {
+    "path": "/reviewed_memory/rule_content_id",
+    "baseline": null,
+    "variant": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7"
+  },
+  "capture_policy": {
+    "selection": "all_frozen_pack_clips",
+    "repetitions_per_clip": 3,
+    "pairing": "same_clip_and_preregistered_repetition",
+    "capture_after_registration_day": true,
+    "score_every_capture": true
+  },
+  "capture_plan": [
+    {
+      "clip_id": "2o0f-V4uoMg",
+      "repetition": 1,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r1-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r1-with"
+    },
+    {
+      "clip_id": "2o0f-V4uoMg",
+      "repetition": 2,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r2-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r2-with"
+    },
+    {
+      "clip_id": "2o0f-V4uoMg",
+      "repetition": 3,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r3-with"
+    },
+    {
+      "clip_id": "Ni5rBtowdnI",
+      "repetition": 1,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c2-r1-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c2-r1-with"
+    },
+    {
+      "clip_id": "Ni5rBtowdnI",
+      "repetition": 2,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c2-r2-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c2-r2-with"
+    },
+    {
+      "clip_id": "Ni5rBtowdnI",
+      "repetition": 3,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c2-r3-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c2-r3-with"
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "repetition": 1,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r1-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r1-with"
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "repetition": 2,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r2-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r2-with"
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "repetition": 3,
+      "without_run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r3-without",
+      "with_run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r3-with"
+    }
+  ],
+  "qualification_policy": {
+    "semantic_authority": "human_labels_only",
+    "score_schema": "studio.bench.score.v1",
+    "judge": null,
+    "primary_metric": "critical_meaning_rate",
+    "minimum_effect": 0.25,
+    "variance_method": "max_within_condition_clip_range",
+    "require_effect_exceeds_variance": true,
+    "catastrophic_policy": "no_new_units_and_non_increasing_total",
+    "outcomes": [
+      "correct",
+      "wrong",
+      "withheld",
+      "missing"
+    ]
+  },
+  "results": null,
+  "notes": "Result-free provider-authorized IL-03 registration input. The provider adapter is benchmark-only and has no product runtime deployment authority. Live capture requires separate operator authorization and exact one-shot execution receipts."
+}

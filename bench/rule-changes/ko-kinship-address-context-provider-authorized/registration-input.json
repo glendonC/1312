@@ -1,0 +1,69 @@
+{
+  "schema": "studio.bench.rule-change-registration.v2",
+  "slug": "ko-kinship-address-context-provider-authorized",
+  "status": "registered",
+  "hypothesis": "The candidate rule improves critical meaning on hard-ko-provider-authorized-v1 by preventing unsupported family relationships while preserving explicitly supported kinship, with an effect of at least 0.25 that exceeds repeated-run variation and introduces no catastrophic unit.",
+  "proposal_path": "memory/review/proposals/f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3.json",
+  "candidates_manifest_path": "bench/candidates/run-005/candidates.json",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "subject": {
+    "system_id": "1321-openai-audio-translation-rule-change",
+    "baseline": {
+      "config": {
+        "model": "whisper-1",
+        "provider": {
+          "id": "openai",
+          "operation": "audio_translation",
+          "response_format": "verbose_json",
+          "temperature": 0,
+          "timeout_ms": 120000,
+          "max_response_bytes": 1048576
+        },
+        "reviewed_memory": {
+          "rule_content_id": null
+        }
+      }
+    },
+    "variant": {
+      "config": {
+        "model": "whisper-1",
+        "provider": {
+          "id": "openai",
+          "operation": "audio_translation",
+          "response_format": "verbose_json",
+          "temperature": 0,
+          "timeout_ms": 120000,
+          "max_response_bytes": 1048576
+        },
+        "reviewed_memory": {
+          "rule_content_id": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7"
+        }
+      }
+    }
+  },
+  "capture_policy": {
+    "selection": "all_frozen_pack_clips",
+    "repetitions_per_clip": 3,
+    "pairing": "same_clip_and_preregistered_repetition",
+    "capture_after_registration_day": true,
+    "score_every_capture": true
+  },
+  "qualification_policy": {
+    "semantic_authority": "human_labels_only",
+    "score_schema": "studio.bench.score.v1",
+    "judge": null,
+    "primary_metric": "critical_meaning_rate",
+    "minimum_effect": 0.25,
+    "variance_method": "max_within_condition_clip_range",
+    "require_effect_exceeds_variance": true,
+    "catastrophic_policy": "no_new_units_and_non_increasing_total",
+    "outcomes": [
+      "correct",
+      "wrong",
+      "withheld",
+      "missing"
+    ]
+  },
+  "results": null,
+  "notes": "Result-free provider-authorized IL-03 registration input. The provider adapter is benchmark-only and has no product runtime deployment authority. Live capture requires separate operator authorization and exact one-shot execution receipts."
+}

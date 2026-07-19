@@ -1,0 +1,138 @@
+{
+  "schema": "studio.bench.gold.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "2o0f-V4uoMg",
+  "status": "candidate",
+  "drafter": "agent:gold-drafter-v1",
+  "source": {
+    "kind": "youtube",
+    "url": "https://www.youtube.com/watch?v=2o0f-V4uoMg",
+    "channel": "카오스 사이언스",
+    "licence": "Creative Commons Attribution license (reuse allowed)",
+    "window": {
+      "start": "00:01:37",
+      "end": "00:02:37",
+      "duration": 60
+    },
+    "attribution": "\"[코로나 인터뷰] 박종화_ 한국사람이 코로나19에 좀더 저항성이 있다?!\" by 카오스 사이언스, used under Creative Commons Attribution license (reuse allowed)."
+  },
+  "mined_from": null,
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 6,
+      "korean_gold": "아 일반적으로 공식이 있습니다. 치사율하고 전염력의 공식이 있는데 반비례합니다.",
+      "english_guidance": "The speaker says there is a general relationship or formula in which fatality and transmissibility are inversely related.",
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-0000-0600-inverse-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker describes fatality and transmissibility as inversely related."
+          ],
+          "catastrophic_if": [
+            "The rendering says fatality and transmissibility rise together rather than being inversely related."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 6,
+      "t_end": 15,
+      "korean_gold": "그래서 팬데믹이 되려면 어쩔 수 없이 숙주를 너무 많이 죽이면 안 되고 적절하게 숙주에서 빠져나갈 수 있는, 그러니까 독하지 않아야 되는 거죠.",
+      "english_guidance": "For a pathogen to become pandemic, he says it cannot kill too many hosts; it must be able to leave or spread from the host appropriately, meaning it cannot be too virulent.",
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-0600-1500-host-01",
+          "phenomenon": "none",
+          "facts": [
+            "A pandemic pathogen must not kill too many hosts.",
+            "It must be able to spread onward from the host and therefore cannot be too virulent."
+          ],
+          "catastrophic_if": [
+            "The rendering claims that killing more hosts is what enables pandemic spread."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 15,
+      "t_end": 27.8,
+      "korean_gold": "적절하게 그 균형을 맞춰야 되는, 너무 독하지 않으면서 전염력이 있어야 되는. 그렇기 때문에 그런 어떤 공식 비율의 황금비죠, 어떻게 보면. 황금비에 맞춰서 전염률, 감염률이 결정이 됩니다.",
+      "english_guidance": "He says a balance is required: the pathogen must not be too virulent but must remain transmissible. He figuratively calls the relevant ratio a golden ratio that determines transmission or infection rates.",
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-1500-2780-balance-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker says pandemic spread requires a balance between not being too virulent and retaining transmissibility.",
+            "He describes the balance figuratively as a golden ratio affecting transmission or infection rates."
+          ],
+          "catastrophic_if": [
+            "The rendering removes or reverses the claimed tradeoff between virulence and transmissibility."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 32.9,
+      "t_end": 38.72,
+      "korean_gold": "저는 있다고 생각합니다. 최근에 스페인하고 이탈리아 학자가 논문을 냈는데 유전적인 차이가 있다.",
+      "english_guidance": "After an edit, the speaker says he thinks such a possibility exists. He cites a recent paper by Spanish and Italian researchers reporting a genetic difference. The object of 있다 depends on the preceding interview question and should not be over-specified from this unit alone.",
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-3290-3872-paper-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker says he believes the discussed possibility exists.",
+            "He cites a recent paper by researchers in Spain and Italy that reports a genetic difference."
+          ],
+          "catastrophic_if": [
+            "The rendering says the cited paper found no genetic difference."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 39.34,
+      "t_end": 49.4,
+      "korean_gold": "그래서 그전까지는 인간 유전자 차이를 이렇게 아무도 확신을 하고 주장한 사람이 없었습니다. 데이터가 없다 보니까. 근데 최근에 그렇게 나왔고 저희들도 최근에 그 연구를 했습니다.",
+      "english_guidance": "He says that previously nobody asserted human genetic differences with confidence because there were no data. He says recent findings changed that and that his group also recently conducted the research.",
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-3934-4940-evidence-01",
+          "phenomenon": "none",
+          "facts": [
+            "Earlier claims about human genetic differences lacked data and therefore were not made confidently.",
+            "The speaker says recent evidence emerged and his group also recently studied the question."
+          ],
+          "catastrophic_if": [
+            "The rendering says strong supporting data had already existed before the recent work."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 49.66,
+      "t_end": 60,
+      "korean_gold": "울산에서 하는 만 명 게놈 사업에서 나온 수천 명의 한국인 게놈을 가지고 분석을 해보니 한국 사람이 코로나바이러스에 조금 저항성이 있을 수 있다라는 이제 초기 연구 결과가",
+      "english_guidance": "Using genomes from thousands of Koreans in Ulsan's 10,000 Genomes Project, the analysis produced an early result suggesting that Korean people might have some resistance to coronavirus. Preserve the tentative wording and the fact that the clip cuts off before the sentence is completed.",
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-4966-6000-genome-01",
+          "phenomenon": "none",
+          "facts": [
+            "The data came from thousands of Korean genomes in Ulsan's 10,000 Genomes Project.",
+            "The preliminary result suggests only that Korean people might have some coronavirus resistance.",
+            "The sentence is incomplete when the clip ends."
+          ],
+          "catastrophic_if": [
+            "The rendering turns a tentative preliminary population-level result into proof that Korean people are immune to coronavirus.",
+            "The rendering changes the studied population or the 10,000-genome project into unrelated data."
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": "Audio-grounded candidate drafted from the exact bound 60-second media, with local open-weight ASR used only as a fallible navigation and transcription lead. The final sentence is intentionally incomplete at the clip boundary; reviewers must verify the technical wording and the 전염률/감염률 sequence. Unreviewed and unfrozen. Prompt pack bench-gold-prompt:sha256:adddfe3cb78b967c6dac2789375dc7512c4756462958f939581d2f8dde7a560c."
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "studio.bench.gold.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ni5rBtowdnI",
+  "status": "candidate",
+  "drafter": "agent:gold-drafter-v1",
+  "source": {
+    "kind": "youtube",
+    "url": "https://www.youtube.com/watch?v=Ni5rBtowdnI",
+    "channel": "외대알리",
+    "licence": "Creative Commons Attribution license (reuse allowed)",
+    "window": {
+      "start": "00:00:00",
+      "end": "00:00:45",
+      "duration": 45
+    },
+    "attribution": "\"[한국외대 외대알리] 인터뷰#5 - 와킹댄서 킹키=김기현\" by 외대알리, used under Creative Commons Attribution license (reuse allowed)."
+  },
+  "mined_from": null,
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 9.3,
+      "korean_gold": "저는 한국외국어대학교 스페인어과 2학년까지 다니다가 학교는 그만두고 댄서 활동을 하고 있고, 이름은 김기현, 댄서 네임은 킹키.",
+      "english_guidance": "The speaker says he attended the Spanish department at Hankuk University of Foreign Studies through his second year, then left school and now works as a dancer. He identifies himself as Kim Gihyeon and gives Kinky as his dancer name.",
+      "critical_units": [
+        {
+          "id": "Ni5rBtowdnI-0000-0930-identity-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker attended Hankuk University of Foreign Studies as a Spanish major through his second year and then left school.",
+            "The speaker now works as a dancer.",
+            "The speaker identifies himself as Kim Gihyeon and uses Kinky as his dancer name."
+          ],
+          "catastrophic_if": [
+            "The rendering identifies a different person or reverses the statement that he left school to work as a dancer."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 9.3,
+      "t_end": 23,
+      "korean_gold": "왁킹이라는 장르를 추고 있고 왁킹은 이렇게 뭐 팔을 돌린다든지 영화 속의 주인공이 된 것처럼 무드를 중요시하고 순간순간에 막 그런 감정을 표출하고 그런 춤이고",
+      "english_guidance": "He dances waacking. He describes it as involving movements such as rotating the arms, valuing a movie-protagonist-like mood, and expressing emotion from moment to moment. The clause continues beyond this unit.",
+      "critical_units": [
+        {
+          "id": "Ni5rBtowdnI-0930-2300-waacking-01",
+          "phenomenon": "none",
+          "facts": [
+            "The dance genre is waacking.",
+            "His description mentions rotating the arms, a movie-protagonist-like mood, and expressing emotions moment by moment.",
+            "The utterance remains incomplete at the unit boundary."
+          ],
+          "catastrophic_if": [
+            "The rendering changes waacking into a different dance genre or denies that emotional expression is central to the description."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 23,
+      "t_end": 31,
+      "korean_gold": "제가 하고 있는 게 드랙을 하고 있다고 말씀드리기에는 아직 시작 단계고 저도 잘 모르고 제가 댄서 네임 킹키라고 말씀드렸잖아요.",
+      "english_guidance": "The speaker is cautious about saying that what he does is drag because he is still at an early stage and does not yet know it well. He refers back to having said that his dancer name is Kinky.",
+      "critical_units": [
+        {
+          "id": "Ni5rBtowdnI-2300-3100-drag-01",
+          "phenomenon": "none",
+          "facts": [
+            "The speaker says it is too early to characterize what he does as drag.",
+            "He says he is still a beginner and does not know it well.",
+            "He refers back to the dancer name Kinky."
+          ],
+          "catastrophic_if": [
+            "The rendering turns his explicit uncertainty and beginner status into a claim of established expertise."
+          ]
+        }
+      ]
+    },
+    {
+      "t_start": 31,
+      "t_end": 45,
+      "korean_gold": "킹키라는 새로운 존재가 돼가지고 춤을 추는 건데 내가 원하는 춤, 내가 표출하고 싶은 에너지를 보여주는 데 있어서 그런 메이크업이라든지 옷 같은 게 더 이걸 극대화시켜 줄 수 있으니까",
+      "english_guidance": "He says that dancing means becoming a new being called Kinky. Makeup and clothing can further heighten the dance he wants to perform and the energy he wants to express. The clip ends on a causal connective, so the thought is unfinished.",
+      "critical_units": [
+        {
+          "id": "Ni5rBtowdnI-3100-4500-persona-01",
+          "phenomenon": "none",
+          "facts": [
+            "Kinky is described as a new persona or being that the speaker becomes to dance.",
+            "Makeup and clothing help intensify the desired dance and expressive energy.",
+            "The thought is unfinished when the clip ends."
+          ],
+          "catastrophic_if": [
+            "The rendering treats Kinky as an unrelated third person rather than the speaker's dance persona."
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": "Audio-grounded candidate drafted from the exact bound 45-second media, with local open-weight ASR used only as a fallible navigation and transcription lead. The department name is heard as 스페인어과, and the drag term is rendered as 드랙. Human reviewers must verify both against the audio. Unreviewed and unfrozen. Prompt pack bench-gold-prompt:sha256:f69320d896191a40e869a68c7a6e0ac7c7a3d3bb61f9302c78699dba253c7a14."
+}

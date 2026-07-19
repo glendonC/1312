@@ -2,8 +2,9 @@
  * Preregister and evaluate one reviewed-memory behavioral rule against a frozen pack.
  *
  * Registration binds a training-routed miss, exact rule bytes, one scalar config delta, and a
- * complete run grid before captures exist. Evaluation cold-reopens every pair, score, and capture.
- * V1 always refuses eligibility until a host-owned single-attempt execution seam exists.
+ * complete run grid before captures exist. Evaluation cold-reopens every pair, score, capture,
+ * and optional certified single-attempt proof. Historical V1 remains refusal-only; V2 can become
+ * eligible only when the complete execution grid is host-attributed.
  */
 
 import { readdir } from "node:fs/promises";
@@ -27,6 +28,7 @@ import {
   validatePairedScoreReceipt,
   verifyPairedScoreReceipt,
 } from "./bench-paired-score.mjs";
+import { verifyExecutionAttribution } from "./bench-single-attempt.mjs";
 import {
   canonicalJson,
   contentIdForJson,
@@ -37,7 +39,8 @@ import { normalizeSourceReceipt } from "./source-receipts.mjs";
 
 export const RULE_CHANGE_SCHEMAS = Object.freeze({
   registration: "studio.bench.rule-change-registration.v1",
-  result: "studio.bench.rule-change-result.v1",
+  resultV1: "studio.bench.rule-change-result.v1",
+  result: "studio.bench.rule-change-result.v2",
 });
 
 function fail(message) {
@@ -163,14 +166,16 @@ async function validators() {
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/,
       );
       ajv.addFormat("date", /^\d{4}-\d{2}-\d{2}$/);
-      const [registration, result, capture] = await Promise.all([
+      const [registration, resultV1, result, capture] = await Promise.all([
         readJsonFile(new URL("../../bench/schemas/rule-change-registration.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/rule-change-result.schema.json", import.meta.url)),
+        readJsonFile(new URL("../../bench/schemas/rule-change-result-v2.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/capture.schema.json", import.meta.url)),
       ]);
       return {
         ajv,
         registration: ajv.compile(registration),
+        resultV1: ajv.compile(resultV1),
         result: ajv.compile(result),
         capture: ajv.compile(capture),
       };
@@ -588,7 +593,11 @@ async function validateCaptureForSide({ score, registration, plan, side, workspa
   if (score.scored_at.slice(0, 10) < capture.captured_at) {
     fail(`${context} score predates its bound capture day`);
   }
-  return { capture, headline: score.systems[registration.subject.system_id].headline };
+  return {
+    capture,
+    captureBinding: score.bindings.capture,
+    headline: score.systems[registration.subject.system_id].headline,
+  };
 }
 
 async function rejectUnplannedMatchingCaptures(registration, plannedRuns, workspaceRoot) {
@@ -657,8 +666,42 @@ async function rejectUnplannedMatchingCaptures(registration, plannedRuns, worksp
   }
 }
 
-async function deriveRuleChangeResult({ registration, registrationBinding, pairBindings, evaluatedAt, workspaceRoot }) {
+function executionProofsByRun(proofBindings, registration) {
+  const plannedRuns = new Set(
+    registration.capture_plan.flatMap((plan) => [plan.without_run, plan.with_run]),
+  );
+  const result = new Map();
+  for (const binding of proofBindings) {
+    const match = /^bench\/attempts\/([^/]+)\/attribution\.json$/.exec(binding.path);
+    if (!match || !plannedRuns.has(match[1])) {
+      fail(`execution proof path is not one preregistered canonical attempt: ${binding.path}`);
+    }
+    if (result.has(match[1])) fail(`rule change result repeats execution proof for ${match[1]}`);
+    result.set(match[1], binding);
+  }
+  return result;
+}
+
+function sameBinding(left, right) {
+  return left.path === right.path && left.content_id === right.content_id && left.bytes === right.bytes;
+}
+
+async function deriveRuleChangeResult({
+  registration,
+  registrationBinding,
+  pairBindings,
+  proofBindings = [],
+  evaluatedAt,
+  workspaceRoot,
+  resultSchema = RULE_CHANGE_SCHEMAS.result,
+}) {
   await validateRuleChangeRegistration(registration, { workspaceRoot });
+  if (!new Set([RULE_CHANGE_SCHEMAS.resultV1, RULE_CHANGE_SCHEMAS.result]).has(resultSchema)) {
+    fail(`rule change result schema ${String(resultSchema)} is not registered`);
+  }
+  if (resultSchema === RULE_CHANGE_SCHEMAS.resultV1 && proofBindings.length > 0) {
+    fail("historical V1 results cannot carry execution proofs");
+  }
   const expectedRegistrationPath = `bench/rule-changes/${registration.slug}/registration.json`;
   if (registrationBinding.path !== expectedRegistrationPath) {
     fail(`rule change registration path must be ${expectedRegistrationPath}`);
@@ -670,6 +713,7 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
   if (pairBindings.length !== registration.capture_plan.length) {
     fail(`rule change result requires ${registration.capture_plan.length} preregistered pairs`);
   }
+  const proofByRun = executionProofsByRun(proofBindings, registration);
 
   const plansByRuns = new Map(
     registration.capture_plan.map((plan) => [`${plan.without_run}\0${plan.with_run}`, plan]),
@@ -682,6 +726,30 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
   const clipRates = new Map();
   let lostCorrectUnits = 0;
   let newCatastrophicUnits = 0;
+  const seenAttempts = new Set();
+  let verifiedExecutionCount = 0;
+
+  const executionFor = async (run, side, captureBinding) => {
+    const binding = proofByRun.get(run);
+    if (!binding) return null;
+    await verifiedBinding(binding, workspaceRoot, `rule change ${run} execution proof`);
+    const proof = await verifyExecutionAttribution(binding.path, {
+      workspaceRoot,
+      registration,
+      expectedRegistration: registrationBinding,
+      expectedRun: run,
+      expectedSide: side,
+      expectedCapture: captureBinding,
+      validateRegistration: validateRuleChangeRegistration,
+    });
+    if (!sameBinding(proof.receipt, binding)) {
+      fail(`rule change ${run} execution proof differs from its recorded bytes`);
+    }
+    if (seenAttempts.has(proof.attempt_id)) fail(`attempt ${proof.attempt_id} appears more than once`);
+    seenAttempts.add(proof.attempt_id);
+    verifiedExecutionCount += 1;
+    return proof;
+  };
 
   for (const binding of pairBindings) {
     if (!/^bench\/scores\/pairs\/[^/]+\.json$/.test(binding.path)) {
@@ -767,6 +835,16 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
       workspaceRoot,
       context: `pair ${pair.pair_id} with`,
     });
+    const withoutExecution = await executionFor(
+      plan.without_run,
+      "without",
+      without.captureBinding,
+    );
+    const withExecution = await executionFor(
+      plan.with_run,
+      "with",
+      withSide.captureBinding,
+    );
     withoutHeadlines.push(without.headline);
     withHeadlines.push(withSide.headline);
     const rates = clipRates.get(plan.clip_id) ?? { without: [], with: [] };
@@ -775,14 +853,19 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
     clipRates.set(plan.clip_id, rates);
     lostCorrectUnits += pair.regressions.length;
     newCatastrophicUnits += pair.catastrophic_regressions.length;
-    rows.push({
+    const row = {
       clip_id: plan.clip_id,
       repetition: plan.repetition,
       without_run: plan.without_run,
       with_run: plan.with_run,
       receipt: binding,
       pair_id: pair.pair_id,
-    });
+    };
+    if (resultSchema === RULE_CHANGE_SCHEMAS.result) {
+      row.without_execution = withoutExecution;
+      row.with_execution = withExecution;
+    }
+    rows.push(row);
   }
 
   if (seenPlans.size !== registration.capture_plan.length) fail("rule change result omits a preregistered pair");
@@ -819,6 +902,9 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
   const ranges = byClip.flatMap((row) => [row.without_range, row.with_range]);
   const observedFloor = ranges.some((value) => value === null) ? null : Math.max(...ranges);
   const allRatesMeasurable = criticalRateDelta !== null && observedFloor !== null;
+  const completeExecutionGrid =
+    resultSchema === RULE_CHANGE_SCHEMAS.result &&
+    verifiedExecutionCount === registration.capture_plan.length * 2;
   const checks = {
     complete_preregistered_grid: true,
     all_rates_measurable: allRatesMeasurable,
@@ -828,8 +914,8 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
       allRatesMeasurable && criticalRateDelta > observedFloor,
     catastrophic_non_increase: withSide.catastrophic_count <= without.catastrophic_count,
     no_new_catastrophic_units: newCatastrophicUnits === 0,
-    single_attempt_proven: false,
-    execution_attribution_proven: false,
+    single_attempt_proven: completeExecutionGrid,
+    execution_attribution_proven: completeExecutionGrid,
   };
   const reasons = [];
   if (!checks.all_rates_measurable) reasons.push("critical meaning rates or within-condition variance are not measurable");
@@ -845,7 +931,7 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
   }
   const qualified = Object.values(checks).every(Boolean);
   const body = {
-    schema: RULE_CHANGE_SCHEMAS.result,
+    schema: resultSchema,
     registration: {
       receipt: registrationBinding,
       registration_id: registration.registration_id,
@@ -876,7 +962,9 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
     },
     judge: null,
     notes:
-      "Mechanical evaluation only. V1 refuses promotion because no host-owned single-attempt and execution-attribution receipt exists. This receipt does not prove a later run consumed the rule.",
+      resultSchema === RULE_CHANGE_SCHEMAS.resultV1
+        ? "Mechanical evaluation only. Historical V1 refuses promotion because no host-owned single-attempt and execution-attribution receipt exists. This receipt does not prove a later run consumed the rule."
+        : "Mechanical evaluation only. V2 verifies certified single-attempt execution when every capture carries a cold-reopenable proof. Eligibility is only for later human review and does not prove deployment, generalization, or a later run consuming the rule.",
   };
   const result = { result_id: resultId(body), ...body };
   await validateRuleChangeResult(result);
@@ -884,10 +972,11 @@ async function deriveRuleChangeResult({ registration, registrationBinding, pairB
 }
 
 export async function materializeRuleChangeResult(
-  { registrationPath, pairPaths },
+  { registrationPath, pairPaths, proofPaths = [] },
   { workspaceRoot = process.cwd(), evaluatedAt = new Date().toISOString() } = {},
 ) {
   if (!Array.isArray(pairPaths) || pairPaths.length === 0) fail("rule change result requires pair paths");
+  if (!Array.isArray(proofPaths)) fail("rule change execution proof paths must be an array");
   const recordedRegistrationPath = requiredText(registrationPath, "registration path");
   const registration = await readJsonFile(resolveFile(recordedRegistrationPath, workspaceRoot), "rule change registration");
   const registrationBinding = await fileReceipt(
@@ -899,18 +988,29 @@ export async function materializeRuleChangeResult(
     const recordedPath = requiredText(path, "pair path");
     pairBindings.push(await fileReceipt(resolveFile(recordedPath, workspaceRoot), recordedPath));
   }
+  const proofBindings = [];
+  for (const path of proofPaths) {
+    const recordedPath = requiredText(path, "execution proof path");
+    proofBindings.push(await fileReceipt(resolveFile(recordedPath, workspaceRoot), recordedPath));
+  }
   return deriveRuleChangeResult({
     registration,
     registrationBinding,
     pairBindings,
+    proofBindings,
     evaluatedAt,
     workspaceRoot,
   });
 }
 
 export async function validateRuleChangeResult(result, context = "rule change result") {
-  await schemaCheck(result, "result", context);
-  if (result.schema !== RULE_CHANGE_SCHEMAS.result) fail(`${context} schema is not registered`);
+  const schemaName = result?.schema === RULE_CHANGE_SCHEMAS.resultV1
+    ? "resultV1"
+    : result?.schema === RULE_CHANGE_SCHEMAS.result
+      ? "result"
+      : null;
+  if (!schemaName) fail(`${context} schema is not registered`);
+  await schemaCheck(result, schemaName, context);
   exactTimestamp(result.evaluated_at, `${context}.evaluated_at`);
   if (result.result_id !== resultId(result)) fail(`${context} result_id does not match its immutable contents`);
   const passed = Object.values(result.qualification.checks).every(Boolean);
@@ -943,8 +1043,14 @@ export async function verifyRuleChangeResult(resultValue, { workspaceRoot = proc
     registration,
     registrationBinding: result.registration.receipt,
     pairBindings: result.pairs.map((pair) => pair.receipt),
+    proofBindings: result.schema === RULE_CHANGE_SCHEMAS.result
+      ? result.pairs.flatMap((pair) => [pair.without_execution, pair.with_execution])
+          .filter((proof) => proof !== null)
+          .map((proof) => proof.receipt)
+      : [],
     evaluatedAt: result.evaluated_at,
     workspaceRoot,
+    resultSchema: result.schema,
   });
   if (contentIdForJson(rederived) !== contentIdForJson(result)) {
     fail("stored result does not rederive from its registered grid and bound bytes");

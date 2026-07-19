@@ -7,16 +7,19 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import { validateAblationRegistration } from "./lib/bench-ablation.mjs";
+import { resolveCertifiedRelease } from "./lib/bench-certified-release.mjs";
 import {
   compareSubjectScores,
   validatePairedScoreReceipt,
   verifyPairedScoreReceipt,
 } from "./lib/bench-paired-score.mjs";
 import {
+  RULE_CHANGE_SCHEMAS,
   validateRuleChangeRegistration,
   validateRuleChangeResult,
   verifyRuleChangeResult,
 } from "./lib/bench-rule-change.mjs";
+import { auditSingleAttemptCharges } from "./lib/bench-single-attempt.mjs";
 import {
   assertCommitDescends,
   firstAdditionCommit,
@@ -294,6 +297,18 @@ const ruleChangeResultSchema = JSON.parse(
   readFileSync(new URL("../bench/schemas/rule-change-result.schema.json", import.meta.url), "utf8"),
 );
 const validateRuleChangeResultSchema = ajv.compile(ruleChangeResultSchema);
+const ruleChangeResultV2Schema = JSON.parse(
+  readFileSync(new URL("../bench/schemas/rule-change-result-v2.schema.json", import.meta.url), "utf8"),
+);
+const validateRuleChangeResultV2Schema = ajv.compile(ruleChangeResultV2Schema);
+for (const schemaName of [
+  "certified-release.schema.json",
+  "execution-input.schema.json",
+  "single-attempt-charge.schema.json",
+  "execution-attribution.schema.json",
+]) {
+  ajv.compile(JSON.parse(readFileSync(new URL(`../bench/schemas/${schemaName}`, import.meta.url), "utf8")));
+}
 const captures = [];
 
 // The schema is loaded unconditionally: a missing capture schema must crash the check, not
@@ -662,6 +677,23 @@ if (existsSync(pairsDir)) {
 }
 console.log(`paired score check passed: ${pairedScoresChecked} immutable pair receipt(s)`);
 
+const releasesDir = join(ROOT, "bench/releases");
+let certifiedReleasesChecked = 0;
+if (existsSync(releasesDir)) {
+  for (const entry of readdirSync(releasesDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    await resolveCertifiedRelease(`bench/releases/${entry.name}`, {
+      workspaceRoot: ROOT,
+      validateRegistration: validateRuleChangeRegistration,
+    });
+    certifiedReleasesChecked += 1;
+  }
+}
+const singleAttemptCharges = await auditSingleAttemptCharges({ workspaceRoot: ROOT });
+console.log(
+  `certified execution check passed: ${certifiedReleasesChecked} release(s), ${singleAttemptCharges.length} charged attempt(s)`,
+);
+
 const ruleChangesDir = join(ROOT, "bench/rule-changes");
 let ruleChangeRegistrationsChecked = 0;
 let ruleChangeResultsChecked = 0;
@@ -687,9 +719,12 @@ if (existsSync(ruleChangesDir)) {
       await readJsonFile(resultPath, `rule change result ${entry.name}`),
       `rule change result ${entry.name}`,
     );
+    const validateResultSchema = result.schema === RULE_CHANGE_SCHEMAS.resultV1
+      ? validateRuleChangeResultSchema
+      : validateRuleChangeResultV2Schema;
     assert(
-      validateRuleChangeResultSchema(result),
-      `rule change result ${entry.name} schema: ${ajv.errorsText(validateRuleChangeResultSchema.errors)}`,
+      validateResultSchema(result),
+      `rule change result ${entry.name} schema: ${ajv.errorsText(validateResultSchema.errors)}`,
     );
     await verifyRuleChangeResult(result, { workspaceRoot: ROOT });
     assert(
@@ -739,6 +774,7 @@ if (existsSync(ruleChangesDir)) {
     });
     const result = await readJsonFile(join(ROOT, resultPath), `rule change result ${entry.name}`);
     const pairCommits = [];
+    const executionCommits = [];
     for (const row of result.pairs) {
       const pairCommit = immutableArtifactCommit(row.receipt.path, {
         workspaceRoot: ROOT,
@@ -776,6 +812,38 @@ if (existsSync(ruleChangesDir)) {
           workspaceRoot: ROOT,
           context: `rule change ${entry.name} pair ${row.pair_id}`,
         });
+        const execution = row[`${side}_execution`];
+        if (execution) {
+          const attributionCommit = immutableArtifactCommit(execution.receipt.path, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} execution attribution`,
+          });
+          const attribution = await readJsonFile(
+            join(ROOT, execution.receipt.path),
+            `rule change ${entry.name} ${side} execution attribution`,
+          );
+          const inputCommit = immutableArtifactCommit(attribution.execution_input.path, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} execution input`,
+          });
+          const chargeCommit = immutableArtifactCommit(attribution.charge.path, {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} attempt charge`,
+          });
+          const input = await readJsonFile(
+            join(ROOT, attribution.execution_input.path),
+            `rule change ${entry.name} ${side} execution input`,
+          );
+          const releaseCommit = immutableArtifactAfter(
+            registrationCommit,
+            input.release.receipt.path,
+            {
+              workspaceRoot: ROOT,
+              context: `rule change ${entry.name} ${side} certified release`,
+            },
+          );
+          executionCommits.push(attributionCommit, inputCommit, chargeCommit, releaseCommit);
+        }
       }
     }
     const resultCommit = firstAdditionCommit(resultPath, { workspaceRoot: ROOT });
@@ -788,6 +856,12 @@ if (existsSync(ruleChangesDir)) {
         assertCommitDescends(pairCommit, resultCommit, {
           workspaceRoot: ROOT,
           context: `rule change result ${entry.name}`,
+        });
+      }
+      for (const executionCommit of new Set(executionCommits)) {
+        assertCommitDescends(executionCommit, resultCommit, {
+          workspaceRoot: ROOT,
+          context: `rule change result ${entry.name} execution proof`,
         });
       }
     }

@@ -13,6 +13,7 @@ function usage(message = null) {
   console.error(`Usage:
   node scripts/qualify-rule-change.mjs \\
     --registration <registration.json> --pair <pair.json> [--pair <pair.json> ...] \\
+    [--proof <attribution.json> ...] \\
     --out <result.json>
 `);
   process.exit(1);
@@ -38,12 +39,24 @@ function many(name) {
   return values;
 }
 
+function optionalMany(name) {
+  const values = [];
+  for (let index = 0; index < process.argv.length; index += 1) {
+    if (process.argv[index] !== `--${name}`) continue;
+    const value = process.argv[index + 1];
+    if (!value || value.startsWith("--")) usage(`--${name} requires a value`);
+    values.push(value);
+  }
+  return values;
+}
+
 async function main() {
   const registrationPath = one("registration");
   const pairPaths = many("pair");
+  const proofPaths = optionalMany("proof");
   const out = one("out");
   const result = await materializeRuleChangeResult(
-    { registrationPath, pairPaths },
+    { registrationPath, pairPaths, proofPaths },
     { workspaceRoot: ROOT },
   );
   const state = await writeImmutableJson(resolve(ROOT, out), result);

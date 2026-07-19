@@ -1,5 +1,9 @@
-/* Real-structure Results: the header chrome (title + Details / Run details), the media|transcript
-   split, and the completed-viewer modes. Reuses the existing .player and .cue styles. */
+/*
+ * Results chrome and completed viewer layout.
+ * Owns: .result-title-chip, .result-chrome-*, .result-viewer / .result-main split, viewer modes.
+ * Must not: shared .player transport (results.player.css); Dock; Focus shell.
+ * Header seats (.results-title-seat, .results-control-seat) live in studio.css.
+ */
 
 /* ---------- header chrome (rendered in .top, so it aligns with the home mark) ---------- */
 

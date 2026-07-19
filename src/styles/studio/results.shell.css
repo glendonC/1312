@@ -1,4 +1,8 @@
-/* The result: the player, the captions it will stand behind, and the scores. */
+/*
+ * Results shell: completed-run viewport, act padding, submitted-source boundary.
+ * Owns: .results, .act-results, .submitted-results-*.
+ * Must not: header chrome (.result-chrome-*, seats in studio.css); shared player rules.
+ */
 
 /* ---------- the completed-run viewing surface ---------- */
 

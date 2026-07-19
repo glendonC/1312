@@ -1,3 +1,8 @@
+/*
+ * Results caption list (reading column), not burn-in on the player.
+ * Owns: .cues, .cue*, transcript list states.
+ * Must not: .burn on-player captions (results.player.css); learning explanation sheets.
+ */
 
 /* captions */
 

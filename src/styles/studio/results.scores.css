@@ -1,3 +1,8 @@
+/*
+ * Results score disclosure cards.
+ * Owns: .scores and related score/caveat presentation.
+ * Must not: learning workspace; player; header chrome.
+ */
 
 /* scores */
 

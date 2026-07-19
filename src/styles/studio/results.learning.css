@@ -1,3 +1,9 @@
+/*
+ * Learning Results body under .result-main.
+ * Owns: .learning-workspace and learning explanation / facet UI.
+ * Must not: header chrome; shared player transport; production caption-results identity.
+ */
+
 .learning-workspace {
   display: flex;
   width: 100%;

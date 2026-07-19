@@ -1,4 +1,8 @@
-/* The worker's environment at compact and expanded-focus scales. */
+/*
+ * Worker environment at compact cell and expanded focus density.
+ * Owns: .env field layout shared across scales.
+ * Must not: Results chrome; Dock; redefine Focus shell stacking.
+ */
 
 /* ---------- the worker's environment ---------- */
 

@@ -1,3 +1,8 @@
+/*
+ * Results responsive overrides only.
+ * Owns: narrow breakpoints for submitted boundary, player chrome density, learning shell.
+ * Must not: Dock or Workspace breakpoints (those stay in their *.responsive.css sheets).
+ */
 
 /* ---------- responsive ---------- */
 

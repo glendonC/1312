@@ -1,4 +1,8 @@
-/* Source entry before a run, and the single global control while a run is active. */
+/*
+ * Dock shell and canvas well for input/run acts.
+ * Owns: .act-input, .canvas well, dock shell stacking.
+ * Must not: Results chrome; Focus panel; shared player rules.
+ */
 
 .act-input {
   position: relative;

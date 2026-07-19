@@ -1,3 +1,8 @@
+/*
+ * Dock responsive overrides only.
+ * Owns: narrow dock bar, hold, layout/parameters placement.
+ * Must not: Results or Workspace breakpoints.
+ */
 
 @media (max-width: 720px) {
   .rail:not([data-terminal="true"]) {

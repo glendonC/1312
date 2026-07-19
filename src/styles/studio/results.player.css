@@ -1,3 +1,9 @@
+/*
+ * Shared recorded player surface for Results and Focus workbench.
+ * Owns: .player, .screen, .burn, transport controls, mode chips on the player.
+ * Must not: Results header chrome; learning workspace body; Dock geometry.
+ * Quarantine during Results chrome polish: edits here also hit Focus workbench.
+ */
 
 /* ---------- the screen ---------- */
 

@@ -1,5 +1,7 @@
 /*
- * Studio agent-focus surface index: shell, commands, evidence, and activity panes.
+ * Agent-focus surface index, imported by AgentPanel.tsx (not studio.css).
+ * Owns: focus shell, commands, evidence, activity panes.
+ * Must not: Results chrome; Dock geometry; load through the Studio route barrel.
  */
 
 @import "./shell.css";

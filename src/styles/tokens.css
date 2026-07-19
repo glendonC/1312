@@ -83,7 +83,10 @@
   --glass-highlight-soft: rgba(255, 255, 255, 0.46);
   --glass-highlight: rgba(255, 255, 255, 0.62);
   --glass-highlight-strong: rgba(255, 255, 255, 0.88);
+  --glass-panel: rgba(255, 255, 255, 0.92);
   --glass-reflection: rgba(255, 255, 255, 0.16);
+  /* Deep teal-black used by the shared recorded player screen and pressed mode chips. */
+  --player-deep: #10201d;
   --glass-cast-subtle: rgba(22, 29, 27, 0.025);
   --glass-cast-soft: rgba(22, 29, 27, 0.055);
   --glass-blur-compact: 16px;

@@ -111,7 +111,7 @@
   border: 1px solid var(--glass-border);
   border-radius: 17px;
   corner-shape: squircle;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--glass-panel);
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(26px) saturate(1.7);
   -webkit-backdrop-filter: blur(26px) saturate(1.7);

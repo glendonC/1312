@@ -1,0 +1,39 @@
+---
+import GlassNav from "../../components/GlassNav.astro";
+import ApiDocsShell from "../../features/api/ApiDocsShell.astro";
+import ApiGroupSection from "../../features/api/components/ApiGroupSection.astro";
+import AgentsSection from "../../features/api/sections/AgentsSection.astro";
+import AuthSection from "../../features/api/sections/AuthSection.astro";
+import ErrorsSection from "../../features/api/sections/ErrorsSection.astro";
+import ImproveSection from "../../features/api/sections/ImproveSection.astro";
+import NonClaimsSection from "../../features/api/sections/NonClaimsSection.astro";
+import ReceiptsSection from "../../features/api/sections/ReceiptsSection.astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { API_ENDPOINT_GROUPS, API_PAGES } from "../../features/api/model.ts";
+import "../../features/api/styles/index.css";
+
+export function getStaticPaths() {
+  return API_PAGES.filter((page) => page.slug !== "").map((page) => ({
+    params: { slug: page.slug },
+    props: { page },
+  }));
+}
+
+const { page } = Astro.props;
+const group = API_ENDPOINT_GROUPS.find((candidate) => candidate.id === page.slug) ?? null;
+---
+
+<SiteLayout title={`${page.title} | 1321 API`} description={page.description}>
+  <GlassNav />
+  <main class="api-page" data-palette={page.palette}>
+    <ApiDocsShell activeSlug={page.slug} eyebrow={page.group}>
+      {group !== null && <ApiGroupSection group={group} />}
+      {page.slug === "authentication" && <AuthSection />}
+      {page.slug === "errors" && <ErrorsSection />}
+      {page.slug === "receipts" && <ReceiptsSection />}
+      {page.slug === "agents" && <AgentsSection />}
+      {page.slug === "improve" && <ImproveSection />}
+      {page.slug === "non-claims" && <NonClaimsSection />}
+    </ApiDocsShell>
+  </main>
+</SiteLayout>

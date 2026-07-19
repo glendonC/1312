@@ -304,11 +304,15 @@ const ruleChangeResultV2Schema = JSON.parse(
 const validateRuleChangeResultV2Schema = ajv.compile(ruleChangeResultV2Schema);
 for (const schemaName of [
   "capture-executor.schema.json",
+  "capture-executor-v2.schema.json",
   "certified-release.schema.json",
   "execution-input.schema.json",
+  "execution-input-v2.schema.json",
   "single-attempt-charge.schema.json",
   "single-attempt-journal.schema.json",
   "execution-attribution.schema.json",
+  "execution-attribution-v2.schema.json",
+  "provider-call.schema.json",
 ]) {
   ajv.compile(JSON.parse(readFileSync(new URL(`../bench/schemas/${schemaName}`, import.meta.url), "utf8")));
 }
@@ -703,6 +707,7 @@ if (existsSync(executorsDir)) {
 }
 const singleAttemptCharges = await auditSingleAttemptCharges({
   workspaceRoot: ROOT,
+  validateRegistration: validateRuleChangeRegistration,
 });
 console.log(
   `certified execution check passed: ${certifiedReleasesChecked} release(s), ${captureExecutorsChecked} executor(s), ${singleAttemptCharges.length} charged attempt(s)`,

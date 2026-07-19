@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/execution-attribution-v2.schema.json",
+  "title": "studio.bench.execution-attribution.v2",
+  "description": "Additive provider attribution binding the exact call receipt to a successful capture outcome.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "attribution_id",
+    "completed_at",
+    "attempt_id",
+    "run",
+    "side",
+    "release_id",
+    "host_context_id",
+    "execution_input",
+    "charge",
+    "charge_journal",
+    "provider_call",
+    "capture"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.execution-attribution.v2" },
+    "attribution_id": { "type": "string", "pattern": "^bench-execution-attribution:sha256:[a-f0-9]{64}$" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "attempt_id": { "type": "string", "pattern": "^bench-attempt:sha256:[a-f0-9]{64}$" },
+    "run": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+    "side": { "enum": ["without", "with"] },
+    "release_id": { "type": "string", "pattern": "^bench-certified-release:sha256:[a-f0-9]{64}$" },
+    "host_context_id": { "type": "string", "pattern": "^bench-host-context:sha256:[a-f0-9]{64}$" },
+    "execution_input": { "$ref": "#/$defs/identifiedBinding" },
+    "charge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes", "attempt_id"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "attempt_id": { "type": "string", "pattern": "^bench-attempt:sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "charge_journal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes", "head_commit", "charge_commit"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "head_commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+        "charge_commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" }
+      }
+    },
+    "provider_call": { "$ref": "#/$defs/identifiedBinding" },
+    "capture": { "$ref": "#/$defs/identifiedBinding" }
+  },
+  "$defs": {
+    "identifiedBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes", "id"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

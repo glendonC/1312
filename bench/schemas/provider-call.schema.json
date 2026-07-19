@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/provider-call.schema.json",
+  "title": "studio.bench.provider-call.v1",
+  "description": "Immutable outcome of one charged provider transport invocation. Test-injected receipts have no live-provider proof authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "provider_call_id",
+    "attempt_id",
+    "started_at",
+    "completed_at",
+    "execution_mode",
+    "provider",
+    "operation",
+    "endpoint",
+    "method",
+    "requested_model",
+    "host_context_id",
+    "media",
+    "prompt",
+    "request",
+    "http_status",
+    "provider_request_id",
+    "response",
+    "outcome",
+    "failure_code",
+    "transport_invocations",
+    "retries"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.provider-call.v1" },
+    "provider_call_id": { "type": "string", "pattern": "^bench-provider-call:sha256:[a-f0-9]{64}$" },
+    "attempt_id": { "type": "string", "pattern": "^bench-attempt:sha256:[a-f0-9]{64}$" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "execution_mode": { "enum": ["live_openai", "test_injected"] },
+    "provider": { "const": "openai" },
+    "operation": { "const": "audio_translation" },
+    "endpoint": { "const": "https://api.openai.com/v1/audio/translations" },
+    "method": { "const": "POST" },
+    "requested_model": { "const": "whisper-1" },
+    "host_context_id": { "type": "string", "pattern": "^bench-host-context:sha256:[a-f0-9]{64}$" },
+    "media": { "$ref": "#/$defs/contentBinding" },
+    "prompt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_id", "bytes", "rule_content_id"],
+      "properties": {
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "rule_content_id": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "request": { "$ref": "#/$defs/contentBinding" },
+    "http_status": { "type": ["integer", "null"], "minimum": 100, "maximum": 599 },
+    "provider_request_id": { "type": ["string", "null"], "minLength": 1 },
+    "response": {
+      "oneOf": [
+        { "$ref": "#/$defs/fileBinding" },
+        { "$ref": "#/$defs/emptyResponseBinding" },
+        { "type": "null" }
+      ]
+    },
+    "outcome": { "enum": ["success", "failed"] },
+    "failure_code": {
+      "type": ["string", "null"],
+      "enum": [
+        null,
+        "provider_timeout",
+        "provider_rate_limited",
+        "provider_http_error",
+        "provider_transport_failed",
+        "provider_invalid_output",
+        "provider_response_limit_exceeded"
+      ]
+    },
+    "transport_invocations": { "const": 1 },
+    "retries": { "const": 0 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "success" } } },
+      "then": {
+        "properties": {
+          "http_status": { "type": "integer", "minimum": 200, "maximum": 299 },
+          "response": { "$ref": "#/$defs/fileBinding" },
+          "failure_code": { "type": "null" }
+        }
+      },
+      "else": {
+        "properties": {
+          "failure_code": { "type": "string" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "contentBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_id", "bytes"],
+      "properties": {
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^bench/attempts/[A-Za-z0-9][A-Za-z0-9._-]*/provider-response\\.json$" },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "emptyResponseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_id", "bytes"],
+      "properties": {
+        "content_id": { "const": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
+        "bytes": { "const": 0 }
+      }
+    }
+  }
+}

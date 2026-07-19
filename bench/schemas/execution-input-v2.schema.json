@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/execution-input-v2.schema.json",
+  "title": "studio.bench.execution-input.v2",
+  "description": "Provider-capable single-attempt input bound before the provider call is charged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "execution_input_id",
+    "created_at",
+    "attempt_id",
+    "registration",
+    "release",
+    "executor",
+    "plan",
+    "source",
+    "host_context_id"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.execution-input.v2" },
+    "execution_input_id": { "type": "string", "pattern": "^bench-execution-input:sha256:[a-f0-9]{64}$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "attempt_id": { "type": "string", "pattern": "^bench-attempt:sha256:[a-f0-9]{64}$" },
+    "registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt", "registration_id"],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "registration_id": { "type": "string", "pattern": "^bench-rule-change-registration:sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt", "release_id"],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "release_id": { "type": "string", "pattern": "^bench-certified-release:sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "executor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt", "executor_id", "adapter_id", "host_content_id", "implementation_content_id"],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "executor_id": { "type": "string", "pattern": "^bench-capture-executor:sha256:[a-f0-9]{64}$" },
+        "adapter_id": { "const": "openai_audio_translation_v1" },
+        "host_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "implementation_content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run", "clip_id", "repetition", "side"],
+      "properties": {
+        "run": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "clip_id": { "type": "string", "minLength": 1 },
+        "repetition": { "type": "integer", "minimum": 1 },
+        "side": { "enum": ["without", "with"] }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clip_id", "artifact"],
+      "properties": {
+        "clip_id": { "type": "string", "minLength": 1 },
+        "artifact": { "$ref": "#/$defs/fileBinding" }
+      }
+    },
+    "host_context_id": { "type": "string", "pattern": "^bench-host-context:sha256:[a-f0-9]{64}$" }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

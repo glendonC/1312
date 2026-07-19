@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, readdir, readFile, writeFile, mkdir } from "node:fs/promises";
-import { isAbsolute, resolve, dirname } from "node:path";
+import { basename, isAbsolute, resolve, dirname } from "node:path";
 
 import Ajv2020 from "ajv/dist/2020.js";
 
@@ -16,6 +16,14 @@ import {
 import { executeDeterministicFixture } from "./bench-adapters/deterministic-fixture-v1.mjs";
 import { executeDeterministicFixtureFailure } from "./bench-adapters/deterministic-fixture-failure-v1.mjs";
 import { executeDeterministicFixtureStaleConfig } from "./bench-adapters/deterministic-fixture-stale-config-v1.mjs";
+import {
+  buildOpenAIAudioTranslationRequest,
+  captureFromOpenAIAudioTranslation,
+  executeOpenAIAudioTranslation,
+  materializeProviderCallReceipt,
+  preflightOpenAIAudioTranslation,
+  PROVIDER_CALL_SCHEMA,
+} from "./bench-adapters/openai-audio-translation-v1.mjs";
 import { resolveCertifiedRelease } from "./bench-certified-release.mjs";
 import { assertCommitDescends, immutableArtifactCommit } from "./bench-git-evidence.mjs";
 import { readJsonFile, verifiedBinding } from "./bench-gold.mjs";
@@ -27,8 +35,10 @@ import {
 
 export const SINGLE_ATTEMPT_SCHEMAS = Object.freeze({
   input: "studio.bench.execution-input.v1",
+  inputProvider: "studio.bench.execution-input.v2",
   charge: "studio.bench.single-attempt-charge.v1",
   attribution: "studio.bench.execution-attribution.v1",
+  attributionProvider: "studio.bench.execution-attribution.v2",
   journal: "studio.bench.single-attempt-journal.v1",
 });
 
@@ -100,6 +110,8 @@ export function singleAttemptPaths(runValue) {
     input: `${base}/execution-input.json`,
     charge: `${base}/charge.json`,
     journal: `${base}/journal.json`,
+    providerCall: `${base}/provider-call.json`,
+    providerResponse: `${base}/provider-response.json`,
     attribution: `${base}/attribution.json`,
     capture: `bench/runs/${run}/capture.json`,
   };
@@ -110,6 +122,17 @@ async function writeOnceJson(path, value, context) {
   await mkdir(dirname(path), { recursive: true });
   try {
     await writeFile(path, rendered, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if (error?.code === "EEXIST") fail(`${context} already exists; the preregistered slot is spent`);
+    throw error;
+  }
+}
+
+async function writeOnceBytes(path, value, context) {
+  if (!Buffer.isBuffer(value) || value.length === 0) fail(`${context} must be non-empty bytes`);
+  await mkdir(dirname(path), { recursive: true });
+  try {
+    await writeFile(path, value, { flag: "wx" });
   } catch (error) {
     if (error?.code === "EEXIST") fail(`${context} already exists; the preregistered slot is spent`);
     throw error;
@@ -232,14 +255,13 @@ function commitChargeEvidence(paths, run, headCommit, workspaceRoot) {
   return chargeCommit;
 }
 
-function commitAttemptOutcome(paths, run, chargeCommit, workspaceRoot) {
-  const outcomePaths = [paths.capture, paths.attribution];
+function commitAttemptOutcome(outcomePaths, run, chargeCommit, workspaceRoot, message = `Record rule change attempt ${run}`) {
   git(["add", "--", ...outcomePaths], {
     workspaceRoot,
     context: "stage exact attempt outcome evidence",
   });
   git(
-    ["commit", "--only", "-m", `Record rule change attempt ${run}`, "--", ...outcomePaths],
+    ["commit", "--only", "-m", message, "--", ...outcomePaths],
     { workspaceRoot, context: "commit exact attempt outcome evidence" },
   );
   const outcomeCommit = git(["rev-parse", "HEAD"], {
@@ -278,19 +300,25 @@ async function validators() {
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/,
       );
       ajv.addFormat("date", /^\d{4}-\d{2}-\d{2}$/);
-      const [input, charge, journal, attribution, capture] = await Promise.all([
+      const [input, inputProvider, charge, journal, attribution, attributionProvider, providerCall, capture] = await Promise.all([
         readJsonFile(new URL("../../bench/schemas/execution-input.schema.json", import.meta.url)),
+        readJsonFile(new URL("../../bench/schemas/execution-input-v2.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/single-attempt-charge.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/single-attempt-journal.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/execution-attribution.schema.json", import.meta.url)),
+        readJsonFile(new URL("../../bench/schemas/execution-attribution-v2.schema.json", import.meta.url)),
+        readJsonFile(new URL("../../bench/schemas/provider-call.schema.json", import.meta.url)),
         readJsonFile(new URL("../../bench/schemas/capture.schema.json", import.meta.url)),
       ]);
       return {
         ajv,
         input: ajv.compile(input),
+        inputProvider: ajv.compile(inputProvider),
         charge: ajv.compile(charge),
         journal: ajv.compile(journal),
         attribution: ajv.compile(attribution),
+        attributionProvider: ajv.compile(attributionProvider),
+        providerCall: ajv.compile(providerCall),
         capture: ajv.compile(capture),
       };
     })();
@@ -307,7 +335,11 @@ async function schemaCheck(value, name, context) {
 }
 
 export async function validateExecutionInput(input, context = "execution input") {
-  await schemaCheck(input, "input", context);
+  await schemaCheck(
+    input,
+    input?.schema === SINGLE_ATTEMPT_SCHEMAS.inputProvider ? "inputProvider" : "input",
+    context,
+  );
   exactTimestamp(input.created_at, `${context}.created_at`);
   if (input.execution_input_id !== executionInputId(input)) {
     fail(`${context} id does not match its immutable contents`);
@@ -340,7 +372,13 @@ export async function validateSingleAttemptJournal(journal, context = "single-at
 }
 
 export async function validateExecutionAttribution(attribution, context = "execution attribution") {
-  await schemaCheck(attribution, "attribution", context);
+  await schemaCheck(
+    attribution,
+    attribution?.schema === SINGLE_ATTEMPT_SCHEMAS.attributionProvider
+      ? "attributionProvider"
+      : "attribution",
+    context,
+  );
   exactTimestamp(attribution.completed_at, `${context}.completed_at`);
   if (attribution.attribution_id !== attributionId(attribution)) {
     fail(`${context} id does not match its immutable contents`);
@@ -349,6 +387,19 @@ export async function validateExecutionAttribution(attribution, context = "execu
     fail(`${context} attempt id differs from its charge`);
   }
   return attribution;
+}
+
+export async function validateProviderCall(providerCall, context = "provider call") {
+  await schemaCheck(providerCall, "providerCall", context);
+  exactTimestamp(providerCall.started_at, `${context}.started_at`);
+  exactTimestamp(providerCall.completed_at, `${context}.completed_at`);
+  if (Date.parse(providerCall.completed_at) < Date.parse(providerCall.started_at)) {
+    fail(`${context} completion predates its start`);
+  }
+  const { provider_call_id: _id, ...body } = providerCall;
+  const expectedId = `bench-provider-call:${contentIdForJson({ provider_call_id: null, ...body })}`;
+  if (providerCall.provider_call_id !== expectedId) fail(`${context} id does not match its immutable contents`);
+  return providerCall;
 }
 
 async function validatedRegistration(path, workspaceRoot, validateRegistration) {
@@ -376,18 +427,64 @@ function validateCaptureForInvocation(capture, { registration, release, plan, ru
   }
 }
 
-function executeHostOwnedAdapter(adapterId, invocation, completedAt) {
+async function clipDescriptor(registration, clipId, workspaceRoot) {
+  const pack = await readJsonFile(
+    resolve(workspaceRoot, registration.pack.manifest.path),
+    "single-attempt pack manifest",
+  );
+  const matches = pack.clips?.filter((clip) => clip.clip_id === clipId) ?? [];
+  if (matches.length !== 1) fail(`frozen pack does not describe one clip ${clipId}`);
+  const source = matches[0].source;
+  if (!source || typeof source !== "object" || typeof source.duration !== "number" || source.duration <= 0) {
+    fail(`frozen pack clip ${clipId} has no exact positive duration`);
+  }
+  const text = (value) => typeof value === "string" ? value : "";
+  return {
+    durationS: source.duration,
+    lang: "ko",
+    pair: "ko->en",
+    source: {
+      kind: text(source.kind),
+      url: text(source.url),
+      channel: text(source.channel),
+      licence: text(source.licence),
+      window: source.window && typeof source.window === "object" ? structuredClone(source.window) : null,
+      attribution: text(source.attribution),
+    },
+  };
+}
+
+function providerAdapter(adapterId) {
+  return adapterId === "openai_audio_translation_v1";
+}
+
+async function executeHostOwnedAdapter(
+  adapterId,
+  invocation,
+  completedAt,
+  { providerExecution, providerResponsePath },
+) {
+  if (providerAdapter(adapterId)) {
+    const injectedCompletion = providerExecution?.mode === "test" ? completedAt : null;
+    return executeOpenAIAudioTranslation(invocation, providerExecution, {
+      startedAt: injectedCompletion
+        ? injectedCompletion
+        : new Date().toISOString(),
+      now: () => injectedCompletion ?? new Date().toISOString(),
+      providerResponsePath,
+    });
+  }
   if (invocation.hostContext.config.model !== "deterministic-fixture") {
     fail(`capture adapter ${adapterId} cannot execute ${String(invocation.hostContext.config.model)}`);
   }
   if (adapterId === "deterministic_fixture_v1") {
-    return executeDeterministicFixture(invocation, completedAt);
+    return { ok: true, capture: executeDeterministicFixture(invocation, completedAt), evidence: null };
   }
   if (adapterId === "deterministic_fixture_failure_v1") {
-    return executeDeterministicFixtureFailure(invocation, completedAt);
+    return { ok: true, capture: executeDeterministicFixtureFailure(invocation, completedAt), evidence: null };
   }
   if (adapterId === "deterministic_fixture_stale_config_v1") {
-    return executeDeterministicFixtureStaleConfig(invocation, completedAt);
+    return { ok: true, capture: executeDeterministicFixtureStaleConfig(invocation, completedAt), evidence: null };
   }
   fail(`capture adapter ${adapterId} is not host-owned`);
 }
@@ -399,6 +496,7 @@ export async function runSingleAttempt(
     chargedAt = new Date().toISOString(),
     completedAt = null,
     validateRegistration,
+    providerExecution = null,
   } = {},
 ) {
   exactKeys(
@@ -457,12 +555,36 @@ export async function runSingleAttempt(
       "single-attempt host adapter implementation",
     ),
   ]);
+  const usesProvider = providerAdapter(resolvedExecutor.executor.adapter_id);
+  const invocation = deepFreeze({
+    attemptId,
+    run,
+    clipId: plan.clip_id,
+    repetition: plan.repetition,
+    side,
+    source: {
+      contentId: sourceBinding.content_id,
+      bytes: sourceBinding.bytes,
+      dataBase64: sourceBytes.toString("base64"),
+      ...(usesProvider ? { filename: basename(sourceBinding.path) } : {}),
+    },
+    ...(usesProvider ? { clip: await clipDescriptor(registration, plan.clip_id, workspaceRoot) } : {}),
+    hostContext: structuredClone(resolved.hostContext),
+  });
+  if (usesProvider) {
+    preflightOpenAIAudioTranslation(invocation, providerExecution);
+    if (completedAt !== null && providerExecution?.mode !== "test") {
+      fail("provider completion time injection is test-only");
+    }
+  } else if (providerExecution !== null) {
+    fail("provider execution authority was supplied to a non-provider adapter");
+  }
   const at = exactTimestamp(chargedAt, "attempt charged_at");
   if (Date.parse(at) < Date.parse(resolved.release.created_at)) {
     fail("attempt charge predates its certified release");
   }
   const inputBody = {
-    schema: SINGLE_ATTEMPT_SCHEMAS.input,
+    schema: usesProvider ? SINGLE_ATTEMPT_SCHEMAS.inputProvider : SINGLE_ATTEMPT_SCHEMAS.input,
     created_at: at,
     attempt_id: attemptId,
     registration: {
@@ -517,26 +639,61 @@ export async function runSingleAttempt(
   const chargeCommit = commitChargeEvidence(paths, run, chargeJournal.head_commit, workspaceRoot);
   chargeJournal = { ...chargeJournal, charge_commit: chargeCommit };
 
-  const invocation = deepFreeze({
-    attemptId,
-    run,
-    clipId: plan.clip_id,
-    repetition: plan.repetition,
-    side,
-    source: {
-      contentId: sourceBinding.content_id,
-      bytes: sourceBinding.bytes,
-      dataBase64: sourceBytes.toString("base64"),
-    },
-    hostContext: structuredClone(resolved.hostContext),
-  });
-  const finishedAt = exactTimestamp(completedAt ?? new Date().toISOString(), "attempt completed_at");
-  if (Date.parse(finishedAt) < Date.parse(at)) fail("attempt completed_at predates its charge");
-  const capture = executeHostOwnedAdapter(
+  if (completedAt !== null && Date.parse(exactTimestamp(completedAt, "attempt completed_at")) < Date.parse(at)) {
+    fail("attempt completed_at predates its charge");
+  }
+  const adapterCompletedAt = usesProvider
+    ? completedAt
+    : exactTimestamp(completedAt ?? new Date().toISOString(), "attempt completed_at");
+  const adapterOutcome = await executeHostOwnedAdapter(
     resolvedExecutor.executor.adapter_id,
     invocation,
-    finishedAt,
+    adapterCompletedAt,
+    { providerExecution, providerResponsePath: paths.providerResponse },
   );
+  let providerCall = null;
+  let providerCallBinding = null;
+  let providerResponseBinding = null;
+  if (usesProvider) {
+    if (Buffer.isBuffer(adapterOutcome.responseBytes) && adapterOutcome.responseBytes.length > 0) {
+      await writeOnceBytes(
+        resolve(workspaceRoot, paths.providerResponse),
+        adapterOutcome.responseBytes,
+        "provider response",
+      );
+      providerResponseBinding = await fileReceipt(
+        resolve(workspaceRoot, paths.providerResponse),
+        paths.providerResponse,
+      );
+    } else if (Buffer.isBuffer(adapterOutcome.responseBytes)) {
+      providerResponseBinding = byteContentBinding(adapterOutcome.responseBytes);
+    }
+    providerCall = materializeProviderCallReceipt(adapterOutcome.evidence, providerResponseBinding);
+    await validateProviderCall(providerCall);
+    await writeOnceJson(resolve(workspaceRoot, paths.providerCall), providerCall, "provider call");
+    providerCallBinding = await fileReceipt(resolve(workspaceRoot, paths.providerCall), paths.providerCall);
+    if (!adapterOutcome.ok) {
+      const failedPaths = [
+        ...(providerResponseBinding?.path ? [paths.providerResponse] : []),
+        paths.providerCall,
+      ];
+      const outcomeCommit = commitAttemptOutcome(
+        failedPaths,
+        run,
+        chargeCommit,
+        workspaceRoot,
+        `Record failed provider attempt ${run}`,
+      );
+      const error = new Error(`provider attempt failed after charge: ${adapterOutcome.failureCode}`);
+      error.code = adapterOutcome.failureCode;
+      error.outcomeCommit = outcomeCommit;
+      throw error;
+    }
+  }
+  const finishedAt = usesProvider
+    ? providerCall.completed_at
+    : adapterCompletedAt;
+  const capture = adapterOutcome.capture;
   await schemaCheck(capture, "capture", "executor capture");
   validateCaptureForInvocation(capture, {
     registration,
@@ -551,7 +708,9 @@ export async function runSingleAttempt(
     fail("executor capture date differs from the host completion date");
   }
   const attributionBody = {
-    schema: SINGLE_ATTEMPT_SCHEMAS.attribution,
+    schema: usesProvider
+      ? SINGLE_ATTEMPT_SCHEMAS.attributionProvider
+      : SINGLE_ATTEMPT_SCHEMAS.attribution,
     completed_at: finishedAt,
     attempt_id: attemptId,
     run,
@@ -567,6 +726,14 @@ export async function runSingleAttempt(
       attempt_id: attemptId,
     },
     charge_journal: chargeJournal,
+    ...(usesProvider
+      ? {
+          provider_call: {
+            ...providerCallBinding,
+            id: providerCall.provider_call_id,
+          },
+        }
+      : {}),
     capture: {
       ...captureBinding,
       id: capture.capture_id,
@@ -575,13 +742,17 @@ export async function runSingleAttempt(
   const attribution = { attribution_id: attributionId(attributionBody), ...attributionBody };
   await validateExecutionAttribution(attribution);
   await writeOnceJson(resolve(workspaceRoot, paths.attribution), attribution, "execution attribution");
-  const outcomeCommit = commitAttemptOutcome(paths, run, chargeCommit, workspaceRoot);
+  const outcomePaths = usesProvider
+    ? [paths.providerResponse, paths.providerCall, paths.capture, paths.attribution]
+    : [paths.capture, paths.attribution];
+  const outcomeCommit = commitAttemptOutcome(outcomePaths, run, chargeCommit, workspaceRoot);
   return {
     input,
     charge,
     chargeJournal,
     outcomeCommit,
     attribution,
+    providerCall,
     paths,
   };
 }
@@ -595,6 +766,28 @@ function exactBytesBinding(bytes, binding) {
     bytes.length === binding.bytes &&
     `sha256:${createHash("sha256").update(bytes).digest("hex")}` === binding.content_id
   );
+}
+
+function byteContentBinding(bytes) {
+  if (!Buffer.isBuffer(bytes)) fail("provider response content must be bytes");
+  return {
+    content_id: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+    bytes: bytes.length,
+  };
+}
+
+function sameContentBinding(left, right) {
+  return left.content_id === right.content_id && left.bytes === right.bytes;
+}
+
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 function fileBindingOnly(binding) {
@@ -625,6 +818,7 @@ export async function verifyExecutionAttribution(
   const attribution = await validateExecutionAttribution(
     await readJsonFile(resolve(workspaceRoot, recordedPath), "execution attribution"),
   );
+  const providerAttribution = attribution.schema === SINGLE_ATTEMPT_SCHEMAS.attributionProvider;
   if (attribution.run !== run || attribution.side !== expectedSide) {
     fail("execution attribution names a different preregistered slot");
   }
@@ -637,6 +831,31 @@ export async function verifyExecutionAttribution(
     attribution.capture.path !== paths.capture
   ) {
     fail("execution attribution does not use canonical attempt paths");
+  }
+  let providerCall = null;
+  if (providerAttribution) {
+    if (attribution.provider_call.path !== paths.providerCall) {
+      fail("provider execution attribution does not use its canonical provider call path");
+    }
+    await verifiedBinding(fileBindingOnly(attribution.provider_call), workspaceRoot, "provider call");
+    providerCall = await validateProviderCall(
+      await readJsonFile(resolve(workspaceRoot, attribution.provider_call.path), "provider call"),
+    );
+    if (
+      attribution.provider_call.id !== providerCall.provider_call_id ||
+      providerCall.attempt_id !== attribution.attempt_id ||
+      providerCall.host_context_id !== attribution.host_context_id ||
+      providerCall.completed_at !== attribution.completed_at ||
+      providerCall.outcome !== "success" ||
+      providerCall.failure_code !== null ||
+      providerCall.execution_mode !== "live_openai"
+    ) {
+      fail("provider call cannot prove one successful live provider execution");
+    }
+    if (!providerCall.response || providerCall.response.path !== paths.providerResponse) {
+      fail("provider call does not bind its canonical response artifact");
+    }
+    await verifiedBinding(providerCall.response, workspaceRoot, "provider response");
   }
   if (!expectedCapture || !exactBinding(attribution.capture, expectedCapture)) {
     fail("execution attribution capture differs from the score-bound capture bytes");
@@ -666,7 +885,11 @@ export async function verifyExecutionAttribution(
     attribution.charge_journal,
     workspaceRoot,
   );
-  const outcomeCommits = [attribution.capture.path, recordedPath]
+  const outcomeCommits = [
+    attribution.capture.path,
+    recordedPath,
+    ...(providerAttribution ? [attribution.provider_call.path, providerCall.response.path] : []),
+  ]
     .map((path) => immutableArtifactCommit(path, {
       workspaceRoot,
       context: `attempt outcome evidence ${path}`,
@@ -714,6 +937,52 @@ export async function verifyExecutionAttribution(
   ) {
     fail("execution input differs from its closed host-owned capture adapter");
   }
+  if (providerAttribution) {
+    if (!providerAdapter(resolvedExecutor.executor.adapter_id) || input.schema !== SINGLE_ATTEMPT_SCHEMAS.inputProvider) {
+      fail("provider attribution does not use the provider execution input and adapter");
+    }
+    const sourceBytes = await readFile(resolve(workspaceRoot, input.source.artifact.path));
+    if (!exactBytesBinding(sourceBytes, input.source.artifact)) {
+      fail("provider execution source bytes differ from their certified identity");
+    }
+    const providerInvocation = deepFreeze({
+      attemptId: attribution.attempt_id,
+      run,
+      clipId: input.plan.clip_id,
+      repetition: input.plan.repetition,
+      side: expectedSide,
+      source: {
+        contentId: input.source.artifact.content_id,
+        bytes: input.source.artifact.bytes,
+        dataBase64: sourceBytes.toString("base64"),
+        filename: basename(input.source.artifact.path),
+      },
+      clip: await clipDescriptor(registration, input.plan.clip_id, workspaceRoot),
+      hostContext: structuredClone(resolved.hostContext),
+    });
+    const expectedRequest = buildOpenAIAudioTranslationRequest(providerInvocation);
+    if (
+      providerCall.request.content_id !== expectedRequest.request.content_id ||
+      providerCall.request.bytes !== expectedRequest.request.bytes ||
+      canonicalJson(providerCall.prompt) !== canonicalJson(expectedRequest.prompt) ||
+      providerCall.media.content_id !== input.source.artifact.content_id ||
+      providerCall.media.bytes !== input.source.artifact.bytes ||
+      providerCall.requested_model !== resolved.hostContext.config.model
+    ) {
+      fail("provider call request differs from the exact certified media, model, prompt, or rule bytes");
+    }
+    const responseBytes = await readFile(resolve(workspaceRoot, providerCall.response.path));
+    const expectedCaptureObject = captureFromOpenAIAudioTranslation(providerInvocation, responseBytes, {
+      startedAt: providerCall.started_at,
+      completedAt: providerCall.completed_at,
+      providerResponsePath: providerCall.response.path,
+    });
+    if (canonicalJson(expectedCaptureObject) !== canonicalJson(capture)) {
+      fail("provider capture differs from the exact provider response bytes");
+    }
+  } else if (providerAdapter(resolvedExecutor.executor.adapter_id)) {
+    fail("provider adapter execution is missing provider attribution");
+  }
   if (
     !exactBinding(input.release.receipt, resolved.binding) ||
     input.release.release_id !== resolved.release.release_id ||
@@ -756,8 +1025,160 @@ export async function verifyExecutionAttribution(
   };
 }
 
+function validateProviderFailureSemantics(providerCall, context) {
+  const { failure_code: code, http_status: status } = providerCall;
+  if (code === "provider_rate_limited" && status !== 429) {
+    fail(`${context} rate-limit failure does not carry HTTP 429`);
+  }
+  if (
+    code === "provider_http_error" &&
+    (status === null || status === 429 || (status >= 200 && status < 300))
+  ) {
+    fail(`${context} HTTP failure does not carry a non-2xx, non-429 status`);
+  }
+  if (
+    new Set(["provider_invalid_output", "provider_response_limit_exceeded"]).has(code) &&
+    status !== null &&
+    (status < 200 || status >= 300)
+  ) {
+    fail(`${context} output failure carries a non-success HTTP status`);
+  }
+  if (new Set(["provider_timeout", "provider_transport_failed"]).has(code) && status !== null) {
+    fail(`${context} transport failure unexpectedly carries an HTTP status`);
+  }
+}
+
+async function auditProviderOutcome(item, journal, workspaceRoot, validateRegistration) {
+  if (item.input.schema !== SINGLE_ATTEMPT_SCHEMAS.inputProvider) return;
+  const run = item.charge.slot.run;
+  const paths = singleAttemptPaths(run);
+  const providerCallPath = resolve(workspaceRoot, paths.providerCall);
+  if (!await pathExists(providerCallPath)) return;
+  const providerCall = await validateProviderCall(
+    await readJsonFile(providerCallPath, `provider call ${run}`),
+    `provider call ${run}`,
+  );
+  if (
+    providerCall.attempt_id !== item.charge.attempt_id ||
+    providerCall.host_context_id !== item.input.host_context_id ||
+    item.input.executor.adapter_id !== "openai_audio_translation_v1" ||
+    !sameContentBinding(providerCall.media, item.input.source.artifact)
+  ) {
+    fail(`provider call ${run} differs from its charged execution input`);
+  }
+  const outcomePaths = [paths.providerCall];
+  if (providerCall.response?.path) {
+    if (providerCall.response.path !== paths.providerResponse) {
+      fail(`provider call ${run} does not use its canonical response path`);
+    }
+    await verifiedBinding(providerCall.response, workspaceRoot, `provider call ${run} response`);
+    outcomePaths.push(paths.providerResponse);
+  }
+  const outcomeCommits = outcomePaths.map((path) => immutableArtifactCommit(path, {
+    workspaceRoot,
+    context: `provider call ${run} outcome ${path}`,
+  }));
+  if (new Set(outcomeCommits).size !== 1) {
+    fail(`provider call ${run} receipt and response do not share one immutable outcome commit`);
+  }
+  assertCommitDescends(journal.charge_commit, outcomeCommits[0], {
+    workspaceRoot,
+    context: `provider call ${run} outcome chronology`,
+  });
+  if (providerCall.outcome !== "failed") return;
+  validateProviderFailureSemantics(providerCall, `provider call ${run}`);
+  if (
+    new Set(["provider_rate_limited", "provider_http_error", "provider_invalid_output"]).has(
+      providerCall.failure_code,
+    ) &&
+    providerCall.response === null
+  ) {
+    fail(`provider call ${run} dropped the exact HTTP response identity`);
+  }
+  if (
+    new Set(["provider_timeout", "provider_transport_failed"]).has(providerCall.failure_code) &&
+    providerCall.response !== null
+  ) {
+    fail(`provider call ${run} invents response bytes for a transport failure`);
+  }
+  if (
+    await pathExists(resolve(workspaceRoot, paths.capture)) ||
+    await pathExists(resolve(workspaceRoot, paths.attribution))
+  ) {
+    fail(`failed provider call ${run} cannot carry capture or attribution evidence`);
+  }
+  if (typeof validateRegistration !== "function") return;
+  const { registration, binding: registrationBinding } = await validatedRegistration(
+    item.input.registration.receipt.path,
+    workspaceRoot,
+    validateRegistration,
+  );
+  if (
+    item.input.registration.registration_id !== registration.registration_id ||
+    !exactBinding(item.input.registration.receipt, registrationBinding)
+  ) {
+    fail(`provider call ${run} registration differs from its charged execution input`);
+  }
+  const resolved = await resolveCertifiedRelease(item.input.release.receipt.path, {
+    workspaceRoot,
+    validateRegistration,
+  });
+  if (
+    item.input.release.release_id !== resolved.release.release_id ||
+    !exactBinding(item.input.release.receipt, resolved.binding) ||
+    resolved.hostContext.context_id !== item.input.host_context_id ||
+    providerCall.requested_model !== resolved.hostContext.config.model
+  ) {
+    fail(`provider call ${run} release or model differs from its charged execution input`);
+  }
+  const resolvedExecutor = await resolveCaptureExecutorAtCommit(
+    item.input.executor.receipt.path,
+    journal.head_commit,
+    { workspaceRoot },
+  );
+  if (
+    !exactBinding(item.input.executor.receipt, resolvedExecutor.binding) ||
+    item.input.executor.executor_id !== resolvedExecutor.executor.executor_id ||
+    item.input.executor.adapter_id !== resolvedExecutor.executor.adapter_id ||
+    resolvedExecutor.executor.adapter_id !== "openai_audio_translation_v1"
+  ) {
+    fail(`provider call ${run} executor differs from its precharge certified bytes`);
+  }
+  await verifiedBinding(item.input.source.artifact, workspaceRoot, `provider call ${run} source`);
+  const sourceRows = resolved.evaluationSources.filter(
+    (source) => source.clip_id === item.input.plan.clip_id,
+  );
+  if (sourceRows.length !== 1 || !exactBinding(item.input.source.artifact, sourceRows[0].artifact)) {
+    fail(`provider call ${run} source differs from its certified release`);
+  }
+  const sourceBytes = await readFile(resolve(workspaceRoot, item.input.source.artifact.path));
+  const invocation = deepFreeze({
+    attemptId: item.charge.attempt_id,
+    run,
+    clipId: item.input.plan.clip_id,
+    repetition: item.input.plan.repetition,
+    side: item.input.plan.side,
+    source: {
+      contentId: item.input.source.artifact.content_id,
+      bytes: item.input.source.artifact.bytes,
+      dataBase64: sourceBytes.toString("base64"),
+      filename: basename(item.input.source.artifact.path),
+    },
+    clip: await clipDescriptor(registration, item.input.plan.clip_id, workspaceRoot),
+    hostContext: structuredClone(resolved.hostContext),
+  });
+  const expected = buildOpenAIAudioTranslationRequest(invocation);
+  if (
+    !sameContentBinding(providerCall.request, expected.request) ||
+    canonicalJson(providerCall.prompt) !== canonicalJson(expected.prompt)
+  ) {
+    fail(`provider call ${run} request differs from the certified media, prompt, or rule bytes`);
+  }
+}
+
 export async function auditSingleAttemptCharges({
   workspaceRoot = process.cwd(),
+  validateRegistration = null,
 } = {}) {
   const attemptsRoot = resolve(workspaceRoot, "bench/attempts");
   let entries = [];
@@ -820,6 +1241,7 @@ export async function auditSingleAttemptCharges({
     charges.push({
       path,
       charge,
+      input,
       binding: await fileReceipt(resolve(workspaceRoot, path), path),
     });
   }
@@ -830,19 +1252,21 @@ export async function auditSingleAttemptCharges({
       `single-attempt journal ${item.charge.attempt_id}`,
     );
     const journalBinding = await fileReceipt(resolve(workspaceRoot, journalPath), journalPath);
+    const verifiedJournal = {
+      ...journalBinding,
+      head_commit: journal.head_commit,
+      charge_commit: immutableArtifactCommit(item.path, {
+        workspaceRoot,
+        context: `single-attempt charge ${item.charge.slot.run}`,
+      }),
+    };
     await verifyChargeJournal(
       item.charge,
       item.binding,
-      {
-        ...journalBinding,
-        head_commit: journal.head_commit,
-        charge_commit: immutableArtifactCommit(item.path, {
-          workspaceRoot,
-          context: `single-attempt charge ${item.charge.slot.run}`,
-        }),
-      },
+      verifiedJournal,
       workspaceRoot,
     );
+    await auditProviderOutcome(item, verifiedJournal, workspaceRoot, validateRegistration);
   }
   return charges;
 }

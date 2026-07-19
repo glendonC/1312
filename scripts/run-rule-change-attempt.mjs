@@ -13,7 +13,10 @@ function usage(message = null) {
   console.error(`Usage:
   node scripts/run-rule-change-attempt.mjs \\
     --registration <registration.json> --release <release.json> \\
-    --executor <executor.json> --run <run-id> --side <without|with>
+    --executor <executor.json> --run <run-id> --side <without|with> \\
+    [--allow-live-provider]
+
+Provider execution additionally requires STUDIO_BENCH_PROVIDER_MODE=live and OPENAI_API_KEY.
 `);
   process.exit(1);
 }
@@ -27,6 +30,15 @@ function one(name) {
 }
 
 async function main() {
+  const allowLiveProvider = process.argv.includes("--allow-live-provider");
+  const providerExecution = allowLiveProvider
+    ? {
+        mode: "live",
+        allowLive: true,
+        environment: process.env.STUDIO_BENCH_PROVIDER_MODE,
+        apiKey: process.env.OPENAI_API_KEY,
+      }
+    : null;
   const state = await runSingleAttempt(
     {
       registrationPath: one("registration"),
@@ -35,7 +47,11 @@ async function main() {
       run: one("run"),
       side: one("side"),
     },
-    { workspaceRoot: ROOT, validateRegistration: validateRuleChangeRegistration },
+    {
+      workspaceRoot: ROOT,
+      validateRegistration: validateRuleChangeRegistration,
+      providerExecution,
+    },
   );
   console.log(`${state.attribution.attribution_id}\n${state.paths.attribution}`);
 }

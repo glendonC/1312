@@ -14,11 +14,13 @@ import {
 } from "./immutable-receipts.mjs";
 
 export const CAPTURE_EXECUTOR_SCHEMA = "studio.bench.capture-executor.v1";
+export const CAPTURE_EXECUTOR_PROVIDER_SCHEMA = "studio.bench.capture-executor.v2";
 export const CAPTURE_HOST_IMPLEMENTATION_PATH = "scripts/lib/bench-single-attempt.mjs";
 export const CAPTURE_ADAPTER_IMPLEMENTATIONS = Object.freeze({
   deterministic_fixture_v1: "scripts/lib/bench-adapters/deterministic-fixture-v1.mjs",
   deterministic_fixture_failure_v1: "scripts/lib/bench-adapters/deterministic-fixture-failure-v1.mjs",
   deterministic_fixture_stale_config_v1: "scripts/lib/bench-adapters/deterministic-fixture-stale-config-v1.mjs",
+  openai_audio_translation_v1: "scripts/lib/bench-adapters/openai-audio-translation-v1.mjs",
 });
 
 function fail(message) {
@@ -42,12 +44,22 @@ let validatorPromise;
 async function validator() {
   if (!validatorPromise) {
     validatorPromise = (async () => {
-      const schema = await readJsonFile(
-        new URL("../../bench/schemas/capture-executor.schema.json", import.meta.url),
-        "capture executor schema",
-      );
+      const [schema, providerSchema] = await Promise.all([
+        readJsonFile(
+          new URL("../../bench/schemas/capture-executor.schema.json", import.meta.url),
+          "capture executor schema",
+        ),
+        readJsonFile(
+          new URL("../../bench/schemas/capture-executor-v2.schema.json", import.meta.url),
+          "provider capture executor schema",
+        ),
+      ]);
       const ajv = new Ajv2020({ allErrors: true, strict: true });
-      return { ajv, validate: ajv.compile(schema) };
+      return {
+        ajv,
+        validate: ajv.compile(schema),
+        validateProvider: ajv.compile(providerSchema),
+      };
     })();
   }
   return validatorPromise;
@@ -63,8 +75,11 @@ export function captureExecutorPath(executor) {
 
 export async function validateCaptureExecutor(executor, context = "capture executor") {
   const held = await validator();
-  if (!held.validate(executor)) {
-    fail(`${context} failed schema validation:\n${held.ajv.errorsText(held.validate.errors, { separator: "\n" })}`);
+  const validate = executor?.schema === CAPTURE_EXECUTOR_PROVIDER_SCHEMA
+    ? held.validateProvider
+    : held.validate;
+  if (!validate(executor)) {
+    fail(`${context} failed schema validation:\n${held.ajv.errorsText(validate.errors, { separator: "\n" })}`);
   }
   if (executor.executor_id !== executorId(executor)) fail(`${context} id does not match its immutable contents`);
   repositoryPath(executor.implementation.path, `${context} implementation path`);
@@ -128,7 +143,9 @@ export async function materializeCaptureExecutor(
   const implementationPath = CAPTURE_ADAPTER_IMPLEMENTATIONS[adapterId];
   if (!implementationPath) fail(`capture adapter ${String(adapterId)} is not host-owned`);
   const body = {
-    schema: CAPTURE_EXECUTOR_SCHEMA,
+    schema: adapterId === "openai_audio_translation_v1"
+      ? CAPTURE_EXECUTOR_PROVIDER_SCHEMA
+      : CAPTURE_EXECUTOR_SCHEMA,
     adapter_id: adapterId,
     host: await fileReceipt(
       resolve(workspaceRoot, CAPTURE_HOST_IMPLEMENTATION_PATH),

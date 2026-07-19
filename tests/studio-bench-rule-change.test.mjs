@@ -23,6 +23,7 @@ import {
   auditSingleAttemptCharges,
   runSingleAttempt,
   singleAttemptPaths,
+  validateProviderCall,
   verifyExecutionAttribution,
 } from "../scripts/lib/bench-single-attempt.mjs";
 import {
@@ -81,6 +82,7 @@ async function fixture({
   variantRates = [1, 1, 1],
   variantCatastrophic = [0, 0, 0],
   buildGrid = true,
+  providerAdapter = false,
 } = {}) {
   const workspace = await mkdtemp(join(tmpdir(), "studio-rule-change-"));
   const runId = "training-origin-run";
@@ -143,7 +145,9 @@ async function fixture({
 
   const packId = "fixture-pack";
   const evaluationClip = "evaluation-clip";
-  const evaluationSourcePath = "bench/inputs/evaluation-clip.bin";
+  const evaluationSourcePath = providerAdapter
+    ? "bench/inputs/evaluation-clip.mp4"
+    : "bench/inputs/evaluation-clip.bin";
   await mkdir(dirname(join(workspace, evaluationSourcePath)), { recursive: true });
   await writeFile(join(workspace, evaluationSourcePath), "synthetic evaluation media bytes\n");
   const evaluationSourceBinding = await fileReceipt(
@@ -237,6 +241,11 @@ async function fixture({
         source: {
           kind: "owned",
           note: "Synthetic test source.",
+          duration: 30,
+          url: "https://example.test/evaluation-fixture",
+          channel: "fixture",
+          licence: "Owned fixture",
+          attribution: "Fixture owner",
           local_copy: evaluationSourceBinding,
         },
         gold_path: "fixture-gold.json",
@@ -264,14 +273,34 @@ async function fixture({
   });
   const proposalPath = relative(workspace, proposalState.path);
   const ruleContentId = contentIdForJson(proposalState.proposal.value);
-  const baselineConfig = {
-    model: "deterministic-fixture",
-    reviewed_memory: { rule_content_id: null },
+  const providerConfig = {
+    id: "openai",
+    operation: "audio_translation",
+    response_format: "verbose_json",
+    temperature: 0,
+    timeout_ms: 20,
+    max_response_bytes: 4096,
   };
-  const variantConfig = {
-    model: "deterministic-fixture",
-    reviewed_memory: { rule_content_id: ruleContentId },
-  };
+  const baselineConfig = providerAdapter
+    ? {
+        model: "whisper-1",
+        provider: providerConfig,
+        reviewed_memory: { rule_content_id: null },
+      }
+    : {
+        model: "deterministic-fixture",
+        reviewed_memory: { rule_content_id: null },
+      };
+  const variantConfig = providerAdapter
+    ? {
+        model: "whisper-1",
+        provider: providerConfig,
+        reviewed_memory: { rule_content_id: ruleContentId },
+      }
+    : {
+        model: "deterministic-fixture",
+        reviewed_memory: { rule_content_id: ruleContentId },
+      };
   const draft = {
     schema: RULE_CHANGE_SCHEMAS.registration,
     slug: "fixture-rule-change",
@@ -463,7 +492,7 @@ async function fixture({
   }
   const executor = await materializeCaptureExecutor(
     {
-      adapterId: "deterministic_fixture_v1",
+      adapterId: providerAdapter ? "openai_audio_translation_v1" : "deterministic_fixture_v1",
       notes: "Synthetic executor for deterministic contract tests only.",
     },
     { workspaceRoot: workspace },
@@ -792,6 +821,221 @@ test("failed single attempt remains charged and duplicate attempt ids fail close
       { workspaceRoot: held.workspace, validateRegistration: validateRuleChangeRegistration },
     ),
     /names a deleted charge/,
+  );
+});
+
+test("provider adapter is gated before charge and test transport cannot become live execution proof", async (t) => {
+  const held = await fixture({ buildGrid: false, providerAdapter: true });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const run = held.registration.capture_plan[0].without_run;
+  const paths = singleAttemptPaths(run);
+
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run,
+        side: "without",
+      },
+      {
+        workspaceRoot: held.workspace,
+        chargedAt: "2026-07-20T00:00:00.000Z",
+        completedAt: "2026-07-20T00:01:00.000Z",
+        validateRegistration: validateRuleChangeRegistration,
+      },
+    ),
+    /provider execution must be an object/,
+  );
+  await assert.rejects(access(join(held.workspace, paths.charge)));
+
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run,
+        side: "without",
+      },
+      {
+        workspaceRoot: held.workspace,
+        chargedAt: "2026-07-20T00:00:00.000Z",
+        completedAt: "2026-07-21T00:00:00.000Z",
+        validateRegistration: validateRuleChangeRegistration,
+        providerExecution: {
+          mode: "live",
+          allowLive: true,
+          environment: "live",
+          apiKey: "test-key-never-sent",
+        },
+      },
+    ),
+    /completion time injection is test-only/,
+  );
+  await assert.rejects(access(join(held.workspace, paths.charge)));
+
+  let calls = 0;
+  const response = Buffer.from(JSON.stringify({
+    text: "Verification.",
+    language: "korean",
+    duration: 30,
+    segments: [{ start: 0, end: 1, text: "Verification." }],
+  }));
+  const state = await runSingleAttempt(
+    {
+      registrationPath: held.registrationPath,
+      releasePath: without.path,
+      executorManifestPath: held.executorPath,
+      run,
+      side: "without",
+    },
+    {
+      workspaceRoot: held.workspace,
+      chargedAt: "2026-07-20T00:00:00.000Z",
+      completedAt: "2026-07-20T00:01:00.000Z",
+      validateRegistration: validateRuleChangeRegistration,
+      providerExecution: {
+        mode: "test",
+        transport: async () => {
+          calls += 1;
+          return { status: 200, headers: { "x-request-id": "req_host_fixture" }, body: response };
+        },
+      },
+    },
+  );
+  assert.equal(calls, 1);
+  assert.equal(state.providerCall.execution_mode, "test_injected");
+  await validateProviderCall(await json(join(held.workspace, paths.providerCall)));
+  await access(join(held.workspace, paths.providerResponse));
+  await access(join(held.workspace, paths.capture));
+  await access(join(held.workspace, paths.attribution));
+  await assert.rejects(
+    verifyExecutionAttribution(paths.attribution, {
+      workspaceRoot: held.workspace,
+      registration: held.registration,
+      expectedRegistration: await fileReceipt(
+        join(held.workspace, held.registrationPath),
+        held.registrationPath,
+      ),
+      expectedRun: run,
+      expectedSide: "without",
+      expectedCapture: await fileReceipt(join(held.workspace, paths.capture), paths.capture),
+      validateRegistration: validateRuleChangeRegistration,
+    }),
+    /cannot prove one successful live provider execution/,
+  );
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run,
+        side: "without",
+      },
+      {
+        workspaceRoot: held.workspace,
+        validateRegistration: validateRuleChangeRegistration,
+        providerExecution: {
+          mode: "test",
+          transport: async () => {
+            calls += 1;
+            return { status: 200, headers: {}, body: response };
+          },
+        },
+      },
+    ),
+    /slot is spent|already charged/,
+  );
+  assert.equal(calls, 1);
+});
+
+test("provider failure commits its exact receipt and leaves the charged slot spent", async (t) => {
+  const held = await fixture({ buildGrid: false, providerAdapter: true });
+  t.after(() => rm(held.workspace, { recursive: true, force: true }));
+  const without = await certifyFixtureSide(held, "without");
+  const run = held.registration.capture_plan[0].without_run;
+  const paths = singleAttemptPaths(run);
+  let calls = 0;
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run,
+        side: "without",
+      },
+      {
+        workspaceRoot: held.workspace,
+        chargedAt: "2026-07-20T00:00:00.000Z",
+        completedAt: "2026-07-20T00:01:00.000Z",
+        validateRegistration: validateRuleChangeRegistration,
+        providerExecution: {
+          mode: "test",
+          transport: async () => {
+            calls += 1;
+            return { status: 429, headers: { "x-request-id": "req_rate_fixture" }, body: Buffer.alloc(0) };
+          },
+        },
+      },
+    ),
+    /provider_rate_limited/,
+  );
+  assert.equal(calls, 1);
+  await access(join(held.workspace, paths.charge));
+  await assert.rejects(access(join(held.workspace, paths.providerResponse)));
+  const providerCall = await validateProviderCall(await json(join(held.workspace, paths.providerCall)));
+  assert.equal(providerCall.failure_code, "provider_rate_limited");
+  assert.equal(providerCall.http_status, 429);
+  assert.equal(providerCall.provider_request_id, "req_rate_fixture");
+  assert.equal(providerCall.response.bytes, 0);
+  await assert.rejects(access(join(held.workspace, paths.capture)));
+  await assert.rejects(access(join(held.workspace, paths.attribution)));
+  await assert.rejects(
+    runSingleAttempt(
+      {
+        registrationPath: held.registrationPath,
+        releasePath: without.path,
+        executorManifestPath: held.executorPath,
+        run,
+        side: "without",
+      },
+      {
+        workspaceRoot: held.workspace,
+        validateRegistration: validateRuleChangeRegistration,
+        providerExecution: {
+          mode: "test",
+          transport: async () => {
+            calls += 1;
+            return { status: 200, headers: {}, body: Buffer.from('{"text":"retry"}') };
+          },
+        },
+      },
+    ),
+    /slot is spent|already charged/,
+  );
+  assert.equal(calls, 1);
+
+  const { provider_call_id: _providerCallId, ...tamperedBody } = providerCall;
+  tamperedBody.provider_request_id = "req_forged_after_commit";
+  const tampered = {
+    provider_call_id: `bench-provider-call:${contentIdForJson({
+      provider_call_id: null,
+      ...tamperedBody,
+    })}`,
+    ...tamperedBody,
+  };
+  await writeFile(join(held.workspace, paths.providerCall), `${JSON.stringify(tampered, null, 2)}\n`);
+  await assert.rejects(
+    auditSingleAttemptCharges({
+      workspaceRoot: held.workspace,
+      validateRegistration: validateRuleChangeRegistration,
+    }),
+    /uncommitted or changed after its evidence commit/,
   );
 });
 

@@ -64,7 +64,7 @@ test.beforeEach(async ({ page }) => {
 
 async function openLab(page: Page): Promise<void> {
   await page.goto("/studio/?lab=1");
-  await expect(page.getByRole("button", { name: "Preview YouTube with recorded demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Preview a YouTube link with recorded demo" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Studio trace lab" })).toBeVisible();
 }
 
@@ -79,6 +79,19 @@ function readout(page: Page) {
 function productStudioUrl(): string {
   const runtimeHost = process.env.STUDIO_RUNTIME_HOST_URL;
   return runtimeHost ? `/studio/?runtimeHost=${encodeURIComponent(runtimeHost)}` : "/studio/";
+}
+
+async function openSourceChooser(page: Page): Promise<Locator> {
+  const trigger = page.getByRole("button", { name: "Choose source: local or recorded" });
+  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
+  const panel = page.getByRole("dialog", { name: "Choose a Studio source" });
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+async function chooseSource(page: Page, name: string): Promise<void> {
+  const panel = await openSourceChooser(page);
+  await panel.getByRole("button", { name, exact: true }).click();
 }
 
 async function finishPreparation(page: Page, previewMode = true, keyboard = false): Promise<void> {
@@ -110,7 +123,7 @@ async function startSubmittedPreview(
   page: Page,
   source = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
 ): Promise<void> {
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill(source);
   await page.keyboard.press("Enter");
   await finishPreparation(page);
@@ -217,8 +230,9 @@ async function renderedDifference(
 
 test("the lab is opt-in during development", async ({ page }) => {
   await page.goto("/studio/");
-  await expect(page.getByRole("button", { name: "Preview YouTube with recorded demo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Owned file local ingest" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Preview a YouTube link with recorded demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose source: local or recorded" })).toBeVisible();
+  await expect((await openSourceChooser(page)).getByRole("button", { name: "Process a file I own locally" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Studio trace lab" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Local runtime host" })).toHaveCount(0);
 
@@ -231,7 +245,7 @@ test("the lab is opt-in during development", async ({ page }) => {
 
 test("the default Studio exposes a separate owned-source operator path", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Owned file local ingest" }).click();
+  await chooseSource(page, "Process a file I own locally");
 
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await expect(productRuntime).toBeVisible();
@@ -247,15 +261,15 @@ test("the default Studio exposes a separate owned-source operator path", async (
   await expect(productRuntime.getByRole("button", { name: "Connect to local host", exact: true })).toBeDisabled();
 
   await productRuntime.getByRole("button", { name: "Exit setup" }).click();
-  await expect(page.getByRole("button", { name: "Preview YouTube with recorded demo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Explore run-006 recorded demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Preview a YouTube link with recorded demo" })).toBeVisible();
+  await expect((await openSourceChooser(page)).getByRole("button", { name: "Explore the recorded run-006 demo" })).toBeVisible();
 });
 
 test("recorded and owned setup paths share the centered staged panel", async ({ page }) => {
   await page.goto("/studio/");
   const dockBefore = await page.locator(".studio-source-dock").boundingBox();
 
-  await page.getByRole("button", { name: "Explore run-006 recorded demo" }).click();
+  await chooseSource(page, "Explore the recorded run-006 demo");
   const recorded = page.locator('.preflight[data-preview-mode="recorded-demo"]');
   const recordedPanel = recorded.locator(".preflight-stage-panel");
   await expect(recorded.locator(".preflight-stage-nav button")).toHaveCount(6);
@@ -278,7 +292,7 @@ test("recorded and owned setup paths share the centered staged panel", async ({ 
 
   await page.goto("/studio/");
 
-  await page.getByRole("button", { name: "Owned file local ingest" }).click();
+  await chooseSource(page, "Process a file I own locally");
   const owned = page.getByRole("region", { name: "Owned local source" });
   await expect(owned.locator(".preflight-stage-nav button")).toHaveCount(6);
   await expect(owned.locator(".preflight-stage-panel")).toBeVisible();
@@ -350,7 +364,7 @@ test("owned browser media requires rights, registers, and continues through the 
   test.skip(!token, "requires an operator-started deterministic runtime host");
 
   await page.goto(productStudioUrl());
-  await page.getByRole("button", { name: "Owned file local ingest" }).click();
+  await chooseSource(page, "Process a file I own locally");
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await productRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
   await productRuntime.getByRole("button", { name: "Connect to local host" }).click();
@@ -394,7 +408,7 @@ test("the product path reviews and freezes an exact local forecast without enter
   test.skip(!token, "requires an operator-started deterministic runtime host");
 
   await page.goto(productStudioUrl());
-  await page.getByRole("button", { name: "Owned file local ingest" }).click();
+  await chooseSource(page, "Process a file I own locally");
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
   await productRuntime.getByLabel("Paste-once bearer token").fill(token ?? "");
   await productRuntime.getByRole("button", { name: "Connect to local host" }).click();
@@ -473,9 +487,21 @@ test("the lab starts and polls an explicitly running deterministic host without 
 test("the input stage introduces the orchestrator before asking for a source", async ({ page }) => {
   await page.goto("/studio/");
 
-  await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
-  await expect(page.getByText(/sit back and watch it come together/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Explore run-006 recorded demo" })).toBeVisible();
+  const heading = page.getByRole("heading", {
+    name: "Welcome to Studio. Add a source when you’re ready. We’ll take it from there, so you can sit back and watch it come together.",
+  });
+  const sourceTrigger = page.getByRole("button", { name: "Choose source: local or recorded" });
+  const sourcePanel = page.getByRole("dialog", { name: "Choose a Studio source" });
+  const previewTrigger = page.getByRole("button", { name: "Preview a YouTube link with recorded demo" });
+  await expect(heading).toBeVisible();
+  await expect(previewTrigger).toBeVisible();
+  await expect(sourceTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(sourcePanel).toHaveCount(0);
+
+  await sourceTrigger.click();
+  await expect(sourcePanel).toBeVisible();
+  await expect(sourcePanel.getByRole("group", { name: "Process locally" })).toBeVisible();
+  await expect(sourcePanel.getByRole("group", { name: "Explore a recording" })).toBeVisible();
 
   const identity = page.locator('[data-agent-identity="orchestrator-root"]');
   await expect(identity).toBeVisible();
@@ -497,11 +523,20 @@ test("the input stage introduces the orchestrator before asking for a source", a
     ring: "none",
   });
 
-  const addSource = page.getByRole("button", { name: "Preview YouTube with recorded demo" });
-  await addSource.click();
+  await sourceTrigger.focus();
+  await page.keyboard.press("Escape");
+  await expect(sourcePanel).toHaveCount(0);
+  await expect(sourceTrigger).toBeFocused();
+  await sourceTrigger.click();
+  await expect(sourcePanel).toBeVisible();
+  await heading.click();
+  await expect(sourcePanel).toHaveCount(0);
+
+  await previewTrigger.click();
   await expect(page.getByRole("textbox", { name: "YouTube link for recorded preview" })).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(addSource).toBeFocused();
+  await expect(previewTrigger).toBeFocused();
+  await expect(sourcePanel).toHaveCount(0);
 });
 
 test("client navigation from Home preserves Studio material tokens", async ({ page }) => {
@@ -510,119 +545,85 @@ test("client navigation from Home preserves Studio material tokens", async ({ pa
   await expect(page).toHaveURL(/\/studio\/$/);
   await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
 
-  const option = page.locator('.studio-source-option[data-palette="peach"]');
-  await expect(option).toBeVisible();
-  const clientNavigationStyle = await option.evaluate((element) => {
+  const home = page.getByRole("link", { name: "1321 home" });
+  const sourceTrigger = page.getByRole("button", { name: "Choose source: local or recorded" });
+  await expect(sourceTrigger).toBeVisible();
+  const clientNavigationStyle = await sourceTrigger.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
-      palette: style.getPropertyValue("--palette-color").trim(),
-      highlight: style.getPropertyValue("--glass-highlight-soft").trim(),
-      blur: style.getPropertyValue("--glass-blur-compact").trim(),
-      backgroundImage: style.backgroundImage,
+      width: style.width,
+      height: style.height,
+      backgroundColor: style.backgroundColor,
       backdropFilter: style.backdropFilter,
       borderRadius: style.borderRadius,
       boxShadow: style.boxShadow,
     };
   });
-
-  expect(clientNavigationStyle.palette).not.toBe("");
-  expect(clientNavigationStyle.highlight).not.toBe("");
-  expect(clientNavigationStyle.blur).not.toBe("");
-  expect(clientNavigationStyle.backgroundImage).not.toBe("none");
+  const homeStyle = await home.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      width: style.width,
+      height: style.height,
+      backgroundColor: style.backgroundColor,
+      backdropFilter: style.backdropFilter,
+      borderRadius: style.borderRadius,
+      boxShadow: style.boxShadow,
+    };
+  });
+  expect(clientNavigationStyle).toEqual(homeStyle);
+  expect(clientNavigationStyle.width).toBe("40px");
+  expect(clientNavigationStyle.height).toBe("40px");
   expect(clientNavigationStyle.backdropFilter).not.toBe("none");
-  expect(clientNavigationStyle.borderRadius).toBe("12px");
-  expect(clientNavigationStyle.boxShadow).toContain("inset");
+  expect(clientNavigationStyle.borderRadius).toBe("13px");
 
   await page.reload();
-  await expect(option).toBeVisible();
-  await expect.poll(async () => option.evaluate((element) => {
+  await expect(sourceTrigger).toBeVisible();
+  await expect.poll(async () => sourceTrigger.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
-      backgroundImage: style.backgroundImage,
+      width: style.width,
+      height: style.height,
+      backgroundColor: style.backgroundColor,
       backdropFilter: style.backdropFilter,
       borderRadius: style.borderRadius,
       boxShadow: style.boxShadow,
     };
-  })).toEqual({
-    backgroundImage: clientNavigationStyle.backgroundImage,
-    backdropFilter: clientNavigationStyle.backdropFilter,
-    borderRadius: clientNavigationStyle.borderRadius,
-    boxShadow: clientNavigationStyle.boxShadow,
-  });
+  })).toEqual(clientNavigationStyle);
 });
 
 test("source authority options separate live local ingest from recorded preview", async ({ page }) => {
   await page.goto("/studio/");
 
-  const optionRow = page.locator(".studio-source-options");
-  const optionControls = optionRow.locator(".studio-source-option");
-  const youtubeLocal = page.getByRole("button", { name: "YouTube local ingest" });
-  const demo = page.getByRole("button", { name: "Explore run-006 recorded demo" });
-  const ownedMedia = page.getByRole("button", { name: "Owned file local ingest" });
-  const samples = page.getByRole("button", { name: "Recorded YouTube samples" });
+  const trigger = page.getByRole("button", { name: "Choose source: local or recorded" });
+  const previewTrigger = page.getByRole("button", { name: "Preview a YouTube link with recorded demo" });
+  const panel = page.getByRole("dialog", { name: "Choose a Studio source" });
+  await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(panel).toHaveCount(0);
+  await expect(previewTrigger).toBeVisible();
+  await expect(page.locator('.source-entry[data-source-authority="recorded-preview"]')).toBeVisible();
 
-  await expect(optionRow).toBeVisible();
-  await expect(optionControls).toHaveCount(4);
-  await expect(youtubeLocal).toHaveAttribute("data-source-authority", "live-local");
-  await expect(ownedMedia).toHaveAttribute("data-source-authority", "live-local");
-  await expect(demo).toHaveAttribute("data-source-authority", "recorded");
-  await expect(samples).toHaveAttribute("data-source-authority", "recorded");
-  await expect(demo).toBeVisible();
-  await expect(ownedMedia).toBeVisible();
-  await expect(samples).toHaveAttribute("aria-haspopup", "menu");
-  expect(await optionControls.evaluateAll((controls) => controls.map((control) => ({
-    palette: control.getAttribute("data-palette"),
-    height: Math.round(control.getBoundingClientRect().height),
-    radius: Number.parseFloat(getComputedStyle(control).borderRadius),
-  })))).toEqual([
-    { palette: "teal", height: 34, radius: 12 },
-    { palette: "blue", height: 34, radius: 12 },
-    { palette: "peach", height: 34, radius: 12 },
-    { palette: "coral", height: 34, radius: 12 },
-  ]);
+  await trigger.click();
+  const local = panel.getByRole("group", { name: "Process locally" });
+  const recorded = panel.getByRole("group", { name: "Explore a recording" });
+  const localChoices = local.locator(".studio-source-choice");
+  const recordedChoices = recorded.locator(".studio-source-choice");
+  const firstSample = panel.getByRole("button", { name: "Use Korean sample 01 for recorded preview" });
+  const secondSample = panel.getByRole("button", { name: "Use Korean sample 02 for recorded preview" });
 
-  const optionShadowsAreInset = await optionControls.evaluateAll((controls) => {
-    const splitLayers = (value: string) => {
-      const layers: string[] = [];
-      let depth = 0;
-      let start = 0;
-      for (let index = 0; index < value.length; index += 1) {
-        if (value[index] === "(") depth += 1;
-        if (value[index] === ")") depth -= 1;
-        if (value[index] === "," && depth === 0) {
-          layers.push(value.slice(start, index).trim());
-          start = index + 1;
-        }
-      }
-      layers.push(value.slice(start).trim());
-      return layers;
-    };
-    return controls.every((control) => {
-      const shadow = getComputedStyle(control).boxShadow;
-      return shadow === "none" || splitLayers(shadow).every((layer) => layer.includes("inset"));
-    });
-  });
-  expect(optionShadowsAreInset).toBe(true);
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(panel).toBeVisible();
+  await expect(localChoices).toHaveCount(2);
+  await expect(recordedChoices).toHaveCount(1);
+  await expect(localChoices.nth(0)).toHaveAttribute("data-source-authority", "live-local");
+  await expect(localChoices.nth(1)).toHaveAttribute("data-source-authority", "live-local");
+  await expect(recordedChoices.nth(0)).toHaveAttribute("data-source-authority", "recorded");
+  await expect(local).toContainText("Private local host");
+  await expect(recorded).toContainText("No new processing");
+  await expect(recorded.getByRole("button", { name: "Explore the recorded run-006 demo" })).toBeVisible();
+  await expect(firstSample).toHaveAttribute("data-source-example-authority", "recorded-preview");
+  await expect(secondSample).toHaveAttribute("data-source-example-authority", "recorded-preview");
 
-  await samples.focus();
-  await samples.press("ArrowDown");
-  const menu = page.getByRole("menu", { name: "Recorded YouTube samples" });
-  const firstSample = page.getByRole("menuitem", { name: "Korean sample 01 Recorded preview link" });
-  const secondSample = page.getByRole("menuitem", { name: "Korean sample 02 Recorded preview link" });
-  await expect(menu).toBeVisible();
-  await expect(firstSample).toBeFocused();
-  await firstSample.press("ArrowDown");
-  await expect(secondSample).toBeFocused();
-  await secondSample.press("Escape");
-  await expect(menu).toHaveCount(0);
-  await expect(samples).toBeFocused();
-
-  await samples.click();
-  await expect(firstSample).toBeFocused();
-  await page.getByRole("heading", { name: /Welcome to Studio/ }).click();
-  await expect(menu).toHaveCount(0);
-
-  await samples.click();
   await firstSample.click();
   const sourceField = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
   await expect(sourceField).toBeFocused();
@@ -632,7 +633,8 @@ test("source authority options separate live local ingest from recorded preview"
   await page.waitForTimeout(420);
   const sourceBarBefore = await page.locator(".source-entry .dock-bar").boundingBox();
 
-  await samples.click();
+  await trigger.click();
+  await expect(panel).toBeVisible();
   await secondSample.click();
   await expect(sourceField).toBeFocused();
   await expect(sourceField).toHaveValue("https://www.youtube.com/watch?v=XauBqFepc-s");
@@ -681,7 +683,7 @@ test("YouTube local ingest registers exact local bytes and enters the existing p
   try {
     const address = await listenRuntimeHost(server, { port: 0 });
     await page.goto(`/studio/?runtimeHost=${encodeURIComponent(`http://${address.host}:${address.port}`)}`);
-    await page.getByRole("button", { name: "YouTube local ingest" }).click();
+    await chooseSource(page, "Process a YouTube range locally");
 
     const productRuntime = page.getByRole("region", { name: "YouTube local source" });
     await expect(productRuntime).toBeVisible();
@@ -730,7 +732,7 @@ test("YouTube local ingest registers exact local bytes and enters the existing p
 
 test("a failed source check reports directly above the source dock", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   const source = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
   await source.fill("https://example.com/media");
   await page.keyboard.press("Enter");
@@ -750,7 +752,7 @@ test("a failed source check reports directly above the source dock", async ({ pa
 
 test("an identified source keeps the URL editor unchanged", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   const source = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
   const editor = page.locator(".source-entry .dock-bar");
   await page.waitForTimeout(420);
@@ -786,46 +788,47 @@ test("the welcome composition fits every supported viewport", async ({ page }, t
     await page.goto("/studio/");
     await expect(page.getByRole("heading", { name: /Welcome to Studio/ })).toBeVisible();
 
+    const home = page.getByRole("link", { name: "1321 home" });
+    const sourceTrigger = page.getByRole("button", { name: "Choose source: local or recorded" });
     const orchestrator = page.locator(".welcome-orchestrator-anchor");
-    const panel = page.locator(".welcome-panel");
-    const addSource = page.getByRole("button", { name: "Preview YouTube with recorded demo" });
-    const options = page.locator(".studio-source-options");
-    const youtubeLocal = page.getByRole("button", { name: "YouTube local ingest" });
-    const demo = page.getByRole("button", { name: "Explore run-006 recorded demo" });
-    const ownedMedia = page.getByRole("button", { name: "Owned file local ingest" });
-    const samples = page.getByRole("button", { name: "Recorded YouTube samples" });
-    const [orchestratorBox, panelBox, addSourceBox, optionsBox] = await Promise.all([
+    const welcomePanel = page.locator(".welcome-panel");
+    const [homeBox, sourceTriggerBox] = await Promise.all([
+      home.boundingBox(),
+      sourceTrigger.boundingBox(),
+    ]);
+
+    expect(homeBox).not.toBeNull();
+    expect(sourceTriggerBox).not.toBeNull();
+    expect(sourceTriggerBox?.width).toBe(40);
+    expect(sourceTriggerBox?.height).toBe(40);
+    expect(Math.abs((sourceTriggerBox?.y ?? Infinity) - (homeBox?.y ?? -Infinity))).toBeLessThanOrEqual(0.5);
+
+    if ((await sourceTrigger.getAttribute("aria-expanded")) === "false") await sourceTrigger.click();
+    const sourcePanel = page.getByRole("dialog", { name: "Choose a Studio source" });
+    await expect(sourcePanel).toBeVisible();
+    const sourcePanelBox = await sourcePanel.boundingBox();
+    expect(sourcePanelBox).not.toBeNull();
+    expect(sourcePanelBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect(sourcePanelBox?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
+    expect((sourcePanelBox?.x ?? 0) + (sourcePanelBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
+    expect((sourcePanelBox?.y ?? 0) + (sourcePanelBox?.height ?? 0)).toBeLessThanOrEqual(viewport.height + 0.5);
+
+    await sourceTrigger.focus();
+    await page.keyboard.press("Escape");
+    await expect(sourcePanel).toHaveCount(0);
+    await expect(sourceTrigger).toBeFocused();
+
+    const [orchestratorBox, welcomePanelBox] = await Promise.all([
       orchestrator.boundingBox(),
-      panel.boundingBox(),
-      addSource.boundingBox(),
-      options.boundingBox(),
+      welcomePanel.boundingBox(),
     ]);
 
     expect(orchestratorBox).not.toBeNull();
-    expect(panelBox).not.toBeNull();
-    expect(addSourceBox).not.toBeNull();
-    expect(optionsBox).not.toBeNull();
-    expect(orchestratorBox?.x ?? 0).toBeLessThan(panelBox?.x ?? 0);
-    expect(
-      Math.abs((addSourceBox?.x ?? 0) + (addSourceBox?.width ?? 0) / 2 - viewport.width / 2),
-    ).toBeLessThanOrEqual(0.5);
-    await expect(youtubeLocal).toBeVisible();
-    await expect(demo).toBeVisible();
-    await expect(ownedMedia).toBeVisible();
-    await expect(samples).toBeVisible();
-    expect(optionsBox?.y ?? 0).toBeGreaterThanOrEqual((panelBox?.y ?? 0) + (panelBox?.height ?? 0));
-
-    await samples.click();
-    const sampleMenu = page.getByRole("menu", { name: "Recorded YouTube samples" });
-    await expect(sampleMenu).toBeVisible();
-    const sampleMenuBox = await sampleMenu.boundingBox();
-    expect(sampleMenuBox).not.toBeNull();
-    expect(sampleMenuBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
-    expect((sampleMenuBox?.x ?? 0) + (sampleMenuBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
-    await page.keyboard.press("Escape");
+    expect(welcomePanelBox).not.toBeNull();
+    expect(orchestratorBox?.x ?? 0).toBeLessThan(welcomePanelBox?.x ?? 0);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
 
-    for (const locator of [orchestrator, panel, addSource, options, demo, ownedMedia, samples]) {
+    for (const locator of [home, sourceTrigger, orchestrator, welcomePanel]) {
       const box = await locator.boundingBox();
       expect(box).not.toBeNull();
       expect(box?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
@@ -838,7 +841,7 @@ test("the welcome composition fits every supported viewport", async ({ page }, t
 
 test("a submitted source moves through setup and forecast before the recorded interface preview", async ({ page }, testInfo) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   const clipField = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
   const submittedUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
   await clipField.fill(submittedUrl);
@@ -862,7 +865,7 @@ test("a submitted source moves through setup and forecast before the recorded in
   await expect(lifecycleBar.locator(".dock-pct")).toHaveText("1 / 6");
   await expect(lifecycleBar.getByRole("button", { name: "Exit setup" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Live local and recorded source options" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Choose a Studio source" })).toHaveCount(0);
   await page.waitForTimeout(420);
   const welcomeLockupAfter = await page.locator(".welcome-lockup").boundingBox();
   const welcomeOrbAfter = await page.locator(".welcome-orchestrator-anchor").boundingBox();
@@ -1245,7 +1248,7 @@ test("submitted metadata resolution stays in the welcome composition", async ({ 
   });
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/resolvingfixture");
   await page.keyboard.press("Enter");
 
@@ -1272,7 +1275,7 @@ test("submitted metadata resolution stays in the welcome composition", async ({ 
     name: "One moment—I’m asking YouTube for the title, creator, and duration. The media itself remains untouched.",
   })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "YouTube link for recorded preview" })).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Live local and recorded source options" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Choose a Studio source" })).toHaveCount(0);
   await expect(page.locator(".preflight")).toHaveCount(0);
 
   releaseResolution();
@@ -1298,7 +1301,7 @@ test("metadata resolution can be cancelled without implying a pausable operation
   });
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   const submittedUrl = "https://youtu.be/cancelledfixture";
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill(submittedUrl);
   await page.getByRole("button", { name: "Resolve metadata for recorded preview" }).click();
@@ -1322,7 +1325,7 @@ test("metadata resolution can be cancelled without implying a pausable operation
 
 test("a submitted custom range presents one exact and directly manipulable trim control", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/customrangefixture");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Continue to Range" }).click();
@@ -1438,7 +1441,7 @@ test("a long submitted source opens with an explicit editable two-minute request
   });
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/longfixture");
   await page.keyboard.press("Enter");
 
@@ -1512,7 +1515,7 @@ test("a compact submitted range popover does not show a phantom scrollbar", asyn
   });
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/compactrangefixture");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Continue to Range" }).click();
@@ -1604,9 +1607,13 @@ test("completed recorded runs transition directly into the learning viewer", asy
   await expect(viewer.getByRole("button", { name: "Full screen" })).toBeVisible();
   await expect(viewer.getByRole("slider", { name: "Volume" })).toBeVisible();
   await expect(viewer.getByRole("combobox", { name: "Playback speed" })).toBeVisible();
-  await expect(results.getByText("Run details", { exact: true })).toBeVisible();
-  await expect(results.getByText("11 captioned", { exact: true })).toBeVisible();
-  await expect(results.locator(".result-details-list")).not.toBeVisible();
+  await expect(viewer).toHaveAttribute("data-result-authority", "recorded_demo");
+  await expect(viewer.locator(".result-authority-badge")).toHaveText("Recorded demo");
+  const face = results.getByRole("region", { name: "Customize learning" });
+  await expect(face).toHaveAttribute("data-learning-prep-authority", "recorded_fixture");
+  await expect(results.locator('[data-moments-overlay-authority="design_fixture"]')).toBeVisible();
+  await expect(results.locator('.result-coverage > div[data-kind="captioned"] dd')).toHaveText("11");
+  await expect(page.getByRole("button", { name: "Run details" })).toBeVisible();
 });
 
 test("a remote metadata failure keeps duration and range controls unavailable", async ({ page }) => {
@@ -1630,7 +1637,7 @@ test("a remote metadata failure keeps duration and range controls unavailable", 
     });
   });
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/privatevideo");
   await page.getByRole("button", { name: "Resolve metadata for recorded preview" }).click();
 
@@ -1662,7 +1669,7 @@ test("the submitted preparation sequence stays horizontally contained at every s
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("/studio/");
-    await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
     await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/dQw4w9WgXcQ");
     await page.getByRole("button", { name: "Resolve metadata for recorded preview" }).click();
 
@@ -2103,8 +2110,8 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
 
   await page.goto("/");
   await page.getByRole("link", { name: "Open Studio" }).click();
-  await expect(page.getByRole("button", { name: "Preview YouTube with recorded demo" })).toBeVisible();
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await expect(page.getByRole("button", { name: "Preview a YouTube link with recorded demo" })).toBeVisible();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill(
     "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   );
@@ -2394,7 +2401,7 @@ test("the submitted preview fits every supported viewport", async ({ page }, tes
     await page.setViewportSize(viewport);
     await page.goto("/studio/?lab=1");
     await page.getByRole("button", { name: "Collapse trace lab" }).click();
-    await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
     await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill(`https://youtu.be/${longVideoId}`);
     await page.keyboard.press("Enter");
     await finishPreparation(page, true, true);
@@ -2439,7 +2446,7 @@ test("the submitted preview fits every supported viewport", async ({ page }, tes
 
 test("the source capsule sizes to content before applying its maximum", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/dQw4w9WgXcQ");
   await page.keyboard.press("Enter");
   await finishPreparation(page);
@@ -2451,7 +2458,7 @@ test("the source capsule sizes to content before applying its maximum", async ({
   expect(shortWidth).toBeLessThan(360);
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
   await page
     .getByRole("textbox", { name: "YouTube link for recorded preview" })
     .fill(`https://youtu.be/${"deliberately-long-source-id-".repeat(12)}`);
@@ -2466,7 +2473,7 @@ test("the source capsule sizes to content before applying its maximum", async ({
 
 test("the recorded run uses its receipted source identity", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Explore run-006 recorded demo" }).click();
+  await chooseSource(page, "Explore the recorded run-006 demo");
   await finishPreparation(page, false);
 
   const source = page.getByRole("group", {
@@ -2574,8 +2581,8 @@ test("owned-media preflight keeps receipted language decisions separate from job
   await expect(readout(page)).toHaveText(/\d+ \/ 72/);
   await page.getByRole("button", { name: "Ready", exact: true }).click();
   await page.getByRole("button", { name: "Collapse trace lab" }).click();
-  await page.getByRole("button", { name: "Preview YouTube with recorded demo" }).click();
-  await page.getByRole("button", { name: "Explore run-006 recorded demo" }).click();
+  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
+  await chooseSource(page, "Explore the recorded run-006 demo");
 
   // The recorded source stage now narrates its boundary conversationally instead of
   // rendering the receipted evidence tables. The measured language ranges stay

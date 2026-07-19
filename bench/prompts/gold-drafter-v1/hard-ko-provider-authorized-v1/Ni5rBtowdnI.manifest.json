@@ -1,0 +1,46 @@
+{
+  "schema": "studio.bench.gold-prompt-pack.v1",
+  "prompt_id": "bench-gold-prompt:sha256:f69320d896191a40e869a68c7a6e0ac7c7a3d3bb61f9302c78699dba253c7a14",
+  "name": "gold-drafter-v1",
+  "version": "1.1.0",
+  "drafter_id": "agent:gold-drafter-v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ni5rBtowdnI",
+  "prompt": {
+    "path": "bench/prompts/gold-drafter-v1/provider-authorized.md",
+    "content_id": "sha256:1b312773f53ffd22cacba201db338b9f6e7acf24ee6b9e9a6cfacd4dcd426ce5",
+    "bytes": 2819
+  },
+  "inputs": [
+    {
+      "role": "gold_schema",
+      "path": "bench/schemas/gold.schema.json",
+      "content_id": "sha256:a0dd937dbe2450db86bd7ac86257608c250e3a10400adf7b4041cdb0174dfb8a",
+      "bytes": 4954
+    },
+    {
+      "role": "source",
+      "path": "bench/packs/hard-ko-provider-authorized-v1/Ni5rBtowdnI.source.json",
+      "content_id": "sha256:76faba11e5fa79e5b4b44b85e546791384818e4163e7648ec40d990e95ea57f1",
+      "bytes": 964
+    },
+    {
+      "role": "media",
+      "path": "bench/packs/hard-ko-provider-authorized-v1/Ni5rBtowdnI.m4a",
+      "content_id": "sha256:b1de8455ae1dd9bb4b5c60db30062280b0010b160e26a4217cd7528e6c5d9193",
+      "bytes": 742145
+    },
+    {
+      "role": "ko_pack",
+      "path": "public/demo/packs/ko-v3.json",
+      "content_id": "sha256:9b938e5b4fe38cebb532c861a1c966aaa881274feff1ae369eaf3fbdefd530e5",
+      "bytes": 4150
+    }
+  ],
+  "output_contract": {
+    "schema": "studio.bench.gold.v1",
+    "status": "candidate",
+    "materializer": "scripts/draft-gold-from-candidates.mjs"
+  },
+  "notes": "Content-addressed source-only drafting inputs for the independently sourced Ni5rBtowdnI control. The candidate remains unreviewed and unfrozen."
+}

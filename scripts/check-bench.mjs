@@ -403,30 +403,40 @@ if (existsSync(capturesDir)) {
 
 const manifests = await loadCandidatesManifests(join(ROOT, "bench/candidates"), ROOT);
 
-// The only gold-shaped example is intentionally outside bench/packs: this environment could
-// not audition run-006 audio, so committing ASR-derived text as real gold would be dishonest.
-// Re-run the same content-addressed prompt/evidence and materializer checks used for a real
-// proposal, while requiring the dry-run marker and example-only path.
-const draftingFixture = "bench/examples/gold-drafts/Ux-TMWnmntM.gold.json";
-try {
-  execFileSync(
-    process.execPath,
-    [
-      "scripts/draft-gold-from-candidates.mjs",
-      "--draft",
-      draftingFixture,
-      "--example",
-      "--out",
-      draftingFixture,
-      "--check",
-    ],
-    { cwd: ROOT, encoding: "utf8", stdio: "pipe" },
-  );
-} catch (error) {
-  const detail = error?.stderr?.toString().trim() || error?.message || String(error);
-  throw new Error(`bench check failed: gold drafting prompt/fixture validation failed: ${detail}`);
+// Re-run every committed gold-drafter prompt/evidence binding. The original run-006 fixture
+// remains example-only because it was not audio-grounded. Provider-authorized pack candidates
+// use v1.1 prompt manifests that bind source-only controls or the mined hard-clip evidence.
+const draftingCases = [
+  {
+    draft: "bench/examples/gold-drafts/Ux-TMWnmntM.gold.json",
+    prompt: null,
+    example: true,
+  },
+  ...["Ni5rBtowdnI", "2o0f-V4uoMg", "Ux-TMWnmntM"].map((clipId) => ({
+    draft: `bench/packs/hard-ko-provider-authorized-v1/${clipId}.gold.json`,
+    prompt: `bench/prompts/gold-drafter-v1/hard-ko-provider-authorized-v1/${clipId}.manifest.json`,
+    example: false,
+  })),
+];
+for (const drafting of draftingCases) {
+  const args = [
+    "scripts/draft-gold-from-candidates.mjs",
+    "--draft",
+    drafting.draft,
+    "--out",
+    drafting.draft,
+    "--check",
+  ];
+  if (drafting.prompt !== null) args.push("--prompt-manifest", drafting.prompt);
+  if (drafting.example) args.push("--example");
+  try {
+    execFileSync(process.execPath, args, { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
+  } catch (error) {
+    const detail = error?.stderr?.toString().trim() || error?.message || String(error);
+    throw new Error(`bench check failed: gold drafting validation failed for ${drafting.draft}: ${detail}`);
+  }
 }
-console.log("gold drafting check passed: 1 content-bound prompt pack, 1 non-authoritative candidate-shaped fixture");
+console.log("gold drafting check passed: 4 content-bound prompt packs, 3 real candidates, 1 non-authoritative fixture");
 
 // Routing is forever: writeImmutableJson stops a manifest from being rewritten in place, but
 // nothing on disk stops `git rm`. Every candidates manifest this branch's history has ever

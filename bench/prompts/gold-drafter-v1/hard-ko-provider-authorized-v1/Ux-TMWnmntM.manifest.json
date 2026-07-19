@@ -1,0 +1,70 @@
+{
+  "schema": "studio.bench.gold-prompt-pack.v1",
+  "prompt_id": "bench-gold-prompt:sha256:490a6d9cdaf6ef929c10d577e908191cf3c643b7261fdd356e37bf9606d4cb70",
+  "name": "gold-drafter-v1",
+  "version": "1.1.0",
+  "drafter_id": "agent:gold-drafter-v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "prompt": {
+    "path": "bench/prompts/gold-drafter-v1/provider-authorized.md",
+    "content_id": "sha256:1b312773f53ffd22cacba201db338b9f6e7acf24ee6b9e9a6cfacd4dcd426ce5",
+    "bytes": 2819
+  },
+  "inputs": [
+    {
+      "role": "candidates",
+      "path": "bench/candidates/run-006/candidates.json",
+      "content_id": "sha256:c4e6fa69698ece83ed3a75943f159286462f1bea60614b247a7cef2221124dce",
+      "bytes": 12970
+    },
+    {
+      "role": "gold_schema",
+      "path": "bench/schemas/gold.schema.json",
+      "content_id": "sha256:a0dd937dbe2450db86bd7ac86257608c250e3a10400adf7b4041cdb0174dfb8a",
+      "bytes": 4954
+    },
+    {
+      "role": "source",
+      "path": "bench/packs/hard-ko-provider-authorized-v1/Ux-TMWnmntM.source.json",
+      "content_id": "sha256:fac9c163250b99fb1996298b0fe7bc8e93b25499646b6625d50400054ce36d3d",
+      "bytes": 985
+    },
+    {
+      "role": "captions",
+      "path": "public/demo/runs/run-006/captions.json",
+      "content_id": "sha256:45b3ff96cef4a0112586e6bfb6e530e7cb227d48147f90a65e4ace3fd3f6690c",
+      "bytes": 13502
+    },
+    {
+      "role": "corrections",
+      "path": "public/demo/runs/run-006/corrections.json",
+      "content_id": "sha256:868e38880fc66c5f96908ab6a4a0dc1c0de0f64e9314cb63f815daa804877a0f",
+      "bytes": 1489
+    },
+    {
+      "role": "run",
+      "path": "public/demo/runs/run-006/run.json",
+      "content_id": "sha256:bdedff75be4a01c580fa7ee3b46710124ff003761bace376ee40d3d1856664bf",
+      "bytes": 2562
+    },
+    {
+      "role": "media",
+      "path": "public/demo/runs/run-006/clip.mp4",
+      "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+      "bytes": 3465772
+    },
+    {
+      "role": "ko_pack",
+      "path": "public/demo/packs/ko-v3.json",
+      "content_id": "sha256:9b938e5b4fe38cebb532c861a1c966aaa881274feff1ae369eaf3fbdefd530e5",
+      "bytes": 4150
+    }
+  ],
+  "output_contract": {
+    "schema": "studio.bench.gold.v1",
+    "status": "candidate",
+    "materializer": "scripts/draft-gold-from-candidates.mjs"
+  },
+  "notes": "Content-addressed mined-candidate drafting inputs for Ux-TMWnmntM in the provider-authorized pack. System outputs are drafting context only; the candidate remains unreviewed and unfrozen."
+}

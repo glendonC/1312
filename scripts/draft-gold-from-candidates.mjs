@@ -25,7 +25,7 @@ import {
   fileReceipt,
   writeImmutableJson,
 } from "./lib/immutable-receipts.mjs";
-import { normalizeSourceReceipt } from "./lib/source-receipts.mjs";
+import { normalizeBenchSourceReceipt } from "./lib/source-receipts.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_PROMPT = "bench/prompts/gold-drafter-v1/manifest.json";
@@ -77,9 +77,9 @@ function recordedPath(path) {
 }
 
 function expectedGoldSource(sourceReceipt) {
-  const source = normalizeSourceReceipt(sourceReceipt);
+  const source = normalizeBenchSourceReceipt(sourceReceipt);
   if (source.kind !== "youtube") {
-    throw new Error("gold-drafter-v1 is bound to the run-006 YouTube receipt");
+    throw new Error("gold-drafter-v1 currently requires a redistributable YouTube source receipt");
   }
   return {
     kind: source.kind,
@@ -108,8 +108,8 @@ async function validatePromptPack(path) {
   if (promptPack.prompt_id !== receiptIdFor("bench-gold-prompt", promptPack, "prompt_id")) {
     throw new Error("gold drafting prompt manifest id does not match its canonical contents");
   }
-  if (promptPack.name !== "gold-drafter-v1" || promptPack.version !== "1.0.0") {
-    throw new Error("gold drafting prompt manifest does not name version 1.0.0");
+  if (promptPack.name !== "gold-drafter-v1" || !new Set(["1.0.0", "1.1.0"]).has(promptPack.version)) {
+    throw new Error("gold drafting prompt manifest does not name a registered gold-drafter-v1 version");
   }
   if (!/^agent:[a-z0-9][a-z0-9._-]*$/.test(promptPack.drafter_id)) {
     throw new Error("prompt drafter_id must be a stable agent id");
@@ -130,8 +130,17 @@ async function validatePromptPack(path) {
       `prompt input ${input.role}`,
     );
   }
-  for (const role of ["candidates", "gold_schema", "source", "captions", "corrections", "run", "media", "ko_pack"]) {
+  const allowedRoles = new Set(["candidates", "gold_schema", "source", "captions", "corrections", "run", "media", "ko_pack"]);
+  for (const role of roles.keys()) {
+    if (!allowedRoles.has(role)) throw new Error(`gold drafting prompt manifest has unknown input role ${role}`);
+  }
+  for (const role of ["gold_schema", "source", "media", "ko_pack"]) {
     if (!roles.has(role)) throw new Error(`gold drafting prompt manifest lacks ${role}`);
+  }
+  const minedRoles = ["candidates", "captions", "corrections", "run"];
+  const minedRoleCount = minedRoles.filter((role) => roles.has(role)).length;
+  if (minedRoleCount !== 0 && minedRoleCount !== minedRoles.length) {
+    throw new Error("gold drafting prompt manifest has only part of the mined-candidate evidence set");
   }
   exactKeys(promptPack.output_contract, ["schema", "status", "materializer"], "prompt output contract");
   if (
@@ -146,17 +155,17 @@ async function validatePromptPack(path) {
 
 try {
   const draftArg = arg("draft");
-  const candidatesArg = arg("candidates", "bench/candidates/run-006/candidates.json");
-  const sourceArg = arg("source-json", "public/demo/runs/run-006/source.json");
   const promptArg = arg("prompt-manifest", DEFAULT_PROMPT);
   if (!draftArg) die("--draft is required (a complete studio.bench.gold.v1 proposal)");
 
   const draftPath = readableInputPath(draftArg, "--draft");
-  const candidatesPath = workspacePath(candidatesArg, "--candidates");
-  const sourcePath = workspacePath(sourceArg, "--source-json");
   const promptPath = workspacePath(promptArg, "--prompt-manifest");
   const draft = await validateGold(await readJsonFile(draftPath, "agent gold proposal"), "agent gold proposal");
   const { promptPack, roles } = await validatePromptPack(promptPath);
+  const candidatesArg = arg("candidates", roles.get("candidates")?.path ?? null);
+  const sourceArg = arg("source-json", roles.get("source").path);
+  const candidatesPath = candidatesArg === null ? null : workspacePath(candidatesArg, "--candidates");
+  const sourcePath = workspacePath(sourceArg, "--source-json");
 
   if (draft.pack_id !== promptPack.pack_id || draft.clip_id !== promptPack.clip_id) {
     throw new Error("agent proposal names a different pack or clip than the prompt pack");
@@ -167,60 +176,93 @@ try {
   if (draft.status !== "candidate") {
     throw new Error("agent proposal status must stay candidate");
   }
-  if (roles.get("candidates").path !== recordedPath(candidatesPath)) {
+  if (roles.has("candidates") !== (candidatesPath !== null)) {
+    throw new Error("--candidates must be present exactly when the prompt pack binds mined candidates");
+  }
+  if (candidatesPath !== null && roles.get("candidates").path !== recordedPath(candidatesPath)) {
     throw new Error("--candidates does not match the prompt pack binding");
   }
   if (roles.get("source").path !== recordedPath(sourcePath)) {
     throw new Error("--source-json does not match the prompt pack binding");
   }
 
-  const candidates = validateCandidatesManifest(
-    await readJsonFile(candidatesPath, "mined candidates manifest"),
-    "mined candidates manifest",
-  );
-  if (candidates.routing.route !== "gold") {
-    throw new Error("mined clip was not routed gold; exclusive routing forbids a gold proposal");
-  }
-  if (candidates.clip.id !== draft.clip_id) {
-    throw new Error("mined candidates manifest names a different clip");
-  }
-  for (const [index, binding] of candidates.source_artifacts.entries()) {
-    await verifiedBinding(binding, ROOT, `candidates source artifact ${index}`);
-  }
-
-  const candidateBinding = await fileReceipt(candidatesPath, recordedPath(candidatesPath));
-  if (canonicalJson(draft.mined_from) !== canonicalJson(candidateBinding)) {
-    throw new Error("agent proposal mined_from does not bind the exact candidates manifest bytes");
-  }
-  const sourceReceipt = await readJsonFile(sourcePath, "run source receipt");
+  const sourceReceipt = await readJsonFile(sourcePath, "source receipt");
   if (canonicalJson(draft.source) !== canonicalJson(expectedGoldSource(sourceReceipt))) {
-    throw new Error("agent proposal source does not match normalized run-006 source provenance");
+    throw new Error("agent proposal source does not match normalized source provenance");
+  }
+  if (sourceReceipt.local_copy !== undefined) {
+    const expectedMedia = {
+      path: sourceReceipt.local_copy.path,
+      content_id: sourceReceipt.local_copy.content_id,
+      bytes: sourceReceipt.local_copy.bytes,
+    };
+    const heldMedia = roles.get("media");
+    if (canonicalJson(expectedMedia) !== canonicalJson({
+      path: heldMedia.path,
+      content_id: heldMedia.content_id,
+      bytes: heldMedia.bytes,
+    })) {
+      throw new Error("prompt media binding does not match source receipt local_copy");
+    }
   }
 
-  const expectedWindows = new Map(
-    candidates.candidates.map((candidate) => [`${candidate.t_start}\0${candidate.t_end}`, candidate]),
-  );
-  if (draft.units.length !== expectedWindows.size) {
-    throw new Error(`agent proposal must contain all ${expectedWindows.size} candidate windows exactly once`);
+  let expectedWindows = null;
+  let outputText = new Set();
+  if (candidatesPath !== null) {
+    const candidates = validateCandidatesManifest(
+      await readJsonFile(candidatesPath, "mined candidates manifest"),
+      "mined candidates manifest",
+    );
+    if (candidates.routing.route !== "gold") {
+      throw new Error("mined clip was not routed gold; exclusive routing forbids a gold proposal");
+    }
+    if (candidates.clip.id !== draft.clip_id) {
+      throw new Error("mined candidates manifest names a different clip");
+    }
+    for (const [index, binding] of candidates.source_artifacts.entries()) {
+      await verifiedBinding(binding, ROOT, `candidates source artifact ${index}`);
+    }
+    const candidateBinding = await fileReceipt(candidatesPath, recordedPath(candidatesPath));
+    if (canonicalJson(draft.mined_from) !== canonicalJson(candidateBinding)) {
+      throw new Error("agent proposal mined_from does not bind the exact candidates manifest bytes");
+    }
+    expectedWindows = new Map(
+      candidates.candidates.map((candidate) => [`${candidate.t_start}\0${candidate.t_end}`, candidate]),
+    );
+    if (draft.units.length !== expectedWindows.size) {
+      throw new Error(`agent proposal must contain all ${expectedWindows.size} candidate windows exactly once`);
+    }
+    outputText = new Set(
+      candidates.candidates.flatMap((candidate) =>
+        Object.values(candidate.outputs)
+          .map((output) => output.text?.trim())
+          .filter(Boolean),
+      ),
+    );
+  } else if (draft.mined_from !== null) {
+    throw new Error("independently sourced proposal mined_from must be null");
   }
-  const seenWindows = new Set();
-  const outputText = new Set(
-    candidates.candidates.flatMap((candidate) =>
-      Object.values(candidate.outputs)
-        .map((output) => output.text?.trim())
-        .filter(Boolean),
-    ),
-  );
+
   const koPack = await readJsonFile(workspacePath(roles.get("ko_pack").path, "ko pack"), "ko-v3 pack");
   const phenomena = new Set(["none", ...koPack.phenomena.map((phenomenon) => phenomenon.id)]);
+  const seenWindows = new Set();
+  let previousStart = -1;
+  let previousEnd = -1;
 
   for (const [index, unit] of draft.units.entries()) {
     const key = `${unit.t_start}\0${unit.t_end}`;
-    const candidate = expectedWindows.get(key);
-    if (!candidate || seenWindows.has(key)) {
+    if (expectedWindows !== null && (!expectedWindows.has(key) || seenWindows.has(key))) {
       throw new Error(`agent proposal unit ${index} is not one unique mined candidate window`);
     }
     seenWindows.add(key);
+    if (unit.t_start < previousStart || unit.t_start < previousEnd) {
+      throw new Error(`agent proposal unit ${index} is not in ascending, non-overlapping time order`);
+    }
+    if (expectedWindows === null && unit.t_end > expectedGoldSource(sourceReceipt).window.duration) {
+      throw new Error(`agent proposal unit ${index} extends beyond the bound source window`);
+    }
+    previousStart = unit.t_start;
+    previousEnd = unit.t_end;
     if (!/[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]/u.test(unit.korean_gold)) {
       throw new Error(`agent proposal unit ${index} korean_gold contains no Korean text`);
     }

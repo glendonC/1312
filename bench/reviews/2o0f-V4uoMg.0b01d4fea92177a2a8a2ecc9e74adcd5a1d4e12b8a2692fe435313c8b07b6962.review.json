@@ -1,0 +1,59 @@
+{
+  "review_id": "bench-review:sha256:0b01d4fea92177a2a8a2ecc9e74adcd5a1d4e12b8a2692fe435313c8b07b6962",
+  "schema": "studio.bench.review.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "2o0f-V4uoMg",
+  "candidate": {
+    "path": "bench/packs/hard-ko-provider-authorized-v1/2o0f-V4uoMg.gold.json",
+    "content_id": "sha256:e0047f26c88abef626f790552f37b0e9453b08836aa4c53a019c3eab7c098d1f",
+    "bytes": 7480
+  },
+  "reviewer": {
+    "name": "Bench Reviewer B",
+    "git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+  },
+  "drafter": "agent:gold-drafter-v1",
+  "blinded": true,
+  "action": "accept",
+  "reason": "Independent hackathon blinded panel accept after audio listen of every exact window; Korean transcription, English guidance, and critical units accepted as written for this candidate.",
+  "unit_decisions": [
+    {
+      "t_start": 0,
+      "t_end": 6,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 6,
+      "t_end": 15,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 15,
+      "t_end": 27.8,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 32.9,
+      "t_end": 38.72,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 39.34,
+      "t_end": 49.4,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 49.66,
+      "t_end": 60,
+      "action": "accept",
+      "note": null
+    }
+  ],
+  "minutes_spent": null,
+  "created_at": "2026-07-19T20:18:35.000Z"
+}

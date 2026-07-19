@@ -553,6 +553,7 @@ test("documented example shapes stay bound to the contract they claim", () => {
     results?: Array<{
       verification?: {
         integrity?: string;
+        caption?: { jobId?: string };
         executor?: { classification?: string; model?: string; id?: string };
         result?: { status?: string; availableFacetCount?: number };
       };
@@ -586,6 +587,16 @@ test("documented example shapes stay bound to the contract they claim", () => {
   assert.equal(LANGUAGE_REQUEST_EXAMPLE.lineId, "deterministic-current-run-line-001");
   assert.deepEqual(LANGUAGE_REQUEST_EXAMPLE.facetKinds, ["meaning", "word"]);
   assert.equal(LANGUAGE_REQUEST_EXAMPLE.selection.text, "테스");
+  assert.equal(
+    LANGUAGE_REQUEST_EXAMPLE.caption.jobId,
+    caption201.captions?.[0]?.jobId,
+    "language request binds the continuous-family caption job",
+  );
+  assert.equal(
+    language201.results?.[0]?.verification?.caption?.jobId,
+    caption201.captions?.[0]?.jobId,
+    "language 201 result binds the continuous-family caption job",
+  );
 
   const languagePanels = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
     .find((endpoint) => endpoint.path === "/v1/runtimes/:runtimeId/language-explanations")

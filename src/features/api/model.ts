@@ -195,10 +195,10 @@ export const YOUTUBE_INGEST_EXAMPLE = {
 
 export const REVIEW_DECISION_EXAMPLE = {
   intake: {
-    intakeId: "publish-review-intake:d8f36771fe30d61e378fbe67afa75b6780b8869b2004bc42831dc561beba69a2",
-    artifactId: "artifact:2c1e7488a5b5edcda2459cacd963fddbf78e4585eff8bb0313f986febc7aa01d",
-    receiptId: "publish-review-intake-receipt:4ef807398c8f53dc5b6678edafc2fdf98040b198ede06e478a746d06a7341e6d",
-    receiptContentId: "sha256:d9f80a2f3b2b6d4928aad9e7afd831c306e901359278462b1aea5f2e3edf4f84",
+    intakeId: "publish-review-intake:d2e6ca337389d34b267c563a523eccede7e26960a50ac140a25cd8ba4ebac588",
+    artifactId: "artifact:af9c320c97bd32daaa8a09cd4bc94b0305efa6891361fc566f63a5a188c9ecda",
+    receiptId: "publish-review-intake-receipt:20cad736985710c6a9beb195a38a602bf57f8ae58bd63033df248d28f5932504",
+    receiptContentId: "sha256:0befb1c0a44ac9726e4bccfb8a8ddaa542806e9f99fe6fb5d23389fca3fd5498",
   },
   reviewer: {
     id: "reviewer:local-operator",
@@ -213,22 +213,22 @@ export const REVIEW_DECISION_EXAMPLE = {
 
 export const CAPTION_REQUEST_EXAMPLE = {
   approval: {
-    reviewId: "publish-review:19adbd8e569a53432830eeaa486a1e36bc9319e208851bca1234564c55e6956e",
-    artifactId: "artifact:83938d4759c1b26a818cb5391202842229d466517f26b43e5d5087d6f0c49b21",
-    receiptId: "publish-review-decision-receipt:538ba71d19c1a12dcf25f8bb46a04c119142e57c96c9773d3f91f823a9f3cb7a",
-    receiptContentId: "sha256:0b69e0bade67cfd0b1f6c2d43ae000276fe2e48d980087ddeaecfece107129a3",
+    reviewId: "publish-review:55cb99708b008092cb1b8e9675468eb869016ad859cefb9397457e98c0d5cf08",
+    artifactId: "artifact:e986d94e686a223f7c269d49d68188b45b8cba746f38f293189fa55803872e54",
+    receiptId: "publish-review-decision-receipt:088b53b0a71ff278d4a5c5d349645f3c7d470f8c61f94151b3aa6ccb8cb8f1ee",
+    receiptContentId: "sha256:85ad2898c419684dd4e49600b5ce8565e4c18bccc6e748e36fcd5e4ffe1205b3",
   },
 } satisfies RuntimeHostCaptionProductionRequest;
 
-/** Candidate span from the gpt-4o-mini language 201 capture (deterministic caption seam first). */
+/** Candidate span from the continuous-family gpt-4o-mini language 201 capture. */
 export const LANGUAGE_REQUEST_EXAMPLE = {
   caption: {
-    jobId: "caption-production:f64f8415a4223364b11b024c41f65425b98f707f6ec760c338f43888a7e13049",
-    artifactId: "artifact:0fa7219f41e248d8fe9f429993c2c6624ce2df3509202660a88441f092c0f5ce",
-    contentId: "sha256:7ec6826cd3119981fa97adeffda0c3c48acec22c76cf0aded5cfb4b1f4ff600e",
-    receiptArtifactId: "artifact:5faf42ea281f71e6e8bc26e53f38f58be08766af55338ebb6a6815ecc9b8537b",
-    receiptId: "caption-production-receipt:2148790b3453c6f684cb30c7eaa33ac357f7a925088e2247f59ff27ee13b7458",
-    receiptContentId: "sha256:3ee3d6ef242507082e0740eb99c756fe80454c5b703458aa4012df4280b1bef5",
+    jobId: "caption-production:8632c0316e227114cb8eecc6f32c261800393099f491f0a30e3a6c583e87541d",
+    artifactId: "artifact:ed7d787901b289b943809ac89c8cba823c63e09a19f4f1d4e7fe01661a997ba1",
+    contentId: "sha256:f2690f4986365e18bb28bbafad81a84931f8155ee9d66060c39eba719382db01",
+    receiptArtifactId: "artifact:68027e372b84749660fa0265ff2df40ed7e7ae191756baa09584a2469adaa614",
+    receiptId: "caption-production-receipt:87aa6ac8e34b725ab1fc618e5b8b0392f6b7263a55731af07d61789d98399af8",
+    receiptContentId: "sha256:d1dabde385d17b44c07c16ee65795004bbac94b1f12c387705718d19150f7d66",
   },
   lineId: "deterministic-current-run-line-001",
   selection: {
@@ -238,7 +238,10 @@ export const LANGUAGE_REQUEST_EXAMPLE = {
     end: 2,
     text: "테스",
   },
-  facetKinds: ["meaning", "word"],
+  facetKinds: [
+    "meaning",
+    "word"
+  ],
 } satisfies RuntimeHostLanguageExplanationRequest;
 
 export const REVIEW_REVOCATION_EXAMPLE = {
@@ -261,11 +264,11 @@ export const REVIEW_REVOCATION_EXAMPLE = {
 /** Candidate ids from the deterministic test-seam caption 201 capture. Host auto-runs QC on create. */
 export const CAPTION_QC_REQUEST_EXAMPLE = {
   candidate: {
-    jobId: "caption-production:278a43dfbc1ba6357e093189be709656e9480ef7f642b9411646adfdb0071ef6",
-    captionArtifactId: "artifact:a87ffabb03c94f62762cee20d5b18e19f9fc5f32af39c57c5e17a816d57a32a7",
-    captionContentId: "sha256:0e27beec77fd1b60edcaee2e4fbf6a05e8018b31b058b663a212d45911c6cba8",
-    captionReceiptId: "caption-production-receipt:a1a00adb31a15e20296758888f4f612bf8085e1058bf05dc7b6f7e0ee0a99539",
-    captionReceiptContentId: "sha256:6f9d53f6498439471c243f7433afde7791629819d51d2c31c5745fb753a67e8a",
+    jobId: "caption-production:8632c0316e227114cb8eecc6f32c261800393099f491f0a30e3a6c583e87541d",
+    captionArtifactId: "artifact:ed7d787901b289b943809ac89c8cba823c63e09a19f4f1d4e7fe01661a997ba1",
+    captionContentId: "sha256:f2690f4986365e18bb28bbafad81a84931f8155ee9d66060c39eba719382db01",
+    captionReceiptId: "caption-production-receipt:87aa6ac8e34b725ab1fc618e5b8b0392f6b7263a55731af07d61789d98399af8",
+    captionReceiptContentId: "sha256:d1dabde385d17b44c07c16ee65795004bbac94b1f12c387705718d19150f7d66",
   },
 } satisfies RuntimeHostCaptionQualityControlRequest;
 

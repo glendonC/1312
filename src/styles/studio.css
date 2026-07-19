@@ -151,6 +151,34 @@
   transform: translateX(-50%);
 }
 
+/* On a completed run the header carries the result identity: the title in the centre seat, and the
+   Details / Run details controls in the true top-right seat, aligned with the home mark. */
+.results-title-seat {
+  min-width: 0;
+  max-width: min(560px, 100%);
+  justify-self: center;
+}
+
+.results-control-seat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+}
+
+/* On a completed run the centre column is constrained (not content-sized) so a long title truncates
+   inside its seat instead of pushing the controls off the row. Equal thirds keep it viewport-centred. */
+.top:has(.results-control-seat) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+@media (max-width: 820px) {
+  /* Narrow: give the title the flexible middle and let the mark and icon controls size to content. */
+  .top:has(.results-control-seat) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
 /* ---------- acts ---------- */
 
 .act {

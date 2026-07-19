@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import Dock from "./Dock";
 import InputAct from "./InputAct";
 import { presentRecordedSource } from "./previewSession";
+import ResultsChrome from "./ResultsChrome";
 import RunAct from "./RunAct";
 import SourceDisplay from "./SourceDisplay";
 import { replayTransport, useBundle, useComplete, usePaused, useStage, useStudio } from "./store";
@@ -83,13 +84,11 @@ export default function StudioApp({ runId }: { runId: string }) {
         )}
 
         {/*
-         * Nothing in the third seat.
-         *
-         * A permanent link out of the instrument does not earn the loudest corner of the
-         * canvas — and the studio already offers the bench at the only moment it means
-         * anything, in Results, underneath the scores it is asking you to compare. The mark
-         * is the way home. That is enough of an exit.
+         * On a completed run the header carries the result's identity: the title in the centre seat
+         * and the Details / Run details controls in the true top-right seat, aligned with the home
+         * mark. While a run is still going the third seat stays empty.
          */}
+        {complete && <ResultsChrome />}
       </header>
 
       <AnimatePresence mode="wait">

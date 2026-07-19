@@ -9,61 +9,167 @@
   margin: 0;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--ink) 3%, var(--paper));
-  overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 2%, var(--paper));
+  overflow: visible;
 }
 
 .api-panel figcaption {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 10px 8px 16px;
+  padding: 10px 12px 10px 16px;
   border-bottom: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
   background: var(--palette-soft);
+}
+
+.api-panel-title {
   color: var(--palette-ink);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .api-copy {
-  padding: 3px 9px;
-  border: 1px solid color-mix(in srgb, var(--palette-ink) 30%, transparent);
-  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  border: none;
   background: transparent;
   color: var(--palette-ink);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-family: var(--font-sans, inherit);
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+  line-height: 1;
   cursor: pointer;
+}
+
+.api-copy-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* Panel squircles: bare icon + custom tooltip */
+.api-copy-icon-only {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  color: color-mix(in srgb, var(--palette-ink) 72%, transparent);
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.api-copy-icon-only:hover,
+.api-copy-icon-only:focus-visible {
+  color: var(--palette-ink);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.api-copy-icon-only:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--palette-ink) 35%, transparent);
+  border-radius: 8px;
+}
+
+.api-copy-icon-only.is-copied {
+  color: var(--palette-ink);
+}
+
+.api-copy-tooltip {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 8px);
+  z-index: 3;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.68rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(2px, -50%);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.api-copy-icon-only:hover .api-copy-tooltip,
+.api-copy-icon-only:focus-visible .api-copy-tooltip,
+.api-copy-icon-only.is-copied .api-copy-tooltip {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+/* Page header keeps a labeled control */
+.api-copy-page {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
   transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
 }
 
-.api-copy:hover {
-  border-color: var(--palette-ink);
-  background: var(--paper);
+.api-copy-page:hover {
+  border-color: var(--palette-ink, var(--ink));
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 
-.api-copy.is-copied {
-  color: var(--paper);
-  background: var(--palette-ink);
-  border-color: var(--palette-ink);
+.api-copy-page.is-copied {
+  border-color: var(--palette-ink, var(--ink));
+  color: var(--palette-ink, var(--ink));
+  background: color-mix(in srgb, var(--palette-ink, var(--ink)) 8%, transparent);
 }
 
 .api-panel pre {
   margin: 0;
-  padding: 14px 16px;
-  overflow-x: auto;
+  padding: 16px 18px;
+  overflow: auto;
+  max-height: min(28rem, 70vh);
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: color-mix(in srgb, var(--ink) 1.5%, var(--paper));
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+}
+
+.api-panel pre::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.api-panel pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.api-panel pre::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: 999px;
+}
+
+.api-panel pre::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ink) 36%, transparent);
+}
+
+.api-panel pre::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .api-panel code {
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.74rem;
-  line-height: 1.6;
+  font-size: 0.76rem;
+  line-height: 1.65;
   white-space: pre;
 }
 

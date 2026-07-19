@@ -1,4 +1,6 @@
 ---
+import ApiCopyButton from "./ApiCopyButton.astro";
+
 interface Props {
   title: string;
   body: string;
@@ -9,8 +11,8 @@ const { title, body } = Astro.props;
 
 <figure class="api-panel">
   <figcaption>
-    <span>{title}</span>
-    <button type="button" class="api-copy" data-api-copy aria-label={`Copy ${title}`}>Copy</button>
+    <span class="api-panel-title">{title}</span>
+    <ApiCopyButton ariaLabel={`Copy ${title}`} />
   </figcaption>
   <pre><code>{body}</code></pre>
 </figure>

@@ -1,0 +1,129 @@
+{
+  "release_id": "bench-certified-release:sha256:d0e2ba9114029d5fcbdfb2df66e79dfde1f4c84c525d8731e9da4df89ab169f1",
+  "schema": "studio.bench.certified-release.v1",
+  "created_at": "2026-07-19T17:12:47.377Z",
+  "purpose": "rule_change_qualification",
+  "runtime_deployable": false,
+  "registration": {
+    "receipt": {
+      "path": "bench/rule-changes/ko-kinship-address-context/registration.json",
+      "content_id": "sha256:52eabe2f5c0493553042ea1892d7a5de85953a24e5dd8b6b93f151a3212bc3f2",
+      "bytes": 7479
+    },
+    "registration_id": "bench-rule-change-registration:sha256:8ca90db19a68f84a0f409323d0de12fa9a888dd9fa6d84fd9ca5a695dbea430d"
+  },
+  "side": "with",
+  "system_id": "1321-openai-audio-translation-rule-change",
+  "configuration": {
+    "config_id": "bench-config:sha256:28ef658e553a684152d1a4de0e1ba99cc28705b0b7b78ebb84ffa2086e86cf9b",
+    "config": {
+      "model": "whisper-1",
+      "provider": {
+        "id": "openai",
+        "operation": "audio_translation",
+        "response_format": "verbose_json",
+        "temperature": 0,
+        "timeout_ms": 120000,
+        "max_response_bytes": 1048576
+      },
+      "reviewed_memory": {
+        "rule_content_id": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7"
+      }
+    }
+  },
+  "evaluation_sources": [
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "authority": {
+        "path": "bench/prompts/gold-drafter-v1/manifest.json",
+        "content_id": "sha256:c6ae65505304bc7c3e4f8bc76598ba26bd6cd001ff0fcc71291df2703bda5430",
+        "bytes": 2550
+      },
+      "artifact": {
+        "path": "public/demo/runs/run-006/clip.mp4",
+        "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+        "bytes": 3465772
+      }
+    },
+    {
+      "clip_id": "local-eval-ko-control-01",
+      "authority": {
+        "path": "bench/packs/hard-ko-v1/pack.json",
+        "content_id": "sha256:12041b80b72c3d6135a26fc68eb6820288dd345cc2d9ed1921ac5226700e3adb",
+        "bytes": 4839
+      },
+      "artifact": {
+        "path": ".studio/scratch/control-01/gyumindInterviewTest.mp4",
+        "content_id": "sha256:2502c559cb77870dfddbedf074d7535c6c04cd9501b61435f7b910fd85c076e7",
+        "bytes": 5776236
+      }
+    },
+    {
+      "clip_id": "local-eval-ko-control-02",
+      "authority": {
+        "path": "bench/packs/hard-ko-v1/pack.json",
+        "content_id": "sha256:12041b80b72c3d6135a26fc68eb6820288dd345cc2d9ed1921ac5226700e3adb",
+        "bytes": 4839
+      },
+      "artifact": {
+        "path": ".studio/scratch/control-02/hyunseokInterviewTest.mp4",
+        "content_id": "sha256:48607e221bf5b12409e453171414667c9917c6eae7bdafa0497e2ffee76e4fc1",
+        "bytes": 9374608
+      }
+    }
+  ],
+  "reviewed_memory": {
+    "accepted_materialization": null,
+    "candidate_rule": {
+      "proposal": {
+        "path": "memory/review/proposals/f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3.json",
+        "content_id": "sha256:125328f5eb983e33bb16feb357327f93b81c11f2258a0d3039fa96c677a709c8",
+        "bytes": 1471
+      },
+      "proposal_id": "memory-proposal:sha256:f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3",
+      "proposal_content_id": "sha256:09856cd6d4d5a006c607bfa8b11e1adc5dad6f1b93aa27cf0f5c2acc87730d2b",
+      "rule_content_id": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7",
+      "namespace": "language/ko/rules",
+      "key": "ko.kinship-address-context",
+      "value": {
+        "instruction": "Treat bare Korean social address forms such as 누나, 오빠, 형, and 언니 as forms of address, not proof of a family relationship. Translate a family relationship only when surrounding speech supplies explicit kinship evidence, including terms such as 친누나 or 매형."
+      }
+    }
+  },
+  "host_context": {
+    "context_id": "bench-host-context:sha256:0c0b4379a0a7869328f5dd73a2256e47d8d4563877922ae0ea33743d4c76eab3",
+    "schema": "studio.bench.certified-host-context.v1",
+    "system_id": "1321-openai-audio-translation-rule-change",
+    "config_id": "bench-config:sha256:28ef658e553a684152d1a4de0e1ba99cc28705b0b7b78ebb84ffa2086e86cf9b",
+    "config": {
+      "model": "whisper-1",
+      "provider": {
+        "id": "openai",
+        "operation": "audio_translation",
+        "response_format": "verbose_json",
+        "temperature": 0,
+        "timeout_ms": 120000,
+        "max_response_bytes": 1048576
+      },
+      "reviewed_memory": {
+        "rule_content_id": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7"
+      }
+    },
+    "reviewed_memory": {
+      "accepted_materialization": null,
+      "entries": [
+        {
+          "namespace": "language/ko/rules",
+          "kind": "rule",
+          "key": "ko.kinship-address-context",
+          "value": {
+            "instruction": "Treat bare Korean social address forms such as 누나, 오빠, 형, and 언니 as forms of address, not proof of a family relationship. Translate a family relationship only when surrounding speech supplies explicit kinship evidence, including terms such as 친누나 or 매형."
+          },
+          "proposal_id": "memory-proposal:sha256:f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3",
+          "rule_content_id": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7",
+          "status": "qualification_candidate"
+        }
+      ]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { canonicalJsonContentId, canonicalSha256 } from "../artifactStore.ts";
+import { canonicalJsonContentId, canonicalSha256 } from "../canonicalIdentity.ts";
 import type {
   AgentRecoveryAuthorizationReceipt,
   AgentRecoveryPolicyContract,

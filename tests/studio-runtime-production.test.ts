@@ -33,7 +33,10 @@ import {
   initialRuntimeProjection,
   projectRuntimeEvents,
 } from "../src/studio/runtime/production/projection.ts";
-import { projectProductionRuntimeJournal } from "../src/studio/runtime/production/studioProjection.ts";
+import {
+  adaptProductionRuntime,
+  projectProductionRuntimeJournal,
+} from "../src/studio/runtime/production/studioProjection.ts";
 import type {
   RuntimeLimits,
   SourceArtifactDescriptor,
@@ -1030,6 +1033,11 @@ test("Codex launcher fails closed on unsupported capabilities and invalid child 
       const classification = Object.values(runtime.ledger.state().executorFailureClassifications)[0];
       assert.equal(classification.code, "output_limit_exceeded");
       assert.equal(classification.retryability, "terminal");
+      const production = adaptProductionRuntime(runtime.ledger.state());
+      assert.equal(production.executorFailureClassifications.length, 1);
+      assert.equal(production.executorFailureClassifications[0].code, "output_limit_exceeded");
+      assert.equal(production.executorFailureClassifications[0].retryability, "terminal");
+      assert.equal(production.agentRecoveries.length, 0);
     } finally {
       await cleanup(runtime);
     }

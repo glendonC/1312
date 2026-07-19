@@ -506,6 +506,8 @@ test("production adapter projects spawn and output lineage with existing facts o
     recordedDemo: false,
   });
   assert.equal(projection.lastSeq, 16);
+  assert.deepEqual(projection.executorFailureClassifications, []);
+  assert.deepEqual(projection.agentRecoveries, []);
   assert.deepEqual(projection.counts, {
     tasks: 2,
     workers: 2,

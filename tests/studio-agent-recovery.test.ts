@@ -7,6 +7,7 @@ import test from "node:test";
 import { FileEventJournal, MemoryEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import type { ExecutorFailureCode, RuntimeProjection } from "../src/studio/runtime/production/model.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
+import { adaptProductionRuntime } from "../src/studio/runtime/production/studioProjection.ts";
 import { interruptAmbiguousRuntime } from "../src/studio/runtime/production/recovery.ts";
 import {
   GENERALIZED_BASELINE_RUN_BUDGET,
@@ -195,6 +196,49 @@ test("retryable initial-coverage faults autonomously issue one exact replacement
         assert.equal(Object.keys(runtime.state.generalizedOwnedMediaStudies).length, 1);
         assert.equal(Object.values(runtime.state.generalizedParentArtifactAdmissions).some((entry) => entry.childTaskId === failed.id), false);
 
+        const production = adaptProductionRuntime(runtime.state);
+        assert.equal(production.counts.executorFailureClassifications, 1);
+        assert.equal(production.counts.agentRecoveries, 1);
+        assert.equal(production.executorFailureClassifications[0].receiptId, recovery.authorization.failedAttempt.failureClassificationReceiptId);
+        assert.equal(production.executorFailureClassifications[0].retryability, "replaceable");
+        assert.equal(production.executorFailureClassifications[0].code, code);
+        assert.equal(production.agentRecoveries[0].state, "replacement_reported");
+        assert.equal(production.agentRecoveries[0].authorization.failedAttempt.ordinal, 0);
+        assert.equal(production.agentRecoveries[0].authorization.failedAttempt.taskId, failed.id);
+        assert.equal(production.agentRecoveries[0].authorization.replacement.ordinal, 1);
+        assert.equal(production.agentRecoveries[0].authorization.replacement.taskId, replacement.id);
+        assert.equal(production.agentRecoveries[0].terminal?.replacementReportId !== null, true);
+        assert.equal(production.agentRecoveries[0].terminal?.attemptsConsumed, 2);
+        assert.equal(production.agentRecoveries[0].terminal?.remainingAttempts, 0);
+        assert.equal(production.agentRecoveries[0].terminal?.nonClaims.bestOfK, "not_performed");
+        assert.equal(JSON.stringify(production).includes("selected best report"), false);
+
+        if (code === "process_failed") {
+          const classificationIndex = runtime.events.findIndex((event) => event.type === "executor.failure_classified");
+          assert.ok(classificationIndex > 0);
+          const classifiedOnly = adaptProductionRuntime(projectRuntimeEvents(
+            runtime.runtimeId,
+            runtime.events.slice(0, classificationIndex + 1),
+          ));
+          assert.equal(classifiedOnly.executorFailureClassifications.length, 1);
+          assert.equal(classifiedOnly.executorFailureClassifications[0].retryability, "replaceable");
+          assert.equal(classifiedOnly.agentRecoveries.length, 0);
+
+          const authorizationIndex = runtime.events.findIndex((event) => event.type === "agent.recovery_authorized");
+          assert.ok(authorizationIndex > classificationIndex);
+          const authorizedOnly = adaptProductionRuntime(projectRuntimeEvents(
+            runtime.runtimeId,
+            runtime.events.slice(0, authorizationIndex + 1),
+          ));
+          assert.equal(authorizedOnly.agentRecoveries.length, 1);
+          assert.equal(authorizedOnly.agentRecoveries[0].state, "authorized");
+          assert.equal(authorizedOnly.agentRecoveries[0].terminal, null);
+          assert.equal(authorizedOnly.agentRecoveries[0].authorization.failedAttempt.taskId, failed.id);
+          assert.equal(authorizedOnly.agentRecoveries[0].authorization.replacement.taskId, replacement.id);
+          assert.equal(authorizedOnly.tasks.some((task) => task.taskId === failed.id && task.status === "failed"), true);
+          assert.equal(authorizedOnly.tasks.some((task) => task.taskId === replacement.id), false);
+        }
+
         const wait = Object.values(runtime.state.reportWaits).find((entry) =>
           entry.children.some((child) => child.taskId === replacement.id));
         assert.equal(wait?.result, "all_terminal");
@@ -374,6 +418,14 @@ test("a failed replacement closes exhausted, withholds the root, and cannot crea
       entry.children.some((child) => child.taskId === recovery.authorization.replacement.taskId));
     assert.equal(wait?.result, "closed_failure");
     assert.equal(wait?.failure, "child_failed");
+    const production = adaptProductionRuntime(runtime.state);
+    assert.equal(production.agentRecoveries.length, 1);
+    assert.equal(production.agentRecoveries[0].state, "exhausted");
+    assert.equal(production.agentRecoveries[0].authorization.failedAttempt.taskId, recovery.authorization.failedAttempt.taskId);
+    assert.equal(production.agentRecoveries[0].authorization.replacement.taskId, recovery.authorization.replacement.taskId);
+    assert.equal(production.agentRecoveries[0].terminal?.replacementReportId, null);
+    assert.equal(production.agentRecoveries[0].terminal?.attemptsConsumed, 2);
+    assert.equal(production.agentRecoveries[0].terminal?.remainingAttempts, 0);
   } finally {
     await cleanup(runtime.directory);
   }
@@ -410,6 +462,9 @@ test("weak/exhausted and conflicting evidence never enter execution recovery", a
       try {
         assert.equal(Object.keys(runtime.state.agentRecoveries).length, 0);
         assert.equal(Object.keys(runtime.state.executorFailureClassifications).length, 0);
+        const production = adaptProductionRuntime(runtime.state);
+        assert.equal(production.executorFailureClassifications.length, 0);
+        assert.equal(production.agentRecoveries.length, 0);
         if (mode === "restudy_exhausted") {
           assert.ok(Object.values(runtime.state.rangePasses).some((entry) => entry.terminal?.outcome === "withheld_exhausted"));
         } else {

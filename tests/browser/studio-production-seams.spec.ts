@@ -1,13 +1,31 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
 import { expect, test, type Locator, type Page, type Request, type Response } from "@playwright/test";
+
+import {
+  DeterministicRuntimeExecutor,
+  DurableRuntimeCommandStore,
+  RuntimeSourceRegistry,
+  RuntimeStartService,
+  createRuntimeHostHttpServer,
+  deterministicOrchestratorLauncherFactory,
+  listenRuntimeHost,
+} from "../../src/studio/runtime/production/runtimeHost/index.ts";
 
 function productStudioUrl(): string {
   const runtimeHost = process.env.STUDIO_RUNTIME_HOST_URL;
   return runtimeHost ? `/studio/?runtimeHost=${encodeURIComponent(runtimeHost)}` : "/studio/";
 }
 
-async function openCompletedDeterministicProjection(page: Page, endSeconds?: number): Promise<Locator> {
-  const token = process.env.STUDIO_RUNTIME_HOST_TOKEN ?? "";
-  await page.goto(productStudioUrl());
+async function openCompletedDeterministicProjection(
+  page: Page,
+  endSeconds?: number,
+  connection?: { url: string; token: string },
+): Promise<Locator> {
+  const token = connection?.token ?? process.env.STUDIO_RUNTIME_HOST_TOKEN ?? "";
+  await page.goto(connection ? `/studio/?runtimeHost=${encodeURIComponent(connection.url)}` : productStudioUrl());
   await page.getByRole("button", { name: "Owned file local ingest" }).click();
 
   const productRuntime = page.getByRole("region", { name: "Owned local source" });
@@ -30,7 +48,9 @@ async function openCompletedDeterministicProjection(page: Page, endSeconds?: num
   await productRuntime.getByRole("button", { name: "Accept forecast and start local runtime" }).click();
 
   const status = productRuntime.getByRole("region", { name: "Local runtime status" });
-  await expect(status.getByRole("heading", { name: "Terminal", exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(status.getByRole("heading", { name: /^(Terminal|Failed|Interrupted)$/, exact: true })).toBeVisible({
+    timeout: 10_000,
+  });
   return status.getByRole("region", { name: "Production task and handoff facts" });
 }
 
@@ -65,8 +85,105 @@ test("owned processing canvas exposes projection facts and explicit missing rece
   );
   await expect(coordination.locator('[data-production-live-empty="caption-lineage"]')).toBeVisible();
   await expect(coordination.getByText(/No caption-production start receipt/)).toBeVisible();
+  await expect(coordination.locator('[data-production-live-empty="agent-recovery"]')).toBeVisible();
+  await expect(coordination.locator("[data-production-live-recovery-boundary]")).toContainText("no best-of-K selection");
   await expect(canvas.getByRole("button", { name: "Evidence", exact: true })).toBeVisible();
   await expect(canvas.getByRole("button", { name: "Results", exact: true })).toHaveCount(0);
+});
+
+test("deterministic recovery receipts project absent, reported, and exhausted production facts", async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  test.skip(testInfo.project.name !== "desktop", "one deterministic desktop recovery projection is sufficient");
+
+  const fixtures = [
+    { label: "absent", executor: {}, state: null, classifications: 0 },
+    { label: "replacement_reported", executor: { failFirstInitialCoverageCode: "process_failed" }, state: "replacement_reported", classifications: 1 },
+    { label: "exhausted", executor: { exhaustInitialCoverageCode: "process_failed" }, state: "exhausted", classifications: 2 },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    const directory = await mkdtemp(join(tmpdir(), `studio-recovery-browser-${fixture.label}-`));
+    const sources = await RuntimeSourceRegistry.open({ sourceDirectories: [resolve("public/demo/runs/run-005")] });
+    const store = await DurableRuntimeCommandStore.open(join(directory, "runtime"));
+    const executor = new DeterministicRuntimeExecutor(fixture.executor);
+    const service = await RuntimeStartService.open({
+      store,
+      sources,
+      launcherFactory: executor.factory(),
+      orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory({ mode: "spawn_one" }),
+      recoverOnOpen: false,
+    });
+    const token = "c".repeat(64);
+    await page.goto("/studio/");
+    const origin = new URL(page.url()).origin;
+    const server = createRuntimeHostHttpServer({ service, token, allowedOrigins: [origin] });
+    try {
+      const address = await listenRuntimeHost(server, { port: 0 });
+      const url = `http://${address.host}:${address.port}`;
+      const production = await openCompletedDeterministicProjection(page, 1, { url, token });
+      const recoveryFacts = production.locator('[data-production-region="agent-recovery"]');
+      await expect(recoveryFacts.getByRole("heading", { name: "Initial-coverage recovery" })).toBeVisible();
+      await expect(recoveryFacts.locator("[data-production-recovery-boundary]")).toContainText("no best-of-K selection");
+      await expect(recoveryFacts.locator("[data-production-recovery-boundary]")).toContainText("does not recover root, caption, or Learning work");
+      await expect(recoveryFacts).not.toContainText("selected best report");
+
+      const coordination = page.getByRole("region", { name: "Receipt-backed coordination" });
+      if (fixture.state === null) {
+        await expect(recoveryFacts.locator('[data-production-empty="agent-recovery"]')).toBeVisible();
+        await expect(recoveryFacts.locator("[data-production-failure-classification-id]")).toHaveCount(0);
+        await expect(recoveryFacts.locator("[data-production-agent-recovery-id]")).toHaveCount(0);
+        await expect(coordination.locator('[data-production-live-empty="agent-recovery"]')).toBeVisible();
+        continue;
+      }
+
+      const classification = recoveryFacts.locator("[data-production-failure-classification-id]");
+      await expect(classification).toHaveCount(fixture.classifications);
+      for (let index = 0; index < fixture.classifications; index += 1) {
+        await expect(classification.nth(index)).toHaveAttribute("data-retryability", "replaceable");
+        await expect(classification.nth(index)).toContainText("Eligible for scheduler policy review only");
+      }
+
+      const recovery = recoveryFacts.locator("[data-production-agent-recovery-id]");
+      await expect(recovery).toHaveCount(1);
+      await expect(recovery).toHaveAttribute("data-recovery-state", fixture.state);
+      await expect(recovery.locator('[data-recovery-attempt="0"]')).toContainText("Attempt 0 · failed");
+      await expect(recovery.locator('[data-recovery-attempt="1"]')).toContainText("Attempt 1 · exact replacement");
+      await expect(recovery).toContainText("Replacement allocation ceiling");
+      await expect(recovery).toContainText("Run recovery contingency ceiling");
+      await expect(recovery).toContainText("2 / 0");
+      await expect(recovery.locator('[data-recovery-attempt="2"]')).toHaveCount(0);
+      await expect(recovery.getByRole("button")).toHaveCount(0);
+
+      const failedAttemptTaskLink = recovery.locator('[data-recovery-attempt="0"] [data-production-navigation="task"]');
+      await expect(failedAttemptTaskLink).toHaveCount(1);
+      const failedAttemptHref = await failedAttemptTaskLink.getAttribute("href");
+      expect(failedAttemptHref).toMatch(/^#product-production-task-/);
+      expect(await page.evaluate((target) => Boolean(target && document.getElementById(target.slice(1))), failedAttemptHref)).toBe(true);
+      expect(await page.evaluate(
+        (target) => target ? document.getElementById(target.slice(1))?.getAttribute("data-status") : null,
+        failedAttemptHref,
+      )).toBe("failed");
+
+      if (fixture.state === "replacement_reported") {
+        await expect(recovery).toContainText("Replacement reported");
+        await expect(recovery.locator('[data-recovery-attempt="1"] [data-production-navigation="report"]')).toHaveCount(1);
+      } else {
+        await expect(recovery).toContainText("Exhausted. Both authorized attempts were consumed, zero remain");
+        await expect(recovery).toContainText("None; recovery exhausted");
+        await expect(recovery.locator('[data-recovery-attempt="1"] [data-production-navigation="report"]')).toHaveCount(0);
+      }
+
+      const liveRecovery = coordination.locator("[data-production-live-recovery-id]");
+      await expect(liveRecovery).toHaveCount(1);
+      await expect(liveRecovery).toHaveAttribute("data-recovery-state", fixture.state);
+      await expect(liveRecovery.locator('[data-recovery-attempt="0"]')).toBeVisible();
+      await expect(liveRecovery.locator('[data-recovery-attempt="1"]')).toBeVisible();
+      await expect(liveRecovery).toContainText("not a forecast");
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+      await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+    }
+  }
 });
 
 test("attested approval explicitly produces private bounded captions without publication", async ({ page }, testInfo) => {

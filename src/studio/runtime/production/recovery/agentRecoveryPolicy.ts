@@ -1,4 +1,4 @@
-import { canonicalSha256 } from "../artifactStore.ts";
+import { canonicalSha256 } from "../canonicalIdentity.ts";
 import type {
   AgentRecoveryPolicyContract,
   ExecutorFailureCode,

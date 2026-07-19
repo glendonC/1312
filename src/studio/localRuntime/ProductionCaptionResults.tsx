@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import LearningFineTuneFace from "../learning/LearningFineTuneFace";
 import LearningResults from "../learning/LearningResults";
+import MomentsOverlay from "../learning/MomentsOverlay";
 import { projectProductionLearningPresentation } from "../learning/productionExplanationAdapter";
 import { projectVerifiedProductionLearningSource } from "../learning/productionSourceAdapter";
 import {
+  LEARNING_LENS_KINDS,
+  learningPrepKey,
   learningRequestKey,
   type LearningExplanationState,
+  type LearningFineTuneDraft,
   type LearningPlayback,
+  type LearningPrepProjection,
   type LearningSelectionRequest,
+  type ProductionLearningPrepInteraction,
 } from "../learning/presentation.ts";
 import { PRODUCTION_CAPTION_RESULTS_ID } from "../resultAccess";
 import type { VerifiedCaptionProductionResult } from "../runtime/production/captionProductionAudit";
 import type { LocalRuntimeHostClient } from "./client";
 import ProductionMediaPlayer from "./ProductionMediaPlayer.tsx";
 import { ProductionLearningController } from "./productionLearningController.ts";
+import { ProductionLearningPrepController } from "./productionLearningPrepController.ts";
 import {
   ProductionPlaybackController,
   type ProductionPlaybackLoadResult,
@@ -66,7 +74,13 @@ function ProductionCaptionResult({
     () => client ? new ProductionLearningController(client) : null,
     [client],
   );
+  const prepController = useMemo(
+    () => client ? new ProductionLearningPrepController(client) : null,
+    [client],
+  );
   const [explanation, setExplanation] = useState<LearningExplanationState | null>(null);
+  const [fineTuneDraft, setFineTuneDraft] = useState<LearningFineTuneDraft>({ armedLenses: [], temperature: "medium" });
+  const [prep, setPrep] = useState<LearningPrepProjection>({ state: "not_requested" });
   const playbackAvailable = playback.state === "available";
 
   useEffect(() => {
@@ -111,6 +125,56 @@ function ProductionCaptionResult({
     learningController?.invalidate();
     return () => learningController?.invalidate();
   }, [learningController, playbackAvailable, projectionKey]);
+
+  useEffect(() => {
+    setFineTuneDraft({ armedLenses: [], temperature: "medium" });
+    setPrep({ state: "not_requested" });
+    prepController?.invalidate();
+    return () => prepController?.invalidate();
+  }, [prepController, projectionKey]);
+
+  const updateFineTune = (next: LearningFineTuneDraft) => {
+    setFineTuneDraft(next);
+    setPrep({ state: "not_requested" });
+    prepController?.invalidate();
+  };
+
+  const updatePrep = (retry: boolean) => {
+    if (!prepController || sourceProjection.state !== "ready" || fineTuneDraft.armedLenses.length === 0) return;
+    const fineTune: LearningFineTuneDraft = {
+      armedLenses: [...fineTuneDraft.armedLenses],
+      temperature: fineTuneDraft.temperature,
+    };
+    const prepKey = learningPrepKey(sourceProjection.source, fineTune);
+    if (!retry && (prep.state === "loading" || (prep.state === "ready" && prep.prepKey === prepKey))) return;
+    if (retry && !(prep.state === "failed" && prep.prepKey === prepKey && prep.retry === "available")) return;
+    setPrep({ state: "loading", prepKey, fineTune });
+    const input = { runtimeId, source: sourceProjection.source, fineTune };
+    const pending = retry ? prepController.retry(input) : prepController.request(input);
+    void pending.then((next) => {
+      setPrep((current) => current.state !== "not_requested" && current.prepKey === prepKey ? next : current);
+    });
+  };
+
+  const prepInteraction: ProductionLearningPrepInteraction = {
+    draft: fineTuneDraft,
+    prep,
+    availability: sourceProjection.state === "ready" && sourceProjection.source.context.authorityState !== "unrevoked"
+      ? { state: "unavailable", reasonCode: "caption_authority_revoked" }
+      : prepController
+        ? { state: "available" }
+        : { state: "unavailable", reasonCode: "prep_interaction_unavailable" },
+    onToggleLens: (lens) => updateFineTune({
+      armedLenses: LEARNING_LENS_KINDS.filter((candidate) =>
+        candidate === lens
+          ? !fineTuneDraft.armedLenses.includes(lens)
+          : fineTuneDraft.armedLenses.includes(candidate)),
+      temperature: fineTuneDraft.temperature,
+    }),
+    onTemperature: (temperature) => updateFineTune({ armedLenses: fineTuneDraft.armedLenses, temperature }),
+    onPrepare: () => updatePrep(false),
+    onRetry: () => updatePrep(true),
+  };
 
   const updateExplanation = (request: LearningSelectionRequest, retry: boolean) => {
     if (!learningController || !playbackAvailable || sourceProjection.state !== "ready") return;
@@ -164,7 +228,10 @@ function ProductionCaptionResult({
       {sourceProjection.state === "ready" ? (
         <>
           {loadResult.state === "available" ? (
-            <ProductionMediaPlayer binding={loadResult.binding} onPlaybackChange={setPlayback} />
+            <div className="product-runtime-player-frame">
+              <ProductionMediaPlayer binding={loadResult.binding} onPlaybackChange={setPlayback} />
+              <MomentsOverlay prep={prep} playback={playback} />
+            </div>
           ) : (
             <p
               className="product-runtime-unavailable"
@@ -177,6 +244,7 @@ function ProductionCaptionResult({
                 : loadResult.detail}
             </p>
           )}
+          <LearningFineTuneFace interaction={prepInteraction} />
           <LearningResults
             presentation={projectProductionLearningPresentation(sourceProjection.source, {
               playbackAvailable,

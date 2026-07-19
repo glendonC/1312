@@ -209,3 +209,138 @@ export function learningRequestKey(
     request.span.text,
   ].join("\u001f");
 }
+
+export const LEARNING_LENS_KINDS = [
+  "word_order",
+  "grammar_salience",
+  "situating",
+  "culture_reference",
+  "historical_reference",
+] as const;
+
+export type LearningLensKind = (typeof LEARNING_LENS_KINDS)[number];
+
+export const LEARNING_TEMPERATURES = ["low", "medium", "high"] as const;
+
+export type LearningTemperature = (typeof LEARNING_TEMPERATURES)[number];
+
+export interface LearningFineTuneDraft {
+  armedLenses: LearningLensKind[];
+  temperature: LearningTemperature;
+}
+
+export interface LearningPrepContentByLens {
+  word_order: { sourcePhrase: string; targetPhrase: string; note: string };
+  grammar_salience: { construction: string; note: string };
+  situating: { situation: string };
+  culture_reference: { referent: string; note: string };
+  historical_reference: { referent: string; note: string };
+}
+
+interface LearningPrepMomentAuthority {
+  executionAuthority: "host_receipted";
+  semanticReviewState: "not_reviewed";
+  externalCitationIds: [];
+}
+
+export type AvailableLearningPrepMoment = {
+  [Lens in LearningLensKind]: LearningPrepMomentAuthority & {
+    lens: Lens;
+    lineId: string;
+    startMs: number;
+    endMs: number;
+    availability: "available";
+    reasonCode: null;
+    grounding: "caption_context_inference";
+    content: LearningPrepContentByLens[Lens];
+  };
+}[LearningLensKind];
+
+export interface MissingLearningPrepMoment extends LearningPrepMomentAuthority {
+  lens: LearningLensKind;
+  lineId: string;
+  startMs: number;
+  endMs: number;
+  availability: "withheld" | "unavailable";
+  reasonCode: "generator_abstained" | "insufficient_caption_context" | "external_grounding_unavailable";
+  grounding: "none";
+  content: null;
+}
+
+export type LearningPrepMoment = AvailableLearningPrepMoment | MissingLearningPrepMoment;
+
+export interface LearningPrepLensSummary {
+  lens: LearningLensKind;
+  state: "surfaced" | "abstained";
+  reasonCode: "generator_abstained" | "insufficient_caption_context" | "no_reference_detected" | null;
+  candidateCount: number;
+}
+
+export type LearningPrepSegmentationView =
+  | { mode: "beats"; beats: Array<{ beatId: string; startMs: number; endMs: number; lineIds: string[] }> }
+  | { mode: "watch_through"; reasonCode: "no_beat_boundaries_warranted" | "insufficient_caption_context" };
+
+export type LearningPrepProjection =
+  | { state: "not_requested" }
+  | { state: "loading"; prepKey: string; fineTune: LearningFineTuneDraft }
+  | {
+      state: "unavailable";
+      prepKey: string;
+      fineTune: LearningFineTuneDraft;
+      reasonCode: "production_prep_executor_unavailable" | "caption_authority_revoked";
+      detail: string;
+      retry: "unavailable";
+    }
+  | {
+      state: "failed";
+      prepKey: string;
+      fineTune: LearningFineTuneDraft;
+      reasonCode: "prep_request_failed" | "prep_retry_exhausted" | "invalid_prep_binding";
+      detail: string;
+      retry: "available" | "unavailable";
+    }
+  | {
+      state: "ready";
+      prepKey: string;
+      fineTune: LearningFineTuneDraft;
+      resultState: "completed" | "partial" | "unavailable";
+      segmentation: LearningPrepSegmentationView;
+      moments: LearningPrepMoment[];
+      lenses: LearningPrepLensSummary[];
+      authority: {
+        dataClass: "runtime_artifact";
+        executionAuthority: "host_receipted";
+        semanticReviewState: "not_reviewed";
+        artifactId: string;
+        contentId: string;
+        receiptId: string;
+        receiptContentId: string;
+      };
+      nonClaims: readonly string[];
+    };
+
+export interface ProductionLearningPrepInteraction {
+  draft: LearningFineTuneDraft;
+  prep: LearningPrepProjection;
+  availability:
+    | { state: "available" }
+    | { state: "unavailable"; reasonCode: "caption_authority_revoked" | "prep_interaction_unavailable" };
+  onToggleLens: (lens: LearningLensKind) => void;
+  onTemperature: (temperature: LearningTemperature) => void;
+  onPrepare: () => void;
+  onRetry: () => void;
+}
+
+export function learningPrepKey(
+  source: Extract<LearningViewingSource, { context: { origin: "verified_production_caption" } }>,
+  fineTune: LearningFineTuneDraft,
+): string {
+  const identity = source.context.identities;
+  return [
+    identity.runId,
+    identity.captionJobId,
+    identity.captionContentId,
+    fineTune.temperature,
+    ...fineTune.armedLenses,
+  ].join("\u001f");
+}

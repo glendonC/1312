@@ -10,6 +10,8 @@ import type {
   RuntimeHostDecisionReceiptResponse,
   RuntimeHostLanguageExplanationRequest,
   RuntimeHostLanguageExplanationResponse,
+  RuntimeHostLearningPrepRequest,
+  RuntimeHostLearningPrepResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewDecisionRequest,
@@ -34,6 +36,7 @@ import {
 } from "./captionResponses.ts";
 import { planResponse } from "./planResponse.ts";
 import { languageExplanationResponse } from "./languageExplanationResponses.ts";
+import { learningPrepResponse } from "./learningPrepResponses.ts";
 import {
   contentId,
   exact,
@@ -365,6 +368,27 @@ export class LocalRuntimeHostClient {
   ): Promise<RuntimeHostLanguageExplanationResponse> {
     return languageExplanationResponse(
       await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/language-explanations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      }),
+      runtimeId,
+    );
+  }
+
+  async learningPreps(runtimeId: string): Promise<RuntimeHostLearningPrepResponse> {
+    return learningPrepResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/learning-preps`),
+      runtimeId,
+    );
+  }
+
+  async createLearningPrep(
+    runtimeId: string,
+    request: RuntimeHostLearningPrepRequest,
+  ): Promise<RuntimeHostLearningPrepResponse> {
+    return learningPrepResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/learning-preps`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),

@@ -707,3 +707,145 @@ test("receipted child media/evidence operations and artifact identity hooks proj
   await sourceLinks.first().click();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe(sourceHref);
 });
+
+test("armed fine-tune prepares a receipted moments overlay that stays silent without justified help", async ({ page }, testInfo) => {
+  test.setTimeout(150_000);
+  test.skip(testInfo.project.name !== "desktop", "one deterministic desktop learning-prep path is sufficient");
+
+  const { DeterministicCurrentRunCaptionTestExecutor } = await import(
+    "../../src/studio/runtime/production/runtimeHost/index.ts"
+  );
+  const { DeterministicLearningPrepTestExecutor } = await import(
+    "../../src/studio/runtime/production/learningPrep/deterministicTestExecutor.ts"
+  );
+
+  const prepExecutor = new DeterministicLearningPrepTestExecutor((input) => ({
+    segmentation: { mode: "watch_through", reasonCode: "no_beat_boundaries_warranted" },
+    candidates: [
+      {
+        lens: "situating",
+        lineId: input.lines[0].lineId,
+        availability: "available",
+        reasonCode: null,
+        content: { situation: "The clip opens with one speaker naming the current scene." },
+      },
+      ...(input.lines.length > 1
+        ? [{
+            lens: "culture_reference" as const,
+            lineId: input.lines[1].lineId,
+            availability: "withheld" as const,
+            reasonCode: "external_grounding_unavailable" as const,
+            content: null,
+          }]
+        : []),
+    ],
+    lensAbstentions: [
+      { lens: "historical_reference", reasonCode: "no_reference_detected" },
+    ],
+  }));
+
+  const fixtures = [
+    { label: "prepared", learningPrepExecutor: prepExecutor },
+    { label: "unconfigured", learningPrepExecutor: undefined },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    const directory = await mkdtemp(join(tmpdir(), `studio-learning-prep-browser-${fixture.label}-`));
+    const sources = await RuntimeSourceRegistry.open({ sourceDirectories: [resolve("public/demo/runs/run-005")] });
+    const store = await DurableRuntimeCommandStore.open(join(directory, "runtime"));
+    const service = await RuntimeStartService.open({
+      store,
+      sources,
+      launcherFactory: new DeterministicRuntimeExecutor({}).factory(),
+      orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory(),
+      captionExecutor: new DeterministicCurrentRunCaptionTestExecutor(),
+      learningPrepExecutor: fixture.learningPrepExecutor,
+      recoverOnOpen: false,
+    });
+    const token = "e".repeat(64);
+    await page.goto("/studio/");
+    const origin = new URL(page.url()).origin;
+    const server = createRuntimeHostHttpServer({ service, token, allowedOrigins: [origin] });
+    const learningPrepPosts: Request[] = [];
+    await page.route("**/v1/runtimes/*/learning-preps", async (route) => {
+      if (route.request().method() === "POST") learningPrepPosts.push(route.request());
+      await route.continue();
+    });
+    try {
+      const address = await listenRuntimeHost(server, { port: 0 });
+      const url = `http://${address.host}:${address.port}`;
+      const production = await openCompletedDeterministicProjection(page, 47.2, { url, token });
+
+      const review = production.locator('[data-production-region="publish-review-human-review"]');
+      const control = review.locator("[data-production-review-control-intake-id]");
+      await expect(control).toHaveCount(1, { timeout: 15_000 });
+      await control.locator("[data-production-review-attestation]").check();
+      await control.locator('[data-production-review-action="approve_for_caption_production"]').click();
+      const captions = production.locator('[data-production-region="caption-production"]');
+      await captions.locator('[data-production-caption-action="start"]').click();
+      const productionResults = page.locator('[data-production-results-region="caption-lineage"]');
+      await expect(productionResults.locator("[data-production-results-job-id]")).toHaveCount(1, { timeout: 15_000 });
+
+      const face = productionResults.getByRole("region", { name: "Customize learning" });
+      await expect(face).toHaveAttribute("data-learning-prep-state", "not_requested");
+      await expect(face).toContainText("never verified culture or history");
+      const prepare = face.locator('[data-fine-tune-action="prepare"]');
+      await expect(prepare).toBeDisabled();
+      await face.locator('[data-fine-tune-lens="situating"] input').check();
+      await face.locator('[data-fine-tune-lens="culture_reference"] input').check();
+      await face.locator('[data-fine-tune-lens="historical_reference"] input').check();
+      await face.locator('[data-fine-tune-temperature="low"] input').check();
+      await expect(face).toHaveAttribute("data-armed-lenses", "situating,culture_reference,historical_reference");
+      await expect(face).toHaveAttribute("data-temperature", "low");
+      await expect(prepare).toBeEnabled();
+      await prepare.click();
+
+      await expect.poll(() => learningPrepPosts.length).toBe(1);
+      const posted = learningPrepPosts[0].postDataJSON() as {
+        caption: { jobId: string };
+        fineTune: { schema: string; armedLenses: string[]; temperature: string };
+      };
+      expect(posted.fineTune).toEqual({
+        schema: "studio.learning-fine-tune.v1",
+        armedLenses: ["situating", "culture_reference", "historical_reference"],
+        temperature: "low",
+      });
+      const resultsJobId = await productionResults
+        .locator("[data-production-results-job-id]")
+        .getAttribute("data-production-results-job-id");
+      expect(posted.caption.jobId).toBe(resultsJobId);
+
+      if (fixture.learningPrepExecutor) {
+        await expect(face).toHaveAttribute("data-learning-prep-state", "ready", { timeout: 15_000 });
+        await expect(face).toHaveAttribute("data-learning-prep-result-state", "partial");
+        await expect(face.locator('[data-prep-lens="situating"]')).toHaveAttribute("data-lens-state", "surfaced");
+        await expect(face.locator('[data-prep-lens="culture_reference"]')).toHaveAttribute("data-lens-state", "surfaced");
+        await expect(face.locator('[data-prep-lens="historical_reference"]')).toHaveAttribute("data-lens-state", "abstained");
+        await expect(face).toContainText("Withheld and abstained help stays withheld");
+        await expect(face).toContainText("not culture or history authority");
+
+        const privatePlayer = productionResults.getByRole("region", { name: "Private production media playback" });
+        await expect(privatePlayer).toHaveAttribute("data-private-playback-state", "ready", { timeout: 15_000 });
+        const overlay = page.locator('[data-moments-overlay-state="active"]');
+        await expect(overlay).toHaveCount(1, { timeout: 10_000 });
+        await expect(overlay).toHaveAttribute("data-moments-lens", "situating");
+        await expect(overlay).toContainText("naming the current scene");
+        await expect(overlay).toContainText("unreviewed note");
+
+        const learning = productionResults.getByRole("region", { name: "Language learning workspace" });
+        const secondCue = learning.locator("[data-production-results-line-id]").nth(1);
+        await secondCue.getByRole("button", { name: /^Seek to / }).click();
+        await expect(secondCue).toHaveClass(/is-active/, { timeout: 10_000 });
+        await expect(page.locator('[data-moments-overlay-state="active"]')).toHaveCount(0);
+      } else {
+        await expect(face).toHaveAttribute("data-learning-prep-state", "unavailable", { timeout: 15_000 });
+        await expect(face.locator('[data-reason-code="production_prep_executor_unavailable"]')).toBeVisible();
+        await expect(face.locator('[data-fine-tune-action="retry"]')).toHaveCount(0);
+      }
+    } finally {
+      await page.unroute("**/v1/runtimes/*/learning-preps");
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+      await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+    }
+  }
+});

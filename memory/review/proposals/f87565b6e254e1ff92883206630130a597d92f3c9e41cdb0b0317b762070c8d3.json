@@ -1,0 +1,38 @@
+{
+  "proposal_id": "memory-proposal:sha256:f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3",
+  "schema": "studio.memory.proposal.v1",
+  "namespace": "language/ko/rules",
+  "kind": "rule",
+  "key": "ko.kinship-address-context",
+  "value": {
+    "instruction": "Treat bare Korean social address forms such as 누나, 오빠, 형, and 언니 as forms of address, not proof of a family relationship. Translate a family relationship only when surrounding speech supplies explicit kinship evidence, including terms such as 친누나 or 매형."
+  },
+  "proposed_by": "agent:il03-draft",
+  "created_at": "2026-07-19T16:33:50.300Z",
+  "source": {
+    "run_id": "run-005",
+    "clip_id": "ko-clip-01",
+    "candidates_manifest": "bench/candidates/run-005/candidates.json",
+    "routing": "training",
+    "miss_signal": "ko.kinship_address",
+    "note": "Draft behavioral rule from a training-routed correction. This file is not a reviewed memory proposal."
+  },
+  "evidence": [
+    {
+      "path": "public/demo/runs/run-005/corrections.json",
+      "content_id": "sha256:3a1ac5144b9f2a6f86098cae7a84c9feedc76ad4396a6f15d334e7ecf0dfc77a",
+      "bytes": 2522
+    },
+    {
+      "path": "public/demo/runs/run-005/glossary.json",
+      "content_id": "sha256:680f155e8023f6a4aa1073c4e3d54d37f974621224f319a98430e9b5fbd99611",
+      "bytes": 1136
+    }
+  ],
+  "supersedes": null,
+  "review_requirements": {
+    "benchmark": {
+      "pack_id": "hard-ko-v1"
+    }
+  }
+}

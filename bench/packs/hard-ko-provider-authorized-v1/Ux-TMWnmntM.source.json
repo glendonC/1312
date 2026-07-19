@@ -1,0 +1,20 @@
+{
+  "kind": "youtube",
+  "label": "Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
+  "channel": "Didi's Korean Culture Podcast",
+  "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+  "video_id": "Ux-TMWnmntM",
+  "licence": "Creative Commons Attribution license (reuse allowed)",
+  "window": {
+    "start": "00:05:10",
+    "end": "00:05:50"
+  },
+  "duration": 40,
+  "attribution": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed).",
+  "local_copy": {
+    "path": "public/demo/runs/run-006/clip.mp4",
+    "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+    "bytes": 3465772
+  },
+  "note": "Exact 00:05:10–00:05:50 Creative Commons Attribution evaluation window retained from run-006. The existing content-bound local copy is reused for provider-authorized benchmark execution."
+}

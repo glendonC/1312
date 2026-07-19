@@ -16,6 +16,11 @@ import {
   PROOF_RUNTIME_LIMITS,
   runBoundedRuntimeApplication,
 } from "../src/studio/runtime/production/runtimeHost/runtimeApplication.ts";
+import {
+  GENERALIZED_INITIAL_COVERAGE_BUDGET,
+  GENERALIZED_ROOT_BUDGET,
+  GENERALIZED_RUN_BUDGET,
+} from "../src/studio/runtime/production/executor/generalizedBudgetContract.ts";
 
 function currentRunRecognizer(): CurrentRunSpeechRecognizer {
   return {
@@ -51,7 +56,10 @@ function currentRunRecognizer(): CurrentRunSpeechRecognizer {
   };
 }
 
-async function fakeCodex(directory: string, mode: "normal" | "hang-root" = "normal"): Promise<{ executable: string; prefix: string[] }> {
+async function fakeCodex(
+  directory: string,
+  mode: "normal" | "hang-root" | "repeat-generalized-read" | "wrong-generalized-budget" = "normal",
+): Promise<{ executable: string; prefix: string[] }> {
   const script = join(directory, "fake-owned-swarm-codex.mjs");
   await writeFile(script, `
 const args = process.argv.slice(2);
@@ -89,11 +97,11 @@ if (isRoot) {
   if (!prompt.includes("exactly " + expectedRootToolCount + " closed, path-free tools") || !prompt.includes("study_synthesize") || !prompt.includes("jobContext") || (restudied && (!prompt.includes("study_restudy_request") || !prompt.includes("study_separation_request") || !prompt.includes("study_research_request")))) {
     throw new Error("closed root prompt contract is missing");
   }
-  if (!prompt.includes('budget exactly {"wallMs":180000,"toolCalls":2}') || !prompt.includes("Never retry an equivalent rejected range")) {
+  if ((generalized && !prompt.includes('budget exactly {"wallMs":240000,"toolCalls":2}')) || !prompt.includes("Never retry an equivalent rejected range")) {
     throw new Error("initial coverage child budget contract is missing");
   }
   const root = JSON.parse(prompt.split("\\n\\n").at(-1));
-  const call = async (name, argumentsValue) => {
+  const rawCall = async (name, argumentsValue) => {
     const response = await fetch(process.env.STUDIO_ORCHESTRATOR_BRIDGE_URL + "/v1/call", {
       method: "POST",
       headers: {
@@ -103,6 +111,10 @@ if (isRoot) {
       body: JSON.stringify({ name, arguments: argumentsValue }),
     });
     const body = await response.json();
+    return { response, body };
+  };
+  const call = async (name, argumentsValue) => {
+    const { response, body } = await rawCall(name, argumentsValue);
     if (!response.ok || body.ok !== true) throw new Error("orchestrator bridge rejected " + name + ": " + JSON.stringify(body));
     return body.result;
   };
@@ -116,7 +128,7 @@ if (isRoot) {
     requiredOutputs: [{ name: "coverage study", artifactKind: generalized ? "studio.study-report.v2" : "studio.study-report.v1", required: true }],
     requiredCapabilities: ["speech.transcribe", "report.submit"],
     dependencyWorkloadKeys: [],
-    budget: { wallMs: generalized ? 180000 : 10000, toolCalls: 2 },
+    budget: { wallMs: generalized ? (testMode === "wrong-generalized-budget" ? 180000 : 240000) : 10000, toolCalls: 2 },
   });
   const midpoint = Math.floor((root.mediaScope[0].startMs + root.mediaScope[0].endMs) / 2);
   const left = await call("task_spawn_request", child("left", root.mediaScope[0].startMs, midpoint));
@@ -126,6 +138,7 @@ if (isRoot) {
   if (waited.result !== "all_terminal" || waited.children.length !== 2) throw new Error("wait did not return two terminal children");
   let planningInput = null;
   let synthesisInput = null;
+  let firstReadRequest = null;
   for (const childResult of waited.children) {
     const disposition = await call("report_disposition", {
       reportId: childResult.reportId,
@@ -134,15 +147,27 @@ if (isRoot) {
       reason: "The fake model root accepts this structurally audited report for contract planning only.",
     });
     if (!disposition.admission) throw new Error("accepted report had no admission");
-    const read = await call("artifact_read", {
+    const readRequest = {
       grantId: disposition.admission.grant.id,
       contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
-    });
+    };
+    firstReadRequest = firstReadRequest || readRequest;
+    const read = await call("artifact_read", readRequest);
     planningInput = read.planningInput || planningInput;
     synthesisInput = read.synthesisInput || synthesisInput;
   }
   if (generalized) {
     if (!synthesisInput) throw new Error("two admitted generalized reads did not expose synthesis input");
+    if (Object.keys(synthesisInput).length !== 1 || typeof synthesisInput.inputId !== "string" || !synthesisInput.inputId.startsWith("study-synthesis-input:")) {
+      throw new Error("generalized synthesis input was not one opaque host-derived id");
+    }
+    if (testMode === "repeat-generalized-read") {
+      const duplicate = await rawCall("artifact_read", firstReadRequest);
+      if (duplicate.response.ok || duplicate.body.ok === true || !duplicate.body.error.message.includes("one read authority") ||
+          !duplicate.body.error.message.includes(synthesisInput.inputId) || !duplicate.body.error.message.includes("Call study_synthesize now")) {
+        throw new Error("duplicate generalized admission read did not fail before mutation");
+      }
+    }
     const synthesis = await call("study_synthesize", synthesisInput);
     if (!synthesis.studyId || synthesis.executorReceipt.schema !== (restudied ? "studio.owned-media-study.executor-receipt.v3" : "studio.owned-media-study.executor-receipt.v2")) throw new Error("generalized study synthesis did not close");
   } else {
@@ -349,7 +374,7 @@ test("default Codex launcher closes the eight-tool research-aware report-to-read
       loadedSource,
       analysisRequest,
     });
-    const fake = await fakeCodex(directory);
+    const fake = await fakeCodex(directory, "repeat-generalized-read");
     const model = "owned-swarm-test-model";
     await runBoundedRuntimeApplication(
       initialized,
@@ -359,10 +384,10 @@ test("default Codex launcher closes the eight-tool research-aware report-to-read
     const state = (await RuntimeLedger.open(initialized.runStart.runtimeId, new FileEventJournal(initialized.journalPath))).state();
     const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
     const children = Object.values(state.tasks).filter((task) => task.parentTaskId === root.id);
-    assert.deepEqual(root.budget, { wallMs: 300_000, toolCalls: 20 });
-    assert.ok(children.every((task) => task.budget.wallMs === 180_000));
-    assert.equal(PROOF_RUNTIME_LIMITS.runBudget.wallMs, 740_000);
-    assert.ok(root.budget.wallMs > Math.max(...children.map((task) => task.budget.wallMs)));
+    assert.deepEqual(root.budget, GENERALIZED_ROOT_BUDGET);
+    assert.ok(children.every((task) => task.budget.wallMs === GENERALIZED_INITIAL_COVERAGE_BUDGET.wallMs));
+    assert.deepEqual(PROOF_RUNTIME_LIMITS.runBudget, GENERALIZED_RUN_BUDGET);
+    assert.equal(root.budget.wallMs - Math.max(...children.map((task) => task.budget.wallMs)), 180_000);
     assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v3", required: true }]);
     assert.equal(root.grants.some((grant) => grant.capability === "study.plan"), false);
     assert.equal(root.grants.some((grant) => grant.capability === "study.restudy"), true);
@@ -370,6 +395,9 @@ test("default Codex launcher closes the eight-tool research-aware report-to-read
     assert.equal(Object.values(state.reports).filter((report) => report.study?.schema === "studio.study-report-submission.v2").length, 2);
     assert.equal(Object.keys(state.generalizedParentArtifactAdmissions).length, 2);
     assert.equal(Object.keys(state.generalizedParentArtifactReads).length, 2);
+    assert.equal(Object.values(state.orchestratorToolCalls).filter((call) => call.tool === "artifact_read").length, 2);
+    assert.equal(Object.values(state.orchestratorToolCalls).filter((call) => call.tool === "study_synthesize").length, 1);
+    assert.ok(Object.values(state.researchRequestInputs).some((input) => input.triggers.length === 0));
     assert.equal(Object.keys(state.generalizedOwnedMediaStudies).length, 1);
     assert.equal(Object.keys(state.generalizedStudyReadiness).length, 1);
     assert.equal(Object.values(state.generalizedOwnedMediaStudies)[0].schema, "studio.owned-media-study.v3");
@@ -377,6 +405,51 @@ test("default Codex launcher closes the eight-tool research-aware report-to-read
     assert.equal(Object.keys(state.parentArtifactDispositions).length, 0);
     assert.equal(Object.keys(state.ownedMediaStudies).length, 0);
     assert.equal(Object.keys(state.studyPlanningDecisions).length, 0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("generalized Codex launcher rejects an initial coverage budget below the shared 240s contract", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "studio-orchestrator-budget-contract-"));
+  try {
+    const loadedSource = await loadOwnedSourceSession(resolve("public/demo/runs/run-005"));
+    const analysisRequest = createProductionAnalysisRequest(loadedSource.session, {
+      range: { startMs: 0, endMs: 2_000 },
+      requestedSource: { mode: "declared", languages: ["ko"], reason: null },
+      targetLanguage: "en",
+      selectedLanguagePackId: "ko-v3",
+      outputDepth: "evidence",
+    });
+    const runtimeRoot = join(directory, "runtime");
+    const initialized = await initializeRuntimeApplication({
+      runtimeRoot,
+      journalPath: join(runtimeRoot, "events.ndjson"),
+      artifactStoreRoot: join(runtimeRoot, "artifact-store"),
+      runStartPath: join(runtimeRoot, "run-start.json"),
+      runtimeId: "runtime:orchestrator-budget-contract",
+      journalId: "journal:orchestrator-budget-contract",
+      acceptedBy: "operator:test",
+      startedAt: "2026-07-16T12:00:00.000Z",
+      loadedSource,
+      analysisRequest,
+    });
+    const fake = await fakeCodex(directory, "wrong-generalized-budget");
+    const model = "owned-swarm-test-model";
+    await assert.rejects(
+      runBoundedRuntimeApplication(
+        initialized,
+        codexWorkerLauncherFactory({ executable: fake.executable, executableArgsPrefix: fake.prefix, model, maximumWallMs: 20_000 }),
+        codexOrchestratorLauncherFactory({ executable: fake.executable, executableArgsPrefix: fake.prefix, model, maximumWallMs: 20_000 }),
+      ),
+      /changed the coverage-study child contract/,
+    );
+    const state = (await RuntimeLedger.open(initialized.runStart.runtimeId, new FileEventJournal(initialized.journalPath))).state();
+    const root = Object.values(state.tasks).find((task) => task.parentTaskId === null)!;
+    assert.equal(root.status, "failed");
+    assert.ok(Object.values(state.spawnRequests).every((request) => request.input.budget.wallMs === 180_000));
+    assert.equal(Object.keys(state.orchestratorDecisions).length, 0);
+    assert.equal(Object.keys(state.generalizedStudyReadiness).length, 0);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

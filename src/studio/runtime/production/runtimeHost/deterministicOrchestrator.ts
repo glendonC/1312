@@ -3,7 +3,7 @@ import {
   BoundedOrchestratorBridge,
   type ReportsWaitToolResult,
 } from "../executor/orchestratorBridge.ts";
-import type { ExecutorSpanReceipt, OwnedMediaStudyClaimV2, OwnedMediaStudyCoverageRangeV2, RestudiedResearchRequestInput, StudyPlanningInput, StudyReportArtifact, TaskRecord } from "../model.ts";
+import type { ExecutorSpanReceipt, RestudiedResearchRequestInput, StudyPlanningInput, StudyReportArtifact, TaskRecord } from "../model.ts";
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import type {
   BoundedOrchestratorLauncher,
@@ -28,6 +28,7 @@ export type DeterministicOrchestratorMode =
   | "unsupported_claim"
   | "hidden_gap"
   | "duplicate_synthesis"
+  | "empty_research_synthesis_only"
   | "restudy_support"
   | "restudy_exhausted"
   | "restudy_disagreement"
@@ -175,9 +176,10 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
       }
       const waited = await bridge.wait({});
       if (waited.result !== "all_terminal") throw new Error(`Deterministic generalized fan-out failed as ${waited.failure}`);
-      let synthesisInput: { coverage: OwnedMediaStudyCoverageRangeV2[]; claims: OwnedMediaStudyClaimV2[] } | null = null;
+      let synthesisInput: { inputId: string } | null = null;
       let restudyInput: Awaited<ReturnType<RangePassHost["inspect"]>> | null = null;
       let researchInput: RestudiedResearchRequestInput | null = null;
+      let firstReadRequest: { grantId: string; contentIds: string[] } | null = null;
       for (const child of waited.children) {
         if (!child.reportId || child.artifactIds.length !== 1) throw new Error("Deterministic generalized child did not return one typed report");
         const disposition = await bridge.disposition({
@@ -187,13 +189,42 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
           reason: "The deterministic seam accepts this structurally audited U3 report for bounded synthesis; no correctness or quality is claimed.",
         });
         if (!disposition.admission || !("grant" in disposition.admission)) throw new Error("Deterministic generalized admission did not create exact read authority");
-        const read = await bridge.readAdmitted({
+        const readRequest = {
           grantId: disposition.admission.grant.id,
           contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
-        });
+        };
+        firstReadRequest ??= readRequest;
+        const read = await bridge.readAdmitted(readRequest);
         synthesisInput = read.synthesisInput ?? synthesisInput;
         restudyInput = read.restudyInput ?? restudyInput;
         researchInput = read.researchInput?.schema === "studio.research-request-input.v2" ? read.researchInput : researchInput;
+      }
+      const initialSynthesisInputId = synthesisInput?.inputId ?? null;
+      if (this.mode === "empty_research_synthesis_only") {
+        if (!firstReadRequest || !synthesisInput || restudyInput?.candidates.length !== 0 || researchInput?.triggers.length !== 0) {
+          throw new Error("Deterministic synthesis-only proof did not reach an empty restudy and research boundary");
+        }
+        let duplicateReadRejected = false;
+        try {
+          await bridge.readAdmitted(firstReadRequest);
+        } catch (error) {
+          duplicateReadRejected = error instanceof Error && error.message.includes("one read authority");
+        }
+        if (!duplicateReadRejected) throw new Error("Deterministic synthesis-only proof accepted a duplicate generalized read");
+        let repeatedWaitRejected = false;
+        try {
+          await bridge.wait({});
+        } catch (error) {
+          repeatedWaitRejected = error instanceof Error && error.message.includes("only authorized root tool");
+        }
+        if (!repeatedWaitRejected) throw new Error("Deterministic synthesis-only proof left a non-synthesis root tool open");
+        let forgedSynthesisRejected = false;
+        try {
+          await bridge.synthesize({ inputId: `${synthesisInput.inputId}:forged` });
+        } catch (error) {
+          forgedSynthesisRejected = error instanceof Error && error.message.includes("stale or does not match");
+        }
+        if (!forgedSynthesisRejected) throw new Error("Deterministic synthesis-only proof accepted a forged synthesis input id");
       }
       const initialResearchRequest = this.mode === "restudy_research"
         ? (() => {
@@ -368,6 +399,18 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
           contentIds: disposition.admission.grant.contentScope.map((entry) => entry.contentId),
         });
         synthesisInput = read.synthesisInput ?? synthesisInput;
+        if (this.mode === "restudy_support") {
+          if (!initialSynthesisInputId || synthesisInput?.inputId === initialSynthesisInputId) {
+            throw new Error("Deterministic U4 proof did not invalidate its pre-pass synthesis input id");
+          }
+          let staleSynthesisRejected = false;
+          try {
+            await bridge.synthesize({ inputId: initialSynthesisInputId });
+          } catch (error) {
+            staleSynthesisRejected = error instanceof Error && error.message.includes("stale or does not match");
+          }
+          if (!staleSynthesisRejected) throw new Error("Deterministic U4 proof accepted a stale pre-pass synthesis input id");
+        }
 
         if (initialResearchRequest) {
           let staleRejected = false;

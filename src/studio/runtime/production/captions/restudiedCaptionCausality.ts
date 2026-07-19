@@ -1,6 +1,10 @@
-import type { ContentAddressedArtifactStore } from "../artifactStore.ts";
+import { canonicalSha256, type ContentAddressedArtifactStore } from "../artifactStore.ts";
 import type { CaptionLineCausalityV4, EvidenceCitationEnvelope, QualifiedMediaRange, RuntimeProjection } from "../model.ts";
 import { RestudiedStudyReadinessHost, type RestudiedReadinessV4Reference } from "../study/restudiedStudyReadinessHost.ts";
+
+type CaptionCausalityTextInput =
+  | { sourceText: string; targetText: string; sourceUnavailableReason?: never }
+  | { sourceText: null; targetText: null; sourceUnavailableReason: "recognizer_unavailable" | "recognizer_empty" };
 
 function closesLine(range: QualifiedMediaRange, citations: EvidenceCitationEnvelope[]): boolean {
   const observations = citations.flatMap((citation) => citation.observations)
@@ -32,18 +36,33 @@ function reason(state: CaptionLineCausalityV4["lineage"]["coverageState"]): stri
 /** V4 line causality authorizes only supported cells; terminal weak cells are withheld locally. */
 export class RestudiedCaptionCausalityHost {
   private readonly readiness: RestudiedStudyReadinessHost;
+  private readonly reopenedReadiness = new Map<
+    string,
+    ReturnType<RestudiedStudyReadinessHost["reopen"]>
+  >();
 
   constructor(state: RuntimeProjection, artifacts: ContentAddressedArtifactStore) {
     this.readiness = new RestudiedStudyReadinessHost(state, artifacts);
   }
 
+  private reopen(reference: RestudiedReadinessV4Reference): ReturnType<RestudiedStudyReadinessHost["reopen"]> {
+    const key = canonicalSha256(reference);
+    const existing = this.reopenedReadiness.get(key);
+    if (existing) return existing;
+    const reopened = this.readiness.reopen(reference);
+    this.reopenedReadiness.set(key, reopened);
+    return reopened;
+  }
+
   async close(input: {
     readiness: RestudiedReadinessV4Reference;
     range: QualifiedMediaRange;
-    sourceText: string;
-    targetText: string;
-  }): Promise<CaptionLineCausalityV4> {
-    const ready = await this.readiness.reopen(input.readiness);
+  } & CaptionCausalityTextInput): Promise<CaptionLineCausalityV4> {
+    const unavailable = input.sourceText === null && input.targetText === null && input.sourceUnavailableReason !== undefined;
+    if (!unavailable && (typeof input.sourceText !== "string" || typeof input.targetText !== "string")) {
+      throw new Error("Restudied caption causality requires either available text or one typed unavailable recognizer reason");
+    }
+    const ready = await this.reopen(input.readiness);
     const study = ready.reopenedStudy;
     const covering = study?.envelope.coverage.filter((entry) => entry.artifactId === input.range.artifactId && entry.trackId === input.range.trackId && entry.startMs <= input.range.startMs && entry.endMs >= input.range.endMs) ?? [];
     const coverage = covering.length === 1 ? covering[0] : null;
@@ -65,11 +84,21 @@ export class RestudiedCaptionCausalityHost {
     }
     const coverageState = coverage?.state ?? "uncovered";
     const withheldReason = allowed ? null : ready.receipt.result.outcome === "withheld" ? "study_readiness_withheld" : reason(coverageState);
+    const source = allowed
+      ? unavailable
+        ? { language: "ko" as const, state: "unavailable" as const, text: null, reasonCode: input.sourceUnavailableReason }
+        : { language: "ko" as const, state: "available" as const, text: input.sourceText, reasonCode: null }
+      : { language: "ko" as const, state: "withheld" as const, text: null, reasonCode: withheldReason };
+    const target = allowed
+      ? unavailable
+        ? { language: "en" as const, state: "unavailable" as const, text: null, reasonCode: "source_unavailable" }
+        : { language: "en" as const, state: "available" as const, text: input.targetText, reasonCode: null }
+      : { language: "en" as const, state: "withheld" as const, text: null, reasonCode: withheldReason };
     return {
       schema: "studio.caption-line-causality.v4",
       range: structuredClone(input.range),
-      source: { language: "ko", state: allowed ? "available" : "withheld", text: allowed ? input.sourceText : null, reasonCode: withheldReason },
-      target: { language: "en", state: allowed ? "available" : "withheld", text: allowed ? input.targetText : null, reasonCode: withheldReason },
+      source,
+      target,
       lineage: {
         study: structuredClone(input.readiness.study.study),
         readiness: { readinessId: input.readiness.readinessId, receiptId: input.readiness.receiptId, receiptContentId: input.readiness.receiptContentId },

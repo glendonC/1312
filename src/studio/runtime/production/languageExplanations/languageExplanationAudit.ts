@@ -8,6 +8,7 @@ import {
   createLanguageExplanationReceiptArtifactId,
 } from "../artifactStore.ts";
 import { reopenCaptionProductionResults } from "../captions/captionProductionAudit.ts";
+import { materializeCaptionProductionLines } from "../captions/captionArtifactCompaction.ts";
 import type {
   LanguageExplanationReceipt,
   RuntimeProjection,
@@ -192,9 +193,10 @@ export async function reopenLanguageExplanationResults(
     ]);
     const explanation = validateLanguageExplanationArtifact(storedExplanation.value);
     const receipt = validateLanguageExplanationReceipt(storedReceipt.value);
-    const lineIndex = caption.artifact.lines.findIndex((line) => line.id === record.lineId);
+    const captionLines = materializeCaptionProductionLines(caption.artifact);
+    const lineIndex = captionLines.findIndex((line) => line.id === record.lineId);
     if (lineIndex < 0) throw new Error(`Language explanation ${record.jobId} lost its selected caption line`);
-    const selectedCaptionLine = caption.artifact.lines[lineIndex];
+    const selectedCaptionLine = captionLines[lineIndex];
     const selectedSide = record.selection.side === "source" ? selectedCaptionLine.source : selectedCaptionLine.target;
     const exactText = selectedSide.text === null
       ? null
@@ -213,7 +215,7 @@ export async function reopenLanguageExplanationResults(
       !same(explanation.input.selection, record.selection) ||
       exactText !== record.selection.text ||
       !same(explanation.input.line, languageExplanationCaptionSnapshot(selectedCaptionLine)) ||
-      !same(explanation.input.contextLines, languageExplanationContextWindow(caption.artifact.lines, lineIndex)) ||
+      !same(explanation.input.contextLines, languageExplanationContextWindow(captionLines, lineIndex)) ||
       !same(explanation.input.source, {
         artifactId: caption.verification.source.artifactId,
         contentId: caption.verification.source.contentId,

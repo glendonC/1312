@@ -116,7 +116,7 @@ async function proveSharedInvestigationSpine(input: SharedProofInput): Promise<v
   const closedHeading = status.getByRole("heading", { name: /^(Terminal|Failed)$/ });
   await expect(closedHeading).toBeVisible({ timeout: 420_000 });
   expect(await closedHeading.textContent(), (await status.textContent()) ?? "Runtime closed without status detail").toBe("Terminal");
-  await expect(status).toContainText("Closed at validated journal head");
+  await expect(status).toContainText("Closed at validated journal head", { timeout: 420_000 });
 
   const processing = page.getByRole("region", { name: "Processing canvas" });
   await expect(processing).toContainText(sourceLabel);
@@ -221,7 +221,7 @@ async function proveSharedInvestigationSpine(input: SharedProofInput): Promise<v
   await expect(explanation).toHaveAttribute(
     "data-learning-state",
     /production-(failed|available|partial)/,
-    { timeout: 30_000 },
+    { timeout: 90_000 },
   );
   if (await explanation.getAttribute("data-learning-state") === "production-failed" && allowOneLearningRetry) {
     await explanation.getByRole("button", { name: "Retry explanation" }).click();

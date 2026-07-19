@@ -33,6 +33,7 @@ import {
   validateOrchestratorResult,
   type OrchestratorResult,
 } from "./executor/orchestratorContract.ts";
+import { isExactGeneralizedInitialCoverageBudget } from "./executor/generalizedBudgetContract.ts";
 import { runBoundedProcess, type ProcessResult } from "./executor/processRunner.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import type {
@@ -371,7 +372,8 @@ export class CodexExecOrchestratorLauncher {
           const capabilities = new Set(request!.input.requiredCapabilities);
           if (
             outputs.length !== 1 || outputs[0].required !== true || outputs[0].artifactKind !== (generalizedEnabled ? "studio.study-report.v2" : "studio.study-report.v1") ||
-            !capabilities.has("speech.transcribe") || !capabilities.has("report.submit")
+            !capabilities.has("speech.transcribe") || !capabilities.has("report.submit") ||
+            (generalizedEnabled && !isExactGeneralizedInitialCoverageBudget(request!.input.budget))
           ) {
             throw new LauncherFailure("Orchestrator changed the coverage-study child contract", "Codex orchestrator returned an accepted child outside the typed coverage-study boundary.");
           }
@@ -406,7 +408,9 @@ export class CodexExecOrchestratorLauncher {
         const studies = Object.values(state.generalizedOwnedMediaStudies).filter((entry) =>
           entry.executionId === executionId);
         const acceptedPasses = Object.values(state.rangePasses).filter((entry) => entry.accepted);
-        if (acceptedAdmissions.length < 2 || completedReads.length < 2 || studies.length !== 1 ||
+        const exactReadClosure = acceptedAdmissions.length >= 2 && completedReads.length === acceptedAdmissions.length &&
+          acceptedAdmissions.every((admission) => completedReads.filter((entry) => entry.admissionId === admission.admissionId).length === 1);
+        if (!exactReadClosure || studies.length !== 1 ||
             studies[0]?.schema !== (restudiedEnabled ? "studio.owned-media-study.v3" : "studio.owned-media-study.v2") ||
             (restudiedEnabled && acceptedPasses.some((entry) => !entry.terminal))) {
           throw new LauncherFailure(

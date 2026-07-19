@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod/v4";
 
 import { isConditionalSeparationHostArtifactKind, isFrameHostArtifactKind } from "../model.ts";
+import { GENERALIZED_INITIAL_COVERAGE_BUDGET } from "./generalizedBudgetContract.ts";
 
 import {
   ORCHESTRATOR_SPAWN_TOOL,
@@ -84,7 +85,7 @@ const spawnInput = z.object({
   ])).min(1).max(6),
   dependencyWorkloadKeys: z.array(z.string().min(1).max(256)).max(8),
   budget: z.object({
-    wallMs: z.number().int().positive().max(180_000),
+    wallMs: z.number().int().positive().max(GENERALIZED_INITIAL_COVERAGE_BUDGET.wallMs),
     toolCalls: z.number().int().positive().max(16),
   }).strict(),
   followUpCause: z.object({
@@ -340,39 +341,6 @@ const semanticCitation = z.object({
   }).strict()).min(1).max(256),
 }).strict();
 
-const generalizedRange = {
-  artifactId: z.string().min(1),
-  trackId: z.string().min(1),
-  startMs: z.number().int().nonnegative(),
-  endMs: z.number().int().positive(),
-};
-const generalizedCoverage = z.object({
-  coverageId: z.string().min(1),
-  ...generalizedRange,
-  state: z.enum(["supported", "unknown", "withheld", "unavailable", "truncated", "conflicting", "failed", "not_in_scope"]),
-  preservedStates: z.array(z.enum(["supported", "unknown", "withheld", "unavailable", "truncated", "conflicting", "failed", "not_in_scope"])).min(1).max(8),
-  rawStates: z.array(z.string().min(1)).max(32),
-  claimIds: z.array(z.string().min(1)).max(256),
-  citationIds: z.array(z.string().min(1)).max(512),
-  reason: z.object({
-    code: z.enum(["evidence_unknown", "worker_withheld", "evidence_unavailable", "evidence_truncated", "evidence_conflicting", "operation_failed", "not_in_requested_scope"]),
-    detail: z.string().min(1).max(4_000),
-  }).strict().nullable(),
-}).strict();
-const generalizedClaim = z.object({
-  claimId: z.string().min(1),
-  ...generalizedRange,
-  statement: z.string().min(1).max(8_000),
-  childClaims: z.array(z.object({
-    admissionId: z.string().min(1),
-    reportArtifactId: z.string().min(1),
-    reportContentId: z.string().min(1),
-    claimId: z.string().min(1),
-  }).strict()).min(1).max(512),
-  citationIds: z.array(z.string().min(1)).min(1).max(512),
-}).strict();
-const restudiedCoverage = generalizedCoverage.extend({ passIds: z.array(z.string().min(1)).max(32) }).strict();
-
 const legacySynthesisInput = z.object({
   planningDecisionId: z.string().min(1),
   coverage: z.array(studyCoverage).min(1).max(256),
@@ -394,10 +362,12 @@ if (names.has(ORCHESTRATOR_SYNTHESIZE_TOOL)) {
     ORCHESTRATOR_SYNTHESIZE_TOOL,
     {
       title: "Emit owned-media study",
-      description: "Emit model-authored study coverage, claims, conflicts, and limitations. The host injects immutable context, dispositions, and follow-up history and rejects unsupported support.",
+      description: names.has(ORCHESTRATOR_PLAN_TOOL)
+        ? "Emit model-authored study coverage, claims, conflicts, and limitations. The host injects immutable context, dispositions, and follow-up history and rejects unsupported support."
+        : "Close the exact current generalized study projection by copying only its host-derived synthesisInput.inputId. The host cold-recomputes coverage, claims, pass history, and citations and rejects stale or forged input ids.",
       inputSchema: names.has(ORCHESTRATOR_PLAN_TOOL)
         ? legacySynthesisInput
-        : z.object({ coverage: z.array(names.has(ORCHESTRATOR_RESTUDY_TOOL) ? restudiedCoverage : generalizedCoverage).min(1).max(256), claims: z.array(generalizedClaim).max(256) }).strict(),
+        : z.object({ inputId: z.string().min(1) }).strict(),
       annotations: { title: "Emit owned-media study", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async (args: unknown) => {

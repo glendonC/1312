@@ -9,6 +9,10 @@ import {
   OpenAiCaptionProductionExecutor,
   type CaptionProductionExecutor,
 } from "../src/studio/runtime/production/captions/captionProductionExecutor.ts";
+import {
+  compactCaptionProductionArtifactV5,
+  materializeCaptionProductionLines,
+} from "../src/studio/runtime/production/captions/captionArtifactCompaction.ts";
 import { FileEventJournal, RuntimeLedger } from "../src/studio/runtime/production/journal.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "../src/studio/runtime/production/model.ts";
 import { projectRuntimeEvents } from "../src/studio/runtime/production/projection.ts";
@@ -244,7 +248,7 @@ test("full owned-run current-run captions and independent QC close under cold re
     assert.equal(caption.readiness.readinessId, approval.response.reviews[0].readiness.readinessId);
 
     const results = await runtime.service.captionProductionResults(approval.runtimeId);
-    const line = results.results[0].artifact.lines[0];
+    const line = materializeCaptionProductionLines(results.results[0].artifact)[0];
     assert.equal(line.lineage.derivation, "current_run_source_execution");
     assert.equal(line.lineage.study.studyId, caption.study.studyId);
     assert.equal(line.lineage.study.coverage.state, "supported");
@@ -318,7 +322,7 @@ test("full owned-run current-run captions and independent QC close under cold re
   }
 });
 
-test("default U4 approval produces a v4 caption artifact with durable pass-aware causality", async () => {
+test("default U4 approval produces a compact v5 caption artifact with durable pass-aware causality", async () => {
   const runtime = await harness({ captionExecutor: currentRunCaptionExecutor, defaultU4: true });
   try {
     const approval = await approved(runtime);
@@ -326,9 +330,9 @@ test("default U4 approval produces a v4 caption artifact with durable pass-aware
     assert.equal(produced.captions.length, 1);
     const results = await runtime.service.captionProductionResults(approval.runtimeId);
     const artifact = results.results[0].artifact;
-    assert.equal(artifact.schema, "studio.caption-production.artifact.v4");
+    assert.equal(artifact.schema, "studio.caption-production.artifact.v5");
     assert.equal(artifact.lines.length, 1);
-    const causality = artifact.lines[0].lineage.generalizedCausality;
+    const causality = materializeCaptionProductionLines(artifact)[0].lineage.generalizedCausality;
     assert.equal(causality?.schema, "studio.caption-line-causality.v4");
     assert.equal(causality?.lineage.coverageState, "supported");
     assert.ok((causality?.lineage.citationIds.length ?? 0) > 0);
@@ -337,6 +341,65 @@ test("default U4 approval produces a v4 caption artifact with durable pass-aware
     assert.equal(Object.keys(loaded.state.generalizedOwnedMediaStudies).length, 1);
     assert.equal(Object.keys(loaded.state.studyReadiness).length, 0);
     assert.equal(Object.keys(loaded.state.generalizedStudyReadiness).length, 1);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("compact v5 keeps dense shared-citation lines under the artifact ceiling and rejects reference tamper", async () => {
+  const runtime = await harness({ captionExecutor: currentRunCaptionExecutor, defaultU4: true });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const original = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0].artifact;
+    if (original.schema !== "studio.caption-production.artifact.v5") throw new Error("Expected compact caption v5");
+    const seed = materializeCaptionProductionLines(original)[0];
+    const count = 33;
+    const stepMs = Math.floor((seed.endMs - seed.startMs) / count);
+    assert.ok(stepMs > 0);
+    const denseLines = Array.from({ length: count }, (_unused, index) => {
+      const startMs = seed.startMs + index * stepMs;
+      const endMs = index === count - 1 ? seed.endMs : startMs + stepMs;
+      const line = structuredClone(seed);
+      line.id = `line-dense-shared-${String(index + 1).padStart(3, "0")}`;
+      line.startMs = startMs;
+      line.endMs = endMs;
+      line.lineage.source.window = { startMs, endMs };
+      line.lineage.generalizedCausality!.range.startMs = startMs;
+      line.lineage.generalizedCausality!.range.endMs = endMs;
+      return line;
+    });
+    const { evidence: _evidence, ...sharedLineage } = original.sharedLineage;
+    const dense = compactCaptionProductionArtifactV5({
+      jobId: original.jobId,
+      runId: original.runId,
+      input: original.input,
+      executor: original.executor,
+      lines: denseLines,
+      result: deriveCaptionProductionResult(denseLines),
+      sharedLineage,
+    });
+    const validated = validateCaptionProductionArtifact(dense);
+    assert.equal(validated.schema, "studio.caption-production.artifact.v5");
+    assert.equal(materializeCaptionProductionLines(validated).length, count);
+    assert.ok(Buffer.byteLength(JSON.stringify(validated), "utf8") < CAPTION_PRODUCTION_LIMITS.maxArtifactBytes);
+    assert.equal(validated.sharedLineage.evidence.semanticCitations.length, 1);
+    assert.equal(validated.sharedLineage.evidence.childReports.length, 1);
+
+    const missingCitation = structuredClone(validated);
+    missingCitation.lines[0].lineage.study.semanticCitationIndexes[0] = 999_999;
+    assert.throws(() => validateCaptionProductionArtifact(missingCitation), /missing shared semantic-citation identity/);
+
+    const changedSource = structuredClone(validated);
+    changedSource.sharedLineage.source.contentId = `sha256:${"0".repeat(64)}`;
+    assert.throws(() => validateCaptionProductionArtifact(changedSource), /current run input and executor scope/);
+
+    const unusedReport = structuredClone(validated);
+    unusedReport.sharedLineage.evidence.childReports.push({
+      ...structuredClone(unusedReport.sharedLineage.evidence.childReports[0]),
+      artifactId: "artifact:unused-shared-report",
+    });
+    assert.throws(() => validateCaptionProductionArtifact(unusedReport), /unreferenced shared causal evidence/);
   } finally {
     await cleanup(runtime);
   }
@@ -368,6 +431,44 @@ test("default U4 binds real-caption execution to the exact supported current-sou
       .filter((entry) => entry.state === "supported")
       .map((entry) => ({ startMs: entry.startMs, endMs: entry.endMs }))
       .sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs));
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
+test("default U4 closes one exact recognizer-unavailable supported cell without authorizing caption text", async () => {
+  const unavailableExecutor: CaptionProductionExecutor = {
+    describe: currentRunCaptionExecutor.describe,
+    async execute(input) {
+      const first = input.productionRanges[0];
+      return [{
+        id: "line-current-run-unavailable-001",
+        startMs: first.startMs,
+        endMs: first.endMs,
+        source: { language: "ko", state: "unavailable", text: null, reasonCode: "recognizer_unavailable" },
+        target: { language: "en", state: "unavailable", text: null, reasonCode: "source_unavailable" },
+      }];
+    },
+  };
+  const runtime = await harness({ captionExecutor: unavailableExecutor, defaultU4: true });
+  try {
+    const approval = await approved(runtime);
+    await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
+    const result = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
+    const line = materializeCaptionProductionLines(result.artifact)[0];
+    assert.equal(result.artifact.schema, "studio.caption-production.artifact.v5");
+    assert.equal(result.artifact.result.status, "unavailable");
+    assert.equal(line.source.state, "unavailable");
+    assert.equal(line.source.reasonCode, "recognizer_unavailable");
+    assert.equal(line.target.reasonCode, "source_unavailable");
+    assert.equal(line.lineage.study.coverage.state, "supported");
+    assert.ok(line.lineage.study.claimIds.length > 0);
+    assert.ok(line.lineage.study.semanticCitations.length > 0);
+    assert.equal(line.lineage.generalizedCausality?.source.state, "unavailable");
+    assert.equal(line.lineage.generalizedCausality?.target.reasonCode, "source_unavailable");
+    const qc = (await runtime.service.captionQualityControls(approval.runtimeId)).qualityControls[0];
+    assert.equal(qc.outcome, "withheld");
+    assert.deepEqual(qc.reasonCodes, ["candidate_has_unavailable_or_withheld_lines"]);
   } finally {
     await cleanup(runtime);
   }
@@ -408,14 +509,143 @@ test("real caption executor recognizes each host-derived range and requests stri
     const lines = await executor.execute({
       sourcePath: resolve("public/demo/runs/run-005/clip.m4a"),
       fixtureCaptionPath: "",
-      range: { startMs: 0, endMs: 2_000 },
-      productionRanges: [{ startMs: 0, endMs: 500 }, { startMs: 1_000, endMs: 1_500 }],
+      range: { startMs: 0, endMs: 3_000 },
+      productionRanges: [{ startMs: 0, endMs: 1_000 }, { startMs: 2_000, endMs: 3_000 }],
     }, new AbortController().signal);
     assert.equal(transcriptionCalls, 2);
     assert.equal(translationCalls, 1);
     assert.deepEqual(lines.map((line) => ({ id: line.id, startMs: line.startMs, endMs: line.endMs, target: line.target.text })), [
       { id: "line-001-001", startMs: 0, endMs: 400, target: "First range" },
-      { id: "line-002-001", startMs: 1_000, endMs: 1_400, target: "Second range" },
+      { id: "line-002-001", startMs: 2_000, endMs: 2_400, target: "Second range" },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("real caption executor bounds range concurrency, preserves exact ranges, and never retries", async () => {
+  const originalFetch = globalThis.fetch;
+  let transcriptionCalls = 0;
+  let activeTranscriptions = 0;
+  let maximumActiveTranscriptions = 0;
+  let translationCalls = 0;
+  try {
+    globalThis.fetch = async (request, init) => {
+      const url = typeof request === "string" ? request : request instanceof URL ? request.href : request.url;
+      if (url.endsWith("/audio/transcriptions")) {
+        transcriptionCalls += 1;
+        activeTranscriptions += 1;
+        maximumActiveTranscriptions = Math.max(maximumActiveTranscriptions, activeTranscriptions);
+        try {
+          assert.ok(init?.body instanceof FormData);
+          assert.equal(init.body.get("chunking_strategy"), "auto");
+          await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+          return new Response(JSON.stringify({
+            segments: [{ start: 0, end: 0.4, text: "범위" }],
+          }), { status: 200, headers: { "Content-Type": "application/json" } });
+        } finally {
+          activeTranscriptions -= 1;
+        }
+      }
+      if (url.endsWith("/chat/completions")) {
+        translationCalls += 1;
+        const body = JSON.parse(String(init?.body)) as { messages?: Array<{ role?: unknown; content?: unknown }> };
+        const user = body.messages?.find((message) => message.role === "user")?.content;
+        const requested = JSON.parse(String(user)) as { lines: Array<{ id: string }> };
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({
+            lines: requested.lines.map((line) => ({ id: line.id, en: `English ${line.id}` })),
+          }) } }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      assert.fail(`unexpected provider URL ${url}`);
+    };
+    const executor = new OpenAiCaptionProductionExecutor({ apiKey: "test-key" });
+    const productionRanges = Array.from({ length: 6 }, (_, index) => ({
+      startMs: index * 1_000,
+      endMs: index * 1_000 + 1_000,
+    }));
+    const lines = await executor.execute({
+      sourcePath: resolve("public/demo/runs/run-005/clip.m4a"),
+      fixtureCaptionPath: "",
+      range: { startMs: 0, endMs: 6_000 },
+      productionRanges,
+    }, new AbortController().signal);
+    assert.equal(transcriptionCalls, productionRanges.length);
+    assert.equal(maximumActiveTranscriptions, 4);
+    assert.equal(translationCalls, 1);
+    assert.deepEqual(lines.map((line) => ({ id: line.id, startMs: line.startMs, endMs: line.endMs })),
+      productionRanges.map((range, index) => ({
+        id: `line-${String(index + 1).padStart(3, "0")}-001`,
+        startMs: range.startMs,
+        endMs: range.startMs + 400,
+      })));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("real caption executor types tiny and single-range failures without retrying or reordering dense cells", async () => {
+  const originalFetch = globalThis.fetch;
+  let transcriptionCalls = 0;
+  let translationCalls = 0;
+  try {
+    globalThis.fetch = async (request, init) => {
+      const url = typeof request === "string" ? request : request instanceof URL ? request.href : request.url;
+      if (url.endsWith("/audio/transcriptions")) {
+        transcriptionCalls += 1;
+        assert.ok(init?.body instanceof FormData);
+        const file = init.body.get("file");
+        assert.ok(file instanceof File);
+        if (file.name === "range-003.wav") {
+          return new Response(JSON.stringify({ error: { type: "rate_limit" } }), {
+            status: 429,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, file.name === "range-002.wav" ? 25 : 5));
+        return new Response(JSON.stringify({
+          segments: [{ start: 0, end: 0.5, text: "범위" }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.endsWith("/chat/completions")) {
+        translationCalls += 1;
+        const body = JSON.parse(String(init?.body)) as { messages?: Array<{ role?: unknown; content?: unknown }> };
+        const user = body.messages?.find((message) => message.role === "user")?.content;
+        const requested = JSON.parse(String(user)) as { lines: Array<{ id: string }> };
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({
+            lines: requested.lines.map((line) => ({ id: line.id, en: `English ${line.id}` })),
+          }) } }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      assert.fail(`unexpected provider URL ${url}`);
+    };
+    const executor = new OpenAiCaptionProductionExecutor({ apiKey: "test-key" });
+    const lines = await executor.execute({
+      sourcePath: resolve("public/demo/runs/run-005/clip.m4a"),
+      fixtureCaptionPath: "",
+      range: { startMs: 0, endMs: 4_800 },
+      productionRanges: [
+        { startMs: 0, endMs: 999 },
+        { startMs: 1_000, endMs: 2_200 },
+        { startMs: 2_300, endMs: 3_500 },
+        { startMs: 3_600, endMs: 4_800 },
+      ],
+    }, new AbortController().signal);
+    assert.equal(transcriptionCalls, 3);
+    assert.equal(translationCalls, 1);
+    assert.deepEqual(lines.map((line) => ({
+      id: line.id,
+      startMs: line.startMs,
+      endMs: line.endMs,
+      sourceState: line.source.state,
+      sourceReason: line.source.reasonCode,
+    })), [
+      { id: "line-001-unavailable", startMs: 0, endMs: 999, sourceState: "unavailable", sourceReason: "recognizer_unavailable" },
+      { id: "line-002-001", startMs: 1_000, endMs: 1_500, sourceState: "available", sourceReason: null },
+      { id: "line-003-unavailable", startMs: 2_300, endMs: 3_500, sourceState: "unavailable", sourceReason: "recognizer_unavailable" },
+      { id: "line-004-001", startMs: 3_600, endMs: 4_100, sourceState: "available", sourceReason: null },
     ]);
   } finally {
     globalThis.fetch = originalFetch;
@@ -456,6 +686,7 @@ test("withheld, unknown, failed, conflict, uncovered, and citation-mismatch line
     const approval = await approved(runtime);
     await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
     const original = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0].artifact;
+    if (original.schema === "studio.caption-production.artifact.v5") throw new Error("Expected the legacy study harness");
     const cases = [
       ["withheld", "worker_withheld", "study_coverage_withheld"],
       ["unknown", "unobserved_range", "study_coverage_unknown"],
@@ -503,7 +734,7 @@ test("executor output outside one supported study range is nulled and independen
     const approval = await approved(runtime);
     await runtime.service.createCaptionProduction(approval.runtimeId, approval.request);
     const result = (await runtime.service.captionProductionResults(approval.runtimeId)).results[0];
-    const line = result.artifact.lines[0];
+    const line = materializeCaptionProductionLines(result.artifact)[0];
     assert.equal(line.lineage.study.coverage.state, "uncovered");
     assert.equal(line.source.text, null);
     assert.equal(line.target.text, null);

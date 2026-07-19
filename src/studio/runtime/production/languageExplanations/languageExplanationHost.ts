@@ -6,6 +6,7 @@ import {
 import { canonicalJson } from "../artifactStore/contentIdentity.ts";
 import { canonicalSha256 } from "../canonicalIdentity.ts";
 import { reopenCaptionProductionResults } from "../captions/captionProductionAudit.ts";
+import { materializeCaptionProductionLines } from "../captions/captionArtifactCompaction.ts";
 import { RuntimeJournalConflict, type RuntimeLedger } from "../journal.ts";
 import type {
   CaptionProductionLine,
@@ -179,11 +180,12 @@ export class LanguageExplanationHost {
         "The registered source rights do not match the runtime host authority",
       );
     }
-    const selectedIndex = caption.artifact.lines.findIndex((line) => line.id === request.lineId);
+    const captionLines = materializeCaptionProductionLines(caption.artifact);
+    const selectedIndex = captionLines.findIndex((line) => line.id === request.lineId);
     if (selectedIndex < 0) {
       throw new LanguageExplanationHostError("invalid_language_selection", "The selected caption line does not exist");
     }
-    const selectedLine = caption.artifact.lines[selectedIndex];
+    const selectedLine = captionLines[selectedIndex];
     const selectedSide = request.selection.side === "source" ? selectedLine.source : selectedLine.target;
     if (selectedSide.state !== "available" || selectedSide.text === null) {
       throw new LanguageExplanationHostError(
@@ -201,7 +203,7 @@ export class LanguageExplanationHost {
       );
     }
     const line = languageExplanationCaptionSnapshot(selectedLine);
-    const contextLines = languageExplanationContextWindow(caption.artifact.lines, selectedIndex);
+    const contextLines = languageExplanationContextWindow(captionLines, selectedIndex);
     const approval = caption.verification.approval;
     const semanticCitations = selectedLine.lineage.study.semanticCitations;
     const input: LanguageExplanationInputAuthority = {

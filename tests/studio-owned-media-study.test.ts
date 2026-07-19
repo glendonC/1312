@@ -195,6 +195,23 @@ test("default owned path exposes U4 while preserving v2 report/admission and clo
   }
 });
 
+test("empty restudy and research close the root to one-use reads and immediate synthesis", async () => {
+  const runtime = await runDefaultU4("empty_research_synthesis_only");
+  try {
+    assert.equal(runtime.lifecycle, "terminal");
+    const state = (await journal(runtime)).state;
+    assert.equal(Object.keys(state.generalizedParentArtifactAdmissions).length, 2);
+    assert.equal(Object.keys(state.generalizedParentArtifactReads).length, 2);
+    assert.equal(Object.values(state.orchestratorToolCalls).filter((entry) => entry.tool === "artifact_read").length, 2);
+    assert.equal(Object.values(state.orchestratorToolCalls).filter((entry) => entry.tool === "task_reports_wait").length, 1);
+    assert.equal(Object.values(state.orchestratorToolCalls).filter((entry) => entry.tool === "study_synthesize").length, 1);
+    assert.deepEqual(Object.values(state.researchRequestInputs).at(-1)?.triggers, []);
+    assert.equal(Object.keys(state.generalizedOwnedMediaStudies).length, 1);
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
 test("default U4 schedules one attenuated speech pass and upgrades only its exact subrange through pass-new citations", async () => {
   const runtime = await runDefaultU4("restudy_support");
   try {
@@ -235,7 +252,7 @@ test("default U4 schedules one attenuated speech pass and upgrades only its exac
     assert.equal(duplicateSpawns.length, 2);
     assert.equal(duplicateSpawns.filter((entry) => entry.accepted).length, 1);
     assert.equal(duplicateSpawns.find((entry) => !entry.accepted)?.rejection, "restudy_duplicate_work");
-    assert.equal(Object.values(state.orchestratorToolCalls).filter((entry) => entry.tool === "study_restudy_request").length, 5);
+    assert.equal(Object.values(state.orchestratorToolCalls).filter((entry) => entry.tool === "study_restudy_request").length, 4);
 
     const study = Object.values(state.generalizedOwnedMediaStudies)[0];
     assert.equal(study.schema, "studio.owned-media-study.v3");
@@ -440,7 +457,7 @@ test("default v3 projects one exact conflict research trigger and rejects forged
     assert.equal(researchGrant.researchScope.gap.inputId, initial.inputId);
     assert.equal(researchGrant.researchScope.gap.triggerId, trigger.triggerId);
     assert.deepEqual(researchGrant.researchScope.gap.media, trigger.source);
-    assert.equal(Object.values(state.orchestratorToolCalls).filter((entry) => entry.tool === "study_research_request").length, 4);
+    assert.equal(Object.values(state.orchestratorToolCalls).filter((entry) => entry.tool === "study_research_request").length, 3);
     assert.deepEqual(projectRuntimeEvents(runtime.runtimeId, loaded.events), state);
     const tampered = structuredClone(loaded.events);
     const candidateEvent = tampered.find((event) =>

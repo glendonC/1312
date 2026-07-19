@@ -24,6 +24,7 @@ import {
   deriveCaptionLineStudySupport,
   generalizedCaptionStudyIdentity,
 } from "./captionStudyCausality.ts";
+import { materializeCaptionProductionLines } from "./captionArtifactCompaction.ts";
 import { rangeOverlapsNonDialogue } from "../../../acoustic/dialogueScopePolicy.ts";
 import { reopenStudyReadiness } from "../study/studyReadinessAudit.ts";
 import { reopenOwnedMediaStudy } from "../study/studySynthesisAudit.ts";
@@ -130,11 +131,13 @@ export async function reopenCaptionProductionResults(
   events: readonly RuntimeEvent[],
   artifacts: ContentAddressedArtifactStore,
 ): Promise<VerifiedCaptionProductionResult[]> {
-  const reviews = await reopenPublishReviewDecisions(state, events, artifacts);
-  const verified: VerifiedCaptionProductionResult[] = [];
   const completed = Object.values(state.captionProductions)
     .filter((job) => job.status === "completed")
     .sort((left, right) => left.id.localeCompare(right.id));
+  if (completed.length === 0) return [];
+
+  const reviews = await reopenPublishReviewDecisions(state, events, artifacts);
+  const verified: VerifiedCaptionProductionResult[] = [];
 
   for (const job of completed) {
     if (
@@ -293,13 +296,20 @@ export async function reopenCaptionProductionResults(
     const expectsDialogueScopeVersion = Boolean(readiness?.receipt.dialogueScopePolicy);
     if (generalizedStudy
       ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4"
-        ? caption.schema !== "studio.caption-production.artifact.v4" || receipt.schema !== "studio.caption-production.receipt.v4"
+        ? caption.schema !== "studio.caption-production.artifact.v5" || receipt.schema !== "studio.caption-production.receipt.v5"
         : caption.schema !== "studio.caption-production.artifact.v3" || receipt.schema !== "studio.caption-production.receipt.v3"
       : (caption.schema === "studio.caption-production.artifact.v2") !== expectsDialogueScopeVersion ||
         (receipt.schema === "studio.caption-production.receipt.v2") !== expectsDialogueScopeVersion
     ) throw new Error(`Caption production ${job.id} does not use the contract version required by its readiness policy`);
+    const captionLines = materializeCaptionProductionLines(caption);
+    const restudiedCausality = generalizedRecord?.schema === "studio.study-readiness.receipt.v4"
+      ? new RestudiedCaptionCausalityHost(state, artifacts)
+      : null;
+    const generalizedCausality = generalizedRecord && generalizedRecord.schema !== "studio.study-readiness.receipt.v4"
+      ? new GeneralizedCaptionCausalityHost(state, artifacts)
+      : null;
     let invalidLineCausality = false;
-    for (const line of caption.lines) {
+    for (const line of captionLines) {
       const commonInvalid = !sameCanonical(line.lineage.readiness, approval.readiness) ||
         !sameCanonical(line.lineage.approval, {
           reviewId: approval.reviewId,
@@ -316,10 +326,21 @@ export async function reopenCaptionProductionResults(
       if (generalizedStudy && generalizedRecord) {
         const causality = line.lineage.generalizedCausality;
         if (!causality) { invalidLineCausality = true; continue; }
-        if (causality.source.state === "available" && causality.source.text !== null && causality.target.text !== null) {
+        if (causality.source.state !== "withheld") {
+          const unavailable = causality.source.state === "unavailable" && causality.target.state === "unavailable" &&
+            causality.source.text === null && causality.target.text === null &&
+            (causality.source.reasonCode === "recognizer_unavailable" || causality.source.reasonCode === "recognizer_empty") &&
+            causality.target.reasonCode === "source_unavailable";
+          const available = causality.source.state === "available" && causality.target.state === "available" &&
+            causality.source.text !== null && causality.target.text !== null;
+          if (!available && !unavailable) { invalidLineCausality = true; continue; }
           const expected = generalizedRecord.schema === "studio.study-readiness.receipt.v4"
-            ? await new RestudiedCaptionCausalityHost(state, artifacts).close({ readiness: restudiedReadinessReference(generalizedRecord), range: structuredClone(causality.range), sourceText: causality.source.text, targetText: causality.target.text })
-            : await new GeneralizedCaptionCausalityHost(state, artifacts).close({ readiness: generalizedReadinessReference(generalizedRecord), range: structuredClone(causality.range), sourceText: causality.source.text, targetText: causality.target.text });
+            ? unavailable
+              ? await restudiedCausality!.close({ readiness: restudiedReadinessReference(generalizedRecord), range: structuredClone(causality.range), sourceText: null, targetText: null, sourceUnavailableReason: causality.source.reasonCode as "recognizer_unavailable" | "recognizer_empty" })
+              : await restudiedCausality!.close({ readiness: restudiedReadinessReference(generalizedRecord), range: structuredClone(causality.range), sourceText: causality.source.text!, targetText: causality.target.text! })
+            : unavailable
+              ? await generalizedCausality!.close({ readiness: generalizedReadinessReference(generalizedRecord), range: structuredClone(causality.range), sourceText: null, targetText: null, sourceUnavailableReason: causality.source.reasonCode as "recognizer_unavailable" | "recognizer_empty" })
+              : await generalizedCausality!.close({ readiness: generalizedReadinessReference(generalizedRecord), range: structuredClone(causality.range), sourceText: causality.source.text!, targetText: causality.target.text! });
           if (!sameCanonical(expected, causality)) { invalidLineCausality = true; continue; }
         }
         const expectedLine = closeGeneralizedCaptionLineCausality({
@@ -381,7 +402,7 @@ export async function reopenCaptionProductionResults(
       receipt.result.captionArtifactId !== captionArtifact.id ||
       receipt.result.captionContentId !== captionArtifact.content.contentId ||
       receipt.result.captionBytes !== captionArtifact.content.bytes ||
-      !sameCanonical(receipt.result.lines, caption.lines.map(captionLineReceiptProjection)) ||
+      !sameCanonical(receipt.result.lines, captionLines.map(captionLineReceiptProjection)) ||
       !sameCanonical(receipt.result.lines, job.lines) ||
       !sameCanonical(caption.result, {
         status: receipt.result.status,

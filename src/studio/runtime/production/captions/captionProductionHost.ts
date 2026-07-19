@@ -10,6 +10,9 @@ import {
   type CaptionExecutorInput,
 } from "./captionProductionExecutor.ts";
 import {
+  compactCaptionProductionArtifactV5,
+} from "./captionArtifactCompaction.ts";
+import {
   captionLineReceiptProjection,
   captionStudyIdentity,
   closeGeneralizedCaptionLineCausality,
@@ -20,6 +23,7 @@ import {
 import type { RuntimeLedger } from "../journal.ts";
 import type {
   CaptionProductionArtifact,
+  CaptionProductionLine,
   CaptionProductionReceipt,
   CaptionProductionRequest,
   ProductionAnalysisRequest,
@@ -407,19 +411,36 @@ export class CaptionProductionHost {
       }
       const derivation = "current_run_source_execution" as const;
       phase = "causality_closure";
-      const captionLines: CaptionProductionArtifact["lines"] = generalizedStudy && closedGeneralizedReadiness
+      const causalityState = this.ledger.state();
+      const restudiedCausality = generalizedRecord?.schema === "studio.study-readiness.receipt.v4"
+        ? new RestudiedCaptionCausalityHost(causalityState, this.artifacts)
+        : null;
+      const generalizedCausality = generalizedRecord && generalizedRecord.schema !== "studio.study-readiness.receipt.v4"
+        ? new GeneralizedCaptionCausalityHost(causalityState, this.artifacts)
+        : null;
+      const captionLines: CaptionProductionLine[] = generalizedStudy && closedGeneralizedReadiness
         ? await Promise.all(lines.map(async (line) => {
-          if (line.source.state !== "available" || line.target.state !== "available" || line.source.text === null || line.target.text === null) {
-            throw new Error("Generalized caption production requires current-run source and target text before causal authorization");
+          const available = line.source.state === "available" && line.target.state === "available" &&
+            line.source.text !== null && line.target.text !== null;
+          const unavailable = line.source.state === "unavailable" && line.target.state === "unavailable" &&
+            line.source.text === null && line.target.text === null &&
+            (line.source.reasonCode === "recognizer_unavailable" || line.source.reasonCode === "recognizer_empty") &&
+            line.target.reasonCode === "source_unavailable";
+          if (!available && !unavailable) {
+            throw new Error("Generalized caption production requires current-run text or one typed recognizer-unavailable exact range before causal authorization");
           }
           const covering = generalizedStudy.envelope.coverage.filter((entry) => entry.startMs <= line.startMs && entry.endMs >= line.endMs);
           if (covering.length !== 1) throw new Error("Generalized caption line has no unique study coverage range");
           const range = { artifactId: covering[0].artifactId, trackId: covering[0].trackId, startMs: line.startMs, endMs: line.endMs };
           const causality = generalizedRecord!.schema === "studio.study-readiness.receipt.v4"
-            ? await new RestudiedCaptionCausalityHost(this.ledger.state(), this.artifacts).close({ readiness: restudiedReadinessReference(generalizedRecord!), range, sourceText: line.source.text, targetText: line.target.text })
-            : await new GeneralizedCaptionCausalityHost(this.ledger.state(), this.artifacts).close({ readiness: generalizedReadinessReference(generalizedRecord!), range, sourceText: line.source.text, targetText: line.target.text });
+            ? unavailable
+              ? await restudiedCausality!.close({ readiness: restudiedReadinessReference(generalizedRecord!), range, sourceText: null, targetText: null, sourceUnavailableReason: line.source.reasonCode as "recognizer_unavailable" | "recognizer_empty" })
+              : await restudiedCausality!.close({ readiness: restudiedReadinessReference(generalizedRecord!), range, sourceText: line.source.text!, targetText: line.target.text! })
+            : unavailable
+              ? await generalizedCausality!.close({ readiness: generalizedReadinessReference(generalizedRecord!), range, sourceText: null, targetText: null, sourceUnavailableReason: line.source.reasonCode as "recognizer_unavailable" | "recognizer_empty" })
+              : await generalizedCausality!.close({ readiness: generalizedReadinessReference(generalizedRecord!), range, sourceText: line.source.text!, targetText: line.target.text! });
           return closeGeneralizedCaptionLineCausality({
-            line, state: this.ledger.state(), study: generalizedStudy!, studyIdentity, causality,
+            line, state: causalityState, study: generalizedStudy!, studyIdentity, causality,
             readiness: approval.readiness, approval: request.approval,
             source: { artifactId: input.sourceArtifactId, contentId: input.sourceContentId },
             executor: { jobId, id: executor.id, version: executor.version, executionScope: executor.executionScope, cognitionClaim: executor.cognitionClaim },
@@ -443,19 +464,56 @@ export class CaptionProductionHost {
           derivation,
         }), readiness!.receipt.dialogueScopePolicy));
       phase = "artifact_closure";
-      const caption: CaptionProductionArtifact = {
-        schema: generalizedStudy
-          ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "studio.caption-production.artifact.v4" : "studio.caption-production.artifact.v3"
-          : readiness!.receipt.dialogueScopePolicy
-          ? "studio.caption-production.artifact.v2"
-          : "studio.caption-production.artifact.v1",
-        jobId,
-        runId: this.ledger.runId,
-        input,
-        executor,
-        lines: captionLines,
-        result: deriveCaptionProductionResult(captionLines),
-      };
+      const result = deriveCaptionProductionResult(captionLines);
+      let caption: CaptionProductionArtifact;
+      if (generalizedRecord?.schema === "studio.study-readiness.receipt.v4") {
+        const reference = restudiedReadinessReference(generalizedRecord);
+        caption = compactCaptionProductionArtifactV5({
+          jobId,
+          runId: this.ledger.runId,
+          input,
+          executor,
+          lines: captionLines,
+          result,
+          sharedLineage: {
+            derivation,
+            source: { artifactId: input.sourceArtifactId, contentId: input.sourceContentId },
+            study: structuredClone(studyIdentity),
+            readiness: structuredClone(approval.readiness),
+            approval: structuredClone(request.approval),
+            captionExecutor: {
+              jobId,
+              id: executor.id,
+              version: executor.version,
+              executionScope: executor.executionScope,
+              cognitionClaim: executor.cognitionClaim,
+            },
+            generalizedCausality: {
+              schema: "studio.caption-line-causality.v4",
+              study: structuredClone(reference.study.study),
+              readiness: {
+                readinessId: reference.readinessId,
+                receiptId: reference.receiptId,
+                receiptContentId: reference.receiptContentId,
+              },
+            },
+          },
+        });
+      } else {
+        caption = {
+          schema: generalizedStudy
+            ? "studio.caption-production.artifact.v3"
+            : readiness!.receipt.dialogueScopePolicy
+            ? "studio.caption-production.artifact.v2"
+            : "studio.caption-production.artifact.v1",
+          jobId,
+          runId: this.ledger.runId,
+          input,
+          executor,
+          lines: captionLines,
+          result,
+        };
+      }
       validateCaptionProductionArtifact(caption);
       const storedCaption = await this.artifacts.storeJson(caption);
       if (storedCaption.content.bytes > CAPTION_PRODUCTION_LIMITS.maxArtifactBytes) {
@@ -485,10 +543,10 @@ export class CaptionProductionHost {
         input: structuredClone(input),
         producer: {
           id: "studio.host-caption-production" as const,
-          version: generalizedStudy ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "4" as const : "3" as const : readiness!.receipt.dialogueScopePolicy ? "2" as const : "1" as const,
+          version: generalizedStudy ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "5" as const : "3" as const : readiness!.receipt.dialogueScopePolicy ? "2" as const : "1" as const,
           policy: generalizedStudy
             ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4"
-              ? "verified_unrevoked_approval_and_restudied_causality_v4_only" as const
+              ? "verified_unrevoked_approval_and_shared_restudied_causality_v5_only" as const
               : "verified_unrevoked_approval_and_generalized_causality_v3_only" as const
             : readiness!.receipt.dialogueScopePolicy
               ? "verified_unrevoked_approval_and_dialogue_scope_only" as const
@@ -506,7 +564,7 @@ export class CaptionProductionHost {
       };
       const receipt: CaptionProductionReceipt = {
         schema: generalizedStudy
-          ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "studio.caption-production.receipt.v4" : "studio.caption-production.receipt.v3"
+          ? generalizedRecord!.schema === "studio.study-readiness.receipt.v4" ? "studio.caption-production.receipt.v5" : "studio.caption-production.receipt.v3"
           : readiness!.receipt.dialogueScopePolicy
           ? "studio.caption-production.receipt.v2"
           : "studio.caption-production.receipt.v1",

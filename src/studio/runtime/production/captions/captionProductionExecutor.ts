@@ -11,6 +11,8 @@ import type {
 import { CAPTION_PRODUCTION_LIMITS } from "../model.ts";
 
 const MAX_FIXTURE_BYTES = 1024 * 1024;
+const MAX_CONCURRENT_CAPTION_RECOGNITION_RANGES = 4;
+const MINIMUM_CAPTION_RECOGNITION_RANGE_MS = 1_000;
 
 export interface CaptionExecutorInput {
   sourcePath: string;
@@ -248,7 +250,7 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
       classification: "real_recognizer_translator",
       executionScope: "current_run",
       cognitionClaim: "none",
-      recognizer: "gpt-4o-transcribe-diarize (per host-derived production range)",
+      recognizer: "gpt-4o-transcribe-diarize (host-derived ranges at least 1000ms, max 4 concurrent, no retry; shorter or failed ranges unavailable)",
       translator: "gpt-5 (strict structured output)",
       sourceCaptionContentId: null,
     };
@@ -263,8 +265,7 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
           "Real caption recognition requires a bounded non-empty host-derived production range set",
         );
       }
-      const sourceLines: CaptionExecutorLine[] = [];
-      for (const [rangeIndex, range] of input.productionRanges.entries()) {
+      for (const range of input.productionRanges) {
         if (
           !Number.isSafeInteger(range.startMs) || !Number.isSafeInteger(range.endMs) ||
           range.startMs < input.range.startMs || range.endMs > input.range.endMs || range.endMs <= range.startMs
@@ -274,69 +275,110 @@ export class OpenAiCaptionProductionExecutor implements CaptionProductionExecuto
             "The host-derived caption production range is outside the approved analysis range",
           );
         }
-        const audioPath = join(temporary, `range-${String(rangeIndex + 1).padStart(3, "0")}.wav`);
-        await execute(this.ffmpeg, [
-          "-nostdin", "-hide_banner", "-loglevel", "error",
-          "-ss", (range.startMs / 1_000).toFixed(3),
-          "-t", ((range.endMs - range.startMs) / 1_000).toFixed(3),
-          "-i", input.sourcePath,
-          "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", audioPath,
-        ], Math.min(20_000, CAPTION_PRODUCTION_LIMITS.maxWallMs));
-        if (signal.aborted) throw new Error("Real caption execution was aborted");
-        const form = new FormData();
-        form.append("file", new Blob([await readFile(audioPath)], { type: "audio/wav" }), "range.wav");
-        form.append("model", "gpt-4o-transcribe-diarize");
-        form.append("language", "ko");
-        form.append("response_format", "diarized_json");
-        form.append("chunking_strategy", "auto");
-        let transcription: unknown;
+      }
+      const unavailableRangeLine = (
+        rangeIndex: number,
+        range: CaptionExecutorInput["productionRanges"][number],
+        reasonCode: "recognizer_unavailable" | "recognizer_empty",
+      ): CaptionExecutorLine => ({
+        id: `line-${String(rangeIndex + 1).padStart(3, "0")}-unavailable`,
+        startMs: range.startMs,
+        endMs: range.endMs,
+        source: { language: "ko", state: "unavailable", text: null, reasonCode },
+        target: { language: "en", state: "unavailable", text: null, reasonCode: "source_unavailable" },
+      });
+      const recognizeRange = async (
+        rangeIndex: number,
+        range: CaptionExecutorInput["productionRanges"][number],
+      ): Promise<CaptionExecutorLine[]> => {
         try {
-          transcription = await apiJson(this.apiKey, "audio/transcriptions", form, signal, null);
-        } catch (error) {
-          throw new CaptionProductionExecutorError(
-            "recognizer_provider_failed",
-            "The bounded current-run caption recognizer failed closed",
-            { cause: error },
+          if (range.endMs - range.startMs < MINIMUM_CAPTION_RECOGNITION_RANGE_MS) {
+            return [unavailableRangeLine(rangeIndex, range, "recognizer_unavailable")];
+          }
+          const audioPath = join(temporary, `range-${String(rangeIndex + 1).padStart(3, "0")}.wav`);
+          await execute(this.ffmpeg, [
+            "-nostdin", "-hide_banner", "-loglevel", "error",
+            "-ss", (range.startMs / 1_000).toFixed(3),
+            "-t", ((range.endMs - range.startMs) / 1_000).toFixed(3),
+            "-i", input.sourcePath,
+            "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", audioPath,
+          ], Math.min(20_000, CAPTION_PRODUCTION_LIMITS.maxWallMs));
+          if (signal.aborted) throw new Error("Real caption execution was aborted");
+          const form = new FormData();
+          form.append(
+            "file",
+            new Blob([await readFile(audioPath)], { type: "audio/wav" }),
+            `range-${String(rangeIndex + 1).padStart(3, "0")}.wav`,
           );
-        }
-        const segments = (transcription as { segments?: unknown }).segments;
-        if (!Array.isArray(segments)) {
-          throw new CaptionProductionExecutorError(
-            "recognizer_output_invalid",
-            "The bounded current-run caption recognizer returned no segment array",
-          );
-        }
-        for (const [segmentIndex, candidate] of segments.entries()) {
-          const segment = candidate as { start?: unknown; end?: unknown; text?: unknown };
-          const startMs = range.startMs + Math.round(Number(segment.start) * 1_000);
-          const endMs = range.startMs + Math.round(Number(segment.end) * 1_000);
-          const text = typeof segment.text === "string" ? segment.text.trim() : "";
-          if (
-            !Number.isSafeInteger(startMs) || !Number.isSafeInteger(endMs) || endMs <= startMs ||
-            startMs < range.startMs || endMs > range.endMs
-          ) {
+          form.append("model", "gpt-4o-transcribe-diarize");
+          form.append("language", "ko");
+          form.append("response_format", "diarized_json");
+          form.append("chunking_strategy", "auto");
+          let transcription: unknown;
+          try {
+            transcription = await apiJson(this.apiKey, "audio/transcriptions", form, signal, null);
+          } catch (error) {
             throw new CaptionProductionExecutorError(
-              "recognizer_output_invalid",
-              "The bounded current-run caption recognizer returned timing outside its host-derived production range",
+              "recognizer_provider_failed",
+              "The bounded current-run caption recognizer failed closed",
+              { cause: error },
             );
           }
-          const id = `line-${String(rangeIndex + 1).padStart(3, "0")}-${String(segmentIndex + 1).padStart(3, "0")}`;
-          sourceLines.push(text
-            ? {
-                id,
-                startMs,
-                endMs,
-                source: { language: "ko", state: "available", text, reasonCode: null },
-                target: { language: "en", state: "unavailable", text: null, reasonCode: "translator_unavailable" },
-              }
-            : {
-                id,
-                startMs,
-                endMs,
-                source: { language: "ko", state: "unavailable", text: null, reasonCode: "recognizer_empty" },
-                target: { language: "en", state: "unavailable", text: null, reasonCode: "source_unavailable" },
-              });
+          const segments = (transcription as { segments?: unknown }).segments;
+          if (!Array.isArray(segments)) {
+            throw new CaptionProductionExecutorError(
+              "recognizer_output_invalid",
+              "The bounded current-run caption recognizer returned no segment array",
+            );
+          }
+          if (segments.length === 0) {
+            return [unavailableRangeLine(rangeIndex, range, "recognizer_empty")];
+          }
+          const rangeLines: CaptionExecutorLine[] = [];
+          for (const [segmentIndex, candidate] of segments.entries()) {
+            const segment = candidate as { start?: unknown; end?: unknown; text?: unknown };
+            const startMs = range.startMs + Math.round(Number(segment.start) * 1_000);
+            const endMs = range.startMs + Math.round(Number(segment.end) * 1_000);
+            const text = typeof segment.text === "string" ? segment.text.trim() : "";
+            if (
+              !Number.isSafeInteger(startMs) || !Number.isSafeInteger(endMs) || endMs <= startMs ||
+              startMs < range.startMs || endMs > range.endMs
+            ) {
+              throw new CaptionProductionExecutorError(
+                "recognizer_output_invalid",
+                "The bounded current-run caption recognizer returned timing outside its host-derived production range",
+              );
+            }
+            const id = `line-${String(rangeIndex + 1).padStart(3, "0")}-${String(segmentIndex + 1).padStart(3, "0")}`;
+            rangeLines.push(text
+              ? {
+                  id,
+                  startMs,
+                  endMs,
+                  source: { language: "ko", state: "available", text, reasonCode: null },
+                  target: { language: "en", state: "unavailable", text: null, reasonCode: "translator_unavailable" },
+                }
+              : {
+                  id,
+                  startMs,
+                  endMs,
+                  source: { language: "ko", state: "unavailable", text: null, reasonCode: "recognizer_empty" },
+                  target: { language: "en", state: "unavailable", text: null, reasonCode: "source_unavailable" },
+                });
+          }
+          return rangeLines;
+        } catch (error) {
+          if (signal.aborted) throw error;
+          return [unavailableRangeLine(rangeIndex, range, "recognizer_unavailable")];
         }
+      };
+      const sourceLines: CaptionExecutorLine[] = [];
+      for (let offset = 0; offset < input.productionRanges.length; offset += MAX_CONCURRENT_CAPTION_RECOGNITION_RANGES) {
+        const batch = input.productionRanges.slice(offset, offset + MAX_CONCURRENT_CAPTION_RECOGNITION_RANGES);
+        const settled = await Promise.allSettled(batch.map((range, index) => recognizeRange(offset + index, range)));
+        const failure = settled.find((entry): entry is PromiseRejectedResult => entry.status === "rejected");
+        if (failure) throw failure.reason;
+        for (const result of settled) if (result.status === "fulfilled") sourceLines.push(...result.value);
       }
       sourceLines.sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs || left.id.localeCompare(right.id));
       if (sourceLines.length > CAPTION_PRODUCTION_LIMITS.maxLines) {

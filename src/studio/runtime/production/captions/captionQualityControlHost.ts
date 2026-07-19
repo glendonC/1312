@@ -4,6 +4,7 @@ import {
   ContentAddressedArtifactStore,
 } from "../artifactStore.ts";
 import { reopenCaptionProductionResults } from "./captionProductionAudit.ts";
+import { materializeCaptionProductionLines } from "./captionArtifactCompaction.ts";
 import type { RuntimeLedger } from "../journal.ts";
 import type {
   CaptionQualityControlReasonCode,
@@ -84,7 +85,8 @@ export class CaptionQualityControlHost {
     }
 
     const testDemoOnly = candidate.artifact.executor.executionScope === "test_demo_only";
-    const lines = candidate.artifact.lines.map((line) => {
+    const candidateLines = materializeCaptionProductionLines(candidate.artifact);
+    const lines = candidateLines.map((line) => {
       const complete = !testDemoOnly &&
         line.lineage.study.coverage.state === "supported" &&
         line.lineage.study.coverage.reasonCode === null &&
@@ -101,7 +103,7 @@ export class CaptionQualityControlHost {
     });
     const reasonCode: CaptionQualityControlReasonCode = testDemoOnly
       ? "recorded_fixture_test_demo_only"
-      : candidate.artifact.lines.length === 0
+      : candidateLines.length === 0
         ? "candidate_has_no_lines"
         : lines.every((line) => line.outcome === "accepted")
           ? "current_run_candidate_structurally_complete"
@@ -121,7 +123,7 @@ export class CaptionQualityControlHost {
         executor: structuredClone(candidate.artifact.executor),
         study: structuredClone(candidate.artifact.input.study),
         readiness: structuredClone(candidate.artifact.input.readiness),
-        approval: structuredClone(candidate.artifact.lines[0]?.lineage.approval ?? candidate.verification.approval),
+        approval: structuredClone(candidateLines[0]?.lineage.approval ?? candidate.verification.approval),
       },
       producer: {
         id: "studio.host-caption-quality-control" as const,

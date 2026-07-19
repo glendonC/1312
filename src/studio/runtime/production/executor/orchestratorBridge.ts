@@ -15,10 +15,7 @@ import type {
   ParentArtifactAdmissionReceiptV2,
   ParentArtifactReadReceiptV2,
   OwnedMediaStudyExecutorReceiptV2,
-  OwnedMediaStudyCoverageRangeV2,
-  OwnedMediaStudyClaimV2,
   OwnedMediaStudyExecutorReceiptV3,
-  OwnedMediaStudyCoverageRangeV3,
   StudyRestudyInput,
   RangePassRequestReceipt,
   AnyResearchRequestInput,
@@ -96,9 +93,10 @@ export interface AdmittedArtifactReadToolResult {
   receipt: ParentArtifactReadReceipt | ParentArtifactReadReceiptV2;
   artifacts: Array<{ artifactId: string; contentId: string; schema: "studio.study-report.v1" | "studio.study-report.v2"; content: unknown }>;
   planningInput: StudyPlanningInput | null;
-  synthesisInput?: { coverage: OwnedMediaStudyCoverageRangeV2[]; claims: OwnedMediaStudyClaimV2[] } | null;
+  synthesisInput?: { inputId: string } | null;
   restudyInput?: StudyRestudyInput | null;
   researchInput?: AnyResearchRequestInput | null;
+  requiredNextAction?: typeof ORCHESTRATOR_SYNTHESIZE_TOOL | null;
 }
 
 export interface StudyPlanningToolResult {
@@ -158,6 +156,24 @@ function exact(item: Record<string, unknown>, keys: readonly string[]): boolean 
   return Object.keys(item).length === keys.length && keys.every((key) => key in item);
 }
 
+function generalizedSynthesisInput(
+  runId: string,
+  parentTaskId: string,
+  contractVersion: 2 | 3,
+  projection: { coverage: readonly unknown[]; claims: readonly unknown[] },
+): { inputId: string } {
+  return {
+    inputId: `study-synthesis-input:${canonicalSha256({
+      schema: "studio.generalized-study-synthesis-input.v1",
+      runId,
+      parentTaskId,
+      contractVersion,
+      coverage: projection.coverage,
+      claims: projection.claims,
+    })}`,
+  };
+}
+
 function terminalIdentity(ledger: RuntimeLedger, taskId: string): TerminalChildIdentity {
   const state = ledger.state();
   const task = state.tasks[taskId];
@@ -200,6 +216,7 @@ export class BoundedOrchestratorBridge {
   private readonly separationRequestHost: ConditionalSeparationRequestHost | null;
   private readonly researchRequestHost: ResearchRequestExecutionHost | null;
   private readonly computerUseRequestHost: ComputerUseRequestExecutionHost | null;
+  private synthesisOnly = false;
 
   constructor(input: {
     task: TaskRecord;
@@ -289,6 +306,12 @@ export class BoundedOrchestratorBridge {
     callId: string,
     tool: OrchestratorToolName,
   ): Promise<void> {
+    if (this.synthesisOnly && tool !== ORCHESTRATOR_SYNTHESIZE_TOOL) {
+      throw new OrchestratorBridgeError(
+        "operation_rejected",
+        "The host recorded empty restudy and research sets. study_synthesize is now the only authorized root tool; copy the exact synthesisInput returned by the preceding artifact_read.",
+      );
+    }
     await this.ledger.transact(
       { producer: { kind: "launcher", id: "model-orchestrator-bridge" }, causationId: this.executionId },
       ({ state }) => {
@@ -621,6 +644,27 @@ export class BoundedOrchestratorBridge {
           admission.parentTaskId !== this.task.id || admission.parentAgentId !== this.task.assignedAgentId) {
         throw new OrchestratorBridgeError("capability_not_granted", "The exact generalized admission authority is unavailable.");
       }
+      if (Object.values(this.ledger.state().generalizedParentArtifactReads).some((entry) =>
+        entry.contractVersion === 2 && entry.parentTaskId === this.task.id && entry.admissionId === admission.admissionId)) {
+        const completedReads = Object.values(this.ledger.state().generalizedParentArtifactReads).filter((entry) =>
+          entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
+        let recovery = "Use the previously returned synthesisInput.inputId with study_synthesize, or select one exact still-authorized restudy/research request.";
+        if (completedReads.length >= 2) {
+          try {
+            const projection = this.restudied
+              ? await inspectRestudiedStudy(this.ledger, this.scheduler, this.artifacts, this.task.id).then(({ inspected }) => inspected)
+              : await inspectGeneralizedStudy(this.ledger, this.artifacts, this.task.id).then(({ inspected }) => inspected);
+            const current = generalizedSynthesisInput(this.ledger.runId, this.task.id, this.restudied ? 3 : 2, projection);
+            recovery = `Call study_synthesize now with exactly {"inputId":"${current.inputId}"}, or select one exact still-authorized restudy/research request.`;
+          } catch {
+            // A pending pass may prevent a current synthesis projection; the one-use rejection still holds.
+          }
+        }
+        throw new OrchestratorBridgeError(
+          "operation_rejected",
+          `Each generalized admission has one read authority. This admission is already read; do not retry it. ${recovery}`,
+        );
+      }
       const callId = this.nextCallId(ORCHESTRATOR_READ_TOOL);
       await this.recordCall(callId, ORCHESTRATOR_READ_TOOL);
       const operationId = `operation:generalized-parent-artifact-read:${canonicalSha256({ executionId: this.executionId, callId })}`;
@@ -635,10 +679,13 @@ export class BoundedOrchestratorBridge {
       if (this.restudied && this.rangePassHost) await this.rangePassHost.finalizeTask(admission.childTaskId);
       const completedReads = Object.values(this.ledger.state().generalizedParentArtifactReads).filter((entry) =>
         entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
-      const synthesisInput = completedReads.length >= 2
+      const synthesisProjection = completedReads.length >= 2
         ? this.restudied
-          ? await inspectRestudiedStudy(this.ledger, this.scheduler, this.artifacts, this.task.id).then(({ inspected }) => ({ coverage: inspected.coverage, claims: inspected.claims }))
-          : await inspectGeneralizedStudy(this.ledger, this.artifacts, this.task.id).then(({ inspected }) => ({ coverage: inspected.coverage, claims: inspected.claims }))
+          ? await inspectRestudiedStudy(this.ledger, this.scheduler, this.artifacts, this.task.id).then(({ inspected }) => inspected)
+          : await inspectGeneralizedStudy(this.ledger, this.artifacts, this.task.id).then(({ inspected }) => inspected)
+        : null;
+      const synthesisInput = synthesisProjection
+        ? generalizedSynthesisInput(this.ledger.runId, this.task.id, this.restudied ? 3 : 2, synthesisProjection)
         : null;
       const restudyInput = completedReads.length >= 2 && this.restudied && this.rangePassHost
         ? await this.rangePassHost.inspect(this.executionId)
@@ -646,12 +693,17 @@ export class BoundedOrchestratorBridge {
       const researchInput = completedReads.length >= 2 && this.restudied && this.researchRequestHost
         ? await this.researchRequestHost.inspect(this.executionId)
         : null;
+      const requiredNextAction = this.restudied && researchInput?.triggers.length === 0 && restudyInput?.candidates.length === 0
+        ? ORCHESTRATOR_SYNTHESIZE_TOOL
+        : null;
+      if (requiredNextAction === ORCHESTRATOR_SYNTHESIZE_TOOL) this.synthesisOnly = true;
       return {
         schema: "studio.orchestrator-admitted-artifact-read-result.v2",
+        synthesisInput,
+        ...(this.restudied && this.researchRequestHost ? { requiredNextAction } : {}),
         receipt: result.receipt,
         artifacts: [{ artifactId: result.receipt.returned.artifactId, contentId: result.receipt.returned.contentId, schema: "studio.study-report.v2", content: result.report }],
         planningInput: null,
-        synthesisInput,
         ...(this.restudied ? { restudyInput } : {}),
         ...(this.restudied && this.researchRequestHost ? { researchInput } : {}),
       };
@@ -682,21 +734,33 @@ export class BoundedOrchestratorBridge {
   async synthesize(value: unknown): Promise<StudySynthesisToolResult> {
     this.manifest();
     if (!this.synthesisHost && !this.generalized) throw new OrchestratorBridgeError("capability_not_granted", "Study synthesis is unavailable.");
-    await this.recordCall(this.nextCallId(ORCHESTRATOR_SYNTHESIZE_TOOL), ORCHESTRATOR_SYNTHESIZE_TOOL);
     if (this.generalized) {
       if (!this.artifacts) throw new OrchestratorBridgeError("capability_not_granted", "Generalized synthesis storage is unavailable.");
       const admissions = Object.values(this.ledger.state().generalizedParentArtifactAdmissions).filter((entry) =>
         entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
       const reads = Object.values(this.ledger.state().generalizedParentArtifactReads).filter((entry) =>
         entry.contractVersion === 2 && entry.parentTaskId === this.task.id);
-      if (admissions.length < 2 || reads.length < admissions.length) {
-        throw new OrchestratorBridgeError("operation_rejected", "Generalized synthesis requires every admitted report to be read and at least two admitted reports.");
+      const exactReadClosure = admissions.length >= 2 && reads.length === admissions.length && admissions.every((admission) =>
+        reads.filter((entry) => entry.admissionId === admission.admissionId).length === 1);
+      if (!exactReadClosure) {
+        throw new OrchestratorBridgeError("operation_rejected", "Generalized synthesis requires exactly one read of every admitted report and at least two admitted reports.");
+      }
+      const item = record(value);
+      if (!item || !exact(item, ["inputId"]) || typeof item.inputId !== "string" || item.inputId.length === 0) {
+        throw new OrchestratorBridgeError("invalid_request", "Generalized synthesis accepts only one exact host-derived synthesis input id.");
       }
       if (this.restudied) {
+        const synthesisProjection = await inspectRestudiedStudy(this.ledger, this.scheduler, this.artifacts, this.task.id)
+          .then(({ inspected }) => inspected);
+        const expectedInput = generalizedSynthesisInput(this.ledger.runId, this.task.id, 3, synthesisProjection);
+        if (item.inputId !== expectedInput.inputId) {
+          throw new OrchestratorBridgeError("operation_rejected", "The generalized synthesis input id is stale or does not match the exact current admitted projection.");
+        }
         const acceptedPasses = Object.values(this.ledger.state().rangePasses).filter((entry) =>
           entry.accepted && entry.request.root.taskId === this.task.id);
         if (acceptedPasses.some((entry) => !entry.terminal)) throw new OrchestratorBridgeError("operation_rejected", "Every accepted range pass must terminate before v3 synthesis.");
-        const result = await recordRestudiedStudy({ ledger: this.ledger, scheduler: this.scheduler, artifacts: this.artifacts, parentTaskId: this.task.id, request: value as Parameters<typeof recordRestudiedStudy>[0]["request"] });
+        await this.recordCall(this.nextCallId(ORCHESTRATOR_SYNTHESIZE_TOOL), ORCHESTRATOR_SYNTHESIZE_TOOL);
+        const result = await recordRestudiedStudy({ ledger: this.ledger, scheduler: this.scheduler, artifacts: this.artifacts, parentTaskId: this.task.id, request: { coverage: synthesisProjection.coverage, claims: synthesisProjection.claims } });
         return {
           schema: "studio.orchestrator-study-synthesis-result.v3",
           studyId: result.study.studyId,
@@ -706,7 +770,14 @@ export class BoundedOrchestratorBridge {
           executorReceipt: result.executorReceipt,
         };
       }
-      const result = await recordGeneralizedStudy({ ledger: this.ledger, artifacts: this.artifacts, parentTaskId: this.task.id, request: value as Parameters<typeof recordGeneralizedStudy>[0]["request"] });
+      const synthesisProjection = await inspectGeneralizedStudy(this.ledger, this.artifacts, this.task.id)
+        .then(({ inspected }) => inspected);
+      const expectedInput = generalizedSynthesisInput(this.ledger.runId, this.task.id, 2, synthesisProjection);
+      if (item.inputId !== expectedInput.inputId) {
+        throw new OrchestratorBridgeError("operation_rejected", "The generalized synthesis input id is stale or does not match the exact current admitted projection.");
+      }
+      await this.recordCall(this.nextCallId(ORCHESTRATOR_SYNTHESIZE_TOOL), ORCHESTRATOR_SYNTHESIZE_TOOL);
+      const result = await recordGeneralizedStudy({ ledger: this.ledger, artifacts: this.artifacts, parentTaskId: this.task.id, request: { coverage: synthesisProjection.coverage, claims: synthesisProjection.claims } });
       return {
         schema: "studio.orchestrator-study-synthesis-result.v2",
         studyId: result.study.studyId,
@@ -716,6 +787,7 @@ export class BoundedOrchestratorBridge {
         executorReceipt: result.executorReceipt,
       };
     }
+    await this.recordCall(this.nextCallId(ORCHESTRATOR_SYNTHESIZE_TOOL), ORCHESTRATOR_SYNTHESIZE_TOOL);
     const result = await this.synthesisHost!.synthesize(this.executionId, value);
     return {
       schema: "studio.orchestrator-study-synthesis-result.v1",

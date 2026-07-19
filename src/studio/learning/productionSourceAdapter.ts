@@ -1,6 +1,7 @@
 import type { VerifiedCaptionProductionResult } from "../runtime/production/captionProductionAudit";
 import type { CaptionProductionLine } from "../runtime/production/model/captions";
 import { validateCaptionProductionArtifact } from "../runtime/production/validation/captionProduction.ts";
+import { materializeCaptionProductionLines } from "../runtime/production/captions/captionArtifactCompaction.ts";
 import type {
   LearningSourceContext,
   LearningViewingSource,
@@ -134,6 +135,7 @@ export function projectVerifiedProductionLearningSource(
   const verified = validatedVerifiedProductionResult(input);
   if (!verified) return { state: "failed", reasonCode: "invalid_source_binding" };
   const { verification, artifact } = verified;
+  const captionLines = materializeCaptionProductionLines(artifact);
   const context: Extract<LearningSourceContext, { origin: "verified_production_caption" }> = {
     origin: "verified_production_caption",
     authorityState: verification.authorityState,
@@ -163,7 +165,7 @@ export function projectVerifiedProductionLearningSource(
       captionReceiptArtifactId: verification.receiptArtifactId,
       captionReceiptId: verification.receiptId,
       captionReceiptContentId: verification.receiptContentId,
-      lineIds: artifact.lines.map((line) => line.id),
+      lineIds: captionLines.map((line) => line.id),
     },
     rights: {
       basis: "production_private_source_policy",
@@ -178,7 +180,7 @@ export function projectVerifiedProductionLearningSource(
       "publication_not_authorized",
     ],
   };
-  const moments = artifact.lines.map((line): ProductionPresentedMoment => ({
+  const moments = captionLines.map((line): ProductionPresentedMoment => ({
     lineId: line.id,
     startMs: line.startMs,
     endMs: line.endMs,

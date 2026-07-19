@@ -1,6 +1,7 @@
 import type {
   CaptionExecutorDescriptor,
   CaptionProductionArtifact,
+  CaptionProductionArtifactV5,
   CaptionProductionLine,
   CaptionProductionReceipt,
   CaptionProductionRequest,
@@ -11,6 +12,10 @@ import type {
   GeneralizedCoverageState,
 } from "../model.ts";
 import { CAPTION_PRODUCTION_LIMITS } from "../model.ts";
+import {
+  compactCaptionProductionArtifactV5,
+  materializeCaptionProductionLines,
+} from "../captions/captionArtifactCompaction.ts";
 import { validatePublishReviewDecisionReceiptIdentity } from "./publishReviewDecision.ts";
 import { validateStudyReadinessReceiptIdentity } from "./publishReview.ts";
 import { validateSemanticEvidenceCitationInput } from "./semanticEvidence.ts";
@@ -45,6 +50,17 @@ const V1_REASON_CODES = new Set([
 const V2_REASON_CODES = new Set([...V1_REASON_CODES, "not_in_requested_dialogue_scope"]);
 const V3_REASON_CODES = new Set([...V2_REASON_CODES, "study_coverage_unavailable", "study_coverage_truncated", "study_readiness_withheld"]);
 const OUTPUT_STATUSES = new Set(["completed", "partial", "withheld", "unavailable"]);
+
+function canonicalStructure(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalStructure).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalStructure(entry)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
 
 function stableIdentity(value: unknown, context: string, path: string): string {
   const identity = string(value, context, path);
@@ -172,20 +188,33 @@ function validateGeneralizedCausality(value: unknown, context: string, path: str
   };
   if (parsedRange.endMs <= parsedRange.startMs) fail(context, `${path}.range`, "must be non-empty");
   const parseText = <Language extends "ko" | "en">(raw: unknown, language: Language, textPath: string): {
-    language: Language; state: "available" | "withheld"; text: string | null; reasonCode: string | null;
+    language: Language; state: "available" | "withheld" | "unavailable"; text: string | null; reasonCode: string | null;
   } => {
     const entry = object(raw, context, textPath);
     exact(entry, ["language", "state", "text", "reasonCode"], context, textPath);
     literal(entry.language, language, context, `${textPath}.language`);
-    const state = oneOf<"available" | "withheld">(entry.state, new Set(["available", "withheld"]), context, `${textPath}.state`);
+    const state = oneOf<"available" | "withheld" | "unavailable">(
+      entry.state,
+      new Set(["available", "withheld", "unavailable"]),
+      context,
+      `${textPath}.state`,
+    );
     const text = entry.text === null ? null : boundedText(entry.text, context, `${textPath}.text`);
     const reasonCode = entry.reasonCode === null ? null : string(entry.reasonCode, context, `${textPath}.reasonCode`);
-    if ((state === "available") !== (text !== null && reasonCode === null)) fail(context, textPath, "must bind available text or a closed withheld reason");
+    if ((state === "available") !== (text !== null && reasonCode === null)) {
+      fail(context, textPath, "must bind available text or a closed withheld/unavailable reason");
+    }
     return { language, state, text, reasonCode };
   };
   const source = parseText(item.source, "ko", `${path}.source`);
   const target = parseText(item.target, "en", `${path}.target`);
-  if (source.state !== target.state || source.reasonCode !== target.reasonCode) fail(context, path, "source and target generalized authority must agree");
+  if (
+    source.state !== target.state ||
+    (source.state === "withheld" && source.reasonCode !== target.reasonCode) ||
+    (source.state === "unavailable" &&
+      (!new Set(["recognizer_unavailable", "recognizer_empty"]).has(source.reasonCode ?? "") ||
+        target.reasonCode !== "source_unavailable"))
+  ) fail(context, path, "source and target generalized authority must agree or preserve one typed recognizer unavailability");
   const lineage = object(item.lineage, context, `${path}.lineage`);
   exact(lineage, ["study", "readiness", "coverageId", "coverageState", "preservedStates", "claimIds", "citationIds", ...(version === 4 ? ["passIds"] : [])], context, `${path}.lineage`);
   const study = object(lineage.study, context, `${path}.lineage.study`);
@@ -199,7 +228,7 @@ function validateGeneralizedCausality(value: unknown, context: string, path: str
   const claimIds = array(lineage.claimIds, context, `${path}.lineage.claimIds`).map((id, index) => stableIdentity(id, context, `${path}.lineage.claimIds[${index}]`));
   const citationIds = array(lineage.citationIds, context, `${path}.lineage.citationIds`).map((id, index) => stableIdentity(id, context, `${path}.lineage.citationIds[${index}]`));
   const passIds = version === 4 ? array(lineage.passIds, context, `${path}.lineage.passIds`).map((id, index) => stableIdentity(id, context, `${path}.lineage.passIds[${index}]`)) : [];
-  if (source.state === "available" && (coverageState !== "supported" || claimIds.length === 0 || citationIds.length === 0)) fail(context, path, "available generalized text requires supported speech causality");
+  if (source.state !== "withheld" && (coverageState !== "supported" || claimIds.length === 0 || citationIds.length === 0)) fail(context, path, "available or unavailable generalized caption state requires supported speech causality");
   if (source.state === "withheld" && (claimIds.length !== 0 || citationIds.length !== 0)) fail(context, path, "withheld generalized text cannot retain claim authority");
   const common = {
     range: parsedRange,
@@ -430,6 +459,42 @@ function validateLine(value: unknown, context: string, path: string, version: 1 
   };
 }
 
+function structurallyExactV5(value: unknown, context: string, path: string): CaptionProductionArtifactV5 {
+  const item = object(value, context, path);
+  exact(item, ["schema", "jobId", "runId", "input", "executor", "sharedLineage", "lines", "result"], context, path);
+  literal(item.schema, "studio.caption-production.artifact.v5", context, `${path}.schema`);
+  const shared = object(item.sharedLineage, context, `${path}.sharedLineage`);
+  exact(shared, ["derivation", "source", "study", "readiness", "approval", "captionExecutor", "generalizedCausality", "evidence"], context, `${path}.sharedLineage`);
+  const sharedSource = object(shared.source, context, `${path}.sharedLineage.source`);
+  exact(sharedSource, ["artifactId", "contentId"], context, `${path}.sharedLineage.source`);
+  const generalized = object(shared.generalizedCausality, context, `${path}.sharedLineage.generalizedCausality`);
+  exact(generalized, ["schema", "study", "readiness"], context, `${path}.sharedLineage.generalizedCausality`);
+  const evidence = object(shared.evidence, context, `${path}.sharedLineage.evidence`);
+  exact(evidence, ["semanticCitations", "childReports"], context, `${path}.sharedLineage.evidence`);
+  array(evidence.semanticCitations, context, `${path}.sharedLineage.evidence.semanticCitations`)
+    .forEach((entry, index) => object(entry, context, `${path}.sharedLineage.evidence.semanticCitations[${index}]`));
+  array(evidence.childReports, context, `${path}.sharedLineage.evidence.childReports`)
+    .forEach((entry, index) => object(entry, context, `${path}.sharedLineage.evidence.childReports[${index}]`));
+  const lines = array(item.lines, context, `${path}.lines`);
+  if (lines.length === 0) fail(context, `${path}.lines`, "v5 shared causality requires at least one exact line closure");
+  lines.forEach((value, index) => {
+    const linePath = `${path}.lines[${index}]`;
+    const line = object(value, context, linePath);
+    exact(line, ["id", "startMs", "endMs", "lineage", "source", "target"], context, linePath);
+    const lineage = object(line.lineage, context, `${linePath}.lineage`);
+    exact(lineage, ["study", "generalizedCausality"], context, `${linePath}.lineage`);
+    const study = object(lineage.study, context, `${linePath}.lineage.study`);
+    exact(study, ["coverage", "claimIds", "semanticCitationIndexes", "childReportIndexes"], context, `${linePath}.lineage.study`);
+    const coverage = object(study.coverage, context, `${linePath}.lineage.study.coverage`);
+    exact(coverage, ["coverageId", "state", "reasonCode"], context, `${linePath}.lineage.study.coverage`);
+    const compactCausality = object(lineage.generalizedCausality, context, `${linePath}.lineage.generalizedCausality`);
+    exact(compactCausality, ["trackId", "coverageId", "coverageState", "preservedStates", "claimIds", "citationIds", "passIds"], context, `${linePath}.lineage.generalizedCausality`);
+    object(line.source, context, `${linePath}.source`);
+    object(line.target, context, `${linePath}.target`);
+  });
+  return structuredClone(item) as unknown as CaptionProductionArtifactV5;
+}
+
 export function deriveCaptionProductionResult(lines: readonly CaptionProductionLine[]): CaptionProductionArtifact["result"] {
   const sourceAvailableCount = lines.filter((line) => line.source.state === "available").length;
   const targetAvailableCount = lines.filter((line) => line.target.state === "available").length;
@@ -471,16 +536,29 @@ export function validateCaptionProductionArtifact(
   path = "artifact",
 ): CaptionProductionArtifact {
   const item = object(value, context, path);
-  exact(item, ["schema", "jobId", "runId", "input", "executor", "lines", "result"], context, path);
-  const schema = oneOf<CaptionProductionArtifact["schema"]>(item.schema, new Set(["studio.caption-production.artifact.v1", "studio.caption-production.artifact.v2", "studio.caption-production.artifact.v3", "studio.caption-production.artifact.v4"]), context, `${path}.schema`);
+  const schema = oneOf<CaptionProductionArtifact["schema"]>(item.schema, new Set(["studio.caption-production.artifact.v1", "studio.caption-production.artifact.v2", "studio.caption-production.artifact.v3", "studio.caption-production.artifact.v4", "studio.caption-production.artifact.v5"]), context, `${path}.schema`);
+  if (schema !== "studio.caption-production.artifact.v5") {
+    exact(item, ["schema", "jobId", "runId", "input", "executor", "lines", "result"], context, path);
+  }
   const input = validateCaptionProductionInput(item.input, context, `${path}.input`);
   const executor = validateCaptionExecutorDescriptor(item.executor, context, `${path}.executor`);
-  const lines = array(item.lines, context, `${path}.lines`).map((line, index) =>
-    validateLine(line, context, `${path}.lines[${index}]`, schema === "studio.caption-production.artifact.v4" ? 4 : schema === "studio.caption-production.artifact.v3" ? 3 : schema === "studio.caption-production.artifact.v2" ? 2 : 1));
+  const compactV5 = schema === "studio.caption-production.artifact.v5"
+    ? structurallyExactV5(item, context, path)
+    : null;
+  let materialized: CaptionProductionLine[];
+  try {
+    materialized = compactV5 ? materializeCaptionProductionLines(compactV5) : item.lines as CaptionProductionLine[];
+  } catch (error) {
+    fail(context, `${path}.sharedLineage`, error instanceof Error ? error.message : "cannot materialize compact causal references");
+  }
+  const lines = materialized.map((line, index) =>
+    validateLine(line, context, `${path}.lines[${index}]`, schema === "studio.caption-production.artifact.v4" || schema === "studio.caption-production.artifact.v5" ? 4 : schema === "studio.caption-production.artifact.v3" ? 3 : schema === "studio.caption-production.artifact.v2" ? 2 : 1));
   if (lines.length > CAPTION_PRODUCTION_LIMITS.maxLines || new Set(lines.map((line) => line.id)).size !== lines.length) {
     fail(context, `${path}.lines`, "exceed the line ceiling or contain duplicate identities");
   }
   let previousEnd = input.range.startMs;
+  const jobId = stableIdentity(item.jobId, context, `${path}.jobId`);
+  const runId = stableIdentity(item.runId, context, `${path}.runId`);
   for (const [index, line] of lines.entries()) {
     if (line.startMs < input.range.startMs || line.endMs > input.range.endMs || line.endMs <= line.startMs || line.startMs < previousEnd) {
       fail(context, `${path}.lines[${index}]`, "must be ordered, non-overlapping, and inside the approved analysis range");
@@ -500,7 +578,7 @@ export function validateCaptionProductionArtifact(
         executorReceiptContentId: line.lineage.study.executorReceiptContentId,
       }) !== JSON.stringify(input.study) ||
       JSON.stringify(line.lineage.readiness) !== JSON.stringify(input.readiness) ||
-      line.lineage.captionExecutor.jobId !== stableIdentity(item.jobId, context, `${path}.jobId`) ||
+      line.lineage.captionExecutor.jobId !== jobId ||
       line.lineage.captionExecutor.id !== executor.id ||
       line.lineage.captionExecutor.version !== executor.version ||
       line.lineage.captionExecutor.executionScope !== executor.executionScope ||
@@ -518,15 +596,48 @@ export function validateCaptionProductionArtifact(
   if (JSON.stringify(result) !== JSON.stringify(deriveCaptionProductionResult(lines))) {
     fail(context, `${path}.result`, "does not match the timed line states");
   }
-  return {
-    schema,
-    jobId: stableIdentity(item.jobId, context, `${path}.jobId`),
-    runId: stableIdentity(item.runId, context, `${path}.runId`),
-    input,
-    executor,
-    lines,
-    result,
-  };
+  if (compactV5) {
+    const first = lines[0];
+    const causality = first.lineage.generalizedCausality;
+    if (!causality || causality.schema !== "studio.caption-line-causality.v4") {
+      fail(context, `${path}.sharedLineage.generalizedCausality`, "must materialize one v4 causality closure");
+    }
+    const normalized = compactCaptionProductionArtifactV5({
+      jobId,
+      runId,
+      input,
+      executor,
+      lines,
+      result,
+      sharedLineage: {
+        derivation: first.lineage.derivation,
+        source: {
+          artifactId: first.lineage.source.artifactId,
+          contentId: first.lineage.source.contentId,
+        },
+        study: {
+          studyId: first.lineage.study.studyId,
+          artifactId: first.lineage.study.artifactId,
+          contentId: first.lineage.study.contentId,
+          executorReceiptId: first.lineage.study.executorReceiptId,
+          executorReceiptContentId: first.lineage.study.executorReceiptContentId,
+        },
+        readiness: structuredClone(first.lineage.readiness),
+        approval: structuredClone(first.lineage.approval),
+        captionExecutor: structuredClone(first.lineage.captionExecutor),
+        generalizedCausality: {
+          schema: causality.schema,
+          study: structuredClone(causality.lineage.study),
+          readiness: structuredClone(causality.lineage.readiness),
+        },
+      },
+    });
+    if (canonicalStructure(normalized) !== canonicalStructure(compactV5)) {
+      fail(context, path, "does not use the unique canonical shared-lineage representation");
+    }
+    return normalized;
+  }
+  return { schema, jobId, runId, input, executor, lines, result } as CaptionProductionArtifact;
 }
 
 export function validateCaptionProductionLimits(value: unknown, context: string, path: string): typeof CAPTION_PRODUCTION_LIMITS {
@@ -545,7 +656,7 @@ export function validateCaptionProductionReceipt(
 ): CaptionProductionReceipt {
   const item = object(value, context, path);
   exact(item, ["schema", "receiptId", "jobId", "authority", "input", "producer", "limits", "result"], context, path);
-  const schema = oneOf<CaptionProductionReceipt["schema"]>(item.schema, new Set(["studio.caption-production.receipt.v1", "studio.caption-production.receipt.v2", "studio.caption-production.receipt.v3", "studio.caption-production.receipt.v4"]), context, `${path}.schema`);
+  const schema = oneOf<CaptionProductionReceipt["schema"]>(item.schema, new Set(["studio.caption-production.receipt.v1", "studio.caption-production.receipt.v2", "studio.caption-production.receipt.v3", "studio.caption-production.receipt.v4", "studio.caption-production.receipt.v5"]), context, `${path}.schema`);
   const authority = object(item.authority, context, `${path}.authority`);
   exact(authority, ["approval", "verification"], context, `${path}.authority`);
   const verification = object(authority.verification, context, `${path}.authority.verification`);
@@ -557,8 +668,8 @@ export function validateCaptionProductionReceipt(
   const producer = object(item.producer, context, `${path}.producer`);
   exact(producer, ["id", "version", "policy", "executor"], context, `${path}.producer`);
   literal(producer.id, "studio.host-caption-production", context, `${path}.producer.id`);
-  const producerVersion = schema === "studio.caption-production.receipt.v4" ? "4" : schema === "studio.caption-production.receipt.v3" ? "3" : schema === "studio.caption-production.receipt.v2" ? "2" : "1";
-  const producerPolicy = schema === "studio.caption-production.receipt.v4" ? "verified_unrevoked_approval_and_restudied_causality_v4_only" : schema === "studio.caption-production.receipt.v3" ? "verified_unrevoked_approval_and_generalized_causality_v3_only" : schema === "studio.caption-production.receipt.v2" ? "verified_unrevoked_approval_and_dialogue_scope_only" : "verified_unrevoked_approval_only";
+  const producerVersion = schema === "studio.caption-production.receipt.v5" ? "5" : schema === "studio.caption-production.receipt.v4" ? "4" : schema === "studio.caption-production.receipt.v3" ? "3" : schema === "studio.caption-production.receipt.v2" ? "2" : "1";
+  const producerPolicy = schema === "studio.caption-production.receipt.v5" ? "verified_unrevoked_approval_and_shared_restudied_causality_v5_only" : schema === "studio.caption-production.receipt.v4" ? "verified_unrevoked_approval_and_restudied_causality_v4_only" : schema === "studio.caption-production.receipt.v3" ? "verified_unrevoked_approval_and_generalized_causality_v3_only" : schema === "studio.caption-production.receipt.v2" ? "verified_unrevoked_approval_and_dialogue_scope_only" : "verified_unrevoked_approval_only";
   literal(producer.version, producerVersion, context, `${path}.producer.version`);
   literal(producer.policy, producerPolicy, context, `${path}.producer.policy`);
   const result = object(item.result, context, `${path}.result`);
@@ -581,7 +692,7 @@ export function validateCaptionProductionReceipt(
     exact(line, [
       "lineId", "startMs", "endMs", "sourceState", "targetState", "reasonCode", "coverageId",
       "coverageState", "claimIds", "semanticEvidenceArtifactIds", "reportArtifactIds",
-      ...(schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" ? ["generalizedCausality"] : []),
+      ...(schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" || schema === "studio.caption-production.receipt.v5" ? ["generalizedCausality"] : []),
     ], context, linePath);
     const startMs = integer(line.startMs, context, `${linePath}.startMs`);
     const endMs = integer(line.endMs, context, `${linePath}.endMs`, 1);
@@ -592,13 +703,13 @@ export function validateCaptionProductionReceipt(
       endMs,
       sourceState: oneOf<CaptionProductionLine["source"]["state"]>(line.sourceState, LINE_STATES, context, `${linePath}.sourceState`),
       targetState: oneOf<CaptionProductionLine["target"]["state"]>(line.targetState, LINE_STATES, context, `${linePath}.targetState`),
-      reasonCode: line.reasonCode === null ? null : oneOf<NonNullable<CaptionProductionLine["target"]["reasonCode"]>>(line.reasonCode, schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" ? V3_REASON_CODES : schema === "studio.caption-production.receipt.v2" ? V2_REASON_CODES : V1_REASON_CODES, context, `${linePath}.reasonCode`),
+      reasonCode: line.reasonCode === null ? null : oneOf<NonNullable<CaptionProductionLine["target"]["reasonCode"]>>(line.reasonCode, schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" || schema === "studio.caption-production.receipt.v5" ? V3_REASON_CODES : schema === "studio.caption-production.receipt.v2" ? V2_REASON_CODES : V1_REASON_CODES, context, `${linePath}.reasonCode`),
       coverageId: line.coverageId === null ? null : stableIdentity(line.coverageId, context, `${linePath}.coverageId`),
       coverageState: oneOf<CaptionProductionLine["lineage"]["study"]["coverage"]["state"]>(line.coverageState, new Set(["supported", "withheld", "unknown", "failed", "uncovered", "conflict"]), context, `${linePath}.coverageState`),
       claimIds: array(line.claimIds, context, `${linePath}.claimIds`).map((id, claimIndex) => stableIdentity(id, context, `${linePath}.claimIds[${claimIndex}]`)),
       semanticEvidenceArtifactIds: array(line.semanticEvidenceArtifactIds, context, `${linePath}.semanticEvidenceArtifactIds`).map((id, citationIndex) => stableIdentity(id, context, `${linePath}.semanticEvidenceArtifactIds[${citationIndex}]`)),
       reportArtifactIds: array(line.reportArtifactIds, context, `${linePath}.reportArtifactIds`).map((id, reportIndex) => stableIdentity(id, context, `${linePath}.reportArtifactIds[${reportIndex}]`)),
-      ...(schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" ? { generalizedCausality: validateGeneralizedCausality(line.generalizedCausality, context, `${linePath}.generalizedCausality`, schema === "studio.caption-production.receipt.v4" ? 4 : 3) } : {}),
+      ...(schema === "studio.caption-production.receipt.v3" || schema === "studio.caption-production.receipt.v4" || schema === "studio.caption-production.receipt.v5" ? { generalizedCausality: validateGeneralizedCausality(line.generalizedCausality, context, `${linePath}.generalizedCausality`, schema === "studio.caption-production.receipt.v4" || schema === "studio.caption-production.receipt.v5" ? 4 : 3) } : {}),
     };
   });
   if (lines.length !== counts.lineCount || new Set(lines.map((line) => line.lineId)).size !== lines.length) {

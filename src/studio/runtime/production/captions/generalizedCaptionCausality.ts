@@ -1,10 +1,14 @@
 import type { CaptionLineCausalityV3, EvidenceCitationEnvelope, QualifiedMediaRange, RuntimeProjection } from "../model.ts";
-import type { ContentAddressedArtifactStore } from "../artifactStore.ts";
+import { canonicalSha256, type ContentAddressedArtifactStore } from "../artifactStore.ts";
 import type { GeneralizedEvidenceAdmissionOptions } from "../admission/generalizedEvidenceAdmissionHost.ts";
 import {
   GeneralizedStudyReadinessHost,
   type GeneralizedReadinessV3Reference,
 } from "../study/generalizedStudyReadinessHost.ts";
+
+type CaptionCausalityTextInput =
+  | { sourceText: string; targetText: string; sourceUnavailableReason?: never }
+  | { sourceText: null; targetText: null; sourceUnavailableReason: "recognizer_unavailable" | "recognizer_empty" };
 
 function closesLine(range: QualifiedMediaRange, citations: EvidenceCitationEnvelope[]): boolean {
   const observations = citations.flatMap((citation) => citation.observations)
@@ -30,17 +34,32 @@ function reason(state: CaptionLineCausalityV3["lineage"]["coverageState"]): stri
 /** Caption causality copies only range-closing speech citations; context-only frames cannot authorize text. */
 export class GeneralizedCaptionCausalityHost {
   private readonly readiness: GeneralizedStudyReadinessHost;
+  private readonly reopenedReadiness = new Map<
+    string,
+    ReturnType<GeneralizedStudyReadinessHost["reopen"]>
+  >();
   constructor(state: RuntimeProjection, artifacts: ContentAddressedArtifactStore, options: GeneralizedEvidenceAdmissionOptions = {}) {
     this.readiness = new GeneralizedStudyReadinessHost(state, artifacts, options);
+  }
+
+  private reopen(reference: GeneralizedReadinessV3Reference): ReturnType<GeneralizedStudyReadinessHost["reopen"]> {
+    const key = canonicalSha256(reference);
+    const existing = this.reopenedReadiness.get(key);
+    if (existing) return existing;
+    const reopened = this.readiness.reopen(reference);
+    this.reopenedReadiness.set(key, reopened);
+    return reopened;
   }
 
   async close(input: {
     readiness: GeneralizedReadinessV3Reference;
     range: QualifiedMediaRange;
-    sourceText: string;
-    targetText: string;
-  }): Promise<CaptionLineCausalityV3> {
-    const ready = await this.readiness.reopen(input.readiness); const study = ready.reopenedStudy;
+  } & CaptionCausalityTextInput): Promise<CaptionLineCausalityV3> {
+    const unavailable = input.sourceText === null && input.targetText === null && input.sourceUnavailableReason !== undefined;
+    if (!unavailable && (typeof input.sourceText !== "string" || typeof input.targetText !== "string")) {
+      throw new Error("Generalized caption causality requires either available text or one typed unavailable recognizer reason");
+    }
+    const ready = await this.reopen(input.readiness); const study = ready.reopenedStudy;
     const covering = study?.envelope.coverage.filter((entry) => entry.artifactId === input.range.artifactId && entry.trackId === input.range.trackId && entry.startMs <= input.range.startMs && entry.endMs >= input.range.endMs) ?? [];
     const coverage = covering.length === 1 ? covering[0] : null;
     let claimIds: string[] = []; let citationIds: string[] = []; let allowed = false;
@@ -54,10 +73,20 @@ export class GeneralizedCaptionCausalityHost {
       if (claim) { allowed = true; claimIds = [claim.claimId]; citationIds = [...claim.citationIds]; }
     }
     const coverageState = coverage?.state ?? "uncovered"; const withheldReason = allowed ? null : ready.receipt.result.outcome === "withheld" ? "study_readiness_withheld" : reason(coverageState);
+    const source = allowed
+      ? unavailable
+        ? { language: "ko" as const, state: "unavailable" as const, text: null, reasonCode: input.sourceUnavailableReason }
+        : { language: "ko" as const, state: "available" as const, text: input.sourceText, reasonCode: null }
+      : { language: "ko" as const, state: "withheld" as const, text: null, reasonCode: withheldReason };
+    const target = allowed
+      ? unavailable
+        ? { language: "en" as const, state: "unavailable" as const, text: null, reasonCode: "source_unavailable" }
+        : { language: "en" as const, state: "available" as const, text: input.targetText, reasonCode: null }
+      : { language: "en" as const, state: "withheld" as const, text: null, reasonCode: withheldReason };
     return {
       schema: "studio.caption-line-causality.v3", range: structuredClone(input.range),
-      source: { language: "ko", state: allowed ? "available" : "withheld", text: allowed ? input.sourceText : null, reasonCode: withheldReason },
-      target: { language: "en", state: allowed ? "available" : "withheld", text: allowed ? input.targetText : null, reasonCode: withheldReason },
+      source,
+      target,
       lineage: { study: structuredClone(input.readiness.study.study), readiness: { readinessId: input.readiness.readinessId, receiptId: input.readiness.receiptId, receiptContentId: input.readiness.receiptContentId }, coverageId: coverage?.coverageId ?? null, coverageState, preservedStates: coverage?.preservedStates ?? [], claimIds, citationIds },
     };
   }

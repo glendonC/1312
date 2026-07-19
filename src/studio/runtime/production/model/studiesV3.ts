@@ -321,8 +321,8 @@ export interface StudyReadinessRecordV4 {
 export interface CaptionLineCausalityV4 {
   schema: "studio.caption-line-causality.v4";
   range: QualifiedMediaRange;
-  source: { language: "ko"; state: "available" | "withheld"; text: string | null; reasonCode: string | null };
-  target: { language: "en"; state: "available" | "withheld"; text: string | null; reasonCode: string | null };
+  source: { language: "ko"; state: "available" | "withheld" | "unavailable"; text: string | null; reasonCode: string | null };
+  target: { language: "en"; state: "available" | "withheld" | "unavailable"; text: string | null; reasonCode: string | null };
   lineage: {
     study: OwnedMediaStudyV3Identity;
     readiness: { readinessId: string; receiptId: string; receiptContentId: string };

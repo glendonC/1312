@@ -99,6 +99,57 @@ export interface CaptionProductionLine {
   };
 }
 
+/**
+ * V5 stores authority shared by every line once and keeps only range-specific
+ * causal references on each line. Validators materialize the full v4 line
+ * causality before granting downstream authority.
+ */
+export interface CaptionProductionSharedLineageV5 {
+  derivation: CaptionProductionLine["lineage"]["derivation"];
+  source: {
+    artifactId: string;
+    contentId: string;
+  };
+  study: CaptionStudyIdentity;
+  readiness: StudyReadinessReceiptIdentity;
+  approval: PublishReviewDecisionReceiptIdentity;
+  captionExecutor: CaptionProductionLine["lineage"]["captionExecutor"];
+  generalizedCausality: {
+    schema: CaptionLineCausalityV4["schema"];
+    study: CaptionLineCausalityV4["lineage"]["study"];
+    readiness: CaptionLineCausalityV4["lineage"]["readiness"];
+  };
+  evidence: {
+    semanticCitations: SemanticEvidenceCitationInput[];
+    childReports: StudyPlanningReportInput[];
+  };
+}
+
+export interface CaptionProductionLineV5 {
+  id: string;
+  startMs: number;
+  endMs: number;
+  lineage: {
+    study: {
+      coverage: CaptionLineStudySupport["coverage"];
+      claimIds: string[];
+      semanticCitationIndexes: number[];
+      childReportIndexes: number[];
+    };
+    generalizedCausality: {
+      trackId: string;
+      coverageId: string | null;
+      coverageState: CaptionLineCausalityV4["lineage"]["coverageState"];
+      preservedStates: CaptionLineCausalityV4["lineage"]["preservedStates"];
+      claimIds: string[];
+      citationIds: string[];
+      passIds: string[];
+    };
+  };
+  source: CaptionProductionLine["source"];
+  target: CaptionProductionLine["target"];
+}
+
 export type CaptionProductionStatus = "completed" | "partial" | "withheld" | "unavailable";
 
 export type CaptionExecutorClassification =
@@ -120,8 +171,7 @@ export interface CaptionExecutorDescriptor {
   sourceCaptionContentId: string | null;
 }
 
-export interface CaptionProductionArtifact {
-  schema: "studio.caption-production.artifact.v1" | "studio.caption-production.artifact.v2" | "studio.caption-production.artifact.v3" | "studio.caption-production.artifact.v4";
+interface CaptionProductionArtifactBase {
   jobId: string;
   runId: string;
   input: {
@@ -135,7 +185,6 @@ export interface CaptionProductionArtifact {
     readiness: StudyReadinessReceiptIdentity;
   };
   executor: CaptionExecutorDescriptor;
-  lines: CaptionProductionLine[];
   result: {
     status: CaptionProductionStatus;
     lineCount: number;
@@ -146,8 +195,21 @@ export interface CaptionProductionArtifact {
   };
 }
 
+export interface CaptionProductionArtifactV1ToV4 extends CaptionProductionArtifactBase {
+  schema: "studio.caption-production.artifact.v1" | "studio.caption-production.artifact.v2" | "studio.caption-production.artifact.v3" | "studio.caption-production.artifact.v4";
+  lines: CaptionProductionLine[];
+}
+
+export interface CaptionProductionArtifactV5 extends CaptionProductionArtifactBase {
+  schema: "studio.caption-production.artifact.v5";
+  sharedLineage: CaptionProductionSharedLineageV5;
+  lines: CaptionProductionLineV5[];
+}
+
+export type CaptionProductionArtifact = CaptionProductionArtifactV1ToV4 | CaptionProductionArtifactV5;
+
 export interface CaptionProductionReceipt {
-  schema: "studio.caption-production.receipt.v1" | "studio.caption-production.receipt.v2" | "studio.caption-production.receipt.v3" | "studio.caption-production.receipt.v4";
+  schema: "studio.caption-production.receipt.v1" | "studio.caption-production.receipt.v2" | "studio.caption-production.receipt.v3" | "studio.caption-production.receipt.v4" | "studio.caption-production.receipt.v5";
   receiptId: string;
   jobId: string;
   authority: {
@@ -164,8 +226,8 @@ export interface CaptionProductionReceipt {
   input: CaptionProductionArtifact["input"];
   producer: {
     id: "studio.host-caption-production";
-    version: "1" | "2" | "3" | "4";
-    policy: "verified_unrevoked_approval_only" | "verified_unrevoked_approval_and_dialogue_scope_only" | "verified_unrevoked_approval_and_generalized_causality_v3_only" | "verified_unrevoked_approval_and_restudied_causality_v4_only";
+    version: "1" | "2" | "3" | "4" | "5";
+    policy: "verified_unrevoked_approval_only" | "verified_unrevoked_approval_and_dialogue_scope_only" | "verified_unrevoked_approval_and_generalized_causality_v3_only" | "verified_unrevoked_approval_and_restudied_causality_v4_only" | "verified_unrevoked_approval_and_shared_restudied_causality_v5_only";
     executor: CaptionExecutorDescriptor;
   };
   limits: typeof CAPTION_PRODUCTION_LIMITS;

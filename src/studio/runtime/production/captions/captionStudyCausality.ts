@@ -139,16 +139,20 @@ export function closeGeneralizedCaptionLineCausality(input: {
     "not_in_requested_dialogue_scope", "study_coverage_conflict", "study_coverage_truncated",
     "study_coverage_unavailable", "study_coverage_failed", "study_coverage_withheld",
     "study_coverage_unknown", "study_coverage_uncovered", "study_readiness_withheld",
+    "recognizer_unavailable", "recognizer_empty", "source_unavailable",
   ]);
-  const reasonCode = input.causality.source.reasonCode;
-  if (reasonCode !== null && !knownReasons.has(reasonCode as CaptionLineReasonCode)) {
+  const sourceReason = input.causality.source.reasonCode;
+  const targetReason = input.causality.target.reasonCode;
+  if (
+    (sourceReason !== null && !knownReasons.has(sourceReason as CaptionLineReasonCode)) ||
+    (targetReason !== null && !knownReasons.has(targetReason as CaptionLineReasonCode))
+  ) {
     throw new Error("Generalized caption causality returned an unknown closed reason");
   }
-  const typedReason = reasonCode as CaptionLineReasonCode | null;
   return {
     ...structuredClone(input.line),
-    source: { ...structuredClone(input.causality.source), reasonCode: typedReason },
-    target: { ...structuredClone(input.causality.target), reasonCode: typedReason },
+    source: { ...structuredClone(input.causality.source), reasonCode: sourceReason as CaptionLineReasonCode | null },
+    target: { ...structuredClone(input.causality.target), reasonCode: targetReason as CaptionLineReasonCode | null },
     lineage: {
       derivation: input.derivation,
       source: {

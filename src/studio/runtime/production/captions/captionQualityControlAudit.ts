@@ -6,6 +6,7 @@ import {
   ContentAddressedArtifactStore,
 } from "../artifactStore.ts";
 import { reopenCaptionProductionResults } from "./captionProductionAudit.ts";
+import { materializeCaptionProductionLines } from "./captionArtifactCompaction.ts";
 import type { CaptionProductionVerification } from "./captionProductionAudit.ts";
 import type {
   CaptionQualityControlOutcome,
@@ -87,7 +88,8 @@ export async function reopenCaptionQualityControls(
       kind: "caption-quality-control-receipt",
       contentId: record.receiptContentId,
     })}`;
-    const lineById = new Map(candidate.artifact.lines.map((line) => [line.id, line]));
+    const candidateLines = materializeCaptionProductionLines(candidate.artifact);
+    const lineById = new Map(candidateLines.map((line) => [line.id, line]));
     const expectedTestDemo = candidate.artifact.executor.executionScope === "test_demo_only";
     const invalidLine = receipt.decision.lines.some((line) => {
       const source = lineById.get(line.lineId);
@@ -120,7 +122,7 @@ export async function reopenCaptionQualityControls(
       canonicalSha256(receipt.lineage.study) !== canonicalSha256(candidate.verification.study) ||
       canonicalSha256(receipt.lineage.readiness) !== canonicalSha256(candidate.verification.readiness) ||
       canonicalSha256(receipt.lineage.approval) !== canonicalSha256(candidate.verification.approval) ||
-      receipt.decision.lines.length !== candidate.artifact.lines.length || invalidLine ||
+      receipt.decision.lines.length !== candidateLines.length || invalidLine ||
       artifact.id !== expectedArtifactId || artifact.id !== event.data.outputArtifactId ||
       artifact.runId !== state.runId || artifact.mediaClass !== "non_media" || artifact.publication !== "private" ||
       artifact.content.contentId !== record.receiptContentId ||

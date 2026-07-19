@@ -253,6 +253,60 @@ test("duplicate runtime directory and inconsistent command content fail closed w
   }
 });
 
+test("recover quarantines one unreadable journal without aborting sibling runtimes or rewriting bytes", async () => {
+  const runtime = await hostHarness();
+  try {
+    const healthy = await runtime.service.start(runtime.request);
+    await waitForLifecycle(runtime.service, healthy.commandId, "terminal");
+
+    const legacy = await runtime.service.start({
+      ...runtime.request,
+      range: { startMs: 0, endMs: 2_000 },
+    });
+    assert.notEqual(legacy.commandId, healthy.commandId);
+    await waitForLifecycle(runtime.service, legacy.commandId, "terminal");
+
+    const journalPath = runtime.store.paths(legacy.runtimeId).journalPath;
+    const before = await readFile(journalPath, "utf8");
+    const lines = before.trimEnd().split("\n");
+    assert.ok(lines.length >= 2, "legacy fixture needs a second journal line to corrupt");
+    const corrupted = `${lines[0]}\nnot-valid-journal-json\n${lines.slice(2).join("\n")}${lines.length > 2 ? "\n" : ""}`;
+    await writeFile(journalPath, corrupted);
+
+    const restarted = await RuntimeStartService.open({
+      store: runtime.store,
+      sources: runtime.sources,
+      launcherFactory: new DeterministicRuntimeExecutor().factory(),
+      recoverOnOpen: true,
+    });
+
+    const healthyStatus = await restarted.statusByCommand(healthy.commandId);
+    assert.equal(healthyStatus.lifecycle, "terminal");
+    assert.equal(healthyStatus.reason, null);
+
+    const legacyStatus = await restarted.statusByCommand(legacy.commandId);
+    assert.equal(legacyStatus.lifecycle, "failed");
+    assert.equal(legacyStatus.reason?.code, "malformed_journal");
+    assert.match(legacyStatus.reason?.message ?? "", /not valid JSON|runtime-event validation|malformed/i);
+
+    assert.equal(await readFile(journalPath, "utf8"), corrupted, "quarantine must not rewrite journal bytes");
+
+    await assert.rejects(
+      restarted.poll(legacy.runtimeId, 0, 100),
+      /not valid JSON|malformed|runtime-event validation/i,
+    );
+
+    const fresh = await restarted.start({
+      ...runtime.request,
+      range: { startMs: 0, endMs: 3_000 },
+    });
+    await waitForLifecycle(restarted, fresh.commandId, "terminal");
+    assert.equal((await restarted.statusByCommand(fresh.commandId)).lifecycle, "terminal");
+  } finally {
+    await cleanup(runtime);
+  }
+});
+
 test("the opt-in CLI smoke retains its explicit run-005 fixture while shared composition stays fixture-neutral", async () => {
   const packageValue = JSON.parse(await readFile(resolve("package.json"), "utf8")) as {
     scripts: Record<string, string>;

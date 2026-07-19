@@ -14,6 +14,8 @@ export function terminal(lifecycle: RuntimeHostCommandRecord["lifecycle"]): bool
   return lifecycle === "terminal" || lifecycle === "failed" || lifecycle === "interrupted";
 }
 
+const UNREADABLE_JOURNAL_CODES = new Set(["malformed_journal", "invalid_journal", "journal_too_large"]);
+
 async function exists(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isFile();
@@ -21,6 +23,10 @@ async function exists(path: string): Promise<boolean> {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
     throw error;
   }
+}
+
+function isUnreadableJournalError(error: unknown): error is RuntimeHostError {
+  return error instanceof RuntimeHostError && UNREADABLE_JOURNAL_CODES.has(error.code);
 }
 
 export class RuntimeHostLifecycleCoordinator {
@@ -154,7 +160,20 @@ export class RuntimeHostLifecycleCoordinator {
       }
       return record;
     }
-    let journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
+    let journal;
+    try {
+      journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
+    } catch (error) {
+      if (!isUnreadableJournalError(error)) throw error;
+      // Quarantine this command only. Leave journal bytes untouched; do not abort sibling recovery.
+      if (record.lifecycle === "failed" && record.reason?.code === "malformed_journal") {
+        return record;
+      }
+      return this.replaceLifecycle(record, "failed", {
+        code: "malformed_journal",
+        message: error.message,
+      });
+    }
     if (journal.head === 0) {
       if (recovery && !terminal(record.lifecycle)) {
         const launched = await this.store.hasLaunchClaim(record.commandId);
@@ -194,7 +213,18 @@ export class RuntimeHostLifecycleCoordinator {
           if (!(error instanceof RuntimeJournalConflict) || attempt === 2) throw error;
         }
       }
-      journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
+      try {
+        journal = await readValidatedRuntimeJournal(paths.journalPath, record.runtimeId);
+      } catch (error) {
+        if (!isUnreadableJournalError(error)) throw error;
+        if (record.lifecycle === "failed" && record.reason?.code === "malformed_journal") {
+          return record;
+        }
+        return this.replaceLifecycle(record, "failed", {
+          code: "malformed_journal",
+          message: error.message,
+        });
+      }
       return this.replaceLifecycle(record, "interrupted", {
         code: "nonterminal_journal_after_restart",
         message: "The recovered journal records explicit interruption; this host will not launch a replacement model turn or child.",

@@ -44,7 +44,8 @@ export interface RuntimeHostFailureReason {
     | "executor_launch_unconfirmed"
     | "nonterminal_journal_after_restart"
     | "runtime_evidence_failed"
-    | "stored_content_inconsistent";
+    | "stored_content_inconsistent"
+    | "malformed_journal";
   message: string;
 }
 

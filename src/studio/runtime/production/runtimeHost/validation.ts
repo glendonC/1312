@@ -17,6 +17,7 @@ const FAILURE_CODES = new Set<RuntimeHostFailureReason["code"]>([
   "nonterminal_journal_after_restart",
   "runtime_evidence_failed",
   "stored_content_inconsistent",
+  "malformed_journal",
 ]);
 
 function fail(context: string, path: string, message: string): never {

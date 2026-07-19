@@ -601,6 +601,10 @@ export class RuntimeStartService {
   async recover(): Promise<void> {
     for (const record of await this.store.list()) {
       const reconciled = await this.lifecycle.reconcile(record, true);
+      // Unreadable journals are quarantined as failed; do not open them for language recovery.
+      if (reconciled.lifecycle === "failed" && reconciled.reason?.code === "malformed_journal") {
+        continue;
+      }
       if (reconciled.journalHead > 0) {
         await this.languageExplanation.recoverInterrupted(record.runtimeId);
       }

@@ -8,7 +8,7 @@
     {
       "slot": "slot-control-01",
       "role": "control",
-      "status": "sourced",
+      "status": "gold_ready",
       "clip_id": "Ni5rBtowdnI",
       "source": {
         "kind": "youtube",
@@ -30,13 +30,13 @@
         },
         "note": "Exact 00:00:00–00:00:45 evaluation window derived from the uploader's Creative Commons Attribution source. The local copy is content-bound for provider-authorized benchmark execution."
       },
-      "gold_path": null,
+      "gold_path": "Ni5rBtowdnI.gold.json",
       "candidates_manifest": null
     },
     {
       "slot": "slot-control-02",
       "role": "control",
-      "status": "sourced",
+      "status": "gold_ready",
       "clip_id": "2o0f-V4uoMg",
       "source": {
         "kind": "youtube",
@@ -58,13 +58,13 @@
         },
         "note": "Exact 00:01:37–00:02:37 evaluation window derived from the uploader's Creative Commons Attribution source. The local copy is content-bound for provider-authorized benchmark execution."
       },
-      "gold_path": null,
+      "gold_path": "2o0f-V4uoMg.gold.json",
       "candidates_manifest": null
     },
     {
       "slot": "slot-hard-01",
       "role": "hard",
-      "status": "sourced",
+      "status": "gold_ready",
       "clip_id": "Ux-TMWnmntM",
       "source": {
         "kind": "youtube",
@@ -86,8 +86,8 @@
         },
         "note": "Exact 00:05:10–00:05:50 Creative Commons Attribution evaluation window retained from run-006. The existing content-bound local copy is reused for provider-authorized benchmark execution."
       },
-      "gold_path": null,
-      "candidates_manifest": null
+      "gold_path": "Ux-TMWnmntM.gold.json",
+      "candidates_manifest": "bench/candidates/run-006/candidates.json"
     }
   ],
   "freeze_receipt": null

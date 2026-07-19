@@ -4,15 +4,31 @@ import ApiCopyButton from "./ApiCopyButton.astro";
 interface Props {
   title: string;
   body: string;
+  status?: string;
+  provenance?: "captured" | "illustrative";
 }
 
-const { title, body } = Astro.props;
+const { title, body, status, provenance } = Astro.props;
 ---
 
 <figure class="api-panel">
   <figcaption>
-    <span class="api-panel-title">{title}</span>
+    <span class="api-panel-heading">
+      {status && <span class="api-panel-status">{status}</span>}
+      <span class="api-panel-title">{title}</span>
+      {/* Captured is the norm and stays quiet; only a hand-written example
+          must announce itself. */}
+      {provenance === "illustrative" && (
+        <span class="api-panel-provenance">{provenance}</span>
+      )}
+    </span>
     <ApiCopyButton ariaLabel={`Copy ${title}`} />
   </figcaption>
-  <pre><code>{body}</code></pre>
+  <div class="api-panel-code" data-api-code>
+    <pre tabindex="0" role="region" aria-label={title}><code>{body}</code></pre>
+    <span class="api-panel-fade" data-fade="top" aria-hidden="true"></span>
+    <span class="api-panel-fade" data-fade="bottom" aria-hidden="true"></span>
+    <span class="api-panel-fade" data-fade="left" aria-hidden="true"></span>
+    <span class="api-panel-fade" data-fade="right" aria-hidden="true"></span>
+  </div>
 </figure>

@@ -5,11 +5,15 @@
   min-width: 0;
 }
 
+/* Panels share the site's elevated-card material (white surface, soft long
+   shadow) at roughly half the strength of Method's cards, so code sits with
+   the page's other cards without outweighing the prose beside it. */
 .api-panel {
   margin: 0;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--ink) 2%, var(--paper));
+  border-radius: var(--control-radius);
+  background: var(--paper-elevated);
+  box-shadow: 0 10px 28px rgba(22, 29, 27, 0.05);
   overflow: visible;
 }
 
@@ -22,8 +26,16 @@
   gap: 12px;
   padding: 10px 12px 10px 16px;
   border-bottom: 1px solid var(--line);
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: var(--control-radius) var(--control-radius) 0 0;
   background: var(--palette-soft);
+}
+
+.api-panel-heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .api-panel-title {
@@ -32,6 +44,30 @@
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.api-panel-status {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--paper-elevated);
+  color: var(--palette-ink);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+}
+
+/* Recorded ≠ live: captured examples are the norm and carry no badge, but a
+   hand-written example wears a dashed outline so it can never pass for a
+   recording. */
+.api-panel-provenance {
+  padding: 1px 6px;
+  border: 1px dashed color-mix(in srgb, var(--palette-ink) 45%, transparent);
+  border-radius: 5px;
+  color: var(--palette-ink);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
 }
 
 .api-copy {
@@ -132,37 +168,77 @@
   background: color-mix(in srgb, var(--palette-ink, var(--ink)) 8%, transparent);
 }
 
+/* Code panels show no scrollbar at all — the edge fades below are the
+   continuation affordance, and a bar (or its reserved gutter) reads as noise
+   beside them. The pre stays focusable so keyboard users can still scroll. */
+.api-panel-code {
+  position: relative;
+  border-radius: 0 0 var(--control-radius) var(--control-radius);
+  overflow: hidden;
+}
+
 .api-panel pre {
   margin: 0;
   padding: 16px 18px;
   overflow: auto;
   max-height: min(28rem, 70vh);
-  border-radius: 0 0 var(--radius) var(--radius);
-  background: color-mix(in srgb, var(--ink) 1.5%, var(--paper));
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+  background: transparent;
+  scrollbar-width: none;
 }
 
 .api-panel pre::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  display: none;
 }
 
-.api-panel pre::-webkit-scrollbar-track {
-  background: transparent;
+.api-panel pre:focus-visible {
+  outline: 2px solid var(--palette-ink, var(--accent));
+  outline-offset: -2px;
 }
 
-.api-panel pre::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--ink) 22%, transparent);
-  border-radius: 999px;
+/* One fade per edge, shown only while content continues past that edge
+   (data-fade-* attributes are kept current by the shell script). */
+.api-panel-fade {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease;
 }
 
-.api-panel pre::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--ink) 36%, transparent);
+.api-panel-fade[data-fade="top"] {
+  inset: 0 0 auto 0;
+  height: 28px;
+  background: linear-gradient(180deg, var(--paper-elevated), transparent);
 }
 
-.api-panel pre::-webkit-scrollbar-corner {
-  background: transparent;
+.api-panel-fade[data-fade="bottom"] {
+  inset: auto 0 0 0;
+  height: 28px;
+  background: linear-gradient(0deg, var(--paper-elevated), transparent);
+}
+
+.api-panel-fade[data-fade="left"] {
+  inset: 0 auto 0 0;
+  width: 32px;
+  background: linear-gradient(90deg, var(--paper-elevated), transparent);
+}
+
+.api-panel-fade[data-fade="right"] {
+  inset: 0 0 0 auto;
+  width: 32px;
+  background: linear-gradient(270deg, var(--paper-elevated), transparent);
+}
+
+.api-panel-code[data-fade-top] .api-panel-fade[data-fade="top"],
+.api-panel-code[data-fade-bottom] .api-panel-fade[data-fade="bottom"],
+.api-panel-code[data-fade-left] .api-panel-fade[data-fade="left"],
+.api-panel-code[data-fade-right] .api-panel-fade[data-fade="right"] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-panel-fade {
+    transition: none;
+  }
 }
 
 .api-panel code {

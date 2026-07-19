@@ -32,6 +32,7 @@ import {
   API_ENDPOINT_GROUPS,
   API_PAGES,
   API_SUCCESSFUL_PATH,
+  type ApiResponsePanel,
   CAPTION_REQUEST_EXAMPLE,
   ERROR_SCHEMA,
   LANGUAGE_REQUEST_EXAMPLE,
@@ -155,10 +156,17 @@ test("code panels are executable requests or parseable captured responses", () =
     assert.ok(panel.body.startsWith("curl"), `request panel "${panel.title}" is an executable curl`);
   }
   for (const endpoint of API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)) {
-    for (const panel of endpoint.panels.filter((candidate) => candidate.kind === "response")) {
+    for (const panel of endpoint.panels.filter(
+      (candidate): candidate is ApiResponsePanel => candidate.kind === "response",
+    )) {
       assert.ok(
-        /\bCaptured\b/.test(panel.title) || /\bIllustrative\b/.test(panel.title),
-        `response panel "${panel.title}" labels Captured or Illustrative authority`,
+        panel.provenance === "captured" || panel.provenance === "illustrative",
+        `response panel "${panel.title}" declares captured or illustrative authority`,
+      );
+      assert.match(
+        panel.status,
+        /^\d{3}$/,
+        `response panel "${panel.title}" names the HTTP status it answers with`,
       );
       if (endpoint.responseSchema === null) {
         assert.ok(
@@ -343,9 +351,15 @@ test("documented example shapes stay bound to the contract they claim", () => {
   assert.equal(youtubeGet.source?.detectedLanguageEvidenceAvailable, false);
   const youtubeGetPanel = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
     .find((endpoint) => endpoint.path === "/v1/youtube-local-ingests/:ingestId")
-    ?.panels.find((panel) => panel.kind === "response");
-  assert.ok(youtubeGetPanel?.title.includes("Registered"), "YouTube GET documents registered capture");
-  assert.ok(!youtubeGetPanel?.title.includes("Resolving"), "YouTube GET no longer claims resolving-only");
+    ?.panels.find((panel): panel is ApiResponsePanel => panel.kind === "response");
+  assert.ok(
+    youtubeGetPanel?.body.includes('"status": "registered"'),
+    "YouTube GET documents a registered capture",
+  );
+  assert.ok(
+    !youtubeGetPanel?.body.includes('"status": "resolving"'),
+    "YouTube GET no longer claims resolving-only",
+  );
   assert.equal(captionProductions.schema, "studio.local-runtime-caption-productions.v1");
   assert.deepEqual(captionProductions.captions, []);
   assert.equal(captionProductions.runtimeId, status.runtimeId);
@@ -501,35 +515,36 @@ test("documented example shapes stay bound to the contract they claim", () => {
     ?.panels.find((panel) => panel.kind === "request");
   const playbackGrantResponse = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
     .find((endpoint) => endpoint.path === "/v1/runtimes/:runtimeId/private-playback-grants")
-    ?.panels.find((panel) => panel.kind === "response");
+    ?.panels.find((panel): panel is ApiResponsePanel => panel.kind === "response");
   const playbackRevokeRequest = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
     .find((endpoint) => endpoint.path === "/v1/runtimes/:runtimeId/private-playback-grants/:grantId/revocations")
     ?.panels.find((panel) => panel.kind === "request");
   const ownedPostResponse = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
     .find((endpoint) => endpoint.path === "/v1/owned-media-ingests")
-    ?.panels.find((panel) => panel.kind === "response");
+    ?.panels.find((panel): panel is ApiResponsePanel => panel.kind === "response");
   const ownedPutResponse = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
     .find((endpoint) => endpoint.path === "/v1/owned-media-ingests/:ingestId/media")
-    ?.panels.find((panel) => panel.kind === "response");
+    ?.panels.find((panel): panel is ApiResponsePanel => panel.kind === "response");
   const ownedGetResponse = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
     .find((endpoint) => endpoint.path === "/v1/owned-media-ingests/:ingestId")
-    ?.panels.find((panel) => panel.kind === "response");
+    ?.panels.find((panel): panel is ApiResponsePanel => panel.kind === "response");
   assert.ok(playbackGrantRequest?.body.includes('Origin: $ORIGIN'), "grant mint curl requires Origin");
   assert.ok(playbackRevokeRequest?.body.includes('Origin: $ORIGIN'), "grant revoke curl requires Origin");
-  assert.ok(playbackGrantResponse?.title.includes("Captured"), "grant mint response is Captured");
-  assert.ok(!playbackGrantResponse?.title.includes("Illustrative"), "grant mint is no longer Illustrative");
-  assert.ok(ownedPostResponse?.title.includes("Captured"), "owned POST response is Captured");
-  assert.ok(ownedPutResponse?.title.includes("Captured"), "owned PUT response is Captured");
-  assert.ok(ownedGetResponse?.title.includes("Captured"), "owned GET response is Captured");
-  assert.ok(ownedGetResponse?.title.includes("Registered"), "owned GET shows registered status");
-  assert.ok(!ownedPostResponse?.title.includes("Illustrative"), "owned POST is no longer Illustrative");
+  assert.equal(playbackGrantResponse?.provenance, "captured", "grant mint response is captured, not illustrative");
+  assert.equal(ownedPostResponse?.provenance, "captured", "owned POST response is captured, not illustrative");
+  assert.equal(ownedPutResponse?.provenance, "captured", "owned PUT response is captured");
+  assert.equal(ownedGetResponse?.provenance, "captured", "owned GET response is captured");
+  assert.ok(
+    ownedGetResponse?.body.includes('"status": "registered"'),
+    "owned GET shows registered status",
+  );
 
   const privateMedia = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints).find(
     (endpoint) => endpoint.path === "/v1/private-source-media/:grantId/:secret",
   );
-  const privateMediaResponse = privateMedia?.panels.find((panel) => panel.kind === "response");
+  const privateMediaResponse = privateMedia?.panels.find((panel): panel is ApiResponsePanel => panel.kind === "response");
   assert.equal(privateMedia?.responseSchema, null, "private media has no JSON response schema");
-  assert.ok(privateMediaResponse?.title.includes("Illustrative"), "private media status line is Illustrative");
+  assert.equal(privateMediaResponse?.provenance, "illustrative", "private media status line is illustrative");
   assert.ok(privateMediaResponse?.body.includes("206"), "private media notes Range 206");
   assert.ok(privateMediaResponse?.body.includes("grantId"), "private media notes grant-secret auth");
   assert.ok(privateMediaResponse?.body.includes("403"), "private media notes Origin 403");
@@ -601,9 +616,18 @@ test("documented example shapes stay bound to the contract they claim", () => {
   const languagePanels = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
     .find((endpoint) => endpoint.path === "/v1/runtimes/:runtimeId/language-explanations")
     ?.panels ?? [];
-  assert.ok(languagePanels.some((panel) => panel.title.includes("Honest Empty")));
-  assert.ok(languagePanels.some((panel) => panel.title.includes("Opt-In OpenAI")));
-  assert.ok(languagePanels.some((panel) => panel.title.includes("gpt-4o-mini")));
+  assert.ok(
+    languagePanels.some((panel) => panel.kind === "response" && panel.body.includes('"results": []')),
+    "language documents the default empty result list",
+  );
+  assert.ok(
+    languagePanels.some((panel) => panel.title.includes("OpenAI executor")),
+    "language 201 example names its opt-in executor",
+  );
+  assert.ok(
+    languagePanels.some((panel) => panel.body.includes("gpt-4o-mini")),
+    "language 201 example names the captured model",
+  );
   assert.ok(languagePanels.some((panel) => panel.kind === "request" && panel.title.includes("Create")));
 });
 

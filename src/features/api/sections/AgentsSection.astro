@@ -9,7 +9,7 @@ const markdown = [
   "Integrate at host `/v1`, the same local runtime host Studio uses. Your client talks to the host;",
   "models never see `/v1`.",
   "",
-  "Start with Overview smoke: `GET /v1/source-sessions` → plan → start → poll events. Branch on",
+  "Start with the Overview quickstart: `GET /v1/source-sessions` → plan → start → poll events. Branch on",
   "receipts and fail-closed envelopes, not on guessed capability.",
   "",
   "## Child worker tools (not host HTTP)",
@@ -35,14 +35,14 @@ const markdown = [
     one exact span means. Each of those returns as a receipt with lineage.
   </p>
   <p>
-    Your client talks to the host. The models doing the work never see <code>/v1</code>. Follow the
-    <a href="/api/">Overview</a> successful path and smoke sequence before captions or language
+    Your client talks to the host. The models doing the work never see <code>/v1</code>. Follow
+    the <a href="/api/">Overview</a> core flow and quickstart before captions or language
     explanations.
   </p>
   <h2 id="api-agents-tools-heading">Child Worker Tools</h2>
   <p>
-    Grant-scoped tools over ephemeral loopback bridges. Workers cannot mint capability, choose a
-    path, or widen scope. These names are not host HTTP routes.
+    Grant-scoped tools over ephemeral loopback bridges. Workers cannot grant themselves
+    capability, choose their own path, or widen their scope. These names are not host HTTP routes.
   </p>
   <ul class="api-tools" aria-label="Grant-scoped worker tools (not /v1 routes)">
     {WORKER_TOOLS.map((tool) => (

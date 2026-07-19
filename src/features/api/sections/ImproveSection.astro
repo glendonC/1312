@@ -5,9 +5,7 @@ const markdown = `# Improve
 
 Not a \`/v1\` host surface. There is no Improve HTTP route on the local runtime host.
 
-This Concepts page describes the miss-to-gold conveyor used by the evaluation and memory spine.
-Misses become measurement under the same rules as the runtime. Nothing scores itself. No
-self-improvement win is claimed.
+This page describes the evaluation and correction loop behind the API. Misses become measurement under the same rules as the runtime. Nothing scores itself. No self-improvement gain is claimed.
 
 Pipeline: run misses → mine → route (exclusive) → agent draft → blinded adjudication → freeze → pre-register → score → compare
 
@@ -17,15 +15,15 @@ At mine time a clip feeds exactly one pool: frozen bench or learning stream. Nev
 
 ## Memory gate
 
-Runs only propose. A different actor accepts, rejects, or revokes. accepted_entries: 0 · legacy_quarantined: 1
+Runs only propose. A different actor accepts, rejects, or revokes. Current state: 0 entries accepted, 1 legacy entry quarantined.
 
-## Scored, honestly
+## Scoring
 
-packs_frozen: 1 · scored_runs: 1 · judge: null
+1 pack frozen, 1 run scored, no model judge.
 
-## Declared next tier: offline adapters
+## Next: offline adapters
 
-status: contract_only · adapters_trained: 0 · claims_without_receipts: 0
+Contract only: 0 adapters trained, 0 claims without receipts.
 `;
 ---
 
@@ -33,13 +31,13 @@ status: contract_only · adapters_trained: 0 · claims_without_receipts: 0
   <ApiPageHeader
     title="Improve"
     headingId="api-improve-heading"
-    description="Concepts only: not a /v1 host surface. Misses become measurement. Nothing scores itself."
+    description="The evaluation and correction loop behind the API. Not a /v1 host surface."
     markdown={markdown}
   />
   <p>
-    There is no Improve HTTP route on the local runtime host. Integrate study and receipts at
-    <code>/v1</code>; route misses through the evaluation and memory spine documented here and on
-    <a href="/benchmarks/">Benchmarks</a>.
+    There is no Improve HTTP route on the local runtime host. Integrate study and receipts
+    at <code>/v1</code>; route misses through the evaluation loop documented here and
+    on <a href="/benchmarks/">Benchmarks</a>.
   </p>
   <p class="api-pipeline">
     run misses &rarr; mine &rarr; route (exclusive) &rarr; agent draft &rarr; blinded adjudication
@@ -58,27 +56,27 @@ status: contract_only · adapters_trained: 0 · claims_without_receipts: 0
     <div class="api-improve-block">
       <h3>Memory Gate</h3>
       <p>
-        Runs only propose. A different actor accepts, rejects, or revokes with a reason. Behavioral
-        rules also require a pre-registered ablation pair on the same frozen pack. A gate that
-        never opened for weak evidence is the feature.
+        Runs only propose. A different actor accepts, rejects, or revokes with a reason.
+        Behavioral rules also require a pre-registered ablation pair on the same frozen pack. The
+        gate has never accepted an entry on weak evidence.
       </p>
-      <p class="api-status">accepted_entries: 0 · legacy_quarantined: 1</p>
+      <p class="api-status">0 entries accepted, 1 legacy entry quarantined</p>
     </div>
     <div class="api-improve-block">
-      <h3>Scored, Honestly</h3>
+      <h3>Scoring</h3>
       <p>
         One frozen pack, one scored run, and a prepped arm that scored below the cold control. The
         number is on the <a href="/benchmarks/">benchmarks page</a> because the loop only works if
         misses are captured, not explained away.
       </p>
-      <p class="api-status">packs_frozen: 1 · scored_runs: 1 · judge: null</p>
+      <p class="api-status">1 pack frozen, 1 run scored, no model judge</p>
     </div>
   </div>
 
   <div class="api-improve-block api-improve-wide">
-    <h3>Declared Next Tier: Offline Adapters</h3>
+    <h3>Next: Offline Adapters</h3>
     <p>
-      Today accepted memory conditions runs through retrieval. The declared next rung exports
+      Today accepted memory conditions runs through retrieval. The declared next step exports
       adjudicated correction pairs into offline adapter training, under a contract fixed before any
       adapter exists:
     </p>
@@ -90,7 +88,7 @@ status: contract_only · adapters_trained: 0 · claims_without_receipts: 0
       </li>
       <li>
         Weight training waits until the adjudicated pair count clears roughly one thousand. Current
-        yield is about five rows per run, so this rung is measured in months.
+        yield is about five rows per run, so this step is measured in months.
       </li>
       <li>
         A trained adapter ships as a versioned, content-addressed policy artifact behind the same
@@ -98,6 +96,6 @@ status: contract_only · adapters_trained: 0 · claims_without_receipts: 0
         scored on the frozen bench.
       </li>
     </ul>
-    <p class="api-status">status: contract_only · adapters_trained: 0 · claims_without_receipts: 0</p>
+    <p class="api-status">contract only: 0 adapters trained, 0 claims without receipts</p>
   </div>
 </section>

@@ -41,10 +41,15 @@ const showAbsentResponse =
     {endpoint.panels.length > 0 && (
       <div class="api-panels">
         {endpoint.panels.map((panel) => (
-          <ApiPanel title={panel.title} body={panel.body} />
+          <ApiPanel
+            title={panel.title}
+            body={panel.body}
+            status={panel.kind === "response" ? panel.status : undefined}
+            provenance={panel.kind === "response" ? panel.provenance : undefined}
+          />
         ))}
         {showAbsentResponse && (
-          <p class="api-example-absent">No Captured Response For This Route Yet.</p>
+          <p class="api-example-absent">No captured response for this route yet.</p>
         )}
       </div>
     )}

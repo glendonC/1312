@@ -57,11 +57,25 @@ export interface ApiFieldTable {
   fields: ApiField[];
 }
 
-export interface ApiCodePanel {
-  kind: "request" | "response";
+export interface ApiRequestPanel {
+  kind: "request";
   title: string;
   body: string;
 }
+
+/* Recorded ≠ live is a typed claim, not display copy: a response panel cannot
+   exist without declaring the status it answers with and whether its body was
+   captured from a recorded host run or written by hand. */
+export interface ApiResponsePanel {
+  kind: "response";
+  title: string;
+  /** HTTP status the body answers with, e.g. "200". */
+  status: string;
+  provenance: "captured" | "illustrative";
+  body: string;
+}
+
+export type ApiCodePanel = ApiRequestPanel | ApiResponsePanel;
 
 export interface ApiEndpoint {
   methods: string[];
@@ -296,34 +310,33 @@ curl -H "Authorization: Bearer $TOKEN" \\
  * Proves auth, registered source, plan, start, and journal poll to terminal.
  * Does not claim captions, SaaS, or model spend.
  */
-export const SMOKE_TO_TERMINAL_DISPLAY = `# First win: local host only (no SaaS, no model spend)
+export const SMOKE_TO_TERMINAL_DISPLAY = `# Quickstart: local host only (no SaaS, no model spend)
 # 1. npm run runtime:host
 # 2. Copy authorizationToken from the host stdout JSON
 TOKEN=<authorizationToken>
 
-# 3. Prove authorization and list registered sources (run-005 is pre-registered)
+# 3. Verify authorization and list registered sources (one sample source ships pre-registered)
 curl -H "Authorization: Bearer $TOKEN" \\
   ${BASE_URL}/v1/source-sessions
 
-# 4. Forecast without writing a durable command
+# 4. Plan the study and read its forecast; nothing durable is written
 ${curlFor("POST", "/v1/runtime-plans", START_REQUEST_EXAMPLE)}
 
 # 5. Start one bounded study; read runtimeId from the 202 ack
 ${curlFor("POST", "/v1/runtime-starts", START_REQUEST_EXAMPLE)}
 
-# 6. Poll the journal until lifecycle is terminal (or reachedHead)
+# 6. Poll events until lifecycle is terminal (or reachedHead)
 curl -H "Authorization: Bearer $TOKEN" \\
   "${BASE_URL}/v1/runtimes/$RUNTIME_ID/events?after=0&limit=100"
 
-# Next authority step is Publish Review (after a queued intake), then Captions.
-# Default recorded caption executor may refuse fixture authority: that is fail-closed, not a host gap.
-# Captured caption 201 panels need an opt-in host:
+# Caption production requires an approved Publish Review decision. The default
+# host fails closed with 409 for caption production; the deterministic test
+# executor is an opt-in host configuration:
 #   --caption-executor deterministic-test --allow-deterministic-caption-test-seam
-# That seam sets cognitionClaim none; it is not default npm run runtime:host behavior.
-# Captured language 201 panels need a further opt-in (after a caption seam):
+# Language explanations additionally require an opt-in OpenAI executor:
 #   --language-explanation-executor openai --allow-real-language-explanation
 #   --language-explanation-model gpt-4o-mini
-# Default host language stays honest-empty / unavailable.`;
+# The default host returns an empty language list.`;
 
 /** Operator ladder for Overview / LLM paste. Order matches host authority, not nav density. */
 export const API_SUCCESSFUL_PATH: ReadonlyArray<{
@@ -344,7 +357,7 @@ export const API_SUCCESSFUL_PATH: ReadonlyArray<{
   {
     href: "/api/audits/",
     label: "Evidence Audits",
-    detail: "Optional: reopen assessments and decision receipts without inventing facts.",
+    detail: "Optional: reopen and re-verify stored assessments and decision receipts.",
   },
   {
     href: "/api/review/",
@@ -355,7 +368,7 @@ export const API_SUCCESSFUL_PATH: ReadonlyArray<{
     href: "/api/captions/",
     label: "Captions And QC",
     detail:
-      "Private caption candidates and structural QC. Not publication. Default host often 409; Captured 201 panels use an opt-in deterministic test seam.",
+      "Private caption candidates and structural QC. The default host fails closed with 409; 201 examples require an opt-in test executor.",
   },
   {
     href: "/api/playback/",
@@ -366,7 +379,7 @@ export const API_SUCCESSFUL_PATH: ReadonlyArray<{
     href: "/api/language/",
     label: "Language Explanations",
     detail:
-      "Typed facets over one verified caption span. Default host stays empty; Captured 201 panels need opt-in OpenAI flags.",
+      "Typed facets over one verified caption span. The default host returns an empty list; 201 examples require an opt-in OpenAI executor.",
   },
 ];
 
@@ -600,7 +613,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "response",
-            title: "200 · Captured",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: SOURCE_SESSIONS_200,
           },
         ],
@@ -642,7 +657,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "202 · Captured · Queued",
+            title: "Response",
+            status: "202",
+            provenance: "captured",
             body: OWNED_MEDIA_INGEST_POST_202,
           },
         ],
@@ -656,7 +673,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · Octet-Stream",
+            title: "Upload request",
             body: curlBinaryPut(
               "/v1/owned-media-ingests/$INGEST_ID/media",
               "public/demo/runs/run-005/clip.m4a",
@@ -664,7 +681,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "202 · Captured · Queued",
+            title: "Response",
+            status: "202",
+            provenance: "captured",
             body: OWNED_MEDIA_INGEST_PUT_202,
           },
         ],
@@ -685,7 +704,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             kind: "response",
             // Captured after octet-stream PUT on a temp owned-ingest-root without a
             // preloaded colliding --source-directory. Local processing only; not SaaS upload.
-            title: "200 · Captured · Registered",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: OWNED_MEDIA_INGEST_GET_200,
           },
         ],
@@ -720,7 +741,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "202 · Captured · Queued",
+            title: "Response",
+            status: "202",
+            provenance: "captured",
             body: YOUTUBE_INGEST_202,
           },
         ],
@@ -741,7 +764,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             kind: "response",
             // Captured after yt-dlp download + local seal/register. Private local_processing
             // only; not upload, CDN, or redistribution authority.
-            title: "200 · Captured · Registered",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: YOUTUBE_INGEST_GET_200,
           },
         ],
@@ -767,7 +792,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · Captured",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: RUNTIME_PLAN_200,
           },
         ],
@@ -786,7 +813,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "202 · Captured",
+            title: "Response",
+            status: "202",
+            provenance: "captured",
             body: RUNTIME_START_ACK_202,
           },
         ],
@@ -805,7 +834,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · Terminal · Captured",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: RUNTIME_STATUS_200,
           },
         ],
@@ -824,7 +855,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · Terminal · Captured",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: RUNTIME_STATUS_200,
           },
         ],
@@ -843,7 +876,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · events?after=0&limit=2 · Captured",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: RUNTIME_EVENTS_200,
           },
         ],
@@ -869,7 +904,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · Captured · Honest Empty",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: ASSESSMENT_AUDITS_200,
           },
         ],
@@ -888,7 +925,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · Captured · Honest Empty",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: DECISION_RECEIPTS_200,
           },
         ],
@@ -898,7 +937,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   {
     id: "review",
     title: "Publish Review",
-    note: "Attested human approve or reject before private caption production. Reviewer identity is host-configured; callers cannot invent it.",
+    note: "An attested human approve or reject before private caption production. Reviewer identity is host-configured and cannot be set by callers.",
     endpoints: [
       {
         methods: ["GET"],
@@ -914,7 +953,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · Captured",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: PUBLISH_REVIEW_INTAKES_200,
           },
         ],
@@ -949,22 +990,26 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · Read",
+            title: "Read request",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/publish-review-decisions"),
           },
           {
             kind: "response",
-            title: "200 · Captured · Honest Empty",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: PUBLISH_REVIEW_DECISIONS_200,
           },
           {
             kind: "request",
-            title: "Request · Approve",
+            title: "Approve request",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/publish-review-decisions", REVIEW_DECISION_EXAMPLE),
           },
           {
             kind: "response",
-            title: "201 · Decision Receipt · Captured",
+            title: "Response",
+            status: "201",
+            provenance: "captured",
             body: PUBLISH_REVIEW_DECISION_201,
           },
         ],
@@ -998,12 +1043,14 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · Revoke",
+            title: "Revoke request",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/publish-review-revocations", REVIEW_REVOCATION_EXAMPLE),
           },
           {
             kind: "response",
-            title: "201 · Revocation · Captured",
+            title: "Response",
+            status: "201",
+            provenance: "captured",
             body: PUBLISH_REVIEW_REVOCATION_201,
           },
         ],
@@ -1014,11 +1061,10 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
     id: "captions",
     title: "Captions And QC",
     note:
-      "Private caption candidates, verified timed lines, and structural QC. Not publication. " +
-      "Default npm run runtime:host uses the recorded caption executor and fails closed with 409. " +
-      "201 panels were captured with --caption-executor deterministic-test " +
-      "--allow-deterministic-caption-test-seam (cognitionClaim none). " +
-      "The host auto-runs independent QC when caption create succeeds.",
+      "Private caption candidates, verified timed lines, and structural QC. Captions are " +
+      "private artifacts, not publication. The default host fails closed with 409 until a " +
+      "review approves the run; responses labeled test executor require an opt-in host " +
+      "configuration. The host runs structural QC automatically when a caption create succeeds.",
     endpoints: [
       {
         methods: ["GET", "POST"],
@@ -1035,27 +1081,33 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · Read",
+            title: "Read request",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/caption-productions"),
           },
           {
             kind: "response",
-            title: "200 · Captured · Honest Empty",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: CAPTION_PRODUCTIONS_200,
           },
           {
             kind: "request",
-            title: "Request · Create",
+            title: "Create request",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/caption-productions", CAPTION_REQUEST_EXAMPLE),
           },
           {
             kind: "response",
-            title: "409 · Fail-Closed · Captured",
+            title: "Response",
+            status: "409",
+            provenance: "captured",
             body: CAPTION_PRODUCTION_409,
           },
           {
             kind: "response",
-            title: "201 · Captured · Deterministic Test Seam",
+            title: "Test executor response",
+            status: "201",
+            provenance: "captured",
             body: CAPTION_PRODUCTION_201,
           },
         ],
@@ -1074,12 +1126,16 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · Captured · Honest Empty",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: CAPTION_PRODUCTION_RESULTS_200,
           },
           {
             kind: "response",
-            title: "200 · Captured · Deterministic Test Seam",
+            title: "Test executor response",
+            status: "200",
+            provenance: "captured",
             body: CAPTION_PRODUCTION_RESULTS_TEST_SEAM_200,
           },
         ],
@@ -1099,27 +1155,33 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · Read",
+            title: "Read request",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/caption-quality-controls"),
           },
           {
             kind: "response",
-            title: "200 · Captured · Honest Empty",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: CAPTION_QUALITY_CONTROLS_200,
           },
           {
             kind: "response",
-            title: "200 · Captured · Deterministic Test Seam",
+            title: "Test executor response",
+            status: "200",
+            provenance: "captured",
             body: CAPTION_QUALITY_CONTROLS_TEST_SEAM_200,
           },
           {
             kind: "request",
-            title: "Request · Create",
+            title: "Create request",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/caption-quality-controls", CAPTION_QC_REQUEST_EXAMPLE),
           },
           {
             kind: "response",
-            title: "409 · Fail-Closed · Captured",
+            title: "Response",
+            status: "409",
+            provenance: "captured",
             body: CAPTION_QC_409,
           },
         ],
@@ -1130,10 +1192,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
     id: "language",
     title: "Language Explanations",
     note:
-      "Typed facets over one verified caption span. Default host has no language executor (honest empty). " +
-      "201 panels were captured with --language-explanation-executor openai " +
-      "--allow-real-language-explanation --language-explanation-model gpt-4o-mini after a " +
-      "deterministic-test caption seam. Failed attempts stay visible.",
+      "Typed facets over one verified caption span. The default host has no language executor " +
+      "and returns an empty list; responses labeled OpenAI executor require an opt-in host " +
+      "configuration (gpt-4o-mini). Failed attempts remain visible.",
     endpoints: [
       {
         methods: ["GET", "POST"],
@@ -1145,24 +1206,28 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · Read",
+            title: "Read request",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/language-explanations"),
           },
           {
             kind: "response",
-            title: "200 · Captured · Honest Empty",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: LANGUAGE_EXPLANATIONS_200,
           },
           {
             kind: "request",
-            title: "Request · Create",
+            title: "Create request",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/language-explanations", LANGUAGE_REQUEST_EXAMPLE),
           },
           {
             kind: "response",
             // Opt-in OpenAI after deterministic caption seam. Real model; private only.
             // Not default npm run runtime:host behavior.
-            title: "201 · Captured · Opt-In OpenAI (gpt-4o-mini)",
+            title: "OpenAI executor response",
+            status: "201",
+            provenance: "captured",
             body: LANGUAGE_EXPLANATIONS_201,
           },
         ],
@@ -1173,10 +1238,10 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
     id: "playback",
     title: "Private Playback",
     note:
-      "Mint a short-lived origin-bound grant, then stream exact private source bytes. " +
-      "Media authorizes by grant secret, not the bearer token. Origin is required on mint, " +
-      "revoke, and media bytes. Captured grant mint and revoke panels are one continuous host " +
-      "session and share the same grantId. GET/HEAD media is binary with no JSON success envelope.",
+      "Mint a short-lived, origin-bound grant, then stream the exact private source bytes. " +
+      "Media authorizes by grant secret, not the bearer token; an allowlisted Origin is " +
+      "required on mint, revoke, and media requests. Media responses are binary with no " +
+      "JSON envelope.",
     endpoints: [
       {
         methods: ["POST"],
@@ -1211,7 +1276,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             kind: "response",
             // Option B continuous family after smoke + caption seam. Origin required.
             // Private loopback grant only; mediaPath embeds a short-lived secret, not a CDN URL.
-            title: "201 · Playback Grant · Captured",
+            title: "Response",
+            status: "201",
+            provenance: "captured",
             body: PRIVATE_PLAYBACK_GRANT_201,
           },
         ],
@@ -1235,7 +1302,9 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           {
             kind: "response",
             // Same continuous session and same grantId as the mint 201 panel above.
-            title: "200 · Revoked · Captured",
+            title: "Response",
+            status: "200",
+            provenance: "captured",
             body: PRIVATE_PLAYBACK_REVOKE_200,
           },
         ],
@@ -1250,14 +1319,16 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · HEAD + Range",
+            title: "Request",
             body: curlPrivateMediaHead(),
           },
           {
             kind: "response",
             // Illustrative status/header note from host tests. Success body is binary octets,
             // not a JSON envelope. Do not paste media bytes into the docs.
-            title: "206 · Range Headers · Illustrative",
+            title: "Response",
+            status: "206",
+            provenance: "illustrative",
             body: PRIVATE_MEDIA_STATUS_LINE,
           },
         ],
@@ -1309,7 +1380,7 @@ export const API_PAGES: ApiPageDef[] = [
     title: "Evidence Audits",
     group: "Endpoints",
     palette: "citron",
-    description: "Reopen and re-verify stored assessments and decision receipts without inventing facts.",
+    description: "Reopen and re-verify stored assessments and decision receipts by content identity.",
   },
   {
     slug: "review",
@@ -1351,7 +1422,7 @@ export const API_PAGES: ApiPageDef[] = [
     title: "For Agentic Editors",
     group: "Concepts",
     palette: "blue",
-    description: "Integrate at /v1 for proof-backed branching; workers stay grant-scoped.",
+    description: "Integrate an editor or agent at /v1 and branch on receipts instead of guessed capability.",
   },
   {
     slug: "improve",
@@ -1359,14 +1430,14 @@ export const API_PAGES: ApiPageDef[] = [
     group: "Concepts",
     palette: "teal",
     description:
-      "Miss-to-gold conveyor concept, not a /v1 host surface. Exclusive routing, memory gate, and declared offline adapters.",
+      "The evaluation and correction loop behind the API. Concepts only; not a /v1 host surface.",
   },
   {
     slug: "non-claims",
-    title: "Non-Claims",
+    title: "Limitations",
     group: "Concepts",
     palette: "coral",
-    description: "Standing non-claims so clients do not invent capability from a route list.",
+    description: "What this API does not do or claim.",
   },
 ];
 

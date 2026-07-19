@@ -1,23 +1,23 @@
 ---
 import ApiPageHeader from "../components/ApiPageHeader.astro";
 
-const markdown = `# Non-Claims
+const markdown = `# Limitations
 
-What this API does not claim:
+What this API does not do or claim:
 
 - Self-hosted runtime host only. No hosted service, upload, publication, account, or sync.
 - Detector output is not transcription, understanding, or translation.
 - Coverage, citation closure, receipt integrity, and structural QC are not semantic quality.
 - Private captions and artifacts are not publication.
-- No self-improvement win is claimed.
+- No self-improvement gain is claimed.
 `;
 ---
 
 <section class="api-section" aria-labelledby="api-nonclaims-heading">
   <ApiPageHeader
-    title="Non-Claims"
+    title="Limitations"
     headingId="api-nonclaims-heading"
-    description="What this API does not claim, so clients do not invent capability from a route list."
+    description="What this API does not do or claim."
     markdown={markdown}
   />
   <ul class="api-list">
@@ -32,8 +32,8 @@ What this API does not claim:
     <li>Coverage, citation closure, receipt integrity, and structural QC are not semantic quality.</li>
     <li>Private captions and artifacts are not publication.</li>
     <li>
-      No self-improvement win is claimed. The machinery that would make one provable exists; the
-      win does not yet.
+      No self-improvement gain is claimed. The measurement machinery exists; a proven gain does
+      not yet.
     </li>
   </ul>
   <div class="api-links">

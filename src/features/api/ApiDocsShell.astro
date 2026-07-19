@@ -26,6 +26,52 @@ const { activeSlug, eyebrow } = Astro.props;
 </div>
 
 <script>
+  const fadeState = window as Window & { __apiFadeBound?: boolean };
+  if (!fadeState.__apiFadeBound) {
+    const updatePanelFades = (code: HTMLElement) => {
+      const pre = code.querySelector("pre");
+      if (!pre) return;
+      const fuzz = 2;
+      code.toggleAttribute("data-fade-left", pre.scrollLeft > fuzz);
+      code.toggleAttribute(
+        "data-fade-right",
+        pre.scrollLeft + pre.clientWidth < pre.scrollWidth - fuzz,
+      );
+      code.toggleAttribute("data-fade-top", pre.scrollTop > fuzz);
+      code.toggleAttribute(
+        "data-fade-bottom",
+        pre.scrollTop + pre.clientHeight < pre.scrollHeight - fuzz,
+      );
+    };
+    const updateAllPanelFades = () => {
+      for (const code of document.querySelectorAll<HTMLElement>("[data-api-code]")) {
+        updatePanelFades(code);
+      }
+    };
+    // Scroll and toggle do not bubble; capture observes them from any panel.
+    document.addEventListener(
+      "scroll",
+      (event) => {
+        const code = (event.target as Partial<HTMLElement> | null)?.closest?.("[data-api-code]");
+        if (code instanceof HTMLElement) updatePanelFades(code);
+      },
+      true,
+    );
+    document.addEventListener(
+      "toggle",
+      () => {
+        updateAllPanelFades();
+        // Endpoint <details> ease open over ~300ms; re-measure once settled.
+        window.setTimeout(updateAllPanelFades, 360);
+      },
+      true,
+    );
+    window.addEventListener("resize", updateAllPanelFades);
+    updateAllPanelFades();
+    document.fonts?.ready.then(updateAllPanelFades);
+    fadeState.__apiFadeBound = true;
+  }
+
   const copyState = window as Window & { __apiCopyBound?: boolean };
   if (!copyState.__apiCopyBound) {
     const flash = (button: HTMLButtonElement, idle: string) => {

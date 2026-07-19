@@ -5,9 +5,9 @@ import { BASE_URL, SMOKE_TO_TERMINAL_DISPLAY } from "../model.ts";
 
 const markdown = `# Authentication
 
-Every \`/v1\` resource uses a bearer token from the host process.
+Every \`/v1\` resource uses a bearer token issued by the host process.
 
-Start the host with \`npm run runtime:host\`. It binds \`${BASE_URL}\`, prints one token per process on stdout as \`authorizationToken\`, and serves loopback only. Browser clients must match an explicit origin allowlist.
+Start the host with \`npm run runtime:host\`. It binds \`${BASE_URL}\`, prints one token per process on stdout as \`authorizationToken\`, and serves loopback only. Browser clients must also match an explicit origin allowlist.
 
 ## Authorization
 
@@ -15,9 +15,9 @@ Start the host with \`npm run runtime:host\`. It binds \`${BASE_URL}\`, prints o
 
 The private media route authorizes by grant secret instead of the bearer token.
 
-## First-win smoke
+## Quickstart
 
-After the token prints, the Overview smoke sequence proves auth through journal poll without claiming captions or SaaS:
+After the token prints, this sequence verifies it end to end: list sources, plan, start, poll events to terminal.
 
 \`\`\`bash
 ${SMOKE_TO_TERMINAL_DISPLAY}
@@ -58,14 +58,14 @@ ${SMOKE_TO_TERMINAL_DISPLAY}
   </div>
   <div class="api-split">
     <div>
-      <h2 id="api-auth-smoke-heading">First-Win Smoke</h2>
+      <h2 id="api-auth-smoke-heading">Quickstart</h2>
       <p>
-        Same sequence as <a href="/api/">Overview</a>: list sources, plan, start, poll events to
-        terminal. Proves the local host without claiming captions, upload CDN, or multi-tenant SaaS.
+        Same sequence as the <a href="/api/">Overview</a>: list sources, plan, start, poll events
+        to terminal. It verifies the token against every core endpoint on the local host.
       </p>
     </div>
     <div class="api-panels">
-      <ApiPanel title="Smoke · Local Host" body={SMOKE_TO_TERMINAL_DISPLAY} />
+      <ApiPanel title="Quickstart" body={SMOKE_TO_TERMINAL_DISPLAY} />
     </div>
   </div>
 </section>

@@ -7,7 +7,7 @@ export const endpointGroupMarkdown = (group: ApiEndpointGroup): string => {
     lines.push(group.note, "");
   }
   for (const endpoint of group.endpoints) {
-    lines.push(`## ${endpoint.methods.join(" · ")} \`${endpoint.path}\``, "", endpoint.summary, "");
+    lines.push(`## ${endpoint.methods.join(" | ")} \`${endpoint.path}\``, "", endpoint.summary, "");
     if (endpoint.responseSchema) {
       lines.push(`Response schema: \`${endpoint.responseSchema}\``, "");
     }
@@ -20,8 +20,12 @@ export const endpointGroupMarkdown = (group: ApiEndpointGroup): string => {
       lines.push("");
     }
     for (const panel of endpoint.panels) {
+      const heading =
+        panel.kind === "request"
+          ? panel.title
+          : `${panel.title} (${panel.status}, ${panel.provenance})`;
       const fence = panel.kind === "request" ? "bash" : "json";
-      lines.push(`### ${panel.title}`, "", "```" + fence, panel.body, "```", "");
+      lines.push(`### ${heading}`, "", "```" + fence, panel.body, "```", "");
     }
   }
   return `${lines.join("\n").trim()}\n`;

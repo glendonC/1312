@@ -3,10 +3,10 @@ import ApiPageHeader from "../components/ApiPageHeader.astro";
 
 const markdown = `# Receipts
 
-A receipt is how this API proves a fact. Clients branch on receipts, not on fluent-looking text.
+A receipt is how this API proves a fact. Clients branch on receipts, not on unverified text.
 
 - Every response names its contract in a \`schema\` tag. Facts land in an append-only journal beside content-addressed artifacts. Read endpoints re-verify stored receipts; tamper fails the whole read.
-- Unavailable, unknown, withheld, truncated, and failed are first-class states. The API returns an honest empty list before a fluent guess.
+- Unavailable, unknown, withheld, truncated, and failed are first-class states. When a fact cannot be verified, the API returns an empty list rather than a guess.
 - Passing an audit proves integrity and citation closure, not semantic truth or translation quality.
 `;
 ---
@@ -15,7 +15,7 @@ A receipt is how this API proves a fact. Clients branch on receipts, not on flue
   <ApiPageHeader
     title="Receipts"
     headingId="api-receipts-heading"
-    description="How this API proves a fact. Clients branch on receipts, not on fluent-looking text."
+    description="How this API proves a fact. Clients branch on receipts, not on unverified text."
     markdown={markdown}
   />
   <ul class="api-list">
@@ -25,8 +25,8 @@ A receipt is how this API proves a fact. Clients branch on receipts, not on flue
       of trusting storage; tamper fails the whole read.
     </li>
     <li>
-      Unavailable, unknown, withheld, truncated, and failed are first-class states. The API returns
-      an honest empty list before a fluent guess.
+      Unavailable, unknown, withheld, truncated, and failed are first-class states. When a fact
+      cannot be verified, the API returns an empty list rather than a guess.
     </li>
     <li>
       Passing an audit proves integrity and citation closure, not semantic truth or translation

@@ -83,16 +83,20 @@ score.
   anchor exact caption lines and abstain with closed reasons; temperature only caps surfaced
   available candidates and never coerces availability. Available notes stay `not_reviewed`
   caption-context inference with empty external citations, so culture or history availability is a
-  receipted note, not verified culture truth. The default executor is unavailable and no real or
-  test executor is CLI-reachable; deterministic executors are test-injected only. A strict browser
+  receipted note, not verified culture truth. The default executor is unavailable; real OpenAI
+  execution requires an explicit operator-selected model and flag on the runtime host command line,
+  while deterministic executors stay test-injected only. A strict browser
   client re-hashes both stored objects, a request controller creates at most one explicit prep per
   fine-tune with bounded retry, and the production Customize learning face plus watch-first Moments
   overlay project only host-derived states: the overlay surfaces at most one prepared available
   note for the moment under the playhead and stays silent otherwise, while withheld, abstained, and
   all-withheld states stay visible in the face. Deterministic coverage lives in
   `tests/studio-learning-prep.test.ts` and one desktop browser test in
-  `tests/browser/studio-production-seams.spec.ts` covering the prepared and unconfigured paths. No
-  real-model executor, learner persistence, export, or Learning OS surface is included.
+  `tests/browser/studio-production-seams.spec.ts` covering the prepared and unconfigured paths;
+  adapter, configuration, and guard coverage lives in `tests/studio-learning-prep-openai.test.ts`.
+  A guarded live proof requires explicit environment opt-in and claims execution and stored lineage
+  only, never semantic quality or culture truth; its default skip is not proof. No learner
+  persistence, export, or Learning OS surface is included.
 - **Bet G first scored capture:** `hard-ko-v1` is frozen and the human-labeled run-007 score receipt
   exists with `judge: null`. It is one benchmark data point, not production semantic QC, calibration,
   or a general quality/improvement claim.

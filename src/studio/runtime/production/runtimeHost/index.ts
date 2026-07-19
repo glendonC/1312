@@ -70,6 +70,7 @@ export {
 } from "../languageExplanations/index.ts";
 export {
   DeterministicLearningPrepTestExecutor,
+  OpenAiLearningPrepExecutor,
   UnavailableLearningPrepExecutor,
   resolveLearningPrepExecutorConfiguration,
   type LearningPrepExecutor,

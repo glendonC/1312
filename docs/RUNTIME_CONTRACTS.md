@@ -885,9 +885,14 @@ and ceilings, and rejects the whole response on tamper or mixed identity. Every 
 remains visible as `started`, `completed`, or `failed`; an identical retry receives the next
 host-derived attempt number up to the fixed three-attempt ceiling, and explicit host recovery
 closes a process-interrupted `started` attempt as failed without inventing output. The default
-executor is explicitly unavailable, and no real or deterministic learning-prep executor is
-reachable from the host command line; deterministic executors are injected only through in-process
-service options in tests. The strict browser client re-hashes both stored objects and closes
+executor is explicitly unavailable. The optional OpenAI Responses API executor requires an explicit
+model id and real-execution flag in `scripts/run-runtime-host.ts`; no model id is selected by the
+browser, and deterministic executors remain injected only through in-process service options in
+tests. The guarded real-OpenAI learning-prep proof requires `STUDIO_RUN_REAL_LEARNING_PREP=1`, an
+explicit `STUDIO_LEARNING_PREP_MODEL`, and a real `OPENAI_API_KEY`; by default it retains its
+runtime journal and content-addressed prep artifact and receipt under
+`.studio/learning-prep-proofs`. A successful live call proves execution and stored lineage, not
+semantic quality, culture or history truth, or ranking truth. The strict browser client re-hashes both stored objects and closes
 attempt, grant, artifact, receipt, caption, fine-tune, lens, and result identities one-to-one, and
 the production Customize learning face plus the watch-first Moments overlay project only
 host-derived states over that verified read. Prep availability never claims verified culture truth,

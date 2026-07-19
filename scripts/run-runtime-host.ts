@@ -10,6 +10,7 @@ import {
   OpenAiCaptionProductionExecutor,
   OpenAiCurrentRunSpeechRecognizer,
   OpenAiLanguageExplanationExecutor,
+  OpenAiLearningPrepExecutor,
   RecordedCaptionFixtureExecutor,
   RuntimeSourceRegistry,
   RuntimeStartService,
@@ -87,8 +88,11 @@ const languageExplanationConfiguration = resolveLanguageExplanationExecutorConfi
   allowReal: flag("--allow-real-language-explanation"),
   model: value("--language-explanation-model"),
 });
-// Learning prep has no CLI-reachable real or test executor in this slice; the host default stays unavailable.
-resolveLearningPrepExecutorConfiguration({ mode: value("--learning-prep-executor") });
+const learningPrepConfiguration = resolveLearningPrepExecutorConfiguration({
+  mode: value("--learning-prep-executor"),
+  allowReal: flag("--allow-real-learning-prep"),
+  model: value("--learning-prep-model"),
+});
 
 async function openAiKey(): Promise<string> {
   const environmentKey = process.env.OPENAI_API_KEY?.trim();
@@ -145,6 +149,12 @@ const languageExplanationExecutor = languageExplanationConfiguration.mode === "o
       model: languageExplanationConfiguration.model,
     })
   : undefined;
+const learningPrepExecutor = learningPrepConfiguration.mode === "openai"
+  ? new OpenAiLearningPrepExecutor({
+      apiKey: await openAiKey(),
+      model: learningPrepConfiguration.model,
+    })
+  : undefined;
 const service = await RuntimeStartService.open({
   store,
   sources,
@@ -165,6 +175,7 @@ const service = await RuntimeStartService.open({
   reviewer: { id: reviewerId, label: reviewerLabel },
   captionExecutor,
   languageExplanationExecutor,
+  learningPrepExecutor,
 });
 const token = randomBytes(32).toString("hex");
 const server = createRuntimeHostHttpServer({ service, ownedMediaIngest, youtubeLocalIngest, token, allowedOrigins });
@@ -205,6 +216,9 @@ process.stdout.write(`${JSON.stringify({
     : "current-run-unavailable-no-fixture-fallback",
   languageExplanationExecutor: languageExplanationConfiguration.mode === "openai"
     ? `current-run-openai-opt-in:${languageExplanationConfiguration.model}`
+    : "unavailable-no-fixture-fallback",
+  learningPrepExecutor: learningPrepConfiguration.mode === "openai"
+    ? `current-run-openai-opt-in:${learningPrepConfiguration.model}`
     : "unavailable-no-fixture-fallback",
   authorizationToken: token,
 }, null, 2)}\n`);

@@ -1,0 +1,103 @@
+{
+  "release_id": "bench-certified-release:sha256:f4903dc34e5222c918d2a27e311fffba7be6ebc3a1218b1098e9cb7c9110dff9",
+  "schema": "studio.bench.certified-release.v1",
+  "created_at": "2026-07-19T20:24:05.901Z",
+  "purpose": "rule_change_qualification",
+  "runtime_deployable": false,
+  "registration": {
+    "receipt": {
+      "path": "bench/rule-changes/ko-kinship-address-context-provider-authorized/registration.json",
+      "content_id": "sha256:d14aec39ec44c441a01af7cbf79e81c7c0a2d1712df675701466f53d0f67db6c",
+      "bytes": 7897
+    },
+    "registration_id": "bench-rule-change-registration:sha256:222b65152093755812937f287139756e185b2bef94fc9556edcc4cee3b95ca8f"
+  },
+  "side": "without",
+  "system_id": "1321-openai-audio-translation-rule-change",
+  "configuration": {
+    "config_id": "bench-config:sha256:c0182300de81ad3de5ba588ccee6a25e60a23ed2a928299e0c9ab67f842b8206",
+    "config": {
+      "model": "whisper-1",
+      "provider": {
+        "id": "openai",
+        "operation": "audio_translation",
+        "response_format": "verbose_json",
+        "temperature": 0,
+        "timeout_ms": 120000,
+        "max_response_bytes": 1048576
+      },
+      "reviewed_memory": {
+        "rule_content_id": null
+      }
+    }
+  },
+  "evaluation_sources": [
+    {
+      "clip_id": "2o0f-V4uoMg",
+      "authority": {
+        "path": "bench/packs/hard-ko-provider-authorized-v1/pack.json",
+        "content_id": "sha256:e3115116111c404488253c71bf1dae6a4213551e5f71571ae9cead672fe592cb",
+        "bytes": 4258
+      },
+      "artifact": {
+        "path": "bench/packs/hard-ko-provider-authorized-v1/2o0f-V4uoMg.m4a",
+        "content_id": "sha256:a0e78a490a27b228713963a5d8f3c992748e1ae3505b53550fd5dd4dfca9e514",
+        "bytes": 973872
+      }
+    },
+    {
+      "clip_id": "Ni5rBtowdnI",
+      "authority": {
+        "path": "bench/packs/hard-ko-provider-authorized-v1/pack.json",
+        "content_id": "sha256:e3115116111c404488253c71bf1dae6a4213551e5f71571ae9cead672fe592cb",
+        "bytes": 4258
+      },
+      "artifact": {
+        "path": "bench/packs/hard-ko-provider-authorized-v1/Ni5rBtowdnI.m4a",
+        "content_id": "sha256:b1de8455ae1dd9bb4b5c60db30062280b0010b160e26a4217cd7528e6c5d9193",
+        "bytes": 742145
+      }
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "authority": {
+        "path": "bench/packs/hard-ko-provider-authorized-v1/pack.json",
+        "content_id": "sha256:e3115116111c404488253c71bf1dae6a4213551e5f71571ae9cead672fe592cb",
+        "bytes": 4258
+      },
+      "artifact": {
+        "path": "public/demo/runs/run-006/clip.mp4",
+        "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+        "bytes": 3465772
+      }
+    }
+  ],
+  "reviewed_memory": {
+    "accepted_materialization": null,
+    "candidate_rule": null
+  },
+  "host_context": {
+    "context_id": "bench-host-context:sha256:053638d7a4414581427f407ae4b57b7bc42d1f5bd43b598727b8fce8cd840686",
+    "schema": "studio.bench.certified-host-context.v1",
+    "system_id": "1321-openai-audio-translation-rule-change",
+    "config_id": "bench-config:sha256:c0182300de81ad3de5ba588ccee6a25e60a23ed2a928299e0c9ab67f842b8206",
+    "config": {
+      "model": "whisper-1",
+      "provider": {
+        "id": "openai",
+        "operation": "audio_translation",
+        "response_format": "verbose_json",
+        "temperature": 0,
+        "timeout_ms": 120000,
+        "max_response_bytes": 1048576
+      },
+      "reviewed_memory": {
+        "rule_content_id": null
+      }
+    },
+    "reviewed_memory": {
+      "accepted_materialization": null,
+      "entries": []
+    }
+  }
+}

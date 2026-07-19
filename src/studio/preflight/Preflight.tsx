@@ -9,7 +9,14 @@ import {
   type PreflightSession,
 } from "./model";
 
-import "./preflight.css";
+// Direct leaf imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
+import "./preflight.shell.css";
+import "./preflight.preparation.css";
+import "./preflight.inputs.css";
+import "./preflight.forecast-ledger.css";
+import "./preflight.output.css";
+import "./preflight.stages.css";
+import "./preflight.responsive.css";
 
 export default function Preflight() {
   const bundle = useBundle();

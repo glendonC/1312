@@ -6,9 +6,16 @@ const toolLines = WORKER_TOOLS.map((tool) => `- \`${tool}\``).join("\n");
 const markdown = [
   "# For Agentic Editors",
   "",
-  "Use `/v1` when your editor needs to branch on proof. Your client talks to the host; models never see `/v1`. Workers receive task-private, grant-scoped tools over ephemeral loopback bridges.",
+  "Integrate at host `/v1`, the same local runtime host Studio uses. Your client talks to the host;",
+  "models never see `/v1`.",
   "",
-  "## Worker tools",
+  "Start with Overview smoke: `GET /v1/source-sessions` → plan → start → poll events. Branch on",
+  "receipts and fail-closed envelopes, not on guessed capability.",
+  "",
+  "## Child worker tools (not host HTTP)",
+  "",
+  "The names below are grant-scoped tools on ephemeral loopback MCP bridges for child workers.",
+  "They are not `/v1` routes. Do not call them as REST endpoints.",
   "",
   toolLines,
   "",
@@ -19,7 +26,7 @@ const markdown = [
   <ApiPageHeader
     title="For Agentic Editors"
     headingId="api-agents-heading"
-    description="Integrate at /v1 for proof-backed branching. Workers stay grant-scoped; the host stays the authority."
+    description="Integrate at /v1 on the local host. Worker tool names are child MCP grants, not REST routes."
     markdown={markdown}
   />
   <p>
@@ -28,11 +35,16 @@ const markdown = [
     one exact span means. Each of those returns as a receipt with lineage.
   </p>
   <p>
-    Your client talks to the host. The models doing the work never see <code>/v1</code>. Workers
-    receive task-private, grant-scoped tools over ephemeral loopback bridges; they cannot mint
-    capability, choose a path, or widen scope.
+    Your client talks to the host. The models doing the work never see <code>/v1</code>. Follow the
+    <a href="/api/">Overview</a> successful path and smoke sequence before captions or language
+    explanations.
   </p>
-  <ul class="api-tools" aria-label="Grant-scoped worker tools">
+  <h2 id="api-agents-tools-heading">Child Worker Tools</h2>
+  <p>
+    Grant-scoped tools over ephemeral loopback bridges. Workers cannot mint capability, choose a
+    path, or widen scope. These names are not host HTTP routes.
+  </p>
+  <ul class="api-tools" aria-label="Grant-scoped worker tools (not /v1 routes)">
     {WORKER_TOOLS.map((tool) => (
       <li>{tool}</li>
     ))}

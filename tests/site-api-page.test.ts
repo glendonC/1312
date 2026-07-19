@@ -3,10 +3,17 @@ import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  RUNTIME_PLAN_200,
+  RUNTIME_START_ACK_202,
+  RUNTIME_STATUS_200,
+} from "../src/features/api/examples.ts";
+import {
   API_ENDPOINT_GROUPS,
   API_PAGES,
+  API_SUCCESSFUL_PATH,
   ERROR_SCHEMA,
   PLAYBACK_GRANT_EXAMPLE,
+  SMOKE_TO_TERMINAL_DISPLAY,
   START_REQUEST_EXAMPLE,
   WORKER_TOOLS,
 } from "../src/features/api/model.ts";
@@ -123,6 +130,10 @@ test("code panels are executable requests or parseable captured responses", () =
     assert.ok(panel.body.startsWith("curl"), `request panel "${panel.title}" is an executable curl`);
   }
   for (const panel of responses) {
+    assert.ok(
+      /\bCaptured\b/.test(panel.title) || /\bIllustrative\b/.test(panel.title),
+      `response panel "${panel.title}" labels Captured or Illustrative authority`,
+    );
     const parsed = JSON.parse(panel.body) as { schema?: unknown };
     assert.equal(typeof parsed.schema, "string", `response panel "${panel.title}" carries a schema tag`);
     assert.ok(
@@ -132,11 +143,60 @@ test("code panels are executable requests or parseable captured responses", () =
   }
 });
 
+test("successful path matches host authority order and smoke stays local", () => {
+  const hrefs = API_SUCCESSFUL_PATH.map((step) => step.href);
+  assert.deepEqual(hrefs, [
+    "/api/sources/",
+    "/api/runtime/",
+    "/api/audits/",
+    "/api/review/",
+    "/api/captions/",
+    "/api/playback/",
+    "/api/language/",
+  ]);
+  assert.ok(!hrefs.includes("/api/improve/"), "Improve is not a Successful Path /v1 step");
+  assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("/v1/source-sessions"));
+  assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("/v1/runtime-plans"));
+  assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("/v1/runtime-starts"));
+  assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("/v1/runtimes/$RUNTIME_ID/events"));
+  assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("no SaaS"));
+  assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("Publish Review"));
+
+  const improvePage = API_PAGES.find((page) => page.slug === "improve");
+  assert.ok(improvePage?.description.includes("not a /v1"), "Improve page meta denies host surface");
+});
+
 test("documented example shapes stay bound to the contract they claim", () => {
   assert.equal(PLAYBACK_GRANT_EXAMPLE.schema, "studio.private-playback-grant.v1");
   assert.equal(PLAYBACK_GRANT_EXAMPLE.timestampOrigin.kind, "source_media_zero");
   assert.equal(START_REQUEST_EXAMPLE.requestedSourceLanguage.mode, "declared");
   assert.ok(START_REQUEST_EXAMPLE.range.endMs > START_REQUEST_EXAMPLE.range.startMs);
+
+  const plan = JSON.parse(RUNTIME_PLAN_200) as { schema?: string; acceptance?: { status?: string } };
+  const start = JSON.parse(RUNTIME_START_ACK_202) as {
+    schema?: string;
+    lifecycle?: string;
+    terminal?: boolean;
+    commandId?: string;
+    runtimeId?: string;
+  };
+  const status = JSON.parse(RUNTIME_STATUS_200) as {
+    schema?: string;
+    lifecycle?: string;
+    terminal?: boolean;
+    commandId?: string;
+    runtimeId?: string;
+  };
+  assert.equal(plan.schema, "studio.local-runtime-plan.v1");
+  assert.equal(plan.acceptance?.status, "not_started");
+  assert.equal(start.schema, "studio.local-runtime-start-ack.v1");
+  assert.equal(start.lifecycle, "initializing");
+  assert.equal(start.terminal, false);
+  assert.equal(status.schema, "studio.local-runtime-status.v1");
+  assert.equal(status.lifecycle, "terminal");
+  assert.equal(status.terminal, true);
+  assert.equal(start.commandId, status.commandId);
+  assert.equal(start.runtimeId, status.runtimeId);
 });
 
 test("every reference page has a unique slug and every endpoint group has a page", () => {

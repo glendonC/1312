@@ -3,7 +3,11 @@ import ApiPageHeader from "../components/ApiPageHeader.astro";
 
 const markdown = `# Improve
 
-Misses become measurement under the same rules as the runtime. Nothing scores itself.
+Not a \`/v1\` host surface. There is no Improve HTTP route on the local runtime host.
+
+This Concepts page describes the miss-to-gold conveyor used by the evaluation and memory spine.
+Misses become measurement under the same rules as the runtime. Nothing scores itself. No
+self-improvement win is claimed.
 
 Pipeline: run misses → mine → route (exclusive) → agent draft → blinded adjudication → freeze → pre-register → score → compare
 
@@ -29,9 +33,14 @@ status: contract_only · adapters_trained: 0 · claims_without_receipts: 0
   <ApiPageHeader
     title="Improve"
     headingId="api-improve-heading"
-    description="Misses become measurement. Typed contracts, immutable receipts, fail-closed gates. Nothing scores itself."
+    description="Concepts only: not a /v1 host surface. Misses become measurement. Nothing scores itself."
     markdown={markdown}
   />
+  <p>
+    There is no Improve HTTP route on the local runtime host. Integrate study and receipts at
+    <code>/v1</code>; route misses through the evaluation and memory spine documented here and on
+    <a href="/benchmarks/">Benchmarks</a>.
+  </p>
   <p class="api-pipeline">
     run misses &rarr; mine &rarr; route (exclusive) &rarr; agent draft &rarr; blinded adjudication
     &rarr; freeze &rarr; pre-register &rarr; score &rarr; compare

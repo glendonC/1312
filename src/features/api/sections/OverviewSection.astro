@@ -1,18 +1,29 @@
 ---
 import ApiCopyButton from "../components/ApiCopyButton.astro";
 import ApiPanel from "../components/ApiPanel.astro";
-import { CURL_DISPLAY } from "../model.ts";
+import {
+  API_SUCCESSFUL_PATH,
+  CURL_DISPLAY,
+  SMOKE_TO_TERMINAL_DISPLAY,
+} from "../model.ts";
+
+const pathMarkdown = API_SUCCESSFUL_PATH.map(
+  (step, index) => `${index + 1}. ${step.label} (${step.href}): ${step.detail}`,
+).join("\n");
 
 const markdown = `# API Reference
 
 Local \`/v1\` for evidence-backed media understanding. Live translate guesses; this studies the media first, then returns receipts your pipeline can verify.
 
+Studio and agentic editors are both clients of the same local runtime host. This is not a hosted SaaS API.
+
 ## Successful path
 
-1. Register or list a source — /api/sources/
-2. Plan or start a bounded study, poll its journal — /api/runtime/
-3. Reopen evidence — /api/audits/ — or apply private captions/language explanations
-4. Misses route through /api/improve/; they do not score themselves
+Host authority order (not every nav page is a first call):
+
+${pathMarkdown}
+
+Improve (\`/api/improve/\`) is a Concepts page about the miss-to-gold conveyor. It is not a \`/v1\` surface.
 
 An empty list envelope is an honest answer, not an error.
 
@@ -22,6 +33,14 @@ With a running host and bearer token, \`GET /v1/source-sessions\` proves authori
 
 \`\`\`bash
 ${CURL_DISPLAY}
+\`\`\`
+
+## Smoke to terminal
+
+Copy-paste sequence that proves local value without claiming captions or SaaS:
+
+\`\`\`bash
+${SMOKE_TO_TERMINAL_DISPLAY}
 \`\`\`
 `;
 ---
@@ -34,7 +53,7 @@ ${CURL_DISPLAY}
   <p class="api-lede">
     Local <code>/v1</code> for evidence-backed media understanding. Live translate guesses; this
     studies the media first, then returns receipts your pipeline can verify. Studio and agentic
-    editors are both clients of the same host.
+    editors are both clients of the same local runtime host.
   </p>
   <script is:inline type="application/json" data-api-copy-source set:html={JSON.stringify(markdown)} />
 </header>
@@ -42,27 +61,18 @@ ${CURL_DISPLAY}
 <section class="api-section" aria-labelledby="api-path-heading">
   <h2 id="api-path-heading">Successful Path</h2>
   <ol class="api-steps">
-    <li>
-      Register or list a source under
-      <a href="/api/sources/">Sources And Ingest</a>.
-    </li>
-    <li>
-      Plan or start one bounded study, then poll its journal under
-      <a href="/api/runtime/">Runtime Lifecycle</a>.
-    </li>
-    <li>
-      Reopen evidence under <a href="/api/audits/">Evidence Audits</a>, or apply private
-      <a href="/api/captions/">Captions And QC</a> and
-      <a href="/api/language/">Language Explanations</a>.
-    </li>
-    <li>
-      Misses route through the <a href="/api/improve/">Improve</a> conveyor; they do not score
-      themselves.
-    </li>
+    {API_SUCCESSFUL_PATH.map((step) => (
+      <li>
+        <a href={step.href}>{step.label}</a>
+        {": "}
+        {step.detail}
+      </li>
+    ))}
   </ol>
   <p>
-    An empty list envelope is an honest answer, not an error. Fail-closed reads stay unavailable or
-    withheld instead of inventing output.
+    <a href="/api/improve/">Improve</a> is a Concepts page about the miss-to-gold conveyor. It is
+    not a <code>/v1</code> surface. An empty list envelope is an honest answer, not an error.
+    Fail-closed reads stay unavailable or withheld instead of inventing output.
   </p>
 </section>
 
@@ -82,6 +92,26 @@ ${CURL_DISPLAY}
     </div>
     <div class="api-panels">
       <ApiPanel title="First Call" body={CURL_DISPLAY} />
+    </div>
+  </div>
+</section>
+
+<section class="api-section" aria-labelledby="api-smoke-heading">
+  <h2 id="api-smoke-heading">Smoke To Terminal</h2>
+  <div class="api-split">
+    <div>
+      <p>
+        Smallest sequence that proves value on the default deterministic host: list sources, plan,
+        start, poll the journal to terminal. No model spend. No hosted upload path.
+      </p>
+      <p>
+        Captions come later, only after
+        <a href="/api/review/">Publish Review</a>. The default recorded caption executor may refuse
+        fixture authority; that is fail-closed, not a missing route.
+      </p>
+    </div>
+    <div class="api-panels">
+      <ApiPanel title="Smoke · Local Host" body={SMOKE_TO_TERMINAL_DISPLAY} />
     </div>
   </div>
 </section>

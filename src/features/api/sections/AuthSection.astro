@@ -1,18 +1,27 @@
 ---
 import ApiPageHeader from "../components/ApiPageHeader.astro";
-import { BASE_URL } from "../model.ts";
+import ApiPanel from "../components/ApiPanel.astro";
+import { BASE_URL, SMOKE_TO_TERMINAL_DISPLAY } from "../model.ts";
 
 const markdown = `# Authentication
 
 Every \`/v1\` resource uses a bearer token from the host process.
 
-Start the host with \`npm run runtime:host\`. It binds \`${BASE_URL}\`, prints one token per process on stdout, and serves loopback only. Browser clients must match an explicit origin allowlist.
+Start the host with \`npm run runtime:host\`. It binds \`${BASE_URL}\`, prints one token per process on stdout as \`authorizationToken\`, and serves loopback only. Browser clients must match an explicit origin allowlist.
 
 ## Authorization
 
-\`Authorization: Bearer <token>\` — compared exactly against the issued token. Missing or wrong tokens return 401.
+\`Authorization: Bearer <token>\`: compared exactly against the issued token. Missing or wrong tokens return 401.
 
 The private media route authorizes by grant secret instead of the bearer token.
+
+## First-win smoke
+
+After the token prints, the Overview smoke sequence proves auth through journal poll without claiming captions or SaaS:
+
+\`\`\`bash
+${SMOKE_TO_TERMINAL_DISPLAY}
+\`\`\`
 `;
 ---
 
@@ -25,8 +34,9 @@ The private media route authorizes by grant secret instead of the bearer token.
   />
   <p>
     Start the host with <code>npm run runtime:host</code>; it binds <code>127.0.0.1:4312</code>,
-    prints one token per process on stdout, and serves only that loopback address. Browser clients
-    must also match an explicit origin allowlist; wildcard origins are rejected.
+    prints one token per process on stdout as <code>authorizationToken</code>, and serves only that
+    loopback address. Browser clients must also match an explicit origin allowlist; wildcard origins
+    are rejected.
   </p>
   <div class="api-meta">
     <span class="api-meta-label">Base URL</span>
@@ -45,5 +55,17 @@ The private media route authorizes by grant secret instead of the bearer token.
       Missing or wrong tokens return 401. The <a href="/api/playback/">private media route</a> is
       the one exception; it authorizes by grant secret instead, so media elements can stream.
     </p>
+  </div>
+  <div class="api-split">
+    <div>
+      <h2 id="api-auth-smoke-heading">First-Win Smoke</h2>
+      <p>
+        Same sequence as <a href="/api/">Overview</a>: list sources, plan, start, poll events to
+        terminal. Proves the local host without claiming captions, upload CDN, or multi-tenant SaaS.
+      </p>
+    </div>
+    <div class="api-panels">
+      <ApiPanel title="Smoke · Local Host" body={SMOKE_TO_TERMINAL_DISPLAY} />
+    </div>
   </div>
 </section>

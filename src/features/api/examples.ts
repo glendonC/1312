@@ -1,7 +1,8 @@
-// Captured verbatim from a live local runtime host on 2026-07-18: deterministic
-// executor over the recorded run-005 workspace, one real plan/start/poll/review
-// cycle. Values are real receipts, not fabricated placeholders. The drift test
-// re-parses each capture and checks its schema tag against the documented surface.
+// Captured verbatim from a live local runtime host.
+// 2026-07-18: source-sessions, events, audits, review, caption 409, language empty, error.
+// 2026-07-19: runtime plan, start ack, and terminal status (deterministic executor, run-005,
+// fresh --runtime-root). Values are real receipts, not fabricated placeholders. The drift
+// test re-parses each capture and checks its schema tag against the documented surface.
 
 export const SOURCE_SESSIONS_200 = `{
     "schema": "studio.local-source-session-list.v1",
@@ -43,6 +44,793 @@ export const SOURCE_SESSIONS_200 = `{
             "detectedLanguageEvidenceAvailable": false
         }
     ]
+}`;
+
+export const RUNTIME_PLAN_200 = `{
+    "schema": "studio.local-runtime-plan.v1",
+    "commandId": "runtime-start:87a88ad697c53b8134783135c64c45c8c362bf9f682e121a720eb7867b2fcd2e",
+    "runtimeId": "runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+    "sourceSessionId": "source-session:50e48113837e62499233f29f53ab91f5ed591d39bda98879effb02364e2a03a2",
+    "sourceRevisionId": "source-revision:6800f536f61f5d73dc474443cf0469c823ae94a984a209192940fc28b94afa09",
+    "analysisRequestId": "analysis-request:431b63bd657b18e37f3c36da8d512006338cfbe674bb77cb21e1818bbb982b83",
+    "forecast": {
+        "schema": "studio.forecast.v1",
+        "forecastId": "forecast:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+        "content": {
+            "algorithm": "sha256",
+            "digest": "93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+            "contentId": "sha256:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+            "bytes": 3413
+        },
+        "estimator": {
+            "id": "studio.forecast.deterministic-floor",
+            "version": "1"
+        },
+        "inputs": {
+            "artifact": {
+                "artifactId": "artifact:9f49fcb0eb07542cf19ca6e6e70d4d8aab491ff85abe2bd09658666ae5e4ae70",
+                "contentId": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                "measuredDurationMs": 47200,
+                "durationMeasurement": {
+                    "schema": "studio.media-probe.v1",
+                    "producer": "scripts/probe-media.mjs",
+                    "receiptContentId": "sha256:def1dcaeeabe4dbc24247279638d1ce666fdc397de3dfa557a924dd12cb8b0c2"
+                }
+            },
+            "selectedRange": {
+                "startMs": 0,
+                "endMs": 47200,
+                "durationMs": 47200
+            },
+            "workPlan": {
+                "schema": "studio.forecast.work-plan.v1",
+                "planId": "plan:bounded-media-seek:e7b3dbb7a086245f6d2b55bb00cd54d57bb6f72e1bca09ded7d4543b4c7b2a8a",
+                "operations": [
+                    {
+                        "operationId": "operation:bounded-media-seek:3ea64c5620ca47571a78068ada97d5179c7fddf5e3282731089d400d412b60d6",
+                        "kind": "media.seek",
+                        "range": {
+                            "startMs": 0,
+                            "endMs": 47200
+                        }
+                    }
+                ]
+            }
+        },
+        "scenarios": {
+            "baseline": {
+                "label": "baseline",
+                "status": "floor_only",
+                "workload": {
+                    "selectedMediaDurationMs": 47200,
+                    "operationCount": 1,
+                    "requestedOperationMediaDurationMs": 47200,
+                    "operations": [
+                        {
+                            "operationId": "operation:bounded-media-seek:3ea64c5620ca47571a78068ada97d5179c7fddf5e3282731089d400d412b60d6",
+                            "kind": "media.seek",
+                            "requestedMediaDurationMs": 47200
+                        }
+                    ]
+                },
+                "elapsedDurationMs": null,
+                "modelUsage": null,
+                "apiCost": {
+                    "amount": null,
+                    "currency": null
+                }
+            },
+            "expected": {
+                "label": "expected",
+                "status": "unavailable",
+                "workload": null,
+                "elapsedDurationMs": null,
+                "modelUsage": null,
+                "apiCost": {
+                    "amount": null,
+                    "currency": null
+                }
+            },
+            "conservative": {
+                "label": "conservative",
+                "status": "unavailable",
+                "workload": null,
+                "elapsedDurationMs": null,
+                "modelUsage": null,
+                "apiCost": {
+                    "amount": null,
+                    "currency": null
+                }
+            }
+        },
+        "assumptions": [
+            {
+                "code": "measured_duration_envelope",
+                "statement": "The selected range is bounded by the duration declared by the referenced studio.media-probe.v1 receipt."
+            },
+            {
+                "code": "explicit_operation_ranges_only",
+                "statement": "The floor sums each requested operation range once; retries, spawned work, and undeclared operations are excluded."
+            },
+            {
+                "code": "workload_not_elapsed_time",
+                "statement": "Requested media milliseconds are workload volume, not wall time, active execution time, usage, or billing."
+            }
+        ],
+        "uncertainty": [
+            {
+                "code": "dynamic_work_unavailable",
+                "affects": [
+                    "scenarios.baseline.workload"
+                ],
+                "statement": "No producer establishes retries, child work, or reprocessing before the run."
+            },
+            {
+                "code": "historical_calibration_unavailable",
+                "affects": [
+                    "scenarios.expected",
+                    "scenarios.conservative"
+                ],
+                "statement": "No compatible historical calibration producer exists."
+            },
+            {
+                "code": "elapsed_time_unavailable",
+                "affects": [
+                    "scenarios.baseline.elapsedDurationMs",
+                    "scenarios.expected.elapsedDurationMs",
+                    "scenarios.conservative.elapsedDurationMs"
+                ],
+                "statement": "Media duration and operation scopes do not establish concurrency or processing speed."
+            },
+            {
+                "code": "model_usage_unavailable",
+                "affects": [
+                    "scenarios.baseline.modelUsage",
+                    "scenarios.expected.modelUsage",
+                    "scenarios.conservative.modelUsage"
+                ],
+                "statement": "No compatible pre-run model-usage estimator or calibrated history exists."
+            },
+            {
+                "code": "pricing_unavailable",
+                "affects": [
+                    "scenarios.baseline.apiCost",
+                    "scenarios.expected.apiCost",
+                    "scenarios.conservative.apiCost"
+                ],
+                "statement": "No versioned price-book adapter or pricing snapshot exists."
+            }
+        ],
+        "calibration": {
+            "status": "unavailable",
+            "evidence": null,
+            "cohort": null
+        },
+        "pricing": {
+            "status": "unavailable",
+            "priceBookAdapter": null,
+            "priceBookSnapshot": null,
+            "currency": null
+        }
+    },
+    "acceptance": {
+        "status": "not_started",
+        "frozenForecastId": null
+    }
+}`;
+
+export const RUNTIME_START_ACK_202 = `{
+    "schema": "studio.local-runtime-start-ack.v1",
+    "commandId": "runtime-start:87a88ad697c53b8134783135c64c45c8c362bf9f682e121a720eb7867b2fcd2e",
+    "runtimeId": "runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+    "journalId": "journal:runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+    "lifecycle": "initializing",
+    "acceptedAt": "2026-07-19T16:14:06.771Z",
+    "lastTransitionAt": "2026-07-19T16:14:06.798Z",
+    "reason": null,
+    "sourceSessionId": "source-session:50e48113837e62499233f29f53ab91f5ed591d39bda98879effb02364e2a03a2",
+    "sourceRevisionId": "source-revision:6800f536f61f5d73dc474443cf0469c823ae94a984a209192940fc28b94afa09",
+    "analysisRequestId": "analysis-request:431b63bd657b18e37f3c36da8d512006338cfbe674bb77cb21e1818bbb982b83",
+    "forecast": {
+        "forecastId": "forecast:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+        "contentId": "sha256:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+        "frozenForecastId": "forecast-freeze:ddc139aa2b7e61a7f32e0ea42a074655625a5475eef585cb44bbdf07491fe0bb",
+        "baselineStatus": "floor_only"
+    },
+    "runStartReceipt": {
+        "contentId": "sha256:bac814e3fa3f50c5cbc4c40cd3fe0c38896542a468cd4a2c9afedf79eb1efc2a",
+        "record": {
+            "schema": "studio.runtime-start.v1",
+            "producer": {
+                "id": "studio.local-runtime-start",
+                "version": "1"
+            },
+            "commandId": "runtime-start:87a88ad697c53b8134783135c64c45c8c362bf9f682e121a720eb7867b2fcd2e",
+            "runtimeId": "runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+            "journalId": "journal:runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+            "sourceSession": {
+                "schema": "studio.source-session.v1",
+                "sessionId": "source-session:50e48113837e62499233f29f53ab91f5ed591d39bda98879effb02364e2a03a2",
+                "revisionId": "source-revision:6800f536f61f5d73dc474443cf0469c823ae94a984a209192940fc28b94afa09",
+                "adapterId": "owned-local-source-adapter.v1",
+                "sourceReceipt": {
+                    "schema": "studio.ingest.owned-local.v1",
+                    "receiptId": "owned-local:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                    "contentId": "sha256:ced8e654d0bba45d118d73276d76c12d4fb45dae17a25a8a0cf9fb843dc96735",
+                    "rightsScope": "redistribution"
+                },
+                "source": {
+                    "contentId": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                    "bytes": 329662,
+                    "durationMs": 47200
+                },
+                "mediaProbe": {
+                    "schema": "studio.media-probe.v1",
+                    "producer": "scripts/probe-media.mjs",
+                    "contentId": "sha256:def1dcaeeabe4dbc24247279638d1ce666fdc397de3dfa557a924dd12cb8b0c2"
+                },
+                "preflight": {
+                    "schema": "studio.preflight-bundle.v3",
+                    "preflightId": "preflight:sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e:speech-v1:language-v1",
+                    "contentId": "sha256:0aa3f0023a4ce1500195e5051004644a63ee2060f5e92ebf8ee8f61afb7eb5aa"
+                },
+                "detectedLanguageEvidenceContentIds": [
+                    "sha256:a61f2157005daa7cb51419c01229993f5397fbbc48845e6668fdd37cbb24924d"
+                ]
+            },
+            "sourceArtifactId": "artifact:9f49fcb0eb07542cf19ca6e6e70d4d8aab491ff85abe2bd09658666ae5e4ae70",
+            "analysisRequest": {
+                "schema": "studio.analysis-request.v1",
+                "requestId": "analysis-request:431b63bd657b18e37f3c36da8d512006338cfbe674bb77cb21e1818bbb982b83",
+                "sourceSessionId": "source-session:50e48113837e62499233f29f53ab91f5ed591d39bda98879effb02364e2a03a2",
+                "sourceRevisionId": "source-revision:6800f536f61f5d73dc474443cf0469c823ae94a984a209192940fc28b94afa09",
+                "sourceContentId": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                "range": {
+                    "startMs": 0,
+                    "endMs": 47200
+                },
+                "language": {
+                    "languagePair": {
+                        "requestedSource": {
+                            "mode": "declared",
+                            "languages": [
+                                "ko"
+                            ],
+                            "reason": null
+                        },
+                        "targetLanguage": "en"
+                    },
+                    "selectedLanguagePackId": "ko-v3",
+                    "detectedLanguageEvidenceContentIds": [
+                        "sha256:a61f2157005daa7cb51419c01229993f5397fbbc48845e6668fdd37cbb24924d"
+                    ]
+                },
+                "outputDepth": "evidence",
+                "options": {
+                    "speechScope": "foreground",
+                    "includeLyrics": false,
+                    "speaker": null,
+                    "honorifics": "preserve",
+                    "translationStyle": "natural",
+                    "captionDensity": "balanced",
+                    "slowAnalysis": false
+                }
+            },
+            "workPlan": {
+                "schema": "studio.forecast.work-plan.v1",
+                "planId": "plan:bounded-media-seek:e7b3dbb7a086245f6d2b55bb00cd54d57bb6f72e1bca09ded7d4543b4c7b2a8a",
+                "operations": [
+                    {
+                        "operationId": "operation:bounded-media-seek:3ea64c5620ca47571a78068ada97d5179c7fddf5e3282731089d400d412b60d6",
+                        "kind": "media.seek",
+                        "range": {
+                            "startMs": 0,
+                            "endMs": 47200
+                        }
+                    }
+                ]
+            },
+            "forecast": {
+                "schema": "studio.forecast.v1",
+                "forecastId": "forecast:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+                "content": {
+                    "algorithm": "sha256",
+                    "digest": "93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+                    "contentId": "sha256:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+                    "bytes": 3413
+                },
+                "estimator": {
+                    "id": "studio.forecast.deterministic-floor",
+                    "version": "1"
+                },
+                "inputs": {
+                    "artifact": {
+                        "artifactId": "artifact:9f49fcb0eb07542cf19ca6e6e70d4d8aab491ff85abe2bd09658666ae5e4ae70",
+                        "contentId": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                        "measuredDurationMs": 47200,
+                        "durationMeasurement": {
+                            "schema": "studio.media-probe.v1",
+                            "producer": "scripts/probe-media.mjs",
+                            "receiptContentId": "sha256:def1dcaeeabe4dbc24247279638d1ce666fdc397de3dfa557a924dd12cb8b0c2"
+                        }
+                    },
+                    "selectedRange": {
+                        "startMs": 0,
+                        "endMs": 47200,
+                        "durationMs": 47200
+                    },
+                    "workPlan": {
+                        "schema": "studio.forecast.work-plan.v1",
+                        "planId": "plan:bounded-media-seek:e7b3dbb7a086245f6d2b55bb00cd54d57bb6f72e1bca09ded7d4543b4c7b2a8a",
+                        "operations": [
+                            {
+                                "operationId": "operation:bounded-media-seek:3ea64c5620ca47571a78068ada97d5179c7fddf5e3282731089d400d412b60d6",
+                                "kind": "media.seek",
+                                "range": {
+                                    "startMs": 0,
+                                    "endMs": 47200
+                                }
+                            }
+                        ]
+                    }
+                },
+                "scenarios": {
+                    "baseline": {
+                        "label": "baseline",
+                        "status": "floor_only",
+                        "workload": {
+                            "selectedMediaDurationMs": 47200,
+                            "operationCount": 1,
+                            "requestedOperationMediaDurationMs": 47200,
+                            "operations": [
+                                {
+                                    "operationId": "operation:bounded-media-seek:3ea64c5620ca47571a78068ada97d5179c7fddf5e3282731089d400d412b60d6",
+                                    "kind": "media.seek",
+                                    "requestedMediaDurationMs": 47200
+                                }
+                            ]
+                        },
+                        "elapsedDurationMs": null,
+                        "modelUsage": null,
+                        "apiCost": {
+                            "amount": null,
+                            "currency": null
+                        }
+                    },
+                    "expected": {
+                        "label": "expected",
+                        "status": "unavailable",
+                        "workload": null,
+                        "elapsedDurationMs": null,
+                        "modelUsage": null,
+                        "apiCost": {
+                            "amount": null,
+                            "currency": null
+                        }
+                    },
+                    "conservative": {
+                        "label": "conservative",
+                        "status": "unavailable",
+                        "workload": null,
+                        "elapsedDurationMs": null,
+                        "modelUsage": null,
+                        "apiCost": {
+                            "amount": null,
+                            "currency": null
+                        }
+                    }
+                },
+                "assumptions": [
+                    {
+                        "code": "measured_duration_envelope",
+                        "statement": "The selected range is bounded by the duration declared by the referenced studio.media-probe.v1 receipt."
+                    },
+                    {
+                        "code": "explicit_operation_ranges_only",
+                        "statement": "The floor sums each requested operation range once; retries, spawned work, and undeclared operations are excluded."
+                    },
+                    {
+                        "code": "workload_not_elapsed_time",
+                        "statement": "Requested media milliseconds are workload volume, not wall time, active execution time, usage, or billing."
+                    }
+                ],
+                "uncertainty": [
+                    {
+                        "code": "dynamic_work_unavailable",
+                        "affects": [
+                            "scenarios.baseline.workload"
+                        ],
+                        "statement": "No producer establishes retries, child work, or reprocessing before the run."
+                    },
+                    {
+                        "code": "historical_calibration_unavailable",
+                        "affects": [
+                            "scenarios.expected",
+                            "scenarios.conservative"
+                        ],
+                        "statement": "No compatible historical calibration producer exists."
+                    },
+                    {
+                        "code": "elapsed_time_unavailable",
+                        "affects": [
+                            "scenarios.baseline.elapsedDurationMs",
+                            "scenarios.expected.elapsedDurationMs",
+                            "scenarios.conservative.elapsedDurationMs"
+                        ],
+                        "statement": "Media duration and operation scopes do not establish concurrency or processing speed."
+                    },
+                    {
+                        "code": "model_usage_unavailable",
+                        "affects": [
+                            "scenarios.baseline.modelUsage",
+                            "scenarios.expected.modelUsage",
+                            "scenarios.conservative.modelUsage"
+                        ],
+                        "statement": "No compatible pre-run model-usage estimator or calibrated history exists."
+                    },
+                    {
+                        "code": "pricing_unavailable",
+                        "affects": [
+                            "scenarios.baseline.apiCost",
+                            "scenarios.expected.apiCost",
+                            "scenarios.conservative.apiCost"
+                        ],
+                        "statement": "No versioned price-book adapter or pricing snapshot exists."
+                    }
+                ],
+                "calibration": {
+                    "status": "unavailable",
+                    "evidence": null,
+                    "cohort": null
+                },
+                "pricing": {
+                    "status": "unavailable",
+                    "priceBookAdapter": null,
+                    "priceBookSnapshot": null,
+                    "currency": null
+                }
+            },
+            "frozenForecast": {
+                "schema": "studio.forecast-freeze.v1",
+                "freezeId": "forecast-freeze:ddc139aa2b7e61a7f32e0ea42a074655625a5475eef585cb44bbdf07491fe0bb",
+                "content": {
+                    "algorithm": "sha256",
+                    "digest": "ddc139aa2b7e61a7f32e0ea42a074655625a5475eef585cb44bbdf07491fe0bb",
+                    "contentId": "sha256:ddc139aa2b7e61a7f32e0ea42a074655625a5475eef585cb44bbdf07491fe0bb",
+                    "bytes": 580
+                },
+                "producer": {
+                    "id": "studio.forecast.freeze",
+                    "version": "1"
+                },
+                "forecast": {
+                    "schema": "studio.forecast.v1",
+                    "forecastId": "forecast:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+                    "contentId": "sha256:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09"
+                },
+                "acceptance": {
+                    "runId": "runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+                    "acceptedBy": "operator:local-runtime-host",
+                    "runStartAt": "2026-07-19T16:14:06.771Z"
+                },
+                "immutability": {
+                    "forecast": "referenced_by_content_id",
+                    "actuals": "not_embedded",
+                    "evaluation": "separate_artifact"
+                }
+            },
+            "startedAt": "2026-07-19T16:14:06.771Z"
+        }
+    },
+    "journalHead": 0,
+    "terminal": false
+}`;
+
+export const RUNTIME_STATUS_200 = `{
+    "schema": "studio.local-runtime-status.v1",
+    "commandId": "runtime-start:87a88ad697c53b8134783135c64c45c8c362bf9f682e121a720eb7867b2fcd2e",
+    "runtimeId": "runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+    "journalId": "journal:runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+    "lifecycle": "terminal",
+    "acceptedAt": "2026-07-19T16:14:06.771Z",
+    "lastTransitionAt": "2026-07-19T16:14:07.276Z",
+    "reason": null,
+    "sourceSessionId": "source-session:50e48113837e62499233f29f53ab91f5ed591d39bda98879effb02364e2a03a2",
+    "sourceRevisionId": "source-revision:6800f536f61f5d73dc474443cf0469c823ae94a984a209192940fc28b94afa09",
+    "analysisRequestId": "analysis-request:431b63bd657b18e37f3c36da8d512006338cfbe674bb77cb21e1818bbb982b83",
+    "forecast": {
+        "forecastId": "forecast:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+        "contentId": "sha256:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+        "frozenForecastId": "forecast-freeze:ddc139aa2b7e61a7f32e0ea42a074655625a5475eef585cb44bbdf07491fe0bb",
+        "baselineStatus": "floor_only"
+    },
+    "runStartReceipt": {
+        "contentId": "sha256:bac814e3fa3f50c5cbc4c40cd3fe0c38896542a468cd4a2c9afedf79eb1efc2a",
+        "record": {
+            "schema": "studio.runtime-start.v1",
+            "producer": {
+                "id": "studio.local-runtime-start",
+                "version": "1"
+            },
+            "commandId": "runtime-start:87a88ad697c53b8134783135c64c45c8c362bf9f682e121a720eb7867b2fcd2e",
+            "runtimeId": "runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+            "journalId": "journal:runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+            "sourceSession": {
+                "schema": "studio.source-session.v1",
+                "sessionId": "source-session:50e48113837e62499233f29f53ab91f5ed591d39bda98879effb02364e2a03a2",
+                "revisionId": "source-revision:6800f536f61f5d73dc474443cf0469c823ae94a984a209192940fc28b94afa09",
+                "adapterId": "owned-local-source-adapter.v1",
+                "sourceReceipt": {
+                    "schema": "studio.ingest.owned-local.v1",
+                    "receiptId": "owned-local:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                    "contentId": "sha256:ced8e654d0bba45d118d73276d76c12d4fb45dae17a25a8a0cf9fb843dc96735",
+                    "rightsScope": "redistribution"
+                },
+                "source": {
+                    "contentId": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                    "bytes": 329662,
+                    "durationMs": 47200
+                },
+                "mediaProbe": {
+                    "schema": "studio.media-probe.v1",
+                    "producer": "scripts/probe-media.mjs",
+                    "contentId": "sha256:def1dcaeeabe4dbc24247279638d1ce666fdc397de3dfa557a924dd12cb8b0c2"
+                },
+                "preflight": {
+                    "schema": "studio.preflight-bundle.v3",
+                    "preflightId": "preflight:sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e:speech-v1:language-v1",
+                    "contentId": "sha256:0aa3f0023a4ce1500195e5051004644a63ee2060f5e92ebf8ee8f61afb7eb5aa"
+                },
+                "detectedLanguageEvidenceContentIds": [
+                    "sha256:a61f2157005daa7cb51419c01229993f5397fbbc48845e6668fdd37cbb24924d"
+                ]
+            },
+            "sourceArtifactId": "artifact:9f49fcb0eb07542cf19ca6e6e70d4d8aab491ff85abe2bd09658666ae5e4ae70",
+            "analysisRequest": {
+                "schema": "studio.analysis-request.v1",
+                "requestId": "analysis-request:431b63bd657b18e37f3c36da8d512006338cfbe674bb77cb21e1818bbb982b83",
+                "sourceSessionId": "source-session:50e48113837e62499233f29f53ab91f5ed591d39bda98879effb02364e2a03a2",
+                "sourceRevisionId": "source-revision:6800f536f61f5d73dc474443cf0469c823ae94a984a209192940fc28b94afa09",
+                "sourceContentId": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                "range": {
+                    "startMs": 0,
+                    "endMs": 47200
+                },
+                "language": {
+                    "languagePair": {
+                        "requestedSource": {
+                            "mode": "declared",
+                            "languages": [
+                                "ko"
+                            ],
+                            "reason": null
+                        },
+                        "targetLanguage": "en"
+                    },
+                    "selectedLanguagePackId": "ko-v3",
+                    "detectedLanguageEvidenceContentIds": [
+                        "sha256:a61f2157005daa7cb51419c01229993f5397fbbc48845e6668fdd37cbb24924d"
+                    ]
+                },
+                "outputDepth": "evidence",
+                "options": {
+                    "speechScope": "foreground",
+                    "includeLyrics": false,
+                    "speaker": null,
+                    "honorifics": "preserve",
+                    "translationStyle": "natural",
+                    "captionDensity": "balanced",
+                    "slowAnalysis": false
+                }
+            },
+            "workPlan": {
+                "schema": "studio.forecast.work-plan.v1",
+                "planId": "plan:bounded-media-seek:e7b3dbb7a086245f6d2b55bb00cd54d57bb6f72e1bca09ded7d4543b4c7b2a8a",
+                "operations": [
+                    {
+                        "operationId": "operation:bounded-media-seek:3ea64c5620ca47571a78068ada97d5179c7fddf5e3282731089d400d412b60d6",
+                        "kind": "media.seek",
+                        "range": {
+                            "startMs": 0,
+                            "endMs": 47200
+                        }
+                    }
+                ]
+            },
+            "forecast": {
+                "schema": "studio.forecast.v1",
+                "forecastId": "forecast:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+                "content": {
+                    "algorithm": "sha256",
+                    "digest": "93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+                    "contentId": "sha256:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+                    "bytes": 3413
+                },
+                "estimator": {
+                    "id": "studio.forecast.deterministic-floor",
+                    "version": "1"
+                },
+                "inputs": {
+                    "artifact": {
+                        "artifactId": "artifact:9f49fcb0eb07542cf19ca6e6e70d4d8aab491ff85abe2bd09658666ae5e4ae70",
+                        "contentId": "sha256:e141cd9d0a693f70d7e069deb4bf2b300af64a1a89b0b8e806e7aae6be1c924e",
+                        "measuredDurationMs": 47200,
+                        "durationMeasurement": {
+                            "schema": "studio.media-probe.v1",
+                            "producer": "scripts/probe-media.mjs",
+                            "receiptContentId": "sha256:def1dcaeeabe4dbc24247279638d1ce666fdc397de3dfa557a924dd12cb8b0c2"
+                        }
+                    },
+                    "selectedRange": {
+                        "startMs": 0,
+                        "endMs": 47200,
+                        "durationMs": 47200
+                    },
+                    "workPlan": {
+                        "schema": "studio.forecast.work-plan.v1",
+                        "planId": "plan:bounded-media-seek:e7b3dbb7a086245f6d2b55bb00cd54d57bb6f72e1bca09ded7d4543b4c7b2a8a",
+                        "operations": [
+                            {
+                                "operationId": "operation:bounded-media-seek:3ea64c5620ca47571a78068ada97d5179c7fddf5e3282731089d400d412b60d6",
+                                "kind": "media.seek",
+                                "range": {
+                                    "startMs": 0,
+                                    "endMs": 47200
+                                }
+                            }
+                        ]
+                    }
+                },
+                "scenarios": {
+                    "baseline": {
+                        "label": "baseline",
+                        "status": "floor_only",
+                        "workload": {
+                            "selectedMediaDurationMs": 47200,
+                            "operationCount": 1,
+                            "requestedOperationMediaDurationMs": 47200,
+                            "operations": [
+                                {
+                                    "operationId": "operation:bounded-media-seek:3ea64c5620ca47571a78068ada97d5179c7fddf5e3282731089d400d412b60d6",
+                                    "kind": "media.seek",
+                                    "requestedMediaDurationMs": 47200
+                                }
+                            ]
+                        },
+                        "elapsedDurationMs": null,
+                        "modelUsage": null,
+                        "apiCost": {
+                            "amount": null,
+                            "currency": null
+                        }
+                    },
+                    "expected": {
+                        "label": "expected",
+                        "status": "unavailable",
+                        "workload": null,
+                        "elapsedDurationMs": null,
+                        "modelUsage": null,
+                        "apiCost": {
+                            "amount": null,
+                            "currency": null
+                        }
+                    },
+                    "conservative": {
+                        "label": "conservative",
+                        "status": "unavailable",
+                        "workload": null,
+                        "elapsedDurationMs": null,
+                        "modelUsage": null,
+                        "apiCost": {
+                            "amount": null,
+                            "currency": null
+                        }
+                    }
+                },
+                "assumptions": [
+                    {
+                        "code": "measured_duration_envelope",
+                        "statement": "The selected range is bounded by the duration declared by the referenced studio.media-probe.v1 receipt."
+                    },
+                    {
+                        "code": "explicit_operation_ranges_only",
+                        "statement": "The floor sums each requested operation range once; retries, spawned work, and undeclared operations are excluded."
+                    },
+                    {
+                        "code": "workload_not_elapsed_time",
+                        "statement": "Requested media milliseconds are workload volume, not wall time, active execution time, usage, or billing."
+                    }
+                ],
+                "uncertainty": [
+                    {
+                        "code": "dynamic_work_unavailable",
+                        "affects": [
+                            "scenarios.baseline.workload"
+                        ],
+                        "statement": "No producer establishes retries, child work, or reprocessing before the run."
+                    },
+                    {
+                        "code": "historical_calibration_unavailable",
+                        "affects": [
+                            "scenarios.expected",
+                            "scenarios.conservative"
+                        ],
+                        "statement": "No compatible historical calibration producer exists."
+                    },
+                    {
+                        "code": "elapsed_time_unavailable",
+                        "affects": [
+                            "scenarios.baseline.elapsedDurationMs",
+                            "scenarios.expected.elapsedDurationMs",
+                            "scenarios.conservative.elapsedDurationMs"
+                        ],
+                        "statement": "Media duration and operation scopes do not establish concurrency or processing speed."
+                    },
+                    {
+                        "code": "model_usage_unavailable",
+                        "affects": [
+                            "scenarios.baseline.modelUsage",
+                            "scenarios.expected.modelUsage",
+                            "scenarios.conservative.modelUsage"
+                        ],
+                        "statement": "No compatible pre-run model-usage estimator or calibrated history exists."
+                    },
+                    {
+                        "code": "pricing_unavailable",
+                        "affects": [
+                            "scenarios.baseline.apiCost",
+                            "scenarios.expected.apiCost",
+                            "scenarios.conservative.apiCost"
+                        ],
+                        "statement": "No versioned price-book adapter or pricing snapshot exists."
+                    }
+                ],
+                "calibration": {
+                    "status": "unavailable",
+                    "evidence": null,
+                    "cohort": null
+                },
+                "pricing": {
+                    "status": "unavailable",
+                    "priceBookAdapter": null,
+                    "priceBookSnapshot": null,
+                    "currency": null
+                }
+            },
+            "frozenForecast": {
+                "schema": "studio.forecast-freeze.v1",
+                "freezeId": "forecast-freeze:ddc139aa2b7e61a7f32e0ea42a074655625a5475eef585cb44bbdf07491fe0bb",
+                "content": {
+                    "algorithm": "sha256",
+                    "digest": "ddc139aa2b7e61a7f32e0ea42a074655625a5475eef585cb44bbdf07491fe0bb",
+                    "contentId": "sha256:ddc139aa2b7e61a7f32e0ea42a074655625a5475eef585cb44bbdf07491fe0bb",
+                    "bytes": 580
+                },
+                "producer": {
+                    "id": "studio.forecast.freeze",
+                    "version": "1"
+                },
+                "forecast": {
+                    "schema": "studio.forecast.v1",
+                    "forecastId": "forecast:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09",
+                    "contentId": "sha256:93afa3f4de14110d351f40e0108f41eacd62b3afb9adc6a7b327addee002fd09"
+                },
+                "acceptance": {
+                    "runId": "runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
+                    "acceptedBy": "operator:local-runtime-host",
+                    "runStartAt": "2026-07-19T16:14:06.771Z"
+                },
+                "immutability": {
+                    "forecast": "referenced_by_content_id",
+                    "actuals": "not_embedded",
+                    "evaluation": "separate_artifact"
+                }
+            },
+            "startedAt": "2026-07-19T16:14:06.771Z"
+        }
+    },
+    "journalHead": 67,
+    "terminal": true
 }`;
 
 export const RUNTIME_EVENTS_200 = `{

@@ -17,6 +17,9 @@ import {
   PUBLISH_REVIEW_DECISION_201,
   PUBLISH_REVIEW_INTAKES_200,
   RUNTIME_EVENTS_200,
+  RUNTIME_PLAN_200,
+  RUNTIME_START_ACK_202,
+  RUNTIME_STATUS_200,
   SOURCE_SESSIONS_200,
   UNKNOWN_QUERY_400,
 } from "./examples.ts";
@@ -227,6 +230,76 @@ TOKEN=<authorizationToken>
 curl -H "Authorization: Bearer $TOKEN" \\
   ${BASE_URL}/v1/source-sessions`;
 
+/**
+ * First-win smoke on the default deterministic host (`npm run runtime:host`).
+ * Proves auth, registered source, plan, start, and journal poll to terminal.
+ * Does not claim captions, SaaS, or model spend.
+ */
+export const SMOKE_TO_TERMINAL_DISPLAY = `# First win: local host only (no SaaS, no model spend)
+# 1. npm run runtime:host
+# 2. Copy authorizationToken from the host stdout JSON
+TOKEN=<authorizationToken>
+
+# 3. Prove authorization and list registered sources (run-005 is pre-registered)
+curl -H "Authorization: Bearer $TOKEN" \\
+  ${BASE_URL}/v1/source-sessions
+
+# 4. Forecast without writing a durable command
+${curlFor("POST", "/v1/runtime-plans", START_REQUEST_EXAMPLE)}
+
+# 5. Start one bounded study; read runtimeId from the 202 ack
+${curlFor("POST", "/v1/runtime-starts", START_REQUEST_EXAMPLE)}
+
+# 6. Poll the journal until lifecycle is terminal (or reachedHead)
+curl -H "Authorization: Bearer $TOKEN" \\
+  "${BASE_URL}/v1/runtimes/$RUNTIME_ID/events?after=0&limit=100"
+
+# Next authority step is Publish Review (after a queued intake), then Captions.
+# Default recorded caption executor may refuse fixture authority: that is fail-closed, not a host gap.`;
+
+/** Operator ladder for Overview / LLM paste. Order matches host authority, not nav density. */
+export const API_SUCCESSFUL_PATH: ReadonlyArray<{
+  href: string;
+  label: string;
+  detail: string;
+}> = [
+  {
+    href: "/api/sources/",
+    label: "Sources And Ingest",
+    detail: "Register or list a local source before any study can start.",
+  },
+  {
+    href: "/api/runtime/",
+    label: "Runtime Lifecycle",
+    detail: "Plan or start one bounded study, then poll its journal to terminal.",
+  },
+  {
+    href: "/api/audits/",
+    label: "Evidence Audits",
+    detail: "Optional: reopen assessments and decision receipts without inventing facts.",
+  },
+  {
+    href: "/api/review/",
+    label: "Publish Review",
+    detail: "Attested approve or reject. Required before private caption production.",
+  },
+  {
+    href: "/api/captions/",
+    label: "Captions And QC",
+    detail: "Private caption candidates and structural QC. Not publication.",
+  },
+  {
+    href: "/api/playback/",
+    label: "Private Playback",
+    detail: "Mint an origin-bound grant, then stream exact private source bytes.",
+  },
+  {
+    href: "/api/language/",
+    label: "Language Explanations",
+    detail: "Typed facets over one verified caption span.",
+  },
+];
+
 export const ERROR_DISPLAY = UNKNOWN_QUERY_400;
 
 export const WORKER_TOOLS = [
@@ -314,7 +387,7 @@ const RUNTIME_STATUS_FIELDS: ApiFieldTable = {
 
 const ingestStatusPanel = (title: string): ApiCodePanel => ({
   kind: "response",
-  title,
+  title: `${title} · Illustrative`,
   body: JSON.stringify(INGEST_STATUS_EXAMPLE, null, 2),
 });
 
@@ -599,6 +672,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("POST", "/v1/runtime-plans", START_REQUEST_EXAMPLE),
           },
+          {
+            kind: "response",
+            title: "200 · Captured",
+            body: RUNTIME_PLAN_200,
+          },
         ],
       },
       {
@@ -612,6 +690,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             kind: "request",
             title: "Request",
             body: curlFor("POST", "/v1/runtime-starts", START_REQUEST_EXAMPLE),
+          },
+          {
+            kind: "response",
+            title: "202 · Captured",
+            body: RUNTIME_START_ACK_202,
           },
         ],
       },
@@ -627,6 +710,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("GET", "/v1/runtime-starts/$COMMAND_ID"),
           },
+          {
+            kind: "response",
+            title: "200 · Terminal · Captured",
+            body: RUNTIME_STATUS_200,
+          },
         ],
       },
       {
@@ -640,6 +728,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             kind: "request",
             title: "Request",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID"),
+          },
+          {
+            kind: "response",
+            title: "200 · Terminal · Captured",
+            body: RUNTIME_STATUS_200,
           },
         ],
       },
@@ -926,7 +1019,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "201 · Playback Grant",
+            title: "201 · Playback Grant · Illustrative",
             body: JSON.stringify(PLAYBACK_GRANT_EXAMPLE, null, 2),
           },
         ],
@@ -1059,7 +1152,8 @@ export const API_PAGES: ApiPageDef[] = [
     title: "Improve",
     group: "Concepts",
     palette: "teal",
-    description: "Miss-to-gold conveyor, exclusive routing, memory gate, and declared offline adapters.",
+    description:
+      "Miss-to-gold conveyor concept, not a /v1 host surface. Exclusive routing, memory gate, and declared offline adapters.",
   },
   {
     slug: "non-claims",

@@ -131,6 +131,33 @@
   line-height: 1.6;
 }
 
+/* Global base.css resets anchors to inherit + no underline. Content links must
+   read as links without looking like sidebar/pager chrome. */
+.api-content a:not(.api-side-link):not(.api-pager-link) {
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-line);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+
+.api-content a:not(.api-side-link):not(.api-pager-link):hover {
+  color: var(--palette-ink, var(--accent));
+  text-decoration-color: currentColor;
+}
+
+.api-content a:not(.api-side-link):not(.api-pager-link):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.api-step-detail {
+  color: var(--ink);
+}
+
 .api-pager {
   display: flex;
   justify-content: space-between;

@@ -33,12 +33,16 @@ not pin a Node version, so do not add an unsupported version claim.
 ## Make an evidence-backed change
 
 - Verify current behavior against code, tests, schemas, or bound receipts.
-- Update the owning document when a product claim, contract, or status fact changes.
+- Update the owning document when a product claim, contract, or status fact changes. Prefer
+  link-to-owner over copying status into architecture or RFC text.
 - Keep unsupported states unavailable, unknown, withheld, or failed.
 - Do not submit secrets, credentials, private media, or material you cannot redistribute.
 - Do not alter frozen benchmark inputs or gold labels to improve a score.
 - Preserve third-party notices and file-specific license terms.
 - Avoid drive-by formatting and unrelated cleanup.
+- Capability rung IDs (`U1`…`U7`, and related slice labels) are defined in
+  [`docs/build-week/CAPABILITY_LADDER.md`](docs/build-week/CAPABILITY_LADDER.md). Outside that file,
+  gloss or link on first use.
 
 ## Run the relevant checks
 

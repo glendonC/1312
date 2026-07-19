@@ -1,15 +1,25 @@
 # Hard-KO Clip Pack bench
 
-This directory is the evidence boundary for Benchmarks. The public page may render only what these artifacts can support.
+- Document type: Evaluation-domain entry
+- Lifecycle: Active
+- Authority: Bench layout, commands, packs, and score artifacts in this directory
+- Last verified: 2026-07-19
+- Update when: Bench layout, commands, or artifact ownership changes
 
-Current evidence state: `hard-ko-v1` is frozen with three sourced clips, exact per-clip gold, and
-six human adjudication receipts. run-007 has a post-freeze capture, human output labels, and one
-re-derived `studio.bench.score.v1` receipt with `judge: null`. This is one scored capture, not
-calibration, variance, generalization, or a positive result. The public aggregate under
-`bench/examples/unscored-report.json` remains a protocol draft with no scored systems, so the
-public page still cannot show a rank or superiority claim.
+This directory is the evidence boundary for Benchmarks. The public page may render only what these
+artifacts can support. Conveyor invariants live in
+[`docs/rfcs/0001-miss-to-gold-conveyor.md`](../docs/rfcs/0001-miss-to-gold-conveyor.md). Capability
+rung U7 means conditional separation; see
+[`docs/build-week/CAPABILITY_LADDER.md`](../docs/build-week/CAPABILITY_LADDER.md).
 
-The registered raw-versus-eligible-stem ablation now also has an immutable
+Current evidence state (verify against artifacts, not this paragraph alone): `hard-ko-v1` is frozen
+with three sourced clips, exact per-clip gold, and six human adjudication receipts. run-007 has a
+post-freeze capture, human output labels, and one re-derived `studio.bench.score.v1` receipt with
+`judge: null`. This is one scored capture, not calibration, variance, generalization, or a positive
+result. The public aggregate under `bench/examples/unscored-report.json` remains a protocol draft
+with no scored systems, so the public page still cannot show a rank or superiority claim.
+
+The registered raw-versus-eligible-stem ablation also has an immutable
 `studio.bench.u7-ablation-inputs.v1` registry for all three frozen clips and a cold-audit-first
 packager. No ablation capture, label, score, variance measurement, or result is committed.
 
@@ -41,9 +51,9 @@ bench/
 
 ## State progression
 
-1. `protocol_draft` — slots and conditions may be planned; all sources, runs, and result values remain empty.
-2. `gold_frozen` — real sources and all required gold exist; systems may now run without changing the test set.
-3. `scored` — every compared system has raw outputs, configuration, reviewer labels, artifacts, and scores.
+1. `protocol_draft`: slots and conditions may be planned; all sources, runs, and result values remain empty.
+2. `gold_frozen`: real sources and all required gold exist; systems may run without changing the test set.
+3. `scored`: every compared system has raw outputs, configuration, reviewer labels, artifacts, and scores.
 
 The page must not show ranks or superiority claims in the first two states.
 

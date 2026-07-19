@@ -33,13 +33,17 @@ npm run dev
 
 ## Docs
 
-- [Product](docs/PRODUCT.md) - identity and pitch
-- [Codex and GPT-5.6](docs/CODEX.md) - how agents run in production
-- [Architecture](docs/ARCHITECTURE.md) - stack and boundaries
-- [Build Week status](docs/build-week/STATUS.md) - what is shipped vs next
-- [Studio product contract](docs/STUDIO_PRODUCT_CONTRACT.md) - what Studio shows vs records
-- [Capability ladder](docs/build-week/CAPABILITY_LADDER.md) - honesty bounds for claims
+Use [`docs/README.md`](docs/README.md) as the owner registry. Start here:
+
+- [Product](docs/PRODUCT.md): identity and proof boundary
+- [Codex and GPT-5.6](docs/CODEX.md): product-launched executor cage
+- [Architecture](docs/ARCHITECTURE.md): stable module boundaries
+- [Engineering status](docs/build-week/STATUS.md): current milestones and next actions
+- [Studio product contract](docs/STUDIO_PRODUCT_CONTRACT.md): Studio meaning, authority, and unavailable states
+- [Capability ladder](docs/build-week/CAPABILITY_LADDER.md): rung order, done-when, and capability non-claims
 
 ## Evaluation
 
-We freeze hard clips before scoring. The first human-labeled beachhead score exists with no model judge. One capture is a baseline, not a general quality win. See `/benchmarks/` and `bench/scores/run-007/`.
+We freeze hard clips before scoring. Current pack and score facts live in `bench/packs/`,
+`bench/scores/`, and their bound receipts; prose is never stronger than those artifacts. See
+[`bench/README.md`](bench/README.md), `/benchmarks/`, and `bench/scores/run-007/`.

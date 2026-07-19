@@ -1,7 +1,14 @@
 # Hard-KO human adjudication worksheet
 
+- Document type: Evaluation runbook
+- Lifecycle: Active
+- Authority: Human gold-review procedure for frozen pack candidates
+- Last verified: 2026-07-19
+- Update when: The blinded review or freeze handoff procedure changes
+
 This is the human decision step between an agent-drafted gold candidate and
-`scripts/freeze-pack.mjs`. Agents draft; humans decide; code freezes; nothing scores itself.
+`scripts/freeze-pack.mjs`. Agents draft; humans decide; code freezes; nothing scores itself. Bench
+layout and current pack facts live in [`README.md`](./README.md).
 
 ## Stop conditions
 

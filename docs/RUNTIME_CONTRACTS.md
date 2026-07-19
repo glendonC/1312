@@ -28,8 +28,16 @@ inert. Consequently these contracts:
 
 ## Separate production implementation
 
-`src/studio/runtime/production/` is a new, independently versioned protocol and implementation. It
-does not import this proposal or its `fixtureOnly` events. Its current real producers are:
+`src/studio/runtime/production/` is an independently versioned protocol and implementation. It does
+not import the historical proposal or its `fixtureOnly` events.
+
+Rung shorthand used below (see [`CAPABILITY_LADDER.md`](./build-week/CAPABILITY_LADDER.md)):
+`U1` acoustic triage, `U2` bounded frame sampling, `U3` multimodal admission, `U4` budgeted
+re-study, `U5` OCR / cite-only visual context, `U6` anonymous speaker/overlap, `U6.1` exact
+`speaker_overlap` re-study trigger, `U7` conditional separation, `U7.1` acoustic `mixed`-cell
+separation trigger.
+
+Current real producers include:
 
 - an append-only NDJSON event journal and pure replay projection;
 - a bounded scheduler that derives task ids, depth, parentage, ownership, grants, and reservations;
@@ -49,7 +57,7 @@ does not import this proposal or its `fixtureOnly` events. Its current real prod
   transformation and decoder lineage, and atomically records content-addressed frame, manifest, and
   receipt artifacts;
 - a separate path-free `media_frames_ocr` bridge and bounded OCR host that accept only one completed
-  same-task U2 frame operation identity, cold-audit its source/manifest/receipt/PNG/decoder lineage,
+  same-task U2 (frame sampling) operation identity, cold-audit its source/manifest/receipt/PNG/decoder lineage,
   run pinned local Tesseract.js/core 7.0.0 over the real PNG bytes with vendored Korean+English
   `tessdata_fast` 4.1.0 models, and atomically store private content-addressed observation/receipt
   artifacts under fixed count/byte/text/wall/call ceilings;

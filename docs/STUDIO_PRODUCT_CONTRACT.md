@@ -690,10 +690,11 @@ explicitly confirmed bounded YouTube-local range. Implemented glue:
 - Explicit UI labels for the production local one-child proof versus recorded demonstration
 
 The runtime also has a production-only `media.visual-transitions.analyze` slice over exact completed
-U2 frame and U5 OCR lineage. It emits cold-audited cite-only temporal pixel-change candidates and
-does not add a Studio UI surface, scene/shot claim, semantic visual result, caption authority, or
-publication state. The existing product projection must continue to omit these private host
-artifacts until a separately specified UI contract lands.
+U2 (bounded frame sampling) and U5 (cite-only OCR) lineage; see
+[`build-week/CAPABILITY_LADDER.md`](./build-week/CAPABILITY_LADDER.md). It emits cold-audited
+cite-only temporal pixel-change candidates and does not add a Studio UI surface, scene/shot claim,
+semantic visual result, caption authority, or publication state. The existing product projection
+must continue to omit these private host artifacts until a separately specified UI contract lands.
 
 Still open: hosted/link ingest, speech/language detection for browser V1 ingest, operation/tier
 choices, calibrated estimation, and every larger-runtime item below.

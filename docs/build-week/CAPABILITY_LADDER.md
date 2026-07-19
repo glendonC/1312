@@ -38,7 +38,7 @@ be “more agents,” “faster captions,” or “we are a caption app.” It s
 duration truthfully accounted for by evidence that a bounded specialist actually inspected, with weak
 regions restudied or abstained rather than guessed.
 
-The landed implementation slices after the UI demo freeze now include the fail-closed
+Accepted implementation slices include the fail-closed
 **acoustic triage and non-dialogue coverage boundary**; bounded **frame sampling with real child
 image delivery**; additive **multimodal admission with generalized abstention**; one
 **attenuated and bounded padded-audio current-run speech re-study** slice; a thin **on-screen OCR

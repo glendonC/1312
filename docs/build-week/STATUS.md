@@ -80,11 +80,17 @@ score.
   content-addressed config leaf delta to current frozen pack and freeze bytes, keeps results and
   model judge null, requires three paired repetitions per frozen clip, and separates structural
   diagnostics from human semantic scores. The first registration plans raw versus eligible
-  anonymous U7 stems. `studio.bench.u7-ablation-inputs.v1` now binds exact pre-capture media for all
-  three frozen clips. A cold-audit-first packager emits both fixed anonymous-stem capture drafts,
-  preserves the exact registered configs, maps absent output only to missing or withheld, and keeps
-  semantic fields null. No registered capture, label, variance, or result exists yet.
-- **U1 acoustic triage:** a pinned local YAMNet-compatible ONNX producer now operates over the exact
+  anonymous U7 (conditional separation) stems. `studio.bench.u7-ablation-inputs.v1` binds exact
+  pre-capture media for all three frozen clips. A cold-audit-first packager emits both fixed
+  anonymous-stem capture drafts, preserves the exact registered configs, maps absent output only to
+  missing or withheld, and keeps semantic fields null. No registered capture, label, variance, or
+  result exists yet.
+
+Rung IDs below (`U1`…`U7`, including slice labels such as `U6.1` and `U7.1`) are defined in
+[`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md). This section records acceptance state; done-when
+and non-claims remain in the ladder.
+
+- **U1 acoustic triage:** a pinned local YAMNet-compatible ONNX producer operates over the exact
   sealed mono-16 kHz owned-media bytes, produces a complete closed-vocabulary partition plus a
   separate execution receipt, and seals both additively in preflight V4. Spawned children can read
   the actual observations only through exact `evidence.read` grants. Deterministic VAD/acoustic/
@@ -266,34 +272,34 @@ score.
 ### Sequenced next — active understanding backlog
 
 These are ordered, slice-by-slice rungs in [`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md), not
-indefinite deferrals or a one-day implementation claim:
+indefinite deferrals. Status here is a summary; ladder done-when and non-claims win on conflict.
 
-1. U1 acoustic triage and honest non-dialogue coverage — implemented; accuracy evaluation remains
+1. U1 acoustic triage and honest non-dialogue coverage: implemented; accuracy evaluation remains
    separate.
-2. U2 bounded frame sampling and inspection — implemented; visual interpretation remains a later
+2. U2 bounded frame sampling and inspection: implemented; visual interpretation remains a later
    producer rung.
-3. U3 multimodal admission and generalized abstention — implemented and default-runtime wired;
+3. U3 multimodal admission and generalized abstention: implemented and default-runtime wired;
    frames remain cite-only.
 4. U4 budgeted multi-pass re-study: attenuated current-run speech, the exact U6.1
-   `speaker_overlap` cause/trigger, and one bounded non-speaker padded-audio pass are implemented and
-   default-runtime wired; additional delta producers remain closed.
+   (`speaker_overlap` separation trigger) cause, and one bounded non-speaker padded-audio pass are
+   implemented and default-runtime wired; additional delta producers remain closed.
 5. U5 OCR and scene/on-screen context: OCR and deterministic cite-only visual-change candidate
    slices are implemented; scene/shot semantics, default specialist routing, and U4 denser-frame/
    specialist wiring remain.
-6. U6 anonymous speaker/overlap evidence — one pinned local producer, immutable accounting receipt,
+6. U6 anonymous speaker/overlap evidence: one pinned local producer, immutable accounting receipt,
    launcher bridge, U3 coverage qualification, and typed exact-range U4 overlap trigger implemented;
    non-darwin native pins and a diarization quality bench remain.
-7. U7 conditional separation and raw/stem comparison — the first U6.1-triggered, pinned local,
-   private-artifact, cold-audited slice is implemented and default-runtime wired, and a U7.1 closed
-   U1 `mixed`-acoustic eligibility trigger now reuses the same path. Its exact Bet G input and
-   capture-packaging boundary is implemented; other platforms/models, independent or human semantic
-   preference, registered capture executions, and scores remain.
-8. R1 bounded receipted web research — the first trigger-gated slice (grant, scheduler admission,
+7. U7 conditional separation and raw/stem comparison: the first U6.1-triggered, pinned local,
+   private-artifact, cold-audited slice is implemented and default-runtime wired, and a U7.1
+   (acoustic `mixed`-cell trigger) closed U1 eligibility path reuses the same host. Its exact Bet G
+   input and capture-packaging boundary is implemented; other platforms/models, independent or human
+   semantic preference, registered capture executions, and scores remain.
+8. R1 bounded receipted web research: the first trigger-gated slice (grant, scheduler admission,
    launcher tools, journaled operations, production v2 report construction, cite-only span admission)
    is wired offline; a real
    provider behind an explicit allow flag, DNS pinning, freshness/provenance depth, and
    deeper context-specialist synthesis remain. Default v3 conflict derivation is wired but dormant.
-9. R2 optional offline runtime wiring - implemented behind dormant root authority and explicit host
+9. R2 optional offline runtime wiring: implemented behind dormant root authority and explicit host
    composition; a real isolated read-only driver remains after media senses and R1.
 10. G1 semantic evaluation expansion, execution of registered ablation captures, repeated scores,
     variance, and later packs; structural QC remains separate.

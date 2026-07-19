@@ -1,7 +1,7 @@
 /*
  * Results responsive overrides only.
- * Owns: narrow breakpoints for submitted boundary, player chrome density, learning shell.
- * Must not: Dock or Workspace breakpoints (those stay in their *.responsive.css sheets).
+ * Owns: narrow breakpoints for submitted-results boundary.
+ * Must not: Dock or Workspace breakpoints; player transport density (results.player.css).
  */
 
 /* ---------- responsive ---------- */
@@ -13,53 +13,5 @@
 
   .submitted-results-boundary dl div:nth-child(odd) {
     padding-right: 0;
-  }
-
-  .transport {
-    flex-wrap: wrap;
-  }
-
-  .transport .play,
-  .player-control,
-  .player-rate select {
-    min-height: 44px;
-  }
-
-  .transport .play {
-    width: 44px;
-    height: 44px;
-  }
-
-  .transport .wave {
-    min-width: 180px;
-  }
-
-  .player-sound input {
-    width: 64px;
-  }
-
-  /* Larger touch targets for the in-player controls on the results surface. */
-  .pctl {
-    gap: 6px;
-  }
-
-  .pbtn,
-  .player-fullscreen {
-    width: 40px;
-    height: 40px;
-  }
-
-  .pspeed {
-    height: 36px;
-  }
-
-  /* Study/Theater change the desktop side-by-side split; on mobile the layout is already single
-     column, so the toggle is dropped to keep the control row uncramped. Full screen stays. */
-  .player-modes-layout {
-    display: none;
-  }
-
-  .ptime {
-    font-size: 0.68rem;
   }
 }

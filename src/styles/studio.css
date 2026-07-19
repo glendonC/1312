@@ -3,6 +3,7 @@
  * Owns: .studio route shell, floating .top header, act layout, Results header seats.
  * Must not: grow into Results/Dock/player god rules; nest CSS @import indexes (stale HMR).
  * Agent focus loads from AgentPanel.tsx via direct focus/*.css leaf imports.
+ * Shared player loads from RecordedMediaPlayer.tsx via results.player.css.
  */
 
 /* Dock leaves */
@@ -24,7 +25,7 @@
 
 /* Results leaves */
 @import "./studio/results.shell.css";
-@import "./studio/results.player.css";
+/* Shared player loads from RecordedMediaPlayer.tsx (results.player.css). */
 @import "./studio/results.captions.css";
 @import "./studio/results.learning.css";
 @import "./studio/results.summary.css";

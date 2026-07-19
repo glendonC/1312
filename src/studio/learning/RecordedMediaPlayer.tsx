@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
+// Direct import so Vite invalidates player edits for Results and Focus workbench;
+// a CSS @import barrel can serve stale CSS until HMR.
+import "../../styles/studio/results.player.css";
 import { clock } from "../format";
 import { Hold, Volume } from "../glyphs";
 import { useStudio } from "../store";

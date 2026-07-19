@@ -1,8 +1,10 @@
 /*
- * Shared recorded player surface for Results and Focus workbench.
- * Owns: .player, .screen, .burn, transport controls, mode chips on the player.
- * Must not: Results header chrome; learning workspace body; Dock geometry.
- * Quarantine during Results chrome polish: edits here also hit Focus workbench.
+ * Shared recorded player for Results (surface=results) and Focus workbench (surface=workbench).
+ * Owner entry: RecordedMediaPlayer.tsx direct-imports this sheet (not studio.css).
+ * Owns: .screen, .burn, transport/.pctl chrome, mode chips, and narrow-breakpoint density.
+ * Must not: Results header chrome; learning workspace body; Dock geometry; invent dark-void tokens.
+ * Note: base .player flex host still lives in results.shell.css; Results layout overrides stay in
+ * results.summary.css (higher specificity). Edits here hit both surfaces.
  */
 
 /* ---------- the screen ---------- */
@@ -76,7 +78,7 @@
 /* Not a caption: a refusal, and the reason for it. It must not look like speech. */
 .burn[data-path="withheld"] {
   padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--glass-reflection);
   border-radius: 10px;
   corner-shape: squircle;
   color: rgba(255, 255, 255, 0.82);
@@ -538,7 +540,7 @@
   height: 13px;
   margin-left: -6.5px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--paper-elevated);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   transform: translateY(-50%) scale(0);
   transition: transform 120ms ease;
@@ -604,7 +606,7 @@
 }
 
 .pbtn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--glass-fill);
 }
 
 .pbtn:disabled {
@@ -687,7 +689,7 @@
   padding: 3px;
   border-radius: 9px;
   corner-shape: squircle;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--glass-fill);
 }
 
 .player-modes-layout button {
@@ -730,7 +732,7 @@
 }
 
 .player-fullscreen:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--glass-fill);
 }
 
 .player-fullscreen:disabled {
@@ -749,4 +751,56 @@
 .pvol-slider:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
+}
+
+/* ---------- narrow density (was results.responsive.css; keep with player for cascade) ---------- */
+
+@media (max-width: 720px) {
+  .transport {
+    flex-wrap: wrap;
+  }
+
+  .transport .play,
+  .player-control,
+  .player-rate select {
+    min-height: 44px;
+  }
+
+  .transport .play {
+    width: 44px;
+    height: 44px;
+  }
+
+  .transport .wave {
+    min-width: 180px;
+  }
+
+  .player-sound input {
+    width: 64px;
+  }
+
+  /* Larger touch targets for the in-player controls on the results surface. */
+  .pctl {
+    gap: 6px;
+  }
+
+  .pbtn,
+  .player-fullscreen {
+    width: 40px;
+    height: 40px;
+  }
+
+  .pspeed {
+    height: 36px;
+  }
+
+  /* Study/Theater change the desktop side-by-side split; on mobile the layout is already single
+     column, so the toggle is dropped to keep the control row uncramped. Full screen stays. */
+  .player-modes-layout {
+    display: none;
+  }
+
+  .ptime {
+    font-size: 0.68rem;
+  }
 }

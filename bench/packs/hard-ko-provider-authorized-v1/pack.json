@@ -1,0 +1,94 @@
+{
+  "schema": "studio.bench.pack.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "label": "Hard-KO Provider-Authorized Clip Pack v1",
+  "frozen": false,
+  "target_clip_count": 3,
+  "clips": [
+    {
+      "slot": "slot-control-01",
+      "role": "control",
+      "status": "sourced",
+      "clip_id": "Ni5rBtowdnI",
+      "source": {
+        "kind": "youtube",
+        "label": "[한국외대 외대알리] 인터뷰#5 - 와킹댄서 킹키=김기현",
+        "channel": "외대알리",
+        "url": "https://www.youtube.com/watch?v=Ni5rBtowdnI",
+        "video_id": "Ni5rBtowdnI",
+        "licence": "Creative Commons Attribution license (reuse allowed)",
+        "window": {
+          "start": "00:00:00",
+          "end": "00:00:45"
+        },
+        "duration": 45,
+        "attribution": "\"[한국외대 외대알리] 인터뷰#5 - 와킹댄서 킹키=김기현\" by 외대알리, used under Creative Commons Attribution license (reuse allowed).",
+        "local_copy": {
+          "path": "bench/packs/hard-ko-provider-authorized-v1/Ni5rBtowdnI.m4a",
+          "content_id": "sha256:b1de8455ae1dd9bb4b5c60db30062280b0010b160e26a4217cd7528e6c5d9193",
+          "bytes": 742145
+        },
+        "note": "Exact 00:00:00–00:00:45 evaluation window derived from the uploader's Creative Commons Attribution source. The local copy is content-bound for provider-authorized benchmark execution."
+      },
+      "gold_path": null,
+      "candidates_manifest": null
+    },
+    {
+      "slot": "slot-control-02",
+      "role": "control",
+      "status": "sourced",
+      "clip_id": "2o0f-V4uoMg",
+      "source": {
+        "kind": "youtube",
+        "label": "[코로나 인터뷰] 박종화_ 한국사람이 코로나19에 좀더 저항성이 있다?!",
+        "channel": "카오스 사이언스",
+        "url": "https://www.youtube.com/watch?v=2o0f-V4uoMg",
+        "video_id": "2o0f-V4uoMg",
+        "licence": "Creative Commons Attribution license (reuse allowed)",
+        "window": {
+          "start": "00:01:37",
+          "end": "00:02:37"
+        },
+        "duration": 60,
+        "attribution": "\"[코로나 인터뷰] 박종화_ 한국사람이 코로나19에 좀더 저항성이 있다?!\" by 카오스 사이언스, used under Creative Commons Attribution license (reuse allowed).",
+        "local_copy": {
+          "path": "bench/packs/hard-ko-provider-authorized-v1/2o0f-V4uoMg.m4a",
+          "content_id": "sha256:a0e78a490a27b228713963a5d8f3c992748e1ae3505b53550fd5dd4dfca9e514",
+          "bytes": 973872
+        },
+        "note": "Exact 00:01:37–00:02:37 evaluation window derived from the uploader's Creative Commons Attribution source. The local copy is content-bound for provider-authorized benchmark execution."
+      },
+      "gold_path": null,
+      "candidates_manifest": null
+    },
+    {
+      "slot": "slot-hard-01",
+      "role": "hard",
+      "status": "sourced",
+      "clip_id": "Ux-TMWnmntM",
+      "source": {
+        "kind": "youtube",
+        "label": "Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
+        "channel": "Didi's Korean Culture Podcast",
+        "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+        "video_id": "Ux-TMWnmntM",
+        "licence": "Creative Commons Attribution license (reuse allowed)",
+        "window": {
+          "start": "00:05:10",
+          "end": "00:05:50"
+        },
+        "duration": 40,
+        "attribution": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed).",
+        "local_copy": {
+          "path": "public/demo/runs/run-006/clip.mp4",
+          "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+          "bytes": 3465772
+        },
+        "note": "Exact 00:05:10–00:05:50 Creative Commons Attribution evaluation window retained from run-006. The existing content-bound local copy is reused for provider-authorized benchmark execution."
+      },
+      "gold_path": null,
+      "candidates_manifest": null
+    }
+  ],
+  "freeze_receipt": null
+}

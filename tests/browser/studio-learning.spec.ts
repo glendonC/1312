@@ -145,7 +145,7 @@ test("viewer modes keep a borderless learning shell and use the browser full scr
   await expect.poll(() => viewer.locator(".player").evaluate((element) => getComputedStyle(element).borderTopWidth))
     .toBe("0px");
   await expect.poll(() => viewer.locator(".screen").evaluate((element) => getComputedStyle(element).borderRadius))
-    .toBe("0px");
+    .toBe("18px");
 
   await theater.click();
   await expect(viewer).toHaveAttribute("data-view-mode", "theater");
@@ -173,12 +173,15 @@ test("a completed run exposes one active media player without legacy workbench c
   await expect(page.getByRole("button", { name: "Open Results" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Run again", exact: true })).toHaveCount(0);
   await expect(page.locator(".dock-well")).toHaveCount(0);
+  // The repeated title/credit below the video is gone; attribution lives in the Details panel instead.
+  await expect(resultsPlayer.locator(".credit")).toHaveCount(0);
   await expect.poll(() => resultsPlayer.evaluate((element) => ({
     border: getComputedStyle(element).borderTopWidth,
     radius: getComputedStyle(element.querySelector(".screen") as Element).borderRadius,
-  }))).toEqual({ border: "0px", radius: "0px" });
+  }))).toEqual({ border: "0px", radius: "18px" });
 
   await resultsPlayer.getByRole("slider", { name: "Seek through clip" }).fill("12.4");
+  await resultsPlayer.locator(".pvol").hover();
   await resultsPlayer.getByRole("slider", { name: "Volume" }).fill("0.35");
   await resultsPlayer.getByRole("combobox", { name: "Playback speed" }).selectOption("1.5");
   await expect(resultsPlayer.getByRole("slider", { name: "Seek through clip" })).toHaveValue("12.4");
@@ -189,6 +192,72 @@ test("a completed run exposes one active media player without legacy workbench c
   await expect(resultsPlayer).toHaveAttribute("data-playback-owner", "true");
   await expect(resultsPlayer.getByRole("button", { name: "Pause" })).toBeVisible();
   await resultsPlayer.getByRole("button", { name: "Pause" }).click();
+});
+
+test("results chrome: header title truncates, Details and Run details open on demand", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop results-chrome coverage");
+  await openCompletedRun006(page);
+
+  // The title lives in a header squircle whose full text stays reachable via its title attribute.
+  const titleChip = page.locator(".result-title-chip");
+  const titleText = page.locator(".result-title-text");
+  await expect(titleChip).toBeVisible();
+  const fullTitle = (await titleText.textContent())?.trim() ?? "";
+  expect(fullTitle.length).toBeGreaterThan(0);
+  await expect(titleChip).toHaveAttribute("title", fullTitle);
+
+  // A deliberately long title truncates to one ellipsised line without forcing horizontal page scroll.
+  const clamp = await titleText.evaluate((element) => {
+    element.textContent = "아주 긴 제목 ".repeat(60) + "END";
+    const style = getComputedStyle(element);
+    return {
+      whiteSpace: style.whiteSpace,
+      overflow: style.overflow,
+      textOverflow: style.textOverflow,
+      truncated: element.scrollWidth > element.clientWidth + 1,
+    };
+  });
+  expect(clamp.whiteSpace).toBe("nowrap");
+  expect(clamp.overflow).toBe("hidden");
+  expect(clamp.textOverflow).toBe("ellipsis");
+  expect(clamp.truncated).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // Details: run identity and attribution, on demand. It carries the source and licence links so
+  // removing the below-video credit does not drop the required attribution, and states the evidence
+  // class in full — the recorded-vs-live distinction is not softened.
+  const details = page.getByRole("button", { name: "Details", exact: true });
+  await expect(details).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Run details and attribution" })).toHaveCount(0);
+  await details.click();
+  const detailsPanel = page.getByRole("dialog", { name: "Run details and attribution" });
+  await expect(detailsPanel).toBeVisible();
+  await expect(detailsPanel).toContainText("KO → EN");
+  await expect(detailsPanel).toContainText("Time range");
+  await expect(detailsPanel.getByRole("link", { name: /Creative Commons/ })).toBeVisible();
+  await expect(detailsPanel).toContainText("Honest demo replay, not a live run.");
+  await detailsPanel.press("Escape");
+  await expect(detailsPanel).toHaveCount(0);
+  await expect(details).toBeFocused();
+
+  // Run details: the second header control, with the per-line accounting.
+  const runDetails = page.getByRole("button", { name: "Run details" });
+  await expect(runDetails).toBeVisible();
+  await runDetails.click();
+  const runPanel = page.getByRole("dialog", { name: "Per-line run accounting" });
+  await expect(runPanel).toBeVisible();
+  await expect(runPanel).toContainText("captioned");
+  await expect(runPanel).toContainText("Coverage");
+  await runPanel.press("Escape");
+  await expect(runPanel).toHaveCount(0);
+
+  // The viewing modes ride on the video's control bar, and the provenance bug stays legible there.
+  const viewer = page.getByRole("region", { name: "Learning viewer" });
+  const modes = viewer.getByRole("group", { name: "Viewing mode" });
+  await expect(modes.getByRole("button", { name: "Study" })).toBeVisible();
+  await expect(modes.getByRole("button", { name: "Theater" })).toBeVisible();
+  await expect(modes.getByRole("button", { name: "Full screen" })).toBeVisible();
+  await expect(viewer.locator(".player-provenance")).toHaveText("recorded");
 });
 
 test("mobile selection and tap open a bounded explanation sheet and return focus", async ({ page }, testInfo) => {

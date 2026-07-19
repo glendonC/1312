@@ -1,6 +1,13 @@
 ---
 import Instrument from "./Instrument.astro";
-import "./styles/index.css";
+// Direct leaf imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
+import "./styles/foundations.css";
+import "./styles/evidence.css";
+import "./styles/pack-compare.css";
+import "./styles/results.css";
+import "./styles/methods.css";
+import "./styles/receipts.css";
+import "./styles/responsive.css";
 ---
 
 <main class="bench-page">

@@ -92,6 +92,9 @@ for (const cue of captions.cues) {
   if (cue.hard === true) signals.push("phenomenon");
   if (emitted && typeof coldText === "string" && coldText !== target.text) signals.push("contrast");
   if (signals.length === 0) continue;
+  // Silence / non-speech cues can carry a phenomenon flag with a null source text; the
+  // candidates schema requires a non-empty source_text, so those cues are not mineable.
+  if (typeof cue.source?.text !== "string" || cue.source.text.trim().length === 0) continue;
 
   for (const signal of signals) counts[signal] += 1;
 

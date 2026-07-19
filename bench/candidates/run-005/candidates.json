@@ -1,0 +1,451 @@
+{
+  "manifest_id": "bench-candidates:sha256:394b8ee145092dee189d5d75a5a93998055d9e24b0e558c2340d74b78feafa17",
+  "schema": "studio.bench.candidates.v1",
+  "run": "run-005",
+  "clip": {
+    "id": "ko-clip-01",
+    "lang": "ko",
+    "duration_s": 47.2
+  },
+  "routing": {
+    "route": "training",
+    "reason": "IL-02 Improve Loop: route ko-clip-01 to training so reviewed glossary may compound; this clip is not in hard-ko-v1 and must never enter a gold pack."
+  },
+  "status": "candidate",
+  "scorable": false,
+  "source_artifacts": [
+    {
+      "path": "public/demo/runs/run-005/run.json",
+      "content_id": "sha256:720f301605c4419f8ba8b4d53c33492e589ea836cc584f594c32511f73cc17a8",
+      "bytes": 2114
+    },
+    {
+      "path": "public/demo/runs/run-005/captions.json",
+      "content_id": "sha256:9cca966b718b53e8daa8abf6d0bcd808949d00566b8502996508825325542fc4",
+      "bytes": 13161
+    },
+    {
+      "path": "public/demo/runs/run-005/corrections.json",
+      "content_id": "sha256:3a1ac5144b9f2a6f86098cae7a84c9feedc76ad4396a6f15d334e7ecf0dfc77a",
+      "bytes": 2522
+    },
+    {
+      "path": "public/demo/runs/run-005/source.json",
+      "content_id": "sha256:ced8e654d0bba45d118d73276d76c12d4fb45dae17a25a8a0cf9fb843dc96735",
+      "bytes": 1854
+    }
+  ],
+  "candidates": [
+    {
+      "t_start": 0,
+      "t_end": 3.63,
+      "source_text": "자, 오늘 게스트 모셨습니다. 다은 씨.",
+      "speakers": [
+        "s1"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "All right, our guest tonight. Daeun.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "So, we have a guest today. Ms. Daeun.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 3.68,
+      "t_end": 5.66,
+      "source_text": "안녕하세요, 다은입니다.",
+      "speakers": [
+        "s2"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "Hi, everyone. I'm Daeun.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "Hello, I'm Daeun.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 5.71,
+      "t_end": 10.41,
+      "source_text": "팀 나오고 첫 방송이시죠? 그때 멤버가 몇 명이었어요?",
+      "speakers": [
+        "s1"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "First time on TV since you left the group, right? How many of you were there back then?",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "This is your first broadcast since leaving the team, right? How many members were there at the time?",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 10.46,
+      "t_end": 12.04,
+      "source_text": "네, 다섯 명이요.",
+      "speakers": [
+        "s2"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": "ko.numeral_boundary",
+      "outputs": {
+        "1321-prepped": {
+          "text": "Yeah, five of us.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "About four or five people.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 12.09,
+      "t_end": 16,
+      "source_text": "다섯 명. 그중에 끝까지 남은 사람은요?",
+      "speakers": [
+        "s1"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "Five. And who stuck it out to the end?",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "Five people. And who stayed until the end?",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 16.05,
+      "t_end": 17.46,
+      "source_text": "저랑 준호 오빠요.",
+      "speakers": [
+        "s2"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": "ko.kinship_address",
+      "outputs": {
+        "1321-prepped": {
+          "text": "Just me and Junho.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "Me and my older brother Junho.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 18.2,
+      "t_end": 21,
+      "source_text": "근데 그때부터 사랑이 식은 거죠, 뭐.",
+      "speakers": [
+        "s2"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": "ko.name_common_noun",
+      "outputs": {
+        "1321-prepped": {
+          "text": "And I guess that's when the love kind of died.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "That's when Sarang cooled off.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 21.1,
+      "t_end": 23.63,
+      "source_text": "그때 왜 해명 안 하셨어요?",
+      "speakers": [
+        "s1"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "Why didn't you set the record straight back then?",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "Why didn't you explain yourself back then?",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 23.68,
+      "t_end": 26.03,
+      "source_text": "못 한 게 아니라 안 한 거예요.",
+      "speakers": [
+        "s2"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": "ko.contrastive_split",
+      "outputs": {
+        "1321-prepped": {
+          "text": "It's not that I couldn't. I chose not to.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "I couldn't do it. · I didn't do it.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 26.08,
+      "t_end": 27.87,
+      "source_text": "말하면 더 커지잖아요.",
+      "speakers": [
+        "s2"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "Say anything and it just gets bigger.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "If you say something, it only gets bigger.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 30,
+      "t_end": 32.14,
+      "source_text": "지금은… 뭐, 괜찮아요.",
+      "speakers": [
+        "s2"
+      ],
+      "signals": [
+        "withheld",
+        "phenomenon"
+      ],
+      "gate": {
+        "id": "music",
+        "reason": "speech SNR -5 dB, lexical confidence 0.31 < 0.60"
+      },
+      "corroboration": null,
+      "phenomenon": "universal.asr_boilerplate",
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "music",
+            "reason": "speech SNR -5 dB, lexical confidence 0.31 < 0.60"
+          }
+        },
+        "1321-cold": {
+          "text": "Please subscribe and like.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 32.19,
+      "t_end": 34.72,
+      "source_text": "괜찮긴 뭐가 괜찮아요.",
+      "speakers": [
+        "s1"
+      ],
+      "signals": [
+        "withheld",
+        "phenomenon"
+      ],
+      "gate": {
+        "id": "music",
+        "reason": "music + laugh transient, lexical confidence 0.38 < 0.60"
+      },
+      "corroboration": null,
+      "phenomenon": "universal.repetition_loop",
+      "outputs": {
+        "1321-prepped": {
+          "text": null,
+          "withheld": {
+            "gate": "music",
+            "reason": "music + laugh transient, lexical confidence 0.38 < 0.60"
+          }
+        },
+        "1321-cold": {
+          "text": "It's okay. It's okay. It's okay. It's okay.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 34.77,
+      "t_end": 37.78,
+      "source_text": "그럼 다시 모이면— · —아니요, 그건 아니고요.",
+      "speakers": [
+        "s1",
+        "s2"
+      ],
+      "signals": [
+        "phenomenon",
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": "universal.speaker_attribution",
+      "outputs": {
+        "1321-prepped": {
+          "text": "No, no, it's not that. · So if you all got back together—",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "So if we get back together, no, it's not that.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 37.83,
+      "t_end": 41.37,
+      "source_text": "알겠습니다. 마지막으로 한마디만.",
+      "speakers": [
+        "s1"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "All right. One last word, then.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "I understand. Just one last word.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    },
+    {
+      "t_start": 41.42,
+      "t_end": 44.4,
+      "source_text": "기다려 주신 분들께 진심으로 감사합니다.",
+      "speakers": [
+        "s2"
+      ],
+      "signals": [
+        "contrast"
+      ],
+      "gate": null,
+      "corroboration": null,
+      "phenomenon": null,
+      "outputs": {
+        "1321-prepped": {
+          "text": "To everyone who waited for me — thank you, sincerely.",
+          "withheld": null
+        },
+        "1321-cold": {
+          "text": "I sincerely thank those who waited.",
+          "withheld": null
+        }
+      },
+      "korean_gold": null,
+      "status": "candidate"
+    }
+  ],
+  "notes": "Derived from the recorded run-005 artifacts only. 15 of 16 cues carry at least one signal: 2 withheld by a gate, 0 committed uncorroborated, 7 ko-v3 phenomenon detections, 13 cold/prepped divergences. A signal is a reason for a human to look, not a verdict: nothing here says any line was right or wrong, and no candidate can be scored against. 7 correction rows exist in the run folder and are deliberately NOT candidates; corrections flow through the memory ledger, and this clip's route (training) decides which of the two pools — bench or memory — this clip may ever feed."
+}

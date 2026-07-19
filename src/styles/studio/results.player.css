@@ -405,23 +405,153 @@
   border-radius: 0;
 }
 
-/* An always-on provenance bug: recorded stays legible in every mode, not only inside a panel. */
-.player-provenance {
+/* ---------- settings pill (top-right of the picture) ---------- */
+
+/* The display settings a learner reaches for: caption show/hide and size, plus the Learning panel's
+   width and (in full screen) placement. Glass over the top-right of the frame, revealed with the rest
+   of the chrome so watching stays clean, and grouped so caption and panel controls read apart. */
+.player-settings-pill {
   position: absolute;
-  top: 12px;
-  left: 14px;
+  top: 10px;
+  right: 12px;
   z-index: 3;
-  padding: 3px 9px;
-  border-radius: 999px;
-  color: var(--glass-panel);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  corner-shape: squircle;
   background: rgba(8, 18, 16, 0.5);
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.player[data-overlay-controls]:hover .player-settings-pill,
+.player[data-overlay-controls]:focus-within .player-settings-pill,
+.player[data-overlay-controls][data-playing="false"] .player-settings-pill {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .player[data-overlay-controls] .player-settings-pill {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.pcap-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pcap-div {
+  width: 1px;
+  height: 18px;
+  flex: none;
+  margin: 0 3px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.pcap-btn {
+  position: relative;
+  display: inline-flex;
+  width: 30px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.85);
+  background: transparent;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.pcap-btn svg {
+  display: block;
+}
+
+/* The caption toggle dims when captions are off; the placement toggle highlights the selected side. */
+.pcap-cc[aria-pressed="false"] {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.pcap-panel button[aria-pressed="true"] {
+  color: var(--player-deep);
+  background: var(--glass-panel);
+}
+
+.pcap-btn:hover:not(:disabled) {
+  color: #fff;
+  background: var(--glass-fill);
+}
+
+.pcap-panel button[aria-pressed="true"]:hover:not(:disabled) {
+  color: var(--player-deep);
+}
+
+.pcap-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.pcap-step {
+  font-size: 0.82rem;
+  font-weight: var(--weight-medium);
+}
+
+.pcap-step small {
+  font-size: 0.72em;
+  margin-left: 0.5px;
+}
+
+.pcap-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* The pill sits at the top, so its tooltips drop below the button. They centre by default and the
+   right-most one anchors to the frame edge so it cannot spill past it. */
+.player-settings-pill button .pm-tip {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -4px);
+}
+
+.player-settings-pill button:hover .pm-tip,
+.player-settings-pill button:focus-visible .pm-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.player-settings-pill > *:last-child button:last-child .pm-tip {
+  left: auto;
+  right: 0;
+  transform: translate(0, -4px);
+}
+
+.player-settings-pill > *:last-child button:last-child:hover .pm-tip,
+.player-settings-pill > *:last-child button:last-child:focus-visible .pm-tip {
+  transform: translate(0, 0);
+}
+
+/* Caption size: md is the default burned-in size; sm/lg step it for the viewer. */
+.screen[data-caption-scale="sm"] .burn[data-path="prepped"] {
+  font-size: clamp(0.74rem, 1.35vw, 0.9rem);
+}
+
+.screen[data-caption-scale="lg"] .burn[data-path="prepped"] {
+  font-size: clamp(1.08rem, 2.3vw, 1.42rem);
 }
 
 .player-controls {
@@ -481,8 +611,7 @@
 .pbtn,
 .pspeed,
 .player-modes,
-.player-modes-layout,
-.player-fullscreen,
+.player-modes-seg,
 .pvol,
 .pvol-slider {
   pointer-events: auto;
@@ -688,14 +817,15 @@
   opacity: 0.4;
 }
 
-/* viewing modes, on the bar's right */
+/* viewing modes, on the bar's right: one plain-text segmented control (Split · Cinema · Full screen),
+   plus the Docked · Overlay pair when full screen. One control language, no orphan icon. */
 .player-modes {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.player-modes-layout {
+.player-modes-seg {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -705,62 +835,88 @@
   background: var(--glass-fill);
 }
 
-.player-modes-layout button {
-  min-height: 26px;
-  padding: 4px 9px;
+.player-modes-seg button {
+  position: relative;
+  display: inline-flex;
+  width: 30px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 6px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.82);
   background: transparent;
-  font-family: var(--font-sans);
-  font-size: 0.7rem;
   cursor: pointer;
   transition:
     color 140ms ease,
     background-color 140ms ease;
 }
 
-.player-modes-layout button:hover {
+.player-modes-seg button svg {
+  display: block;
+}
+
+.player-modes-seg button:hover:not(:disabled) {
   color: #fff;
 }
 
-.player-modes-layout button[aria-pressed="true"] {
+.player-modes-seg button[aria-pressed="true"] {
   color: var(--player-deep);
   background: var(--glass-panel);
 }
 
-.player-fullscreen {
-  display: inline-flex;
-  width: 34px;
-  height: 34px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 8px;
-  color: #fff;
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 140ms ease;
-}
-
-.player-fullscreen:hover:not(:disabled) {
-  background: var(--glass-fill);
-}
-
-.player-fullscreen:disabled {
+.player-modes-seg button:disabled {
   cursor: not-allowed;
   opacity: 0.4;
 }
 
-.player-fullscreen svg {
-  display: block;
+/* Hover/focus tooltip: the glyph names itself without printing the word on the picture. Decorative
+   (aria-hidden); the button's aria-label carries the name to assistive tech. Mirrors the api-copy
+   tooltip pattern, scoped to the player. */
+.pm-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 4;
+  padding: 4px 8px;
+  border-radius: 6px;
+  corner-shape: squircle;
+  color: var(--paper);
+  background: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  pointer-events: none;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.player-modes-seg button:hover .pm-tip,
+.player-modes-seg button:focus-visible .pm-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Keep the right-most tooltip (nearest the frame edge) from spilling past it. */
+.player-modes-seg:last-of-type button:last-child .pm-tip {
+  right: 0;
+  left: auto;
+  transform: translate(0, 4px);
+}
+
+.player-modes-seg:last-of-type button:last-child:hover .pm-tip,
+.player-modes-seg:last-of-type button:last-child:focus-visible .pm-tip {
+  transform: translate(0, 0);
 }
 
 .pbtn:focus-visible,
 .pspeed:focus-visible,
-.player-modes-layout button:focus-visible,
-.player-fullscreen:focus-visible,
+.player-modes-seg button:focus-visible,
 .pvol-slider:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
@@ -797,8 +953,7 @@
     gap: 6px;
   }
 
-  .pbtn,
-  .player-fullscreen {
+  .pbtn {
     width: 40px;
     height: 40px;
   }
@@ -807,10 +962,22 @@
     height: 36px;
   }
 
-  /* Study/Theater change the desktop side-by-side split; on mobile the layout is already single
-     column, so the toggle is dropped to keep the control row uncramped. Full screen stays. */
-  .player-modes-layout {
+  /* Split/Cinema change the desktop side-by-side split; on mobile the layout is already single column,
+     so those two icons are dropped to keep the control row uncramped. Full screen (.pm-fs) stays. */
+  .player-modes-seg .pm-view {
     display: none;
+  }
+
+  /* The pill keeps its caption controls on a phone, but the panel width/placement groups are dropped:
+     the layout is single column (no side panel to size), and their icons have no tooltip on touch. */
+  .pcap-panel,
+  .pcap-div {
+    display: none;
+  }
+
+  .player-modes-seg button {
+    width: 38px;
+    height: 34px;
   }
 
   .ptime {

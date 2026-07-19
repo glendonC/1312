@@ -16,7 +16,7 @@
   border: 1px solid var(--glass-border);
   border-radius: 15px;
   corner-shape: squircle;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--glass-highlight);
   box-shadow: 0 8px 22px rgba(26, 70, 66, 0.07);
   backdrop-filter: blur(18px) saturate(1.6);
   -webkit-backdrop-filter: blur(18px) saturate(1.6);
@@ -50,7 +50,7 @@
   border-radius: 13px;
   corner-shape: squircle;
   color: var(--ink-soft, rgba(22, 29, 27, 0.72));
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--glass-highlight);
   box-shadow: 0 8px 22px rgba(26, 70, 66, 0.07);
   backdrop-filter: blur(18px) saturate(1.6);
   -webkit-backdrop-filter: blur(18px) saturate(1.6);
@@ -68,7 +68,7 @@
 .result-chrome-trigger[aria-expanded="true"] {
   color: var(--ink, #161d1b);
   border-color: var(--accent-line);
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--glass-highlight-strong);
 }
 
 .result-chrome-trigger:focus-visible,

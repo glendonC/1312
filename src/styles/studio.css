@@ -1,40 +1,12 @@
 /*
- * Studio product style entry: page shell plus leaf sheets.
- * Owns: .studio route shell, floating .top header, act layout, Results header seats.
- * Must not: grow into Results/Dock/player god rules; nest CSS @import indexes (stale HMR).
- * Agent focus loads from AgentPanel.tsx via direct focus/*.css leaf imports.
- * Shared player loads from RecordedMediaPlayer.tsx via results.player.css.
+ * Studio page-shell styles: the .studio route shell, floating .top header, act layout, Results header
+ * seats. This is one leaf sheet, not a barrel — the leaves it used to @import are now direct JS imports
+ * in src/pages/studio/index.astro (a CSS @import barrel serves stale CSS in dev until HMR). This sheet
+ * loads last there so its shell rules stay after the leaves in the cascade.
+ * Must not: grow into Results/Dock/player god rules; re-introduce nested CSS @import indexes.
+ * Agent focus loads from AgentPanel.tsx; shared player from RecordedMediaPlayer.tsx (results.player.css);
+ * Results header chrome from ResultsChrome.tsx (results.chrome.css).
  */
-
-/* Dock leaves */
-@import "./studio/dock.shell.css";
-@import "./studio/dock.run-controls.css";
-@import "./studio/dock.layout.css";
-@import "./studio/dock.source-entry.css";
-@import "./studio/dock.responsive.css";
-
-@import "./studio/identity.css";
-@import "./studio/welcome.css";
-@import "./studio/canvas.css";
-
-/* Workspace leaves */
-@import "./studio/workspace.environment.css";
-@import "./studio/workspace.media.css";
-@import "./studio/workspace.responsive.css";
-@import "./studio/workspace.cell.css";
-
-/* Results leaves */
-@import "./studio/results.shell.css";
-/* Shared player loads from RecordedMediaPlayer.tsx (results.player.css). */
-@import "./studio/results.captions.css";
-@import "./studio/results.learning.css";
-@import "./studio/results.summary.css";
-/* Results header chrome loads from ResultsChrome.tsx (results.chrome.css). */
-/* Shared Studio .ghost / .cta action chips (preflight + input recovery). */
-@import "./studio/actions.css";
-@import "./studio/results.responsive.css";
-
-@import "./studio/pause.css";
 
 .studio {
   position: relative;

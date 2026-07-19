@@ -273,6 +273,57 @@
   opacity: 0.5;
 }
 
+/* Dev-only shortcuts (rendered only under import.meta.env.DEV). Kept deliberately plain and dashed so
+   they read as a testing tool, never as product UI. */
+.studio-dev-skip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.studio-dev-skip-label {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.studio-dev-skip-btn {
+  min-height: 28px;
+  padding: 5px 11px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  corner-shape: squircle;
+  color: var(--ink-soft);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.studio-dev-skip-btn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+  background: var(--paper-elevated);
+}
+
+.studio-dev-skip-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.studio-dev-skip-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .studio-sample-popover {
   position: absolute;
   top: calc(100% + 8px);

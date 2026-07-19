@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { Bookmark } from "../glyphs";
 import {
   codePointSlice,
   fullCodePointSpan,
@@ -93,9 +94,10 @@ export default function LearningResults({
   const { source } = presentation;
   const [pinned, setPinned] = useState<PinnedSelection | null>(null);
   const [saved, setSaved] = useState<SessionSavedSelection[]>([]);
-  const [view, setView] = useState<"captions" | "my_set">("captions");
+  const [savedOpen, setSavedOpen] = useState(false);
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
   const captionGuideId = useId();
+  const savedId = useId();
   const prototype = presentation.mode === "prototype" ? presentation.explanations : null;
   const productionReady = presentation.mode === "production" &&
     presentation.explanations.state === "ready" &&
@@ -111,7 +113,7 @@ export default function LearningResults({
   useEffect(() => {
     setPinned(null);
     setSaved([]);
-    setView("captions");
+    setSavedOpen(false);
     setReturnFocus(null);
   }, [sourceKey]);
 
@@ -221,26 +223,21 @@ export default function LearningResults({
       aria-label="Language learning workspace"
       data-learning-mode={presentation.mode}
     >
-      {presentation.mode === "prototype" && <nav className="learning-view-switch" aria-label="Language workspace views">
+      {presentation.mode === "prototype" && <div className="learning-bar">
         <button
           type="button"
-          aria-pressed={view === "captions"}
-          onClick={() => setView("captions")}
+          className="learning-saved-toggle"
+          aria-expanded={savedOpen}
+          aria-controls={savedId}
+          onClick={() => setSavedOpen((open) => !open)}
         >
-          Captions
-        </button>
-        <button
-          type="button"
-          aria-pressed={view === "my_set"}
-          onClick={() => setView("my_set")}
-        >
-          My Set ({saved.length})
+          <Bookmark filled={saved.length > 0} />
+          <span>Saved{saved.length > 0 ? ` (${saved.length})` : ""}</span>
         </button>
         <span className="learning-session-note">Session only</span>
-      </nav>}
+      </div>}
 
-      {view === "captions" ? (
-        <>
+      <>
           <p className="learning-caption-guide" id={captionGuideId}>
             {presentation.mode === "prototype" ? (
               <><b>Prepared prototype.</b> Tap highlighted language, select a phrase, or choose Explain sentence.
@@ -392,10 +389,16 @@ export default function LearningResults({
               );
             })}
           </div>
-        </>
-      ) : presentation.mode === "prototype" ? (
-        <MySet saved={saved} onRemove={(id) => setSaved((current) => current.filter((item) => item.id !== id))} />
-      ) : null}
+      </>
+
+      {presentation.mode === "prototype" && savedOpen && (
+        <SavedDrawer
+          id={savedId}
+          saved={saved}
+          onRemove={(id) => setSaved((current) => current.filter((item) => item.id !== id))}
+          onClose={() => setSavedOpen(false)}
+        />
+      )}
     </section>
   );
 }
@@ -614,7 +617,7 @@ function ExplanationPanel({
               disabled={kept}
               onClick={() => onKeep(preparedSelection)}
             >
-              {kept ? "Kept in My Set" : "Keep in My Set"}
+              {kept ? "Saved" : "Save"}
             </button>
           </div>}
           <details className="learning-prototype-boundary">
@@ -774,16 +777,51 @@ function UnavailableState({
   );
 }
 
-function MySet({ saved, onRemove }: { saved: SessionSavedSelection[]; onRemove: (id: string) => void }) {
+function SavedDrawer({
+  id,
+  saved,
+  onRemove,
+  onClose,
+}: {
+  id: string;
+  saved: SessionSavedSelection[];
+  onRemove: (itemId: string) => void;
+  onClose: () => void;
+}) {
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    drawerRef.current?.focus();
+  }, []);
+
+  // Saved language slides over the transcript instead of replacing it, so the reading position is
+  // never lost. It is a session-only collection, not a co-equal view, so it stays behind one chip.
   return (
-    <section className="learning-my-set" aria-labelledby="learning-my-set-title">
-      <header>
-        <span>This session only</span>
-        <h3 id="learning-my-set-title">My Set</h3>
-        <p>Only language you explicitly keep appears here. Nothing is saved after this result session ends.</p>
+    <section
+      id={id}
+      className="learning-saved"
+      ref={drawerRef}
+      tabIndex={-1}
+      aria-labelledby="learning-saved-title"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      }}
+    >
+      <header className="learning-saved-head">
+        <div>
+          <span>This session only</span>
+          <h3 id="learning-saved-title">Saved</h3>
+        </div>
+        <button type="button" className="learning-saved-close" aria-label="Close saved" onClick={onClose}>
+          Close
+        </button>
       </header>
+      <p className="learning-saved-note">Only language you explicitly keep appears here. Nothing is saved after this result session ends.</p>
       {saved.length === 0 ? (
-        <p className="learning-my-set-empty">Select a prepared word or sentence, then choose Keep in My Set.</p>
+        <p className="learning-saved-empty">Select a prepared word or sentence, then choose Save.</p>
       ) : (
         <ul>
           {saved.map((item) => (

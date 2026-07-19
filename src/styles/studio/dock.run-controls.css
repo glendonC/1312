@@ -170,7 +170,7 @@
 }
 
 .dock-stop:hover {
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--glass-highlight-strong);
 }
 
 .dock-stop[data-running="true"] {
@@ -194,7 +194,7 @@
   border: 1px solid var(--line);
   border-radius: 50%;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--glass-highlight);
   cursor: pointer;
   transition:
     color 160ms ease,

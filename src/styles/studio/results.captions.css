@@ -4,16 +4,38 @@
  * Must not: .burn on-player captions (results.player.css); learning explanation sheets.
  */
 
-/* captions */
+/*
+ * The bilingual reading column. Source (Korean) leads as the primary voice; the English translation
+ * is its quiet gloss below. The timestamp is a mono tick in the left gutter. The line the video is on
+ * right now is the playhead: a calm accent rule and a lit tick, so the eye finds "here" without the
+ * column shouting. A withheld line is a deliberate hold, shown plainly, never a dashed error box.
+ */
 
 .cues {
   width: min(860px, 100%);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 20%, transparent) transparent;
+}
+
+.cues::-webkit-scrollbar {
+  width: 10px;
+}
+
+.cues::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 20%, transparent);
+  background-clip: content-box;
+}
+
+.cues::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ink) 34%, transparent);
+  background-clip: content-box;
 }
 
 .cues-empty {
   margin: 0;
-  padding: 24px 12px;
-  border-bottom: 1px solid var(--line);
+  padding: 28px 18px;
   color: var(--ink-muted);
   font-size: 0.82rem;
   line-height: 1.55;
@@ -22,69 +44,85 @@
 .cue {
   display: grid;
   width: 100%;
-  grid-template-columns: 3.2rem minmax(0, 1fr);
-  gap: 4px 14px;
-  padding: 13px 12px 13px 10px;
+  grid-template-columns: 2.7rem minmax(0, 1fr);
+  gap: 3px 16px;
+  padding: 14px 18px 15px;
   border: 0;
-  border-bottom: 1px solid var(--line);
   border-left: 2px solid transparent;
   background: transparent;
   text-align: left;
   cursor: pointer;
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease;
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+/* A hairline between rows, so the column reads as continuous text rather than a boxed data table. */
+.cue + .cue {
+  border-top: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 .cue:hover {
   background: var(--paper-soft);
 }
 
+/* The playhead. */
 .cue.is-active {
   border-left-color: var(--accent);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .cue-t {
+  align-self: start;
+  padding-top: 3px;
   color: var(--ink-muted);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-variant-numeric: tabular-nums;
-  line-height: 1.75;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+
+.cue.is-active .cue-t {
+  color: var(--accent);
+  font-weight: var(--weight-medium);
 }
 
 .cue-body {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .cue-src {
   color: var(--ink);
-  font-size: 0.98rem;
-  line-height: 1.5;
+  font-size: 1.05rem;
+  line-height: 1.55;
   word-break: keep-all;
 }
 
 .cue-tgt {
-  color: var(--ink-soft);
-  font-size: 0.92rem;
+  color: var(--ink-muted);
+  font-size: 0.85rem;
   line-height: 1.5;
 }
 
+/* Withheld: a held-back line. Flag-tinted, quiet, and clearly not speech, with the reason spelled out
+   in the interface's voice. A left rule marks it as a deliberate act, not an error. */
 .cue-withheld {
-  display: inline-flex;
+  display: flex;
   align-self: flex-start;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border: 1px dashed var(--flag-line);
-  border-radius: 8px;
+  align-items: baseline;
+  gap: 9px;
+  margin-top: 2px;
+  padding: 8px 11px;
+  border-left: 2px solid var(--flag-line);
+  border-radius: 4px 9px 9px 4px;
   color: var(--flag);
   background: var(--flag-soft);
   font-size: 0.8rem;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .cue-silence {
@@ -98,18 +136,33 @@
   line-height: 1.5;
 }
 
-/* Mirrors .cue-withheld-mark: the state is a chip, the rest reads as discrete facts. */
+/* A state marker (WITHHELD / SILENCE): a small solid micro-label, so the rest reads as discrete facts. */
+.cue-withheld-mark,
 .cue-silence-mark {
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--line-strong, rgba(22, 29, 27, 0.16));
-  font-size: 0.58rem;
-  letter-spacing: 0.1em;
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: var(--ink-soft);
 }
+
+.cue-withheld-mark {
+  color: var(--flag);
+  background: color-mix(in srgb, var(--flag) 13%, transparent);
+}
+
+.cue-silence-mark {
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
 .cue-silence-dur {
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
-.cue-silence-note { color: var(--ink-muted); }
+
+.cue-silence-note {
+  color: var(--ink-muted);
+}

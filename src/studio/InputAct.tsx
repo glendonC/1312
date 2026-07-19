@@ -333,6 +333,9 @@ function StudioSourceDock({
 function StudioSourceOptions({ openLocalSource, selectSample }: StudioWelcomeProps) {
   const bundle = useBundle();
   const openRecordedPreflight = useStudio((state) => state.openRecordedPreflight);
+  const dismissPreflight = useStudio((state) => state.dismissPreflight);
+  const start = useStudio((state) => state.start);
+  const seekCursor = useStudio((state) => state.seekCursor);
   const [samplesOpen, setSamplesOpen] = useState(false);
   const sampleMenuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -501,6 +504,40 @@ function StudioSourceOptions({ openLocalSource, selectSample }: StudioWelcomePro
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Dev-only shortcuts for iterating on the recorded demo. Gated by import.meta.env.DEV so they
+          are never bundled into production and never bypass the honest setup flow for real users.
+          Both reuse the store's deterministic replay: "results" jumps to the completed projection (the
+          same path the trace lab uses), "processing" runs the swarm from the top without preflight. */}
+      {import.meta.env.DEV && (
+        <div className="studio-dev-skip" role="group" aria-label="Developer shortcuts">
+          <span className="studio-dev-skip-label">Dev</span>
+          <button
+            type="button"
+            className="studio-dev-skip-btn"
+            disabled={!bundle}
+            onClick={() => {
+              if (!bundle) return;
+              dismissPreflight();
+              seekCursor(bundle.traces.length);
+            }}
+          >
+            Skip to results
+          </button>
+          <button
+            type="button"
+            className="studio-dev-skip-btn"
+            disabled={!bundle}
+            onClick={() => {
+              if (!bundle) return;
+              dismissPreflight();
+              start();
+            }}
+          >
+            Skip to processing
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -202,6 +202,107 @@ export function Compress() {
   );
 }
 
+/*
+ * Viewing-mode layout pickers. One family: a framed screen whose interior shows where the video and
+ * the learning panel sit, so the glyph reads as the layout it selects rather than an arbitrary symbol.
+ * Split and Cinema divide the frame; Docked and Overlay show the panel as a solid shape (parked at the
+ * edge, or floating over the picture). Full screen keeps the universal Expand/Compress arrows.
+ */
+export function SplitView() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="2" y="3.1" width="12" height="9.8" rx="1.7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M9.4 3.4v9.2" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function CinemaView() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="2" y="3.1" width="12" height="9.8" rx="1.7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M2.7 9.7h10.6" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function PanelDock() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="2" y="3.1" width="12" height="9.8" rx="1.7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="9.7" y="4.6" width="3" height="6.8" rx="0.8" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function PanelOverlay() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="2" y="3.1" width="12" height="9.8" rx="1.7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="8" y="5.3" width="4.4" height="5.3" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+/* Panel-width steppers: the same framed screen, with a chevron for the direction the panel edge moves. */
+export function PanelNarrower() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="2" y="3.1" width="12" height="9.8" rx="1.7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6.6 5.7 9 8l-2.4 2.3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function PanelWider() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="2" y="3.1" width="12" height="9.8" rx="1.7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M9.4 5.7 7 8l2.4 2.3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function Bookmark({ filled }: { filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M4.2 2.9h7.6a0.6 0.6 0 0 1 0.6 0.6v9.5l-4.4-2.8-4.4 2.8V3.5a0.6 0.6 0 0 1 0.6-0.6z"
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function TextSize() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M2.2 12 5.1 4.3 8 12M3.2 9.4h3.8M9.6 12l2.1-5.6 2.1 5.6M10.3 10.3h2.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function Captions({ off }: { off?: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="2" y="3.6" width="12" height="8.8" rx="1.8" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6.4 6.9a1.6 1.6 0 0 0-2.5 1.3 1.6 1.6 0 0 0 2.5 1.3M12 6.9a1.6 1.6 0 0 0-2.5 1.3 1.6 1.6 0 0 0 2.5 1.3"
+        fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      {off && <path d="M3 3 13 13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />}
+    </svg>
+  );
+}
+
 export function Info() {
   return (
     <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">

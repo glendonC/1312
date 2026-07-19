@@ -1,6 +1,6 @@
 /*
  * Completed Results viewer layout (media | learning split and view modes).
- * Owns: .result-viewer, .result-main, study/theater/fullscreen modes.
+ * Owns: .result-viewer, .result-main, split/cinema/fullscreen modes.
  * Must not: header chrome (results.chrome.css via ResultsChrome.tsx); Dock; Focus shell.
  */
 
@@ -40,72 +40,125 @@
 }
 .result-main .cue { width: 100%; }
 
-/* Study is the hero view: the video and the caption panel share one tall row so the video is a real
+/* Split is the hero view: the video and the caption panel share one tall row so the video is a real
    player, not a short strip, and there is no dead space beside a taller transcript column. */
 @media (min-width: 821px) {
-  .result-viewer[data-view-mode="study"] .result-main {
+  .result-viewer[data-view-mode="split"] .result-main {
     align-items: stretch;
     height: min(58vh, 620px);
   }
 
-  .result-viewer[data-view-mode="study"] .result-main > .player,
-  .result-viewer[data-view-mode="study"] .result-main .learning-workspace {
+  .result-viewer[data-view-mode="split"] .result-main > .player,
+  .result-viewer[data-view-mode="split"] .result-main .learning-workspace {
     height: 100%;
     max-height: none;
   }
 
-  .result-viewer[data-view-mode="study"] .result-main .player[data-overlay-controls] .screen {
+  .result-viewer[data-view-mode="split"] .result-main .player[data-overlay-controls] .screen {
     flex: 1;
     min-height: 0;
   }
 
-  .result-viewer[data-view-mode="study"] .result-main .player[data-overlay-controls] .screen-video {
+  .result-viewer[data-view-mode="split"] .result-main .player[data-overlay-controls] .screen-video {
     height: 100%;
     max-height: none;
   }
+
+  /* Panel width in Split (m is the base 1.5fr:1fr set on .result-main): narrower gives the video more
+     room, wider gives the transcript more. */
+  .result-viewer[data-view-mode="split"][data-panel-size="s"] .result-main {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
+  }
+
+  .result-viewer[data-view-mode="split"][data-panel-size="l"] .result-main {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }
 
-.result-viewer[data-view-mode="theater"] .result-main {
+/* Cinema: the video goes full page width with the transcript stacked beneath it. A wide, lean-back
+   read of the clip that still lives on the page, distinct from the display-filling Full screen. */
+.result-viewer[data-view-mode="cinema"] .result-main {
   grid-template-columns: 1fr;
 }
 
-.result-viewer[data-view-mode="theater"] .screen-video {
+.result-viewer[data-view-mode="cinema"] .screen-video {
   max-height: min(70vh, 720px);
 }
 
-.result-viewer[data-view-mode="theater"] .learning-workspace {
+.result-viewer[data-view-mode="cinema"] .learning-workspace {
   max-height: 560px;
 }
 
-/* Full screen: the whole study viewer fills the display so captions/Learning stay beside the video. */
+/* ---------- Full screen: the video dominates the display ---------- */
+
+/*
+ * The viewer fills the display and the video is the surface, not a small player letterboxed in a
+ * void. The Learning panel stays usable through the placement toggle: Docked parks it as a narrow
+ * column beside the video; Overlay floats it over the video as glass so the picture reads underneath.
+ * The letterbox bars match the player frame (--player-deep), so any pillar/letterbox reads as the
+ * clip's own frame rather than dead space.
+ */
 .result-viewer[data-view-mode="fullscreen"] {
   width: 100%;
   height: 100dvh;
   max-width: none;
   margin: 0;
-  padding: 18px;
+  padding: 0;
   overflow: hidden;
-  background: #0c1614;
+  background: var(--player-deep);
 }
 
 .result-viewer[data-view-mode="fullscreen"] .result-main {
+  width: 100%;
+  height: 100%;
   min-height: 0;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 30%);
-  gap: 18px;
+  gap: 0;
 }
 
-.result-viewer[data-view-mode="fullscreen"] .player,
-.result-viewer[data-view-mode="fullscreen"] .learning-workspace {
+/* Docked: video takes the display, the panel is a narrow right column. The row is stretched to the
+   full height (not auto) so the video fills it instead of collapsing to its intrinsic box. */
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"] .result-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 24%);
+  grid-template-rows: 100%;
+  align-items: stretch;
+}
+
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"][data-panel-size="s"] .result-main {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 19%);
+}
+
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"][data-panel-size="l"] .result-main {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 32%);
+}
+
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"] .player,
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"] .learning-workspace {
   height: 100%;
+  min-height: 0;
   max-height: none;
 }
 
+/* Overlay: the video fills the display edge to edge; the panel floats over it (see results.learning.css). */
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .result-main {
+  position: relative;
+  display: block;
+}
+
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .player {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+}
+
+/* Both submodes: the player and its screen fill their box so the video is as large as it can be. */
 .result-viewer[data-view-mode="fullscreen"] .player {
   overflow: hidden;
 }
 
 .result-viewer[data-view-mode="fullscreen"] .screen {
+  height: 100%;
   min-height: 0;
   flex: 1;
 }
@@ -115,21 +168,7 @@
   max-height: none;
 }
 
-/* withheld chip inside a transcript line */
-.cue-withheld-mark {
-  display: inline-block;
-  margin-right: 7px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--line-strong, rgba(22, 29, 27, 0.16));
-  font-family: var(--font-mono, monospace);
-  font-style: normal;
-  font-size: 0.58rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
-  vertical-align: middle;
-}
+/* The withheld transcript chip is styled with the rest of the reading column in results.captions.css. */
 
 @media (max-width: 820px) {
   .result-main {
@@ -140,14 +179,17 @@
     max-height: none;
   }
 
-  .result-viewer[data-view-mode="fullscreen"] {
-    padding: 10px;
-  }
-
-  .result-viewer[data-view-mode="fullscreen"] .result-main {
+  /* On a phone the display is too narrow to float a legible panel over the video, so both placements
+     collapse to the same stacked layout: video on top, panel beneath. The toggle stays present but is
+     a no-op here, and Overlay's absolute positioning is reset. */
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"] .result-main,
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .result-main {
+    position: static;
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) minmax(200px, 40dvh);
-    gap: 10px;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px;
   }
 }

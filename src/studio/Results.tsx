@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { clock } from "./format";
-import { Compress, Expand } from "./glyphs";
+import { CinemaView, Compress, Expand, PanelDock, PanelNarrower, PanelOverlay, PanelWider, SplitView } from "./glyphs";
 import LearningResults from "./learning/LearningResults";
 import RecordedMediaPlayer from "./learning/RecordedMediaPlayer";
 import { projectPrototypeLearningPresentation } from "./learning/prototypeAdapter";
@@ -25,9 +25,13 @@ export default function Results() {
   const clipT = useStudio((s) => s.clipT);
   const setClipT = useStudio((s) => s.setClipT);
   const viewerRef = useRef<HTMLElement>(null);
-  const [viewerMode, setViewerMode] = useState<"study" | "theater">("study");
+  const [viewerMode, setViewerMode] = useState<"split" | "cinema">("split");
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
+  // Where the Learning panel sits once the viewer is full screen, and how wide it reads. Both are
+  // sticky for the session so the choice survives leaving and re-entering full screen.
+  const [panelPlacement, setPanelPlacement] = useState<"docked" | "overlay">("docked");
+  const [panelSize, setPanelSize] = useState<"s" | "m" | "l">("m");
   const [viewerNotice, setViewerNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,7 +50,7 @@ export default function Results() {
     learningPrototypeFixture,
   );
 
-  const chooseViewerMode = async (mode: "study" | "theater") => {
+  const chooseViewerMode = async (mode: "split" | "cinema") => {
     try {
       if (document.fullscreenElement === viewerRef.current) await document.exitFullscreen();
       setViewerMode(mode);
@@ -69,38 +73,120 @@ export default function Results() {
     }
   };
 
-  // The viewing modes live on the video's control bar, YouTube-style: two layout toggles and a real
-  // full-screen icon at the right. They stay keyboard reachable (focus reveals the bar), not hover-only.
+  const PANEL_SIZES = ["s", "m", "l"] as const;
+  const stepPanelSize = (direction: -1 | 1) => {
+    const index = PANEL_SIZES.indexOf(panelSize);
+    const next = PANEL_SIZES[Math.min(PANEL_SIZES.length - 1, Math.max(0, index + direction))];
+    if (next !== panelSize) setPanelSize(next);
+  };
+  // The learning panel is only a side panel in Split and in full screen; Cinema stacks it below the
+  // video, where a width control has nothing to act on, so the width stepper is hidden there.
+  const panelHasWidth = fullscreen || viewerMode === "split";
+
+  // The viewing modes live on the video's control bar, YouTube-style, as one coherent icon control:
+  // each glyph depicts the layout it selects (Split and Cinema divide the frame; Full screen is the
+  // universal expand). No orphan control, no words sitting on the picture. Every button carries an
+  // aria-label and a hover/focus tooltip, so the meaning is one pointer-hover or one screen reader away
+  // and keyboard reachable (focus reveals the bar). In full screen a second pair chooses where the
+  // Learning panel sits: Docked beside the video, or Overlay floating on it.
   const modeControls = (
-    <div className="player-modes" role="group" aria-label="Viewing mode">
-      <span className="player-modes-layout">
+    <div className="player-modes">
+      <span className="player-modes-seg" role="group" aria-label="Viewing mode">
         <button
           type="button"
-          aria-pressed={!fullscreen && viewerMode === "study"}
-          onClick={() => void chooseViewerMode("study")}
+          className="pm-btn pm-view"
+          aria-label="Split"
+          aria-pressed={!fullscreen && viewerMode === "split"}
+          onClick={() => void chooseViewerMode("split")}
         >
-          Study
+          <SplitView />
+          <span className="pm-tip" aria-hidden="true">Split</span>
         </button>
         <button
           type="button"
-          aria-pressed={!fullscreen && viewerMode === "theater"}
-          onClick={() => void chooseViewerMode("theater")}
+          className="pm-btn pm-view"
+          aria-label="Cinema"
+          aria-pressed={!fullscreen && viewerMode === "cinema"}
+          onClick={() => void chooseViewerMode("cinema")}
         >
-          Theater
+          <CinemaView />
+          <span className="pm-tip" aria-hidden="true">Cinema</span>
+        </button>
+        <button
+          type="button"
+          className="pm-btn pm-fs"
+          aria-label="Full screen"
+          aria-pressed={fullscreen}
+          disabled={!fullscreenAvailable}
+          onClick={() => void toggleFullscreen()}
+        >
+          {fullscreen ? <Compress /> : <Expand />}
+          <span className="pm-tip" aria-hidden="true">Full screen</span>
         </button>
       </span>
-      <button
-        type="button"
-        className="player-fullscreen"
-        aria-pressed={fullscreen}
-        aria-label={fullscreen ? "Exit full screen" : "Full screen"}
-        title={fullscreen ? "Exit full screen" : "Full screen"}
-        disabled={!fullscreenAvailable}
-        onClick={() => void toggleFullscreen()}
-      >
-        {fullscreen ? <Compress /> : <Expand />}
-      </button>
     </div>
+  );
+
+  // The panel-facing settings live in the top-right pill next to the caption controls, not on the
+  // transport bar: how wide the Learning panel reads (Split and full screen), and where it sits once
+  // full screen (Docked beside the video, or Overlay floating on it).
+  const panelControls = (
+    <>
+      {panelHasWidth && (
+        <>
+          <span className="pcap-div" aria-hidden="true" />
+          <span className="pcap-group pcap-panel" role="group" aria-label="Panel width">
+            <button
+              type="button"
+              className="pcap-btn"
+              aria-label="Narrower panel"
+              disabled={panelSize === "s"}
+              onClick={() => stepPanelSize(-1)}
+            >
+              <PanelNarrower />
+              <span className="pm-tip" aria-hidden="true">Narrower panel</span>
+            </button>
+            <button
+              type="button"
+              className="pcap-btn"
+              aria-label="Wider panel"
+              disabled={panelSize === "l"}
+              onClick={() => stepPanelSize(1)}
+            >
+              <PanelWider />
+              <span className="pm-tip" aria-hidden="true">Wider panel</span>
+            </button>
+          </span>
+        </>
+      )}
+      {fullscreen && (
+        <>
+          <span className="pcap-div" aria-hidden="true" />
+          <span className="pcap-group pcap-panel" role="group" aria-label="Panel placement">
+            <button
+              type="button"
+              className="pcap-btn"
+              aria-label="Docked"
+              aria-pressed={panelPlacement === "docked"}
+              onClick={() => setPanelPlacement("docked")}
+            >
+              <PanelDock />
+              <span className="pm-tip" aria-hidden="true">Docked</span>
+            </button>
+            <button
+              type="button"
+              className="pcap-btn"
+              aria-label="Overlay"
+              aria-pressed={panelPlacement === "overlay"}
+              onClick={() => setPanelPlacement("overlay")}
+            >
+              <PanelOverlay />
+              <span className="pm-tip" aria-hidden="true">Overlay</span>
+            </button>
+          </span>
+        </>
+      )}
+    </>
   );
 
   return (
@@ -127,10 +213,12 @@ export default function Results() {
         ref={viewerRef}
         aria-label="Learning viewer"
         data-view-mode={fullscreen ? "fullscreen" : viewerMode}
+        data-fs-panel={fullscreen ? panelPlacement : undefined}
+        data-panel-size={panelSize}
       >
         {viewerNotice && <p className="result-viewer-notice" role="status">{viewerNotice}</p>}
         <div className="result-main">
-          <RecordedMediaPlayer bundle={bundle} surface="results" modeControls={modeControls} />
+          <RecordedMediaPlayer bundle={bundle} surface="results" modeControls={modeControls} panelControls={panelControls} />
           <LearningResults
             presentation={learningPresentation}
             playback={{

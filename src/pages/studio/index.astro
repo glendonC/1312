@@ -2,6 +2,27 @@
 import LoadingScreen from "../../components/LoadingScreen.astro";
 import StudioApp from "../../studio/StudioApp";
 import SiteLayout from "../../layouts/SiteLayout.astro";
+// Direct leaf imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
+// Order matches the former studio.css barrel; studio.css itself (the page shell rules) loads last.
+import "../../styles/studio/dock.shell.css";
+import "../../styles/studio/dock.run-controls.css";
+import "../../styles/studio/dock.layout.css";
+import "../../styles/studio/dock.source-entry.css";
+import "../../styles/studio/dock.responsive.css";
+import "../../styles/studio/identity.css";
+import "../../styles/studio/welcome.css";
+import "../../styles/studio/canvas.css";
+import "../../styles/studio/workspace.environment.css";
+import "../../styles/studio/workspace.media.css";
+import "../../styles/studio/workspace.responsive.css";
+import "../../styles/studio/workspace.cell.css";
+import "../../styles/studio/results.shell.css";
+import "../../styles/studio/results.captions.css";
+import "../../styles/studio/results.learning.css";
+import "../../styles/studio/results.summary.css";
+import "../../styles/studio/actions.css";
+import "../../styles/studio/results.responsive.css";
+import "../../styles/studio/pause.css";
 import "../../styles/studio.css";
 import { checkRecordedRuns } from "../../studio/checkFixtures";
 

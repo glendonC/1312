@@ -11,6 +11,17 @@ async function openCompletedRun006(page: Page): Promise<void> {
   await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
 }
 
+test("the dev skip-to-results shortcut lands straight on the recorded learning viewer", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop dev-shortcut coverage");
+  // The shortcut is gated by import.meta.env.DEV, which the dev server used for these tests satisfies.
+  await page.goto("/studio/");
+  const dev = page.getByRole("group", { name: "Developer shortcuts" });
+  await expect(dev).toBeVisible();
+  await dev.getByRole("button", { name: "Skip to results" }).click();
+  await expect(page.getByRole("region", { name: "Result" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
+});
+
 test("prepared language stays pinned, saves explicitly, and closes unsupported states", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Desktop interaction and pinned-state coverage");
   await openCompletedRun006(page);
@@ -45,22 +56,25 @@ test("prepared language stays pinned, saves explicitly, and closes unsupported s
   await expect(workspace.locator('[data-learning-line-id="c01"]')).toHaveAttribute("data-learning-pinned", "true");
   await expect(workspace.locator('[data-learning-line-id="c01"]')).not.toHaveClass(/is-active/);
 
-  await panel.getByRole("button", { name: "Keep in My Set" }).click();
-  await expect(workspace.getByRole("button", { name: "My Set (1)" })).toBeVisible();
-  await workspace.getByRole("button", { name: "My Set (1)" }).click();
-  const mySet = workspace.getByRole("region", { name: "My Set" });
-  await expect(mySet).toContainText("This session only");
-  await expect(mySet).toContainText("Nothing is saved after this result session ends.");
-  await expect(mySet).toContainText("몇 분");
-  await expect(mySet).toContainText("I know a few people.");
-  await expect(mySet.getByRole("button", { name: "Remove" })).toBeVisible();
-  await expect(mySet.getByText("Checked practice")).toHaveCount(0);
-  await expect(mySet.getByText("Export", { exact: true })).toHaveCount(0);
-  await mySet.getByRole("button", { name: "Remove" }).click();
-  await expect(workspace.getByRole("button", { name: "My Set (0)" })).toBeVisible();
-  await expect(mySet).not.toContainText("I know a few people.");
+  await panel.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(workspace.getByRole("button", { name: "Saved (1)" })).toBeVisible();
+  await workspace.getByRole("button", { name: "Saved (1)" }).click();
+  const savedDrawer = workspace.getByRole("region", { name: "Saved" });
+  await expect(savedDrawer).toContainText("This session only");
+  await expect(savedDrawer).toContainText("Nothing is saved after this result session ends.");
+  await expect(savedDrawer).toContainText("몇 분");
+  await expect(savedDrawer).toContainText("I know a few people.");
+  await expect(savedDrawer.getByRole("button", { name: "Remove" })).toBeVisible();
+  await expect(savedDrawer.getByText("Checked practice")).toHaveCount(0);
+  await expect(savedDrawer.getByText("Export", { exact: true })).toHaveCount(0);
+  await savedDrawer.getByRole("button", { name: "Remove" }).click();
+  await expect(savedDrawer).not.toContainText("I know a few people.");
+  await savedDrawer.getByRole("button", { name: "Close saved" }).click();
+  // The drawer overlays the transcript, so closing it returns to the same reading position; the chip
+  // now shows no count because the set is empty again.
+  await expect(savedDrawer).toHaveCount(0);
+  await expect(workspace.getByRole("button", { name: "Saved", exact: true })).toBeVisible();
 
-  await workspace.getByRole("button", { name: "Captions" }).click();
   const c01 = workspace.locator('[data-learning-line-id="c01"]');
   await c01.getByRole("button", { name: "Explain Korean sentence at 0:00.0" }).click();
   await expect(panel.getByRole("heading", { name: "분들이 몇 분 계신데" })).toBeVisible();
@@ -86,7 +100,7 @@ test("prepared language stays pinned, saves explicitly, and closes unsupported s
 
   await openCompletedRun006(page);
   await expect(page.getByRole("region", { name: "Language learning workspace" })
-    .getByRole("button", { name: "My Set (0)" })).toBeVisible();
+    .getByRole("button", { name: "Saved", exact: true })).toBeVisible();
 });
 
 test("a source without the bound fixture fails closed without repeated explanation actions", async ({ page }, testInfo) => {
@@ -132,11 +146,11 @@ test("viewer modes keep a borderless learning shell and use the browser full scr
   await openCompletedRun006(page);
 
   const viewer = page.getByRole("region", { name: "Learning viewer" });
-  const study = viewer.getByRole("button", { name: "Study" });
-  const theater = viewer.getByRole("button", { name: "Theater" });
+  const split = viewer.getByRole("button", { name: "Split" });
+  const cinema = viewer.getByRole("button", { name: "Cinema" });
   const fullScreen = viewer.getByRole("button", { name: "Full screen" });
-  await expect(viewer).toHaveAttribute("data-view-mode", "study");
-  await expect(study).toHaveAttribute("aria-pressed", "true");
+  await expect(viewer).toHaveAttribute("data-view-mode", "split");
+  await expect(split).toHaveAttribute("aria-pressed", "true");
   await expect(fullScreen).toBeEnabled();
   await expect(viewer.getByRole("slider", { name: "Volume" })).toHaveValue("0.8");
   const speed = viewer.getByRole("combobox", { name: "Playback speed" });
@@ -147,19 +161,76 @@ test("viewer modes keep a borderless learning shell and use the browser full scr
   await expect.poll(() => viewer.locator(".screen").evaluate((element) => getComputedStyle(element).borderRadius))
     .toBe("18px");
 
-  await theater.click();
-  await expect(viewer).toHaveAttribute("data-view-mode", "theater");
-  await expect(theater).toHaveAttribute("aria-pressed", "true");
-  await expect(viewer.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
+  // Panel width lives in the top-right settings pill; stepping it changes the attribute the layout reads.
+  await expect(viewer).toHaveAttribute("data-panel-size", "m");
+  const width = viewer.getByRole("group", { name: "Panel width" });
+  await width.getByRole("button", { name: "Wider panel" }).click();
+  await expect(viewer).toHaveAttribute("data-panel-size", "l");
+  await expect(width.getByRole("button", { name: "Wider panel" })).toBeDisabled();
+  await width.getByRole("button", { name: "Narrower panel" }).click();
+  await width.getByRole("button", { name: "Narrower panel" }).click();
+  await expect(viewer).toHaveAttribute("data-panel-size", "s");
+  await expect(width.getByRole("button", { name: "Narrower panel" })).toBeDisabled();
 
+  await cinema.click();
+  await expect(viewer).toHaveAttribute("data-view-mode", "cinema");
+  await expect(cinema).toHaveAttribute("aria-pressed", "true");
+  await expect(viewer.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
+  // Cinema stacks the panel below the video, so the width stepper has nothing to act on and is gone.
+  await expect(viewer.getByRole("group", { name: "Panel width" })).toHaveCount(0);
+
+  // Full screen: the placement pair joins the pill next to the width stepper. Docked is the default;
+  // Overlay keeps the Learning panel usable floating over the video. The choice is sticky.
   await fullScreen.click();
   await expect(viewer).toHaveAttribute("data-view-mode", "fullscreen");
-  await expect(viewer.getByRole("button", { name: "Exit full screen" })).toHaveAttribute("aria-pressed", "true");
+  await expect(fullScreen).toHaveAttribute("aria-pressed", "true");
+  await expect(viewer).toHaveAttribute("data-fs-panel", "docked");
+  await expect(viewer.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
+  const placement = viewer.getByRole("group", { name: "Panel placement" });
+  await expect(placement.getByRole("button", { name: "Docked" })).toHaveAttribute("aria-pressed", "true");
+  await placement.getByRole("button", { name: "Overlay" }).click();
+  await expect(viewer).toHaveAttribute("data-fs-panel", "overlay");
   await expect(viewer.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
 
-  await study.click();
-  await expect(viewer).toHaveAttribute("data-view-mode", "study");
-  await expect(study).toHaveAttribute("aria-pressed", "true");
+  // Leaving full screen restores the prior layout; re-entering keeps the sticky Overlay placement.
+  await cinema.click();
+  await expect(viewer).toHaveAttribute("data-view-mode", "cinema");
+  await expect(viewer).not.toHaveAttribute("data-fs-panel", "overlay");
+  await fullScreen.click();
+  await expect(viewer).toHaveAttribute("data-fs-panel", "overlay");
+
+  await split.click();
+  await expect(viewer).toHaveAttribute("data-view-mode", "split");
+  await expect(split).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the caption pill resizes and hides the burned-in caption", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop caption-pill coverage");
+  await openCompletedRun006(page);
+
+  const results = page.getByRole("region", { name: "Result" });
+  const player = results.locator('.player[data-player-surface="results"]');
+  const screen = player.locator(".screen");
+  await player.getByRole("slider", { name: "Seek through clip" }).fill("0.3");
+  await player.hover();
+
+  const caption = screen.locator('.burn[data-path="prepped"]');
+  await expect(caption).toBeVisible();
+  await expect(screen).toHaveAttribute("data-caption-scale", "md");
+
+  const pill = player.getByRole("group", { name: "Caption display" });
+  await pill.getByRole("button", { name: "Larger captions" }).click();
+  await expect(screen).toHaveAttribute("data-caption-scale", "lg");
+  await expect(pill.getByRole("button", { name: "Larger captions" })).toBeDisabled();
+  await pill.getByRole("button", { name: "Smaller captions" }).click();
+  await pill.getByRole("button", { name: "Smaller captions" }).click();
+  await expect(screen).toHaveAttribute("data-caption-scale", "sm");
+
+  await pill.getByRole("button", { name: "Hide captions" }).click();
+  await expect(caption).toHaveCount(0);
+  await expect(pill.getByRole("button", { name: "Smaller captions" })).toBeDisabled();
+  await pill.getByRole("button", { name: "Show captions" }).click();
+  await expect(screen.locator('.burn[data-path="prepped"]')).toBeVisible();
 });
 
 test("a completed run exposes one active media player without legacy workbench chrome", async ({ page }, testInfo) => {
@@ -251,13 +322,14 @@ test("results chrome: header title truncates, Details and Run details open on de
   await runPanel.press("Escape");
   await expect(runPanel).toHaveCount(0);
 
-  // The viewing modes ride on the video's control bar, and the provenance bug stays legible there.
+  // The viewing modes ride on the video's control bar. Recorded-vs-live provenance lives in the
+  // Details panel (Evidence and run files), not burned onto the picture.
   const viewer = page.getByRole("region", { name: "Learning viewer" });
   const modes = viewer.getByRole("group", { name: "Viewing mode" });
-  await expect(modes.getByRole("button", { name: "Study" })).toBeVisible();
-  await expect(modes.getByRole("button", { name: "Theater" })).toBeVisible();
+  await expect(modes.getByRole("button", { name: "Split" })).toBeVisible();
+  await expect(modes.getByRole("button", { name: "Cinema" })).toBeVisible();
   await expect(modes.getByRole("button", { name: "Full screen" })).toBeVisible();
-  await expect(viewer.locator(".player-provenance")).toHaveText("recorded");
+  await expect(viewer.locator(".player-provenance")).toHaveCount(0);
 });
 
 test("mobile selection and tap open a bounded explanation sheet and return focus", async ({ page }, testInfo) => {

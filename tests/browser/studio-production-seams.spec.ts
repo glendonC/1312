@@ -374,7 +374,7 @@ test("attested approval explicitly produces private bounded captions without pub
 
   await expect(productionLearning.getByText("Production learning unavailable")).toHaveCount(0);
   await expect(productionLearning.getByText("Prepared prototype")).toHaveCount(0);
-  await expect(productionLearning.getByRole("button", { name: /My Set/ })).toHaveCount(0);
+  await expect(productionLearning.getByRole("button", { name: /Saved/ })).toHaveCount(0);
 
   const firstCue = productionLearning.locator("[data-production-results-line-id]").first();
   const fullSource = firstCue.locator(".cue-src");

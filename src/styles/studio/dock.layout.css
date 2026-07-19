@@ -59,7 +59,7 @@
 .dock-parameters-trigger:focus-visible {
   border-color: var(--accent-line);
   color: var(--accent);
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--glass-highlight-strong);
   transform: scale(1.04);
 }
 

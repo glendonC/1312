@@ -1599,8 +1599,8 @@ test("completed recorded runs transition directly into the learning viewer", asy
   await expect(results.getByRole("button", { name: "Run again", exact: true })).toHaveCount(0);
   const viewer = results.getByRole("region", { name: "Learning viewer" });
   await expect(viewer).toBeVisible();
-  await expect(viewer.getByRole("button", { name: "Study" })).toHaveAttribute("aria-pressed", "true");
-  await expect(viewer.getByRole("button", { name: "Theater" })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Split" })).toHaveAttribute("aria-pressed", "true");
+  await expect(viewer.getByRole("button", { name: "Cinema" })).toBeVisible();
   await expect(viewer.getByRole("button", { name: "Full screen" })).toBeVisible();
   await expect(viewer.getByRole("slider", { name: "Volume" })).toBeVisible();
   await expect(viewer.getByRole("combobox", { name: "Playback speed" })).toBeVisible();

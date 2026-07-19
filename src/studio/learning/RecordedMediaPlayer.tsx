@@ -4,15 +4,18 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 // a CSS @import barrel can serve stale CSS until HMR.
 import "../../styles/studio/results.player.css";
 import { clock } from "../format";
-import { Hold, Volume } from "../glyphs";
+import { Captions, Hold, Volume } from "../glyphs";
 import { useStudio } from "../store";
 import type { RunBundle } from "../transport";
-import { useViewerSession } from "./viewerSession";
+import { type CaptionScale, useViewerSession } from "./viewerSession";
 
 const HAS_PICTURE = /\.(mp4|webm|mov|m4v)$/i;
+const CAPTION_STEPS: readonly CaptionScale[] = ["sm", "md", "lg"];
 
 function CaptionOverlay({ bundle }: { bundle: RunBundle }) {
   const clipT = useStudio((state) => state.clipT);
+  const captionsVisible = useViewerSession((state) => state.captionsVisible);
+  if (!captionsVisible) return null;
   const cue = bundle.captions.cues.find((candidate) => clipT >= candidate.t_start && clipT < candidate.t_end);
   if (!cue || cue.silence) return null;
 
@@ -38,15 +41,21 @@ export default function RecordedMediaPlayer({
   bundle,
   surface,
   modeControls,
+  panelControls,
 }: {
   bundle: RunBundle;
   surface: "results" | "workbench";
   /**
-   * Results-only. The viewing-mode cluster (Study/Theater/Full screen) rendered onto the video
+   * Results-only. The viewing-mode cluster (Split/Cinema/Full screen) rendered onto the video
    * surface rather than a toolbar stranded outside the frame. Absent on the workbench surface,
    * where the same player follows agent focus and owns no viewing modes.
    */
   modeControls?: ReactNode;
+  /**
+   * Results-only. Learning-panel settings (width, and placement in full screen) that share the
+   * top-right settings pill with the caption controls rather than crowding the transport bar.
+   */
+  panelControls?: ReactNode;
 }) {
   const playerId = useId();
   const clipT = useStudio((state) => state.clipT);
@@ -62,6 +71,10 @@ export default function RecordedMediaPlayer({
   const setMuted = useViewerSession((state) => state.setMuted);
   const setVolume = useViewerSession((state) => state.setVolume);
   const setPlaybackRate = useViewerSession((state) => state.setPlaybackRate);
+  const captionScale = useViewerSession((state) => state.captionScale);
+  const captionsVisible = useViewerSession((state) => state.captionsVisible);
+  const setCaptionScale = useViewerSession((state) => state.setCaptionScale);
+  const setCaptionsVisible = useViewerSession((state) => state.setCaptionsVisible);
 
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const raf = useRef(0);
@@ -165,6 +178,51 @@ export default function RecordedMediaPlayer({
   // surface keeps the plain below-frame transport, so agent-focus playback is unchanged.
   const overlayControls = surface === "results" && picture && Boolean(src);
   const progressPct = duration > 0 ? Math.min(100, (clipT / duration) * 100) : 0;
+
+  const stepCaptionScale = (direction: -1 | 1): void => {
+    const index = CAPTION_STEPS.indexOf(captionScale);
+    const next = CAPTION_STEPS[Math.min(CAPTION_STEPS.length - 1, Math.max(0, index + direction))];
+    if (next !== captionScale) setCaptionScale(next);
+  };
+
+  // A YouTube-style settings pill over the top-right of the picture. The caption controls a learner
+  // reaches for (show/hide the burned line, size it) sit here, and the panel settings share the pill so
+  // nothing crowds the transport bar. It reveals with the rest of the chrome, keeping the frame clean.
+  const settingsPill = (
+    <div className="player-settings-pill">
+      <span className="pcap-group" role="group" aria-label="Caption display">
+        <button
+          type="button"
+          className="pcap-btn pcap-cc"
+          aria-label={captionsVisible ? "Hide captions" : "Show captions"}
+          aria-pressed={captionsVisible}
+          onClick={() => setCaptionsVisible(!captionsVisible)}
+        >
+          <Captions off={!captionsVisible} />
+          <span className="pm-tip" aria-hidden="true">{captionsVisible ? "Hide captions" : "Show captions"}</span>
+        </button>
+        <button
+          type="button"
+          className="pcap-btn pcap-step"
+          aria-label="Smaller captions"
+          disabled={!captionsVisible || captionScale === "sm"}
+          onClick={() => stepCaptionScale(-1)}
+        >
+          A<small>-</small>
+        </button>
+        <button
+          type="button"
+          className="pcap-btn pcap-step"
+          aria-label="Larger captions"
+          disabled={!captionsVisible || captionScale === "lg"}
+          onClick={() => stepCaptionScale(1)}
+        >
+          A<small>+</small>
+        </button>
+      </span>
+      {panelControls}
+    </div>
+  );
 
   const speedSelect = (
     <select
@@ -409,7 +467,7 @@ export default function RecordedMediaPlayer({
       data-playing={activelyPlaying ? "true" : "false"}
     >
       {src && (picture ? (
-        <figure className="screen">
+        <figure className="screen" data-caption-scale={overlayControls ? captionScale : undefined}>
           <video
             ref={attach}
             className="screen-video"
@@ -426,9 +484,7 @@ export default function RecordedMediaPlayer({
           <CaptionOverlay bundle={bundle} />
           {overlayControls && (
             <>
-              {/* An always-on provenance bug: the recorded-vs-live distinction stays visible in every
-                  viewing mode, including theater and full screen, never only behind a details panel. */}
-              <span className="player-provenance">recorded</span>
+              {settingsPill}
               <div className="player-controls">{overlayBar}</div>
             </>
           )}

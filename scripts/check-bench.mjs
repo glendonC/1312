@@ -7,6 +7,11 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import { validateAblationRegistration } from "./lib/bench-ablation.mjs";
+import {
+  compareSubjectScores,
+  validatePairedScoreReceipt,
+  verifyPairedScoreReceipt,
+} from "./lib/bench-paired-score.mjs";
 import { validateU7AblationInputs, validateU7CapturePair } from "./lib/bench-u7-ablation.mjs";
 import {
   contaminationGuard,
@@ -25,7 +30,7 @@ import {
   validateScoreReceipt,
   verifiedBinding,
 } from "./lib/bench-gold.mjs";
-import { fileReceipt, writeImmutableJson } from "./lib/immutable-receipts.mjs";
+import { contentIdForJson, fileReceipt, writeImmutableJson } from "./lib/immutable-receipts.mjs";
 import { loadLedger } from "./lib/memory-review.mjs";
 import { normalizeBenchSourceReceipt } from "./lib/source-receipts.mjs";
 
@@ -267,6 +272,9 @@ console.log(
  */
 const capturesDir = new URL("../bench/runs/", import.meta.url);
 const captureSchemaUrl = new URL("../bench/schemas/capture.schema.json", import.meta.url);
+const pairedScoreSchemaUrl = new URL("../bench/schemas/paired-score.schema.json", import.meta.url);
+const pairedScoreSchema = JSON.parse(readFileSync(pairedScoreSchemaUrl, "utf8"));
+const validatePairedScoreSchema = ajv.compile(pairedScoreSchema);
 const captures = [];
 
 // The schema is loaded unconditionally: a missing capture schema must crash the check, not
@@ -542,6 +550,7 @@ if (existsSync(packsDir)) {
 
 const scoresDir = join(ROOT, "bench/scores");
 const scores = [];
+const scoreBindingsByContentId = new Map();
 if (existsSync(scoresDir)) {
   for (const entry of readdirSync(scoresDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -592,9 +601,40 @@ if (existsSync(scoresDir)) {
       rederived.score_id === score.score_id,
       `score receipt ${entry.name} does not re-derive from its bound bytes; every number in it is unsupported`,
     );
+    const scoreBinding = await fileReceipt(path, `bench/scores/${entry.name}/score.json`);
+    assert(
+      !scoreBindingsByContentId.has(scoreBinding.content_id),
+      `score receipt ${entry.name} duplicates another committed score receipt's exact bytes`,
+    );
+    scoreBindingsByContentId.set(scoreBinding.content_id, scoreBinding);
     scores.push(score);
   }
 }
+
+const pairsDir = join(scoresDir, "pairs");
+let pairedScoresChecked = 0;
+if (existsSync(pairsDir)) {
+  for (const entry of readdirSync(pairsDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    const path = join(pairsDir, entry.name);
+    const pair = validatePairedScoreReceipt(await readJsonFile(path, `paired score ${entry.name}`));
+    assert(
+      validatePairedScoreSchema(pair),
+      `paired score ${entry.name} schema: ${ajv.errorsText(validatePairedScoreSchema.errors)}`,
+    );
+    await verifyPairedScoreReceipt(pair, { workspaceRoot: ROOT });
+    for (const side of ["without", "with"]) {
+      const committed = scoreBindingsByContentId.get(pair[side].score.content_id);
+      assert(committed, `paired score ${entry.name} ${side} side is not a checked committed score receipt`);
+      assert(
+        committed.path === pair[side].score.path && committed.bytes === pair[side].score.bytes,
+        `paired score ${entry.name} ${side} side does not bind the checked score path and bytes`,
+      );
+    }
+    pairedScoresChecked += 1;
+  }
+}
+console.log(`paired score check passed: ${pairedScoresChecked} immutable pair receipt(s)`);
 
 const ablationsDir = join(ROOT, "bench/ablations");
 const ablations = [];
@@ -1299,8 +1339,132 @@ try {
     );
   }
 
+  // Paired-score comparator: same capture twice, judge present, and hidden regressions fail closed.
+  const realScorePath = join(ROOT, "bench/scores/run-007/score.json");
+  if (existsSync(realScorePath)) {
+    const withoutScore = await readJsonFile(realScorePath, "run-007 score");
+    validateScoreReceipt(withoutScore, "run-007 score");
+    const withoutBinding = await fileReceipt(realScorePath, "bench/scores/run-007/score.json");
+    const withScore = structuredClone(withoutScore);
+    withScore.run = "run-drill-with-memory";
+    withScore.bindings.capture = {
+      path: "bench/runs/run-drill-with-memory/capture.json",
+      content_id: `sha256:${"c".repeat(64)}`,
+      bytes: 99,
+    };
+    withScore.bindings.labels = {
+      path: "bench/reviews/labels/run-drill-with-memory.json",
+      content_id: `sha256:${"d".repeat(64)}`,
+      bytes: 99,
+    };
+    // Flip one previously correct unit to wrong so a regression must surface.
+    const subject = withScore.systems["1321-prepped"];
+    const flipped = subject.per_line.find((line) =>
+      line.critical_units.some((unit) => unit.outcome === "correct"));
+    assert(flipped, "run-007 subject has no correct unit to flip for the paired-score drill");
+    const unit = flipped.critical_units.find((entry) => entry.outcome === "correct");
+    unit.outcome = "wrong";
+    flipped.meaning_preserved = false;
+    subject.headline.critical_meaning.passes -= 1;
+    subject.headline.critical_meaning.rate =
+      subject.headline.critical_meaning.passes / subject.headline.critical_meaning.total;
+    subject.headline.critical_outcomes.correct -= 1;
+    subject.headline.critical_outcomes.wrong += 1;
+    const cold = withScore.systems["1321-cold"];
+    withScore.delta_vs_cold.critical_meaning_rate =
+      subject.headline.critical_meaning.rate - cold.headline.critical_meaning.rate;
+    withScore.delta_vs_cold.catastrophic_count =
+      subject.headline.catastrophic.count - cold.headline.catastrophic.count;
+    const { score_id: _ignoredScoreId, ...withBody } = withScore;
+    withScore.score_id = receiptIdFor("bench-score", { score_id: null, ...withBody }, "score_id");
+
+    const withBinding = {
+      path: "bench/scores/run-drill-with-memory/score.json",
+      content_id: `sha256:${"e".repeat(64)}`,
+      bytes: 99,
+    };
+    const pair = compareSubjectScores({
+      withoutScore,
+      withScore,
+      withoutBinding,
+      withBinding,
+      withoutMemory: null,
+      withMemory: null,
+      subjectSystemId: "1321-prepped",
+      comparedAt: "2026-07-19T12:30:00.000Z",
+    });
+    validatePairedScoreReceipt(pair);
+    assert(validatePairedScoreSchema(pair), `paired-score schema: ${ajv.errorsText(validatePairedScoreSchema.errors)}`);
+    assert(pair.regressions.length >= 1, "paired compare hid the flipped regression");
+    assert(pair.delta.critical_outcomes.correct === -1, "paired compare dropped the correct-count delta");
+    assert(pair.without.memory === null, "without side invented a memory binding");
+
+    await rejects(
+      () =>
+        Promise.resolve(
+          compareSubjectScores({
+            withoutScore,
+            withScore: withoutScore,
+            withoutBinding,
+            withBinding: withoutBinding,
+            comparedAt: "2026-07-19T12:30:00.000Z",
+          }),
+        ),
+      /two distinct runs|distinct capture/,
+      "the same score/capture was accepted as both paired sides",
+    );
+
+    const judged = structuredClone(withScore);
+    judged.judge = { model: "invented-judge" };
+    await rejects(
+      () =>
+        Promise.resolve(
+          compareSubjectScores({
+            withoutScore,
+            withScore: judged,
+            withoutBinding,
+            withBinding,
+            comparedAt: "2026-07-19T12:30:00.000Z",
+          }),
+        ),
+      /names a judge|judge/,
+      "a judged score entered the paired comparator",
+    );
+
+    const hidden = structuredClone(pair);
+    hidden.regressions = [];
+    hidden.pair_id = "bench-paired-score:sha256:" + "f".repeat(64);
+    await rejects(
+      () => Promise.resolve(validatePairedScoreReceipt(hidden)),
+      /pair_id does not match/,
+      "a paired receipt with stripped regressions kept its old identity",
+    );
+
+    const withoutTempPath = join(temp, "paired-without-score.json");
+    const withTempPath = join(temp, "paired-with-score.json");
+    await writeImmutableJson(withoutTempPath, withoutScore);
+    await writeImmutableJson(withTempPath, withScore);
+    const coldPair = compareSubjectScores({
+      withoutScore,
+      withScore,
+      withoutBinding: await fileReceipt(withoutTempPath),
+      withBinding: await fileReceipt(withTempPath),
+      comparedAt: "2026-07-19T12:30:00.000Z",
+    });
+    const forged = structuredClone(coldPair);
+    forged.delta.critical_meaning_rate = 999;
+    const { pair_id: _forgedPairId, ...forgedBody } = forged;
+    forged.pair_id = `bench-paired-score:${contentIdForJson({ pair_id: null, ...forgedBody })}`;
+    validatePairedScoreReceipt(forged);
+    await rejects(
+      () => verifyPairedScoreReceipt(forged, { workspaceRoot: ROOT }),
+      /does not rederive/,
+      "a rehashed paired receipt with invented deltas passed cold verification",
+    );
+  }
+
   console.log(
-    "fail-closed drills passed: local-eval public-path, local-eval redistribution, non-CC redistribution, single-reviewer freeze, same-identity freeze, drafter self-review, mined control, backdated freeze, pre-registration, unlabelled line, label-for-nothing, unfrozen gold, split-window aggregation, withheld-shadowed emission, route conflict, training-clip-in-pack, contaminated proposal, masked unresolvable run, unresolvable run, unattributable evidence, unscored post-freeze capture, manifest gold",
+    "fail-closed drills passed: local-eval public-path, local-eval redistribution, non-CC redistribution, single-reviewer freeze, same-identity freeze, drafter self-review, mined control, backdated freeze, pre-registration, unlabelled line, label-for-nothing, unfrozen gold, split-window aggregation, withheld-shadowed emission, route conflict, training-clip-in-pack, contaminated proposal, masked unresolvable run, unresolvable run, unattributable evidence, unscored post-freeze capture, manifest gold, paired-score same-capture, paired-score judge, paired-score stripped-regressions, paired-score rehashed-delta",
   );
 } finally {
   await rm(temp, { recursive: true, force: true });

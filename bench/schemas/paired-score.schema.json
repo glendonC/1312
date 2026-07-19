@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/paired-score.schema.json",
+  "title": "studio.bench.paired-score.v1",
+  "description": "Immutable per-clip comparison of two score receipts on the same frozen pack. Preserves the four-way outcome dyad and lists loss of previously correct critical units. This primitive does not establish exact configuration control, repeated-capture variance, or campaign qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "pair_id",
+    "pack_id",
+    "clip_id",
+    "compared_at",
+    "subject_system",
+    "without",
+    "with",
+    "delta",
+    "regressions",
+    "judge",
+    "notes"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.paired-score.v1" },
+    "pair_id": {
+      "type": "string",
+      "pattern": "^bench-paired-score:sha256:[a-f0-9]{64}$"
+    },
+    "pack_id": { "type": "string", "minLength": 1 },
+    "clip_id": { "type": "string", "minLength": 1 },
+    "compared_at": { "type": "string", "format": "date-time" },
+    "subject_system": { "type": "string", "minLength": 1 },
+    "without": { "$ref": "#/$defs/side" },
+    "with": { "$ref": "#/$defs/side" },
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "critical_meaning_rate",
+        "catastrophic_count",
+        "critical_outcomes"
+      ],
+      "properties": {
+        "critical_meaning_rate": { "type": ["number", "null"] },
+        "catastrophic_count": { "type": "integer" },
+        "critical_outcomes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["correct", "wrong", "withheld", "missing"],
+          "properties": {
+            "correct": { "type": "integer" },
+            "wrong": { "type": "integer" },
+            "withheld": { "type": "integer" },
+            "missing": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "regressions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/regression" }
+    },
+    "judge": {
+      "description": "Pinned null. No model grades the pair.",
+      "type": "null"
+    },
+    "notes": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "memoryBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt",
+        "consumption_id",
+        "run_id",
+        "materialization_id",
+        "snapshot_content_id",
+        "materialization_receipt_content_id",
+        "entry_count"
+      ],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "consumption_id": {
+          "type": "string",
+          "pattern": "^memory-consumption:sha256:[a-f0-9]{64}$"
+        },
+        "run_id": { "type": "string", "minLength": 1 },
+        "materialization_id": {
+          "type": "string",
+          "pattern": "^memory-materialization:sha256:[a-f0-9]{64}$"
+        },
+        "snapshot_content_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "materialization_receipt_content_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "entry_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run", "score", "memory"],
+      "properties": {
+        "run": { "type": "string", "minLength": 1 },
+        "score": { "$ref": "#/$defs/fileBinding" },
+        "memory": {
+          "description": "null on the without side; required consumption binding on the with side when claiming reviewed memory.",
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/memoryBinding" }
+          ]
+        }
+      }
+    },
+    "regression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "t_start",
+        "t_end",
+        "critical_unit_id",
+        "without_outcome",
+        "with_outcome"
+      ],
+      "properties": {
+        "t_start": { "type": "number" },
+        "t_end": { "type": "number" },
+        "critical_unit_id": { "type": "string", "minLength": 1 },
+        "without_outcome": {
+          "type": "string",
+          "enum": ["correct", "wrong", "withheld", "missing"]
+        },
+        "with_outcome": {
+          "type": "string",
+          "enum": ["correct", "wrong", "withheld", "missing"]
+        }
+      }
+    }
+  }
+}

@@ -111,6 +111,14 @@ against a PAIR of scored reports on the identical frozen pack whose subject conf
 differ by exactly the proposed rule (`config.rules` content ids), with the measured delta
 recorded on the decision receipt. One scored report is not evidence about a rule.
 
+Paired without/with scoring uses `scripts/compare-scores.mjs` against
+`bench/schemas/paired-score.schema.json`. It binds two validated score receipts on the same
+`pack_id` + `clip_id`, requires `judge: null` on both, preserves four-way outcome deltas, and lists
+loss of previously correct critical units. Repository checks reopen the bound bytes and rederive
+the receipt, so changing a delta and recomputing its id does not create evidence. This per-clip
+primitive does not establish exact configuration control, repetition variance, or campaign
+qualification. No committed with-side score receipt exists yet.
+
 **What still cannot happen, and why:** the committed raw-versus-eligible-stem registration and input
 registry contain no outputs or results. The packager can materialize only both fixed anonymous-stem
 captures from one cold-audited U7 operation. It maps unavailable, unknown, and truncated recognizer
@@ -118,7 +126,8 @@ results to withheld, maps empty or textless available results to missing, and le
 field null. It cannot select eligible clips after outcomes are known, select a favorable stem, turn
 structural producer success into semantic quality, or establish variance. Execution still needs at
 least three paired repetitions of every frozen clip, human labels for every emitted line, and score
-receipts for every capture. Later packs are still required before a generalization claim.
+receipts for every capture. A with-memory second capture of the same frozen clip is still required
+before any Improve Loop win claim. Later packs are still required before a generalization claim.
 
 Two dating anchors are honest-but-incomplete in v1 and documented rather than pretended:
 `frozen_at` is stamped by the tool (never operator-supplied) and cannot predate its adjudication

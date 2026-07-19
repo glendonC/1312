@@ -7,7 +7,7 @@
     "dev": "astro dev",
     "build": "astro check && astro build",
     "docs:check": "node scripts/check-docs.mjs",
-    "bench:check": "node --test tests/studio-bench-ablation.test.mjs tests/studio-u7-ablation-packaging.test.mjs && node scripts/check-bench.mjs",
+    "bench:check": "node --test tests/studio-bench-ablation.test.mjs tests/studio-bench-paired-score.test.mjs tests/studio-u7-ablation-packaging.test.mjs && node scripts/check-bench.mjs",
     "evidence:check": "node scripts/index-recorded-evidence.mjs --run run-005 --check && node scripts/index-recorded-evidence.mjs --run run-006 --check",
     "memory:check": "node --test tests/studio-memory-producer.test.mjs && node scripts/check-memory.mjs",
     "speech:check": "node --test tests/studio-speech-production.test.ts",

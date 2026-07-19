@@ -4,7 +4,9 @@ import type {
   RuntimeHostCaptionProductionRequest,
   RuntimeHostPrivatePlaybackGrant,
   RuntimeHostPrivatePlaybackGrantRequest,
+  RuntimeHostPrivatePlaybackGrantRevocationRequest,
   RuntimeHostPublishReviewDecisionRequest,
+  RuntimeHostPublishReviewRevocationRequest,
   RuntimeHostStartRequest,
   YouTubeLocalIngestRequest,
 } from "../../studio/runtime/production/runtimeHost/model.ts";
@@ -80,6 +82,21 @@ const curlFor = (method: "GET" | "POST" | "PUT", path: string, body?: object): s
   return lines.join("\n");
 };
 
+const curlBinaryPut = (path: string, fileArg: string): string =>
+  [
+    `curl -X PUT ${BASE_URL}${path} \\`,
+    `  -H "Authorization: Bearer $TOKEN" \\`,
+    `  -H "Content-Type: application/octet-stream" \\`,
+    `  --data-binary @${fileArg}`,
+  ].join("\n");
+
+const curlPrivateMediaHead = (): string =>
+  [
+    `curl -I ${BASE_URL}/v1/private-source-media/$GRANT_ID/$SECRET \\`,
+    `  -H "Origin: $ORIGIN" \\`,
+    `  -H "Range: bytes=0-1023"`,
+  ].join("\n");
+
 /* Identities below are real: they come from the run-005 source receipt and from
    the captured live-run receipts in examples.ts. */
 
@@ -154,6 +171,23 @@ export const CAPTION_REQUEST_EXAMPLE = {
   },
 } satisfies RuntimeHostCaptionProductionRequest;
 
+export const REVIEW_REVOCATION_EXAMPLE = {
+  approval: {
+    reviewId: CAPTION_REQUEST_EXAMPLE.approval.reviewId,
+    artifactId: CAPTION_REQUEST_EXAMPLE.approval.artifactId,
+    receiptId: CAPTION_REQUEST_EXAMPLE.approval.receiptId,
+    receiptContentId: CAPTION_REQUEST_EXAMPLE.approval.receiptContentId,
+  },
+  reviewer: {
+    id: "reviewer:local-operator",
+    attestation: "I attest that I am the named reviewer and made this revocation decision.",
+  },
+  revocation: {
+    reasonCodes: ["approval_entered_in_error"],
+    note: null,
+  },
+} satisfies RuntimeHostPublishReviewRevocationRequest;
+
 export const PLAYBACK_GRANT_REQUEST_EXAMPLE = {
   schema: "studio.private-playback-grant-request.v1",
   source: {
@@ -162,6 +196,10 @@ export const PLAYBACK_GRANT_REQUEST_EXAMPLE = {
     contentId: RUN_005_CONTENT_ID,
   },
 } satisfies RuntimeHostPrivatePlaybackGrantRequest;
+
+export const PLAYBACK_REVOKE_EXAMPLE = {
+  schema: "studio.private-playback-grant-revocation.v1",
+} satisfies RuntimeHostPrivatePlaybackGrantRevocationRequest;
 
 export const PLAYBACK_GRANT_EXAMPLE = {
   schema: "studio.private-playback-grant.v1",
@@ -222,6 +260,151 @@ const INGEST_STATUS_FIELDS: ApiFieldTable = {
     { name: "updatedAt", type: "string", note: "ISO timestamp of the last state change." },
     { name: "source", type: "object | null", note: "Registered source summary once sealed, else null." },
     { name: "failure", type: "{ code, message } | null", note: "Closed failure-code set; null unless failed." },
+  ],
+};
+
+const RUNTIME_START_FIELDS: ApiFieldTable = {
+  title: "Request body",
+  label: "application/json",
+  fields: [
+    { name: "sourceSessionId", type: "string", required: true, note: "Registered source session to study." },
+    { name: "sourceRevisionId", type: "string", required: true, note: "Exact source revision; a mismatch is rejected." },
+    { name: "range", type: "{ startMs, endMs }", required: true, note: "Study window in integer milliseconds." },
+    {
+      name: "requestedSourceLanguage",
+      type: "{ mode, languages, reason }",
+      required: true,
+      note: 'mode is "declared", "automatic", "mixed", "unknown", or "withheld". declared takes exactly one language, mixed at least two, withheld requires a reason.',
+    },
+    { name: "targetLanguage", type: "string", required: true, note: 'Translation target, for example "en".' },
+    {
+      name: "selectedLanguagePackId",
+      type: "string | null",
+      required: true,
+      note: 'Language pack to apply, for example "ko-v3".',
+    },
+    {
+      name: "outputDepth",
+      type: '"captions" | "evidence"',
+      required: true,
+      note: "How deep the study output goes.",
+    },
+    { name: "options", type: "object", required: false, note: "Analysis options, validated by the host." },
+    { name: "clientRequestId", type: "string", required: false, note: "Client-supplied request identifier." },
+  ],
+};
+
+const RUNTIME_STATUS_FIELDS: ApiFieldTable = {
+  title: "Status response",
+  label: "response",
+  fields: [
+    { name: "commandId", type: "string", note: "Accepted command identity." },
+    { name: "runtimeId", type: "string", note: "Runtime identity for all per-runtime resources." },
+    { name: "journalId", type: "string", note: "Journal backing this runtime." },
+    {
+      name: "lifecycle",
+      type: '"accepted" | "initializing" | "running" | "terminal" | "failed" | "interrupted"',
+      note: "The complete lifecycle state set.",
+    },
+    { name: "reason", type: "{ code, message } | null", note: "Closed failure-code set; null unless failed or interrupted." },
+    { name: "forecast", type: "object | null", note: 'Frozen forecast identity once accepted; baselineStatus is "floor_only".' },
+    { name: "runStartReceipt", type: "object | null", note: "Content id plus the run-start record once the runtime starts." },
+    { name: "journalHead", type: "number", note: "Highest journal sequence written." },
+    { name: "terminal", type: "boolean", note: "True once the lifecycle is terminal." },
+  ],
+};
+
+const ingestStatusPanel = (title: string): ApiCodePanel => ({
+  kind: "response",
+  title,
+  body: JSON.stringify(INGEST_STATUS_EXAMPLE, null, 2),
+});
+
+const listEnvelopeFields = (payloadName: string, payloadNote: string): ApiFieldTable => ({
+  title: "Response envelope",
+  label: "response",
+  fields: [
+    { name: "commandId", type: "string", note: "Accepted command identity." },
+    { name: "runtimeId", type: "string", note: "Runtime identity for this journal." },
+    { name: "journalHead", type: "number", note: "Highest journal sequence written." },
+    { name: payloadName, type: "array", note: payloadNote },
+  ],
+});
+
+const EVENTS_QUERY_FIELDS: ApiFieldTable = {
+  title: "Query",
+  label: "query",
+  fields: [
+    { name: "after", type: "number", note: "Cursor; only events with seq greater than after are returned. Defaults to 0." },
+    { name: "limit", type: "number", note: "Page size; host-enforced maximum applies." },
+  ],
+};
+
+const EVENTS_RESPONSE_FIELDS: ApiFieldTable = {
+  title: "Events response",
+  label: "response",
+  fields: [
+    { name: "commandId", type: "string", note: "Accepted command identity." },
+    { name: "runtimeId", type: "string", note: "Runtime identity for this journal." },
+    { name: "lifecycle", type: "string", note: "Current lifecycle state at poll time." },
+    { name: "requestedCursor", type: "number", note: "Echo of the after cursor used for this page." },
+    { name: "nextCursor", type: "number", note: "Pass as after on the next poll." },
+    { name: "journalHead", type: "number", note: "Highest journal sequence written." },
+    { name: "events", type: "array", note: "Append-only runtime events in this page." },
+    { name: "reachedHead", type: "boolean", note: "True when this page reached the current journal head." },
+    { name: "terminal", type: "boolean", note: "True once the lifecycle is terminal." },
+    { name: "reason", type: "{ code, message } | null", note: "Closed failure-code set; null unless failed or interrupted." },
+  ],
+};
+
+const LANGUAGE_ENVELOPE_FIELDS: ApiFieldTable = {
+  title: "Response envelope",
+  label: "response",
+  fields: [
+    { name: "commandId", type: "string", note: "Accepted command identity." },
+    { name: "runtimeId", type: "string", note: "Runtime identity for this journal." },
+    { name: "journalHead", type: "number", note: "Highest journal sequence written." },
+    { name: "attempts", type: "array", note: "Immutable attempt history, including failures." },
+    { name: "results", type: "array", note: "Verified facet results; empty until a successful attempt." },
+  ],
+};
+
+const CAPTION_PRODUCTION_REQUEST_FIELDS: ApiFieldTable = {
+  title: "Production request",
+  label: "application/json",
+  fields: [
+    {
+      name: "approval",
+      type: "object",
+      required: true,
+      note: "Exact unrevoked approval identity: reviewId, artifactId, receiptId, receiptContentId.",
+    },
+  ],
+};
+
+const CAPTION_QC_REQUEST_FIELDS: ApiFieldTable = {
+  title: "QC request",
+  label: "application/json",
+  fields: [
+    {
+      name: "candidate",
+      type: "object",
+      required: true,
+      note: "Exact caption candidate identity: jobId, captionArtifactId, captionContentId, captionReceiptId, captionReceiptContentId.",
+    },
+  ],
+};
+
+const PLAYBACK_REVOKE_FIELDS: ApiFieldTable = {
+  title: "Revocation request",
+  label: "application/json",
+  fields: [
+    {
+      name: "schema",
+      type: '"studio.private-playback-grant-revocation.v1"',
+      required: true,
+      note: "Literal schema tag; the path already names the grant.",
+    },
   ],
 };
 
@@ -296,11 +479,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("POST", "/v1/owned-media-ingests", OWNED_INGEST_EXAMPLE),
           },
-          {
-            kind: "response",
-            title: "202 · ingest status",
-            body: JSON.stringify(INGEST_STATUS_EXAMPLE, null, 2),
-          },
+          ingestStatusPanel("202 · ingest status"),
         ],
       },
       {
@@ -308,8 +487,15 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/owned-media-ingests/:ingestId/media",
         summary: "Upload the raw bytes for one open ingest as an octet stream.",
         responseSchema: "studio.owned-media-ingest.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [INGEST_STATUS_FIELDS],
+        panels: [
+          {
+            kind: "request",
+            title: "Request · octet-stream",
+            body: curlBinaryPut("/v1/owned-media-ingests/$INGEST_ID/media", "clip.m4a"),
+          },
+          ingestStatusPanel("202 · ingest status"),
+        ],
       },
       {
         methods: ["GET"],
@@ -317,7 +503,14 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         summary: "Poll ingest state until registered or failed.",
         responseSchema: "studio.owned-media-ingest.v1",
         fieldTables: [INGEST_STATUS_FIELDS],
-        panels: [],
+        panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor("GET", "/v1/owned-media-ingests/$INGEST_ID"),
+          },
+          ingestStatusPanel("200 · ingest status"),
+        ],
       },
       {
         methods: ["POST"],
@@ -354,8 +547,14 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/youtube-local-ingests/:ingestId",
         summary: "Poll YouTube-local ingest state.",
         responseSchema: "studio.youtube-local-ingest.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [INGEST_STATUS_FIELDS],
+        panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor("GET", "/v1/youtube-local-ingests/$INGEST_ID"),
+          },
+        ],
       },
     ],
   },
@@ -369,46 +568,21 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtime-plans",
         summary: "Plan one bounded study and return its forecast without starting anything. Accepts the same body as /v1/runtime-starts.",
         responseSchema: "studio.local-runtime-plan.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [RUNTIME_START_FIELDS],
+        panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor("POST", "/v1/runtime-plans", START_REQUEST_EXAMPLE),
+          },
+        ],
       },
       {
         methods: ["POST"],
         path: "/v1/runtime-starts",
         summary: "Accept and start one bounded runtime over a registered source range.",
         responseSchema: "studio.local-runtime-start-ack.v1",
-        fieldTables: [
-          {
-            title: "Request body",
-            label: "application/json",
-            fields: [
-              { name: "sourceSessionId", type: "string", required: true, note: "Registered source session to study." },
-              { name: "sourceRevisionId", type: "string", required: true, note: "Exact source revision; a mismatch is rejected." },
-              { name: "range", type: "{ startMs, endMs }", required: true, note: "Study window in integer milliseconds." },
-              {
-                name: "requestedSourceLanguage",
-                type: "{ mode, languages, reason }",
-                required: true,
-                note: 'mode is "declared", "automatic", "mixed", "unknown", or "withheld". declared takes exactly one language, mixed at least two, withheld requires a reason.',
-              },
-              { name: "targetLanguage", type: "string", required: true, note: 'Translation target, for example "en".' },
-              {
-                name: "selectedLanguagePackId",
-                type: "string | null",
-                required: true,
-                note: 'Language pack to apply, for example "ko-v3".',
-              },
-              {
-                name: "outputDepth",
-                type: '"captions" | "evidence"',
-                required: true,
-                note: "How deep the study output goes.",
-              },
-              { name: "options", type: "object", required: false, note: "Analysis options, validated by the host." },
-              { name: "clientRequestId", type: "string", required: false, note: "Client-supplied request identifier." },
-            ],
-          },
-        ],
+        fieldTables: [RUNTIME_START_FIELDS],
         panels: [
           {
             kind: "request",
@@ -422,44 +596,41 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtime-starts/:commandId",
         summary: "Read lifecycle status by the accepted command.",
         responseSchema: "studio.local-runtime-status.v1",
-        fieldTables: [
+        fieldTables: [RUNTIME_STATUS_FIELDS],
+        panels: [
           {
-            title: "Status response",
-            label: "response",
-            fields: [
-              { name: "commandId", type: "string", note: "Accepted command identity." },
-              { name: "runtimeId", type: "string", note: "Runtime identity for all per-runtime resources." },
-              { name: "journalId", type: "string", note: "Journal backing this runtime." },
-              {
-                name: "lifecycle",
-                type: '"accepted" | "initializing" | "running" | "terminal" | "failed" | "interrupted"',
-                note: "The complete lifecycle state set.",
-              },
-              { name: "reason", type: "{ code, message } | null", note: "Closed failure-code set; null unless failed or interrupted." },
-              { name: "forecast", type: "object | null", note: 'Frozen forecast identity once accepted; baselineStatus is "floor_only".' },
-              { name: "runStartReceipt", type: "object | null", note: "Content id plus the run-start record once the runtime starts." },
-              { name: "journalHead", type: "number", note: "Highest journal sequence written." },
-              { name: "terminal", type: "boolean", note: "True once the lifecycle is terminal." },
-            ],
+            kind: "request",
+            title: "Request",
+            body: curlFor("GET", "/v1/runtime-starts/$COMMAND_ID"),
           },
         ],
-        panels: [],
       },
       {
         methods: ["GET"],
         path: "/v1/runtimes/:runtimeId",
         summary: "Read lifecycle status by runtime identity. Same response as the command read.",
         responseSchema: "studio.local-runtime-status.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [RUNTIME_STATUS_FIELDS],
+        panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID"),
+          },
+        ],
       },
       {
         methods: ["GET"],
         path: "/v1/runtimes/:runtimeId/events",
         summary: "Cursor-poll the append-only journal. Only after and limit are accepted.",
         responseSchema: "studio.local-runtime-events.v1",
-        fieldTables: [],
+        fieldTables: [EVENTS_QUERY_FIELDS, EVENTS_RESPONSE_FIELDS],
         panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/events?after=0&limit=2"),
+          },
           {
             kind: "response",
             title: "200 · events?after=0&limit=2 · captured",
@@ -479,7 +650,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtimes/:runtimeId/assessment-audits",
         summary: "Reopen stored evidence assessments and re-verify hashes and citation closure.",
         responseSchema: "studio.local-runtime-assessment-audits.v1",
-        fieldTables: [],
+        fieldTables: [listEnvelopeFields("audits", "Reopened assessment audits; empty when none are stored.")],
         panels: [
           {
             kind: "request",
@@ -498,8 +669,14 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtimes/:runtimeId/decision-receipts",
         summary: "Re-derive stored deterministic decisions from their audited inputs.",
         responseSchema: "studio.local-runtime-decision-receipts.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [listEnvelopeFields("decisions", "Re-derived decision receipts; empty when none are stored.")],
+        panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/decision-receipts"),
+          },
+        ],
       },
     ],
   },
@@ -513,8 +690,13 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtimes/:runtimeId/publish-review-intakes",
         summary: "Read host-produced intake receipts with their full decision lineage.",
         responseSchema: "studio.local-runtime-publish-review-intakes.v1",
-        fieldTables: [],
+        fieldTables: [listEnvelopeFields("intakes", "Host-produced intake receipts with decision lineage.")],
         panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/publish-review-intakes"),
+          },
           {
             kind: "response",
             title: "200 · captured",
@@ -566,8 +748,34 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtimes/:runtimeId/publish-review-revocations",
         summary: "Revoke a prior approval. Rejection and revocation stay visible forever.",
         responseSchema: "studio.local-runtime-publish-review-decisions.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [
+          {
+            title: "Revocation request",
+            label: "application/json",
+            fields: [
+              { name: "approval", type: "object", required: true, note: "Exact approval identity: reviewId, artifactId, receiptId, receiptContentId." },
+              {
+                name: "reviewer",
+                type: "{ id, attestation }",
+                required: true,
+                note: "Must name the host-configured reviewer id and repeat the exact revocation attestation string.",
+              },
+              {
+                name: "revocation",
+                type: "{ reasonCodes, note }",
+                required: true,
+                note: "Closed revocation reason codes; note may be null.",
+              },
+            ],
+          },
+        ],
+        panels: [
+          {
+            kind: "request",
+            title: "Request · revoke",
+            body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/publish-review-revocations", REVIEW_REVOCATION_EXAMPLE),
+          },
+        ],
       },
     ],
   },
@@ -581,7 +789,10 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtimes/:runtimeId/caption-productions",
         summary: "Request or reopen private caption candidates from one unrevoked approval receipt.",
         responseSchema: "studio.local-runtime-caption-productions.v1",
-        fieldTables: [],
+        fieldTables: [
+          CAPTION_PRODUCTION_REQUEST_FIELDS,
+          listEnvelopeFields("captions", "Private caption production records for this runtime."),
+        ],
         panels: [
           {
             kind: "request",
@@ -600,16 +811,31 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtimes/:runtimeId/caption-production-results",
         summary: "Read verified timed lines with exact source, approval, and promotion lineage.",
         responseSchema: "studio.local-runtime-caption-production-results.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [listEnvelopeFields("results", "Verified timed caption results with lineage.")],
+        panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/caption-production-results"),
+          },
+        ],
       },
       {
         methods: ["GET", "POST"],
         path: "/v1/runtimes/:runtimeId/caption-quality-controls",
         summary: "Run or reopen the deterministic structural caption QC gate.",
         responseSchema: "studio.local-runtime-caption-quality-controls.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [
+          CAPTION_QC_REQUEST_FIELDS,
+          listEnvelopeFields("qualityControls", "Structural QC records; empty until a candidate is submitted."),
+        ],
+        panels: [
+          {
+            kind: "request",
+            title: "Request · read",
+            body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/caption-quality-controls"),
+          },
+        ],
       },
     ],
   },
@@ -624,7 +850,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         summary:
           "Request typed meaning, word, phrase, grammar, and translation-choice facets over one verified caption span.",
         responseSchema: "studio.local-runtime-language-explanations.v1",
-        fieldTables: [],
+        fieldTables: [LANGUAGE_ENVELOPE_FIELDS],
         panels: [
           {
             kind: "request",
@@ -686,8 +912,18 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         path: "/v1/runtimes/:runtimeId/private-playback-grants/:grantId/revocations",
         summary: "Revoke an active playback grant before it expires.",
         responseSchema: "studio.private-playback-grant-revoked.v1",
-        fieldTables: [],
-        panels: [],
+        fieldTables: [PLAYBACK_REVOKE_FIELDS],
+        panels: [
+          {
+            kind: "request",
+            title: "Request",
+            body: curlFor(
+              "POST",
+              "/v1/runtimes/$RUNTIME_ID/private-playback-grants/$GRANT_ID/revocations",
+              PLAYBACK_REVOKE_EXAMPLE,
+            ),
+          },
+        ],
       },
       {
         methods: ["GET", "HEAD"],
@@ -695,7 +931,13 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         summary: "Stream granted media bytes with HTTP Range support. Binary response, no JSON envelope.",
         responseSchema: null,
         fieldTables: [],
-        panels: [],
+        panels: [
+          {
+            kind: "request",
+            title: "Request · HEAD + Range",
+            body: curlPrivateMediaHead(),
+          },
+        ],
       },
     ],
   },

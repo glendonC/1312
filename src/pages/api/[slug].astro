@@ -10,7 +10,6 @@ import NonClaimsSection from "../../features/api/sections/NonClaimsSection.astro
 import ReceiptsSection from "../../features/api/sections/ReceiptsSection.astro";
 import SiteLayout from "../../layouts/SiteLayout.astro";
 import { API_ENDPOINT_GROUPS, API_PAGES } from "../../features/api/model.ts";
-import "../../features/api/styles/index.css";
 
 export function getStaticPaths() {
   return API_PAGES.filter((page) => page.slug !== "").map((page) => ({

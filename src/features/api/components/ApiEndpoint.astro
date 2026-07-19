@@ -15,6 +15,9 @@ interface Props {
 }
 
 const { endpoint } = Astro.props;
+const hasResponsePanel = endpoint.panels.some((panel) => panel.kind === "response");
+const showAbsentResponse =
+  endpoint.panels.length > 0 && !hasResponsePanel && endpoint.responseSchema !== null;
 ---
 
 <details class="api-endpoint" open>
@@ -40,6 +43,9 @@ const { endpoint } = Astro.props;
         {endpoint.panels.map((panel) => (
           <ApiPanel title={panel.title} body={panel.body} />
         ))}
+        {showAbsentResponse && (
+          <p class="api-example-absent">No captured response for this route yet.</p>
+        )}
       </div>
     )}
   </div>

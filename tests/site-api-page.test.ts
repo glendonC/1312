@@ -65,6 +65,7 @@ test("every documented response schema is declared by the runtime host source", 
 test("every documented field name exists in the runtime host contract source", async () => {
   const contractSource = [
     await readHostSource("model.ts"),
+    await readHostSource("journalPolling.ts"),
     await readHostSource("../model/review.ts"),
     await readHostSource("../model/captions.ts"),
   ].join("\n");
@@ -109,8 +110,14 @@ test("code panels are executable requests or parseable captured responses", () =
   );
   const requests = panels.filter((panel) => panel.kind === "request");
   const responses = panels.filter((panel) => panel.kind === "response");
-  assert.ok(requests.length >= 6, "request panels cover the surface");
+  assert.ok(requests.length >= 18, "request panels cover the surface");
   assert.ok(responses.length >= 8, "response panels cover the surface");
+  for (const endpoint of API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)) {
+    assert.ok(
+      endpoint.panels.length > 0 || endpoint.fieldTables.length > 0,
+      `${endpoint.methods.join("|")} ${endpoint.path} documents fields or an example panel`,
+    );
+  }
   for (const panel of requests) {
     assert.ok(panel.body.startsWith("curl"), `request panel "${panel.title}" is an executable curl`);
   }

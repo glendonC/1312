@@ -1,6 +1,12 @@
 ---
 import ApiPager from "./components/ApiPager.astro";
 import ApiSidebar from "./components/ApiSidebar.astro";
+// Direct imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
+import "./styles/layout.css";
+import "./styles/sidebar.css";
+import "./styles/reference.css";
+import "./styles/panels.css";
+import "./styles/sections.css";
 
 interface Props {
   activeSlug: string;

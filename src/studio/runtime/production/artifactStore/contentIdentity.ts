@@ -92,3 +92,29 @@ export function createLanguageExplanationReceiptArtifactId(
     contentId,
   })}`;
 }
+
+export function createLearningPrepArtifactId(
+  runId: string,
+  jobId: string,
+  contentId: string,
+): string {
+  return `artifact:${canonicalSha256({
+    runId,
+    jobId,
+    kind: "learning-prep-output",
+    contentId,
+  })}`;
+}
+
+export function createLearningPrepReceiptArtifactId(
+  runId: string,
+  jobId: string,
+  contentId: string,
+): string {
+  return `artifact:${canonicalSha256({
+    runId,
+    jobId,
+    kind: "learning-prep-receipt",
+    contentId,
+  })}`;
+}

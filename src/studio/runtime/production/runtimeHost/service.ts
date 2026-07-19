@@ -43,6 +43,7 @@ import type {
   RuntimeHostPrivatePlaybackGrantRevocationResponse,
   RuntimeHostPublishReviewIntakeResponse,
   RuntimeHostLanguageExplanationResponse,
+  RuntimeHostLearningPrepResponse,
   RuntimeHostPublishReviewDecisionResponse,
   RuntimeHostStartAcknowledgement,
   RuntimeHostSourceSummary,
@@ -65,6 +66,9 @@ import { RuntimeReviewCaptionCoordinator } from "./reviewCaptionCoordinator.ts";
 import type { LanguageExplanationExecutor } from "../languageExplanations/executor.ts";
 import { UnavailableLanguageExplanationExecutor } from "../languageExplanations/executor.ts";
 import { RuntimeLanguageExplanationCoordinator } from "./languageExplanationCoordinator.ts";
+import type { LearningPrepExecutor } from "../learningPrep/executor.ts";
+import { UnavailableLearningPrepExecutor } from "../learningPrep/executor.ts";
+import { RuntimeLearningPrepCoordinator } from "./learningPrepCoordinator.ts";
 import { RuntimeMutationQueue } from "./runtimeMutationQueue.ts";
 import { RuntimePrivatePlaybackService, type PrivatePlaybackMediaResource } from "./privatePlayback.ts";
 
@@ -81,6 +85,7 @@ export interface RuntimeStartServiceOptions {
   reviewer?: PublishReviewOperator;
   captionExecutor?: CaptionProductionExecutor;
   languageExplanationExecutor?: LanguageExplanationExecutor;
+  learningPrepExecutor?: LearningPrepExecutor;
   /** Explicit compatibility selector; omitted means the U3 generalized production spine. */
   studyContractVersion?: StudyContractVersion;
   /** Host-owned memory/review store root. Defaults to cwd `memory/review`. */
@@ -113,6 +118,7 @@ export class RuntimeStartService {
   private readonly queries: RuntimeHostQueries;
   private readonly reviewCaption: RuntimeReviewCaptionCoordinator;
   private readonly languageExplanation: RuntimeLanguageExplanationCoordinator;
+  private readonly learningPrep: RuntimeLearningPrepCoordinator;
   private readonly privatePlayback: RuntimePrivatePlaybackService;
   private readonly studyContractVersion: StudyContractVersion;
   private readonly reviewedMemoryStore: string;
@@ -155,6 +161,15 @@ export class RuntimeStartService {
       lifecycle: this.lifecycle,
       queries: this.queries,
       executor: options.languageExplanationExecutor ?? new UnavailableLanguageExplanationExecutor(),
+      mutationQueue,
+      now: this.now,
+    });
+    this.learningPrep = new RuntimeLearningPrepCoordinator({
+      store: this.store,
+      sources: this.sources,
+      lifecycle: this.lifecycle,
+      queries: this.queries,
+      executor: options.learningPrepExecutor ?? new UnavailableLearningPrepExecutor(),
       mutationQueue,
       now: this.now,
     });
@@ -573,6 +588,17 @@ export class RuntimeStartService {
     return this.languageExplanation.create(runtimeId, value);
   }
 
+  async learningPreps(runtimeId: string): Promise<RuntimeHostLearningPrepResponse> {
+    return this.queries.learningPreps(runtimeId);
+  }
+
+  async createLearningPrep(
+    runtimeId: string,
+    value: unknown,
+  ): Promise<RuntimeHostLearningPrepResponse> {
+    return this.learningPrep.create(runtimeId, value);
+  }
+
   async createPrivatePlaybackGrant(
     runtimeId: string,
     value: unknown,
@@ -607,6 +633,7 @@ export class RuntimeStartService {
       }
       if (reconciled.journalHead > 0) {
         await this.languageExplanation.recoverInterrupted(record.runtimeId);
+        await this.learningPrep.recoverInterrupted(record.runtimeId);
       }
     }
   }

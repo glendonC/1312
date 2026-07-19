@@ -215,6 +215,33 @@ test("HTTP adapter enforces loopback, token, origin, content, shape, and path-re
       (await invalidExplanation.json() as { error: { code: string } }).error.code,
       "invalid_language_explanation_request",
     );
+    const emptyLearningPreps = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/learning-preps`,
+      { headers: authorized },
+    );
+    assert.equal(emptyLearningPreps.status, 200);
+    const emptyLearningPrepBody = await emptyLearningPreps.json() as { schema: string; attempts: unknown[]; results: unknown[] };
+    assert.equal(emptyLearningPrepBody.schema, "studio.local-runtime-learning-preps.v1");
+    assert.deepEqual(emptyLearningPrepBody.attempts, []);
+    assert.deepEqual(emptyLearningPrepBody.results, []);
+    const learningPrepWithoutContentType = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/learning-preps`,
+      { method: "POST", headers: authorized, body: "{}" },
+    );
+    assert.equal(learningPrepWithoutContentType.status, 415);
+    const invalidLearningPrep = await fetch(
+      `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/learning-preps`,
+      {
+        method: "POST",
+        headers: { ...authorized, "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    assert.equal(invalidLearningPrep.status, 400);
+    assert.equal(
+      (await invalidLearningPrep.json() as { error: { code: string } }).error.code,
+      "invalid_learning_prep_request",
+    );
     const createReview = await fetch(
       `${base}/v1/runtimes/${encodeURIComponent(ack.runtimeId)}/publish-review-decisions`,
       {

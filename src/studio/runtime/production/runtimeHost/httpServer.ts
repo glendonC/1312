@@ -565,6 +565,38 @@ export function createRuntimeHostHttpServer(options: RuntimeHostHttpOptions): Se
         return;
       }
 
+      const learningPrepRuntimeId = routeIdentity(
+        url.pathname,
+        /^\/v1\/runtimes\/([^/]+)\/learning-preps$/,
+      );
+      if (learningPrepRuntimeId !== null) {
+        if (url.search) throw new RuntimeHostError("unknown_query", "This endpoint accepts no query parameters.");
+        if (request.method === "GET") {
+          sendJson(response, 200, await options.service.learningPreps(learningPrepRuntimeId), origin);
+          return;
+        }
+        if (request.method !== "POST") {
+          throw new RuntimeHostError("method_not_allowed", "Only GET and POST are supported for this endpoint.", 405);
+        }
+        if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json") {
+          throw new RuntimeHostError(
+            "unsupported_content_type",
+            "Learning preps require Content-Type: application/json.",
+            415,
+          );
+        }
+        sendJson(
+          response,
+          201,
+          await options.service.createLearningPrep(
+            learningPrepRuntimeId,
+            await readJsonBody(request, maximumBytes),
+          ),
+          origin,
+        );
+        return;
+      }
+
       const privatePlaybackRuntimeId = routeIdentity(
         url.pathname,
         /^\/v1\/runtimes\/([^/]+)\/private-playback-grants$/,

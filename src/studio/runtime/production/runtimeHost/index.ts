@@ -29,6 +29,8 @@ export type {
   RuntimeHostCaptionQualityControlRequest,
   RuntimeHostLanguageExplanationRequest,
   RuntimeHostLanguageExplanationResponse,
+  RuntimeHostLearningPrepRequest,
+  RuntimeHostLearningPrepResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPrivatePlaybackGrant,
   RuntimeHostPrivatePlaybackGrantRequest,
@@ -66,6 +68,12 @@ export {
   UnavailableLanguageExplanationExecutor,
   type LanguageExplanationExecutor,
 } from "../languageExplanations/index.ts";
+export {
+  DeterministicLearningPrepTestExecutor,
+  UnavailableLearningPrepExecutor,
+  resolveLearningPrepExecutorConfiguration,
+  type LearningPrepExecutor,
+} from "../learningPrep/index.ts";
 export {
   DeterministicCurrentRunCaptionTestExecutor,
   OpenAiCaptionProductionExecutor,

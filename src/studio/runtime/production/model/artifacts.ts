@@ -478,6 +478,38 @@ export interface LanguageExplanationReceiptArtifactOrigin {
   approvalArtifactId: string;
 }
 
+export interface LearningPrepOutputArtifactOrigin {
+  kind: "learning_prep_output";
+  jobId: string;
+  receiptId: string;
+  receiptContentId: string;
+  captionArtifactId: string;
+  captionContentId: string;
+  captionReceiptArtifactId: string;
+  captionReceiptContentId: string;
+  sourceArtifactId: string;
+  studyArtifactId: string;
+  readinessArtifactId: string;
+  approvalArtifactId: string;
+}
+
+export interface LearningPrepReceiptArtifactOrigin {
+  kind: "learning_prep_receipt";
+  jobId: string;
+  receiptId: string;
+  receiptContentId: string;
+  prepArtifactId: string;
+  prepContentId: string;
+  captionArtifactId: string;
+  captionContentId: string;
+  captionReceiptArtifactId: string;
+  captionReceiptContentId: string;
+  sourceArtifactId: string;
+  studyArtifactId: string;
+  readinessArtifactId: string;
+  approvalArtifactId: string;
+}
+
 export interface RuntimeArtifact {
   schema: "studio.runtime.artifact.v1";
   id: string;
@@ -542,7 +574,9 @@ export interface RuntimeArtifact {
     | CaptionProductionReceiptArtifactOrigin
     | CaptionQualityControlArtifactOrigin
     | LanguageExplanationOutputArtifactOrigin
-    | LanguageExplanationReceiptArtifactOrigin;
+    | LanguageExplanationReceiptArtifactOrigin
+    | LearningPrepOutputArtifactOrigin
+    | LearningPrepReceiptArtifactOrigin;
 }
 
 export interface WorkerOutputEnvelope {

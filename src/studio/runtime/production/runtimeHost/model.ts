@@ -20,7 +20,7 @@ import type {
   VerifiedCaptionProductionResult,
 } from "../captions/captionProductionAudit.ts";
 import type { CaptionQualityControlVerification } from "../captions/captionQualityControlAudit.ts";
-import type { VerifiedLanguageExplanationResult } from "../model.ts";
+import type { VerifiedLanguageExplanationResult, VerifiedLearningPrepResult } from "../model.ts";
 
 export const RUNTIME_HOST_LIFECYCLE_STATES = [
   "accepted",
@@ -367,6 +367,17 @@ export interface RuntimeHostLanguageExplanationResponse {
 }
 
 export type RuntimeHostLanguageExplanationRequest = import("../model.ts").LanguageExplanationRequest;
+
+export interface RuntimeHostLearningPrepResponse {
+  schema: "studio.local-runtime-learning-preps.v1";
+  commandId: string;
+  runtimeId: string;
+  journalHead: number;
+  attempts: import("../model.ts").LearningPrepAttemptState[];
+  results: VerifiedLearningPrepResult[];
+}
+
+export type RuntimeHostLearningPrepRequest = import("../model.ts").LearningPrepRequest;
 
 export interface InitializedRuntimeApplication {
   runtimeRoot: string;

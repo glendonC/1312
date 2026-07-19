@@ -55,6 +55,8 @@ export function projectOutputArtifacts(state: RuntimeProjection, reports: readon
         artifact.origin.kind === "caption_quality_control" ||
         artifact.origin.kind === "language_explanation_output" ||
         artifact.origin.kind === "language_explanation_receipt" ||
+        artifact.origin.kind === "learning_prep_output" ||
+        artifact.origin.kind === "learning_prep_receipt" ||
         artifact.origin.kind === "study_report" ||
         artifact.origin.kind === "parent_artifact_disposition" ||
         artifact.origin.kind === "parent_admission" ||

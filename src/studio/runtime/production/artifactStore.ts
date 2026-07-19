@@ -71,6 +71,9 @@ import {
   buildLanguageExplanationArtifacts as buildLanguageExplanationArtifactsBuilder,
 } from "./artifactStore/languageExplanationArtifacts.ts";
 import {
+  buildLearningPrepArtifacts as buildLearningPrepArtifactsBuilder,
+} from "./artifactStore/learningPrepArtifacts.ts";
+import {
   canonicalJson,
   canonicalJsonContentId,
   canonicalSha256,
@@ -84,6 +87,8 @@ export {
   createCaptionArtifactId,
   createLanguageExplanationArtifactId,
   createLanguageExplanationReceiptArtifactId,
+  createLearningPrepArtifactId,
+  createLearningPrepReceiptArtifactId,
   createSourceArtifactId,
   identifyFile,
 } from "./artifactStore/contentIdentity.ts";
@@ -580,6 +585,12 @@ export class ContentAddressedArtifactStore {
     input: Parameters<typeof buildLanguageExplanationArtifactsBuilder>[0],
   ): ReturnType<typeof buildLanguageExplanationArtifactsBuilder> {
     return buildLanguageExplanationArtifactsBuilder(input);
+  }
+
+  buildLearningPrepArtifacts(
+    input: Parameters<typeof buildLearningPrepArtifactsBuilder>[0],
+  ): ReturnType<typeof buildLearningPrepArtifactsBuilder> {
+    return buildLearningPrepArtifactsBuilder(input);
   }
 
   async record(ledger: RuntimeLedger, artifact: RuntimeArtifact, causationId: string | null = null): Promise<void> {

@@ -1,12 +1,21 @@
 import type { ArtifactOriginValidationInput } from "./artifactOrigin.ts";
 import { contentId, exact, fail, string } from "./primitives.ts";
 
+const APPLY_RECEIPT_OUTPUT_KEYS: Record<string, [string, string]> = {
+  language_explanation_receipt: ["explanationArtifactId", "explanationContentId"],
+  learning_prep_receipt: ["prepArtifactId", "prepContentId"],
+};
+
 export function validateApplyArtifactOrigin(
   kind: string,
   input: ArtifactOriginValidationInput,
 ): boolean {
   const { item, origin, mediaClass, sources, task, agent, context, path } = input;
-  if (kind !== "language_explanation_output" && kind !== "language_explanation_receipt") return false;
+  if (
+    kind !== "language_explanation_output" && kind !== "language_explanation_receipt" &&
+    kind !== "learning_prep_output" && kind !== "learning_prep_receipt"
+  ) return false;
+  const receiptKeys = APPLY_RECEIPT_OUTPUT_KEYS[kind] ?? null;
 
   const commonKeys = [
     "kind",
@@ -24,9 +33,7 @@ export function validateApplyArtifactOrigin(
   ];
   exact(
     origin,
-    kind === "language_explanation_receipt"
-      ? [...commonKeys, "explanationArtifactId", "explanationContentId"]
-      : commonKeys,
+    receiptKeys ? [...commonKeys, ...receiptKeys] : commonKeys,
     context,
     `${path}.origin`,
   );
@@ -41,14 +48,14 @@ export function validateApplyArtifactOrigin(
   const studyArtifactId = string(origin.studyArtifactId, context, `${path}.origin.studyArtifactId`);
   const readinessArtifactId = string(origin.readinessArtifactId, context, `${path}.origin.readinessArtifactId`);
   const approvalArtifactId = string(origin.approvalArtifactId, context, `${path}.origin.approvalArtifactId`);
-  const explanationArtifactId = kind === "language_explanation_receipt"
-    ? string(origin.explanationArtifactId, context, `${path}.origin.explanationArtifactId`)
+  const outputArtifactId = receiptKeys
+    ? string(origin[receiptKeys[0]], context, `${path}.origin.${receiptKeys[0]}`)
     : null;
-  if (kind === "language_explanation_receipt") {
-    contentId(origin.explanationContentId, context, `${path}.origin.explanationContentId`);
+  if (receiptKeys) {
+    contentId(origin[receiptKeys[1]], context, `${path}.origin.${receiptKeys[1]}`);
   }
-  const expectedSources = kind === "language_explanation_receipt"
-    ? [explanationArtifactId!, captionArtifactId, captionReceiptArtifactId, sourceArtifactId, studyArtifactId, readinessArtifactId, approvalArtifactId]
+  const expectedSources = receiptKeys
+    ? [outputArtifactId!, captionArtifactId, captionReceiptArtifactId, sourceArtifactId, studyArtifactId, readinessArtifactId, approvalArtifactId]
     : [captionArtifactId, captionReceiptArtifactId, sourceArtifactId, studyArtifactId, readinessArtifactId, approvalArtifactId];
   if (
     mediaClass !== "non_media" ||
@@ -58,9 +65,9 @@ export function validateApplyArtifactOrigin(
     task !== null ||
     agent !== null ||
     JSON.stringify(sources) !== JSON.stringify(expectedSources) ||
-    (kind === "language_explanation_receipt" && receiptContentId !== (item.content as { contentId: string }).contentId)
+    (receiptKeys !== null && receiptContentId !== (item.content as { contentId: string }).contentId)
   ) {
-    fail(context, path, "language explanations must be private host-produced non-media artifacts over exact caption authority");
+    fail(context, path, "private Apply outputs must be private host-produced non-media artifacts over exact caption authority");
   }
   return true;
 }

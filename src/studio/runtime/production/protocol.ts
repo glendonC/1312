@@ -86,6 +86,11 @@ import type {
   LanguageExplanationStartedEvent,
 } from "./protocol/languageExplanationEvents.ts";
 import type {
+  LearningPrepCompletedEvent,
+  LearningPrepFailedEvent,
+  LearningPrepStartedEvent,
+} from "./protocol/learningPrepEvents.ts";
+import type {
   AgentRecoveryAuthorizedEvent,
   AgentRecoveryTerminalRecordedEvent,
   ExecutorFailureClassifiedEvent,
@@ -104,6 +109,7 @@ export * from "./protocol/computerUseEvents.ts";
 export * from "./protocol/reviewEvents.ts";
 export * from "./protocol/studyEvents.ts";
 export * from "./protocol/languageExplanationEvents.ts";
+export * from "./protocol/learningPrepEvents.ts";
 export * from "./protocol/agentRecoveryEvents.ts";
 
 export type RuntimeEvent =
@@ -176,6 +182,9 @@ export type RuntimeEvent =
   | LanguageExplanationStartedEvent
   | LanguageExplanationCompletedEvent
   | LanguageExplanationFailedEvent
+  | LearningPrepStartedEvent
+  | LearningPrepCompletedEvent
+  | LearningPrepFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent
   | RootOutputDispositionRecordedEvent

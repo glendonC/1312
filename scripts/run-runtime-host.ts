@@ -20,6 +20,7 @@ import {
   listenRuntimeHost,
 } from "../src/studio/runtime/production/runtimeHost/index.ts";
 import { resolveLanguageExplanationExecutorConfiguration } from "../src/studio/runtime/production/languageExplanations/configuration.ts";
+import { resolveLearningPrepExecutorConfiguration } from "../src/studio/runtime/production/learningPrep/configuration.ts";
 
 const REPOSITORY = resolve(import.meta.dirname, "..");
 
@@ -86,6 +87,8 @@ const languageExplanationConfiguration = resolveLanguageExplanationExecutorConfi
   allowReal: flag("--allow-real-language-explanation"),
   model: value("--language-explanation-model"),
 });
+// Learning prep has no CLI-reachable real or test executor in this slice; the host default stays unavailable.
+resolveLearningPrepExecutorConfiguration({ mode: value("--learning-prep-executor") });
 
 async function openAiKey(): Promise<string> {
   const environmentKey = process.env.OPENAI_API_KEY?.trim();

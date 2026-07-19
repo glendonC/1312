@@ -130,6 +130,32 @@ that exact claim and a task cannot acquire a second executor in replay. File-jou
 stale sequence writers. Recovery never resumes an ambiguous model turn: it appends
 `runtime.interrupted`, closes active executor/task identities, and does not create a report.
 
+The generalized initial-coverage path also has a narrower same-process recovery contract for an
+already terminal executor fault. A launcher-authored
+`studio.executor-failure-classification.receipt.v1` separates replaceable `process_failed`,
+`executor_timed_out`, `required_tool_omitted`, `invalid_structured_output`, and
+`provider_transport_failed` faults from terminal configuration, authorization, interruption,
+output-limit, handoff, root, and unknown failures. The scheduler, not the model, may then append one
+content-addressed `studio.agent-recovery-authorization.receipt.v1` and atomically create attempt 1
+for the exact attempt-0 source, range, task context, required output, capability envelope,
+dependencies, and 240,000 ms/2-call allocation. The logical work identity is immutable, the task,
+agent, launch, and executor identities are new, and attempt 0 remains a failed task with its original
+executor and classification facts. A terminal
+`studio.agent-recovery-terminal.receipt.v1` records only `replacement_reported` or `exhausted`; a
+reported replacement enters the unchanged report/disposition/admission/read/synthesis path, while
+exhaustion permits no attempt 2 and withholds the root.
+
+The generalized ceilings are explicit and separate: 1,220,000 ms/32 calls for baseline allocation,
+480,000 ms/4 calls for at most two initial-coverage replacement reservations, and 1,700,000 ms/36
+calls total. These are allocation ceilings, not forecasts of cost, success, correctness, or quality.
+Ordinary model-authored spawn remains charged only against the baseline ceiling and cannot consume
+the recovery contingency; equivalent ordinary work after a recovery authorization is rejected.
+Valid unavailable/empty provider results, weak or conflicting evidence, report rejection, caption or
+Learning work, root failure, and ambiguous host-restart state do not enter this replacement lane.
+Cold restart still interrupts ambiguous work and cannot reconstruct the process-local launch permit;
+this slice proves duplicate prevention and honest interruption, not restart liveness or root
+continuation.
+
 The deterministic orchestrator remains an explicitly named test seam. Its host-authored child
 contract proves scheduler/launch/replay mechanics only and is not model-planning evidence. The
 guarded real-Codex proof requires `STUDIO_RUN_REAL_CODEX_SWARM=1` and an explicit

@@ -334,7 +334,8 @@ export type SpawnRejection =
   | "restudy_producer_pass_cap"
   | "separation_duplicate_work"
   | "research_duplicate_work"
-  | "computer_use_duplicate_work";
+  | "computer_use_duplicate_work"
+  | "recovery_authority_required";
 
 export interface LaunchPermit {
   requestId: string;

@@ -28,6 +28,9 @@ import type {
   ComputerUseGrantScope,
   ComputerUseRequestCandidate,
   ComputerUseSurface,
+  AgentRecoveryAuthorizationReceipt,
+  AgentRecoveryPolicyContract,
+  AgentRecoveryTerminalReceipt,
 } from "./model.ts";
 import type { RuntimeLedger } from "./journal.ts";
 import { currentRestudiedResearchBasis } from "./research/restudiedResearchBasis.ts";
@@ -57,6 +60,14 @@ import {
 } from "./validation/research.ts";
 import { computerUseCandidateId, validateComputerUseDriver, validateComputerUseSurface } from "./validation/computerUse.ts";
 import { VISUAL_TRANSITION_LIMITS } from "./model/visualTransitions.ts";
+import {
+  initialCoverageRecoveryBasis,
+  recoveryAttemptId,
+  recoveryEquivalentInputFingerprint,
+  recoveryReceiptIdentity,
+  replacementWorkloadKey,
+} from "./recovery/agentRecoveryIdentity.ts";
+import { validateAgentRecoveryPolicyIdentity } from "./recovery/agentRecoveryPolicy.ts";
 
 export interface RuntimeIdentityFactory {
   next(kind: "request" | "task" | "agent" | "grant"): string;
@@ -100,6 +111,17 @@ function allocated(state: RuntimeProjection): { wallMs: number; toolCalls: numbe
   );
 }
 
+function allocatedWithoutRecovery(state: RuntimeProjection): { wallMs: number; toolCalls: number } {
+  const recoveryTaskIds = new Set(Object.values(state.agentRecoveries).map((entry) => entry.authorization.replacement.taskId));
+  return Object.values(state.tasks).filter((task) => !recoveryTaskIds.has(task.id)).reduce(
+    (total, task) => ({
+      wallMs: total.wallMs + task.budget.wallMs,
+      toolCalls: total.toolCalls + task.budget.toolCalls,
+    }),
+    { wallMs: 0, toolCalls: 0 },
+  );
+}
+
 function evidenceWindow(
   state: RuntimeProjection,
   input: SpawnRequestInput,
@@ -130,6 +152,22 @@ export interface TaskLaunchClaimResult {
   claim: TaskLaunchRecord;
 }
 
+export type AgentRecoveryRejection =
+  | "recovery_not_configured"
+  | "recovery_stale_or_ineligible"
+  | "recovery_duplicate_work"
+  | "recovery_attempt_ceiling"
+  | "recovery_budget"
+  | "recovery_concurrency";
+
+export interface AgentRecoveryDecision {
+  workId: string | null;
+  decision: "authorized" | "rejected";
+  rejection: AgentRecoveryRejection | null;
+  authorization: AgentRecoveryAuthorizationReceipt | null;
+  permit: LaunchPermit | null;
+}
+
 export class BoundedRuntimeScheduler {
   private readonly permits = new Map<string, LaunchPermit>();
   private readonly ledger: RuntimeLedger;
@@ -138,6 +176,7 @@ export class BoundedRuntimeScheduler {
   /** Host-policy egress allowlist for minted research grants. Never model-authored; empty means no egress. */
   private readonly researchAllowedDomains: string[];
   private readonly computerUsePolicy: { surface: ComputerUseSurface; driver: ComputerUseDriverIdentity } | null;
+  private readonly agentRecoveryPolicy: AgentRecoveryPolicyContract | null;
 
   constructor(
     ledger: RuntimeLedger,
@@ -146,6 +185,7 @@ export class BoundedRuntimeScheduler {
     policies: {
       researchAllowedDomains?: readonly string[];
       computerUse?: { surface: ComputerUseSurface; driver: ComputerUseDriverIdentity };
+      agentRecovery?: AgentRecoveryPolicyContract;
     } = {},
   ) {
     this.ledger = ledger;
@@ -159,6 +199,14 @@ export class BoundedRuntimeScheduler {
       surface: validateComputerUseSurface(policies.computerUse.surface, "Scheduler computer-use policy", "surface"),
       driver: validateComputerUseDriver(policies.computerUse.driver, "Scheduler computer-use policy", "driver"),
     };
+    this.agentRecoveryPolicy = policies.agentRecovery === undefined ? null : structuredClone(policies.agentRecovery);
+    if (this.agentRecoveryPolicy) {
+      if (!validateAgentRecoveryPolicyIdentity(this.agentRecoveryPolicy)) throw new Error("Scheduler agent-recovery policy identity is invalid");
+      if (
+        this.agentRecoveryPolicy.baselineBudget.wallMs + this.agentRecoveryPolicy.recoveryContingency.wallMs > limits.runBudget.wallMs ||
+        this.agentRecoveryPolicy.baselineBudget.toolCalls + this.agentRecoveryPolicy.recoveryContingency.toolCalls > limits.runBudget.toolCalls
+      ) throw new Error("Scheduler recovery ceilings exceed the total run budget");
+    }
   }
 
   private grants(
@@ -481,10 +529,17 @@ export class BoundedRuntimeScheduler {
       return "scope_violation";
     }
     if (!this.capabilityValid(state, input, allowConditionalSeparation, allowResearch, allowComputerUse)) return "capability_not_grantable";
-    const total = allocated(state);
+    if (this.agentRecoveryPolicy) {
+      const fingerprint = recoveryEquivalentInputFingerprint(input);
+      if (Object.values(state.agentRecoveries).some((recovery) => {
+        return fingerprint === recoveryEquivalentInputFingerprint(recovery.authorization.work.initialInput);
+      })) return "recovery_authority_required";
+    }
+    const total = this.agentRecoveryPolicy ? allocatedWithoutRecovery(state) : allocated(state);
+    const ceiling = this.agentRecoveryPolicy?.baselineBudget ?? this.limits.runBudget;
     if (
-      total.wallMs + input.budget.wallMs > this.limits.runBudget.wallMs ||
-      total.toolCalls + input.budget.toolCalls > this.limits.runBudget.toolCalls
+      total.wallMs + input.budget.wallMs > ceiling.wallMs ||
+      total.toolCalls + input.budget.toolCalls > ceiling.toolCalls
     ) {
       return "run_budget";
     }
@@ -1173,6 +1228,219 @@ export class BoundedRuntimeScheduler {
       { ...input, dependencies },
       { executionId, toolCallId },
     );
+  }
+
+  agentRecoveryEnabled(): boolean {
+    return this.agentRecoveryPolicy !== null;
+  }
+
+  /**
+   * Host-only admission for one replacement of one failed generalized initial-coverage task.
+   * The caller supplies identities only. The scheduler cold-derives and clones the exact work
+   * contract, so no model or recovery caller can author replacement scope or capabilities.
+   */
+  async authorizeInitialCoverageRecovery(
+    rootExecutionId: string,
+    failedTaskId: string,
+  ): Promise<AgentRecoveryDecision> {
+    const policy = this.agentRecoveryPolicy;
+    if (!policy) return { workId: null, decision: "rejected", rejection: "recovery_not_configured", authorization: null, permit: null };
+    const transaction = await this.ledger.transact<AgentRecoveryDecision>(
+      { producer: { kind: "scheduler", id: "bounded-agent-recovery-scheduler" }, causationId: failedTaskId },
+      ({ state }) => {
+        const basis = initialCoverageRecoveryBasis(state, policy, rootExecutionId, failedTaskId);
+        if (!basis) {
+          const existing = Object.values(state.agentRecoveries).find((entry) => entry.authorization.failedAttempt.taskId === failedTaskId);
+          return {
+            pending: [],
+            result: {
+              workId: existing?.workId ?? null,
+              decision: "rejected",
+              rejection: existing ? "recovery_duplicate_work" : "recovery_stale_or_ineligible",
+              authorization: existing?.authorization ?? null,
+              permit: null,
+            },
+          };
+        }
+        if (state.agentRecoveries[basis.workId] || Object.values(state.agentRecoveries).some((entry) =>
+          entry.authorization.failedAttempt.taskId === basis.task.id)) {
+          return { pending: [], result: { workId: basis.workId, decision: "rejected", rejection: "recovery_duplicate_work", authorization: null, permit: null } };
+        }
+        if (Object.keys(state.agentRecoveries).length >= policy.maxReplacementsPerRun) {
+          return { pending: [], result: { workId: basis.workId, decision: "rejected", rejection: "recovery_attempt_ceiling", authorization: null, permit: null } };
+        }
+        if (Object.values(state.tasks).filter((task) => active(task.status)).length >= this.limits.maxActiveWorkers) {
+          return { pending: [], result: { workId: basis.workId, decision: "rejected", rejection: "recovery_concurrency", authorization: null, permit: null } };
+        }
+        const reserved = Object.values(state.agentRecoveries).reduce(
+          (sum, entry) => ({
+            wallMs: sum.wallMs + entry.authorization.reservedSpend.wallMs,
+            toolCalls: sum.toolCalls + entry.authorization.reservedSpend.toolCalls,
+          }),
+          { wallMs: 0, toolCalls: 0 },
+        );
+        const total = allocated(state);
+        if (
+          reserved.wallMs + policy.replacementBudget.wallMs > policy.recoveryContingency.wallMs ||
+          reserved.toolCalls + policy.replacementBudget.toolCalls > policy.recoveryContingency.toolCalls ||
+          total.wallMs + policy.replacementBudget.wallMs > this.limits.runBudget.wallMs ||
+          total.toolCalls + policy.replacementBudget.toolCalls > this.limits.runBudget.toolCalls
+        ) {
+          return { pending: [], result: { workId: basis.workId, decision: "rejected", rejection: "recovery_budget", authorization: null, permit: null } };
+        }
+
+        const requestId = this.identities.next("request");
+        const taskId = this.identities.next("task");
+        const agentId = this.identities.next("agent");
+        const workloadKey = replacementWorkloadKey(basis.workId);
+        const input: SpawnRequestInput = {
+          ...structuredClone(basis.request.input),
+          workloadKey,
+        };
+        const grants = this.grants(state, taskId, agentId, input);
+        const permit: LaunchPermit = {
+          requestId,
+          taskId,
+          agentId,
+          registrationSecret: this.identities.secret(),
+        };
+        const task: TaskRecord = {
+          id: taskId,
+          runId: state.runId,
+          workloadKey,
+          objective: input.objective,
+          workerKind: input.workerKind,
+          workerLabel: input.workerLabel,
+          parentTaskId: basis.root.id,
+          parentAgentId: basis.root.ownerAgentId,
+          depth: basis.root.depth + 1,
+          assignedAgentId: agentId,
+          ownerAgentId: null,
+          jobContext: attenuateTaskJobContext(basis.root.jobContext, input.mediaScope, input.inputArtifactIds),
+          mediaScope: structuredClone(input.mediaScope),
+          inputArtifactIds: [...input.inputArtifactIds],
+          requiredOutputs: structuredClone(input.requiredOutputs),
+          dependencies: [...input.dependencies],
+          budget: { ...input.budget },
+          grants,
+          status: "scheduled",
+          terminalReason: null,
+        };
+        const body = {
+          runId: state.runId,
+          policy: structuredClone(policy),
+          parent: { taskId: basis.root.id, agentId: basis.root.ownerAgentId!, executionId: basis.rootExecution.id },
+          work: {
+            workId: basis.workId,
+            contractFingerprint: basis.contractFingerprint,
+            initialSpawnRequestId: basis.request.id,
+            initialInput: structuredClone(basis.request.input),
+            jobContextId: basis.task.jobContext.contextId,
+          },
+          failedAttempt: {
+            attemptId: recoveryAttemptId(basis.workId, 0),
+            ordinal: 0 as const,
+            taskId: basis.task.id,
+            agentId: basis.task.assignedAgentId,
+            executionId: basis.execution.id,
+            executorReceiptId: basis.execution.receipt!.receiptId,
+            failureClassificationReceiptId: basis.classification.receiptId,
+            failureCode: basis.classification.code,
+          },
+          replacement: {
+            attemptId: recoveryAttemptId(basis.workId, 1),
+            ordinal: 1 as const,
+            spawnRequestId: requestId,
+            taskId,
+            agentId,
+            workloadKey,
+          },
+          reservedSpend: { ...policy.replacementBudget },
+          nonClaims: {
+            outcome: "not_known_at_authorization" as const,
+            semanticPreference: "not_used" as const,
+            quality: "not_assessed" as const,
+          },
+        };
+        const authorization: AgentRecoveryAuthorizationReceipt = {
+          schema: "studio.agent-recovery-authorization.receipt.v1",
+          ...recoveryReceiptIdentity("agent-recovery-authorization", body),
+          ...body,
+        };
+        return {
+          pending: [
+            { type: "agent.recovery_authorized", data: { receipt: authorization } },
+            { type: "spawn.requested", data: {
+              requestId,
+              requestedByTaskId: basis.root.id,
+              requestedByAgentId: basis.root.ownerAgentId!,
+              authoredByExecutionId: null,
+              toolCallId: null,
+              input,
+            } },
+            { type: "spawn.decided", data: { requestId, accepted: true, rejection: null, taskId, agentId, grants } },
+            { type: "task.created", data: { task } },
+          ] satisfies PendingRuntimeEvent[],
+          result: { workId: basis.workId, decision: "authorized", rejection: null, authorization, permit },
+        };
+      },
+    );
+    if (transaction.result.permit) this.permits.set(transaction.result.permit.requestId, transaction.result.permit);
+    return transaction.result;
+  }
+
+  async finalizeInitialCoverageRecovery(workId: string): Promise<AgentRecoveryTerminalReceipt> {
+    const transaction = await this.ledger.transact<AgentRecoveryTerminalReceipt>(
+      { producer: { kind: "recovery_host", id: "initial-coverage-recovery-host" }, causationId: workId },
+      ({ state }) => {
+        const recovery = state.agentRecoveries[workId];
+        if (!recovery) throw new Error("Recovery terminal requires one authorized work identity");
+        if (recovery.terminal) return { pending: [], result: structuredClone(recovery.terminal) };
+        const authorization = recovery.authorization;
+        const task = state.tasks[authorization.replacement.taskId];
+        const execution = Object.values(state.executions).find((entry) => entry.taskId === task?.id);
+        const report = Object.values(state.reports).find((entry) => entry.taskId === task?.id) ?? null;
+        const reported = task?.status === "reported" || task?.status === "completed";
+        const exhausted = task?.status === "failed" || task?.status === "withheld" || task?.status === "interrupted";
+        if (!execution || (!reported && !exhausted) || (reported && !report) || (exhausted && report)) {
+          throw new Error("Recovery replacement has not reached one unambiguous terminal report or failure state");
+        }
+        const outcome = reported ? "replacement_reported" as const : "exhausted" as const;
+        const body = {
+          runId: state.runId,
+          policyId: authorization.policy.policyId,
+          workId,
+          authorizationReceiptId: authorization.receiptId,
+          failedAttemptId: authorization.failedAttempt.attemptId,
+          replacementAttemptId: authorization.replacement.attemptId,
+          replacementTaskId: task.id,
+          replacementExecutionId: execution.id,
+          replacementReportId: report?.id ?? null,
+          outcome,
+          attemptsConsumed: 2 as const,
+          remainingAttempts: 0 as const,
+          authorizedAllocation: { ...authorization.reservedSpend },
+          reason: reported
+            ? "The one authorized replacement produced one ordinary terminal report; correctness and quality remain unassessed."
+            : task.terminalReason!,
+          nonClaims: {
+            correctness: "not_assessed" as const,
+            semanticQuality: "not_assessed" as const,
+            bestOfK: "not_performed" as const,
+          },
+        };
+        const receipt: AgentRecoveryTerminalReceipt = {
+          schema: "studio.agent-recovery-terminal.receipt.v1",
+          ...recoveryReceiptIdentity("agent-recovery-terminal", body),
+          ...body,
+        };
+        return {
+          pending: [{ type: "agent.recovery_terminal_recorded", data: { receipt } }] satisfies PendingRuntimeEvent[],
+          result: receipt,
+        };
+      },
+    );
+    return transaction.result;
   }
 
   async claimTaskLaunch(

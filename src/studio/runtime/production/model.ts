@@ -1,4 +1,5 @@
 export * from "./model/artifacts.ts";
+export * from "./model/agentRecovery.ts";
 export * from "./model/captions.ts";
 export * from "./model/computerUse.ts";
 export * from "./model/evidence.ts";

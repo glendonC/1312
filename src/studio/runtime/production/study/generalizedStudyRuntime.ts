@@ -21,6 +21,7 @@ import {
   type GeneralizedReadinessV3Result,
   type GeneralizedReadinessV3Reference,
 } from "./generalizedStudyReadinessHost.ts";
+import { assertRecoveryAdmissionAuthority } from "../recovery/agentRecoveryIdentity.ts";
 
 async function storedReport(
   artifacts: ContentAddressedArtifactStore,
@@ -34,10 +35,14 @@ async function storedReport(
 }
 
 export function admittedReportsFromProjection(ledger: RuntimeLedger, parentTaskId: string): AdmittedStudyReportV2[] {
-  return Object.values(ledger.state().generalizedParentArtifactAdmissions)
+  const state = ledger.state();
+  const entries = Object.values(state.generalizedParentArtifactAdmissions)
     .filter((entry): entry is GeneralizedParentAdmissionRecord =>
       entry.contractVersion === 2 && entry.parentTaskId === parentTaskId)
-    .sort((left, right) => left.admissionId.localeCompare(right.admissionId))
+    .sort((left, right) => left.admissionId.localeCompare(right.admissionId));
+  const workIds = entries.map((entry) => assertRecoveryAdmissionAuthority(state, entry.childTaskId)).filter((entry): entry is string => entry !== null);
+  if (new Set(workIds).size !== workIds.length) throw new Error("Generalized synthesis cannot select among duplicate recovery work reports");
+  return entries
     .map((entry) => ({
       report: structuredClone(entry.report),
       admission: {

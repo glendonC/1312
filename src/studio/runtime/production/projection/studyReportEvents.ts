@@ -1,6 +1,7 @@
 import type { RuntimeProjection } from "../model.ts";
 import type { RuntimeEvent } from "../protocol.ts";
 import { invariant } from "./shared.ts";
+import { assertRecoveryAdmissionAuthority } from "../recovery/agentRecoveryIdentity.ts";
 
 function same(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -15,6 +16,22 @@ export function applyStudyReportEvent(next: RuntimeProjection, event: RuntimeEve
     const artifact = next.artifacts[event.data.admissionArtifactId];
     invariant(report?.study?.schema === "studio.study-report-submission.v2" && report.status === "accepted", event, `generalized admission ${receipt.admissionId} has no accepted v2 report`);
     invariant(!next.generalizedParentArtifactAdmissions[receipt.admissionId], event, `generalized admission ${receipt.admissionId} is duplicated`);
+    let recoveryWorkId: string | null = null;
+    try {
+      recoveryWorkId = assertRecoveryAdmissionAuthority(next, report.taskId);
+    } catch (error) {
+      invariant(false, event, error instanceof Error ? error.message : "generalized admission lost recovery authority");
+    }
+    if (recoveryWorkId) {
+      invariant(
+        !Object.values(next.generalizedParentArtifactAdmissions).some((admission) => {
+          try { return assertRecoveryAdmissionAuthority(next, admission.childTaskId) === recoveryWorkId; }
+          catch { return false; }
+        }),
+        event,
+        `recovery work ${recoveryWorkId} already has evidence authority`,
+      );
+    }
     invariant(
       output?.id === report.study.output.artifactId && output.kind === "studio.study-report.v2" &&
         receipt.report.artifactId === output.id && receipt.report.contentId === output.content.contentId && receipt.report.bytes === output.content.bytes &&

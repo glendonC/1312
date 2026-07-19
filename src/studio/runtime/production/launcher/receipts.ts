@@ -8,6 +8,7 @@ import type {
 import type { PendingRuntimeEvent } from "../protocol.ts";
 import type { CodexUsageEvent } from "../executor/codexEvents.ts";
 import type { ProcessResult } from "../executor/processRunner.ts";
+import type { ExecutorFailureCode } from "../model.ts";
 
 export async function recordCodexModelUsage(input: {
   artifacts: ContentAddressedArtifactStore;
@@ -116,4 +117,21 @@ export function closedProcessExitReason(result: ProcessResult): string {
     return "Codex executor output-schema configuration was rejected before a completed turn.";
   }
   return "Codex executor exited without a completed turn.";
+}
+
+export function closedProcessFailureCode(result: ProcessResult): ExecutorFailureCode {
+  const diagnostic = `${result.stderr}\n${result.stdout}`.toLowerCase();
+  if (diagnostic.includes("401") || diagnostic.includes("403") || diagnostic.includes("unauthorized") || diagnostic.includes("authentication")) {
+    return "authorization_failed";
+  }
+  if (diagnostic.includes("model") && (diagnostic.includes("not found") || diagnostic.includes("unsupported") || diagnostic.includes("invalid"))) {
+    return "configuration_failed";
+  }
+  if (diagnostic.includes("schema") || diagnostic.includes("mcp") || diagnostic.includes("model context protocol")) {
+    return "configuration_failed";
+  }
+  if (diagnostic.includes("stream") || diagnostic.includes("connection") || diagnostic.includes("transport") || diagnostic.includes("429") || diagnostic.includes("rate limit")) {
+    return "provider_transport_failed";
+  }
+  return "process_failed";
 }

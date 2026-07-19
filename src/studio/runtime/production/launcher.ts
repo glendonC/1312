@@ -89,9 +89,11 @@ import {
 } from "./launcher/childCapabilityBridges.ts";
 import {
   closedProcessExitReason,
+  closedProcessFailureCode,
   codexExecutorSpanReceipt,
   recordCodexModelUsage,
 } from "./launcher/receipts.ts";
+import { executorFailureClassificationReceipt } from "./recovery/executorFailureClassification.ts";
 
 export interface CodexWorkerLaunchResult {
   execution: ExecutorSpanReceipt;
@@ -390,6 +392,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Computer-use grant has no sealed fixture driver",
           "This executor cannot start the granted offline external-screen inspection.",
+          "configuration_failed",
         );
       }
       if (this.options.preexecuteRequiredSemanticEvidence && childCapabilities.semanticEvidenceGrant) {
@@ -398,13 +401,33 @@ export class CodexExecWorkerLauncher {
           throw new LauncherFailure(
             "Preexecuted semantic evidence requires one exact grant range",
             "The required current-run semantic evidence grant is not one exact range.",
+            "authority_violation",
           );
         }
-        precompletedSemanticEvidence = await new BoundedChildSemanticEvidenceBridge(
-          task,
-          this.semanticEvidenceHost,
-          { nextOperationId: this.options.nextSemanticEvidenceOperationId },
-        ).call(semanticScope[0]);
+        try {
+          precompletedSemanticEvidence = await new BoundedChildSemanticEvidenceBridge(
+            task,
+            this.semanticEvidenceHost,
+            { nextOperationId: this.options.nextSemanticEvidenceOperationId },
+          ).call(semanticScope[0]);
+        } catch (error) {
+          const failedOperation = Object.values(this.ledger.state().semanticEvidence)
+            .filter((operation) => operation.taskId === task.id && operation.status === "failed")
+            .sort((left, right) => left.id.localeCompare(right.id))
+            .at(-1);
+          const safeReason = failedOperation?.failure ??
+            "The required current-run semantic evidence capability failed before returning a typed result.";
+          const code = safeReason.includes("returned invalid")
+            ? "invalid_structured_output" as const
+            : safeReason.includes("provider") || safeReason.includes("timed out")
+              ? "provider_transport_failed" as const
+              : "unknown_failure" as const;
+          throw new LauncherFailure(
+            `Required current-run semantic evidence transport failed: ${error instanceof Error ? error.message : "provider failure"}`,
+            safeReason,
+            code,
+          );
+        }
       }
       await openLauncherChildCapabilityBridges(
         task,
@@ -448,7 +471,7 @@ export class CodexExecWorkerLauncher {
       const maximumWallMs = Math.min(task.budget.wallMs, this.options.maximumWallMs);
       const preModelElapsedMs = Math.max(0, Math.round(this.options.monotonicNow() - monotonicStart));
       if (preModelElapsedMs >= maximumWallMs) {
-        throw new LauncherFailure("Codex worker timed out before model synthesis", "Codex executor exceeded its active wall-time limit.");
+        throw new LauncherFailure("Codex worker timed out before model synthesis", "Codex executor exceeded its active wall-time limit.", "executor_timed_out");
       }
       processResult = await runProcess({
         executable: this.options.executable,
@@ -461,15 +484,16 @@ export class CodexExecWorkerLauncher {
         maxStderrBytes: this.options.maxStderrBytes,
       });
       if (processResult.timedOut) {
-        throw new LauncherFailure("Codex worker timed out", "Codex executor exceeded its active wall-time limit.");
+        throw new LauncherFailure("Codex worker timed out", "Codex executor exceeded its active wall-time limit.", "executor_timed_out");
       }
       if (processResult.outputOverflow) {
-        throw new LauncherFailure("Codex worker exceeded output bounds", "Codex executor exceeded its output limit.");
+        throw new LauncherFailure("Codex worker exceeded output bounds", "Codex executor exceeded its output limit.", "output_limit_exceeded");
       }
       if (processResult.exitCode !== 0) {
         throw new LauncherFailure(
           `Codex worker exited ${processResult.exitCode ?? processResult.signal ?? "without status"}`,
           closedProcessExitReason(processResult),
+          closedProcessFailureCode(processResult),
         );
       }
       const parsed = parseCodexEvents(processResult.stdout);
@@ -489,6 +513,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete every granted media capability",
           "Codex child did not complete its required receipted media operation.",
+          "required_tool_omitted",
         );
       }
       if (frameGrant && !Object.values(this.ledger.state().frameSamples).some((operation) =>
@@ -496,6 +521,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted frame-sampling operation",
           "Codex child did not complete its required receipted frame sampling.",
+          "required_tool_omitted",
         );
       }
       const completedOcr = Object.values(this.ledger.state().ocrOperations)
@@ -505,6 +531,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted OCR operation",
           "Codex child did not complete its required receipted OCR operation.",
+          "required_tool_omitted",
         );
       }
       const verifiedOcrEvidence: Awaited<ReturnType<typeof auditOcr>>[] = [];
@@ -536,6 +563,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted visual-transition operation",
           "Codex child did not complete its required receipted visual-change candidate analysis.",
+          "required_tool_omitted",
         );
       }
       const verifiedVisualTransitionEvidence: Awaited<ReturnType<typeof auditVisualTransition>>[] = [];
@@ -563,6 +591,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted anonymous speaker/overlap operation",
           "Codex child did not complete its required receipted anonymous speaker/overlap analysis.",
+          "required_tool_omitted",
         );
       }
       const verifiedSpeakerEvidence: Awaited<ReturnType<typeof auditSpeakerOverlap>>[] = [];
@@ -588,6 +617,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted conditional separation",
           "Codex child did not complete its required exact-range private separation and raw/stem comparison.",
+          "required_tool_omitted",
         );
       }
       for (const operation of completedSeparation) {
@@ -596,7 +626,7 @@ export class CodexExecWorkerLauncher {
           speakerDiarizer: this.options.speakerDiarizer,
         });
         if (verified.comparison.deterministicGate.semanticPreference !== null || verified.comparison.deterministicGate.captionAuthority !== "not_granted") {
-          throw new LauncherFailure("Conditional separation attempted an authority upgrade", "Conditional separation comparison is comparability-only and cannot authorize captions.");
+          throw new LauncherFailure("Conditional separation attempted an authority upgrade", "Conditional separation comparison is comparability-only and cannot authorize captions.", "authority_violation");
         }
       }
       const completedResearch = Object.values(this.ledger.state().researchOperations)
@@ -606,16 +636,17 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted research",
           "Codex child did not complete at least one receipted research operation under its gap grant.",
+          "required_tool_omitted",
         );
       }
       const verifiedResearchEvidence: Awaited<ReturnType<typeof auditResearchSnapshot>>[] = [];
       const researchEvidenceInputs: ResearchEvidenceSourceIdentity[] = [];
       for (const operation of completedResearch) {
         if (!operation.receiptContentId) {
-          throw new LauncherFailure("Research operation lost its receipt identity", "A completed research operation has no content-addressed receipt.");
+          throw new LauncherFailure("Research operation lost its receipt identity", "A completed research operation has no content-addressed receipt.", "authority_violation");
         }
         if (operation.executionId !== executionId || operation.launchClaimId !== launchClaim.claim.id) {
-          throw new LauncherFailure("Research operation belongs to another executor", "Research evidence must be produced by this exact task execution.");
+          throw new LauncherFailure("Research operation belongs to another executor", "Research evidence must be produced by this exact task execution.", "authority_violation");
         }
         if (operation.op === "search") {
           const verified = await auditResearchSearch(this.artifacts, this.ledger.runId, operation.receiptContentId);
@@ -625,7 +656,7 @@ export class CodexExecWorkerLauncher {
               authorization.grantId !== operation.grantId || authorization.taskId !== task.id ||
               authorization.agentId !== task.assignedAgentId || authorization.executionId !== executionId ||
               authorization.launchClaimId !== launchClaim.claim.id) {
-            throw new LauncherFailure("Research search changed its executor lineage", "Research search receipt identity is not owned by this exact task execution.");
+            throw new LauncherFailure("Research search changed its executor lineage", "Research search receipt identity is not owned by this exact task execution.", "authority_violation");
           }
         } else {
           const verified = await auditResearchSnapshot(this.artifacts, this.ledger.runId, operation.receiptContentId);
@@ -637,10 +668,10 @@ export class CodexExecWorkerLauncher {
               !("executionId" in authorization) || authorization.grantId !== operation.grantId ||
               authorization.taskId !== task.id || authorization.agentId !== task.assignedAgentId ||
               authorization.executionId !== executionId || authorization.launchClaimId !== launchClaim.claim.id) {
-            throw new LauncherFailure("Research snapshot changed its executor lineage", "Research snapshot identity is not owned by this exact task execution.");
+            throw new LauncherFailure("Research snapshot changed its executor lineage", "Research snapshot identity is not owned by this exact task execution.", "authority_violation");
           }
           if (verified.receipt.nonClaims.speechEvidenceAuthority !== "not_granted") {
-            throw new LauncherFailure("Research attempted an authority upgrade", "Research snapshots are cite-only external context and cannot authorize speech evidence.");
+            throw new LauncherFailure("Research attempted an authority upgrade", "Research snapshots are cite-only external context and cannot authorize speech evidence.", "authority_violation");
           }
           verifiedResearchEvidence.push(verified);
           researchEvidenceInputs.push({
@@ -665,13 +696,14 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete one exact granted computer-use session",
           "Codex child did not complete its required receipted offline external-screen inspection under this executor.",
+          "required_tool_omitted",
         );
       }
       const verifiedComputerUseEvidence: Awaited<ReturnType<typeof auditComputerUseSession>>[] = [];
       const computerUseEvidenceInputs: ComputerUseEvidenceSourceIdentity[] = [];
       for (const operation of projectedComputerUse) {
         if (!operation.sessionArtifactId || !operation.sessionReceiptId || !operation.sessionReceiptContentId) {
-          throw new LauncherFailure("Computer-use operation lost its session identity", "A completed external-screen operation has no content-addressed session receipt.");
+          throw new LauncherFailure("Computer-use operation lost its session identity", "A completed external-screen operation has no content-addressed session receipt.", "authority_violation");
         }
         const verified = await auditComputerUseSession(this.artifacts, this.ledger.runId, operation.sessionReceiptContentId);
         if (
@@ -693,6 +725,7 @@ export class CodexExecWorkerLauncher {
           throw new LauncherFailure(
             "Computer-use session changed its authenticated executor or offline lineage",
             "External-screen context must remain bound to this exact task execution and sealed fixture session.",
+            "authority_violation",
           );
         }
         verifiedComputerUseEvidence.push(verified);
@@ -719,6 +752,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not read every granted evidence artifact",
           "Codex child did not complete its required receipted evidence read.",
+          "required_tool_omitted",
         );
       }
       const completedSemantic = Object.values(this.ledger.state().semanticEvidence)
@@ -728,6 +762,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted speech.transcribe operation",
           "Codex child did not complete its required current-run semantic evidence operation.",
+          "required_tool_omitted",
         );
       }
       const semanticEvidenceInputs: ReturnType<typeof semanticEvidenceCitation>[] = [];
@@ -742,6 +777,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted evidence assessment",
           "Codex child did not complete its required receipted evidence assessment.",
+          "required_tool_omitted",
         );
       }
       if (decisionGrant && !Object.values(this.ledger.state().evidenceDecisions).some((operation) =>
@@ -749,6 +785,7 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           "Codex child did not complete its granted evidence decision",
           "Codex child did not complete its required audited evidence decision.",
+          "required_tool_omitted",
         );
       }
       let workerValue: unknown;
@@ -758,19 +795,29 @@ export class CodexExecWorkerLauncher {
         throw new LauncherFailure(
           `Codex final response is not JSON: ${error instanceof Error ? error.message : "invalid JSON"}`,
           "Codex worker response failed its output contract.",
+          "invalid_structured_output",
         );
       }
-      const worker = validateWorkerResult(
-        workerValue,
-        task,
-        semanticEvidenceInputs,
-        ocrEvidenceInputs,
-        speakerEvidenceInputs,
-        researchEvidenceInputs,
-        computerUseEvidenceInputs,
-        visualTransitionEvidenceInputs,
-        { hostSuppliedSemanticEvidenceInputs },
-      );
+      let worker: ReturnType<typeof validateWorkerResult>;
+      try {
+        worker = validateWorkerResult(
+          workerValue,
+          task,
+          semanticEvidenceInputs,
+          ocrEvidenceInputs,
+          speakerEvidenceInputs,
+          researchEvidenceInputs,
+          computerUseEvidenceInputs,
+          visualTransitionEvidenceInputs,
+          { hostSuppliedSemanticEvidenceInputs },
+        );
+      } catch (error) {
+        throw new LauncherFailure(
+          `Codex worker returned invalid structured output: ${error instanceof Error ? error.message : "invalid output"}`,
+          "Codex worker response failed its output contract.",
+          "invalid_structured_output",
+        );
+      }
       const prepared = await Promise.all(
         worker.outputs.map(async (output) => {
           if ((output.kind === "studio.study-report.v1" || output.kind === "studio.study-report.v2") && "coverage" in output) {
@@ -890,10 +937,19 @@ export class CodexExecWorkerLauncher {
           failure,
         });
         await this.artifacts.storeJson(span);
+        const classification = executorFailureClassificationReceipt({
+          runId: this.ledger.runId,
+          span,
+          code: error instanceof LauncherFailure ? error.code : "unknown_failure",
+          safeReason: failure,
+        });
         await this.ledger.transact(
           { producer: { kind: "launcher", id: "codex-exec-worker-launcher" }, causationId: executionId },
           () => ({
-            pending: [{ type: "executor.finished", data: { receipt: span } }] satisfies PendingRuntimeEvent[],
+            pending: [
+              { type: "executor.finished", data: { receipt: span } },
+              { type: "executor.failure_classified", data: { receipt: classification } },
+            ] satisfies PendingRuntimeEvent[],
             result: undefined,
           }),
         );

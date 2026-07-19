@@ -17,6 +17,9 @@ import {
 } from "../orchestratorLauncher.ts";
 import {
   GENERALIZED_INITIAL_COVERAGE_BUDGET_JSON,
+  GENERALIZED_INITIAL_COVERAGE_BUDGET,
+  GENERALIZED_BASELINE_RUN_BUDGET,
+  GENERALIZED_RECOVERY_CONTINGENCY_BUDGET,
   GENERALIZED_ROOT_BUDGET,
   GENERALIZED_RUN_BUDGET,
 } from "../executor/generalizedBudgetContract.ts";
@@ -37,6 +40,7 @@ import { BoundedRuntimeScheduler } from "../scheduler.ts";
 import { createRootTaskJobContext } from "../jobContext.ts";
 import type { LoadedOwnedSourceSession } from "../runStart/sourceSessionLoader.ts";
 import type { InitializedRuntimeApplication } from "./model.ts";
+import { createAgentRecoveryPolicy } from "../recovery/agentRecoveryPolicy.ts";
 
 export const PROOF_RUNTIME_LIMITS: RuntimeLimits = {
   maxDepth: 2,
@@ -200,12 +204,18 @@ export async function runBoundedRuntimeApplication(
     startMs: initialized.runStart.analysisRequest.range.startMs,
     endMs: initialized.runStart.analysisRequest.range.endMs,
   }];
-  const scheduler = new BoundedRuntimeScheduler(ledger, PROOF_RUNTIME_LIMITS);
   const generalized = studyContractVersion === "v2";
+  const scheduler = new BoundedRuntimeScheduler(ledger, PROOF_RUNTIME_LIMITS, undefined, generalized ? {
+    agentRecovery: createAgentRecoveryPolicy({
+      baselineBudget: GENERALIZED_BASELINE_RUN_BUDGET,
+      recoveryContingency: GENERALIZED_RECOVERY_CONTINGENCY_BUDGET,
+      replacementBudget: GENERALIZED_INITIAL_COVERAGE_BUDGET,
+    }),
+  } : {});
   const rootPermit = await scheduler.createRoot({
     workloadKey: `root:${initialized.runStart.runtimeId}`,
     objective: generalized
-      ? `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing authorized ranges yourself, then wait for every accepted child. Each initial coverage child must use budget exactly ${GENERALIZED_INITIAL_COVERAGE_BUDGET_JSON}, require exactly one studio.study-report.v2, and use current-run speech as the only claim-support kind; never retry an equivalent rejected range under another workload key. Admit and read every accepted report exactly once. For an exact host-derived weak range, you may request one strict attenuated current-run speech subrange with a required delta; for a typed speaker_overlap cause, copy its exact host-derived overlap range, which must refine prior broader speech work. For an exact conflicting researchInput trigger only, you may optionally request one bounded cite-only context child; an empty trigger list grants no research, and external context never upgrades speech or caption authority. Synthesis is the default after all current admissions are read: call study_synthesize with only the opaque synthesisInput.inputId returned by the latest read. Never repeat artifact_read to recover synthesis payload; the host cold-recomputes the exact current coverage, claims, pass history, and citations from that id. The host fixes pass/research configuration scope, budgets, and child contracts, rejects identical work or scope changes, and terminates exhaustion weak without blocking unrelated ranges. Admit/read any accepted pass report, then emit exactly one studio.owned-media-study.v3 through the latest synthesis input id. Support requires pass-new range-closing speech citations. Acoustic and anonymous speaker/overlap evidence may qualify coverage, and frames remain cite-only; none authorizes dialogue text. More passes, tokens, agents, or labels do not prove correctness, understanding, quality, or publication readiness.`
+      ? `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing authorized ranges yourself, then wait for every accepted child. Each initial coverage child must use budget exactly ${GENERALIZED_INITIAL_COVERAGE_BUDGET_JSON}, require exactly one studio.study-report.v2, and use current-run speech as the only claim-support kind; never retry an equivalent rejected range under another workload key. For each typed retryable reportless initial failure, the host may spend one pre-authorized bounded recovery allocation, preserving failed attempt 0 and returning distinct attempt 1; never author that replacement yourself. Admit and read every accepted report exactly once. For an exact host-derived weak range, you may request one strict attenuated current-run speech subrange with a required delta; for a typed speaker_overlap cause, copy its exact host-derived overlap range, which must refine prior broader speech work. For an exact conflicting researchInput trigger only, you may optionally request one bounded cite-only context child; an empty trigger list grants no research, and external context never upgrades speech or caption authority. Synthesis is the default after all current admissions are read: call study_synthesize with only the opaque synthesisInput.inputId returned by the latest read. Never repeat artifact_read to recover synthesis payload; the host cold-recomputes the exact current coverage, claims, pass history, and citations from that id. The host fixes pass/research configuration scope, budgets, and child contracts, rejects identical work or scope changes, and terminates exhaustion weak without blocking unrelated ranges. Admit/read any accepted pass report, then emit exactly one studio.owned-media-study.v3 through the latest synthesis input id. Support requires pass-new range-closing speech citations. Acoustic and anonymous speaker/overlap evidence may qualify coverage, and frames remain cite-only; none authorizes dialogue text. More passes, tokens, agents, or labels do not prove correctness, understanding, quality, or publication readiness.`
       : `Delegate at least two bounded coverage-study tasks for ${initialized.runStart.analysisRequest.requestId}, choosing disjoint or overlapping authorized ranges yourself, then wait for every accepted child. ` +
         "Each accepted child contract must request speech.transcribe and report.submit, require exactly one studio.study-report.v1 output, partition its entire assigned scope with closed supported/withheld/unknown/failed states, and cite only current-run semantic observations for supported claims. After reading at least two model-dispositioned admissions, choose a closed plan, request causally named bounded follow-up when useful, and eventually emit one model-authored studio.owned-media-study.v1 with exact report/semantic citations and every gap/conflict preserved. Coverage and citation closure are structural facts, not correctness, understanding, agreement, truth arbitration, readiness, caption authority, quality, or publication.",
     workerKind: "orchestrator",

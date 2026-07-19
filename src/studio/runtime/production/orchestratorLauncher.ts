@@ -410,9 +410,12 @@ export class CodexExecOrchestratorLauncher {
         const acceptedPasses = Object.values(state.rangePasses).filter((entry) => entry.accepted);
         const exactReadClosure = acceptedAdmissions.length >= 2 && completedReads.length === acceptedAdmissions.length &&
           acceptedAdmissions.every((admission) => completedReads.filter((entry) => entry.admissionId === admission.admissionId).length === 1);
-        if (!exactReadClosure || studies.length !== 1 ||
+        const exhaustedRecovery = Object.values(state.agentRecoveries).some((entry) =>
+          entry.authorization.parent.executionId === executionId && entry.terminal?.outcome === "exhausted");
+        const honestExhaustion = decision.outcome === "withheld" && exhaustedRecovery && studies.length === 0;
+        if (!honestExhaustion && (!exactReadClosure || studies.length !== 1 ||
             studies[0]?.schema !== (restudiedEnabled ? "studio.owned-media-study.v3" : "studio.owned-media-study.v2") ||
-            (restudiedEnabled && acceptedPasses.some((entry) => !entry.terminal))) {
+            (restudiedEnabled && acceptedPasses.some((entry) => !entry.terminal)))) {
           throw new LauncherFailure(
             "Orchestrator omitted required generalized admission, reads, or synthesis",
             `Codex orchestrator did not close two generalized admitted reads, every accepted range pass, and one ${restudiedEnabled ? "v3" : "v2"} owned-media study.`,

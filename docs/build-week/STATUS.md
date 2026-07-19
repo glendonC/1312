@@ -41,6 +41,18 @@ score.
   closed; do not reopen its slices as a new runtime plan.
 - **Runtime modularity:** launcher, validation, projection, protocol, and runtime-host review/caption
   seams are split into cohesive modules; UI catch-up remains next.
+- **Bounded initial-coverage recovery — contract slice:** one terminal, typed execution fault in a
+  required generalized initial-coverage worker can authorize one host-owned exact replacement in the
+  same durable runtime. Content-addressed classification, authorization, and terminal receipts keep
+  failed attempt 0 visible, clone its exact task/context/grant/output authority into distinct attempt
+  1 identities, suppress concurrent/duplicate/equivalent work, and either pass the replacement report
+  through ordinary admission/read/synthesis or terminally exhaust and withhold. Baseline allocation
+  remains a separate 1,220,000 ms/32-call ceiling; the recovery contingency is 480,000 ms/4 calls;
+  the total ceiling is 1,700,000 ms/36 calls. Deterministic hostile tests cover five replaceable fault
+  classes, tamper, stale authority, crash-after-authorization interruption, healthy-sibling
+  preservation, full contingency consumption, and no evidence-quality retry. This slice includes no
+  Results UI, root/caption/Learning recovery, live provider proof, restart liveness, semantic success,
+  correctness, quality, or cost-reduction claim.
 - **Selected-language Apply producer:** an exact verified caption span can now enter a separate
   private language-explanation host with typed meaning/word/phrase/grammar/translation-choice
   facets, immutable grant/artifact/receipt lineage, cold audit, authenticated POST/GET, and a strict

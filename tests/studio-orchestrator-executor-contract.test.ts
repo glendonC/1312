@@ -18,6 +18,8 @@ import {
 } from "../src/studio/runtime/production/runtimeHost/runtimeApplication.ts";
 import {
   GENERALIZED_INITIAL_COVERAGE_BUDGET,
+  GENERALIZED_BASELINE_RUN_BUDGET,
+  GENERALIZED_RECOVERY_CONTINGENCY_BUDGET,
   GENERALIZED_ROOT_BUDGET,
   GENERALIZED_RUN_BUDGET,
 } from "../src/studio/runtime/production/executor/generalizedBudgetContract.ts";
@@ -387,7 +389,9 @@ test("default Codex launcher closes the eight-tool research-aware report-to-read
     assert.deepEqual(root.budget, GENERALIZED_ROOT_BUDGET);
     assert.ok(children.every((task) => task.budget.wallMs === GENERALIZED_INITIAL_COVERAGE_BUDGET.wallMs));
     assert.deepEqual(PROOF_RUNTIME_LIMITS.runBudget, GENERALIZED_RUN_BUDGET);
-    assert.equal(root.budget.wallMs - Math.max(...children.map((task) => task.budget.wallMs)), 180_000);
+    assert.equal(GENERALIZED_BASELINE_RUN_BUDGET.wallMs, 1_220_000);
+    assert.equal(GENERALIZED_RECOVERY_CONTINGENCY_BUDGET.wallMs, 480_000);
+    assert.equal(GENERALIZED_RUN_BUDGET.wallMs, 1_700_000);
     assert.deepEqual(root.requiredOutputs, [{ name: "owned-media study", artifactKind: "studio.owned-media-study.v3", required: true }]);
     assert.equal(root.grants.some((grant) => grant.capability === "study.plan"), false);
     assert.equal(root.grants.some((grant) => grant.capability === "study.restudy"), true);

@@ -20,6 +20,7 @@ import { applyStudyReportEvent } from "./projection/studyReportEvents.ts";
 import { applyStudySynthesisEvent } from "./projection/studySynthesisEvents.ts";
 import { applyRestudyEvent } from "./projection/restudyEvents.ts";
 import { applyLanguageExplanationEvent } from "./projection/languageExplanationEvents.ts";
+import { applyAgentRecoveryEvent } from "./projection/agentRecoveryEvents.ts";
 
 export function initialRuntimeProjection(runId: string): RuntimeProjection {
   if (!runId.trim()) throw new Error("Runtime projection requires a run id");
@@ -70,6 +71,8 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     studyReadiness: {},
     generalizedStudyReadiness: {},
     rangePasses: {},
+    executorFailureClassifications: {},
+    agentRecoveries: {},
   };
 }
 
@@ -86,6 +89,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
 
   if (applyArtifactEvent(next, event)) return next;
   if (applyTaskEvent(next, event)) return next;
+  if (applyAgentRecoveryEvent(next, event)) return next;
   if (applyExecutionMediaEvent(next, event)) return next;
   if (applyFrameEvent(next, event)) return next;
   if (applyOcrEvent(next, event)) return next;

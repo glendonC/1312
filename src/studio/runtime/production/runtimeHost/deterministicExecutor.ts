@@ -19,6 +19,7 @@ import type {
   SpeakerOverlapEvidenceCitationInput,
   TaskRecord,
   WorkerOutputEnvelope,
+  ExecutorFailureCode,
 } from "../model.ts";
 import type {
   CurrentRunRecognizerInput,
@@ -41,6 +42,7 @@ import {
   type BoundedWorkerLauncherContext,
   type BoundedWorkerLauncherFactory,
 } from "./runtimeApplication.ts";
+import { executorFailureClassificationReceipt } from "../recovery/executorFailureClassification.ts";
 
 interface Gate {
   promise: Promise<void>;
@@ -122,6 +124,10 @@ export interface DeterministicExecutorOptions {
   now?: () => Date;
   restudyPassResult?: "supported" | "withheld";
   speakerDiarizer?: SpeakerDiarizer;
+  /** Deterministic hostile seam: fail exactly one initial v2 coverage attempt, then allow its exact replacement. */
+  failFirstInitialCoverageCode?: Extract<ExecutorFailureCode, "process_failed" | "executor_timed_out" | "required_tool_omitted" | "invalid_structured_output" | "provider_transport_failed">;
+  /** Deterministic exhaustion seam: fail one logical initial work identity and its only replacement. */
+  exhaustInitialCoverageCode?: Extract<ExecutorFailureCode, "process_failed" | "executor_timed_out" | "required_tool_omitted" | "invalid_structured_output" | "provider_transport_failed">;
 }
 
 class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
@@ -200,6 +206,36 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
     );
     await this.owner.control.waitMidRun();
 
+    const firstCoverageFailure = this.owner.takeFirstInitialCoverageFailure(task);
+    if (firstCoverageFailure) {
+      const timedOut = firstCoverageFailure === "executor_timed_out";
+      const reason = `The deterministic hostile seam recorded ${firstCoverageFailure} for initial coverage attempt 0.`;
+      const span = this.span(task, executionId, startedAt, {
+        outcome: timedOut ? "timed_out" : "failed",
+        outputArtifactIds: [],
+        failure: reason,
+      });
+      await artifacts.storeJson(span);
+      const classification = executorFailureClassificationReceipt({
+        runId: ledger.runId,
+        span,
+        code: firstCoverageFailure,
+        safeReason: reason,
+      });
+      await ledger.transact(
+        { producer: { kind: "launcher", id: "deterministic-test-executor" }, causationId: executionId },
+        () => ({
+          pending: [
+            { type: "executor.finished", data: { receipt: span } },
+            { type: "executor.failure_classified", data: { receipt: classification } },
+          ] satisfies PendingRuntimeEvent[],
+          result: undefined,
+        }),
+      );
+      await scheduler.transitionTask(task.id, task.assignedAgentId, "failed", reason);
+      throw new Error(reason);
+    }
+
     if (this.owner.mode === "interrupted") {
       throw new RuntimeApplicationInterrupted("The deterministic test executor was interrupted after start evidence.");
     }
@@ -214,10 +250,19 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
         failure: reason,
       });
       await artifacts.storeJson(span);
+      const classification = executorFailureClassificationReceipt({
+        runId: ledger.runId,
+        span,
+        code: timedOut ? "executor_timed_out" : "process_failed",
+        safeReason: reason,
+      });
       await ledger.transact(
         { producer: { kind: "launcher", id: "deterministic-test-executor" }, causationId: executionId },
         () => ({
-          pending: [{ type: "executor.finished", data: { receipt: span } }] satisfies PendingRuntimeEvent[],
+          pending: [
+            { type: "executor.finished", data: { receipt: span } },
+            { type: "executor.failure_classified", data: { receipt: classification } },
+          ] satisfies PendingRuntimeEvent[],
           result: undefined,
         }),
       );
@@ -229,9 +274,10 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
       const reason = "The deterministic contract seam does not perform research; the granted child closes without ambient egress.";
       const span = this.span(task, executionId, startedAt, { outcome: "failed", outputArtifactIds: [], failure: reason });
       await artifacts.storeJson(span);
+      const classification = executorFailureClassificationReceipt({ runId: ledger.runId, span, code: "unknown_failure", safeReason: reason });
       await ledger.transact(
         { producer: { kind: "launcher", id: "deterministic-test-executor" }, causationId: executionId },
-        () => ({ pending: [{ type: "executor.finished", data: { receipt: span } }] satisfies PendingRuntimeEvent[], result: undefined }),
+        () => ({ pending: [{ type: "executor.finished", data: { receipt: span } }, { type: "executor.failure_classified", data: { receipt: classification } }] satisfies PendingRuntimeEvent[], result: undefined }),
       );
       await scheduler.transitionTask(task.id, task.assignedAgentId, "failed", reason);
       throw new Error(reason);
@@ -243,9 +289,10 @@ class DeterministicWorkerLauncher implements BoundedWorkerLauncher {
         const reason = "The deterministic partial-child test seam failed this bounded study worker before producing a report.";
         const span = this.span(task, executionId, startedAt, { outcome: "failed", outputArtifactIds: [], failure: reason });
         await artifacts.storeJson(span);
+        const classification = executorFailureClassificationReceipt({ runId: ledger.runId, span, code: "process_failed", safeReason: reason });
         await ledger.transact(
           { producer: { kind: "launcher", id: "deterministic-test-executor" }, causationId: executionId },
-          () => ({ pending: [{ type: "executor.finished", data: { receipt: span } }] satisfies PendingRuntimeEvent[], result: undefined }),
+          () => ({ pending: [{ type: "executor.finished", data: { receipt: span } }, { type: "executor.failure_classified", data: { receipt: classification } }] satisfies PendingRuntimeEvent[], result: undefined }),
         );
         await scheduler.transitionTask(task.id, task.assignedAgentId, "failed", reason);
         throw new Error(reason);
@@ -505,7 +552,11 @@ export class DeterministicRuntimeExecutor {
   readonly now: () => Date;
   readonly restudyPassResult: "supported" | "withheld";
   readonly speakerDiarizer: SpeakerDiarizer | undefined;
+  readonly failFirstInitialCoverageCode: DeterministicExecutorOptions["failFirstInitialCoverageCode"];
+  readonly exhaustInitialCoverageCode: DeterministicExecutorOptions["exhaustInitialCoverageCode"];
   launchInvocations = 0;
+  private initialCoverageFailureConsumed = false;
+  private exhaustedWorkerLabel: string | null = null;
 
   constructor(options: DeterministicExecutorOptions = {}) {
     this.mode = options.mode ?? "completed";
@@ -513,6 +564,25 @@ export class DeterministicRuntimeExecutor {
     this.now = options.now ?? (() => new Date());
     this.restudyPassResult = options.restudyPassResult ?? "supported";
     this.speakerDiarizer = options.speakerDiarizer;
+    this.failFirstInitialCoverageCode = options.failFirstInitialCoverageCode;
+    this.exhaustInitialCoverageCode = options.exhaustInitialCoverageCode;
+  }
+
+  takeFirstInitialCoverageFailure(task: TaskRecord): DeterministicExecutorOptions["failFirstInitialCoverageCode"] {
+    const initialCoverage = task.requiredOutputs.length === 1 && task.requiredOutputs[0].artifactKind === "studio.study-report.v2";
+    if (initialCoverage && this.exhaustInitialCoverageCode) {
+      if (this.exhaustedWorkerLabel === null && !task.workloadKey.startsWith("recovery:")) {
+        this.exhaustedWorkerLabel = task.workerLabel;
+      }
+      if (task.workerLabel === this.exhaustedWorkerLabel) return this.exhaustInitialCoverageCode;
+    }
+    if (
+      this.initialCoverageFailureConsumed || !this.failFirstInitialCoverageCode ||
+      task.workloadKey.startsWith("recovery:") ||
+      !initialCoverage
+    ) return undefined;
+    this.initialCoverageFailureConsumed = true;
+    return this.failFirstInitialCoverageCode;
   }
 
   factory(): BoundedWorkerLauncherFactory {

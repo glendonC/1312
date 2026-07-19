@@ -265,6 +265,10 @@ if (mediaTask) {
   }
 }
 if (mode === "hang") await new Promise((resolve) => setTimeout(resolve, 60_000));
+if (mode === "process-failed") {
+  process.stderr.write("worker process crashed before completion\\n");
+  process.exit(2);
+}
 const schemaPath = args[args.indexOf("--output-schema") + 1];
 const schema = JSON.parse(await readFile(schemaPath, "utf8"));
 const name = schema.properties.outputs.items.properties.name.enum[0];
@@ -848,6 +852,8 @@ test("Codex media grant fails closed when the child returns without invoking its
     const state = runtime.ledger.state();
     assert.equal(state.tasks[decision.permit.taskId].status, "failed");
     assert.equal(state.executions["execution:codex-media-skip"].status, "failed");
+    assert.equal(Object.values(state.executorFailureClassifications)[0].code, "required_tool_omitted");
+    assert.equal(Object.values(state.executorFailureClassifications)[0].retryability, "replaceable");
     assert.equal(Object.keys(state.operations).length, 0);
   } finally {
     await cleanup(runtime);
@@ -901,6 +907,7 @@ test("Codex launcher fails closed on unsupported capabilities and invalid child 
       assert.equal(state.tasks[decision.permit!.taskId].status, "failed");
       assert.equal(Object.keys(state.reports).length, 0);
       assert.ok(state.executions["execution:invalid-output"].modelUsageReceiptId);
+      assert.equal(Object.values(state.executorFailureClassifications)[0].code, "invalid_structured_output");
     } finally {
       await cleanup(runtime);
     }
@@ -963,6 +970,66 @@ test("Codex launcher fails closed on unsupported capabilities and invalid child 
       assert.equal(execution.status, "timed_out");
       assert.equal(execution.modelUsageReceiptId, null);
       assert.equal(runtime.ledger.state().tasks[decision.permit!.taskId].status, "failed");
+      assert.equal(Object.values(runtime.ledger.state().executorFailureClassifications)[0].code, "executor_timed_out");
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  await suite.test("child process failure receives a retryable typed classification", async () => {
+    const runtime = await harness();
+    try {
+      const decision = await runtime.scheduler.requestSpawn(
+        runtime.rootTaskId,
+        runtime.rootAgentId,
+        codexChildInput(runtime),
+      );
+      const fake = await fakeCodex(runtime, "process-failed");
+      const launcher = new CodexExecWorkerLauncher(
+        runtime.ledger,
+        runtime.scheduler,
+        runtime.store,
+        new BoundedReportHost(runtime.ledger),
+        {
+          executable: fake.executable,
+          executableArgsPrefix: fake.prefix,
+          nextExecutionId: () => "execution:process-failed",
+        },
+      );
+      await assert.rejects(launcher.launch(decision.permit!), /exited 2/);
+      const classification = Object.values(runtime.ledger.state().executorFailureClassifications)[0];
+      assert.equal(classification.code, "process_failed");
+      assert.equal(classification.retryability, "replaceable");
+    } finally {
+      await cleanup(runtime);
+    }
+  });
+
+  await suite.test("bounded output overflow is terminal and cannot enter replacement policy", async () => {
+    const runtime = await harness();
+    try {
+      const decision = await runtime.scheduler.requestSpawn(
+        runtime.rootTaskId,
+        runtime.rootAgentId,
+        codexChildInput(runtime),
+      );
+      const fake = await fakeCodex(runtime);
+      const launcher = new CodexExecWorkerLauncher(
+        runtime.ledger,
+        runtime.scheduler,
+        runtime.store,
+        new BoundedReportHost(runtime.ledger),
+        {
+          executable: fake.executable,
+          executableArgsPrefix: fake.prefix,
+          nextExecutionId: () => "execution:output-overflow",
+          maxStdoutBytes: 64,
+        },
+      );
+      await assert.rejects(launcher.launch(decision.permit!), /output bounds/);
+      const classification = Object.values(runtime.ledger.state().executorFailureClassifications)[0];
+      assert.equal(classification.code, "output_limit_exceeded");
+      assert.equal(classification.retryability, "terminal");
     } finally {
       await cleanup(runtime);
     }
@@ -1418,6 +1485,7 @@ test("media.seek rejects an extract-only caller and source-byte drift", async (s
       await cleanup(runtime);
     }
   });
+
 });
 
 test("capability host rehashes source bytes and records tool failure without an artifact", async () => {

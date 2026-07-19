@@ -85,6 +85,11 @@ import type {
   LanguageExplanationFailedEvent,
   LanguageExplanationStartedEvent,
 } from "./protocol/languageExplanationEvents.ts";
+import type {
+  AgentRecoveryAuthorizedEvent,
+  AgentRecoveryTerminalRecordedEvent,
+  ExecutorFailureClassifiedEvent,
+} from "./protocol/agentRecoveryEvents.ts";
 
 export * from "./protocol/base.ts";
 export * from "./protocol/executionEvents.ts";
@@ -99,6 +104,7 @@ export * from "./protocol/computerUseEvents.ts";
 export * from "./protocol/reviewEvents.ts";
 export * from "./protocol/studyEvents.ts";
 export * from "./protocol/languageExplanationEvents.ts";
+export * from "./protocol/agentRecoveryEvents.ts";
 
 export type RuntimeEvent =
   | ArtifactRecordedEvent
@@ -189,7 +195,10 @@ export type RuntimeEvent =
   | StudyRestudyPassDecidedEvent
   | StudyRestudyPassTerminalRecordedEvent
   | RestudiedOwnedMediaStudyCompletedEvent
-  | RestudiedStudyReadinessAuditedEvent;
+  | RestudiedStudyReadinessAuditedEvent
+  | ExecutorFailureClassifiedEvent
+  | AgentRecoveryAuthorizedEvent
+  | AgentRecoveryTerminalRecordedEvent;
 
 export type PendingRuntimeEvent = RuntimeEvent extends infer Event
   ? Event extends RuntimeEvent

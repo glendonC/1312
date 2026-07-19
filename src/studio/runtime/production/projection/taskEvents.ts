@@ -55,6 +55,20 @@ function validateTaskReferences(next: RuntimeProjection, event: RuntimeEvent, ta
   invariant(task.grants.every((grant) => grant.taskId === task.id && grant.agentId === task.assignedAgentId), event, `task ${task.id} has grants for another owner`);
 }
 
+function recoveryByRequest(next: RuntimeProjection, requestId: string) {
+  return Object.values(next.agentRecoveries).find((entry) =>
+    entry.authorization.replacement.spawnRequestId === requestId) ?? null;
+}
+
+function normalizedRecoveryGrants(grants: TaskRecord["grants"]): unknown[] {
+  return [...grants].sort((left, right) => left.capability.localeCompare(right.capability)).map((grant) => ({
+    ...grant,
+    id: "grant",
+    taskId: "task",
+    agentId: "agent",
+  }));
+}
+
 
 export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): boolean {
   if (event.type === "task.created") {
@@ -64,6 +78,26 @@ export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): bo
     if (task.parentTaskId !== null) {
       const request = Object.values(next.spawnRequests).find((candidate) => candidate.taskId === task.id);
       invariant(request?.accepted === true && request.agentId === task.assignedAgentId, event, `task ${task.id} has no accepted spawn decision`);
+      const recovery = request ? recoveryByRequest(next, request.id) : null;
+      if (recovery) {
+        const authorization = recovery.authorization;
+        const failed = next.tasks[authorization.failedAttempt.taskId];
+        invariant(
+          task.id === authorization.replacement.taskId && task.assignedAgentId === authorization.replacement.agentId &&
+            task.workloadKey === authorization.replacement.workloadKey && task.objective === authorization.work.initialInput.objective &&
+            task.workerKind === failed?.workerKind && task.workerLabel === failed.workerLabel &&
+            task.parentTaskId === authorization.parent.taskId && task.parentAgentId === authorization.parent.agentId &&
+            task.depth === failed.depth && task.jobContext.contextId === authorization.work.jobContextId &&
+            JSON.stringify(task.mediaScope) === JSON.stringify(failed.mediaScope) &&
+            JSON.stringify(task.inputArtifactIds) === JSON.stringify(failed.inputArtifactIds) &&
+            JSON.stringify(task.requiredOutputs) === JSON.stringify(failed.requiredOutputs) &&
+            JSON.stringify(task.dependencies) === JSON.stringify(failed.dependencies) &&
+            JSON.stringify(task.budget) === JSON.stringify(authorization.reservedSpend) &&
+            JSON.stringify(normalizedRecoveryGrants(task.grants)) === JSON.stringify(normalizedRecoveryGrants(failed.grants)),
+          event,
+          `recovery replacement task ${task.id} broadened or changed failed work authority`,
+        );
+      }
     }
     next.tasks[task.id] = task;
     return true;
@@ -89,6 +123,21 @@ export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): bo
       );
       call.spawnRequestId = event.data.requestId;
     }
+    const recovery = recoveryByRequest(next, event.data.requestId);
+    if (recovery) {
+      const authorization = recovery.authorization;
+      invariant(
+        event.data.authoredByExecutionId === null && event.data.toolCallId === null &&
+          event.data.requestedByTaskId === authorization.parent.taskId &&
+          event.data.requestedByAgentId === authorization.parent.agentId &&
+          JSON.stringify(event.data.input) === JSON.stringify({
+            ...authorization.work.initialInput,
+            workloadKey: authorization.replacement.workloadKey,
+          }),
+        event,
+        `recovery spawn request ${event.data.requestId} changed its host-authorized contract`,
+      );
+    }
     next.spawnRequests[event.data.requestId] = {
       id: event.data.requestId,
       requestedByTaskId: event.data.requestedByTaskId,
@@ -113,6 +162,16 @@ export function applyTaskEvent(next: RuntimeProjection, event: RuntimeEvent): bo
     request.rejection = event.data.rejection;
     request.taskId = event.data.taskId;
     request.agentId = event.data.agentId;
+    const recovery = recoveryByRequest(next, event.data.requestId);
+    if (recovery) {
+      invariant(
+        event.data.accepted === true && event.data.rejection === null &&
+          event.data.taskId === recovery.authorization.replacement.taskId &&
+          event.data.agentId === recovery.authorization.replacement.agentId && event.data.grants.length > 0,
+        event,
+        `recovery spawn decision ${event.data.requestId} changed replacement ownership`,
+      );
+    }
     return true;
   }
 

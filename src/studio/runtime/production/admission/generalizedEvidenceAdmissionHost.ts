@@ -27,6 +27,7 @@ import {
   validateParentArtifactReadReceiptV2,
   validateStudyReportArtifactV2,
 } from "../validation/studyReportsV2.ts";
+import { assertRecoveryAdmissionAuthority } from "../recovery/agentRecoveryIdentity.ts";
 
 function same(left: unknown, right: unknown): boolean {
   return canonicalSha256(left) === canonicalSha256(right);
@@ -111,6 +112,7 @@ export class GeneralizedEvidenceAdmissionHost {
       !source || source.origin.kind !== "ingest" || source.content.contentId !== report.assignment.source.contentId ||
       !same(task.mediaScope, report.assignment.mediaScope)
     ) throw new Error("Study report v2 changed its current-run task, executor, parent, source, or assignment authority");
+    assertRecoveryAdmissionAuthority(this.state, task.id);
     await this.artifacts.resolveVerified(source);
     const audited: EvidenceCitationEnvelope[] = [];
     for (const citation of report.evidenceCitations) {

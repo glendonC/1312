@@ -71,6 +71,11 @@ import {
   validateStudyReadinessReceiptV4,
 } from "./studiesV3.ts";
 import {
+  validateAgentRecoveryAuthorizationReceipt,
+  validateAgentRecoveryTerminalReceipt,
+  validateExecutorFailureClassificationReceipt,
+} from "./agentRecovery.ts";
+import {
   assertMediaExtractRequest,
   assertMediaSeekRequest,
   validateMediaOperationReceipt,
@@ -120,6 +125,7 @@ const REJECTIONS = new Set([
   "separation_duplicate_work",
   "research_duplicate_work",
   "computer_use_duplicate_work",
+  "recovery_authority_required",
 ]);
 
 export function assertRuntimeEvent(
@@ -300,6 +306,15 @@ export function assertRuntimeEvent(
   } else if (type === "executor.finished") {
     exact(data, ["receipt"], context, "event.data");
     validateExecutorSpanReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "executor.failure_classified") {
+    exact(data, ["receipt"], context, "event.data");
+    validateExecutorFailureClassificationReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "agent.recovery_authorized") {
+    exact(data, ["receipt"], context, "event.data");
+    validateAgentRecoveryAuthorizationReceipt(data.receipt, context, "event.data.receipt");
+  } else if (type === "agent.recovery_terminal_recorded") {
+    exact(data, ["receipt"], context, "event.data");
+    validateAgentRecoveryTerminalReceipt(data.receipt, context, "event.data.receipt");
   } else if (type === "media.operation_started") {
     exact(data, ["capability", "request", "grantId"], context, "event.data");
     const capability = oneOf<"media.extract" | "media.seek">(

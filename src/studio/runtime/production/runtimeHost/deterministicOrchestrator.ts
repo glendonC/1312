@@ -17,6 +17,7 @@ import { OwnedMediaStudySynthesisHost } from "../study/studySynthesisHost.ts";
 import { RangePassHost } from "../study/rangePassHost.ts";
 import { ConditionalSeparationRequestHost } from "../study/conditionalSeparationRequestHost.ts";
 import { ResearchRequestExecutionHost } from "../study/researchRequestExecutionHost.ts";
+import { GENERALIZED_INITIAL_COVERAGE_BUDGET } from "../executor/generalizedBudgetContract.ts";
 
 export type DeterministicOrchestratorMode =
   | "spawn_one"
@@ -171,17 +172,43 @@ class DeterministicOrchestratorLauncher implements BoundedOrchestratorLauncher {
             "report.submit",
           ],
           dependencyWorkloadKeys: [],
-          budget: { wallMs: 20_000, toolCalls: 2 },
+          budget: { ...GENERALIZED_INITIAL_COVERAGE_BUDGET },
         });
       }
       const waited = await bridge.wait({});
-      if (waited.result !== "all_terminal") throw new Error(`Deterministic generalized fan-out failed as ${waited.failure}`);
+      if (waited.result !== "all_terminal") {
+        const exhausted = waited.recoveries?.some((entry) => entry.outcome === "exhausted") ?? false;
+        if (!exhausted) throw new Error(`Deterministic generalized fan-out failed as ${waited.failure}`);
+        outcome = "withheld";
+        reason = "The one authorized initial-coverage replacement was exhausted; no third attempt, study, or evidence authority was created.";
+        await ledger.transact(
+          { producer: { kind: "launcher", id: "deterministic-test-orchestrator" }, causationId: executionId },
+          () => ({
+            pending: [{ type: "orchestrator.decision_recorded", data: {
+              decision: { executionId, taskId: task.id, outcome, reason },
+            } }] satisfies PendingRuntimeEvent[],
+            result: undefined,
+          }),
+        );
+        const exhaustedSpan = this.span(task, executionId, startedAt);
+        await artifacts.storeJson(exhaustedSpan);
+        await ledger.transact(
+          { producer: { kind: "launcher", id: "deterministic-test-orchestrator" }, causationId: executionId },
+          () => ({ pending: [{ type: "executor.finished", data: { receipt: exhaustedSpan } }] satisfies PendingRuntimeEvent[], result: undefined }),
+        );
+        await scheduler.transitionTask(task.id, task.assignedAgentId, "withheld", reason);
+        return;
+      }
       let synthesisInput: { inputId: string } | null = null;
       let restudyInput: Awaited<ReturnType<RangePassHost["inspect"]>> | null = null;
       let researchInput: RestudiedResearchRequestInput | null = null;
       let firstReadRequest: { grantId: string; contentIds: string[] } | null = null;
       for (const child of waited.children) {
-        if (!child.reportId || child.artifactIds.length !== 1) throw new Error("Deterministic generalized child did not return one typed report");
+        if (!child.reportId) {
+          if (waited.schema === "studio.orchestrator-reports-wait-result.v2" && child.status === "failed") continue;
+          throw new Error("Deterministic generalized child did not return one typed report");
+        }
+        if (child.artifactIds.length !== 1) throw new Error("Deterministic generalized child did not return one typed report");
         const disposition = await bridge.disposition({
           reportId: child.reportId,
           outputArtifactId: child.artifactIds[0],

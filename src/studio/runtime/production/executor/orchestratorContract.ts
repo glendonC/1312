@@ -93,7 +93,7 @@ export function orchestratorPrompt(task: TaskRecord): string {
       "Do not infer that citation closure, coverage, agreement, or readiness proves truth, semantic correctness, transcription quality, or translation quality. The deterministic readiness audit runs only after your executor receipt closes; you do not choose readiness.",
     ] : []),
     ...(generalized ? [
-      "After the first wait, use report_disposition for every returned studio.study-report.v2 artifact. Accept or reject each one yourself with a reason. The host then cold-audits every typed citation and deterministically preserves acoustic dialogue scope and all weak/conflicting states; at least two accepted reports are required.",
+      "After the first wait, use report_disposition for every returned studio.study-report.v2 artifact. A v2 wait may also show immutable failed attempt 0 plus one host-authorized replacement attempt 1. Continue only when its recovery terminal says replacement_reported; never manually respawn equivalent failed work. On exhausted recovery, preserve the failure and return withheld. Accept or reject each actual report yourself with a reason. The host then cold-audits every typed citation and deterministically preserves acoustic dialogue scope and all weak/conflicting states; at least two accepted reports are required.",
       `For each accepted result, call artifact_read with its returned admission grant id and exact report content id. After at least two reads, the result includes synthesisInput${restudied ? `, restudyInput${researchEnabled ? ", and researchInput" : ""}` : ""}. The synthesisInput contains one opaque inputId over the complete host-derived coverage and claim projection. Call study_synthesize with exactly {"inputId": synthesisInput.inputId}; the host cold-recomputes every state, citation, and pass and rejects stale or forged ids before mutation.`,
       "U3 current-run speech is the only claim-support kind. Acoustic and anonymous speaker/overlap evidence can qualify coverage, and frames are cite-only media context; none may authorize dialogue text. Unknown, withheld, unavailable, truncated, conflicting, failed, and not-in-scope states must survive synthesis.",
       ...(restudied ? [
@@ -108,7 +108,7 @@ export function orchestratorPrompt(task: TaskRecord): string {
       ]),
     ] : []),
     "If any spawn is accepted, call task_reports_wait before returning. Do not treat scheduler acceptance, worker count, signal, VAD, language ID, or a report identity as semantic understanding, transcription, translation, or quality.",
-    "Only when requiresDelegation is false and no child request is warranted, make no spawn call and return outcome no_request with a deliberate reason. If a child fails or is interrupted, preserve that state and normally return withheld.",
+    "Only when requiresDelegation is false and no child request is warranted, make no spawn call and return outcome no_request with a deliberate reason. If a child fails or is interrupted without a reported host-authorized replacement, preserve that state and return withheld.",
     requiresStudySynthesis
       ? "Return only the JSON required by the supplied output schema after the study_synthesize call. No captions, publication, quality score, truth arbitration, or UI action is authorized."
       : "Return only the JSON required by the supplied output schema. No synthesis, captions, publication, or UI action is authorized.",

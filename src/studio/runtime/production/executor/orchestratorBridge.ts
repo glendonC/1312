@@ -19,6 +19,7 @@ import type {
   StudyRestudyInput,
   RangePassRequestReceipt,
   AnyResearchRequestInput,
+  AgentRecoveryTerminalReceipt,
 } from "../model.ts";
 import { canonicalSha256 } from "../artifactStore.ts";
 import type { ParentArtifactAdmissionHost } from "../admission/parentArtifactAdmissionHost.ts";
@@ -43,6 +44,7 @@ import type { ConditionalSeparationRequestHost } from "../study/conditionalSepar
 import type { ResearchRequestExecutionHost } from "../study/researchRequestExecutionHost.ts";
 import type { ComputerUseRequestExecutionHost } from "../study/computerUseRequestExecutionHost.ts";
 import { inspectRestudiedStudy, recordRestudiedStudy } from "../study/restudiedStudyRuntime.ts";
+import { InitialCoverageRecoveryHost } from "../recovery/initialCoverageRecoveryHost.ts";
 
 export const ORCHESTRATOR_SPAWN_TOOL = "task_spawn_request" as const;
 export const ORCHESTRATOR_WAIT_TOOL = "task_reports_wait" as const;
@@ -124,10 +126,11 @@ export interface StudySynthesisToolResult {
 }
 
 export interface ReportsWaitToolResult {
-  schema: "studio.orchestrator-reports-wait-result.v1";
+  schema: "studio.orchestrator-reports-wait-result.v1" | "studio.orchestrator-reports-wait-result.v2";
   result: "all_terminal" | "closed_failure";
   failure: "no_children" | "child_interrupted" | "child_failed" | null;
   children: TerminalChildIdentity[];
+  recoveries?: AgentRecoveryTerminalReceipt[];
 }
 
 interface ChildLauncher {
@@ -216,6 +219,7 @@ export class BoundedOrchestratorBridge {
   private readonly separationRequestHost: ConditionalSeparationRequestHost | null;
   private readonly researchRequestHost: ResearchRequestExecutionHost | null;
   private readonly computerUseRequestHost: ComputerUseRequestExecutionHost | null;
+  private readonly recoveryHost: InitialCoverageRecoveryHost | null;
   private synthesisOnly = false;
 
   constructor(input: {
@@ -251,6 +255,9 @@ export class BoundedOrchestratorBridge {
     this.separationRequestHost = input.separationRequestHost ?? null;
     this.researchRequestHost = input.researchRequestHost ?? null;
     this.computerUseRequestHost = input.computerUseRequestHost ?? null;
+    this.recoveryHost = this.generalized && this.scheduler.agentRecoveryEnabled()
+      ? new InitialCoverageRecoveryHost(this.ledger, this.scheduler, this.childLauncher)
+      : null;
     this.nextCallId = input.nextCallId ?? ((tool) => `tool-call:${tool}:${randomUUID()}`);
   }
 
@@ -832,17 +839,36 @@ export class BoundedOrchestratorBridge {
     if (this.restudied && this.rangePassHost) {
       for (const taskId of this.launches.keys()) await this.rangePassHost.finalizeTask(taskId);
     }
-    const state = this.ledger.state();
-    const taskIds = Object.values(state.spawnRequests)
+    let state = this.ledger.state();
+    const initialTaskIds = Object.values(state.spawnRequests)
       .filter((request) => request.authoredByExecutionId === this.executionId && request.accepted === true && request.taskId)
       .map((request) => request.taskId!)
       .sort();
+    const failedInitialTaskIds = initialTaskIds.filter((taskId) => state.tasks[taskId]?.status === "failed");
+    if (this.recoveryHost && failedInitialTaskIds.length > 0) {
+      await this.recoveryHost.recover(this.executionId, failedInitialTaskIds);
+    }
+    state = this.ledger.state();
+    const recoveryTaskIds = Object.values(state.agentRecoveries)
+      .filter((entry) => entry.authorization.parent.executionId === this.executionId)
+      .map((entry) => entry.authorization.replacement.taskId);
+    const taskIds = [...new Set([...initialTaskIds, ...recoveryTaskIds])].sort();
     const children = taskIds.map((taskId) => terminalIdentity(this.ledger, taskId));
+    const recoveredFailedTaskIds = new Set(Object.values(state.agentRecoveries)
+      .filter((entry) => entry.authorization.parent.executionId === this.executionId && entry.terminal?.outcome === "replacement_reported")
+      .map((entry) => entry.authorization.failedAttempt.taskId));
+    const recoveryTerminals = Object.values(state.agentRecoveries)
+      .filter((entry) => entry.authorization.parent.executionId === this.executionId && entry.terminal)
+      .map((entry) => structuredClone(entry.terminal!))
+      .sort((left, right) => left.workId.localeCompare(right.workId));
+    const logicallyFailed = children.filter((child) =>
+      (child.status === "failed" || child.status === "withheld" || child.status === "interrupted") &&
+      !recoveredFailedTaskIds.has(child.taskId));
     const failure = children.length === 0
       ? "no_children" as const
-      : children.some((child) => child.status === "interrupted")
+      : logicallyFailed.some((child) => child.status === "interrupted")
         ? "child_interrupted" as const
-        : children.some((child) => child.status === "failed" || child.status === "withheld")
+        : logicallyFailed.length > 0
           ? "child_failed" as const
           : null;
     const result = failure === null ? "all_terminal" as const : "closed_failure" as const;
@@ -854,6 +880,8 @@ export class BoundedOrchestratorBridge {
       }),
     );
     await this.scheduler.transitionTask(this.task.id, this.task.assignedAgentId, "working");
-    return { schema: "studio.orchestrator-reports-wait-result.v1", result, failure, children };
+    return recoveryTerminals.length > 0
+      ? { schema: "studio.orchestrator-reports-wait-result.v2", result, failure, children, recoveries: recoveryTerminals }
+      : { schema: "studio.orchestrator-reports-wait-result.v1", result, failure, children };
   }
 }

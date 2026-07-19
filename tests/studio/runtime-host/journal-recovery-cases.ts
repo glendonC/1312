@@ -206,7 +206,18 @@ test("terminal evidence repairs stale lifecycle and failed/interrupted executors
       const status = await waitForLifecycle(runtime.service, ack.commandId, expected);
       assert.ok(status.reason);
       assert.ok(status.journalHead > 0);
-      assert.equal(runtime.executor.launchInvocations, 2);
+      assert.equal(runtime.executor.launchInvocations, mode === "interrupted" ? 2 : 4);
+      const loaded = await readValidatedRuntimeJournal(
+        runtime.store.paths(ack.runtimeId).journalPath,
+        ack.runtimeId,
+      );
+      if (mode === "interrupted") {
+        assert.equal(Object.keys(loaded.state.agentRecoveries).length, 0);
+      } else {
+        const recoveries = Object.values(loaded.state.agentRecoveries);
+        assert.equal(recoveries.length, 2);
+        assert.ok(recoveries.every((entry) => entry.terminal?.outcome === "exhausted"));
+      }
     } finally {
       await cleanup(runtime);
     }

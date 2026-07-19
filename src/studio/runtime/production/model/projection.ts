@@ -54,6 +54,10 @@ import type { OwnedMediaStudyRecordV2, StudyReadinessRecordV3 } from "./studiesV
 import type { OwnedMediaStudyRecordV3, RangePassRecord, StudyReadinessRecordV4 } from "./studiesV3.ts";
 import type { GeneralizedParentAdmissionRecord, GeneralizedParentArtifactReadRecord } from "./studyReportsV2.ts";
 import type { LanguageExplanationRecord } from "./languageExplanations.ts";
+import type {
+  AgentRecoveryRecord,
+  ExecutorFailureClassificationReceipt,
+} from "./agentRecovery.ts";
 
 export interface RuntimeProjection {
   runId: string;
@@ -102,4 +106,6 @@ export interface RuntimeProjection {
   studyReadiness: Record<string, StudyReadinessRecord>;
   generalizedStudyReadiness: Record<string, StudyReadinessRecordV3 | StudyReadinessRecordV4>;
   rangePasses: Record<string, RangePassRecord>;
+  executorFailureClassifications: Record<string, ExecutorFailureClassificationReceipt>;
+  agentRecoveries: Record<string, AgentRecoveryRecord>;
 }

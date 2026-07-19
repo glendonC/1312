@@ -1,0 +1,20 @@
+{
+  "kind": "youtube",
+  "label": "[한국외대 외대알리] 인터뷰#5 - 와킹댄서 킹키=김기현",
+  "channel": "외대알리",
+  "url": "https://www.youtube.com/watch?v=Ni5rBtowdnI",
+  "video_id": "Ni5rBtowdnI",
+  "licence": "Creative Commons Attribution license (reuse allowed)",
+  "window": {
+    "start": "00:00:00",
+    "end": "00:00:45"
+  },
+  "duration": 45,
+  "attribution": "\"[한국외대 외대알리] 인터뷰#5 - 와킹댄서 킹키=김기현\" by 외대알리, used under Creative Commons Attribution license (reuse allowed).",
+  "local_copy": {
+    "path": "bench/packs/hard-ko-provider-authorized-v1/Ni5rBtowdnI.m4a",
+    "content_id": "sha256:b1de8455ae1dd9bb4b5c60db30062280b0010b160e26a4217cd7528e6c5d9193",
+    "bytes": 742145
+  },
+  "note": "Exact 00:00:00–00:00:45 evaluation window derived from the uploader's Creative Commons Attribution source. The local copy is content-bound for provider-authorized benchmark execution."
+}

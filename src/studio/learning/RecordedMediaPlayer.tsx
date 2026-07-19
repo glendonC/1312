@@ -416,6 +416,7 @@ export default function RecordedMediaPlayer({
             src={src}
             preload="auto"
             playsInline
+            aria-label="Recorded source video"
             onClick={togglePlayback}
             onError={() => {
               setMediaFailed(true);

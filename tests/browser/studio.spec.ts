@@ -1976,8 +1976,12 @@ test("agent focus presents one bare media stage and one recorded activity narrat
   const visualEvidence = focus.locator(".agent-focus-visual-evidence");
   const narrative = focus.locator(".agent-focus-activity-region");
 
+  const workbenchPlayer = visualEvidence.locator('.player[data-player-surface="workbench"]');
+  await expect(workbenchPlayer).toBeVisible();
   await expect(visualEvidence.getByLabel("Recorded source video")).toBeVisible();
-  await expect(visualEvidence.getByLabel("Recorded source video")).toHaveAttribute("controls");
+  await expect(visualEvidence.getByLabel("Recorded source video")).not.toHaveAttribute("controls");
+  await expect(visualEvidence.getByRole("button", { name: "Play" })).toBeVisible();
+  await expect(visualEvidence.getByRole("slider", { name: "Seek through clip" })).toBeVisible();
   await expect(
     environment.getByRole("heading", { name: /Natural Korean Conversation/ }),
   ).toBeVisible();
@@ -1989,11 +1993,9 @@ test("agent focus presents one bare media stage and one recorded activity narrat
   }));
   expect(dividerStyle.accentContent).toBe("none");
   expect(dividerStyle.lineBackground).toContain("linear-gradient");
-  await expect(visualEvidence.locator(".env-media-frame .env-media-caption")).toHaveCount(0);
+  await expect(visualEvidence.locator(".env-media-frame")).toHaveCount(0);
   await expect(visualEvidence.locator(".env-media-transcript")).toHaveCount(0);
   await expect(visualEvidence.locator(".agent-focus-evidence-map")).toHaveCount(0);
-  await expect(visualEvidence.getByRole("button")).toHaveCount(0);
-  await expect(visualEvidence.getByRole("slider")).toHaveCount(0);
   await expect(narrative).toHaveAttribute("aria-label", "Recorded activity");
   await expect(narrative.getByRole("heading", { name: "Translating" })).toBeVisible();
   await expect(narrative.locator(".agent-focus-activity-group > ol > li").first()).toContainText("draft");
@@ -2131,7 +2133,7 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
     const hero = root.querySelector(".agent-focus-hero");
     const identity = root.querySelector(".agent-focus-identity");
     const media = root.querySelector(".agent-focus-media-instrument");
-    const mediaFrame = root.querySelector(".env-media-frame");
+    const mediaFrame = root.querySelector('.player[data-player-surface="workbench"] .screen');
     const projection = root.querySelector(".agent-focus-activity-region");
     const commands = root.querySelector(".agent-focus-commands");
     const top = document.querySelector(".top");
@@ -2195,7 +2197,8 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
   expect(focusStyles?.identityCentered ?? 999).toBeLessThanOrEqual(0.5);
   expect(focusStyles?.identityMediaGap ?? -1).toBeGreaterThanOrEqual(20);
   expect(focusStyles?.mediaProjectionGap ?? -1).toBeGreaterThanOrEqual(30);
-  expect(parseFloat(focusStyles?.mediaFrameRadius ?? "0")).toBeGreaterThanOrEqual(18);
+  // Workbench screen is square-cornered; radius was a legacy env-media-frame claim.
+  expect(parseFloat(focusStyles?.mediaFrameRadius ?? "0")).toBe(0);
   expect(Number(focusStyles?.rootZIndex ?? 0)).toBeGreaterThan(
     Number(focusStyles?.pauseLayerZIndex ?? 0),
   );
@@ -2234,13 +2237,14 @@ test("agent focus separates identity, bare media, narrative, and commands at eve
     const hero = focus.locator(".agent-focus-hero");
     const identity = focus.locator(".agent-focus-identity");
     const media = page.locator(".agent-focus-media-instrument");
-    const mediaFrame = focus.locator(".env-media-frame");
+    const mediaFrame = focus.locator('.player[data-player-surface="workbench"] .screen');
     const projection = focus.locator(".agent-focus-activity-region");
     const commands = page.getByRole("navigation", { name: "Agent focus commands" });
     const cycleButtons = commands.locator(".agent-focus-cycle-buttons > button");
     const cycleLabel = commands.locator(".agent-focus-cycle-label");
 
     await expect(focus.getByRole("navigation", { name: "Focus instruments" })).toHaveCount(0);
+    await expect(focus.locator('.player[data-player-surface="workbench"]')).toBeVisible();
     await expect(focus.getByLabel("Recorded source video")).toBeVisible();
     await expect(focus.locator(".agent-focus-visual-evidence")).toBeVisible();
     await expect(focus.locator(".agent-focus-activity-feed")).toBeVisible();
@@ -2518,11 +2522,12 @@ test("keyboard opens agent focus, restores the trigger, and keeps playback on th
   const segmentFocus = page.getByRole("dialog", { name: "Segmenter 01" });
   await expect(segmentFocus.getByRole("complementary", { name: "Recorded activity" })).toBeVisible();
   await expect(segmentFocus.getByRole("heading", { name: "Complete" })).toBeVisible();
+  await expect(segmentFocus.locator('.player[data-player-surface="workbench"]')).toBeVisible();
   await expect(segmentFocus.getByLabel("Recorded source video")).toBeVisible();
-  await expect(segmentFocus.getByLabel("Recorded source video")).toHaveAttribute("controls");
+  await expect(segmentFocus.getByLabel("Recorded source video")).not.toHaveAttribute("controls");
+  await expect(segmentFocus.getByRole("button", { name: "Play" })).toBeVisible();
   await expect(segmentFocus.getByRole("button", { name: "Close agent focus" })).toBeFocused();
   await expect(segmentFocus.getByRole("button", { name: /recording/i })).toHaveCount(0);
-  await expect(segmentFocus.getByRole("slider")).toHaveCount(0);
 });
 
 test("mobile controls remain in the viewport", async ({ page }, testInfo) => {

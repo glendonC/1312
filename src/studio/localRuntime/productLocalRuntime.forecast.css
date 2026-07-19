@@ -25,11 +25,11 @@
   line-height: 1.6;
 }
 
-.product-runtime-start {
+.product-runtime[data-runtime="true"] button.product-runtime-start {
   margin-top: 14px;
-  border-color: transparent !important;
-  color: #fff !important;
-  background: var(--accent-control) !important;
+  border-color: transparent;
+  color: #fff;
+  background: var(--accent-control);
   box-shadow: var(--accent-control-shadow);
 }
 

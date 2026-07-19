@@ -231,8 +231,8 @@
   font-style: normal;
 }
 
-.processing-receipt-empty {
-  margin-top: 14px !important;
+.product-runtime p.processing-receipt-empty {
+  margin-top: 14px;
   padding: 14px;
   border: 1px dashed var(--line-strong);
   border-radius: 12px;
@@ -300,8 +300,8 @@
   font-weight: var(--weight-medium);
 }
 
-.processing-caption-boundary {
-  margin-top: 10px !important;
+.product-runtime p.processing-caption-boundary {
+  margin-top: 10px;
   padding: 9px 10px;
   border-left: 2px solid var(--gold-line);
   background: rgba(184, 150, 63, 0.06);
@@ -338,8 +338,8 @@
   overflow-wrap: anywhere;
 }
 
-.processing-receipt-boundary {
-  margin-top: 12px !important;
+.product-runtime p.processing-receipt-boundary {
+  margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
 }

@@ -136,9 +136,9 @@
   scroll-margin-block-start: 76px;
 }
 
-.product-runtime-caption-results-boundary,
-.product-runtime-caption-results-nonclaim {
-  margin-top: 12px !important;
+.product-runtime p.product-runtime-caption-results-boundary,
+.product-runtime p.product-runtime-caption-results-nonclaim {
+  margin-top: 12px;
   padding: 10px 12px;
   border-left: 2px solid var(--accent-line);
   background: var(--accent-soft);

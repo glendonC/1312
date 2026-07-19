@@ -76,10 +76,10 @@
   opacity: 0.46;
 }
 
-.local-runtime-start {
-  border-color: var(--accent-line) !important;
-  color: var(--accent) !important;
-  background: var(--accent-soft) !important;
+.local-runtime-lab button.local-runtime-start {
+  border-color: var(--accent-line);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .local-runtime-range,

@@ -201,7 +201,7 @@
    setup panel (data-runtime="false") reuses the shared .preflight-form input styling
    and the standard borderless .preflight-control shelf instead, so it matches the
    standard preparation flow without any bespoke duplicate styling. */
-.product-runtime[data-runtime="true"] :is(button, input, select) {
+.product-runtime[data-runtime="true"] :is(button, input, select):not(.processing-worker) {
   min-height: 40px;
   min-width: 0;
   padding: 8px 11px;
@@ -234,14 +234,14 @@
     transform 160ms ease;
 }
 
-.product-runtime[data-runtime="true"] button:hover:not(:disabled),
+.product-runtime[data-runtime="true"] button:hover:not(:disabled):not(.processing-worker),
 .product-runtime-setup-form button:not(.preflight-control):hover:not(:disabled) {
   border-color: var(--accent-line);
   color: var(--accent);
   background: #fff;
 }
 
-.product-runtime button:focus-visible,
+.product-runtime button:focus-visible:not(.processing-worker),
 .product-runtime input:focus-visible,
 .product-runtime select:focus-visible,
 .product-runtime summary:focus-visible {

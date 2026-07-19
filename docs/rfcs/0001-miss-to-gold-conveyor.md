@@ -20,8 +20,9 @@ this decision remains `bench/` contracts, `scripts/` producers, and `docs/`. It 
 ## One line
 
 Build the conveyor that turns each run's own misses into **agent-drafted, human-adjudicated,
-receipt-frozen gold**, then pre-register, score, and compare exact changes against it. Frozen gold
-now exists; repeated captures, variance, later packs, and the report-series comparator remain open.
+receipt-frozen gold**, then pre-register, score, and compare exact changes against it. Frozen gold,
+the per-clip comparator, and the result-free behavioral-rule evaluation contracts now exist. No
+behavioral-rule campaign result, later-run consumption proof, or later pack exists.
 
 ## The deadlock this resolves
 
@@ -56,7 +57,9 @@ run artifacts (withholds, uncorroborated commits, phenomenon hits, cold/prepped 
   -> register    scripts/register-ablation.mjs binds one exact result-free config delta
   -> package     scripts/package-u7-ablation.mjs cold-audits one U7 operation; emits both stems
   -> score       scripts/score-run.mjs fills per_line/trail/delta_vs_cold + score receipt
-  -> compare     report-series comparator: Run 1 -> N on the SAME frozen pack
+  -> compare     scripts/compare-scores.mjs rederives one without/with clip pair
+  -> register    scripts/register-rule-change.mjs freezes one rule and the complete run grid
+  -> evaluate    scripts/qualify-rule-change.mjs measures or refuses the complete grid
 ```
 
 Agents draft; humans decide; code freezes; nothing scores itself. This is the same
@@ -66,11 +69,12 @@ test data.
 ## Contracts (all content-addressed, all append-only)
 
 The schemas live in `bench/schemas/` (`gold.schema.json`, `adjudication.schema.json`,
-`ablation.schema.json`, and `u7-ablation-inputs.schema.json`). Candidate, pack, freeze,
-output-label, score, ablation, and U7 packaging invariants are enforced by
+`ablation.schema.json`, `paired-score-v2.schema.json`, `rule-change-registration.schema.json`,
+`rule-change-result.schema.json`, and `u7-ablation-inputs.schema.json`). Candidate, pack, freeze,
+output-label, score, ablation, rule-change, and U7 packaging invariants are enforced by
 `scripts/lib/bench-gold.mjs`, `scripts/lib/bench-ablation.mjs`,
-`scripts/lib/bench-u7-ablation.mjs`, and `check-bench`. The stub directory this RFC originally
-shipped with has been retired in favour of the real files.
+`scripts/lib/bench-rule-change.mjs`, `scripts/lib/bench-u7-ablation.mjs`, and `check-bench`. The
+stub directory this RFC originally shipped with has been retired in favour of the real files.
 
 ### `studio.bench.gold.v1` (per clip)
 
@@ -142,6 +146,32 @@ Partial text from a truncated result is never emitted. The capture binding keeps
 judge, and preference null. If captures enter `bench/runs/`, score-everything deliberately keeps the
 repository red until blinded human labels and a score receipt exist for each capture.
 
+### `studio.bench.rule-change-registration.v1` and `studio.bench.rule-change-result.v1`
+
+The registration is a result-free plan for one behavioral rule proposal. It cold-binds the exact
+proposal and rule bytes, a training-routed candidates manifest, a validated redistributable YouTube
+identity, exact recorded media bytes, one frozen pack, the fixed
+`/reviewed_memory/rule_content_id` null-to-rule change,
+and deterministic run ids for every clip and repetition. The contamination guard runs during
+registration. Capture is dated strictly after the registration day because the capture contract
+cannot prove ordering within one day. Repository validation also requires git ancestry to order
+registration before capture, capture before labels, labels before score, score before pair, and pair
+before a committed result.
+
+The result accepts only the complete preregistered run grid. It reopens each paired receipt, score,
+and capture, checks exact baseline and variant configs, rejects score reuse and unplanned matching
+captures, and rederives aggregate four-way outcomes. The variance floor is the maximum repeated-run
+rate range observed within either condition for any clip. Future qualification requires a preregistered
+minimum effect of at least 0.25, an effect strictly greater than that floor, no increase in total
+catastrophic errors, and no newly catastrophic critical unit. V1 cannot establish that only one
+attempt ran or that the declared configuration produced the capture bytes. Those checks are pinned
+false, so every V1 result is `refused` and `ineligible` even when the measured effect clears the
+preregistered floor and variance. It does not accept a memory proposal, consume reviewed memory,
+inject a production rule, grade its own outputs, or prove improvement on a later pack. The existing
+memory ledger acceptance path is not yet dependent on this result. A future bench-owned
+single-attempt host and certified-release resolver must close those boundaries before eligibility
+or runtime deployment can support a self-improvement claim.
+
 ## Honesty invariants (each mechanical, each fail-closed)
 
 1. **Pre-registration.** Scoring refuses a capture dated on or before the pack's freeze day
@@ -160,12 +190,14 @@ repository red until blinded human labels and a score receipt exist for each cap
    PRODUCT.md core-loop wording ("misses → bench + glossary + …"): one miss feeds **either**
    the bench **or** the learning stream, never both. That is the price of an honest curve.
 4. **Score-everything.** Every capture pinned into `bench/runs/` after a pack freeze must have a
-   score receipt or `check-bench` fails. Best-of-K rerun cherry-picking becomes structurally
-   visible instead of procedurally forbidden.
-5. **Variance floor.** Type `diagnostics.run_variance`; measure rerun spread (≥3 reruns of one
-   clip); refuse to headline any Run-1→N delta smaller than that spread. At the initial pack
-   size (~40–60 units) only step-changes ≥ ~0.25 are resolvable; incremental Run-N vs Run-N+1
-   claims wait for ~200+ units.
+   score receipt or `check-bench` fails. This catches committed omissions, but it cannot see a local
+   attempt discarded or overwritten before commit. Behavioral-rule V1 therefore pins
+   `single_attempt_proven` false. A future bench-owned host must charge one immutable attempt before
+   invocation and forbid retries.
+5. **Variance floor.** Behavioral-rule registration requires at least three repetitions per clip.
+   Qualification refuses an effect that does not strictly exceed the maximum within-condition clip
+   range. At the initial pack size (~40–60 units), a preregistered minimum such as 0.25 is a
+   step-change screen, not a general confidence interval. Incremental claims wait for larger packs.
 6. **Ablation-bound rule promotion** closes a live gap found during the original review. The old
    gate accepted a rule given any scored frozen report with matching `pack_id`, so one report was
    a skeleton key for unlimited rules. The implemented gate instead requires a **pair** of scored
@@ -218,12 +250,21 @@ repository red until blinded human labels and a score receipt exist for each cap
    `check-memory` proofs: a single scored report, a mismatched pack, a non-ablation pair, and a
    self-control report all fail; only the honest pair accepts, and the delta is recorded on the
    decision receipt.
+7. ✅ Result-free behavioral-rule registration and fail-closed mechanical evaluation in
+   `scripts/lib/bench-rule-change.mjs`. The new contract freezes exact run identities and config
+   bytes before capture, rederives the complete paired grid, measures repeated-run spread, and
+   refuses eligibility because single-attempt and execution attribution are not yet provable. No
+   committed campaign result exists.
 
 Post-week update: `hard-ko-v1` is frozen at three clips and run-007 is scored from human labels with
 `judge: null`. One raw-versus-eligible-stem experiment is pre-registered, its frozen inputs are
-content-bound, and its cold-audit packager is implemented with no captures or results. Next are the
-registered paired capture executions and labels, variance measurement, the report-series
-comparator, and a later independently frozen pack before any generalization claim.
+content-bound, and its cold-audit packager is implemented with no captures or results. The
+paired-score comparator and behavioral-rule evaluation spine are implemented. They preserve
+four-way outcome deltas, cold-rederive stored receipts, preregister exact repeated-run grids, and
+refuse effects below observed spread or with catastrophic increase. No committed behavioral-rule
+registration, with-side score, or eligible result exists. The runtime has no accepted
+certified-release injection proof. Next are real training-routed proposals, registered paired
+captures and human labels, then a later independently frozen pack before any generalization claim.
 
 ## Failure modes
 
@@ -231,8 +272,8 @@ comparator, and a later independently frozen pack before any generalization clai
 |---|---|
 | Self-graded gold (drafter == judge) | agents draft candidates only; two blinded human receipts freeze; candidates structurally unscoreable |
 | Knowledge-level contamination | clip/episode-level guard + exclusive routing (invariants 2–3) |
-| Best-of-K curve mining | score-everything (invariant 4) |
-| Noise sold as progress | variance floor; step-change-only claims at n≈50 (invariant 5) |
+| Best-of-K curve mining | V1 refuses eligibility; a future host must charge one attempt before invocation (invariant 4) |
+| Noise sold as progress | preregistered minimum effect plus observed repeated-run floor (invariant 5) |
 | Skeleton-key rule promotion | ablation-bound acceptance (invariant 6) |
 | Teach-to-the-test pack drift | control clips + pack versioning (invariant 7) |
 | Withhold-everything / commit-everything gaming | four-way outcome dyad headline (invariant 8) |

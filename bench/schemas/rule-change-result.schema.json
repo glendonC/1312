@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/rule-change-result.schema.json",
+  "title": "studio.bench.rule-change-result.v1",
+  "description": "Cold-rederived qualification or refusal for one preregistered reviewed-memory rule change.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "result_id",
+    "registration",
+    "evaluated_at",
+    "pairs",
+    "summary",
+    "qualification",
+    "judge",
+    "notes"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.rule-change-result.v1" },
+    "result_id": {
+      "type": "string",
+      "pattern": "^bench-rule-change-result:sha256:[a-f0-9]{64}$"
+    },
+    "registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt", "registration_id"],
+      "properties": {
+        "receipt": { "$ref": "#/$defs/fileBinding" },
+        "registration_id": {
+          "type": "string",
+          "pattern": "^bench-rule-change-registration:sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "evaluated_at": { "type": "string", "format": "date-time" },
+    "pairs": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["clip_id", "repetition", "without_run", "with_run", "receipt", "pair_id"],
+        "properties": {
+          "clip_id": { "type": "string", "minLength": 1 },
+          "repetition": { "type": "integer", "minimum": 1 },
+          "without_run": { "type": "string", "minLength": 1 },
+          "with_run": { "type": "string", "minLength": 1 },
+          "receipt": { "$ref": "#/$defs/fileBinding" },
+          "pair_id": { "type": "string", "pattern": "^bench-paired-score:sha256:[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "without",
+        "with",
+        "delta",
+        "lost_correct_units",
+        "new_catastrophic_units",
+        "variance"
+      ],
+      "properties": {
+        "without": { "$ref": "#/$defs/conditionSummary" },
+        "with": { "$ref": "#/$defs/conditionSummary" },
+        "delta": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["critical_meaning_rate", "catastrophic_count", "critical_outcomes"],
+          "properties": {
+            "critical_meaning_rate": { "type": ["number", "null"] },
+            "catastrophic_count": { "type": "integer" },
+            "critical_outcomes": { "$ref": "#/$defs/outcomes" }
+          }
+        },
+        "lost_correct_units": { "type": "integer", "minimum": 0 },
+        "new_catastrophic_units": { "type": "integer", "minimum": 0 },
+        "variance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "observed_floor", "by_clip"],
+          "properties": {
+            "method": { "const": "max_within_condition_clip_range" },
+            "observed_floor": { "type": ["number", "null"], "minimum": 0 },
+            "by_clip": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["clip_id", "without_range", "with_range"],
+                "properties": {
+                  "clip_id": { "type": "string", "minLength": 1 },
+                  "without_range": { "type": ["number", "null"], "minimum": 0 },
+                  "with_range": { "type": ["number", "null"], "minimum": 0 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "promotion_eligibility", "checks", "reasons"],
+      "properties": {
+        "status": { "const": "refused" },
+        "promotion_eligibility": { "const": "ineligible" },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "complete_preregistered_grid",
+            "all_rates_measurable",
+            "minimum_effect_met",
+            "effect_exceeds_observed_variance",
+            "catastrophic_non_increase",
+            "no_new_catastrophic_units",
+            "single_attempt_proven",
+            "execution_attribution_proven"
+          ],
+          "properties": {
+            "complete_preregistered_grid": { "type": "boolean" },
+            "all_rates_measurable": { "type": "boolean" },
+            "minimum_effect_met": { "type": "boolean" },
+            "effect_exceeds_observed_variance": { "type": "boolean" },
+            "catastrophic_non_increase": { "type": "boolean" },
+            "no_new_catastrophic_units": { "type": "boolean" },
+            "single_attempt_proven": {
+              "const": false,
+              "description": "V1 has no host-owned single-attempt receipt, so it cannot exclude best-of-K selection."
+            },
+            "execution_attribution_proven": {
+              "const": false,
+              "description": "V1 has no host-owned receipt binding the declared config to execution and capture bytes."
+            }
+          }
+        },
+        "reasons": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "judge": { "type": "null" },
+    "notes": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correct", "wrong", "withheld", "missing"],
+      "properties": {
+        "correct": { "type": "integer" },
+        "wrong": { "type": "integer" },
+        "withheld": { "type": "integer" },
+        "missing": { "type": "integer" }
+      }
+    },
+    "conditionSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["critical_meaning", "critical_outcomes", "catastrophic_count"],
+      "properties": {
+        "critical_meaning": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["passes", "total", "rate"],
+          "properties": {
+            "passes": { "type": "integer", "minimum": 0 },
+            "total": { "type": "integer", "minimum": 0 },
+            "rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+          }
+        },
+        "critical_outcomes": { "$ref": "#/$defs/outcomes" },
+        "catastrophic_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

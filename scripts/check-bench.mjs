@@ -12,6 +12,17 @@ import {
   validatePairedScoreReceipt,
   verifyPairedScoreReceipt,
 } from "./lib/bench-paired-score.mjs";
+import {
+  validateRuleChangeRegistration,
+  validateRuleChangeResult,
+  verifyRuleChangeResult,
+} from "./lib/bench-rule-change.mjs";
+import {
+  assertCommitDescends,
+  firstAdditionCommit,
+  immutableArtifactAfter,
+  immutableArtifactCommit,
+} from "./lib/bench-git-evidence.mjs";
 import { validateU7AblationInputs, validateU7CapturePair } from "./lib/bench-u7-ablation.mjs";
 import {
   contaminationGuard,
@@ -272,9 +283,17 @@ console.log(
  */
 const capturesDir = new URL("../bench/runs/", import.meta.url);
 const captureSchemaUrl = new URL("../bench/schemas/capture.schema.json", import.meta.url);
-const pairedScoreSchemaUrl = new URL("../bench/schemas/paired-score.schema.json", import.meta.url);
+const pairedScoreSchemaUrl = new URL("../bench/schemas/paired-score-v2.schema.json", import.meta.url);
 const pairedScoreSchema = JSON.parse(readFileSync(pairedScoreSchemaUrl, "utf8"));
 const validatePairedScoreSchema = ajv.compile(pairedScoreSchema);
+const ruleChangeRegistrationSchema = JSON.parse(
+  readFileSync(new URL("../bench/schemas/rule-change-registration.schema.json", import.meta.url), "utf8"),
+);
+const validateRuleChangeRegistrationSchema = ajv.compile(ruleChangeRegistrationSchema);
+const ruleChangeResultSchema = JSON.parse(
+  readFileSync(new URL("../bench/schemas/rule-change-result.schema.json", import.meta.url), "utf8"),
+);
+const validateRuleChangeResultSchema = ajv.compile(ruleChangeResultSchema);
 const captures = [];
 
 // The schema is loaded unconditionally: a missing capture schema must crash the check, not
@@ -613,6 +632,7 @@ if (existsSync(scoresDir)) {
 
 const pairsDir = join(scoresDir, "pairs");
 let pairedScoresChecked = 0;
+const pairedScoreBindingsByContentId = new Map();
 if (existsSync(pairsDir)) {
   for (const entry of readdirSync(pairsDir, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
@@ -631,10 +651,148 @@ if (existsSync(pairsDir)) {
         `paired score ${entry.name} ${side} side does not bind the checked score path and bytes`,
       );
     }
+    const pairBinding = await fileReceipt(path, `bench/scores/pairs/${entry.name}`);
+    assert(
+      !pairedScoreBindingsByContentId.has(pairBinding.content_id),
+      `paired score ${entry.name} duplicates another committed pair receipt's exact bytes`,
+    );
+    pairedScoreBindingsByContentId.set(pairBinding.content_id, pairBinding);
     pairedScoresChecked += 1;
   }
 }
 console.log(`paired score check passed: ${pairedScoresChecked} immutable pair receipt(s)`);
+
+const ruleChangesDir = join(ROOT, "bench/rule-changes");
+let ruleChangeRegistrationsChecked = 0;
+let ruleChangeResultsChecked = 0;
+if (existsSync(ruleChangesDir)) {
+  for (const entry of readdirSync(ruleChangesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const registrationPath = join(ruleChangesDir, entry.name, "registration.json");
+    assert(existsSync(registrationPath), `rule change directory ${entry.name} has no registration.json`);
+    const registration = await validateRuleChangeRegistration(
+      await readJsonFile(registrationPath, `rule change registration ${entry.name}`),
+      { workspaceRoot: ROOT, context: `rule change registration ${entry.name}` },
+    );
+    assert(
+      validateRuleChangeRegistrationSchema(registration),
+      `rule change registration ${entry.name} schema: ${ajv.errorsText(validateRuleChangeRegistrationSchema.errors)}`,
+    );
+    assert(registration.slug === entry.name, `rule change directory ${entry.name} holds ${registration.slug}`);
+    ruleChangeRegistrationsChecked += 1;
+
+    const resultPath = join(ruleChangesDir, entry.name, "result.json");
+    if (!existsSync(resultPath)) continue;
+    const result = await validateRuleChangeResult(
+      await readJsonFile(resultPath, `rule change result ${entry.name}`),
+      `rule change result ${entry.name}`,
+    );
+    assert(
+      validateRuleChangeResultSchema(result),
+      `rule change result ${entry.name} schema: ${ajv.errorsText(validateRuleChangeResultSchema.errors)}`,
+    );
+    await verifyRuleChangeResult(result, { workspaceRoot: ROOT });
+    assert(
+      result.registration.registration_id === registration.registration_id,
+      `rule change result ${entry.name} binds a different registration`,
+    );
+    for (const pair of result.pairs) {
+      const checked = pairedScoreBindingsByContentId.get(pair.receipt.content_id);
+      assert(checked, `rule change result ${entry.name} binds a pair not checked by repository discovery`);
+      assert(
+        checked.path === pair.receipt.path && checked.bytes === pair.receipt.bytes,
+        `rule change result ${entry.name} pair path or bytes differ from repository discovery`,
+      );
+    }
+    ruleChangeResultsChecked += 1;
+  }
+}
+console.log(
+  `rule change check passed: ${ruleChangeRegistrationsChecked} result-free registration(s), ${ruleChangeResultsChecked} qualified or refused result(s)`,
+);
+let ruleChangeHistory = [];
+try {
+  ruleChangeHistory = execSync(
+    "git log --diff-filter=A --name-only --format= -- bench/rule-changes",
+    { cwd: ROOT, stdio: "pipe" },
+  )
+    .toString()
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.endsWith("/registration.json") || line.endsWith("/result.json"));
+} catch {
+  console.log("rule change history unverified: not a git checkout or git unavailable");
+}
+for (const historical of new Set(ruleChangeHistory)) {
+  assert(existsSync(join(ROOT, historical)), `committed rule change artifact ${historical} was deleted`);
+}
+
+if (existsSync(ruleChangesDir)) {
+  for (const entry of readdirSync(ruleChangesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const resultPath = `bench/rule-changes/${entry.name}/result.json`;
+    if (!existsSync(join(ROOT, resultPath))) continue;
+    const registrationPath = `bench/rule-changes/${entry.name}/registration.json`;
+    const registrationCommit = immutableArtifactCommit(registrationPath, {
+      workspaceRoot: ROOT,
+      context: `rule change registration ${entry.name}`,
+    });
+    const result = await readJsonFile(join(ROOT, resultPath), `rule change result ${entry.name}`);
+    const pairCommits = [];
+    for (const row of result.pairs) {
+      const pairCommit = immutableArtifactCommit(row.receipt.path, {
+        workspaceRoot: ROOT,
+        context: `rule change ${entry.name} pair ${row.pair_id}`,
+      });
+      pairCommits.push(pairCommit);
+      const pair = await readJsonFile(join(ROOT, row.receipt.path), `rule change pair ${row.pair_id}`);
+      for (const side of ["without", "with"]) {
+        const score = await readJsonFile(join(ROOT, pair[side].score.path), `rule change score ${pair[side].run}`);
+        const captureCommit = immutableArtifactAfter(
+          registrationCommit,
+          score.bindings.capture.path,
+          {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} capture ${pair[side].run}`,
+          },
+        );
+        const labelsCommit = immutableArtifactAfter(
+          captureCommit,
+          score.bindings.labels.path,
+          {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} labels ${pair[side].run}`,
+          },
+        );
+        const scoreCommit = immutableArtifactAfter(
+          labelsCommit,
+          pair[side].score.path,
+          {
+            workspaceRoot: ROOT,
+            context: `rule change ${entry.name} ${side} score ${pair[side].run}`,
+          },
+        );
+        assertCommitDescends(scoreCommit, pairCommit, {
+          workspaceRoot: ROOT,
+          context: `rule change ${entry.name} pair ${row.pair_id}`,
+        });
+      }
+    }
+    const resultCommit = firstAdditionCommit(resultPath, { workspaceRoot: ROOT });
+    if (resultCommit !== null) {
+      immutableArtifactCommit(resultPath, {
+        workspaceRoot: ROOT,
+        context: `rule change result ${entry.name}`,
+      });
+      for (const pairCommit of pairCommits) {
+        assertCommitDescends(pairCommit, resultCommit, {
+          workspaceRoot: ROOT,
+          context: `rule change result ${entry.name}`,
+        });
+      }
+    }
+  }
+}
 
 const ablationsDir = join(ROOT, "bench/ablations");
 const ablations = [];

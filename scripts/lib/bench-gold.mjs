@@ -912,6 +912,57 @@ export function validateScoreReceipt(receipt, context = "score receipt") {
   return receipt;
 }
 
+/**
+ * Cold verification for one stored score receipt. Structural validation is insufficient because
+ * a caller could edit headline values and recompute score_id. This reopens every bound input and
+ * reruns the pure scorer, including the human-label and frozen-gold checks.
+ */
+export async function verifyScoreReceipt(
+  receiptValue,
+  { workspaceRoot = process.cwd(), context = "score receipt" } = {},
+) {
+  const receipt = validateScoreReceipt(receiptValue, context);
+  for (const name of ["gold", "freeze", "capture", "labels"]) {
+    await verifiedBinding(receipt.bindings[name], workspaceRoot, `${context} ${name} binding`);
+  }
+  const gold = await validateGold(
+    await readJsonFile(resolveFile(receipt.bindings.gold.path, workspaceRoot), `${context} gold`),
+    `${context} gold`,
+  );
+  const freeze = validateFreezeReceipt(
+    await readJsonFile(resolveFile(receipt.bindings.freeze.path, workspaceRoot), `${context} freeze`),
+    `${context} freeze`,
+  );
+  const capture = await readJsonFile(
+    resolveFile(receipt.bindings.capture.path, workspaceRoot),
+    `${context} capture`,
+  );
+  const labels = validateOutputLabels(
+    await readJsonFile(resolveFile(receipt.bindings.labels.path, workspaceRoot), `${context} labels`),
+    `${context} labels`,
+  );
+  if (
+    gold.pack_id !== receipt.pack_id ||
+    gold.clip_id !== receipt.clip_id ||
+    freeze.pack_id !== receipt.pack_id ||
+    capture.capture_id !== receipt.run
+  ) {
+    fail(`${context} bound inputs name a different pack, clip, or run`);
+  }
+  const rederived = scoreCapture({
+    gold,
+    freeze,
+    capture,
+    labels,
+    bindings: receipt.bindings,
+    scoredAt: receipt.scored_at,
+  });
+  if (rederived.score_id !== receipt.score_id || contentIdForJson(rederived) !== contentIdForJson(receipt)) {
+    fail(`${context} does not rederive from its bound gold, freeze, capture, and human-label bytes`);
+  }
+  return { receipt, gold, freeze, capture, labels };
+}
+
 /* ------------------------------------------------- repository-level guards */
 
 export async function loadCandidatesManifests(candidatesDir, workspaceRoot) {

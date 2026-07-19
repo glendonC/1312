@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1321.local/bench/schemas/rule-change-registration.schema.json",
+  "title": "studio.bench.rule-change-registration.v1",
+  "description": "Result-free preregistration for one reviewed-memory behavioral rule over one frozen pack.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "registration_id",
+    "slug",
+    "status",
+    "registered_at",
+    "hypothesis",
+    "change",
+    "pack",
+    "subject",
+    "delta",
+    "capture_policy",
+    "capture_plan",
+    "qualification_policy",
+    "results",
+    "notes"
+  ],
+  "properties": {
+    "schema": { "const": "studio.bench.rule-change-registration.v1" },
+    "registration_id": {
+      "type": "string",
+      "pattern": "^bench-rule-change-registration:sha256:[a-f0-9]{64}$"
+    },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "status": { "const": "registered" },
+    "registered_at": { "type": "string", "format": "date-time" },
+    "hypothesis": { "type": "string", "minLength": 1 },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal",
+        "proposal_id",
+        "proposal_content_id",
+        "rule_content_id",
+        "origin"
+      ],
+      "properties": {
+        "proposal": { "$ref": "#/$defs/fileBinding" },
+        "proposal_id": {
+          "type": "string",
+          "pattern": "^memory-proposal:sha256:[a-f0-9]{64}$"
+        },
+        "proposal_content_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "rule_content_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "origin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "candidates_manifest",
+            "manifest_id",
+            "run_id",
+            "clip_id",
+            "route",
+            "source_receipt",
+            "run_receipt",
+            "media_artifact",
+            "source_kind",
+            "media_class"
+          ],
+          "properties": {
+            "candidates_manifest": { "$ref": "#/$defs/fileBinding" },
+            "manifest_id": {
+              "type": "string",
+              "pattern": "^bench-candidates:sha256:[a-f0-9]{64}$"
+            },
+            "run_id": { "type": "string", "minLength": 1 },
+            "clip_id": { "type": "string", "minLength": 1 },
+            "route": { "const": "training" },
+            "source_receipt": { "$ref": "#/$defs/fileBinding" },
+            "run_receipt": { "$ref": "#/$defs/fileBinding" },
+            "media_artifact": { "$ref": "#/$defs/fileBinding" },
+            "source_kind": { "const": "youtube" },
+            "media_class": { "const": "recorded_youtube_bytes" }
+          }
+        }
+      }
+    },
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack_id", "manifest", "freeze"],
+      "properties": {
+        "pack_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "manifest": { "$ref": "#/$defs/fileBinding" },
+        "freeze": { "$ref": "#/$defs/fileBinding" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system_id", "baseline", "variant"],
+      "properties": {
+        "system_id": { "type": "string", "minLength": 1 },
+        "baseline": { "$ref": "#/$defs/configuration" },
+        "variant": { "$ref": "#/$defs/configuration" }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "baseline", "variant"],
+      "properties": {
+        "path": { "const": "/reviewed_memory/rule_content_id" },
+        "baseline": { "type": "null" },
+        "variant": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "capture_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection",
+        "repetitions_per_clip",
+        "pairing",
+        "capture_after_registration_day",
+        "score_every_capture"
+      ],
+      "properties": {
+        "selection": { "const": "all_frozen_pack_clips" },
+        "repetitions_per_clip": { "type": "integer", "minimum": 3 },
+        "pairing": { "const": "same_clip_and_preregistered_repetition" },
+        "capture_after_registration_day": { "const": true },
+        "score_every_capture": { "const": true }
+      }
+    },
+    "capture_plan": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["clip_id", "repetition", "without_run", "with_run"],
+        "properties": {
+          "clip_id": { "type": "string", "minLength": 1 },
+          "repetition": { "type": "integer", "minimum": 1 },
+          "without_run": { "type": "string", "minLength": 1 },
+          "with_run": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "qualification_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_authority",
+        "score_schema",
+        "judge",
+        "primary_metric",
+        "minimum_effect",
+        "variance_method",
+        "require_effect_exceeds_variance",
+        "catastrophic_policy",
+        "outcomes"
+      ],
+      "properties": {
+        "semantic_authority": { "const": "human_labels_only" },
+        "score_schema": { "const": "studio.bench.score.v1" },
+        "judge": { "type": "null" },
+        "primary_metric": { "const": "critical_meaning_rate" },
+        "minimum_effect": { "type": "number", "minimum": 0.25, "maximum": 1 },
+        "variance_method": { "const": "max_within_condition_clip_range" },
+        "require_effect_exceeds_variance": { "const": true },
+        "catastrophic_policy": { "const": "no_new_units_and_non_increasing_total" },
+        "outcomes": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "correct" },
+            { "const": "wrong" },
+            { "const": "withheld" },
+            { "const": "missing" }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        }
+      }
+    },
+    "results": { "type": "null" },
+    "notes": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content_id", "bytes"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "content_id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_id", "config"],
+      "properties": {
+        "config_id": { "type": "string", "pattern": "^bench-config:sha256:[a-f0-9]{64}$" },
+        "config": { "type": "object", "minProperties": 1 }
+      }
+    }
+  }
+}

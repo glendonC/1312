@@ -16,7 +16,7 @@ import {
 } from "./bench-gold.mjs";
 import { contentIdForJson } from "./immutable-receipts.mjs";
 
-export const PAIRED_SCORE_SCHEMA = "studio.bench.paired-score.v1";
+export const PAIRED_SCORE_SCHEMA = "studio.bench.paired-score.v2";
 
 function fail(message) {
   throw new Error(`bench paired-score: ${message}`);
@@ -123,6 +123,7 @@ function outcomeMap(system) {
         t_end: line.t_end,
         critical_unit_id: unit.id,
         outcome: unit.outcome,
+        catastrophic: unit.catastrophic,
       });
     }
   }
@@ -183,6 +184,7 @@ export function compareSubjectScores({
   }
 
   const regressions = [];
+  const catastrophicRegressions = [];
   for (const [key, before] of withoutUnits) {
     const after = withUnits.get(key);
     if (isRegression(before.outcome, after.outcome)) {
@@ -194,8 +196,23 @@ export function compareSubjectScores({
         with_outcome: after.outcome,
       });
     }
+    if (before.catastrophic !== true && after.catastrophic === true) {
+      catastrophicRegressions.push({
+        t_start: before.t_start,
+        t_end: before.t_end,
+        critical_unit_id: before.critical_unit_id,
+        without_catastrophic: before.catastrophic,
+        with_catastrophic: true,
+      });
+    }
   }
   regressions.sort(
+    (left, right) =>
+      left.t_start - right.t_start ||
+      left.t_end - right.t_end ||
+      left.critical_unit_id.localeCompare(right.critical_unit_id),
+  );
+  catastrophicRegressions.sort(
     (left, right) =>
       left.t_start - right.t_start ||
       left.t_end - right.t_end ||
@@ -247,9 +264,10 @@ export function compareSubjectScores({
     },
     delta,
     regressions,
+    catastrophic_regressions: catastrophicRegressions,
     judge: null,
     notes:
-      "Paired compare preserves critical_meaning rate delta, catastrophic count delta, and all four outcome deltas. Regressions list loss of a previously correct critical unit. judge is pinned null. No composite score. A null with.memory means this pair does not claim reviewed-memory consumption.",
+      "Paired compare preserves critical_meaning rate delta, catastrophic count delta, and all four outcome deltas. Regressions list loss of a previously correct critical unit and newly catastrophic critical units. judge is pinned null. No composite score. A null with.memory means this pair does not claim reviewed-memory consumption.",
   };
   const pairId = `bench-paired-score:${contentIdForJson({ pair_id: null, ...body })}`;
   return validatePairedScoreReceipt({ pair_id: pairId, ...body });
@@ -269,6 +287,7 @@ export function validatePairedScoreReceipt(receipt, context = "paired score") {
       "with",
       "delta",
       "regressions",
+      "catastrophic_regressions",
       "judge",
       "notes",
     ],
@@ -343,6 +362,22 @@ export function validatePairedScoreReceipt(receipt, context = "paired score") {
     }
     if (!isRegression(row.without_outcome, row.with_outcome)) {
       fail(`${context}.regressions[${index}] is not a regression`);
+    }
+  }
+  if (!Array.isArray(receipt.catastrophic_regressions)) {
+    fail(`${context}.catastrophic_regressions must be an array`);
+  }
+  for (const [index, row] of receipt.catastrophic_regressions.entries()) {
+    exactKeys(
+      row,
+      ["t_start", "t_end", "critical_unit_id", "without_catastrophic", "with_catastrophic"],
+      `${context}.catastrophic_regressions[${index}]`,
+    );
+    if (!(row.t_end > row.t_start)) {
+      fail(`${context}.catastrophic_regressions[${index}] range is malformed`);
+    }
+    if (row.with_catastrophic !== true || row.without_catastrophic === true) {
+      fail(`${context}.catastrophic_regressions[${index}] is not newly catastrophic`);
     }
   }
 

@@ -34,6 +34,8 @@ bench/
     gold.schema.json          # per-clip gold candidate; status pinned "candidate"
     adjudication.schema.json  # one blinded human decision, bound to exact candidate bytes
     ablation.schema.json      # result-free plan for one exact config delta on frozen bytes
+    paired-score-v2.schema.json # cold-rederived per-clip compare with regression detail
+    rule-change-*.schema.json # preregistered campaign and fail-closed evaluation
     u7-ablation-inputs.schema.json # exact pre-capture source identities for one U7 ablation
   examples/
     unscored-report.json      # honest sample rendered by /benchmarks/
@@ -84,6 +86,8 @@ Agents draft; humans decide; code freezes; nothing scores itself.
 | Adjudicate | `scripts/write-adjudication-receipt.mjs` + `bench/ADJUDICATION.md` | A hand-authored/divergent review id; candidate-byte drift; decisions not aligned to every gold time window; a declared Git identity different from the reviewer's checkout identity |
 | Freeze | `scripts/freeze-pack.mjs` | Freezing without two blinded accept receipts per clip from reviewers with distinct declared names AND git identities, neither the drafter; a control clip mined from our own misses; a training-routed clip |
 | Register | `scripts/register-ablation.mjs` | An unfrozen or byte-drifted pack; operator-authored ids or timestamps; more than one config leaf delta; fewer than three paired repetitions; non-null results or model judge; structural diagnostics with semantic authority |
+| Register rule | `scripts/register-rule-change.mjs` | A non-rule proposal; gold-routed or pack-contaminated origin; invalid YouTube identity; absent exact media bytes; result-bearing registration; more than one config leaf delta; fewer than three preregistered pairs per clip |
+| Evaluate rule | `scripts/qualify-rule-change.mjs` | A partial or substituted run grid; capture config drift; unplanned matching captures; post-hoc pairing; invented pair deltas; model judge. V1 always refuses promotion because no host-owned single-attempt or execution-attribution receipt exists. |
 | Package U7 | `scripts/package-u7-ablation.mjs` | An unregistered clip or source byte drift; a non-auditable runtime operation; changed raw/stem configs; one selected anonymous stem; partial output from an unavailable, unknown, or truncated recognizer; any semantic label, score, judge, or preference |
 | Score | `scripts/score-run.mjs` | Non-frozen or amended gold; a capture dated on or before the freeze day (pre-registration); an emitted line with no human label; a label for a line nothing emitted; any LLM judge (`judge` is pinned null) |
 | Check | `scripts/check-bench.mjs` | Route conflicts; a memory proposal drawing on a pack or gold-routed clip (clip-level, not byte-level); a post-freeze capture without a score receipt (score-everything); stale or result-bearing ablation registrations; byte drift in anything a receipt bound |
@@ -112,12 +116,28 @@ differ by exactly the proposed rule (`config.rules` content ids), with the measu
 recorded on the decision receipt. One scored report is not evidence about a rule.
 
 Paired without/with scoring uses `scripts/compare-scores.mjs` against
-`bench/schemas/paired-score.schema.json`. It binds two validated score receipts on the same
+`bench/schemas/paired-score-v2.schema.json`. It binds two validated score receipts on the same
 `pack_id` + `clip_id`, requires `judge: null` on both, preserves four-way outcome deltas, and lists
 loss of previously correct critical units. Repository checks reopen the bound bytes and rederive
 the receipt, so changing a delta and recomputing its id does not create evidence. This per-clip
 primitive does not establish exact configuration control, repetition variance, or campaign
 qualification. No committed with-side score receipt exists yet.
+
+Behavioral rule campaigns use the additive
+`studio.bench.rule-change-registration.v1` and `studio.bench.rule-change-result.v1` contracts.
+Registration binds one training-routed proposal to a validated redistributable YouTube identity,
+the exact recorded media bytes, exact rule bytes, the frozen pack, the fixed
+`/reviewed_memory/rule_content_id` leaf change, and every run id in the clip and repetition grid
+before capture. Evaluation cold-reopens every pair, score, and capture. It requires all
+preregistered runs,
+rejects unplanned matching captures, measures the maximum within-condition clip range, and refuses
+eligibility unless the critical meaning effect meets the preregistered floor of at least 0.25,
+exceeds observed spread, does not increase catastrophic count, and introduces no newly
+catastrophic critical unit. Repository checks require registration, capture, labels, score, pair,
+and result to land in that git ancestry order. V1 always returns `refused` and `ineligible`: the
+repository has no host-owned receipt that proves a single attempt or binds the declared
+configuration to execution and capture bytes. It does not promote memory or prove a later run
+consumed it. No committed rule-change registration or result exists yet.
 
 **What still cannot happen, and why:** the committed raw-versus-eligible-stem registration and input
 registry contain no outputs or results. The packager can materialize only both fixed anonymous-stem
@@ -127,7 +147,10 @@ field null. It cannot select eligible clips after outcomes are known, select a f
 structural producer success into semantic quality, or establish variance. Execution still needs at
 least three paired repetitions of every frozen clip, human labels for every emitted line, and score
 receipts for every capture. A with-memory second capture of the same frozen clip is still required
-before any Improve Loop win claim. Later packs are still required before a generalization claim.
+before any Improve Loop win claim, but that later deployment proof is separate from this
+pre-promotion rule experiment. A bench-owned single-attempt host, next-run runtime injection, and
+exact prompt receipt are not implemented by the bench evaluator. Later packs are still required
+before eligibility or a generalization claim.
 
 Two dating anchors are honest-but-incomplete in v1 and documented rather than pretended:
 `frozen_at` is stamped by the tool (never operator-supplied) and cannot predate its adjudication
@@ -142,10 +165,12 @@ npm run bench:check
 ```
 
 The check validates every report it discovers, every capture, every conveyor artifact, every
-ablation registration, and every U7 input registry or committed capture pair. Focused ablation tests
-reject forged ids, byte drift, premature timestamps, multiple config deltas, low repetition,
-non-null judge or results, structural semantic authority, best-stem selection, hidden ineligible
-outputs, incomplete anonymous-stem pairs, and deletion of a committed registration. The existing
+ablation and rule-change registration, every rule-change result, and every U7 input registry or
+committed capture pair. Focused tests reject forged ids, byte drift, premature timestamps, multiple
+config deltas, low repetition, non-null judge or results, structural semantic authority,
+best-stem selection, hidden ineligible outputs, incomplete anonymous-stem pairs, incomplete or
+unplanned rule-change grids, effects below observed spread, catastrophic increases, and deletion
+of committed registration or result artifacts. The existing
 conveyor drills continue to reject invalid freezes, labels, routes, contamination, and unscored
 post-freeze captures. Planned report slots cannot claim sources or annotations, system and result
 states must agree, four-way outcomes must sum, and a zero-denominator rate remains `null`; it never

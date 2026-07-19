@@ -67,7 +67,14 @@ import {
   type RuntimeStatusView,
 } from "./productLocalRuntimeShared";
 
-import "./productLocalRuntime.css";
+// Direct leaf imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
+import "./productLocalRuntime.shell.css";
+import "./productLocalRuntime.ingest.css";
+import "./productLocalRuntime.forecast.css";
+import "./productLocalRuntime.processing-canvas.css";
+import "./productLocalRuntime.coordination-ledger.css";
+import "./productLocalRuntime.captions-qc.css";
+import "./productLocalRuntime.responsive.css";
 
 type Busy = "connect" | "ingest" | "plan" | "start" | null;
 export type ProductLocalSourceMode = "owned" | "youtube";

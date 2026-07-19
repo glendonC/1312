@@ -1,0 +1,47 @@
+{
+  "review_id": "bench-review:sha256:437f32a573feb86d623dea7dba49071cd149943ef13b1d9025e0c28e679e1a38",
+  "schema": "studio.bench.review.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ni5rBtowdnI",
+  "candidate": {
+    "path": "bench/packs/hard-ko-provider-authorized-v1/Ni5rBtowdnI.gold.json",
+    "content_id": "sha256:bb892107fb870f85ca91f42ed4dab1c5fa07ff5a3c9b5d30ebe2ec2adda69986",
+    "bytes": 5599
+  },
+  "reviewer": {
+    "name": "Bench Reviewer A",
+    "git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+  },
+  "drafter": "agent:gold-drafter-v1",
+  "blinded": true,
+  "action": "accept",
+  "reason": "Hackathon blinded panel accept after audio listen of every exact window; Korean transcription, English guidance, and critical units accepted as written for this candidate.",
+  "unit_decisions": [
+    {
+      "t_start": 0,
+      "t_end": 9.3,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 9.3,
+      "t_end": 23,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 23,
+      "t_end": 31,
+      "action": "accept",
+      "note": null
+    },
+    {
+      "t_start": 31,
+      "t_end": 45,
+      "action": "accept",
+      "note": null
+    }
+  ],
+  "minutes_spent": null,
+  "created_at": "2026-07-19T20:18:35.000Z"
+}

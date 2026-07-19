@@ -1,15 +1,36 @@
 /*
- * Studio product style entry: page shell plus part indexes.
- * Each imported part owns its component selectors and responsive rules (dock, canvas,
- * agent focus, workspace, Results, pause). Do not grow route-level god rules here.
+ * Studio product style entry: page shell plus leaf sheets.
+ * Owns: .studio route shell, floating .top header, act layout, Results header seats.
+ * Must not: grow into Results/Dock/player god rules; nest CSS @import indexes (stale HMR).
+ * Agent focus loads from AgentPanel.tsx via styles/studio/focus/index.css.
  */
 
-@import "./studio/dock.css";
+/* Dock leaves */
+@import "./studio/dock.shell.css";
+@import "./studio/dock.run-controls.css";
+@import "./studio/dock.layout.css";
+@import "./studio/dock.source-entry.css";
+@import "./studio/dock.responsive.css";
+
 @import "./studio/identity.css";
 @import "./studio/welcome.css";
 @import "./studio/canvas.css";
-@import "./studio/workspace.css";
-@import "./studio/results.css";
+
+/* Workspace leaves */
+@import "./studio/workspace.environment.css";
+@import "./studio/workspace.media.css";
+@import "./studio/workspace.responsive.css";
+@import "./studio/workspace.cell.css";
+
+/* Results leaves */
+@import "./studio/results.shell.css";
+@import "./studio/results.player.css";
+@import "./studio/results.captions.css";
+@import "./studio/results.learning.css";
+@import "./studio/results.summary.css";
+@import "./studio/results.scores.css";
+@import "./studio/results.responsive.css";
+
 @import "./studio/pause.css";
 
 .studio {

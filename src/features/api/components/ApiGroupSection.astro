@@ -1,0 +1,20 @@
+---
+import type { ApiEndpointGroup } from "../model.ts";
+import ApiEndpoint from "./ApiEndpoint.astro";
+
+interface Props {
+  group: ApiEndpointGroup;
+}
+
+const { group } = Astro.props;
+---
+
+<section class="api-section" aria-label={group.title}>
+  <h1 class="api-page-title">{group.title}</h1>
+  {group.note && <p class="api-group-note">{group.note}</p>}
+  <div class="api-endpoints">
+    {group.endpoints.map((endpoint) => (
+      <ApiEndpoint endpoint={endpoint} />
+    ))}
+  </div>
+</section>

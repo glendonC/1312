@@ -1,0 +1,27 @@
+---
+import type { ApiFieldTable } from "../model.ts";
+
+interface Props {
+  table: ApiFieldTable;
+}
+
+const { table } = Astro.props;
+---
+
+<div class="api-fields">
+  <div class="api-fields-head">
+    <h3>{table.title}</h3>
+    <span class="api-fields-label">{table.label}</span>
+  </div>
+  {table.fields.map((field) => (
+    <div class="api-field">
+      <div class="api-field-head">
+        <code class="api-field-name">{field.name}</code>
+        <span class="api-tag">{field.type}</span>
+        {field.required === true && <span class="api-tag api-tag-required">required</span>}
+        {field.required === false && <span class="api-tag">optional</span>}
+      </div>
+      <p class="api-field-note">{field.note}</p>
+    </div>
+  ))}
+</div>

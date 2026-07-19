@@ -1,0 +1,68 @@
+.api-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.api-panel {
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--ink) 3%, var(--paper));
+  overflow: hidden;
+}
+
+.api-panel figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--palette-soft);
+  color: var(--palette-ink);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.api-copy {
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--palette-ink) 30%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--palette-ink);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.api-copy:hover {
+  border-color: var(--palette-ink);
+  background: var(--paper);
+}
+
+.api-copy.is-copied {
+  color: var(--paper);
+  background: var(--palette-ink);
+  border-color: var(--palette-ink);
+}
+
+.api-panel pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+
+.api-panel code {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.6;
+  white-space: pre;
+}

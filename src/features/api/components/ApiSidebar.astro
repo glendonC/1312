@@ -1,0 +1,32 @@
+---
+import { API_PAGES, apiPageHref } from "../model.ts";
+
+interface Props {
+  activeSlug: string;
+}
+
+const { activeSlug } = Astro.props;
+
+const groupLabels = [...new Set(API_PAGES.map((page) => page.group))];
+const groups = groupLabels.map((label) => ({
+  label,
+  pages: API_PAGES.filter((page) => page.group === label),
+}));
+---
+
+<nav class="api-sidebar" aria-label="API reference pages">
+  {groups.map((group) => (
+    <div class="api-side-group">
+      <p class="api-side-label">{group.label}</p>
+      {group.pages.map((page) => (
+        <a
+          class="api-side-link"
+          href={apiPageHref(page.slug)}
+          aria-current={page.slug === activeSlug ? "page" : undefined}
+        >
+          {page.title}
+        </a>
+      ))}
+    </div>
+  ))}
+</nav>

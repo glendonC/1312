@@ -1,0 +1,23 @@
+---
+---
+
+<section class="api-section" aria-labelledby="api-receipts-heading">
+  <h1 class="api-page-title" id="api-receipts-heading">What a receipt means</h1>
+  <ul class="api-list">
+    <li>
+      Every response names its contract in a <code>schema</code> tag, and every fact lands in an
+      append-only journal beside content-addressed artifacts. Read endpoints re-verify stored
+      receipts instead of trusting storage; the caption read re-hashes the full authority chain,
+      and tamper fails the whole read.
+    </li>
+    <li>
+      Unavailable, unknown, withheld, truncated, and failed are first-class states that survive
+      every projection. The API returns an honest empty list before a fluent guess.
+    </li>
+    <li>
+      Passing an audit proves integrity and citation closure, not semantic truth or translation
+      quality. Semantic claims live on the <a href="/benchmarks/">benchmarks page</a> with their
+      own receipts.
+    </li>
+  </ul>
+</section>

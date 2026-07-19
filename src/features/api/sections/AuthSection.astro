@@ -1,0 +1,29 @@
+---
+---
+
+<section class="api-section" aria-labelledby="api-auth-heading">
+  <h1 class="api-page-title" id="api-auth-heading">Authentication</h1>
+  <p>
+    Every resource is served under <code>/v1</code> and authorized with a bearer token. The host
+    issues one token per process and prints it on stdout at start
+    (<code>npm run runtime:host</code>). The server binds loopback only, and browser clients must
+    also match an explicit origin allowlist; wildcard origins are rejected.
+  </p>
+  <div class="api-field">
+    <div class="api-field-head">
+      <code class="api-field-name">Authorization</code>
+      <span class="api-tag">string</span>
+      <span class="api-tag">header</span>
+      <span class="api-tag api-tag-required">required</span>
+    </div>
+    <p class="api-field-note">
+      <code>Bearer &lt;token&gt;</code>, compared exactly against the token the host issued.
+      Missing or wrong tokens return 401. The <a href="/api/playback/">private media route</a> is
+      the one exception; it authorizes by grant secret instead, so media elements can stream.
+    </p>
+  </div>
+  <p class="api-callout">
+    1321 is self-hosted. There is no cloud endpoint, account system, or API key portal; the API is
+    the host you run, and this page claims nothing beyond it.
+  </p>
+</section>

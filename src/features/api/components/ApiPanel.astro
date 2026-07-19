@@ -1,0 +1,16 @@
+---
+interface Props {
+  title: string;
+  body: string;
+}
+
+const { title, body } = Astro.props;
+---
+
+<figure class="api-panel">
+  <figcaption>
+    <span>{title}</span>
+    <button type="button" class="api-copy" data-api-copy aria-label={`Copy ${title}`}>Copy</button>
+  </figcaption>
+  <pre><code>{body}</code></pre>
+</figure>

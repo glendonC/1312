@@ -1,0 +1,50 @@
+.api-sidebar {
+  position: sticky;
+  top: calc(var(--interior-main-start) - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.api-side-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.api-side-label {
+  margin: 0 0 8px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.api-side-link {
+  padding: 5px 10px;
+  margin-left: -10px;
+  border-radius: 6px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.api-side-link:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.api-side-link[aria-current="page"] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+@media (max-width: 960px) {
+  .api-sidebar {
+    display: none;
+  }
+}

@@ -1,0 +1,44 @@
+---
+import ApiPager from "./components/ApiPager.astro";
+import ApiSidebar from "./components/ApiSidebar.astro";
+
+interface Props {
+  activeSlug: string;
+  eyebrow?: string;
+}
+
+const { activeSlug, eyebrow } = Astro.props;
+---
+
+<div class="api-shell">
+  <ApiSidebar activeSlug={activeSlug} />
+  <div class="api-content">
+    {eyebrow && <p class="api-kicker">{eyebrow}</p>}
+    <slot />
+    <ApiPager activeSlug={activeSlug} />
+  </div>
+</div>
+
+<script>
+  const copyState = window as Window & { __apiCopyBound?: boolean };
+  if (!copyState.__apiCopyBound) {
+    document.addEventListener("click", async (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-api-copy]");
+      if (!button) return;
+      const code = button.closest("figure")?.querySelector("pre code");
+      if (!code?.textContent) return;
+      try {
+        await navigator.clipboard.writeText(code.textContent);
+      } catch {
+        return;
+      }
+      button.textContent = "Copied";
+      button.classList.add("is-copied");
+      window.setTimeout(() => {
+        button.textContent = "Copy";
+        button.classList.remove("is-copied");
+      }, 1400);
+    });
+    copyState.__apiCopyBound = true;
+  }
+</script>

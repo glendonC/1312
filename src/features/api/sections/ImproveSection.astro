@@ -1,0 +1,70 @@
+---
+---
+
+<section class="api-section api-improve" aria-labelledby="api-improve-heading">
+  <h1 class="api-page-title" id="api-improve-heading">Improve: the loop that compounds</h1>
+  <p>
+    Improvement runs under the same rules as the runtime: typed contracts, immutable receipts,
+    fail-closed gates. Misses become measurement; nothing scores itself.
+  </p>
+  <p class="api-pipeline">
+    run misses &rarr; mine &rarr; route (exclusive) &rarr; agent draft &rarr; blinded adjudication
+    &rarr; freeze &rarr; pre-register &rarr; score &rarr; compare
+  </p>
+
+  <div class="api-improve-grid">
+    <div class="api-improve-block">
+      <h3>Exclusive routing</h3>
+      <p>
+        At mine time a clip feeds exactly one pool: the frozen bench, or the learning stream of
+        glossary entries, rules, and correction pairs. Never both, recorded before adjudication,
+        enforced at clip level. That is the price of an honest improvement curve.
+      </p>
+    </div>
+    <div class="api-improve-block">
+      <h3>The memory gate</h3>
+      <p>
+        Runs only propose. A different actor accepts, rejects, or revokes with a reason, and
+        behavioral rules additionally require a pre-registered ablation pair on the same frozen
+        pack. Nothing has passed the gate yet; a gate that never opened for weak evidence is the
+        feature.
+      </p>
+      <p class="api-status">accepted_entries: 0 · legacy_quarantined: 1</p>
+    </div>
+    <div class="api-improve-block">
+      <h3>Scored, honestly</h3>
+      <p>
+        One frozen pack, one scored run, and a prepped arm that scored below the cold control. The
+        number is published on the <a href="/benchmarks/">benchmarks page</a> because the loop only
+        works if misses are captured, not explained away.
+      </p>
+      <p class="api-status">packs_frozen: 1 · scored_runs: 1 · judge: null</p>
+    </div>
+  </div>
+
+  <div class="api-improve-block api-improve-wide">
+    <h3>The declared next tier: offline adapters</h3>
+    <p>
+      Today accepted memory conditions runs through retrieval. The declared next rung exports
+      adjudicated correction pairs into offline adapter training, under a contract fixed before any
+      adapter exists:
+    </p>
+    <ul class="api-list">
+      <li>All learning is offline over journaled receipts. Nothing learns inside a run.</li>
+      <li>
+        The correction row schema is already the training row shape; provenance-clean pairs come
+        only from the learning-routed pool, never from bench clips.
+      </li>
+      <li>
+        Weight training waits until the adjudicated pair count clears roughly one thousand. Current
+        yield is about five rows per run, so this rung is measured in months.
+      </li>
+      <li>
+        A trained adapter ships as a versioned, content-addressed policy artifact behind the same
+        proposal-to-decision gate as a rule, accepted only through a pre-registered ablation pair
+        scored on the frozen bench.
+      </li>
+    </ul>
+    <p class="api-status">status: contract_only · adapters_trained: 0 · claims_without_receipts: 0</p>
+  </div>
+</section>

@@ -1,0 +1,32 @@
+---
+import { API_PAGES, apiPageHref } from "../model.ts";
+
+interface Props {
+  activeSlug: string;
+}
+
+const { activeSlug } = Astro.props;
+
+const index = API_PAGES.findIndex((page) => page.slug === activeSlug);
+const previous = index > 0 ? API_PAGES[index - 1] : null;
+const next = index >= 0 && index < API_PAGES.length - 1 ? API_PAGES[index + 1] : null;
+---
+
+<nav class="api-pager" aria-label="Reference pages">
+  {previous ? (
+    <a class="api-pager-link" href={apiPageHref(previous.slug)}>
+      <span>Previous</span>
+      <strong>{previous.title}</strong>
+    </a>
+  ) : (
+    <span></span>
+  )}
+  {next ? (
+    <a class="api-pager-link api-pager-next" href={apiPageHref(next.slug)}>
+      <span>Next</span>
+      <strong>{next.title}</strong>
+    </a>
+  ) : (
+    <span></span>
+  )}
+</nav>

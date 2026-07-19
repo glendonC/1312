@@ -1,0 +1,46 @@
+---
+import type { ApiEndpoint } from "../model.ts";
+import ApiFields from "./ApiFields.astro";
+import ApiPanel from "./ApiPanel.astro";
+
+const METHOD_PALETTES: Record<string, string> = {
+  GET: "teal",
+  HEAD: "lilac",
+  POST: "blue",
+  PUT: "peach",
+};
+
+interface Props {
+  endpoint: ApiEndpoint;
+}
+
+const { endpoint } = Astro.props;
+---
+
+<details class="api-endpoint" open>
+  <summary class="api-endpoint-toggle">
+    <span class="api-endpoint-bar">
+      {endpoint.methods.map((method) => (
+        <span class="api-method" data-palette={METHOD_PALETTES[method] ?? "teal"}>{method}</span>
+      ))}
+      <code class="api-path">{endpoint.path}</code>
+      <span class="api-endpoint-chevron" aria-hidden="true"></span>
+    </span>
+    <span class="api-endpoint-lede">{endpoint.summary}</span>
+  </summary>
+  <div class="api-endpoint-body">
+    <div class="api-endpoint-doc">
+      <p class="api-endpoint-schema">{endpoint.responseSchema ?? "binary media stream"}</p>
+      {endpoint.fieldTables.map((table) => (
+        <ApiFields table={table} />
+      ))}
+    </div>
+    {endpoint.panels.length > 0 && (
+      <div class="api-panels">
+        {endpoint.panels.map((panel) => (
+          <ApiPanel title={panel.title} body={panel.body} />
+        ))}
+      </div>
+    )}
+  </div>
+</details>

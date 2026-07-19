@@ -1,0 +1,20 @@
+---
+import ApiPanel from "../components/ApiPanel.astro";
+import { ERROR_DISPLAY } from "../model.ts";
+---
+
+<section class="api-section" aria-labelledby="api-errors-heading">
+  <h1 class="api-page-title" id="api-errors-heading">Errors</h1>
+  <div class="api-split">
+    <div>
+      <p>
+        Requests are strict. Unknown JSON keys, unknown query parameters, wrong content types, and
+        wrong methods are rejected, not ignored. JSON bodies are capped at 64 KiB. Every failure
+        uses one envelope with a stable machine-readable code.
+      </p>
+    </div>
+    <div class="api-panels">
+      <ApiPanel title="Error envelope" body={ERROR_DISPLAY} />
+    </div>
+  </div>
+</section>

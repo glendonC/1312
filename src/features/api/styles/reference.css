@@ -1,0 +1,245 @@
+.api-endpoints {
+  min-width: 0;
+}
+
+/* Inner text line: bar padding (10px) plus its 1px border. Summary text, schema
+   tags, and field tables align to the method chip, not the squircle edge. */
+.api-endpoint {
+  --api-inset: 11px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.api-endpoint:first-child {
+  padding-top: 0;
+}
+
+.api-endpoint:last-child {
+  border-bottom: none;
+}
+
+.api-endpoint-toggle {
+  display: block;
+  cursor: pointer;
+  list-style: none;
+}
+
+.api-endpoint-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.api-endpoint-toggle::marker {
+  content: "";
+}
+
+.api-endpoint-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 2.5%, var(--paper));
+  transition: background-color 160ms ease, border-color 160ms ease, transform 180ms ease;
+}
+
+.api-endpoint-toggle:hover .api-endpoint-bar,
+.api-endpoint-toggle:focus-visible .api-endpoint-bar {
+  background: var(--palette-soft);
+  border-color: color-mix(in srgb, var(--palette-ink) 30%, var(--line-strong));
+  transform: translateY(-1px);
+}
+
+.api-endpoint-toggle:focus-visible {
+  outline: none;
+}
+
+.api-endpoint-toggle:focus-visible .api-endpoint-bar {
+  outline: 2px solid var(--palette-ink);
+  outline-offset: 2px;
+}
+
+.api-method {
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: var(--palette-soft);
+  color: var(--palette-ink);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+}
+
+.api-path {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.api-endpoint-chevron {
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  margin-right: 4px;
+  border-right: 1.5px solid var(--ink-muted);
+  border-bottom: 1.5px solid var(--ink-muted);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
+}
+
+details[open] > .api-endpoint-toggle .api-endpoint-chevron {
+  transform: rotate(45deg);
+}
+
+.api-endpoint-lede {
+  display: block;
+  margin: 9px 0 0;
+  padding-left: var(--api-inset);
+  color: var(--ink);
+  font-size: 0.87rem;
+  line-height: 1.55;
+}
+
+.api-endpoint-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(28px, 3vw, 56px);
+  align-items: start;
+  padding-top: 4px;
+}
+
+/* Eased open/close where the browser supports animating details content;
+   everywhere else the toggle simply snaps, which stays fully usable. */
+@media (prefers-reduced-motion: no-preference) {
+  .api-endpoint {
+    interpolate-size: allow-keywords;
+  }
+
+  .api-endpoint::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height 280ms ease,
+      content-visibility 280ms allow-discrete;
+  }
+
+  .api-endpoint[open]::details-content {
+    height: auto;
+  }
+
+  .api-endpoint[open] .api-endpoint-body {
+    animation: api-endpoint-reveal 300ms ease 40ms backwards;
+  }
+}
+
+@keyframes api-endpoint-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.api-endpoint-doc {
+  min-width: 0;
+  padding-left: var(--api-inset);
+}
+
+.api-endpoint-schema {
+  margin: 2px 0 0;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.01em;
+}
+
+.api-endpoint-doc .api-fields {
+  margin-top: 20px;
+}
+
+.api-endpoint-doc .api-fields h3 {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 1100px) {
+  .api-endpoint-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Field reference rows */
+
+.api-fields-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.api-fields-label {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.03em;
+}
+
+.api-field {
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.api-field:last-child {
+  border-bottom: none;
+}
+
+.api-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.api-field-name {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  color: var(--palette-ink, var(--ink));
+}
+
+.api-tag {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) 3.5%, transparent);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.01em;
+}
+
+.api-tag-required {
+  border-color: color-mix(in srgb, var(--palette-ink) 35%, transparent);
+  background: var(--palette-soft);
+  color: var(--palette-ink);
+}
+
+.api-field-note {
+  margin: 7px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.api-field-note code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}

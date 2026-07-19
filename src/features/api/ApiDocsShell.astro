@@ -28,7 +28,37 @@ const { activeSlug, eyebrow } = Astro.props;
 <script>
   const copyState = window as Window & { __apiCopyBound?: boolean };
   if (!copyState.__apiCopyBound) {
+    const flash = (button: HTMLButtonElement, idle: string) => {
+      const label = button.querySelector<HTMLElement>("[data-api-copy-label]");
+      if (label) label.textContent = "Copied";
+      else button.textContent = "Copied";
+      button.classList.add("is-copied");
+      window.setTimeout(() => {
+        if (label) label.textContent = idle;
+        else button.textContent = idle;
+        button.classList.remove("is-copied");
+      }, 1400);
+    };
+
     document.addEventListener("click", async (event) => {
+      const pageButton = (event.target as HTMLElement).closest<HTMLButtonElement>(
+        "[data-api-copy-page]",
+      );
+      if (pageButton) {
+        const source = pageButton
+          .closest(".api-page-header, .api-hero")
+          ?.querySelector<HTMLScriptElement>("[data-api-copy-source]");
+        if (!source?.textContent) return;
+        try {
+          const markdown = JSON.parse(source.textContent) as string;
+          await navigator.clipboard.writeText(markdown);
+        } catch {
+          return;
+        }
+        flash(pageButton, "Copy page");
+        return;
+      }
+
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-api-copy]");
       if (!button) return;
       const code = button.closest("figure")?.querySelector("pre code");
@@ -38,12 +68,7 @@ const { activeSlug, eyebrow } = Astro.props;
       } catch {
         return;
       }
-      button.textContent = "Copied";
-      button.classList.add("is-copied");
-      window.setTimeout(() => {
-        button.textContent = "Copy";
-        button.classList.remove("is-copied");
-      }, 1400);
+      flash(button, "Copy");
     });
     copyState.__apiCopyBound = true;
   }

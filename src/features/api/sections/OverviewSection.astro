@@ -1,40 +1,87 @@
 ---
+import ApiCopyButton from "../components/ApiCopyButton.astro";
 import ApiPanel from "../components/ApiPanel.astro";
-import { BASE_URL, CURL_DISPLAY } from "../model.ts";
+import { CURL_DISPLAY } from "../model.ts";
+
+const markdown = `# API Reference
+
+Local \`/v1\` for evidence-backed media understanding. Live translate guesses; this studies the media first, then returns receipts your pipeline can verify.
+
+## Successful path
+
+1. Register or list a source — /api/sources/
+2. Plan or start a bounded study, poll its journal — /api/runtime/
+3. Reopen evidence — /api/audits/ — or apply private captions/language explanations
+4. Misses route through /api/improve/; they do not score themselves
+
+An empty list envelope is an honest answer, not an error.
+
+## First verified call
+
+With a running host and bearer token, \`GET /v1/source-sessions\` proves authorization and shows registered sources.
+
+\`\`\`bash
+${CURL_DISPLAY}
+\`\`\`
+`;
 ---
 
 <header class="api-hero">
-  <h1>API reference</h1>
-  <p class="api-lede">
-    The <code>/v1</code> REST surface of the 1321 runtime host: media understanding your pipeline
-    can verify. Studio and agentic video editors are both clients of the same API.
-  </p>
-  <div class="api-meta">
-    <span class="api-meta-label">Base URL</span>
-    <code>{BASE_URL}</code>
-    <span class="api-meta-note">self-hosted</span>
+  <div class="api-page-header-row">
+    <h1>API Reference</h1>
+    <ApiCopyButton kind="page" label="Copy page" ariaLabel="Copy page as Markdown" />
   </div>
+  <p class="api-lede">
+    Local <code>/v1</code> for evidence-backed media understanding. Live translate guesses; this
+    studies the media first, then returns receipts your pipeline can verify. Studio and agentic
+    editors are both clients of the same host.
+  </p>
+  <script is:inline type="application/json" data-api-copy-source set:html={JSON.stringify(markdown)} />
 </header>
 
-<section class="api-section" aria-label="Make the first call">
-  <h2>Make the first call</h2>
+<section class="api-section" aria-labelledby="api-path-heading">
+  <h2 id="api-path-heading">Successful Path</h2>
+  <ol class="api-steps">
+    <li>
+      Register or list a source under
+      <a href="/api/sources/">Sources And Ingest</a>.
+    </li>
+    <li>
+      Plan or start one bounded study, then poll its journal under
+      <a href="/api/runtime/">Runtime Lifecycle</a>.
+    </li>
+    <li>
+      Reopen evidence under <a href="/api/audits/">Evidence Audits</a>, or apply private
+      <a href="/api/captions/">Captions And QC</a> and
+      <a href="/api/language/">Language Explanations</a>.
+    </li>
+    <li>
+      Misses route through the <a href="/api/improve/">Improve</a> conveyor; they do not score
+      themselves.
+    </li>
+  </ol>
+  <p>
+    An empty list envelope is an honest answer, not an error. Fail-closed reads stay unavailable or
+    withheld instead of inventing output.
+  </p>
+</section>
+
+<section class="api-section" aria-labelledby="api-first-call-heading">
+  <h2 id="api-first-call-heading">First Verified Call</h2>
   <div class="api-split">
-    <ol class="api-steps">
-      <li>
-        Start the host: <code>npm run runtime:host</code>. It binds <code>127.0.0.1:4312</code> and
-        prints a bearer token on stdout.
-      </li>
-      <li>
-        Send that token as <code>Authorization: Bearer</code> on every request. Details
-        under <a href="/api/authentication/">Authentication</a>.
-      </li>
-      <li>
-        List registered <a href="/api/sources/">sources</a>, then plan and start a bounded study
-        and poll its journal under <a href="/api/runtime/">Runtime lifecycle</a>.
-      </li>
-    </ol>
+    <div>
+      <p>
+        With a running host and bearer token, <code>GET /v1/source-sessions</code> proves
+        authorization and shows what is already registered. Then move to Runtime Lifecycle for the
+        study itself.
+      </p>
+      <p>
+        Host on loopback; bearer required. See
+        <a href="/api/authentication/">Authentication</a>.
+      </p>
+    </div>
     <div class="api-panels">
-      <ApiPanel title="First call" body={CURL_DISPLAY} />
+      <ApiPanel title="First Call" body={CURL_DISPLAY} />
     </div>
   </div>
 </section>

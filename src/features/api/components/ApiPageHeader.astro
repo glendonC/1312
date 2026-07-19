@@ -1,0 +1,21 @@
+---
+import ApiCopyButton from "./ApiCopyButton.astro";
+
+interface Props {
+  title: string;
+  description?: string | null;
+  markdown: string;
+  headingId?: string;
+}
+
+const { title, description = null, markdown, headingId } = Astro.props;
+---
+
+<header class="api-page-header">
+  <div class="api-page-header-row">
+    <h1 class="api-page-title" id={headingId}>{title}</h1>
+    <ApiCopyButton kind="page" label="Copy page" ariaLabel="Copy page as Markdown" />
+  </div>
+  {description && <p class="api-page-desc">{description}</p>}
+  <script is:inline type="application/json" data-api-copy-source set:html={JSON.stringify(markdown)} />
+</header>

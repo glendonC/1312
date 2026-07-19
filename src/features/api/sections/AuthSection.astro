@@ -1,14 +1,38 @@
 ---
+import ApiPageHeader from "../components/ApiPageHeader.astro";
+import { BASE_URL } from "../model.ts";
+
+const markdown = `# Authentication
+
+Every \`/v1\` resource uses a bearer token from the host process.
+
+Start the host with \`npm run runtime:host\`. It binds \`${BASE_URL}\`, prints one token per process on stdout, and serves loopback only. Browser clients must match an explicit origin allowlist.
+
+## Authorization
+
+\`Authorization: Bearer <token>\` — compared exactly against the issued token. Missing or wrong tokens return 401.
+
+The private media route authorizes by grant secret instead of the bearer token.
+`;
 ---
 
 <section class="api-section" aria-labelledby="api-auth-heading">
-  <h1 class="api-page-title" id="api-auth-heading">Authentication</h1>
+  <ApiPageHeader
+    title="Authentication"
+    headingId="api-auth-heading"
+    description="Bearer token from the host you run. Loopback only; browser clients also need an origin allowlist."
+    markdown={markdown}
+  />
   <p>
-    Every resource is served under <code>/v1</code> and authorized with a bearer token. The host
-    issues one token per process and prints it on stdout at start
-    (<code>npm run runtime:host</code>). The server binds loopback only, and browser clients must
-    also match an explicit origin allowlist; wildcard origins are rejected.
+    Start the host with <code>npm run runtime:host</code>; it binds <code>127.0.0.1:4312</code>,
+    prints one token per process on stdout, and serves only that loopback address. Browser clients
+    must also match an explicit origin allowlist; wildcard origins are rejected.
   </p>
+  <div class="api-meta">
+    <span class="api-meta-label">Base URL</span>
+    <code>{BASE_URL}</code>
+    <span class="api-meta-note">self-hosted</span>
+  </div>
   <div class="api-field">
     <div class="api-field-head">
       <code class="api-field-name">Authorization</code>
@@ -22,8 +46,4 @@
       the one exception; it authorizes by grant secret instead, so media elements can stream.
     </p>
   </div>
-  <p class="api-callout">
-    1321 is self-hosted. There is no cloud endpoint, account system, or API key portal; the API is
-    the host you run, and this page claims nothing beyond it.
-  </p>
 </section>

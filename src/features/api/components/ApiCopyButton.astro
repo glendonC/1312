@@ -1,0 +1,33 @@
+---
+interface Props {
+  label?: string;
+  ariaLabel: string;
+  /** Panel code copy vs full-page markdown copy. */
+  kind?: "panel" | "page";
+}
+
+const { label = "Copy", ariaLabel, kind = "panel" } = Astro.props;
+const attrs =
+  kind === "page"
+    ? { "data-api-copy-page": true }
+    : { "data-api-copy": true };
+---
+
+<button
+  type="button"
+  class:list={["api-copy", kind === "page" ? "api-copy-page" : "api-copy-icon-only"]}
+  aria-label={ariaLabel}
+  {...attrs}
+>
+  <svg class="api-copy-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    <path
+      fill="currentColor"
+      d="M5.5 2.5A1.5 1.5 0 0 1 7 1h5.5A1.5 1.5 0 0 1 14 2.5V10a1.5 1.5 0 0 1-1.5 1.5H12V10h.5a.5.5 0 0 0 .5-.5V2.5a.5.5 0 0 0-.5-.5H7a.5.5 0 0 0-.5.5V3h-1V2.5ZM2 5.5A1.5 1.5 0 0 1 3.5 4H9A1.5 1.5 0 0 1 10.5 5.5v8A1.5 1.5 0 0 1 9 15H3.5A1.5 1.5 0 0 1 2 13.5v-8ZM3.5 5a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5H9a.5.5 0 0 0 .5-.5v-8A.5.5 0 0 0 9 5H3.5Z"
+    ></path>
+  </svg>
+  {kind === "page" ? (
+    <span data-api-copy-label>{label}</span>
+  ) : (
+    <span class="api-copy-tooltip" data-api-copy-label role="tooltip">{label}</span>
+  )}
+</button>

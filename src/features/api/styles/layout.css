@@ -54,7 +54,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-top: 22px;
+  margin: 18px 0 8px;
   padding: 8px 12px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -83,12 +83,40 @@
   padding: 8px 0 40px;
 }
 
+.api-page-header {
+  margin-bottom: 28px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.api-page-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+
 .api-page-title {
-  margin: 0 0 14px;
+  margin: 0;
   font-size: clamp(1.7rem, 2.6vw, 2.2rem);
   font-weight: var(--weight-thin);
   letter-spacing: -0.032em;
   line-height: 1.1;
+}
+
+.api-page-desc {
+  max-width: 42rem;
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.api-page-header-row .api-copy-page,
+.api-hero .api-copy-page {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .api-steps {
@@ -179,7 +207,10 @@
 }
 
 .api-group-note {
+  max-width: 42rem;
   color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.55;
 }
 
 .api-callout {

@@ -1,20 +1,40 @@
 ---
+import ApiPageHeader from "../components/ApiPageHeader.astro";
 import ApiPanel from "../components/ApiPanel.astro";
-import { ERROR_DISPLAY } from "../model.ts";
+import { ERROR_DISPLAY, ERROR_SCHEMA } from "../model.ts";
+
+const markdown = `# Errors
+
+Wrong requests fail closed. Unknown JSON keys, unknown query parameters, wrong content types, and wrong methods are rejected. JSON bodies are capped at 64 KiB.
+
+Every failure uses \`${ERROR_SCHEMA}\` with a stable machine-readable code.
+
+\`\`\`json
+${ERROR_DISPLAY}
+\`\`\`
+`;
 ---
 
 <section class="api-section" aria-labelledby="api-errors-heading">
-  <h1 class="api-page-title" id="api-errors-heading">Errors</h1>
+  <ApiPageHeader
+    title="Errors"
+    headingId="api-errors-heading"
+    description="Wrong requests fail closed. Every failure uses one envelope with a stable machine-readable code."
+    markdown={markdown}
+  />
   <div class="api-split">
     <div>
       <p>
-        Requests are strict. Unknown JSON keys, unknown query parameters, wrong content types, and
-        wrong methods are rejected, not ignored. JSON bodies are capped at 64 KiB. Every failure
-        uses one envelope with a stable machine-readable code.
+        Unknown JSON keys, unknown query parameters, wrong content types, and wrong methods are
+        rejected, not ignored or coerced. JSON bodies are capped at 64&nbsp;KiB.
+      </p>
+      <p>
+        Every failure uses <code>{ERROR_SCHEMA}</code>. Treat that code as the contract; do not infer
+        success from an empty or partial body.
       </p>
     </div>
     <div class="api-panels">
-      <ApiPanel title="Error envelope" body={ERROR_DISPLAY} />
+      <ApiPanel title="Error Envelope" body={ERROR_DISPLAY} />
     </div>
   </div>
 </section>

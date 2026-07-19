@@ -68,6 +68,7 @@ test("every documented field name exists in the runtime host contract source", a
     await readHostSource("journalPolling.ts"),
     await readHostSource("../model/review.ts"),
     await readHostSource("../model/captions.ts"),
+    await readHostSource("../model/languageExplanations.ts"),
   ].join("\n");
   const fields = API_ENDPOINT_GROUPS.flatMap((group) =>
     group.endpoints.flatMap((endpoint) => endpoint.fieldTables.flatMap((table) => table.fields)),

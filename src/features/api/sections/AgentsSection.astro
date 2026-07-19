@@ -1,24 +1,40 @@
 ---
+import ApiPageHeader from "../components/ApiPageHeader.astro";
 import { WORKER_TOOLS } from "../model.ts";
+
+const toolLines = WORKER_TOOLS.map((tool) => `- \`${tool}\``).join("\n");
+const markdown = [
+  "# For Agentic Editors",
+  "",
+  "Use `/v1` when your editor needs to branch on proof. Your client talks to the host; models never see `/v1`. Workers receive task-private, grant-scoped tools over ephemeral loopback bridges.",
+  "",
+  "## Worker tools",
+  "",
+  toolLines,
+  "",
+].join("\n");
 ---
 
 <section class="api-section" aria-labelledby="api-agents-heading">
-  <h1 class="api-page-title" id="api-agents-heading">For agentic editors</h1>
+  <ApiPageHeader
+    title="For Agentic Editors"
+    headingId="api-agents-heading"
+    description="Integrate at /v1 for proof-backed branching. Workers stay grant-scoped; the host stays the authority."
+    markdown={markdown}
+  />
   <p>
-    A pipeline that edits video needs to branch on proof: which ranges are speech, in which
-    language, where speakers overlap, which lines are evidence-backed and which were withheld, and
-    what one exact span means. Each of those returns here as a receipt with lineage.
+    Use <code>/v1</code> when your editor needs to branch on proof: which ranges are speech, in
+    which language, where speakers overlap, which lines are evidence-backed or withheld, and what
+    one exact span means. Each of those returns as a receipt with lineage.
   </p>
   <p>
-    Clients integrate at <code>/v1</code>; the models doing the work never see it. Workers get
-    task-private, grant-scoped tools over ephemeral loopback bridges, and cannot mint capability,
-    choose a path, or widen scope. The host stays the authority for identity, budgets, artifacts,
-    and events.
+    Your client talks to the host. The models doing the work never see <code>/v1</code>. Workers
+    receive task-private, grant-scoped tools over ephemeral loopback bridges; they cannot mint
+    capability, choose a path, or widen scope.
   </p>
   <ul class="api-tools" aria-label="Grant-scoped worker tools">
     {WORKER_TOOLS.map((tool) => (
       <li>{tool}</li>
     ))}
   </ul>
-  <p>Live translate guesses. This studies the media first, then hands your pipeline the study.</p>
 </section>

@@ -1,16 +1,33 @@
 ---
+import ApiPageHeader from "../components/ApiPageHeader.astro";
+
+const markdown = `# Non-Claims
+
+What this API does not claim:
+
+- Self-hosted runtime host only. No hosted service, upload, publication, account, or sync.
+- Detector output is not transcription, understanding, or translation.
+- Coverage, citation closure, receipt integrity, and structural QC are not semantic quality.
+- Private captions and artifacts are not publication.
+- No self-improvement win is claimed.
+`;
 ---
 
 <section class="api-section" aria-labelledby="api-nonclaims-heading">
-  <h1 class="api-page-title" id="api-nonclaims-heading">Non-claims</h1>
+  <ApiPageHeader
+    title="Non-Claims"
+    headingId="api-nonclaims-heading"
+    description="What this API does not claim, so clients do not invent capability from a route list."
+    markdown={markdown}
+  />
   <ul class="api-list">
     <li>
       This is a self-hosted runtime host. No hosted service, upload, publication, account, or sync
       exists.
     </li>
     <li>
-      Detector output, including speech activity, language ranges, acoustic classes, speaker
-      clusters, and separation stems, is not transcription, understanding, or translation.
+      Detector output — speech activity, language ranges, acoustic classes, speaker clusters,
+      separation stems — is not transcription, understanding, or translation.
     </li>
     <li>Coverage, citation closure, receipt integrity, and structural QC are not semantic quality.</li>
     <li>Private captions and artifacts are not publication.</li>
@@ -21,8 +38,6 @@
   </ul>
   <div class="api-links">
     <a class="button button-primary" href="/benchmarks/">Benchmarks</a>
-    <a class="button button-quiet" href="/studio/runtime/memory/">Memory inspector</a>
     <a class="button button-quiet" href="/method/">Method</a>
-    <a class="button button-quiet" href="/studio/">Open Studio</a>
   </div>
 </section>

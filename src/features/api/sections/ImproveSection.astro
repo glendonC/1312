@@ -1,12 +1,37 @@
 ---
+import ApiPageHeader from "../components/ApiPageHeader.astro";
+
+const markdown = `# Improve
+
+Misses become measurement under the same rules as the runtime. Nothing scores itself.
+
+Pipeline: run misses → mine → route (exclusive) → agent draft → blinded adjudication → freeze → pre-register → score → compare
+
+## Exclusive routing
+
+At mine time a clip feeds exactly one pool: frozen bench or learning stream. Never both.
+
+## Memory gate
+
+Runs only propose. A different actor accepts, rejects, or revokes. accepted_entries: 0 · legacy_quarantined: 1
+
+## Scored, honestly
+
+packs_frozen: 1 · scored_runs: 1 · judge: null
+
+## Declared next tier: offline adapters
+
+status: contract_only · adapters_trained: 0 · claims_without_receipts: 0
+`;
 ---
 
 <section class="api-section api-improve" aria-labelledby="api-improve-heading">
-  <h1 class="api-page-title" id="api-improve-heading">Improve: the loop that compounds</h1>
-  <p>
-    Improvement runs under the same rules as the runtime: typed contracts, immutable receipts,
-    fail-closed gates. Misses become measurement; nothing scores itself.
-  </p>
+  <ApiPageHeader
+    title="Improve"
+    headingId="api-improve-heading"
+    description="Misses become measurement. Typed contracts, immutable receipts, fail-closed gates. Nothing scores itself."
+    markdown={markdown}
+  />
   <p class="api-pipeline">
     run misses &rarr; mine &rarr; route (exclusive) &rarr; agent draft &rarr; blinded adjudication
     &rarr; freeze &rarr; pre-register &rarr; score &rarr; compare
@@ -14,36 +39,35 @@
 
   <div class="api-improve-grid">
     <div class="api-improve-block">
-      <h3>Exclusive routing</h3>
+      <h3>Exclusive Routing</h3>
       <p>
         At mine time a clip feeds exactly one pool: the frozen bench, or the learning stream of
-        glossary entries, rules, and correction pairs. Never both, recorded before adjudication,
-        enforced at clip level. That is the price of an honest improvement curve.
+        glossary entries, rules, and correction pairs. Never both. The route is recorded before
+        adjudication and enforced at clip level.
       </p>
     </div>
     <div class="api-improve-block">
-      <h3>The memory gate</h3>
+      <h3>Memory Gate</h3>
       <p>
-        Runs only propose. A different actor accepts, rejects, or revokes with a reason, and
-        behavioral rules additionally require a pre-registered ablation pair on the same frozen
-        pack. Nothing has passed the gate yet; a gate that never opened for weak evidence is the
-        feature.
+        Runs only propose. A different actor accepts, rejects, or revokes with a reason. Behavioral
+        rules also require a pre-registered ablation pair on the same frozen pack. A gate that
+        never opened for weak evidence is the feature.
       </p>
       <p class="api-status">accepted_entries: 0 · legacy_quarantined: 1</p>
     </div>
     <div class="api-improve-block">
-      <h3>Scored, honestly</h3>
+      <h3>Scored, Honestly</h3>
       <p>
         One frozen pack, one scored run, and a prepped arm that scored below the cold control. The
-        number is published on the <a href="/benchmarks/">benchmarks page</a> because the loop only
-        works if misses are captured, not explained away.
+        number is on the <a href="/benchmarks/">benchmarks page</a> because the loop only works if
+        misses are captured, not explained away.
       </p>
       <p class="api-status">packs_frozen: 1 · scored_runs: 1 · judge: null</p>
     </div>
   </div>
 
   <div class="api-improve-block api-improve-wide">
-    <h3>The declared next tier: offline adapters</h3>
+    <h3>Declared Next Tier: Offline Adapters</h3>
     <p>
       Today accepted memory conditions runs through retrieval. The declared next rung exports
       adjudicated correction pairs into offline adapter training, under a contract fixed before any

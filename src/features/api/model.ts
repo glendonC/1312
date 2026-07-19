@@ -54,6 +54,7 @@ export interface ApiEndpoint {
 export interface ApiEndpointGroup {
   id: string;
   title: string;
+  /** Short page description under the title. */
   note: string | null;
   endpoints: ApiEndpoint[];
 }
@@ -63,7 +64,7 @@ export type ApiPalette = "coral" | "citron" | "blue" | "lilac" | "peach" | "teal
 export interface ApiPageDef {
   slug: string;
   title: string;
-  group: "Getting started" | "Endpoints" | "Concepts";
+  group: "Getting Started" | "Endpoints" | "Concepts";
   palette: ApiPalette;
   description: string;
 }
@@ -244,11 +245,8 @@ export const WORKER_TOOLS = [
   "computer_use_readonly",
 ];
 
-const LIST_ENVELOPE_NOTE =
-  "Responses share one envelope: commandId, runtimeId, journalHead, and a typed payload array. An empty array is an honest answer, not an error.";
-
 const INGEST_STATUS_FIELDS: ApiFieldTable = {
-  title: "Ingest status",
+  title: "Ingest Status",
   label: "response",
   fields: [
     { name: "ingestId", type: "string", note: "Identity for polling this ingest." },
@@ -264,7 +262,7 @@ const INGEST_STATUS_FIELDS: ApiFieldTable = {
 };
 
 const RUNTIME_START_FIELDS: ApiFieldTable = {
-  title: "Request body",
+  title: "Request Body",
   label: "application/json",
   fields: [
     { name: "sourceSessionId", type: "string", required: true, note: "Registered source session to study." },
@@ -295,7 +293,7 @@ const RUNTIME_START_FIELDS: ApiFieldTable = {
 };
 
 const RUNTIME_STATUS_FIELDS: ApiFieldTable = {
-  title: "Status response",
+  title: "Status Response",
   label: "response",
   fields: [
     { name: "commandId", type: "string", note: "Accepted command identity." },
@@ -321,7 +319,7 @@ const ingestStatusPanel = (title: string): ApiCodePanel => ({
 });
 
 const listEnvelopeFields = (payloadName: string, payloadNote: string): ApiFieldTable => ({
-  title: "Response envelope",
+  title: "Response Envelope",
   label: "response",
   fields: [
     { name: "commandId", type: "string", note: "Accepted command identity." },
@@ -341,7 +339,7 @@ const EVENTS_QUERY_FIELDS: ApiFieldTable = {
 };
 
 const EVENTS_RESPONSE_FIELDS: ApiFieldTable = {
-  title: "Events response",
+  title: "Events Response",
   label: "response",
   fields: [
     { name: "commandId", type: "string", note: "Accepted command identity." },
@@ -357,8 +355,34 @@ const EVENTS_RESPONSE_FIELDS: ApiFieldTable = {
   ],
 };
 
+const LANGUAGE_REQUEST_FIELDS: ApiFieldTable = {
+  title: "Request Body",
+  label: "application/json",
+  fields: [
+    {
+      name: "caption",
+      type: "object",
+      required: true,
+      note: "Exact verified caption identity: jobId, artifactId, contentId, receiptArtifactId, receiptId, receiptContentId.",
+    },
+    { name: "lineId", type: "string", required: true, note: "Verified caption line to explain." },
+    {
+      name: "selection",
+      type: "{ side, unit, start, end, text }",
+      required: true,
+      note: 'Exact unicode_code_point span on "source" or "target"; text must match the selected range.',
+    },
+    {
+      name: "facetKinds",
+      type: "array",
+      required: true,
+      note: "Closed facet set: meaning, word, phrase, grammar, translation_choice.",
+    },
+  ],
+};
+
 const LANGUAGE_ENVELOPE_FIELDS: ApiFieldTable = {
-  title: "Response envelope",
+  title: "Response Envelope",
   label: "response",
   fields: [
     { name: "commandId", type: "string", note: "Accepted command identity." },
@@ -370,7 +394,7 @@ const LANGUAGE_ENVELOPE_FIELDS: ApiFieldTable = {
 };
 
 const CAPTION_PRODUCTION_REQUEST_FIELDS: ApiFieldTable = {
-  title: "Production request",
+  title: "Production Request",
   label: "application/json",
   fields: [
     {
@@ -383,7 +407,7 @@ const CAPTION_PRODUCTION_REQUEST_FIELDS: ApiFieldTable = {
 };
 
 const CAPTION_QC_REQUEST_FIELDS: ApiFieldTable = {
-  title: "QC request",
+  title: "QC Request",
   label: "application/json",
   fields: [
     {
@@ -396,7 +420,7 @@ const CAPTION_QC_REQUEST_FIELDS: ApiFieldTable = {
 };
 
 const PLAYBACK_REVOKE_FIELDS: ApiFieldTable = {
-  title: "Revocation request",
+  title: "Revocation Request",
   label: "application/json",
   fields: [
     {
@@ -411,8 +435,8 @@ const PLAYBACK_REVOKE_FIELDS: ApiFieldTable = {
 export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   {
     id: "sources",
-    title: "Sources and ingest",
-    note: "Only registered source adapters may ingest. Owned media requires an explicit rights attestation; YouTube ranges require explicit local-processing confirmation.",
+    title: "Sources And Ingest",
+    note: "Register owned media or a private YouTube range as a local source before any study can start.",
     endpoints: [
       {
         methods: ["GET"],
@@ -421,7 +445,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         responseSchema: "studio.local-source-session-list.v1",
         fieldTables: [
           {
-            title: "Source summary",
+            title: "Source Summary",
             label: "response object",
             fields: [
               { name: "sourceSessionId", type: "string", note: "Session identity used to start runtimes." },
@@ -439,7 +463,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "response",
-            title: "200 · captured",
+            title: "200 · Captured",
             body: SOURCE_SESSIONS_200,
           },
         ],
@@ -451,7 +475,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         responseSchema: "studio.owned-media-ingest.v1",
         fieldTables: [
           {
-            title: "Request body",
+            title: "Request Body",
             label: "application/json",
             fields: [
               { name: "filename", type: "string", required: true, note: "Original basename, retained as provenance only." },
@@ -479,7 +503,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("POST", "/v1/owned-media-ingests", OWNED_INGEST_EXAMPLE),
           },
-          ingestStatusPanel("202 · ingest status"),
+          ingestStatusPanel("202 · Ingest Status"),
         ],
       },
       {
@@ -491,10 +515,10 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · octet-stream",
+            title: "Request · Octet-Stream",
             body: curlBinaryPut("/v1/owned-media-ingests/$INGEST_ID/media", "clip.m4a"),
           },
-          ingestStatusPanel("202 · ingest status"),
+          ingestStatusPanel("202 · Ingest Status"),
         ],
       },
       {
@@ -509,7 +533,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("GET", "/v1/owned-media-ingests/$INGEST_ID"),
           },
-          ingestStatusPanel("200 · ingest status"),
+          ingestStatusPanel("200 · Ingest Status"),
         ],
       },
       {
@@ -519,7 +543,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         responseSchema: "studio.youtube-local-ingest.v1",
         fieldTables: [
           {
-            title: "Request body",
+            title: "Request Body",
             label: "application/json",
             fields: [
               { name: "url", type: "string", required: true, note: "Watch URL of the video." },
@@ -560,8 +584,8 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   },
   {
     id: "runtime",
-    title: "Runtime lifecycle",
-    note: "One bounded study per start. The scheduler derives task identity, depth, ownership, grants, and budgets; callers cannot submit desired state.",
+    title: "Runtime Lifecycle",
+    note: "Plan, start, and poll one bounded study. Callers name source and range; the scheduler owns tasks, grants, and budgets.",
     endpoints: [
       {
         methods: ["POST"],
@@ -633,7 +657,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · events?after=0&limit=2 · captured",
+            title: "200 · events?after=0&limit=2 · Captured",
             body: RUNTIME_EVENTS_200,
           },
         ],
@@ -642,8 +666,8 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   },
   {
     id: "audits",
-    title: "Evidence audits",
-    note: `Read-only. Each read reopens stored receipts by content identity and re-verifies hashes and derivations; it never creates a new runtime fact. ${LIST_ENVELOPE_NOTE}`,
+    title: "Evidence Audits",
+    note: "Reopen stored assessments and decision receipts by content identity. Integrity is not semantic quality.",
     endpoints: [
       {
         methods: ["GET"],
@@ -659,7 +683,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · captured · honest empty",
+            title: "200 · Captured · Honest Empty",
             body: ASSESSMENT_AUDITS_200,
           },
         ],
@@ -682,8 +706,8 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   },
   {
     id: "review",
-    title: "Publish review",
-    note: `Human review is a host boundary, not a model tool. The reviewer identity is configured on the host; callers cannot supply it, and decisions require the exact attestation string. ${LIST_ENVELOPE_NOTE}`,
+    title: "Publish Review",
+    note: "Attested human approve or reject before private caption production. Reviewer identity is host-configured; callers cannot invent it.",
     endpoints: [
       {
         methods: ["GET"],
@@ -699,7 +723,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "200 · captured",
+            title: "200 · Captured",
             body: PUBLISH_REVIEW_INTAKES_200,
           },
         ],
@@ -711,7 +735,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         responseSchema: "studio.local-runtime-publish-review-decisions.v1",
         fieldTables: [
           {
-            title: "Decision request",
+            title: "Decision Request",
             label: "application/json",
             fields: [
               { name: "intake", type: "object", required: true, note: "Exact intake identity: intakeId, artifactId, receiptId, receiptContentId." },
@@ -733,12 +757,12 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · approve",
+            title: "Request · Approve",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/publish-review-decisions", REVIEW_DECISION_EXAMPLE),
           },
           {
             kind: "response",
-            title: "201 · decision receipt · captured",
+            title: "201 · Decision Receipt · Captured",
             body: PUBLISH_REVIEW_DECISION_201,
           },
         ],
@@ -750,7 +774,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         responseSchema: "studio.local-runtime-publish-review-decisions.v1",
         fieldTables: [
           {
-            title: "Revocation request",
+            title: "Revocation Request",
             label: "application/json",
             fields: [
               { name: "approval", type: "object", required: true, note: "Exact approval identity: reviewId, artifactId, receiptId, receiptContentId." },
@@ -772,7 +796,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · revoke",
+            title: "Request · Revoke",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/publish-review-revocations", REVIEW_REVOCATION_EXAMPLE),
           },
         ],
@@ -781,8 +805,8 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   },
   {
     id: "captions",
-    title: "Captions and QC",
-    note: `Captions are private production artifacts with exact line lineage. No upload, publication, or public authority follows from them. ${LIST_ENVELOPE_NOTE}`,
+    title: "Captions And QC",
+    note: "Private caption candidates, verified timed lines, and structural QC. Not publication.",
     endpoints: [
       {
         methods: ["GET", "POST"],
@@ -801,7 +825,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "409 · fail-closed · captured",
+            title: "409 · Fail-Closed · Captured",
             body: CAPTION_PRODUCTION_409,
           },
         ],
@@ -832,7 +856,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         panels: [
           {
             kind: "request",
-            title: "Request · read",
+            title: "Request · Read",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/caption-quality-controls"),
           },
         ],
@@ -841,8 +865,8 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   },
   {
     id: "language",
-    title: "Language explanations",
-    note: `Facets are typed and attempt history is immutable; failed attempts stay visible instead of being retried silently. ${LIST_ENVELOPE_NOTE}`,
+    title: "Language Explanations",
+    note: "Typed facets over one verified caption span. Failed attempts stay visible; empty results are honest.",
     endpoints: [
       {
         methods: ["GET", "POST"],
@@ -850,16 +874,16 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         summary:
           "Request typed meaning, word, phrase, grammar, and translation-choice facets over one verified caption span.",
         responseSchema: "studio.local-runtime-language-explanations.v1",
-        fieldTables: [LANGUAGE_ENVELOPE_FIELDS],
+        fieldTables: [LANGUAGE_REQUEST_FIELDS, LANGUAGE_ENVELOPE_FIELDS],
         panels: [
           {
             kind: "request",
-            title: "Request · read",
+            title: "Request · Read",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/language-explanations"),
           },
           {
             kind: "response",
-            title: "200 · captured · honest empty",
+            title: "200 · Captured · Honest Empty",
             body: LANGUAGE_EXPLANATIONS_200,
           },
         ],
@@ -868,8 +892,8 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   },
   {
     id: "playback",
-    title: "Private playback",
-    note: "Grants expire after ten minutes, bind to the requesting origin, and are revocable. The media route checks the grant secret and origin, not the bearer token, so a media element can stream private bytes.",
+    title: "Private Playback",
+    note: "Mint a short-lived origin-bound grant, then stream exact private source bytes. Media authorizes by grant secret, not the bearer token.",
     endpoints: [
       {
         methods: ["POST"],
@@ -878,7 +902,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         responseSchema: "studio.private-playback-grant.v1",
         fieldTables: [
           {
-            title: "Grant response",
+            title: "Grant Response",
             label: "response",
             fields: [
               { name: "grantId", type: "string", note: "Grant identity, also embedded in mediaPath." },
@@ -902,7 +926,7 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           },
           {
             kind: "response",
-            title: "201 · playback grant",
+            title: "201 · Playback Grant",
             body: JSON.stringify(PLAYBACK_GRANT_EXAMPLE, null, 2),
           },
         ],
@@ -947,102 +971,102 @@ export const API_PAGES: ApiPageDef[] = [
   {
     slug: "",
     title: "Overview",
-    group: "Getting started",
+    group: "Getting Started",
     palette: "teal",
     description:
-      "Reference for the /v1 surface of the 1321 local runtime host: base URL, authorization, and the first call.",
+      "Local /v1 for evidence-backed media understanding: register a source, run a bounded study, and read verifiable receipts.",
   },
   {
     slug: "authentication",
     title: "Authentication",
-    group: "Getting started",
+    group: "Getting Started",
     palette: "teal",
-    description: "Bearer-token authorization, origin allowlist, and loopback binding for the 1321 runtime host API.",
+    description:
+      "Bearer-token authorization, loopback base URL, origin allowlist, and host bootstrap for the 1321 runtime host API.",
   },
   {
     slug: "errors",
     title: "Errors",
-    group: "Getting started",
+    group: "Getting Started",
     palette: "coral",
-    description: "Strict request validation and the studio.local-runtime-error.v1 envelope.",
+    description: "Fail-closed request validation and the studio.local-runtime-error.v1 envelope.",
   },
   {
     slug: "sources",
-    title: "Sources and ingest",
+    title: "Sources And Ingest",
     group: "Endpoints",
     palette: "teal",
-    description: "Register owned media and private YouTube ranges as rights-attested local sources.",
+    description: "Register owned media or a private YouTube range as a local source before any study.",
   },
   {
     slug: "runtime",
-    title: "Runtime lifecycle",
+    title: "Runtime Lifecycle",
     group: "Endpoints",
     palette: "blue",
     description: "Plan, start, and poll one bounded study over a registered source range.",
   },
   {
     slug: "audits",
-    title: "Evidence audits",
+    title: "Evidence Audits",
     group: "Endpoints",
     palette: "citron",
-    description: "Re-verified evidence assessments and deterministic decision receipts.",
+    description: "Reopen and re-verify stored assessments and decision receipts without inventing facts.",
   },
   {
     slug: "review",
-    title: "Publish review",
+    title: "Publish Review",
     group: "Endpoints",
     palette: "lilac",
-    description: "Attested human publish review: intakes, decisions, and revocations.",
+    description: "Attested human approve or reject before private caption production.",
   },
   {
     slug: "captions",
-    title: "Captions and QC",
+    title: "Captions And QC",
     group: "Endpoints",
     palette: "coral",
-    description: "Private caption candidates, verified timed lines, and structural QC.",
+    description: "Private caption candidates, verified timed lines, and structural QC — not publication.",
   },
   {
     slug: "language",
-    title: "Language explanations",
+    title: "Language Explanations",
     group: "Endpoints",
     palette: "peach",
-    description: "Typed language-explanation facets over one verified caption span.",
+    description: "Typed facets over one verified caption span, with immutable attempt history.",
   },
   {
     slug: "playback",
-    title: "Private playback",
+    title: "Private Playback",
     group: "Endpoints",
     palette: "blue",
-    description: "Short-lived origin-bound grants for streaming private source bytes.",
+    description: "Mint a short-lived origin-bound grant, then stream exact private source bytes.",
   },
   {
     slug: "receipts",
     title: "Receipts",
     group: "Concepts",
     palette: "citron",
-    description: "What a receipt proves: schema-tagged, content-addressed, fail-closed reads.",
+    description: "What a receipt proves: schema tags, content identity, and fail-closed reads.",
   },
   {
     slug: "agents",
-    title: "For agentic editors",
+    title: "For Agentic Editors",
     group: "Concepts",
     palette: "blue",
-    description: "How agentic video editors integrate, and the grant-scoped worker tool set.",
+    description: "Integrate at /v1 for proof-backed branching; workers stay grant-scoped.",
   },
   {
     slug: "improve",
     title: "Improve",
     group: "Concepts",
     palette: "teal",
-    description:
-      "The miss-to-gold conveyor, exclusive routing, memory gate, and the declared offline adapter tier.",
+    description: "Miss-to-gold conveyor, exclusive routing, memory gate, and declared offline adapters.",
   },
   {
     slug: "non-claims",
-    title: "Non-claims",
+    title: "Non-Claims",
     group: "Concepts",
     palette: "coral",
-    description: "What this API does not claim.",
+    description: "Standing non-claims so clients do not invent capability from a route list.",
   },
 ];
 

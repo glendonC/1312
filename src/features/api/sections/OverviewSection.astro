@@ -27,6 +27,8 @@ Improve (\`/api/improve/\`) is a Concepts page about the miss-to-gold conveyor. 
 
 An empty list envelope is an honest answer, not an error.
 
+Smoke through caption-seam and same-grant playback panels are one continuous local capture family. Owned ingest, YouTube, review revocation, default-host caption 409, and language 201 remain separate families. A shared runtimeId alone is not proof of one journal. Opt-in caption and language 201 panels are not default \`npm run runtime:host\` behavior.
+
 ## First verified call
 
 With a running host and bearer token, \`GET /v1/source-sessions\` proves authorization and shows registered sources.
@@ -64,8 +66,7 @@ ${SMOKE_TO_TERMINAL_DISPLAY}
     {API_SUCCESSFUL_PATH.map((step) => (
       <li>
         <a href={step.href}>{step.label}</a>
-        {": "}
-        {step.detail}
+        <span class="api-step-detail">{`: ${step.detail}`}</span>
       </li>
     ))}
   </ol>
@@ -73,6 +74,13 @@ ${SMOKE_TO_TERMINAL_DISPLAY}
     <a href="/api/improve/">Improve</a> is a Concepts page about the miss-to-gold conveyor. It is
     not a <code>/v1</code> surface. An empty list envelope is an honest answer, not an error.
     Fail-closed reads stay unavailable or withheld instead of inventing output.
+  </p>
+  <p>
+    Smoke through caption-seam and same-grant playback panels are one continuous local capture
+    family. Owned ingest, YouTube, review revocation, default-host caption 409, and language 201
+    remain separate families. A shared <code>runtimeId</code> alone is not proof of one journal.
+    Opt-in caption and language 201 panels are not default <code>npm run runtime:host</code>
+    behavior.
   </p>
 </section>
 
@@ -101,13 +109,15 @@ ${SMOKE_TO_TERMINAL_DISPLAY}
   <div class="api-split">
     <div>
       <p>
-        Smallest sequence that proves value on the default deterministic host: list sources, plan,
-        start, poll the journal to terminal. No model spend. No hosted upload path.
+        Smallest sequence that proves value on the default <code>npm run runtime:host</code>: list
+        sources, plan, start, poll the journal to terminal. No model spend. No hosted upload path.
       </p>
       <p>
         Captions come later, only after
         <a href="/api/review/">Publish Review</a>. The default recorded caption executor may refuse
-        fixture authority; that is fail-closed, not a missing route.
+        fixture authority; that is fail-closed, not a missing route. Captured caption 201 panels use
+        an opt-in deterministic test seam; Captured language 201 panels need further OpenAI host
+        flags. Neither is default host behavior.
       </p>
     </div>
     <div class="api-panels">

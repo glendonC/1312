@@ -1,8 +1,8 @@
 import type {
   OwnedMediaIngestRequest,
-  OwnedMediaIngestStatus,
   RuntimeHostCaptionProductionRequest,
-  RuntimeHostPrivatePlaybackGrant,
+  RuntimeHostCaptionQualityControlRequest,
+  RuntimeHostLanguageExplanationRequest,
   RuntimeHostPrivatePlaybackGrantRequest,
   RuntimeHostPrivatePlaybackGrantRevocationRequest,
   RuntimeHostPublishReviewDecisionRequest,
@@ -12,16 +12,34 @@ import type {
 } from "../../studio/runtime/production/runtimeHost/model.ts";
 import {
   ASSESSMENT_AUDITS_200,
+  CAPTION_PRODUCTION_201,
   CAPTION_PRODUCTION_409,
+  CAPTION_PRODUCTIONS_200,
+  CAPTION_PRODUCTION_RESULTS_200,
+  CAPTION_PRODUCTION_RESULTS_TEST_SEAM_200,
+  CAPTION_QC_409,
+  CAPTION_QUALITY_CONTROLS_200,
+  CAPTION_QUALITY_CONTROLS_TEST_SEAM_200,
+  DECISION_RECEIPTS_200,
   LANGUAGE_EXPLANATIONS_200,
+  LANGUAGE_EXPLANATIONS_201,
+  OWNED_MEDIA_INGEST_GET_200,
+  OWNED_MEDIA_INGEST_POST_202,
+  OWNED_MEDIA_INGEST_PUT_202,
+  PRIVATE_PLAYBACK_GRANT_201,
+  PRIVATE_PLAYBACK_REVOKE_200,
   PUBLISH_REVIEW_DECISION_201,
+  PUBLISH_REVIEW_DECISIONS_200,
   PUBLISH_REVIEW_INTAKES_200,
+  PUBLISH_REVIEW_REVOCATION_201,
   RUNTIME_EVENTS_200,
   RUNTIME_PLAN_200,
   RUNTIME_START_ACK_202,
   RUNTIME_STATUS_200,
   SOURCE_SESSIONS_200,
   UNKNOWN_QUERY_400,
+  YOUTUBE_INGEST_202,
+  YOUTUBE_INGEST_GET_200,
 } from "./examples.ts";
 
 export const BASE_URL = "http://127.0.0.1:4312";
@@ -86,6 +104,20 @@ const curlFor = (method: "GET" | "POST" | "PUT", path: string, body?: object): s
   return lines.join("\n");
 };
 
+/** Private playback mint/revoke require an allowlisted Origin in addition to the bearer token. */
+const curlForOrigin = (method: "GET" | "POST", path: string, body?: object): string => {
+  const lines = [
+    `curl${method === "GET" ? "" : ` -X ${method}`} ${BASE_URL}${path} \\`,
+    `  -H "Authorization: Bearer $TOKEN" \\`,
+    `  -H "Origin: $ORIGIN"${body === undefined ? "" : " \\"}`,
+  ];
+  if (body !== undefined) {
+    lines.push(`  -H "Content-Type: application/json" \\`);
+    lines.push(`  -d '${JSON.stringify(body, null, 2)}'`);
+  }
+  return lines.join("\n");
+};
+
 const curlBinaryPut = (path: string, fileArg: string): string =>
   [
     `curl -X PUT ${BASE_URL}${path} \\`,
@@ -100,6 +132,28 @@ const curlPrivateMediaHead = (): string =>
     `  -H "Origin: $ORIGIN" \\`,
     `  -H "Range: bytes=0-1023"`,
   ].join("\n");
+
+/**
+ * Status/header note for binary private media. Composed from host tests
+ * (tests/studio-private-playback.test.ts); not a JSON envelope and not a pasted body.
+ */
+export const PRIVATE_MEDIA_STATUS_LINE = `HTTP/1.1 206 Partial Content
+Content-Type: audio/mp4
+Content-Length: 8
+Content-Range: bytes 0-7/329662
+Accept-Ranges: bytes
+Cache-Control: private, no-store, max-age=0
+Access-Control-Allow-Origin: $ORIGIN
+
+(binary media octets; not shown)
+
+# Auth: allowlisted Origin required. Path :grantId/:secret authorizes the stream
+# (not the bearer token). Full GET without Range returns 200 with the same header
+# family. HEAD returns the same status and headers with an empty body.
+# Failures use the JSON error envelope: 403 missing/disallowed Origin, 404 unknown
+# or wrong secret, 410 revoked or expired, 416 unsatisfiable Range, 400 any query
+# string, 405 non-GET/HEAD.
+# Private loopback bytes only. Not a CDN URL and not publication.`;
 
 /* Identities below are real: they come from the run-005 source receipt and from
    the captured live-run receipts in examples.ts. */
@@ -139,21 +193,12 @@ export const YOUTUBE_INGEST_EXAMPLE = {
   localProcessingConfirmed: true,
 } satisfies YouTubeLocalIngestRequest;
 
-export const INGEST_STATUS_EXAMPLE = {
-  schema: "studio.owned-media-ingest.v1",
-  ingestId: "ingest-5b21d8",
-  status: "queued",
-  updatedAt: "2026-07-18T09:00:02.000Z",
-  source: null,
-  failure: null,
-} satisfies OwnedMediaIngestStatus;
-
 export const REVIEW_DECISION_EXAMPLE = {
   intake: {
-    intakeId: "publish-review-intake:d5de1955c1403139502d5740a8d04b4e8c1e1d9a7437f12c265bef2fbe0425ae",
-    artifactId: "artifact:99cceac7181985f69eeca33b15895fc0e860a0c8615399798eb90173788bf0f8",
-    receiptId: "publish-review-intake-receipt:1c0b759f9f240367ca898422dddbd00836d7e5d0d5c45c2b476832bac453cb35",
-    receiptContentId: "sha256:30d25055c5754fc51bab6fc9a235e15a20cb9fc4553fe2581beecfd03cdf31e0",
+    intakeId: "publish-review-intake:d8f36771fe30d61e378fbe67afa75b6780b8869b2004bc42831dc561beba69a2",
+    artifactId: "artifact:2c1e7488a5b5edcda2459cacd963fddbf78e4585eff8bb0313f986febc7aa01d",
+    receiptId: "publish-review-intake-receipt:4ef807398c8f53dc5b6678edafc2fdf98040b198ede06e478a746d06a7341e6d",
+    receiptContentId: "sha256:d9f80a2f3b2b6d4928aad9e7afd831c306e901359278462b1aea5f2e3edf4f84",
   },
   reviewer: {
     id: "reviewer:local-operator",
@@ -168,19 +213,40 @@ export const REVIEW_DECISION_EXAMPLE = {
 
 export const CAPTION_REQUEST_EXAMPLE = {
   approval: {
-    reviewId: "publish-review:034269a4d347a017e3571f4adfd46d31854c7d2905e42fe414440dd606284489",
-    artifactId: "artifact:36935fe16b283c526d0698a4ea65eee82d8047b2b891ecb9df1020d0a69183f9",
-    receiptId: "publish-review-decision-receipt:b3808b2e9a083769ec640e93d276abb2976d4aaac988be922d0d9d56af920e79",
-    receiptContentId: "sha256:63b79ac0b5991444ca9da036a1324548ad0fc655b0cf057edb094dfb8ec15129",
+    reviewId: "publish-review:19adbd8e569a53432830eeaa486a1e36bc9319e208851bca1234564c55e6956e",
+    artifactId: "artifact:83938d4759c1b26a818cb5391202842229d466517f26b43e5d5087d6f0c49b21",
+    receiptId: "publish-review-decision-receipt:538ba71d19c1a12dcf25f8bb46a04c119142e57c96c9773d3f91f823a9f3cb7a",
+    receiptContentId: "sha256:0b69e0bade67cfd0b1f6c2d43ae000276fe2e48d980087ddeaecfece107129a3",
   },
 } satisfies RuntimeHostCaptionProductionRequest;
 
+/** Candidate span from the gpt-4o-mini language 201 capture (deterministic caption seam first). */
+export const LANGUAGE_REQUEST_EXAMPLE = {
+  caption: {
+    jobId: "caption-production:f64f8415a4223364b11b024c41f65425b98f707f6ec760c338f43888a7e13049",
+    artifactId: "artifact:0fa7219f41e248d8fe9f429993c2c6624ce2df3509202660a88441f092c0f5ce",
+    contentId: "sha256:7ec6826cd3119981fa97adeffda0c3c48acec22c76cf0aded5cfb4b1f4ff600e",
+    receiptArtifactId: "artifact:5faf42ea281f71e6e8bc26e53f38f58be08766af55338ebb6a6815ecc9b8537b",
+    receiptId: "caption-production-receipt:2148790b3453c6f684cb30c7eaa33ac357f7a925088e2247f59ff27ee13b7458",
+    receiptContentId: "sha256:3ee3d6ef242507082e0740eb99c756fe80454c5b703458aa4012df4280b1bef5",
+  },
+  lineId: "deterministic-current-run-line-001",
+  selection: {
+    side: "source",
+    unit: "unicode_code_point",
+    start: 0,
+    end: 2,
+    text: "테스",
+  },
+  facetKinds: ["meaning", "word"],
+} satisfies RuntimeHostLanguageExplanationRequest;
+
 export const REVIEW_REVOCATION_EXAMPLE = {
   approval: {
-    reviewId: CAPTION_REQUEST_EXAMPLE.approval.reviewId,
-    artifactId: CAPTION_REQUEST_EXAMPLE.approval.artifactId,
-    receiptId: CAPTION_REQUEST_EXAMPLE.approval.receiptId,
-    receiptContentId: CAPTION_REQUEST_EXAMPLE.approval.receiptContentId,
+    reviewId: "publish-review:fd270635f13ca8a82f9ab9858ffdf2d5e8e3fabbbfbdff196f589a4aeb992713",
+    artifactId: "artifact:d3f53f5a25444737836e416ca86683594d1f0ea460facda6d52e60c1c3c01eca",
+    receiptId: "publish-review-decision-receipt:436d61ef564f9b2897bb8a08813c619ffa4cd5cf1af905e2040ad42e8186dd1b",
+    receiptContentId: "sha256:fc69cc44bb855d751f372be4af19a24195e50e0836659ef6747358944f8f5d39",
   },
   reviewer: {
     id: "reviewer:local-operator",
@@ -191,6 +257,17 @@ export const REVIEW_REVOCATION_EXAMPLE = {
     note: null,
   },
 } satisfies RuntimeHostPublishReviewRevocationRequest;
+
+/** Candidate ids from the deterministic test-seam caption 201 capture. Host auto-runs QC on create. */
+export const CAPTION_QC_REQUEST_EXAMPLE = {
+  candidate: {
+    jobId: "caption-production:278a43dfbc1ba6357e093189be709656e9480ef7f642b9411646adfdb0071ef6",
+    captionArtifactId: "artifact:a87ffabb03c94f62762cee20d5b18e19f9fc5f32af39c57c5e17a816d57a32a7",
+    captionContentId: "sha256:0e27beec77fd1b60edcaee2e4fbf6a05e8018b31b058b663a212d45911c6cba8",
+    captionReceiptId: "caption-production-receipt:a1a00adb31a15e20296758888f4f612bf8085e1058bf05dc7b6f7e0ee0a99539",
+    captionReceiptContentId: "sha256:6f9d53f6498439471c243f7433afde7791629819d51d2c31c5745fb753a67e8a",
+  },
+} satisfies RuntimeHostCaptionQualityControlRequest;
 
 export const PLAYBACK_GRANT_REQUEST_EXAMPLE = {
   schema: "studio.private-playback-grant-request.v1",
@@ -204,25 +281,6 @@ export const PLAYBACK_GRANT_REQUEST_EXAMPLE = {
 export const PLAYBACK_REVOKE_EXAMPLE = {
   schema: "studio.private-playback-grant-revocation.v1",
 } satisfies RuntimeHostPrivatePlaybackGrantRevocationRequest;
-
-export const PLAYBACK_GRANT_EXAMPLE = {
-  schema: "studio.private-playback-grant.v1",
-  grantId: "grant-b2f1c0",
-  runtimeId: "runtime:da4ff907-4240-42c7-8f14-deb6e2ce236a",
-  source: {
-    sessionId: RUN_005_SESSION_ID,
-    revisionId: RUN_005_REVISION_ID,
-    artifactId: RUN_005_SOURCE_ARTIFACT_ID,
-    contentId: RUN_005_CONTENT_ID,
-    bytes: 329_662,
-    durationMs: 47_200,
-  },
-  mimeType: "audio/mp4",
-  timestampOrigin: { kind: "source_media_zero", offsetMs: 0 },
-  mediaPath: "/v1/private-source-media/grant-b2f1c0/{secret}",
-  issuedAt: "2026-07-18T09:00:00.000Z",
-  expiresAt: "2026-07-18T09:10:00.000Z",
-} satisfies RuntimeHostPrivatePlaybackGrant;
 
 export const CURL_DISPLAY = `# printed on stdout when the host starts
 TOKEN=<authorizationToken>
@@ -255,7 +313,14 @@ curl -H "Authorization: Bearer $TOKEN" \\
   "${BASE_URL}/v1/runtimes/$RUNTIME_ID/events?after=0&limit=100"
 
 # Next authority step is Publish Review (after a queued intake), then Captions.
-# Default recorded caption executor may refuse fixture authority: that is fail-closed, not a host gap.`;
+# Default recorded caption executor may refuse fixture authority: that is fail-closed, not a host gap.
+# Captured caption 201 panels need an opt-in host:
+#   --caption-executor deterministic-test --allow-deterministic-caption-test-seam
+# That seam sets cognitionClaim none; it is not default npm run runtime:host behavior.
+# Captured language 201 panels need a further opt-in (after a caption seam):
+#   --language-explanation-executor openai --allow-real-language-explanation
+#   --language-explanation-model gpt-4o-mini
+# Default host language stays honest-empty / unavailable.`;
 
 /** Operator ladder for Overview / LLM paste. Order matches host authority, not nav density. */
 export const API_SUCCESSFUL_PATH: ReadonlyArray<{
@@ -286,7 +351,8 @@ export const API_SUCCESSFUL_PATH: ReadonlyArray<{
   {
     href: "/api/captions/",
     label: "Captions And QC",
-    detail: "Private caption candidates and structural QC. Not publication.",
+    detail:
+      "Private caption candidates and structural QC. Not publication. Default host often 409; Captured 201 panels use an opt-in deterministic test seam.",
   },
   {
     href: "/api/playback/",
@@ -296,7 +362,8 @@ export const API_SUCCESSFUL_PATH: ReadonlyArray<{
   {
     href: "/api/language/",
     label: "Language Explanations",
-    detail: "Typed facets over one verified caption span.",
+    detail:
+      "Typed facets over one verified caption span. Default host stays empty; Captured 201 panels need opt-in OpenAI flags.",
   },
 ];
 
@@ -384,12 +451,6 @@ const RUNTIME_STATUS_FIELDS: ApiFieldTable = {
     { name: "terminal", type: "boolean", note: "True once the lifecycle is terminal." },
   ],
 };
-
-const ingestStatusPanel = (title: string): ApiCodePanel => ({
-  kind: "response",
-  title: `${title} · Illustrative`,
-  body: JSON.stringify(INGEST_STATUS_EXAMPLE, null, 2),
-});
 
 const listEnvelopeFields = (payloadName: string, payloadNote: string): ApiFieldTable => ({
   title: "Response Envelope",
@@ -576,7 +637,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("POST", "/v1/owned-media-ingests", OWNED_INGEST_EXAMPLE),
           },
-          ingestStatusPanel("202 · Ingest Status"),
+          {
+            kind: "response",
+            title: "202 · Captured · Queued",
+            body: OWNED_MEDIA_INGEST_POST_202,
+          },
         ],
       },
       {
@@ -589,9 +654,16 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           {
             kind: "request",
             title: "Request · Octet-Stream",
-            body: curlBinaryPut("/v1/owned-media-ingests/$INGEST_ID/media", "clip.m4a"),
+            body: curlBinaryPut(
+              "/v1/owned-media-ingests/$INGEST_ID/media",
+              "public/demo/runs/run-005/clip.m4a",
+            ),
           },
-          ingestStatusPanel("202 · Ingest Status"),
+          {
+            kind: "response",
+            title: "202 · Captured · Queued",
+            body: OWNED_MEDIA_INGEST_PUT_202,
+          },
         ],
       },
       {
@@ -606,7 +678,13 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("GET", "/v1/owned-media-ingests/$INGEST_ID"),
           },
-          ingestStatusPanel("200 · Ingest Status"),
+          {
+            kind: "response",
+            // Captured after octet-stream PUT on a temp owned-ingest-root without a
+            // preloaded colliding --source-directory. Local processing only; not SaaS upload.
+            title: "200 · Captured · Registered",
+            body: OWNED_MEDIA_INGEST_GET_200,
+          },
         ],
       },
       {
@@ -637,6 +715,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("POST", "/v1/youtube-local-ingests", YOUTUBE_INGEST_EXAMPLE),
           },
+          {
+            kind: "response",
+            title: "202 · Captured · Queued",
+            body: YOUTUBE_INGEST_202,
+          },
         ],
       },
       {
@@ -650,6 +733,13 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             kind: "request",
             title: "Request",
             body: curlFor("GET", "/v1/youtube-local-ingests/$INGEST_ID"),
+          },
+          {
+            kind: "response",
+            // Captured after yt-dlp download + local seal/register. Private local_processing
+            // only; not upload, CDN, or redistribution authority.
+            title: "200 · Captured · Registered",
+            body: YOUTUBE_INGEST_GET_200,
           },
         ],
       },
@@ -793,6 +883,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/decision-receipts"),
           },
+          {
+            kind: "response",
+            title: "200 · Captured · Honest Empty",
+            body: DECISION_RECEIPTS_200,
+          },
         ],
       },
     ],
@@ -846,8 +941,19 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
               },
             ],
           },
+          listEnvelopeFields("reviews", "Attested review decisions for this runtime; empty until one is recorded."),
         ],
         panels: [
+          {
+            kind: "request",
+            title: "Request · Read",
+            body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/publish-review-decisions"),
+          },
+          {
+            kind: "response",
+            title: "200 · Captured · Honest Empty",
+            body: PUBLISH_REVIEW_DECISIONS_200,
+          },
           {
             kind: "request",
             title: "Request · Approve",
@@ -892,6 +998,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request · Revoke",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/publish-review-revocations", REVIEW_REVOCATION_EXAMPLE),
           },
+          {
+            kind: "response",
+            title: "201 · Revocation · Captured",
+            body: PUBLISH_REVIEW_REVOCATION_201,
+          },
         ],
       },
     ],
@@ -899,7 +1010,12 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   {
     id: "captions",
     title: "Captions And QC",
-    note: "Private caption candidates, verified timed lines, and structural QC. Not publication.",
+    note:
+      "Private caption candidates, verified timed lines, and structural QC. Not publication. " +
+      "Default npm run runtime:host uses the recorded caption executor and fails closed with 409. " +
+      "201 panels were captured with --caption-executor deterministic-test " +
+      "--allow-deterministic-caption-test-seam (cognitionClaim none). " +
+      "The host auto-runs independent QC when caption create succeeds.",
     endpoints: [
       {
         methods: ["GET", "POST"],
@@ -908,18 +1024,36 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         responseSchema: "studio.local-runtime-caption-productions.v1",
         fieldTables: [
           CAPTION_PRODUCTION_REQUEST_FIELDS,
-          listEnvelopeFields("captions", "Private caption production records for this runtime."),
+          listEnvelopeFields(
+            "captions",
+            "Private caption production records; empty until a current-run caption job completes.",
+          ),
         ],
         panels: [
           {
             kind: "request",
-            title: "Request",
+            title: "Request · Read",
+            body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/caption-productions"),
+          },
+          {
+            kind: "response",
+            title: "200 · Captured · Honest Empty",
+            body: CAPTION_PRODUCTIONS_200,
+          },
+          {
+            kind: "request",
+            title: "Request · Create",
             body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/caption-productions", CAPTION_REQUEST_EXAMPLE),
           },
           {
             kind: "response",
             title: "409 · Fail-Closed · Captured",
             body: CAPTION_PRODUCTION_409,
+          },
+          {
+            kind: "response",
+            title: "201 · Captured · Deterministic Test Seam",
+            body: CAPTION_PRODUCTION_201,
           },
         ],
       },
@@ -935,6 +1069,16 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "Request",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/caption-production-results"),
           },
+          {
+            kind: "response",
+            title: "200 · Captured · Honest Empty",
+            body: CAPTION_PRODUCTION_RESULTS_200,
+          },
+          {
+            kind: "response",
+            title: "200 · Captured · Deterministic Test Seam",
+            body: CAPTION_PRODUCTION_RESULTS_TEST_SEAM_200,
+          },
         ],
       },
       {
@@ -944,13 +1088,36 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         responseSchema: "studio.local-runtime-caption-quality-controls.v1",
         fieldTables: [
           CAPTION_QC_REQUEST_FIELDS,
-          listEnvelopeFields("qualityControls", "Structural QC records; empty until a candidate is submitted."),
+          listEnvelopeFields(
+            "qualityControls",
+            "Structural QC records; empty until a candidate is submitted. Successful caption create auto-runs one QC decision.",
+          ),
         ],
         panels: [
           {
             kind: "request",
             title: "Request · Read",
             body: curlFor("GET", "/v1/runtimes/$RUNTIME_ID/caption-quality-controls"),
+          },
+          {
+            kind: "response",
+            title: "200 · Captured · Honest Empty",
+            body: CAPTION_QUALITY_CONTROLS_200,
+          },
+          {
+            kind: "response",
+            title: "200 · Captured · Deterministic Test Seam",
+            body: CAPTION_QUALITY_CONTROLS_TEST_SEAM_200,
+          },
+          {
+            kind: "request",
+            title: "Request · Create",
+            body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/caption-quality-controls", CAPTION_QC_REQUEST_EXAMPLE),
+          },
+          {
+            kind: "response",
+            title: "409 · Fail-Closed · Captured",
+            body: CAPTION_QC_409,
           },
         ],
       },
@@ -959,7 +1126,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   {
     id: "language",
     title: "Language Explanations",
-    note: "Typed facets over one verified caption span. Failed attempts stay visible; empty results are honest.",
+    note:
+      "Typed facets over one verified caption span. Default host has no language executor (honest empty). " +
+      "201 panels were captured with --language-explanation-executor openai " +
+      "--allow-real-language-explanation --language-explanation-model gpt-4o-mini after a " +
+      "deterministic-test caption seam. Failed attempts stay visible.",
     endpoints: [
       {
         methods: ["GET", "POST"],
@@ -979,6 +1150,18 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             title: "200 · Captured · Honest Empty",
             body: LANGUAGE_EXPLANATIONS_200,
           },
+          {
+            kind: "request",
+            title: "Request · Create",
+            body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/language-explanations", LANGUAGE_REQUEST_EXAMPLE),
+          },
+          {
+            kind: "response",
+            // Opt-in OpenAI after deterministic caption seam. Real model; private only.
+            // Not default npm run runtime:host behavior.
+            title: "201 · Captured · Opt-In OpenAI (gpt-4o-mini)",
+            body: LANGUAGE_EXPLANATIONS_201,
+          },
         ],
       },
     ],
@@ -986,7 +1169,11 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
   {
     id: "playback",
     title: "Private Playback",
-    note: "Mint a short-lived origin-bound grant, then stream exact private source bytes. Media authorizes by grant secret, not the bearer token.",
+    note:
+      "Mint a short-lived origin-bound grant, then stream exact private source bytes. " +
+      "Media authorizes by grant secret, not the bearer token. Origin is required on mint, " +
+      "revoke, and media bytes. Captured grant mint and revoke panels are one continuous host " +
+      "session and share the same grantId. GET/HEAD media is binary with no JSON success envelope.",
     endpoints: [
       {
         methods: ["POST"],
@@ -1015,12 +1202,14 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           {
             kind: "request",
             title: "Request",
-            body: curlFor("POST", "/v1/runtimes/$RUNTIME_ID/private-playback-grants", PLAYBACK_GRANT_REQUEST_EXAMPLE),
+            body: curlForOrigin("POST", "/v1/runtimes/$RUNTIME_ID/private-playback-grants", PLAYBACK_GRANT_REQUEST_EXAMPLE),
           },
           {
             kind: "response",
-            title: "201 · Playback Grant · Illustrative",
-            body: JSON.stringify(PLAYBACK_GRANT_EXAMPLE, null, 2),
+            // Option B continuous family after smoke + caption seam. Origin required.
+            // Private loopback grant only; mediaPath embeds a short-lived secret, not a CDN URL.
+            title: "201 · Playback Grant · Captured",
+            body: PRIVATE_PLAYBACK_GRANT_201,
           },
         ],
       },
@@ -1034,18 +1223,25 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
           {
             kind: "request",
             title: "Request",
-            body: curlFor(
+            body: curlForOrigin(
               "POST",
               "/v1/runtimes/$RUNTIME_ID/private-playback-grants/$GRANT_ID/revocations",
               PLAYBACK_REVOKE_EXAMPLE,
             ),
+          },
+          {
+            kind: "response",
+            // Same continuous session and same grantId as the mint 201 panel above.
+            title: "200 · Revoked · Captured",
+            body: PRIVATE_PLAYBACK_REVOKE_200,
           },
         ],
       },
       {
         methods: ["GET", "HEAD"],
         path: "/v1/private-source-media/:grantId/:secret",
-        summary: "Stream granted media bytes with HTTP Range support. Binary response, no JSON envelope.",
+        summary:
+          "Stream granted media bytes with HTTP Range support. Binary response, no JSON envelope. Origin required; grant-secret path auth (not bearer). 200 full / 206 Range; failures 403/404/410/416.",
         responseSchema: null,
         fieldTables: [],
         panels: [
@@ -1053,6 +1249,13 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
             kind: "request",
             title: "Request · HEAD + Range",
             body: curlPrivateMediaHead(),
+          },
+          {
+            kind: "response",
+            // Illustrative status/header note from host tests. Success body is binary octets,
+            // not a JSON envelope. Do not paste media bytes into the docs.
+            title: "206 · Range Headers · Illustrative",
+            body: PRIVATE_MEDIA_STATUS_LINE,
           },
         ],
       },

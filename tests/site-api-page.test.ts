@@ -3,16 +3,41 @@ import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  CAPTION_PRODUCTION_201,
+  CAPTION_PRODUCTIONS_200,
+  CAPTION_PRODUCTION_RESULTS_200,
+  CAPTION_PRODUCTION_RESULTS_TEST_SEAM_200,
+  CAPTION_QC_409,
+  CAPTION_QUALITY_CONTROLS_200,
+  CAPTION_QUALITY_CONTROLS_TEST_SEAM_200,
+  DECISION_RECEIPTS_200,
+  LANGUAGE_EXPLANATIONS_200,
+  LANGUAGE_EXPLANATIONS_201,
+  OWNED_MEDIA_INGEST_GET_200,
+  OWNED_MEDIA_INGEST_POST_202,
+  OWNED_MEDIA_INGEST_PUT_202,
+  PRIVATE_PLAYBACK_GRANT_201,
+  PRIVATE_PLAYBACK_REVOKE_200,
+  PUBLISH_REVIEW_DECISION_201,
+  PUBLISH_REVIEW_DECISIONS_200,
+  PUBLISH_REVIEW_REVOCATION_201,
+  RUNTIME_EVENTS_200,
   RUNTIME_PLAN_200,
   RUNTIME_START_ACK_202,
   RUNTIME_STATUS_200,
+  YOUTUBE_INGEST_202,
+  YOUTUBE_INGEST_GET_200,
 } from "../src/features/api/examples.ts";
 import {
   API_ENDPOINT_GROUPS,
   API_PAGES,
   API_SUCCESSFUL_PATH,
+  CAPTION_REQUEST_EXAMPLE,
   ERROR_SCHEMA,
-  PLAYBACK_GRANT_EXAMPLE,
+  LANGUAGE_REQUEST_EXAMPLE,
+  PRIVATE_MEDIA_STATUS_LINE,
+  REVIEW_DECISION_EXAMPLE,
+  REVIEW_REVOCATION_EXAMPLE,
   SMOKE_TO_TERMINAL_DISPLAY,
   START_REQUEST_EXAMPLE,
   WORKER_TOOLS,
@@ -129,17 +154,26 @@ test("code panels are executable requests or parseable captured responses", () =
   for (const panel of requests) {
     assert.ok(panel.body.startsWith("curl"), `request panel "${panel.title}" is an executable curl`);
   }
-  for (const panel of responses) {
-    assert.ok(
-      /\bCaptured\b/.test(panel.title) || /\bIllustrative\b/.test(panel.title),
-      `response panel "${panel.title}" labels Captured or Illustrative authority`,
-    );
-    const parsed = JSON.parse(panel.body) as { schema?: unknown };
-    assert.equal(typeof parsed.schema, "string", `response panel "${panel.title}" carries a schema tag`);
-    assert.ok(
-      documented.has(parsed.schema as string),
-      `response panel schema "${String(parsed.schema)}" is documented`,
-    );
+  for (const endpoint of API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)) {
+    for (const panel of endpoint.panels.filter((candidate) => candidate.kind === "response")) {
+      assert.ok(
+        /\bCaptured\b/.test(panel.title) || /\bIllustrative\b/.test(panel.title),
+        `response panel "${panel.title}" labels Captured or Illustrative authority`,
+      );
+      if (endpoint.responseSchema === null) {
+        assert.ok(
+          !/^\s*\{/.test(panel.body),
+          `binary response panel "${panel.title}" must not invent a JSON success body`,
+        );
+        continue;
+      }
+      const parsed = JSON.parse(panel.body) as { schema?: unknown };
+      assert.equal(typeof parsed.schema, "string", `response panel "${panel.title}" carries a schema tag`);
+      assert.ok(
+        documented.has(parsed.schema as string),
+        `response panel schema "${String(parsed.schema)}" is documented`,
+      );
+    }
   }
 });
 
@@ -161,14 +195,25 @@ test("successful path matches host authority order and smoke stays local", () =>
   assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("/v1/runtimes/$RUNTIME_ID/events"));
   assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("no SaaS"));
   assert.ok(SMOKE_TO_TERMINAL_DISPLAY.includes("Publish Review"));
+  assert.ok(
+    SMOKE_TO_TERMINAL_DISPLAY.includes("--allow-deterministic-caption-test-seam"),
+    "smoke notes caption opt-in seam",
+  );
+  assert.ok(
+    SMOKE_TO_TERMINAL_DISPLAY.includes("--allow-real-language-explanation"),
+    "smoke notes language opt-in flags",
+  );
+
+  const captionsPath = API_SUCCESSFUL_PATH.find((step) => step.href === "/api/captions/");
+  const languagePath = API_SUCCESSFUL_PATH.find((step) => step.href === "/api/language/");
+  assert.ok(captionsPath?.detail.includes("opt-in"), "Successful Path captions mark opt-in 201");
+  assert.ok(languagePath?.detail.includes("opt-in"), "Successful Path language marks opt-in 201");
 
   const improvePage = API_PAGES.find((page) => page.slug === "improve");
   assert.ok(improvePage?.description.includes("not a /v1"), "Improve page meta denies host surface");
 });
 
 test("documented example shapes stay bound to the contract they claim", () => {
-  assert.equal(PLAYBACK_GRANT_EXAMPLE.schema, "studio.private-playback-grant.v1");
-  assert.equal(PLAYBACK_GRANT_EXAMPLE.timestampOrigin.kind, "source_media_zero");
   assert.equal(START_REQUEST_EXAMPLE.requestedSourceLanguage.mode, "declared");
   assert.ok(START_REQUEST_EXAMPLE.range.endMs > START_REQUEST_EXAMPLE.range.startMs);
 
@@ -197,6 +242,358 @@ test("documented example shapes stay bound to the contract they claim", () => {
   assert.equal(status.terminal, true);
   assert.equal(start.commandId, status.commandId);
   assert.equal(start.runtimeId, status.runtimeId);
+
+  const startAck = JSON.parse(RUNTIME_START_ACK_202) as { acceptedAt?: string };
+  const eventsPage = JSON.parse(RUNTIME_EVENTS_200) as {
+    schema?: string;
+    runtimeId?: string;
+    commandId?: string;
+    reachedHead?: boolean;
+    events?: Array<{ recordedAt?: string; seq?: number }>;
+  };
+  assert.equal(eventsPage.schema, "studio.local-runtime-events.v1");
+  assert.equal(eventsPage.runtimeId, status.runtimeId);
+  assert.equal(eventsPage.commandId, status.commandId);
+  assert.equal(eventsPage.reachedHead, false, "events panel is a truncated continuous-session sample");
+  assert.ok((eventsPage.events?.length ?? 0) >= 1);
+  assert.ok(
+    (eventsPage.events?.[0]?.recordedAt ?? "") >= (startAck.acceptedAt ?? ""),
+    "Option B events are not from an earlier host session than start",
+  );
+
+  const decision201 = JSON.parse(PUBLISH_REVIEW_DECISION_201) as {
+    schema?: string;
+    runtimeId?: string;
+    reviews?: Array<{ reviewId?: string; artifactId?: string; receiptContentId?: string }>;
+  };
+  assert.equal(decision201.schema, "studio.local-runtime-publish-review-decisions.v1");
+  assert.equal(decision201.runtimeId, status.runtimeId);
+  assert.equal(decision201.reviews?.[0]?.reviewId, CAPTION_REQUEST_EXAMPLE.approval.reviewId);
+  assert.ok(REVIEW_DECISION_EXAMPLE.intake.intakeId.startsWith("publish-review-intake:"));
+  assert.notEqual(
+    decision201.reviews?.[0]?.reviewId,
+    REVIEW_REVOCATION_EXAMPLE.approval.reviewId,
+    "continuous approve is a separate family from parked revocation",
+  );
+
+  const decisionsGet = JSON.parse(PUBLISH_REVIEW_DECISIONS_200) as {
+    schema?: string;
+    reviews?: unknown[];
+    reviewer?: { id?: string };
+  };
+  const revocation = JSON.parse(PUBLISH_REVIEW_REVOCATION_201) as {
+    schema?: string;
+    reviews?: Array<{
+      state?: string;
+      reviewId?: string;
+      revocation?: { reasonCodes?: string[] } | null;
+    }>;
+  };
+  const youtubePost = JSON.parse(YOUTUBE_INGEST_202) as {
+    schema?: string;
+    status?: string;
+    source?: unknown;
+    failure?: unknown;
+    ingestId?: string;
+  };
+  const youtubeGet = JSON.parse(YOUTUBE_INGEST_GET_200) as {
+    schema?: string;
+    status?: string;
+    source?: {
+      sourceKind?: string;
+      rightsScope?: string;
+      durationMs?: number;
+      detectedLanguageEvidenceAvailable?: boolean;
+    } | null;
+    failure?: unknown;
+    ingestId?: string;
+  };
+  const captionProductions = JSON.parse(CAPTION_PRODUCTIONS_200) as {
+    schema?: string;
+    captions?: unknown[];
+    runtimeId?: string;
+  };
+  const captionResults = JSON.parse(CAPTION_PRODUCTION_RESULTS_200) as {
+    schema?: string;
+    results?: unknown[];
+  };
+  const captionQc = JSON.parse(CAPTION_QUALITY_CONTROLS_200) as {
+    schema?: string;
+    qualityControls?: unknown[];
+  };
+  assert.equal(decisionsGet.schema, "studio.local-runtime-publish-review-decisions.v1");
+  assert.deepEqual(decisionsGet.reviews, []);
+  assert.equal(decisionsGet.reviewer?.id, "reviewer:local-operator");
+  assert.equal(revocation.schema, "studio.local-runtime-publish-review-decisions.v1");
+  assert.equal(revocation.reviews?.[0]?.state, "approval_revoked");
+  assert.ok(revocation.reviews?.[0]?.revocation);
+  assert.deepEqual(revocation.reviews?.[0]?.revocation?.reasonCodes, ["approval_entered_in_error"]);
+  assert.equal(revocation.reviews?.[0]?.reviewId, REVIEW_REVOCATION_EXAMPLE.approval.reviewId);
+  assert.equal(youtubePost.schema, "studio.youtube-local-ingest.v1");
+  assert.equal(youtubePost.status, "queued");
+  assert.equal(youtubePost.source, null);
+  assert.equal(youtubePost.failure, null);
+  assert.equal(youtubeGet.schema, "studio.youtube-local-ingest.v1");
+  assert.equal(youtubeGet.status, "registered");
+  assert.equal(youtubeGet.failure, null);
+  assert.equal(youtubePost.ingestId, youtubeGet.ingestId);
+  assert.equal(youtubeGet.source?.sourceKind, "youtube_local");
+  assert.equal(youtubeGet.source?.rightsScope, "local_processing");
+  assert.equal(youtubeGet.source?.durationMs, 30_030);
+  assert.equal(youtubeGet.source?.detectedLanguageEvidenceAvailable, false);
+  const youtubeGetPanel = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
+    .find((endpoint) => endpoint.path === "/v1/youtube-local-ingests/:ingestId")
+    ?.panels.find((panel) => panel.kind === "response");
+  assert.ok(youtubeGetPanel?.title.includes("Registered"), "YouTube GET documents registered capture");
+  assert.ok(!youtubeGetPanel?.title.includes("Resolving"), "YouTube GET no longer claims resolving-only");
+  assert.equal(captionProductions.schema, "studio.local-runtime-caption-productions.v1");
+  assert.deepEqual(captionProductions.captions, []);
+  assert.equal(captionProductions.runtimeId, status.runtimeId);
+  assert.equal(captionResults.schema, "studio.local-runtime-caption-production-results.v1");
+  assert.deepEqual(captionResults.results, []);
+  assert.equal(captionQc.schema, "studio.local-runtime-caption-quality-controls.v1");
+  assert.deepEqual(captionQc.qualityControls, []);
+
+  const caption201 = JSON.parse(CAPTION_PRODUCTION_201) as {
+    schema?: string;
+    captions?: Array<{
+      approval?: { reviewId?: string; receiptContentId?: string };
+      executor?: {
+        classification?: string;
+        cognitionClaim?: string;
+        executionScope?: string;
+      };
+      result?: { status?: string; lineCount?: number };
+    }>;
+  };
+  const captionResultsSeam = JSON.parse(CAPTION_PRODUCTION_RESULTS_TEST_SEAM_200) as {
+    schema?: string;
+    results?: unknown[];
+    runtimeId?: string;
+  };
+  const captionQcSeam = JSON.parse(CAPTION_QUALITY_CONTROLS_TEST_SEAM_200) as {
+    schema?: string;
+    qualityControls?: Array<{ outcome?: string; reasonCodes?: string[] }>;
+    runtimeId?: string;
+  };
+  const captionQcConflict = JSON.parse(CAPTION_QC_409) as {
+    schema?: string;
+    error?: { code?: string };
+  };
+  assert.equal(caption201.schema, "studio.local-runtime-caption-productions.v1");
+  assert.equal(caption201.captions?.length, 1);
+  assert.equal(caption201.captions?.[0]?.approval?.reviewId, CAPTION_REQUEST_EXAMPLE.approval.reviewId);
+  assert.equal(
+    caption201.captions?.[0]?.approval?.receiptContentId,
+    CAPTION_REQUEST_EXAMPLE.approval.receiptContentId,
+  );
+  assert.equal(caption201.captions?.[0]?.executor?.classification, "deterministic_current_run_test_seam");
+  assert.equal(caption201.captions?.[0]?.executor?.cognitionClaim, "none");
+  assert.equal(caption201.captions?.[0]?.executor?.executionScope, "current_run");
+  assert.equal(caption201.captions?.[0]?.result?.status, "completed");
+  assert.equal(caption201.captions?.[0]?.result?.lineCount, 6);
+  assert.equal(captionResultsSeam.schema, "studio.local-runtime-caption-production-results.v1");
+  assert.equal(captionResultsSeam.results?.length, 1);
+  assert.equal(captionResultsSeam.runtimeId, status.runtimeId);
+  assert.equal(captionQcSeam.schema, "studio.local-runtime-caption-quality-controls.v1");
+  assert.equal(captionQcSeam.qualityControls?.length, 1);
+  assert.equal(captionQcSeam.qualityControls?.[0]?.outcome, "accepted");
+  assert.deepEqual(captionQcSeam.qualityControls?.[0]?.reasonCodes, [
+    "current_run_candidate_structurally_complete",
+  ]);
+  assert.equal(captionQcSeam.runtimeId, status.runtimeId);
+  assert.equal(captionQcConflict.schema, "studio.local-runtime-error.v1");
+  assert.equal(captionQcConflict.error?.code, "illegal_caption_qc_transition");
+  assert.match(SMOKE_TO_TERMINAL_DISPLAY, /deterministic-test/);
+  assert.match(SMOKE_TO_TERMINAL_DISPLAY, /allow-deterministic-caption-test-seam/);
+
+  const decisionReceipts = JSON.parse(DECISION_RECEIPTS_200) as {
+    schema?: string;
+    decisions?: unknown[];
+    runtimeId?: string;
+  };
+  const playbackRevoke = JSON.parse(PRIVATE_PLAYBACK_REVOKE_200) as {
+    schema?: string;
+    state?: string;
+    grantId?: string;
+    runtimeId?: string;
+  };
+  const playbackGrant = JSON.parse(PRIVATE_PLAYBACK_GRANT_201) as {
+    schema?: string;
+    grantId?: string;
+    runtimeId?: string;
+    mimeType?: string;
+    timestampOrigin?: { kind?: string; offsetMs?: number };
+    mediaPath?: string;
+    source?: { sessionId?: string; bytes?: number; durationMs?: number };
+  };
+  assert.equal(decisionReceipts.schema, "studio.local-runtime-decision-receipts.v1");
+  assert.deepEqual(decisionReceipts.decisions, []);
+  assert.equal(decisionReceipts.runtimeId, status.runtimeId);
+  assert.equal(playbackRevoke.schema, "studio.private-playback-grant-revoked.v1");
+  assert.equal(playbackRevoke.state, "revoked");
+  assert.equal(playbackRevoke.runtimeId, status.runtimeId);
+  assert.ok(playbackRevoke.grantId?.startsWith("private-playback-grant:"));
+  assert.equal(playbackGrant.schema, "studio.private-playback-grant.v1");
+  assert.equal(playbackGrant.runtimeId, status.runtimeId);
+  assert.ok(playbackGrant.grantId?.startsWith("private-playback-grant:"));
+  assert.equal(playbackGrant.mimeType, "audio/mp4");
+  assert.equal(playbackGrant.timestampOrigin?.kind, "source_media_zero");
+  assert.equal(playbackGrant.timestampOrigin?.offsetMs, 0);
+  assert.equal(playbackGrant.source?.sessionId, START_REQUEST_EXAMPLE.sourceSessionId);
+  assert.equal(playbackGrant.source?.bytes, 329_662);
+  assert.equal(playbackGrant.source?.durationMs, 47_200);
+  assert.ok(playbackGrant.mediaPath?.startsWith("/v1/private-source-media/"));
+  assert.ok(!playbackGrant.mediaPath?.includes("cdn"), "grant mediaPath is not a CDN URL");
+  assert.equal(
+    playbackGrant.grantId,
+    playbackRevoke.grantId,
+    "Option B playback mint and revoke share one grantId",
+  );
+
+  const ownedPost = JSON.parse(OWNED_MEDIA_INGEST_POST_202) as {
+    schema?: string;
+    ingestId?: string;
+    status?: string;
+    source?: unknown;
+    failure?: unknown;
+  };
+  const ownedPut = JSON.parse(OWNED_MEDIA_INGEST_PUT_202) as {
+    schema?: string;
+    ingestId?: string;
+    status?: string;
+  };
+  const ownedGet = JSON.parse(OWNED_MEDIA_INGEST_GET_200) as {
+    schema?: string;
+    ingestId?: string;
+    status?: string;
+    source?: {
+      sourceKind?: string;
+      rightsScope?: string;
+      preflightSchema?: string;
+      detectedLanguageEvidenceAvailable?: boolean;
+    } | null;
+    failure?: unknown;
+  };
+  assert.equal(ownedPost.schema, "studio.owned-media-ingest.v1");
+  assert.equal(ownedPut.schema, "studio.owned-media-ingest.v1");
+  assert.equal(ownedGet.schema, "studio.owned-media-ingest.v1");
+  assert.equal(ownedPost.status, "queued");
+  assert.equal(ownedPut.status, "queued");
+  assert.equal(ownedGet.status, "registered");
+  assert.equal(ownedPost.source, null);
+  assert.equal(ownedPost.failure, null);
+  assert.equal(ownedGet.failure, null);
+  assert.equal(ownedPost.ingestId, ownedPut.ingestId);
+  assert.equal(ownedPost.ingestId, ownedGet.ingestId);
+  assert.ok(ownedPost.ingestId?.startsWith("owned-ingest:"));
+  assert.equal(ownedGet.source?.sourceKind, "owned_local");
+  assert.equal(ownedGet.source?.rightsScope, "local_processing");
+  assert.equal(ownedGet.source?.preflightSchema, "studio.preflight-bundle.v1");
+  assert.equal(ownedGet.source?.detectedLanguageEvidenceAvailable, false);
+  assert.notEqual(ownedGet.schema, "studio.youtube-local-ingest.v1");
+
+  const youtubeQueued = JSON.parse(YOUTUBE_INGEST_202) as { ingestId?: string };
+  assert.notEqual(ownedPost.ingestId, youtubeQueued.ingestId, "owned ingest must not reuse YouTube bodies");
+
+  const playbackGrantRequest = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
+    .find((endpoint) => endpoint.path === "/v1/runtimes/:runtimeId/private-playback-grants")
+    ?.panels.find((panel) => panel.kind === "request");
+  const playbackGrantResponse = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
+    .find((endpoint) => endpoint.path === "/v1/runtimes/:runtimeId/private-playback-grants")
+    ?.panels.find((panel) => panel.kind === "response");
+  const playbackRevokeRequest = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
+    .find((endpoint) => endpoint.path === "/v1/runtimes/:runtimeId/private-playback-grants/:grantId/revocations")
+    ?.panels.find((panel) => panel.kind === "request");
+  const ownedPostResponse = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
+    .find((endpoint) => endpoint.path === "/v1/owned-media-ingests")
+    ?.panels.find((panel) => panel.kind === "response");
+  const ownedPutResponse = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
+    .find((endpoint) => endpoint.path === "/v1/owned-media-ingests/:ingestId/media")
+    ?.panels.find((panel) => panel.kind === "response");
+  const ownedGetResponse = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
+    .find((endpoint) => endpoint.path === "/v1/owned-media-ingests/:ingestId")
+    ?.panels.find((panel) => panel.kind === "response");
+  assert.ok(playbackGrantRequest?.body.includes('Origin: $ORIGIN'), "grant mint curl requires Origin");
+  assert.ok(playbackRevokeRequest?.body.includes('Origin: $ORIGIN'), "grant revoke curl requires Origin");
+  assert.ok(playbackGrantResponse?.title.includes("Captured"), "grant mint response is Captured");
+  assert.ok(!playbackGrantResponse?.title.includes("Illustrative"), "grant mint is no longer Illustrative");
+  assert.ok(ownedPostResponse?.title.includes("Captured"), "owned POST response is Captured");
+  assert.ok(ownedPutResponse?.title.includes("Captured"), "owned PUT response is Captured");
+  assert.ok(ownedGetResponse?.title.includes("Captured"), "owned GET response is Captured");
+  assert.ok(ownedGetResponse?.title.includes("Registered"), "owned GET shows registered status");
+  assert.ok(!ownedPostResponse?.title.includes("Illustrative"), "owned POST is no longer Illustrative");
+
+  const privateMedia = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints).find(
+    (endpoint) => endpoint.path === "/v1/private-source-media/:grantId/:secret",
+  );
+  const privateMediaResponse = privateMedia?.panels.find((panel) => panel.kind === "response");
+  assert.equal(privateMedia?.responseSchema, null, "private media has no JSON response schema");
+  assert.ok(privateMediaResponse?.title.includes("Illustrative"), "private media status line is Illustrative");
+  assert.ok(privateMediaResponse?.body.includes("206"), "private media notes Range 206");
+  assert.ok(privateMediaResponse?.body.includes("grantId"), "private media notes grant-secret auth");
+  assert.ok(privateMediaResponse?.body.includes("403"), "private media notes Origin 403");
+  assert.ok(privateMediaResponse?.body.includes("410"), "private media notes revoked 410");
+  assert.ok(privateMediaResponse?.body.includes("Not a CDN"), "private media denies CDN");
+  assert.equal(privateMediaResponse?.body, PRIVATE_MEDIA_STATUS_LINE);
+  assert.ok(
+    privateMedia?.summary.includes("Origin required"),
+    "private media summary requires Origin",
+  );
+
+  const languageEmpty = JSON.parse(LANGUAGE_EXPLANATIONS_200) as {
+    schema?: string;
+    attempts?: unknown[];
+    results?: unknown[];
+    runtimeId?: string;
+  };
+  const language201 = JSON.parse(LANGUAGE_EXPLANATIONS_201) as {
+    schema?: string;
+    attempts?: Array<{ status?: string; failure?: unknown }>;
+    results?: Array<{
+      verification?: {
+        integrity?: string;
+        executor?: { classification?: string; model?: string; id?: string };
+        result?: { status?: string; availableFacetCount?: number };
+      };
+      artifact?: { rights?: { publication?: string } };
+    }>;
+    runtimeId?: string;
+  };
+  assert.equal(languageEmpty.schema, "studio.local-runtime-language-explanations.v1");
+  assert.deepEqual(languageEmpty.attempts, []);
+  assert.deepEqual(languageEmpty.results, []);
+  assert.equal(languageEmpty.runtimeId, status.runtimeId);
+  assert.equal(language201.schema, "studio.local-runtime-language-explanations.v1");
+  assert.equal(language201.runtimeId, status.runtimeId);
+  assert.equal(language201.attempts?.length, 1);
+  assert.equal(language201.results?.length, 1);
+  assert.equal(language201.attempts?.[0]?.status, "completed");
+  assert.equal(language201.attempts?.[0]?.failure, null);
+  assert.equal(
+    language201.results?.[0]?.verification?.integrity,
+    "stored_explanation_and_receipt_with_verified_current_caption",
+  );
+  assert.equal(language201.results?.[0]?.verification?.executor?.classification, "real_model");
+  assert.equal(language201.results?.[0]?.verification?.executor?.model, "gpt-4o-mini");
+  assert.equal(
+    language201.results?.[0]?.verification?.executor?.id,
+    "studio.openai-language-explanation-generator",
+  );
+  assert.equal(language201.results?.[0]?.verification?.result?.status, "completed");
+  assert.equal(language201.results?.[0]?.verification?.result?.availableFacetCount, 2);
+  assert.equal(language201.results?.[0]?.artifact?.rights?.publication, "private");
+  assert.equal(LANGUAGE_REQUEST_EXAMPLE.lineId, "deterministic-current-run-line-001");
+  assert.deepEqual(LANGUAGE_REQUEST_EXAMPLE.facetKinds, ["meaning", "word"]);
+  assert.equal(LANGUAGE_REQUEST_EXAMPLE.selection.text, "테스");
+
+  const languagePanels = API_ENDPOINT_GROUPS.flatMap((group) => group.endpoints)
+    .find((endpoint) => endpoint.path === "/v1/runtimes/:runtimeId/language-explanations")
+    ?.panels ?? [];
+  assert.ok(languagePanels.some((panel) => panel.title.includes("Honest Empty")));
+  assert.ok(languagePanels.some((panel) => panel.title.includes("Opt-In OpenAI")));
+  assert.ok(languagePanels.some((panel) => panel.title.includes("gpt-4o-mini")));
+  assert.ok(languagePanels.some((panel) => panel.kind === "request" && panel.title.includes("Create")));
 });
 
 test("every reference page has a unique slug and every endpoint group has a page", () => {

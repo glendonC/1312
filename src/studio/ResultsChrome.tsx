@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+// Direct import so Vite invalidates chrome edits without the Studio route barrel.
+import "../styles/studio/results.chrome.css";
 import RecordedEvidence from "./evidence/RecordedEvidence";
 import { clock } from "./format";
 import { Chevron, Coverage, Info } from "./glyphs";

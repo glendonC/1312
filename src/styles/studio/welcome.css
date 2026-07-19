@@ -54,10 +54,6 @@
   position: relative;
 }
 
-.welcome-orchestrator-core .agent-mark {
-  display: block;
-}
-
 .welcome-guide-copy {
   position: absolute;
   top: 130px;

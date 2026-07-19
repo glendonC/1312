@@ -309,12 +309,6 @@
   height: 82px;
 }
 
-.agent-node .agent-mark,
-.hub .agent-mark {
-  width: 100%;
-  height: 100%;
-}
-
 .agent-node[data-on="true"] .agent-mark,
 .hub[data-on="true"] .agent-mark,
 .agent-node:focus-visible .agent-mark,

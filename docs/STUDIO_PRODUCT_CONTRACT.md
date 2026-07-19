@@ -1,7 +1,10 @@
 # Studio Product Contract
 
-Status: shared UI/runtime contract and implementation inventory
-Last updated: 2026-07-18
+- Document type: UI/runtime contract
+- Lifecycle: Active
+- Authority: Studio meaning, authority, actions, evidence classes, and unavailable states
+- Last verified: 2026-07-19
+- Update when: A Studio surface or authority boundary changes
 
 ## Purpose
 

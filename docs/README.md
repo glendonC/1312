@@ -3,7 +3,7 @@
 - Document type: Living registry
 - Lifecycle: Active
 - Authority: Public document ownership, lifecycle, and routing
-- Last verified: 2026-07-17
+- Last verified: 2026-07-19
 - Update when: A public owner document is added, removed, renamed, or changes responsibility
 
 Use this page to find the document that owns a question. Use

@@ -1,6 +1,13 @@
 # Codex and GPT-5.6
 
-How 1321 uses Codex and GPT-5.6 in the product runtime (not only as an IDE assistant).
+- Document type: Product executor runbook
+- Lifecycle: Active
+- Authority: Closed product-launched Codex roles, invocation, tools, and operator proof
+- Last verified: 2026-07-19
+- Update when: The product executor cage or run procedure changes
+
+How 1321 uses Codex and GPT-5.6 in the product runtime (not only as an IDE assistant). Repository
+IDE and CLI agent operations live in [`AGENTS.md`](../AGENTS.md); do not merge those roles.
 
 ## Role
 
@@ -9,7 +16,9 @@ Codex is the production agent executor. The host launches `codex exec` for:
 - a **root orchestrator** that spawns work, waits on children, and synthesizes study under a closed tool list
 - **workers** that only see tools matching live grants for their task
 
-The model string is explicit (`--model` / `STUDIO_OWNED_SWARM_MODEL`). It is not taken from ambient Codex user config. Build Week configures that model as **GPT-5.6** for orchestrator and worker language work.
+The model string is explicit (`--model` / `STUDIO_OWNED_SWARM_MODEL`). It is not taken from ambient
+Codex user config. The configured product model for orchestrator and worker language work is
+**GPT-5.6**.
 
 ## Closed invocation
 

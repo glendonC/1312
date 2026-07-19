@@ -1,8 +1,15 @@
 # Studio Autonomous Media Runtime
 
-Status: deep implementation/reference ledger for the Studio, media runtime, and development lab;
-current Build Week status and roadmap live in [`docs/build-week/STATUS.md`](./build-week/STATUS.md)
-Last updated: 2026-07-16
+- Document type: Deep design ledger
+- Lifecycle: Active
+- Authority: Durable runtime decisions and dated implementation context
+- Last verified: 2026-07-19
+- Update when: A durable decision changes or the ledger is retired
+
+This ledger preserves decisions and historical implementation context. It is not current status.
+Current engineering status and roadmap live in
+[`docs/build-week/STATUS.md`](./build-week/STATUS.md). Dated campaign narrative inside this file is
+historical context unless a section is explicitly marked as a standing decision.
 
 ## Purpose
 

@@ -1,12 +1,19 @@
 # 1321
 
+- Document type: Product identity
+- Lifecycle: Active
+- Authority: Category, product loop, beachhead, and proof boundary
+- Last verified: 2026-07-19
+- Update when: Product identity or proof boundary changes
+
 **Codename:** 1321 (Build Week Jul 13–21, 2026)  
 **Category:** Language intelligence for real-world media  
 **Beachhead:** Korean → English on YouTube / clips (first proof case, not the product boundary)
 
 Human-facing voice is owned by the homepage hero, `/method/`, and the Journey manifesto
 [`src/content/journey/2026-07-13-why-1321.md`](../src/content/journey/2026-07-13-why-1321.md).
-Runtime status and contracts live in the Build Week and runtime docs.
+Current engineering status lives in [`build-week/STATUS.md`](./build-week/STATUS.md). Runtime
+contracts live in [`RUNTIME_CONTRACTS.md`](./RUNTIME_CONTRACTS.md).
 
 ---
 

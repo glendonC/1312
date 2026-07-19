@@ -1,13 +1,17 @@
 # Capability ladder: media understanding
 
-Status: living **post–Build Week / post-UI-freeze** capability plan
-Last updated: 2026-07-18
+- Document type: Capability plan
+- Lifecycle: Active
+- Authority: Rung order, dependencies, done-when, and capability non-claims
+- Last verified: 2026-07-19
+- Update when: A rung is accepted, implemented, blocked, or reordered
 
-This document owns the next media-understanding plan. It does not replace the living Build Week
-status in [`STATUS.md`](./STATUS.md), reopen owned-path v2, or define UI work. The completed v2 spine
-is a dependency: bounded orchestration → current-run semantic evidence → coverage-aware report
-admission → gap-directed study planning/synthesis/readiness → study-causal private captions and
-structural QC.
+This document owns the media-understanding capability sequence and the stable rung IDs (`U1`…
+`U7`, `U6.1`, `U7.1`, `R1`, `R2`, `G1`, and related slice labels). Outside this file, first use of a
+rung ID must link here or include a short plain-language gloss. It does not replace living status in
+[`STATUS.md`](./STATUS.md), reopen owned-path v2, or define UI work. The completed v2 spine is a
+dependency: bounded orchestration → current-run semantic evidence → coverage-aware report admission
+→ gap-directed study planning/synthesis/readiness → study-causal private captions and structural QC.
 
 The product is **language intelligence / media understanding**, not a caption product. See
 [`PRODUCT.md`](../PRODUCT.md). Captions and timed KO/EN text are downstream artifacts that may be

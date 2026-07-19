@@ -1,18 +1,21 @@
-# RFC 0001 — The Miss-to-Gold Conveyor
+# RFC 0001: The Miss-to-Gold Conveyor
 
-Status: **frozen baseline and ablation packaging foundation implemented** (updated 2026-07-18). The conveyor
-contracts and guards below are code. `hard-ko-v1` is frozen with three clips and six human
-adjudication receipts. run-007 has one post-freeze capture, human output labels, and a re-derived
-score receipt with `judge: null`. `studio.bench.ablation.v1` now pre-registers one exact
-content-addressed configuration delta against current frozen pack and freeze bytes, keeps results
-null, requires at least three paired repetitions per clip, and separates structural diagnostics
-from human semantic scoring. The first registration plans raw audio versus eligible anonymous U7
-stems. Its exact frozen-clip source registry and cold-audit-first capture packager are implemented,
-but it contains no captures or result claim. The public aggregate is still a protocol draft.
-Scope: `bench/` contracts, `scripts/` producers, `docs/`. No contact with `src/studio/preflight/*`
-(language-detection workstream), `src/features/*`, or `src/pages/*` (UI workstream).
-Deliverable of: the 1321 technical north-star review (six repo evidence readers, seven bet
-champions, three judges, three adversarial skeptics; judges voted 3–0 for this bet).
+- Document type: Decision record
+- Lifecycle: Accepted
+- Authority: Miss routing, gold isolation, scoring invariants, and rationale
+- Last verified: 2026-07-19
+- Update when: The decision or its invariants change
+
+This RFC owns conveyor invariants and rationale. It does not own current pack counts, score counts,
+or runtime status. Current evaluation facts live in `bench/packs/`, `bench/scores/`, their bound
+receipts, and the summary in [`bench/README.md`](../../bench/README.md). Rung labels such as U7
+(conditional separation) are defined in
+[`../build-week/CAPABILITY_LADDER.md`](../build-week/CAPABILITY_LADDER.md).
+
+Historical acceptance context: the conveyor contracts and guards below are implemented in code. The
+first ablation registration plans raw audio versus eligible anonymous separation stems. Scope for
+this decision remains `bench/` contracts, `scripts/` producers, and `docs/`. It does not own
+`src/studio/preflight/*`, `src/features/*`, or `src/pages/*`.
 
 ## One line
 

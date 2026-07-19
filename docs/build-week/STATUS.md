@@ -1,23 +1,27 @@
 # Build Week status
 
-Last updated: 2026-07-18
+- Document type: Living status
+- Lifecycle: Active
+- Authority: Current milestones, blockers, active work, and next actions
+- Last verified: 2026-07-19
+- Update when: Engineering state changes
 
 ## Document roles
 
-This is the **only living Build Week status and roadmap**. Completed owned-swarm planning checklists
-have been consolidated into the completion record below; Git retains their detailed history. The
-product and architecture documents define stable intent and boundaries, the autonomy and contract
-documents are deep references, and the miss-to-gold RFC owns the separate evaluation conveyor.
-The post–Build Week media-understanding, research, and later-learning plan lives in
-[`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md); it depends on the closed owned-path v2 spine and does
-not reopen that campaign.
+This is the **only living engineering status and roadmap**. Completed owned-swarm planning
+checklists have been consolidated into the completion record below; Git retains their detailed
+history. Product identity and architecture define stable intent and boundaries. Autonomy and
+contract documents are deep references. The miss-to-gold RFC owns conveyor invariants, not pack
+counts. The media-understanding capability sequence lives in
+[`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md); rung IDs such as U1 through U7 are defined there.
+This file summarizes acceptance and blockers; it does not reopen the closed owned-path v2 campaign.
 
 ## North stars
 
 Product identity is defined in [`PRODUCT.md`](../PRODUCT.md) and the public site. This file tracks
 engineering status only.
 
-North stars for engineering tracks this week:
+North stars for the active engineering tracks:
 
 - **Evaluation — Bet G / miss-to-gold:** turn run misses into agent-drafted, human-adjudicated,
   receipt-frozen gold, then score and compare against that fixed evidence. This measures beachhead

@@ -1,7 +1,21 @@
-# Bounded runtime contract proposal
+# Runtime contracts
 
-Status: production-inert typed proposal with exact development fixtures. A separate production
-runtime protocol now exists; these fixture shapes remain disconnected.
+- Document type: Mixed contract reference
+- Lifecycle: Active
+- Authority: Production runtime contracts plus explicitly inert fixture history
+- Last verified: 2026-07-19
+- Update when: A runtime contract changes, or fixture history is split out
+
+This file mixes two authorities until fixture history is split:
+
+1. **Historical snapshot (below):** production-inert typed proposal fixtures.
+2. **Active production contracts:** `src/studio/runtime/production/` protocol and receipts.
+
+Capability rung IDs (`U1`…`U7`, including slice labels such as `U6.1` and `U7.1`) are defined in
+[`build-week/CAPABILITY_LADDER.md`](./build-week/CAPABILITY_LADDER.md). First use in a section should
+gloss or link there. Current roadmap state lives in [`build-week/STATUS.md`](./build-week/STATUS.md).
+
+## Historical snapshot: bounded runtime contract proposal
 
 These original proposal contracts predate the production implementation and remain deliberately
 inert. Consequently these contracts:

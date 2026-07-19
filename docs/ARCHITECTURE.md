@@ -1,30 +1,36 @@
-# Architecture (verified direction — UI-first week)
+# Architecture
 
-Status: stable architecture reference; current Build Week status and roadmap live in
-[`docs/build-week/STATUS.md`](./build-week/STATUS.md).
-Last updated: 2026-07-16
+- Document type: Architecture reference
+- Lifecycle: Stable
+- Authority: Module boundaries, dependency direction, and durable system shape
+- Last verified: 2026-07-19
+- Update when: A stable boundary changes
+
+Current engineering status and roadmap live in
+[`docs/build-week/STATUS.md`](./build-week/STATUS.md). Product identity lives in
+[`PRODUCT.md`](./PRODUCT.md). This file does not own roadmap state.
 
 ## Goals
 
 - Maximize **Codex / GPT-5.6** (computer use, multi-agent, measurable loop).
-- Ship a **complete product experience** for media understanding (ingest → swarm UI → investigated
-  study → reusable Apply outputs → beachhead scores). Captions/timed KO·EN are one Apply branch,
-  not the product category — see [`PRODUCT.md`](./PRODUCT.md).
-- Keep long-term path open for fine-tune + better ASR **without** throwing away schemas.
+- Ship a **complete product experience** for media understanding (ingest to swarm UI to investigated
+  study to reusable Apply outputs to beachhead scores). Captions and timed KO/EN are one Apply
+  branch, not the product category; see [`PRODUCT.md`](./PRODUCT.md).
+- Keep the long-term path open for fine-tune and better ASR without throwing away schemas.
 
-## Recommended stack (UI now → agents next)
+## Recommended stack
 
 | Layer | Choice | Why |
 |-------|--------|-----|
-| Marketing + Studio UI | **Astro static** + light CSS (this repo) | Fast, matches Sori site pattern |
+| Marketing + Studio UI | **Astro static** + light CSS (this repo) | Fast static site with an isolated Studio app |
 | Studio interactivity | **React island** inside the static Astro route | Event-sourced product state without turning the public site into an SPA |
-| Agent runtime | **Codex app / `codex exec`** + orchestrator scripts (Yolodex-like skills) | Contest-native; parallel worktrees/workspaces |
+| Agent runtime | **Codex `codex exec`** behind a closed host cage | Product-launched executor; see [`CODEX.md`](./CODEX.md) |
 | Media ingest | Source adapter → rights receipt → content-addressed workspace media | YouTube and owned/local producers exist; hosted upload remains unimplemented |
 | ASR (v1) | Whisper-family or cloud ASR behind a seam | Swappable; not the brand |
 | Translation / repair | GPT-5.6 specialists + QC gates | Model does language work; code enforces honesty |
 | Persistence | Local workspace folders + **JSON/SQLite** | Accountless compounding on one machine |
-| Eval | Fixed clips + `score.json` | Yolodex-style iterate-until-target |
-| Hosting demo | Vercel / Cloudflare Pages / `*.pages.dev` | Skip expensive `1321.ai` for now |
+| Eval | Fixed clips + content-addressed scores in `bench/` | Executable evidence over prose counts |
+| Public hosting | Static host such as Vercel / Cloudflare Pages | Apex domain optional; not a product dependency |
 
 ## Frontend boundaries
 
@@ -252,8 +258,8 @@ speech or meaning. A seek does not drive a UI playhead. The evidence bridge may 
 from a pinned producer receipt that intersect the task window, clipped to that window; empty, unavailable, unknown, withheld, and truncated are not
 converted into new claims.
 The default deterministic run-005 proof executes one seek, two evidence reads, one assessment, one
-decision over the audited assessment, one host-produced queued publish-review intake, and—only
-after explicit approval—one separately requested caption job.
+decision over the audited assessment, one host-produced queued publish-review intake, and, only
+after explicit approval, one separately requested caption job.
 The queued intake can then receive one explicit local human approve/reject receipt and an approval
 can receive one revocation receipt. Browser-ingested V1 has no evidence-read, assessment, decision,
 intake, review, or caption lineage and projects those regions as unavailable/empty. `queued` remains
@@ -281,7 +287,7 @@ Orchestrator (1)
 - **Not** all-to-all debate.
 - User can open a worker **during/after** to see seeks, drafts, corrections, handoff.
 
-## Artifacts (learning export — not MD-as-brain)
+## Artifacts (learning export, not MD-as-brain)
 
 Per run:
 

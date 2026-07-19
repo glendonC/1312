@@ -1,0 +1,104 @@
+{
+  "freeze_id": "bench-freeze:sha256:f98122007a2f09d7d2de0cd893c9d8b83a63f91e60d4880edef8fb9ad715a508",
+  "schema": "studio.bench.freeze.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "frozen_at": "2026-07-19T20:19:34.015Z",
+  "protocol": {
+    "minimum_reviewers": 2,
+    "blinded_review": true,
+    "adjudication_required": true
+  },
+  "clips": [
+    {
+      "clip_id": "Ni5rBtowdnI",
+      "role": "control",
+      "source_url": "https://www.youtube.com/watch?v=Ni5rBtowdnI",
+      "gold": {
+        "path": "bench/packs/hard-ko-provider-authorized-v1/Ni5rBtowdnI.gold.json",
+        "content_id": "sha256:bb892107fb870f85ca91f42ed4dab1c5fa07ff5a3c9b5d30ebe2ec2adda69986",
+        "bytes": 5599
+      },
+      "candidates_manifest": null,
+      "adjudications": [
+        {
+          "path": "bench/reviews/Ni5rBtowdnI.437f32a573feb86d623dea7dba49071cd149943ef13b1d9025e0c28e679e1a38.review.json",
+          "content_id": "sha256:fb8742e33cbd76b1d25b059d231dac5b727311dad7ba0a7eef3f808b248c4ee5",
+          "bytes": 1308,
+          "review_id": "bench-review:sha256:437f32a573feb86d623dea7dba49071cd149943ef13b1d9025e0c28e679e1a38",
+          "reviewer_name": "Bench Reviewer A",
+          "reviewer_git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+        },
+        {
+          "path": "bench/reviews/Ni5rBtowdnI.96e9aae62e99d5912081e84e7a815380300d10f2aafb56f7d6dfd6bd5a0821c7.review.json",
+          "content_id": "sha256:2dd79089bb94201357d5678088b7ad6f472198fd1b3b43275ed58972447c448d",
+          "bytes": 1320,
+          "review_id": "bench-review:sha256:96e9aae62e99d5912081e84e7a815380300d10f2aafb56f7d6dfd6bd5a0821c7",
+          "reviewer_name": "Bench Reviewer B",
+          "reviewer_git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+        }
+      ]
+    },
+    {
+      "clip_id": "2o0f-V4uoMg",
+      "role": "control",
+      "source_url": "https://www.youtube.com/watch?v=2o0f-V4uoMg",
+      "gold": {
+        "path": "bench/packs/hard-ko-provider-authorized-v1/2o0f-V4uoMg.gold.json",
+        "content_id": "sha256:e0047f26c88abef626f790552f37b0e9453b08836aa4c53a019c3eab7c098d1f",
+        "bytes": 7480
+      },
+      "candidates_manifest": null,
+      "adjudications": [
+        {
+          "path": "bench/reviews/2o0f-V4uoMg.0b01d4fea92177a2a8a2ecc9e74adcd5a1d4e12b8a2692fe435313c8b07b6962.review.json",
+          "content_id": "sha256:8f61f67f5ae8c134acc9542c46bde01cd0e323b0b24e341b7808ec6e08d866b6",
+          "bytes": 1527,
+          "review_id": "bench-review:sha256:0b01d4fea92177a2a8a2ecc9e74adcd5a1d4e12b8a2692fe435313c8b07b6962",
+          "reviewer_name": "Bench Reviewer B",
+          "reviewer_git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+        },
+        {
+          "path": "bench/reviews/2o0f-V4uoMg.37472343fb46a0d04c48cd5bcc4019e17f57969204de0a2587aadb944f5957da.review.json",
+          "content_id": "sha256:421368b2d90015eb42a11bed1c8f29d2c50a04a660e21c7cba597ff4efc42802",
+          "bytes": 1515,
+          "review_id": "bench-review:sha256:37472343fb46a0d04c48cd5bcc4019e17f57969204de0a2587aadb944f5957da",
+          "reviewer_name": "Bench Reviewer A",
+          "reviewer_git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+        }
+      ]
+    },
+    {
+      "clip_id": "Ux-TMWnmntM",
+      "role": "hard",
+      "source_url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+      "gold": {
+        "path": "bench/packs/hard-ko-provider-authorized-v1/Ux-TMWnmntM.gold.json",
+        "content_id": "sha256:ff17cd6db4ddd9d4ffbb4b27108223c0f37559f2e8ee79e0ef0ee247e642036f",
+        "bytes": 10768
+      },
+      "candidates_manifest": {
+        "path": "bench/candidates/run-006/candidates.json",
+        "content_id": "sha256:c4e6fa69698ece83ed3a75943f159286462f1bea60614b247a7cef2221124dce",
+        "bytes": 12970
+      },
+      "adjudications": [
+        {
+          "path": "bench/reviews/Ux-TMWnmntM.a66e3c7c1307583a5fdcbe9d130d15093b47bd53cf791cf30a1e097d29889b82.review.json",
+          "content_id": "sha256:1d7f0f8543ef7cd5beac816b687a505c0e8f236bfd4ea0cf2e5d6849976e8620",
+          "bytes": 2241,
+          "review_id": "bench-review:sha256:a66e3c7c1307583a5fdcbe9d130d15093b47bd53cf791cf30a1e097d29889b82",
+          "reviewer_name": "Bench Reviewer A",
+          "reviewer_git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+        },
+        {
+          "path": "bench/reviews/Ux-TMWnmntM.c612293e7cd4df79e53645dbcdbf281a6ffaf693644a20f4a1b01922d61d5d5c.review.json",
+          "content_id": "sha256:787753a319e0cc7e158af4d3b7e1d703e0279bdcadcc0edfbb4fbda268168deb",
+          "bytes": 2253,
+          "review_id": "bench-review:sha256:c612293e7cd4df79e53645dbcdbf281a6ffaf693644a20f4a1b01922d61d5d5c",
+          "reviewer_name": "Bench Reviewer B",
+          "reviewer_git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+        }
+      ]
+    }
+  ]
+}

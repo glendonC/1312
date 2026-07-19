@@ -2,13 +2,13 @@
   "schema": "studio.bench.pack.v1",
   "pack_id": "hard-ko-provider-authorized-v1",
   "label": "Hard-KO Provider-Authorized Clip Pack v1",
-  "frozen": false,
+  "frozen": true,
   "target_clip_count": 3,
   "clips": [
     {
       "slot": "slot-control-01",
       "role": "control",
-      "status": "gold_ready",
+      "status": "frozen",
       "clip_id": "Ni5rBtowdnI",
       "source": {
         "kind": "youtube",
@@ -36,7 +36,7 @@
     {
       "slot": "slot-control-02",
       "role": "control",
-      "status": "gold_ready",
+      "status": "frozen",
       "clip_id": "2o0f-V4uoMg",
       "source": {
         "kind": "youtube",
@@ -64,7 +64,7 @@
     {
       "slot": "slot-hard-01",
       "role": "hard",
-      "status": "gold_ready",
+      "status": "frozen",
       "clip_id": "Ux-TMWnmntM",
       "source": {
         "kind": "youtube",
@@ -90,5 +90,5 @@
       "candidates_manifest": "bench/candidates/run-006/candidates.json"
     }
   ],
-  "freeze_receipt": null
+  "freeze_receipt": "freeze.json"
 }

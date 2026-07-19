@@ -1,12 +1,13 @@
-# Korean kinship address context campaign draft
+# Korean kinship address context registered campaign
 
-Status: draft only. This directory contains no registered campaign, capture, human label, score,
-qualification, promotion, or product runtime authority.
+Status: result-free registration and both qualification-only certified releases exist. This
+campaign has no capture, human label, score, qualification, promotion, product runtime authority,
+or measured product improvement.
 
 The candidate rule says that bare Korean address forms such as `누나`, `오빠`, `형`, and `언니`
 do not by themselves prove a family relationship. Explicit context such as `친누나` or `매형`
-can support a kinship translation. The draft originates from training-routed `run-005` and is
-evaluated only on frozen `hard-ko-v1` clips.
+can support a kinship translation. The candidate originates from training-routed `run-005` and is
+registered only on frozen `hard-ko-v1` clips.
 
 The closed draft grid has three clips, three repetitions, and two conditions. It plans exactly 18
 `whisper-1` audio translation calls over 606.078 media seconds, but it is not live-ready. The two
@@ -18,35 +19,29 @@ Wall time and spend remain unset. Before any live authorization, replace this pa
 bound campaign against a separately frozen provider-authorized pack. The current adapter accepts
 only the exact Creative Commons source contract. A future owned-media path would need a typed,
 content-bound provider-egress authority contract before it could pass this gate. Do not mutate
-`hard-ko-v1` or reinterpret its existing rights receipts. The provider executor receipt is bound in
-`campaign-draft.json`, but no certified release can exist before registration.
+`hard-ko-v1` or reinterpret its existing rights receipts. The result-free registration and its
+certified releases do not override those media rights or authorize provider capture.
 
-## Human proposal and registration gate
+## Registered, result-free state
 
-1. Review `proposal-draft.json` as a proposal, not as accepted memory.
-2. If a human approves its exact bytes for result-free registration, run
-   `scripts/approve-rule-change-campaign.mjs` with the proposal-draft path, human name, Git identity,
-   and review notes after the proposal creation time. The approver must differ from the agent
-   drafter. The content-addressed receipt always records `live_capture_authorized: false`.
-3. Create the byte-identical canonical proposal at the `canonical_proposal_path` recorded in
-   `campaign-draft.json` through the memory review flow, then run `npm run memory:check`.
-4. Materialize `registration.json` from `registration-input.json` with the approval path printed by
-   step 2:
+The canonical proposal exists at the path bound by `registration.json` and matches the approved
+draft bytes. The exact-byte campaign approval is
+`bench/reviews/rule-change-campaign/26947adc9c71e9ae4965f46a309438ec48be5b360349a451e1d66abf28c72ace.json`.
+It records `live_capture_authorized: false`.
 
-   ```sh
-   node scripts/register-rule-change.mjs \
-     --draft bench/rule-changes/ko-kinship-address-context/registration-input.json \
-     --out bench/rule-changes/ko-kinship-address-context/registration.json \
-     --campaign-approval bench/reviews/rule-change-campaign/<approval-digest>.json
-   ```
+The registration id is
+`bench-rule-change-registration:sha256:8ca90db19a68f84a0f409323d0de12fa9a888dd9fa6d84fd9ca5a695dbea430d`,
+with `results: null`. Its qualification-only releases are:
 
-5. Run `npm run bench:check`, then commit the result-free registration before any capture.
-6. Certify both `without` and `with` releases from that committed registration.
+- `without`: `bench/releases/8297d53d12e17aeb236c9659e6f4d056a57088894dcff174cd3414d8f6538ac1.json`
+- `with`: `bench/releases/d0e2ba9114029d5fcbdfb2df66e79dfde1f4c84c525d8731e9da4df89ab169f1.json`
 
-Do not copy the proposal draft into reviewed memory or create a registration without the human
-decision. The receipt records a declared human name and Git identity; it does not authenticate that
-identity, so the operator still owns the decision. Registration does not authorize live provider
-spend.
+Both releases record `runtime_deployable: false`. The bound provider executor remains
+`bench-capture-executor:sha256:ad94989baaab7e4ac0a40ab4aec0f81602a2530b35f035c09efc8174a5e395bd`.
+Before any capture, preserve the required immutable Git chronology for the registration, releases,
+executor, and attempt receipts. Registration does not authorize live provider spend. The approval
+receipt records a declared human name and Git identity but does not authenticate that identity, so
+the operator still owns the decision.
 
 ## Live capture gate
 

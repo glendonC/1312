@@ -73,6 +73,20 @@ score.
   non-retryable; real OpenAI execution requires an explicit operator-selected model and flag.
   Facets remain semantically `not_reviewed`, and follow-up, listening/culture/reference producers,
   learner persistence, grading, SRS, and export are not included.
+- **Learning fine-tune prep spine:** a second private post-caption Apply producer accepts one exact
+  verified caption identity plus a typed `studio.learning-fine-tune.v1` value (armed lenses
+  `word_order`, `grammar_salience`, `situating`, `culture_reference`, and `historical_reference`,
+  plus one closed temperature) and stores immutable `studio.learning-prep.artifact.v1` and
+  `studio.learning-prep.receipt.v1` lineage with grant, journal events, projection, cold audit,
+  authenticated GET/POST, bounded retries, and explicit interrupted-attempt recovery. Segmentation
+  is a host-validated beat partition or an explicit watch-through reason; per-moment candidates
+  anchor exact caption lines and abstain with closed reasons; temperature only caps surfaced
+  available candidates and never coerces availability. Available notes stay `not_reviewed`
+  caption-context inference with empty external citations, so culture or history availability is a
+  receipted note, not verified culture truth. The default executor is unavailable and no real or
+  test executor is CLI-reachable; deterministic coverage lives in
+  `tests/studio-learning-prep.test.ts`. No Studio UI, overlay projection, strict client parser,
+  learner persistence, export, or Learning OS surface is included.
 - **Bet G first scored capture:** `hard-ko-v1` is frozen and the human-labeled run-007 score receipt
   exists with `judge: null`. It is one benchmark data point, not production semantic QC, calibration,
   or a general quality/improvement claim.
@@ -91,12 +105,13 @@ score.
   and provider-media authority before charging, and keeps injected transports test-only.
   Owned-local rule-change registration V2 binds exact training media only when ownership authorizes
   redistribution and requires a human approval receipt for the exact proposal bytes. That receipt
-  never authorizes live capture. The result-free Korean kinship-address campaign draft binds
-  `run-005`, frozen `hard-ko-v1`, the certified provider executor, the sole rule-content delta, and
-  all 18 planned calls. It is not registered because the behavioral rule is only a draft pending
-  human review. The two local-evaluation controls also block provider egress for 12 planned calls,
-  so this frozen grid is not live-ready. No live provider call, capture, label, score, qualification,
-  accepted memory, runtime deployment, or product improvement result exists.
+  never authorizes live capture. The result-free Korean kinship-address registration binds
+  `run-005`, frozen `hard-ko-v1`, the exact-byte human-approved proposal, the certified provider
+  executor, the sole rule-content delta, and all 18 planned calls. Both qualification-only releases
+  exist and record `runtime_deployable: false`. The two local-evaluation controls still block
+  provider egress for 12 planned calls, so this frozen grid is not live-ready and its six Creative
+  Commons calls cannot run as a partial qualification grid. No live provider call, capture, label,
+  score, qualification, accepted memory, runtime deployment, or product improvement result exists.
 
 Rung IDs below (`U1`…`U7`, including slice labels such as `U6.1` and `U7.1`) are defined in
 [`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md). This section records acceptance state; done-when

@@ -377,3 +377,386 @@
   font-size: 0.78rem;
   line-height: 1.5;
 }
+
+/* ---------- Results: the in-player control surface ---------- */
+
+/*
+ * On the Results surface the recorded clip plays in a squircle frame with a familiar, YouTube-style
+ * control surface ON the video: a full-width progress bar and one control row (play, volume, time on
+ * the left; speed and the viewing modes on the right). The layer is revealed on hover and on keyboard
+ * focus, and stays shown while paused and on touch, so it is never hover-only. The workbench surface
+ * is untouched: it carries no [data-overlay-controls].
+ */
+.player[data-overlay-controls] {
+  gap: 0;
+}
+
+.player[data-overlay-controls] .screen {
+  border-radius: 18px;
+  corner-shape: squircle;
+}
+
+.result-viewer[data-view-mode="fullscreen"] .player[data-overlay-controls] .screen {
+  border-radius: 0;
+}
+
+/* An always-on provenance bug: recorded stays legible in every mode, not only inside a panel. */
+.player-provenance {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 3;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(8, 18, 16, 0.5);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.player-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 12px 8px;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(8, 18, 16, 0) 52%, rgba(8, 18, 16, 0.68) 100%);
+  transition: opacity 180ms ease;
+}
+
+.player[data-overlay-controls]:hover .player-controls,
+.player[data-overlay-controls]:focus-within .player-controls,
+.player[data-overlay-controls][data-playing="false"] .player-controls {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .player[data-overlay-controls] .player-controls {
+    opacity: 1;
+  }
+}
+
+/* When the controls show, the burned caption lifts clear of them, then drops back during playback. */
+.player[data-overlay-controls] .burn {
+  transition:
+    bottom 180ms ease,
+    opacity 220ms ease;
+}
+
+.player[data-overlay-controls]:hover .burn,
+.player[data-overlay-controls]:focus-within .burn,
+.player[data-overlay-controls][data-playing="false"] .burn {
+  bottom: 78px;
+}
+
+@media (hover: none) {
+  .player[data-overlay-controls] .burn {
+    bottom: 78px;
+  }
+}
+
+/* The bar itself never blocks the frame; only the widgets inside capture clicks, so the video stays
+   click-to-pause between controls. */
+.pbar-wrap {
+  pointer-events: none;
+}
+
+.pbar,
+.pctl-left,
+.pctl-right,
+.pbtn,
+.pspeed,
+.player-modes,
+.player-modes-layout,
+.player-fullscreen,
+.pvol,
+.pvol-slider {
+  pointer-events: auto;
+}
+
+/* ---- progress bar ---- */
+.pbar {
+  position: relative;
+  display: flex;
+  height: 18px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.pbar-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  transition: height 120ms ease;
+}
+
+.pbar:hover .pbar-track,
+.pbar:focus-within .pbar-track {
+  height: 6px;
+}
+
+.pbar-regions {
+  position: absolute;
+  inset: 0;
+}
+
+.pbar-region {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.pbar-region[data-kind="music"] {
+  background: rgba(184, 150, 63, 0.55);
+}
+
+.pbar-region[data-kind="silence"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(255, 255, 255, 0.22) 3px,
+    rgba(255, 255, 255, 0.22) 4px
+  );
+}
+
+.pbar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 999px;
+  background: var(--accent, #2f746e);
+}
+
+.pbar-knob {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  margin-left: -6.5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translateY(-50%) scale(0);
+  transition: transform 120ms ease;
+}
+
+.pbar:hover .pbar-knob,
+.pbar:focus-within .pbar-knob {
+  transform: translateY(-50%) scale(1);
+}
+
+.pbar-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.pbar:has(.pbar-input:focus-visible) .pbar-track {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* ---- control row ---- */
+.pctl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 1px;
+}
+
+.pctl-left,
+.pctl-right {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.pctl-right {
+  gap: 8px;
+}
+
+.pbtn {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.pbtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.pbtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.pbtn svg {
+  display: block;
+}
+
+.pbtn-play svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* volume: the slider grows out of the speaker on hover/focus, YouTube-style */
+.pvol {
+  display: inline-flex;
+  align-items: center;
+}
+
+.pvol-slider {
+  width: 0;
+  height: 4px;
+  accent-color: #fff;
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    width 160ms ease,
+    opacity 160ms ease,
+    margin-left 160ms ease;
+}
+
+.pvol:hover .pvol-slider,
+.pvol:focus-within .pvol-slider {
+  width: 62px;
+  margin-left: 4px;
+  opacity: 1;
+}
+
+.ptime {
+  margin-left: 4px;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* speed */
+.pspeed {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(8, 18, 16, 0.5);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.pspeed:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* viewing modes, on the bar's right */
+.player-modes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.player-modes-layout {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.player-modes-layout button {
+  min-height: 26px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.player-modes-layout button:hover {
+  color: #fff;
+}
+
+.player-modes-layout button[aria-pressed="true"] {
+  color: #10201d;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.player-fullscreen {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.player-fullscreen:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.player-fullscreen:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.player-fullscreen svg {
+  display: block;
+}
+
+.pbtn:focus-visible,
+.pspeed:focus-visible,
+.player-modes-layout button:focus-visible,
+.player-fullscreen:focus-visible,
+.pvol-slider:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}

@@ -3,6 +3,7 @@
 /* ---------- the completed-run viewing surface ---------- */
 
 .results {
+  position: relative;
   display: flex;
   width: min(1120px, 100%);
   flex-direction: column;

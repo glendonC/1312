@@ -37,4 +37,29 @@
   .player-sound input {
     width: 64px;
   }
+
+  /* Larger touch targets for the in-player controls on the results surface. */
+  .pctl {
+    gap: 6px;
+  }
+
+  .pbtn,
+  .player-fullscreen {
+    width: 40px;
+    height: 40px;
+  }
+
+  .pspeed {
+    height: 36px;
+  }
+
+  /* Study/Theater change the desktop side-by-side split; on mobile the layout is already single
+     column, so the toggle is dropped to keep the control row uncramped. Full screen stays. */
+  .player-modes-layout {
+    display: none;
+  }
+
+  .ptime {
+    font-size: 0.68rem;
+  }
 }

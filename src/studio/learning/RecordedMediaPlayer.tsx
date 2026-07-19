@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { clock } from "../format";
+import { Hold, Volume } from "../glyphs";
 import { useStudio } from "../store";
 import type { RunBundle } from "../transport";
 import { useViewerSession } from "./viewerSession";
@@ -33,9 +34,16 @@ function CaptionOverlay({ bundle }: { bundle: RunBundle }) {
 export default function RecordedMediaPlayer({
   bundle,
   surface,
+  modeControls,
 }: {
   bundle: RunBundle;
   surface: "results" | "workbench";
+  /**
+   * Results-only. The viewing-mode cluster (Study/Theater/Full screen) rendered onto the video
+   * surface rather than a toolbar stranded outside the frame. Absent on the workbench surface,
+   * where the same player follows agent focus and owns no viewing modes.
+   */
+  modeControls?: ReactNode;
 }) {
   const playerId = useId();
   const clipT = useStudio((state) => state.clipT);
@@ -149,40 +157,122 @@ export default function RecordedMediaPlayer({
   const { peaks } = bundle.wave;
   const { music, silence, source, title } = bundle.run.clip;
 
-  return (
-    <div className="player" data-player-surface={surface} data-playback-owner={ownsPlayback || undefined}>
-      {src && (picture ? (
-        <figure className="screen">
-          <video
-            ref={attach}
-            className="screen-video"
-            src={src}
-            preload="auto"
-            playsInline
-            onClick={togglePlayback}
-            onError={() => {
-              setMediaFailed(true);
-              setPlaying(false);
-            }}
-          />
-          <CaptionOverlay bundle={bundle} />
-        </figure>
-      ) : (
-        <audio
-          ref={attach}
-          src={src}
-          preload="auto"
-          onError={() => {
-            setMediaFailed(true);
-            setPlaying(false);
-          }}
+  // Results plays the recorded clip in a squircle frame with its controls on the video surface,
+  // YouTube-style: revealed on hover/focus, always shown while paused and on touch. The workbench
+  // surface keeps the plain below-frame transport, so agent-focus playback is unchanged.
+  const overlayControls = surface === "results" && picture && Boolean(src);
+  const progressPct = duration > 0 ? Math.min(100, (clipT / duration) * 100) : 0;
+
+  const speedSelect = (
+    <select
+      className={overlayControls ? "pspeed" : undefined}
+      aria-label="Playback speed"
+      value={playbackRate}
+      disabled={!src || mediaFailed}
+      onChange={(event) => setPlaybackRate(Number(event.currentTarget.value))}
+    >
+      <option value={0.5}>0.5×</option>
+      <option value={0.75}>0.75×</option>
+      <option value={1}>1×</option>
+      <option value={1.25}>1.25×</option>
+      <option value={1.5}>1.5×</option>
+      <option value={2}>2×</option>
+    </select>
+  );
+
+  // The YouTube-familiar control surface for Results: a full-width progress bar (played fill, draggable
+  // knob, faint music/silence shading), then one row — play, volume, time on the left; speed and the
+  // viewing modes on the right.
+  const overlayBar = (
+    <div className="pbar-wrap">
+      <div className="pbar" data-empty={duration <= 0 || undefined}>
+        <div className="pbar-track">
+          {duration > 0 && (
+            <div className="pbar-regions" aria-hidden="true">
+              {music.map(([start, end], index) => (
+                <span
+                  key={`music-${index}`}
+                  className="pbar-region"
+                  data-kind="music"
+                  style={{ left: `${(start / duration) * 100}%`, width: `${((end - start) / duration) * 100}%` }}
+                />
+              ))}
+              {silence.map(([start, end], index) => (
+                <span
+                  key={`silence-${index}`}
+                  className="pbar-region"
+                  data-kind="silence"
+                  style={{ left: `${(start / duration) * 100}%`, width: `${((end - start) / duration) * 100}%` }}
+                />
+              ))}
+            </div>
+          )}
+          <div className="pbar-fill" style={{ width: `${progressPct}%` }} aria-hidden="true" />
+          <span className="pbar-knob" style={{ left: `${progressPct}%` }} aria-hidden="true" />
+        </div>
+        <input
+          type="range"
+          className="pbar-input"
+          min={0}
+          max={duration || 0}
+          step={0.1}
+          value={clipT}
+          onChange={(event) => seek(event.currentTarget.valueAsNumber)}
+          aria-label="Seek through clip"
+          aria-valuetext={`${clock(clipT)} of ${clock(duration)}`}
+          disabled={!src || mediaFailed}
         />
-      ))}
+      </div>
+      <div className="pctl">
+        <div className="pctl-left">
+          <button
+            type="button"
+            className="pbtn pbtn-play"
+            onClick={togglePlayback}
+            disabled={!src || mediaFailed}
+            aria-label={activelyPlaying ? "Pause" : "Play"}
+          >
+            <Hold paused={!activelyPlaying} />
+          </button>
+          <div className="pvol">
+            <button
+              type="button"
+              className="pbtn"
+              onClick={toggleMuted}
+              disabled={!src || mediaFailed}
+              aria-label={muted || volume === 0 ? "Unmute" : "Mute"}
+              aria-pressed={muted || volume === 0}
+            >
+              <Volume muted={muted || volume === 0} />
+            </button>
+            <input
+              type="range"
+              className="pvol-slider"
+              min={0}
+              max={1}
+              step={0.05}
+              value={muted ? 0 : volume}
+              aria-label="Volume"
+              disabled={!src || mediaFailed}
+              onChange={(event) => {
+                const nextVolume = event.currentTarget.valueAsNumber;
+                setVolume(nextVolume);
+                setMuted(nextVolume === 0);
+              }}
+            />
+          </div>
+          <span className="ptime">{clock(clipT)} / {clock(duration)}</span>
+        </div>
+        <div className="pctl-right">
+          {speedSelect}
+          {modeControls}
+        </div>
+      </div>
+    </div>
+  );
 
-      {!src && <p className="media-empty">No playable media artifact was recorded for this run.</p>}
-      {mediaFailed && <p className="media-empty">The recorded media could not be loaded. Captions remain inspectable.</p>}
-
-      <div className="transport">
+  const transport = (
+    <div className="transport">
         <button
           type="button"
           className="play"
@@ -290,21 +380,78 @@ export default function RecordedMediaPlayer({
           </select>
         </label>
       </div>
+  );
 
-      {source.licence && (
-        <p className="credit">
-          <span className="credit-work">
-            <span className="credit-title">{title}</span> by {source.label}
-          </span>
-          <span className="credit-licence">
-            {source.url ? (
-              <a href={source.url} target="_blank" rel="noreferrer noopener">
-                {source.licence}
-              </a>
-            ) : source.licence}
-          </span>
-        </p>
+  const credit = source.licence ? (
+    <p className="credit">
+      <span className="credit-work">
+        <span className="credit-title">{title}</span> by {source.label}
+      </span>
+      <span className="credit-licence">
+        {source.url ? (
+          <a href={source.url} target="_blank" rel="noreferrer noopener">
+            {source.licence}
+          </a>
+        ) : source.licence}
+      </span>
+    </p>
+  ) : null;
+
+  return (
+    <div
+      className="player"
+      data-player-surface={surface}
+      data-playback-owner={ownsPlayback || undefined}
+      data-overlay-controls={overlayControls || undefined}
+      data-playing={activelyPlaying ? "true" : "false"}
+    >
+      {src && (picture ? (
+        <figure className="screen">
+          <video
+            ref={attach}
+            className="screen-video"
+            src={src}
+            preload="auto"
+            playsInline
+            onClick={togglePlayback}
+            onError={() => {
+              setMediaFailed(true);
+              setPlaying(false);
+            }}
+          />
+          <CaptionOverlay bundle={bundle} />
+          {overlayControls && (
+            <>
+              {/* An always-on provenance bug: the recorded-vs-live distinction stays visible in every
+                  viewing mode, including theater and full screen, never only behind a details panel. */}
+              <span className="player-provenance">recorded</span>
+              <div className="player-controls">{overlayBar}</div>
+            </>
+          )}
+        </figure>
+      ) : (
+        <audio
+          ref={attach}
+          src={src}
+          preload="auto"
+          onError={() => {
+            setMediaFailed(true);
+            setPlaying(false);
+          }}
+        />
+      ))}
+
+      {!src && <p className="media-empty">No playable media artifact was recorded for this run.</p>}
+      {mediaFailed && <p className="media-empty">The recorded media could not be loaded. Captions remain inspectable.</p>}
+
+      {!overlayControls && (
+        <>
+          {modeControls}
+          {transport}
+        </>
       )}
+
+      {surface !== "results" && credit}
     </div>
   );
 }

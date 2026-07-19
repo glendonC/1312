@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { clock } from "./format";
-import RecordedEvidence from "./evidence/RecordedEvidence";
+import { Compress, Expand } from "./glyphs";
 import LearningResults from "./learning/LearningResults";
 import RecordedMediaPlayer from "./learning/RecordedMediaPlayer";
 import { projectPrototypeLearningPresentation } from "./learning/prototypeAdapter";
@@ -21,7 +21,6 @@ import { useBundle, useStudio } from "./store";
  */
 export default function Results() {
   const bundle = useBundle();
-  const outputDepth = useStudio((s) => s.outputDepth);
   const previewSession = useStudio((s) => s.previewSession);
   const clipT = useStudio((s) => s.clipT);
   const setClipT = useStudio((s) => s.setClipT);
@@ -40,29 +39,12 @@ export default function Results() {
 
   if (!bundle) return null;
 
-  const { run, captions } = bundle;
-  const target = run.pair.target;
-  const showEvidence = outputDepth === "evidence";
+  const { run } = bundle;
   const learningSource = projectRecordedLearningSource(bundle);
   const learningPresentation = projectPrototypeLearningPresentation(
     learningSource,
     learningPrototypeFixture,
   );
-
-  // Real per-line accounting, straight from the recorded cues. A refusal and a silence are
-  // different facts and are counted as different things; neither is an error.
-  const counts = { captioned: 0, withheld: 0, silent: 0 };
-  for (const cue of captions.cues) {
-    if (cue.silence) {
-      counts.silent += 1;
-      continue;
-    }
-    const tgt = cue.targets.find((t) => t.lang === target);
-    if (tgt?.withheld) counts.withheld += 1;
-    else if (tgt?.text) counts.captioned += 1;
-  }
-
-  const licence = run.clip.source.licence;
 
   const chooseViewerMode = async (mode: "study" | "theater") => {
     try {
@@ -87,6 +69,40 @@ export default function Results() {
     }
   };
 
+  // The viewing modes live on the video's control bar, YouTube-style: two layout toggles and a real
+  // full-screen icon at the right. They stay keyboard reachable (focus reveals the bar), not hover-only.
+  const modeControls = (
+    <div className="player-modes" role="group" aria-label="Viewing mode">
+      <span className="player-modes-layout">
+        <button
+          type="button"
+          aria-pressed={!fullscreen && viewerMode === "study"}
+          onClick={() => void chooseViewerMode("study")}
+        >
+          Study
+        </button>
+        <button
+          type="button"
+          aria-pressed={!fullscreen && viewerMode === "theater"}
+          onClick={() => void chooseViewerMode("theater")}
+        >
+          Theater
+        </button>
+      </span>
+      <button
+        type="button"
+        className="player-fullscreen"
+        aria-pressed={fullscreen}
+        aria-label={fullscreen ? "Exit full screen" : "Full screen"}
+        title={fullscreen ? "Exit full screen" : "Full screen"}
+        disabled={!fullscreenAvailable}
+        onClick={() => void toggleFullscreen()}
+      >
+        {fullscreen ? <Compress /> : <Expand />}
+      </button>
+    </div>
+  );
+
   return (
     <motion.div
       id={RECORDED_RESULTS_ID}
@@ -106,55 +122,15 @@ export default function Results() {
         />
       )}
 
-      <header className="result-head">
-        <span className="result-kicker">Result</span>
-        <h2>{run.clip.title}</h2>
-        <p className="result-request">
-          <b className="result-pair">{run.pair.source.toUpperCase()} → {target.toUpperCase()}</b>
-          <span className="result-tag">{clock(0)}–{clock(run.clip.duration)}</span>
-          <span className="result-tag is-quiet">recorded evidence</span>
-        </p>
-      </header>
-
       <section
         className="result-viewer"
         ref={viewerRef}
         aria-label="Learning viewer"
         data-view-mode={fullscreen ? "fullscreen" : viewerMode}
       >
-        <header className="result-viewer-toolbar">
-          <div className="result-viewer-identity">
-            <b>{run.clip.title}</b>
-            <span>{run.pair.source.toUpperCase()} to {target.toUpperCase()}</span>
-          </div>
-          <div className="result-view-modes" role="group" aria-label="Viewing mode">
-            <button
-              type="button"
-              aria-pressed={!fullscreen && viewerMode === "study"}
-              onClick={() => void chooseViewerMode("study")}
-            >
-              Study
-            </button>
-            <button
-              type="button"
-              aria-pressed={!fullscreen && viewerMode === "theater"}
-              onClick={() => void chooseViewerMode("theater")}
-            >
-              Theater
-            </button>
-            <button
-              type="button"
-              aria-pressed={fullscreen}
-              disabled={!fullscreenAvailable}
-              onClick={() => void toggleFullscreen()}
-            >
-              {fullscreen ? "Exit full screen" : "Full screen"}
-            </button>
-          </div>
-        </header>
         {viewerNotice && <p className="result-viewer-notice" role="status">{viewerNotice}</p>}
         <div className="result-main">
-          <RecordedMediaPlayer bundle={bundle} surface="results" />
+          <RecordedMediaPlayer bundle={bundle} surface="results" modeControls={modeControls} />
           <LearningResults
             presentation={learningPresentation}
             playback={{
@@ -166,57 +142,6 @@ export default function Results() {
           />
         </div>
       </section>
-
-      <details className="result-details">
-        <summary>
-          <span>Run details</span>
-          <span className="result-details-summary">
-            <span>{counts.captioned} captioned</span>
-            <span>{counts.withheld} withheld</span>
-            <span>{counts.silent} silent</span>
-          </span>
-        </summary>
-        <dl className="result-details-list">
-          <div>
-            <dt>Coverage</dt>
-            <dd>
-              <span>{counts.captioned} captioned, {counts.withheld} withheld, {counts.silent} silent</span>
-              <small>of {captions.cues.length} lines in range</small>
-            </dd>
-          </div>
-          <div>
-            <dt>Withheld</dt>
-            <dd>
-              <span>Refusals with a recorded reason</span>
-              <small>Shown as gaps, not errors or a translation-quality score</small>
-            </dd>
-          </div>
-          <div>
-            <dt>Source</dt>
-            <dd>
-              <span>{run.clip.source.label}</span>
-              <small>{licence ?? "Recorded evidence"}</small>
-            </dd>
-          </div>
-        </dl>
-        {showEvidence && (
-          <section className="result-provenance" aria-label="Evidence and run files">
-            <RecordedEvidence />
-            {run.artifacts.length > 0 ? (
-              <p className="result-provenance-links">
-                {run.artifacts.map((artifact) => (
-                  <a key={artifact} href={`/demo/runs/${run.id}/${artifact}`}>
-                    {artifact}
-                  </a>
-                ))}
-                <a href={`/demo/packs/${run.pack}.json`}>{run.pack}.json</a>
-              </p>
-            ) : (
-              <p className="result-provenance-empty">No artifact links were declared by this run.</p>
-            )}
-          </section>
-        )}
-      </details>
     </motion.div>
   );
 }

@@ -11,7 +11,6 @@ import {
 
 import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
-import { Play } from "./glyphs";
 import LifecycleBottomBar from "./LifecycleBottomBar";
 import {
   isProcessingMockScenario,
@@ -63,7 +62,10 @@ interface StudioWelcomeProps {
 type LocalSourceMode = "owned" | "youtube";
 
 /** The orchestrator's invitation, before any runtime or evidence state exists. */
-function StudioWelcome({ openLocalSource, selectSample }: StudioWelcomeProps) {
+function StudioWelcome({
+  openLocalSource,
+  selectSample,
+}: StudioWelcomeProps) {
   const preflight = useStudio((state) => state.preflight);
   const previewSession = useStudio((state) => state.previewSession);
   const sourceGuideState: SourceGuideState = !previewSession
@@ -175,18 +177,18 @@ function StudioWelcome({ openLocalSource, selectSample }: StudioWelcomeProps) {
                 </motion.div>
               )}
             </AnimatePresence>
-
-            <AnimatePresence initial={false}>
-              {!sourceGuideActive && (
-                <StudioSourceOptions
-                  openLocalSource={openLocalSource}
-                  selectSample={selectSample}
-                />
-              )}
-            </AnimatePresence>
           </motion.div>
         </motion.div>
       </LayoutGroup>
+
+      <AnimatePresence initial={false}>
+        {!sourceGuideActive && (
+          <StudioSourceControl
+            openLocalSource={openLocalSource}
+            selectSample={selectSample}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }
@@ -330,215 +332,216 @@ function StudioSourceDock({
   );
 }
 
-function StudioSourceOptions({ openLocalSource, selectSample }: StudioWelcomeProps) {
+function StudioSourceControl({
+  openLocalSource,
+  selectSample,
+}: StudioWelcomeProps) {
   const bundle = useBundle();
   const openRecordedPreflight = useStudio((state) => state.openRecordedPreflight);
-  const dismissPreflight = useStudio((state) => state.dismissPreflight);
-  const start = useStudio((state) => state.start);
-  const seekCursor = useStudio((state) => state.seekCursor);
-  const [samplesOpen, setSamplesOpen] = useState(false);
-  const sampleMenuId = useId();
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
   const root = useRef<HTMLDivElement>(null);
-  const sampleTrigger = useRef<HTMLButtonElement>(null);
-  const sampleItems = useRef<Array<HTMLButtonElement | null>>([]);
-  const initialSampleFocus = useRef(0);
+  const trigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (!samplesOpen) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      sampleItems.current[initialSampleFocus.current]?.focus();
-    });
+    if (!open) return;
     const closeFromOutside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setSamplesOpen(false);
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
     document.addEventListener("pointerdown", closeFromOutside, true);
+    return () => document.removeEventListener("pointerdown", closeFromOutside, true);
+  }, [open]);
 
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("pointerdown", closeFromOutside, true);
-    };
-  }, [samplesOpen]);
-
-  function openSamples(focusIndex = 0): void {
-    initialSampleFocus.current = focusIndex;
-    setSamplesOpen(true);
+  function choose(action: () => void): void {
+    setOpen(false);
+    action();
   }
 
-  function closeSamples(restoreTrigger: boolean): void {
-    setSamplesOpen(false);
-    if (restoreTrigger) {
-      window.requestAnimationFrame(() => sampleTrigger.current?.focus());
-    }
-  }
-
-  function handleSampleKeys(event: ReactKeyboardEvent<HTMLDivElement>): void {
-    const activeIndex = sampleItems.current.findIndex((item) => item === document.activeElement);
-    let nextIndex: number | null = null;
-
-    if (event.key === "ArrowDown") nextIndex = (activeIndex + 1) % KOREAN_SAMPLES.length;
-    if (event.key === "ArrowUp") {
-      nextIndex = (activeIndex - 1 + KOREAN_SAMPLES.length) % KOREAN_SAMPLES.length;
-    }
-    if (event.key === "Home") nextIndex = 0;
-    if (event.key === "End") nextIndex = KOREAN_SAMPLES.length - 1;
-
-    if (nextIndex !== null) {
-      event.preventDefault();
-      sampleItems.current[nextIndex]?.focus();
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      closeSamples(true);
-    } else if (event.key === "Tab") {
-      closeSamples(false);
-    }
+  function handleKeys(event: ReactKeyboardEvent<HTMLDivElement>): void {
+    if (event.key !== "Escape" || !open) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setOpen(false);
+    window.requestAnimationFrame(() => trigger.current?.focus());
   }
 
   return (
     <motion.div
       ref={root}
-      className="studio-source-options"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 4 }}
+      className="studio-source-control"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.32, delay: 0.34, ease: [0.22, 1, 0.36, 1] }}
-      layout="position"
+      onKeyDown={handleKeys}
     >
-      <div
-        className="studio-source-option-track"
-        role="group"
-        aria-label="Live local and recorded source options"
+      <button
+        ref={trigger}
+        type="button"
+        className="top-mark studio-source-trigger"
+        aria-label="Choose source: local or recorded"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((current) => !current)}
       >
-        <button
-          type="button"
-          className="studio-source-option"
-          data-palette="teal"
-          data-source-authority="live-local"
-          onClick={() => openLocalSource("youtube")}
-        >
-          YouTube local ingest
-        </button>
-
-        <button
-          type="button"
-          className="studio-source-option"
-          data-palette="blue"
-          data-source-authority="live-local"
-          onClick={() => openLocalSource("owned")}
-        >
-          Owned file local ingest
-        </button>
-
-        <button
-          type="button"
-          className="studio-source-option"
-          data-palette="peach"
-          data-source-authority="recorded"
-          onClick={openRecordedPreflight}
-          disabled={!bundle}
-        >
-          <span>Explore run-006 recorded demo</span>
-          <Play />
-        </button>
-
-        <button
-          ref={sampleTrigger}
-          type="button"
-          className="studio-source-option"
-          data-palette="coral"
-          data-source-authority="recorded"
-          aria-haspopup="menu"
-          aria-expanded={samplesOpen}
-          aria-controls={samplesOpen ? sampleMenuId : undefined}
-          onClick={() => {
-            if (samplesOpen) closeSamples(false);
-            else openSamples();
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-            event.preventDefault();
-            openSamples(event.key === "ArrowUp" ? KOREAN_SAMPLES.length - 1 : 0);
-          }}
-        >
-          Recorded YouTube samples
-        </button>
-      </div>
+        <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+          <path d="M4 5.5h10M4 9h6M4 12.5h4M12.5 10.5v4M10.5 12.5h4" />
+        </svg>
+      </button>
 
       <AnimatePresence>
-        {samplesOpen && (
+        {open && (
           <motion.div
-            id={sampleMenuId}
-            className="studio-sample-popover"
-            role="menu"
-            aria-label="Recorded YouTube samples"
-            initial={{ opacity: 0, y: -5, scale: 0.98 }}
+            id={panelId}
+            className="studio-source-panel"
+            role="dialog"
+            aria-label="Choose a Studio source"
+            aria-modal="false"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            onKeyDown={handleSampleKeys}
           >
-            <p>Choose a link for the recorded preview source bar.</p>
-            <div className="studio-sample-list">
-              {KOREAN_SAMPLES.map((sample, index) => (
+            <header className="studio-source-panel-head">Other ways to start</header>
+
+            <section
+              className="studio-source-group"
+              data-source-authority="live-local"
+              role="group"
+              aria-labelledby={`${panelId}-local`}
+            >
+              <div className="studio-source-group-head">
+                <h2 id={`${panelId}-local`}>Process locally</h2>
+                <span>Private local host</span>
+              </div>
+              <div className="studio-source-choice-list">
                 <button
-                  key={sample.label}
-                  ref={(element) => {
-                    sampleItems.current[index] = element;
-                  }}
                   type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setSamplesOpen(false);
-                    selectSample(sample.url);
-                  }}
+                  className="studio-source-choice"
+                  data-source-kind="youtube"
+                  data-source-authority="live-local"
+                  aria-label="Process a YouTube range locally"
+                  onClick={() => choose(() => openLocalSource("youtube"))}
                 >
-                  <span>{sample.label}</span>
-                  <small>Recorded preview link</small>
+                  <SourceChoiceIcon kind="youtube" />
+                  <span><b>YouTube range</b><small>Up to 2 minutes</small></span>
+                  <span className="studio-source-choice-arrow" aria-hidden="true">›</span>
                 </button>
-              ))}
-            </div>
+                <button
+                  type="button"
+                  className="studio-source-choice"
+                  data-source-kind="file"
+                  data-source-authority="live-local"
+                  aria-label="Process a file I own locally"
+                  onClick={() => choose(() => openLocalSource("owned"))}
+                >
+                  <SourceChoiceIcon kind="file" />
+                  <span><b>Owned file</b><small>You own or control it</small></span>
+                  <span className="studio-source-choice-arrow" aria-hidden="true">›</span>
+                </button>
+              </div>
+            </section>
+
+            <section
+              className="studio-source-group"
+              data-source-authority="recorded"
+              role="group"
+              aria-labelledby={`${panelId}-recorded`}
+            >
+              <div className="studio-source-group-head">
+                <h2 id={`${panelId}-recorded`}>Explore a recording</h2>
+                <span>No new processing</span>
+              </div>
+              <div className="studio-source-choice-list">
+                <button
+                  type="button"
+                  className="studio-source-choice"
+                  data-source-kind="replay"
+                  data-source-authority="recorded"
+                  aria-label="Explore the recorded run-006 demo"
+                  disabled={!bundle}
+                  onClick={() => choose(openRecordedPreflight)}
+                >
+                  <SourceChoiceIcon kind="replay" />
+                  <span><b>run-006 demo</b><small>Replay saved evidence</small></span>
+                  <span className="studio-source-choice-arrow" aria-hidden="true">›</span>
+                </button>
+              </div>
+
+              <div className="studio-source-examples" role="group" aria-label="Example recorded preview links">
+                <SourceChoiceIcon kind="link" />
+                <span><b>Example links</b><small>Fill the preview bar only</small></span>
+                <div>
+                  {KOREAN_SAMPLES.map((sample) => (
+                    <button
+                      key={sample.label}
+                      type="button"
+                      data-source-example-authority="recorded-preview"
+                      aria-label={`Use ${sample.label} for recorded preview`}
+                      onClick={() => choose(() => selectSample(sample.url))}
+                    >
+                      {sample.label.slice(-2)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Dev-only shortcuts for iterating on the recorded demo. Gated by import.meta.env.DEV so they
-          are never bundled into production and never bypass the honest setup flow for real users.
-          Both reuse the store's deterministic replay: "results" jumps to the completed projection (the
-          same path the trace lab uses), "processing" runs the swarm from the top without preflight. */}
-      {import.meta.env.DEV && (
-        <div className="studio-dev-skip" role="group" aria-label="Developer shortcuts">
-          <span className="studio-dev-skip-label">Dev</span>
-          <button
-            type="button"
-            className="studio-dev-skip-btn"
-            disabled={!bundle}
-            onClick={() => {
-              if (!bundle) return;
-              dismissPreflight();
-              seekCursor(bundle.traces.length);
-            }}
-          >
-            Skip to results
-          </button>
-          <button
-            type="button"
-            className="studio-dev-skip-btn"
-            disabled={!bundle}
-            onClick={() => {
-              if (!bundle) return;
-              dismissPreflight();
-              start();
-            }}
-          >
-            Skip to processing
-          </button>
-        </div>
-      )}
     </motion.div>
+  );
+}
+
+function SourceChoiceIcon({ kind }: { kind: "youtube" | "file" | "replay" | "link" }) {
+  return (
+    <span className="studio-source-choice-icon" data-kind={kind} aria-hidden="true">
+      <svg viewBox="0 0 18 18">
+        {kind === "youtube" && <path d="M4.2 5.2h9.6a2 2 0 0 1 2 2v3.6a2 2 0 0 1-2 2H4.2a2 2 0 0 1-2-2V7.2a2 2 0 0 1 2-2Zm3.3 1.9 4 1.9-4 1.9Z" />}
+        {kind === "file" && <path d="M5 2.5h5l3 3v10H5Zm5 0v3h3" />}
+        {kind === "replay" && <path d="M4.4 6.2H1.8V3.6m.2 2.5a7 7 0 1 1-.1 5.7" />}
+        {kind === "link" && <path d="m7.2 10.8 3.6-3.6M6 12.8l-1 1a2.5 2.5 0 0 1-3.5-3.5l2.3-2.3a2.5 2.5 0 0 1 3.5 0m4.7-2.8 1-1a2.5 2.5 0 0 1 3.5 3.5L14.2 10a2.5 2.5 0 0 1-3.5 0" />}
+      </svg>
+    </span>
+  );
+}
+
+/** Development replay controls stay outside the product welcome and source composition. */
+function StudioDevShortcuts() {
+  const bundle = useBundle();
+  const dismissPreflight = useStudio((state) => state.dismissPreflight);
+  const start = useStudio((state) => state.start);
+  const seekCursor = useStudio((state) => state.seekCursor);
+
+  return (
+    <div className="studio-dev-skip" role="group" aria-label="Developer shortcuts">
+      <span className="studio-dev-skip-label">Dev</span>
+      <button
+        type="button"
+        className="studio-dev-skip-btn"
+        disabled={!bundle}
+        onClick={() => {
+          if (!bundle) return;
+          dismissPreflight();
+          seekCursor(bundle.traces.length);
+        }}
+      >
+        Skip to results
+      </button>
+      <button
+        type="button"
+        className="studio-dev-skip-btn"
+        disabled={!bundle}
+        onClick={() => {
+          if (!bundle) return;
+          dismissPreflight();
+          start();
+        }}
+      >
+        Skip to processing
+      </button>
+    </div>
   );
 }
 
@@ -585,6 +588,8 @@ export default function InputAct() {
       transition={{ duration: 0.4 }}
     >
       <div className="canvas" aria-hidden="true" />
+
+      {import.meta.env.DEV && localSourceMode === null && loadStatus === "ready" && <StudioDevShortcuts />}
 
       {localSourceMode !== null && loadStatus === "ready" && (
         <Suspense

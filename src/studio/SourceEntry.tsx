@@ -92,6 +92,7 @@ export default function SourceEntry({
     <motion.div
       className="source-entry studio-bottom-bar-shell"
       data-lifecycle-mode="source"
+      data-source-authority="recorded-preview"
       ref={control}
       layout
       transition={SPRING}
@@ -114,7 +115,7 @@ export default function SourceEntry({
             transition={{ duration: 0.15 }}
             layout
           >
-            Preview YouTube with recorded demo
+            Preview a YouTube link with recorded demo
           </motion.button>
         ) : (
           <motion.form

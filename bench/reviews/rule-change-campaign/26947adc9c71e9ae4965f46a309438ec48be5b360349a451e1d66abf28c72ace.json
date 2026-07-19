@@ -1,0 +1,19 @@
+{
+  "approval_id": "bench-rule-change-campaign-approval:sha256:26947adc9c71e9ae4965f46a309438ec48be5b360349a451e1d66abf28c72ace",
+  "schema": "studio.bench.rule-change-campaign-approval.v1",
+  "approved_at": "2026-07-19T17:02:03.908Z",
+  "action": "approve_result_free_registration",
+  "proposal_draft": {
+    "path": "bench/rule-changes/ko-kinship-address-context/proposal-draft.json",
+    "content_id": "sha256:125328f5eb983e33bb16feb357327f93b81c11f2258a0d3039fa96c677a709c8",
+    "bytes": 1471
+  },
+  "proposal_id": "memory-proposal:sha256:f87565b6e254e1ff92883206630130a597d92f3c9e41cdb0b0317b762070c8d3",
+  "proposal_content_id": "sha256:09856cd6d4d5a006c607bfa8b11e1adc5dad6f1b93aa27cf0f5c2acc87730d2b",
+  "approved_by": {
+    "name": "Glendon Chin",
+    "git_identity": "Glendon Chin <glendonchin@gmail.com>"
+  },
+  "live_capture_authorized": false,
+  "notes": "Approve exact kinship-address rule bytes for result-free registration only."
+}

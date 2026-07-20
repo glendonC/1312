@@ -1,0 +1,48 @@
+{
+  "execution_input_id": "bench-execution-input:sha256:f6651ea3a32a5b8ac28d1f44877ce6b25f12bbf2e90646c054365a090e384fd2",
+  "schema": "studio.bench.execution-input.v2",
+  "created_at": "2026-07-20T00:17:07.236Z",
+  "attempt_id": "bench-attempt:sha256:dcd1fe21c86946c4855f1c68e9daa456a88843429f6b1db1ef9034f35b76cd95",
+  "registration": {
+    "receipt": {
+      "path": "bench/rule-changes/ko-kinship-address-context-provider-authorized/registration.json",
+      "content_id": "sha256:d14aec39ec44c441a01af7cbf79e81c7c0a2d1712df675701466f53d0f67db6c",
+      "bytes": 7897
+    },
+    "registration_id": "bench-rule-change-registration:sha256:222b65152093755812937f287139756e185b2bef94fc9556edcc4cee3b95ca8f"
+  },
+  "release": {
+    "receipt": {
+      "path": "bench/releases/1bafaf5c9d5e03780c2ffe4e513aba80b06ce568385f613bbb7b606b332df71f.json",
+      "content_id": "sha256:a1ba6bb850129131a989ca4e002bfa658bcca75475f97d011d63a68cd189984e",
+      "bytes": 5494
+    },
+    "release_id": "bench-certified-release:sha256:1bafaf5c9d5e03780c2ffe4e513aba80b06ce568385f613bbb7b606b332df71f"
+  },
+  "executor": {
+    "receipt": {
+      "path": "bench/executors/ad94989baaab7e4ac0a40ab4aec0f81602a2530b35f035c09efc8174a5e395bd.json",
+      "content_id": "sha256:0a66548858882504f9e62b5edb36420efb01aab60f669ff24f4081f07b9f33ad",
+      "bytes": 923
+    },
+    "executor_id": "bench-capture-executor:sha256:ad94989baaab7e4ac0a40ab4aec0f81602a2530b35f035c09efc8174a5e395bd",
+    "adapter_id": "openai_audio_translation_v1",
+    "host_content_id": "sha256:e8bfd13eba0fd7354602ce9c9aa4e0ecc5bc07068d22c99b689d95d9c5191e88",
+    "implementation_content_id": "sha256:812e445bd67ef511fc15833c7c934f12bcc5a03dfeb473dc72ef15b2e48006f9"
+  },
+  "plan": {
+    "run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r1-with",
+    "clip_id": "2o0f-V4uoMg",
+    "repetition": 1,
+    "side": "with"
+  },
+  "source": {
+    "clip_id": "2o0f-V4uoMg",
+    "artifact": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/2o0f-V4uoMg.m4a",
+      "content_id": "sha256:a0e78a490a27b228713963a5d8f3c992748e1ae3505b53550fd5dd4dfca9e514",
+      "bytes": 973872
+    }
+  },
+  "host_context_id": "bench-host-context:sha256:0c0b4379a0a7869328f5dd73a2256e47d8d4563877922ae0ea33743d4c76eab3"
+}

@@ -19,6 +19,19 @@ post-freeze capture, human output labels, and one re-derived `studio.bench.score
 result. The public aggregate under `bench/examples/unscored-report.json` remains a protocol draft
 with no scored systems, so the public page still cannot show a rank or superiority claim.
 
+`hard-ko-provider-authorized-v1` is separately frozen. Its provider-authorized kinship campaign
+spent all 18 registered slots once with zero retries. Fifteen provider calls produced captures and
+execution attributions. The three `Ni5rBtowdnI` without-rule calls returned HTTP 200 but failed as
+`provider_invalid_output`, so they have no capture or attribution and remain spent. The 15
+successful captures have operator-authorized hackathon label receipts and score receipts with
+`judge: null`. The label receipts declare `blinded: true`, but their notes explicitly disclaim
+independent blind human semantic QC. Six structural pairs exist for c1 and c3. Qualification
+refused before result materialization because the registration requires nine pairs. No accepted
+rule, runtime deployment, or product improvement result exists. See the exact partial-grid
+[campaign ledger](rule-changes/ko-kinship-address-context-provider-authorized/README.md). The
+repository-wide bench gate validates the six pairs, then remains nonzero because the shared c3 clip
+has a provider-pack score but no score receipt naming the separately frozen `hard-ko-v1` pack.
+
 The registered raw-versus-eligible-stem ablation also has an immutable
 `studio.bench.u7-ablation-inputs.v1` registry for all three frozen clips and a cold-audit-first
 packager. No ablation capture, label, score, variance measurement, or result is committed.
@@ -44,7 +57,7 @@ bench/
     unscored-report.json      # honest sample rendered by /benchmarks/
     gold-drafts/              # non-authoritative drafting-contract fixture; never pack gold
   prompts/
-    gold-drafter-v1/          # content-addressed agent prompt + bound run-006 evidence
+    gold-drafter-v1/          # content-addressed run-006 and provider-authorized drafting inputs
   ADJUDICATION.md             # blinded human worksheet and complete freeze handoff
   candidates/                 # mined miss manifests (studio.bench.candidates.v1)
   packs/<pack_id>/            # pack.json + per-clip gold + immutable freeze receipt
@@ -88,7 +101,7 @@ Agents draft; humans decide; code freezes; nothing scores itself.
 | Step | Tool | What it refuses |
 |---|---|---|
 | Mine | `scripts/mine-gold-candidates.mjs` | Mining without an explicit `--route gold\|training`; a candidate carrying gold text |
-| Draft | `scripts/draft-gold-from-candidates.mjs` + `bench/prompts/gold-drafter-v1/` | Schema drift; unstable/non-agent drafter id; copied English in `korean_gold`; missing/duplicate time windows; stale prompt, manifest, media, source, or schema bytes; a dry-run fixture entering `bench/packs/` |
+| Draft | `scripts/draft-gold-from-candidates.mjs` + `bench/prompts/gold-drafter-v1/` | Schema drift; unstable/non-agent drafter id; copied English in `korean_gold`; missing/duplicate mined windows; overlapping or out-of-range source-only windows; non-null `mined_from` on an independent control; stale prompt, manifest, media, source, or schema bytes; a dry-run fixture entering `bench/packs/` |
 | Adjudicate | `scripts/write-adjudication-receipt.mjs` + `bench/ADJUDICATION.md` | A hand-authored/divergent review id; candidate-byte drift; decisions not aligned to every gold time window; a declared Git identity different from the reviewer's checkout identity |
 | Freeze | `scripts/freeze-pack.mjs` | Freezing without two blinded accept receipts per clip from reviewers with distinct declared names AND git identities, neither the drafter; a control clip mined from our own misses; a training-routed clip |
 | Register | `scripts/register-ablation.mjs` | An unfrozen or byte-drifted pack; operator-authored ids or timestamps; more than one config leaf delta; fewer than three paired repetitions; non-null results or model judge; structural diagnostics with semantic authority |
@@ -105,14 +118,17 @@ nothing to glossary, rules, correction pairs, or future training exports — eve
 routed to training may never enter a pack. `bench/candidates/run-006/` is the first mined
 manifest (routed gold, 13 candidates from 15 cues).
 
-The versioned drafting prompt is `bench/prompts/gold-drafter-v1/prompt.md`; its companion
-`manifest.json` content-binds the prompt, gold schema, candidates manifest, run evidence, ko-v3
-registry, and source media. The materializer always validates `studio.bench.gold.v1`, pins
-`status: "candidate"`, requires the stable `agent:gold-drafter-v1` identity, binds
-`mined_from` to current manifest bytes, and writes immutably. The only produced example is
-`bench/examples/gold-drafts/Ux-TMWnmntM.gold.json`, clearly marked as non-authoritative and
-unreviewable because direct audio audition was unavailable here. A Korean-fluent audio-grounded
-draft must replace machinery with human-checkable evidence before any pack transition.
+The original versioned drafting prompt is `bench/prompts/gold-drafter-v1/prompt.md`; its companion
+`manifest.json` content-binds the run-006 prompt, gold schema, candidates manifest, run evidence,
+ko-v3 registry, and source media. Provider-authorized v1.1 manifests under
+`bench/prompts/gold-drafter-v1/hard-ko-provider-authorized-v1/` bind the shared source-audition
+prompt plus each exact source, media file, schema, and phenomenon registry. The hard clip also
+binds every mined run input. Independent controls omit mined inputs and require `mined_from: null`.
+The materializer validates `studio.bench.gold.v1`, pins `status: "candidate"`, requires the stable
+`agent:gold-drafter-v1` identity, enforces mined windows or bounded source-only windows, and writes
+immutably. `bench/examples/gold-drafts/Ux-TMWnmntM.gold.json` remains a non-authoritative fixture,
+not pack gold. The provider-authorized candidate bytes received two blinded Korean-fluent human
+accepts per clip before their separate pack freeze.
 
 Human reviewers follow `bench/ADJUDICATION.md`. The receipt helper uses the existing canonical
 `bench-review:` id derivation and preserves `minutes_spent` as a measured number or `null`; it
@@ -129,7 +145,9 @@ Paired without/with scoring uses `scripts/compare-scores.mjs` against
 loss of previously correct critical units. Repository checks reopen the bound bytes and rederive
 the receipt, so changing a delta and recomputing its id does not create evidence. This per-clip
 primitive does not establish exact configuration control, repetition variance, or campaign
-qualification. No committed with-side score receipt exists yet.
+qualification. The provider-authorized campaign working tree has 15 score receipts and six
+structural pair receipts under the disclosed hackathon label procedure. The pairs carry no
+with-memory consumption binding and do not establish a full campaign result.
 
 Behavioral rule campaigns use the additive
 `studio.bench.rule-change-registration.v1`, `studio.bench.rule-change-result.v1`, and
@@ -159,12 +177,12 @@ older proof. The host hashes the exact source buffer passed to the adapter again
 
 The host does not execute caller-supplied code. `studio.bench.capture-executor.v1` binds the exact
 single-attempt coordinator and selects one closed adapter with exact implementation bytes. The
-current adapters are deterministic contract fixtures that produce one output or fail once. They
-have no provider or product-runtime authority and cannot perform best-of-K. A failed adapter spends
-the preregistered slot, and the host never retries. Missing any grid proof keeps both execution
-checks false. Complete proofs can unlock only `eligible_for_human_review`; they do not accept or
-deploy the rule, prove a later run consumed it, or establish generalization. No committed
-rule-change registration or result exists yet.
+provider-authorized campaign used the host-owned one-call provider adapter. It cannot perform
+best-of-K. A failed adapter spends the preregistered slot, and the host never retries. Missing any
+grid proof keeps both execution checks false. Complete proofs can unlock only
+`eligible_for_human_review`; they do not accept or deploy the rule, prove a later run consumed it,
+or establish generalization. The provider-authorized registration is committed, but it has no
+result. Its partial qualification command refused because only six of nine registered pairs exist.
 
 **What still cannot happen, and why:** the committed raw-versus-eligible-stem registration and input
 registry contain no outputs or results. The packager can materialize only both fixed anonymous-stem
@@ -177,10 +195,9 @@ receipts for every capture. A with-memory second capture of the same frozen clip
 before any Improve Loop win claim, but that later deployment proof is separate from this
 pre-promotion rule experiment. The bench-owned host now binds exact frozen media, executor bytes,
 and certified host context to each capture, but its releases pin `runtime_deployable` false. The
-closed V1 adapters have no provider or product-runtime authority. A future provider or product
-adapter needs its own narrow host-owned one-call seam and receipt before its captures can use this
-qualification path. Next-run runtime injection is not certified by this contract. Later
-independently frozen packs are still required before any generalization claim.
+provider adapter establishes qualification-only provider execution, not product-runtime authority.
+Next-run runtime injection is not certified by this contract. Later independently frozen packs are
+still required before any generalization claim.
 
 Two dating anchors are honest-but-incomplete in v1 and documented rather than pretended:
 `frozen_at` is stamped by the tool (never operator-supplied) and cannot predate its adjudication

@@ -95,8 +95,10 @@ score.
   `tests/browser/studio-production-seams.spec.ts` covering the prepared and unconfigured paths;
   adapter, configuration, and guard coverage lives in `tests/studio-learning-prep-openai.test.ts`.
   A guarded live proof requires explicit environment opt-in and claims execution and stored lineage
-  only, never semantic quality or culture truth; its default skip is not proof. No learner
-  persistence, export, or Learning OS surface is included.
+  only, never semantic quality or culture truth; its default skip is not proof. One live gpt-4o-mini
+  proof was captured on 2026-07-19 with a receipted provider response id and an honest all-abstained
+  watch-through result over the one-line test caption; it proves execution and lineage only. No
+  learner persistence, export, or Learning OS surface is included.
 - **Bet G first scored capture:** `hard-ko-v1` is frozen and the human-labeled run-007 score receipt
   exists with `judge: null`. It is one benchmark data point, not production semantic QC, calibration,
   or a general quality/improvement claim.
@@ -115,13 +117,20 @@ score.
   and provider-media authority before charging, and keeps injected transports test-only.
   Owned-local rule-change registration V2 binds exact training media only when ownership authorizes
   redistribution and requires a human approval receipt for the exact proposal bytes. That receipt
-  never authorizes live capture. The result-free Korean kinship-address registration binds
-  `run-005`, frozen `hard-ko-v1`, the exact-byte human-approved proposal, the certified provider
+  never authorizes live capture. A replacement result-free registration binds `run-005`, frozen
+  `hard-ko-provider-authorized-v1`, the exact-byte human-approved proposal, the certified provider
   executor, the sole rule-content delta, and all 18 planned calls. Both qualification-only releases
-  exist and record `runtime_deployable: false`. The two local-evaluation controls still block
-  provider egress for 12 planned calls, so this frozen grid is not live-ready and its six Creative
-  Commons calls cannot run as a partial qualification grid. No live provider call, capture, label,
-  score, qualification, accepted memory, runtime deployment, or product improvement result exists.
+  exist and record `runtime_deployable: false`. The live grid spent all 18 slots once with zero
+  retries. Fifteen calls produced captures and execution attributions. The three `Ni5rBtowdnI`
+  without-rule calls returned HTTP 200 but failed as `provider_invalid_output`, so those slots are
+  spent with no capture or attribution. The 15 successful captures have operator-authorized
+  hackathon label receipts and scores with `judge: null`. The receipts declare `blinded: true`, but
+  their notes explicitly say the fill was not independent blind human semantic QC. Six structural
+  paired-score receipts exist for c1 and c3. Their with-side deltas are unfavorable under those
+  disclosed labels. Qualification refused before writing a result because all nine preregistered
+  pairs are required. The bench gate validates all six pairs, then remains nonzero because the
+  shared c3 capture has no second score receipt naming `hard-ko-v1`. No accepted memory, runtime
+  deployment, or product improvement result exists.
 
 Rung IDs below (`U1`…`U7`, including slice labels such as `U6.1` and `U7.1`) are defined in
 [`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md). This section records acceptance state; done-when
@@ -303,6 +312,21 @@ and non-claims remain in the ladder.
   they cannot support claims, coverage, captions, quality, or readiness. The only driver remains
   `offline_fixture`, with zero network, cookies, credentials, downloads, uploads, or mutations. No
   live browser runs, and a real isolated read-only driver remains open.
+- **Recorded completion flow (persistent canvas + golden Result node):** on the recorded surface
+  the swarm canvas no longer unmounts at completion. A golden **Result** node — the shared
+  agent-field material in a gold palette with an orbiting hairline aura — forms at the topology's
+  terminus on the orchestrator's free face (widest ring gap; behind the root in tidy layouts), so
+  its delivery wire can never cross another wire. It projects the run's real receipted captions,
+  emits no trace, and mounts only once the fold is complete. The result workspace auto-opens
+  full-bleed over the canvas in the focus-panel idiom (gold identity anchor with bundle-derived
+  language pair, range, and per-line counts; LearningResultExperience unchanged) with a command
+  baseline: **Source** and **Coverage** disclosures (renamed from Details / Run details) and one
+  **Close · Esc** exit. The Result/Process switch is gone from the recorded surface — the orb is
+  the sole re-entry — while the owned-source production surface keeps its switch. The completed
+  graph carries a passive "Recorded evidence · completed process graph" chip. The agent-focus
+  workbench player now uses the shared squircle screen and on-video chrome; the below-frame
+  transport remains only for pictureless media. No new runtime request, receipt, or authority
+  claim is introduced; everything shown is projection of the already-loaded bundle.
 
 ## Post-freeze backlog boundary
 
@@ -361,11 +385,10 @@ indefinite deferrals. Status here is a summary; ladder done-when and non-claims 
    the exact packager, then obtain exact-byte-bound blinded human labels and score all 18 captures.
    The follow-through audit is the structural checklist, not a semantic result. Measure variance
    later without recasting run-007 or structural diagnostics as runtime semantic QC.
-4. Review the IL-03 behavioral-rule draft and record the exact-byte registration approval. Replace
-   the campaign package with one bound to a separately frozen provider-authorized pack instead of
-   mutating `hard-ko-v1`. Only then materialize and commit its result-free registration and both
-   certified releases. Live capture remains a separate operator authorization gate, followed by
-   blinded human labels and qualification.
+4. Preserve the provider-authorized campaign as an incomplete partial measurement. Do not retry the
+   three spent c2 without-rule attempts or treat the hackathon labels, six pairs, or refused
+   qualification command as a campaign win. Any replacement grid or real independent blind human
+   review requires a separately authorized slice.
 
 ## Honesty non-claims
 
@@ -377,9 +400,11 @@ indefinite deferrals. Status here is a summary; ladder done-when and non-claims 
 - Recorded replay fixtures are not the owned-path swarm. The run-007 Bet G score exists with a null
   model judge; one human-labeled capture does not establish calibration, generalization, or that the
   prepped path is better.
-- The IL-03 provider adapter and campaign draft are an evaluation seam, not a provider-backed result.
-  A campaign draft is not a registration, eligibility is not deployment, accepted memory is not
-  runtime consumption, and none of these facts proves a product self-improvement win.
+- The IL-03 provider campaign has 15 scored captures under disclosed hackathon labels and six
+  partial pairs, not independent blind human semantic QC or a qualification result. The partial
+  deltas are unfavorable, but an incomplete grid still cannot establish a campaign outcome.
+  Eligibility is not deployment, accepted memory is not runtime consumption, and none of these
+  facts proves a product self-improvement win.
 - U1 proves bounded execution, lineage, authorization, full-duration accounting, and abstention. It
   does not prove acoustic classification accuracy, complete speech detection, lyric understanding,
   transcription/translation correctness, or semantic caption QC.

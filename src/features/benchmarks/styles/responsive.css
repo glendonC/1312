@@ -120,38 +120,29 @@
     grid-template-columns: 1fr;
   }
 
+  /* Below the joined desktop bar: the same tabs become a wrapping strip of pills.
+     Each pill is content-width so the row is not wasted, and every section stays
+     visible without a hidden horizontal scroll. */
   .bench-tabs {
-    display: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 
-  .instrument-select {
-    display: grid;
-    padding: 12px 14px;
-    align-items: center;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 10px;
+  .bench-tab {
+    min-height: 40px;
+    padding: 0 16px;
     border: 1px solid var(--bench-line-strong);
-    border-radius: 14px;
+    border-radius: 999px;
     background: var(--bench-surface);
   }
 
-  .instrument-select label {
-    color: var(--bench-muted);
-    font-family: var(--font-mono);
-    font-size: 0.55rem;
-    text-transform: uppercase;
-  }
-
-  .instrument-select select {
-    width: 100%;
-    min-height: 42px;
-    padding: 0 34px 0 12px;
-    border: 1px solid var(--bench-line-strong);
-    border-radius: 8px;
-    color: var(--bench-ink);
-    background: #fff;
-    font: inherit;
-    font-size: 0.8rem;
+  .bench-tab:first-child {
+    border-left: 1px solid var(--bench-line-strong);
   }
 
   .instrument-panel {
@@ -213,22 +204,6 @@
     min-height: 70px;
     border-radius: 18px 18px 0 0;
     grid-template-columns: 1fr;
-  }
-
-  .instrument-select {
-    padding-inline: 10px;
-  }
-
-  .instrument-select label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-  }
-
-  .instrument-select select {
-    font-size: 0.875rem;
   }
 
   .instrument-panel {

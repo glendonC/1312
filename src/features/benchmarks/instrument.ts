@@ -7,7 +7,6 @@ function initializeBenchmarkInstruments(): void {
 
     const tabs = Array.from(instrument.querySelectorAll<HTMLButtonElement>("[data-bench-tab]"));
     const panels = Array.from(instrument.querySelectorAll<HTMLElement>("[data-bench-panel]"));
-    const select = instrument.querySelector<HTMLSelectElement>("[data-bench-select]");
 
     const prevButton = instrument.querySelector<HTMLButtonElement>("[data-bench-seq-prev]");
     const nextButton = instrument.querySelector<HTMLButtonElement>("[data-bench-seq-next]");
@@ -46,7 +45,6 @@ function initializeBenchmarkInstruments(): void {
         panel.hidden = panel.dataset.benchPanel !== id;
       });
 
-      if (select) select.value = id;
       instrument.dataset.activePanel = id;
       updateSequence(index);
 
@@ -83,7 +81,6 @@ function initializeBenchmarkInstruments(): void {
       });
     });
 
-    select?.addEventListener("change", () => activate(select.value));
     activate(window.location.hash.slice(1) || "overview", false);
   });
 }

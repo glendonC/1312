@@ -9,13 +9,6 @@ import { tabs } from "./model";
 ---
 
 <section class="bench-instrument" aria-label="Benchmark report" data-bench-instrument>
-  <div class="instrument-select">
-    <label for="bench-section">Section</label>
-    <select id="bench-section" data-bench-select>
-      {tabs.map((tab) => <option value={tab.id}>{tab.label}</option>)}
-    </select>
-  </div>
-
   <div
     class="bench-tabs"
     role="tablist"

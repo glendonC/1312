@@ -60,10 +60,6 @@
   background: transparent;
 }
 
-.instrument-select {
-  display: none;
-}
-
 .bench-tabs {
   display: grid;
   /* Column count follows the tab list; Instrument sets the custom property. */
@@ -141,7 +137,6 @@
 .bench-tab.tab-peach[aria-selected="true"] { background: var(--bench-peach); }
 
 .bench-tab:focus-visible,
-.instrument-select select:focus-visible,
 .instrument-panel:focus-visible,
 .method-group summary:focus-visible,
 .method-item summary:focus-visible,

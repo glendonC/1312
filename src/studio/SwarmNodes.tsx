@@ -15,6 +15,7 @@ import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { isAgentThinking } from "./agentMeshRenderer";
 import { agentState, agentTitle } from "./agentPresentation";
+import { projectResultAccounting } from "./resultAccounting";
 import ResultArtifactMark from "./ResultArtifactMark";
 import { useAgent, useBundle, useComplete, useStudio } from "./store";
 import { RESULT_ARTIFACT_NODE, type AgentSwarmNode } from "./swarm";
@@ -171,8 +172,7 @@ export const ArtifactNode = memo(function ArtifactNode() {
 
   if (!complete || !bundle) return null;
 
-  const pair = `${bundle.run.pair.source.toUpperCase()} → ${bundle.run.pair.target.toUpperCase()}`;
-  const state = `${pair} captions`;
+  const state = `${projectResultAccounting(bundle).pair} captions`;
 
   return (
     <div

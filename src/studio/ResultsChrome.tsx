@@ -1,8 +1,8 @@
 // Direct import so Vite invalidates chrome edits without the Studio route barrel.
 import "../styles/studio/results.chrome.css";
 import RecordedEvidence from "./evidence/RecordedEvidence";
-import { clock } from "./format";
 import { Coverage, Info } from "./glyphs";
+import { projectResultAccounting } from "./resultAccounting";
 import { useBundle, useStudio } from "./store";
 import ChromePanel from "./viewer/chromePanel";
 
@@ -36,22 +36,10 @@ export function ResultsRunPanels() {
   const outputDepth = useStudio((s) => s.outputDepth);
   if (!bundle) return null;
 
-  const { run, captions } = bundle;
+  const { run } = bundle;
   const source = run.clip.source;
-  const pair = `${run.pair.source.toUpperCase()} → ${run.pair.target.toUpperCase()}`;
-  const range = `${clock(0)}–${clock(run.clip.duration)}`;
+  const { pair, range, counts, totalLines } = projectResultAccounting(bundle);
   const showEvidence = outputDepth === "evidence";
-
-  const counts = { captioned: 0, withheld: 0, silent: 0 };
-  for (const cue of captions.cues) {
-    if (cue.silence) {
-      counts.silent += 1;
-      continue;
-    }
-    const tgt = cue.targets.find((t) => t.lang === run.pair.target);
-    if (tgt?.withheld) counts.withheld += 1;
-    else if (tgt?.text) counts.captioned += 1;
-  }
 
   return (
     <>
@@ -80,7 +68,7 @@ export function ResultsRunPanels() {
                 ? source.url
                   ? <a href={source.url} target="_blank" rel="noreferrer noopener">{source.licence}</a>
                   : source.licence
-                : "Recorded evidence"}
+                : "No licence was recorded"}
             </dd>
           </div>
           <div>
@@ -109,7 +97,7 @@ export function ResultsRunPanels() {
             <dt>Coverage</dt>
             <dd className="result-panel-stacked">
               <span>{counts.captioned} captioned, {counts.withheld} withheld, {counts.silent} silent</span>
-              <small>of {captions.cues.length} lines in range</small>
+              <small>of {totalLines} lines in range</small>
             </dd>
           </div>
           <div>

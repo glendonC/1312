@@ -21,8 +21,21 @@ function Value({ palette, children }: { palette: string; children: ReactNode }) 
  * The finished run, accounted for in sentences: the terminal mirror of the preflight's
  * conversational stages. Every value is read from the bundle through the shared accounting
  * projection — the brief has no numbers or names of its own.
+ *
+ * The `detailed` variant is the watch room's Details tab: the same prose plus the honest evidence
+ * class and, at evidence depth, the run's declared files. It is what the report's separate Source
+ * and Coverage disclosures say, folded into one plain-language read.
  */
-export default function ResultBrief({ bundle }: { bundle: RunBundle }) {
+export default function ResultBrief({
+  bundle,
+  detailed = false,
+  showEvidence = false,
+}: {
+  bundle: RunBundle;
+  detailed?: boolean;
+  /** Evidence depth only: append the run's declared artifact files. Ignored unless `detailed`. */
+  showEvidence?: boolean;
+}) {
   const { run } = bundle;
   const { range, counts, totalLines } = projectResultAccounting(bundle);
   const source = run.clip.source;
@@ -56,7 +69,7 @@ export default function ResultBrief({ bundle }: { bundle: RunBundle }) {
           <>
             {" "}
             <Value palette="lilac">{counts.withheld}</Value>{" "}
-            {counts.withheld === 1 ? "was" : "were"} held back instead of guessed — each line
+            {counts.withheld === 1 ? "was" : "were"} held back instead of guessed; each line
             shows why.
           </>
         )}
@@ -72,11 +85,44 @@ export default function ResultBrief({ bundle }: { bundle: RunBundle }) {
         The source is <Value palette="coral">{source.label}</Value>
         {source.licence ? (
           <>
-            , shared under its <Value palette="coral">{source.licence}</Value>
+            , shared under its{" "}
+            {source.url ? (
+              <a
+                className="result-brief-value"
+                data-palette="coral"
+                href={source.url}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                {source.licence}
+              </a>
+            ) : (
+              <Value palette="coral">{source.licence}</Value>
+            )}
           </>
         ) : null}
         .
       </p>
+      {detailed && (
+        <>
+          <p>
+            This is <Value palette="coral">recorded evidence</Value>: an honest demo replay, not a
+            live run. Its language decisions are shown as they were recorded, never scored.
+          </p>
+          {showEvidence && run.artifacts.length > 0 && (
+            <p className="result-brief-files">
+              The run’s files:{" "}
+              {run.artifacts.map((artifact, index) => (
+                <span key={artifact}>
+                  {index > 0 && ", "}
+                  <a href={`/demo/runs/${run.id}/${artifact}`}>{artifact}</a>
+                </span>
+              ))}
+              , and <a href={`/demo/packs/${run.pack}.json`}>{run.pack}.json</a>.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ export default function Dock() {
   const start = useStudio((state) => state.start);
   const reset = useStudio((state) => state.reset);
   const cancelRun = useStudio((state) => state.cancel);
+  const setResultView = useStudio((state) => state.setResultView);
   const togglePause = useStudio((state) => state.togglePause);
   const pausePending = useStudio((state) => state.pausePending);
   const outcome = useStudio((state) => state.outcome);
@@ -56,6 +57,9 @@ export default function Dock() {
   }
 
   function openResults(): void {
+    // The result workspace is hidden on the process graph, so opening it is the same switch the
+    // golden Result orb makes; focus then follows so keyboard and screen-reader users land on it.
+    setResultView("result");
     if (!selectedAgent) {
       focusResultTarget(RECORDED_RESULTS_ID);
       return;

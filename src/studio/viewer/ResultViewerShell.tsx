@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 // Direct import so Vite invalidates shell styles on every surface that composes the viewer.
 import "../../styles/studio/results.viewer.css";
-import { CinemaView, Compress, Expand, PanelDock, PanelNarrower, PanelFloat, PanelWider, SplitView } from "../glyphs";
+import { CinemaView, Compress, Expand, PanelDock, PanelFloat, SplitView } from "../glyphs";
 
 /**
  * Which authority stands behind what is playing. This is presentation of an already-established
@@ -46,6 +46,7 @@ export default function ResultViewerShell({
   frame = "standard",
   media,
   learning,
+  stageConsole,
 }: {
   authority: ResultAuthority;
   /** Optional right side of the shell bar: title and disclosure panels for surfaces without header chrome. */
@@ -59,15 +60,20 @@ export default function ResultViewerShell({
   frame?: "standard" | "workbench";
   media: (slots: ViewerModeSlots) => ReactNode;
   learning: ReactNode;
+  /**
+   * The watch room's command bar, placed as a direct child of the composition rather than inside the
+   * media column, so it is anchored on the room and never rides the transform that slides the clip
+   * aside for the panel. Omitted (undefined) outside the workbench watch room.
+   */
+  stageConsole?: ReactNode;
 }) {
   const viewerRef = useRef<HTMLElement>(null);
   const [viewerMode, setViewerMode] = useState<"split" | "cinema">("split");
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
-  // Where the Learning panel sits once the viewer is full screen, and how wide it reads. Both are
-  // sticky for the session so the choice survives leaving and re-entering full screen.
+  // Where the Learning panel sits once the viewer is full screen. Sticky for the session so the
+  // choice survives leaving and re-entering full screen.
   const [panelPlacement, setPanelPlacement] = useState<"docked" | "float">("docked");
-  const [panelSize, setPanelSize] = useState<"s" | "m" | "l">("m");
   const [viewerNotice, setViewerNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,16 +105,6 @@ export default function ResultViewerShell({
       setViewerNotice("Full screen is unavailable in this browser.");
     }
   };
-
-  const PANEL_SIZES = ["s", "m", "l"] as const;
-  const stepPanelSize = (direction: -1 | 1) => {
-    const index = PANEL_SIZES.indexOf(panelSize);
-    const next = PANEL_SIZES[Math.min(PANEL_SIZES.length - 1, Math.max(0, index + direction))];
-    if (next !== panelSize) setPanelSize(next);
-  };
-  // The learning panel is only a side panel in Split and in full screen; Cinema stacks it below the
-  // video, where a width control has nothing to act on, so the width stepper is hidden there.
-  const panelHasWidth = fullscreen || viewerMode === "split";
 
   // The viewing modes live on the video's control bar, YouTube-style, as one coherent icon control:
   // each glyph depicts the layout it selects (Split and Cinema divide the frame; Full screen is the
@@ -161,37 +157,10 @@ export default function ResultViewerShell({
   );
 
   // The panel-facing settings live in the top-right pill next to the caption controls, not on the
-  // transport bar: how wide the Learning panel reads (Split and full screen), and where it sits once
-  // full screen (Docked beside the video, or Float hovering over it).
+  // transport bar: where the Learning panel sits once full screen (Docked beside the video, or
+  // Float hovering over it). There is deliberately no width control; the panel is sized by the room.
   const panelControls = (
     <>
-      {panelHasWidth && (
-        <>
-          <span className="pcap-div" aria-hidden="true" />
-          <span className="pcap-group pcap-panel" role="group" aria-label="Panel width">
-            <button
-              type="button"
-              className="pcap-btn"
-              aria-label="Narrower panel"
-              disabled={panelSize === "s"}
-              onClick={() => stepPanelSize(-1)}
-            >
-              <PanelNarrower />
-              <span className="pm-tip" aria-hidden="true">Narrower panel</span>
-            </button>
-            <button
-              type="button"
-              className="pcap-btn"
-              aria-label="Wider panel"
-              disabled={panelSize === "l"}
-              onClick={() => stepPanelSize(1)}
-            >
-              <PanelWider />
-              <span className="pm-tip" aria-hidden="true">Wider panel</span>
-            </button>
-          </span>
-        </>
-      )}
       {fullscreen && (
         <>
           <span className="pcap-div" aria-hidden="true" />
@@ -231,7 +200,6 @@ export default function ResultViewerShell({
       data-shell-frame={frame}
       data-view-mode={fullscreen ? "fullscreen" : viewerMode}
       data-fs-panel={fullscreen ? panelPlacement : undefined}
-      data-panel-size={panelSize}
     >
       {frame === "standard" && (
         <div className="result-shell-bar">
@@ -245,6 +213,7 @@ export default function ResultViewerShell({
           {media({ modeControls, panelControls })}
         </div>
         {learning}
+        {stageConsole}
       </div>
     </section>
   );

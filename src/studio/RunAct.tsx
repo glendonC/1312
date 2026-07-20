@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import AgentPanel from "./AgentPanel";
 import { useComplete, useResultFace, useResultView, useStudio } from "./store";
 import SwarmGraph from "./SwarmGraph";
-import { AuthorityBadge } from "./viewer/ResultViewerShell";
 import ResultWorkspace from "./viewer/ResultWorkspace";
 
 export default function RunAct() {
@@ -62,14 +61,6 @@ export default function RunAct() {
           <div className="act-results-viewer" hidden={resultView === "process"}>
             <ResultWorkspace />
           </div>
-          {/* The open graph is never on screen without its recorded-evidence framing. A passive
-              chip, not a toolbar: the one control on this view is the golden Result node itself. */}
-          {resultView === "process" && (
-            <div className="run-evidence-chip" data-agent-focus={focused ? "true" : undefined}>
-              <AuthorityBadge authority="recorded_demo" />
-              <p className="run-action-note">Recorded evidence · completed process graph</p>
-            </div>
-          )}
         </>
       )}
     </motion.section>

@@ -84,6 +84,27 @@ export default function ResultWorkspace() {
         )}
       </AnimatePresence>
 
+      {/* The watch room's own bright chrome, on the room rather than the dimmed header beneath it:
+          the gold result mark anchors the top-left as the run's identity, and the one exit is a
+          squircle at the top-right, its height matched to the mark. Back steps to the report; the
+          canvas orb is still the way back in. */}
+      {face === "watch" && (
+        <>
+          <span className="watch-room-mark" aria-hidden="true">
+            <ResultArtifactMark />
+          </span>
+          <button
+            type="button"
+            className="watch-room-escape"
+            onClick={() => setResultFace("report")}
+            aria-label="Back to the result report"
+          >
+            <span className="watch-room-escape-label">Back</span>
+            <kbd aria-hidden="true">Esc</kbd>
+          </button>
+        </>
+      )}
+
       <motion.aside
         className="result-workspace-hero"
         aria-label="Result summary"
@@ -159,25 +180,15 @@ export default function ResultWorkspace() {
           <span className="result-workspace-stage-rule" data-edge="bottom" aria-hidden="true" />
         </section>
 
-        {/* The focus-panel command baseline: the Source and Coverage disclosures and one exit —
-            Close to the completed graph from the report, Back to the report from the watch
-            room. No view switch — the golden Result node on the canvas is the way back in. */}
-        <nav className="result-workspace-commands" aria-label="Result commands">
-          <div className="result-workspace-command-group">
-            <ResultsRunPanels />
-          </div>
-          {face === "watch" ? (
-            <button
-              type="button"
-              className="result-workspace-escape"
-              data-intent="back"
-              onClick={() => setResultFace("report")}
-              aria-label="Back to the result report"
-            >
-              <span className="result-workspace-escape-label">Back</span>
-              <kbd aria-hidden="true">Esc</kbd>
-            </button>
-          ) : (
+        {/* The focus-panel command baseline belongs to the report: Source and Coverage beside the
+            one exit to the completed graph. The watch room commands from its own bottom bar and
+            exits through the top-right Back, so this baseline stands down there. No view switch —
+            the golden Result node on the canvas is the way back in. */}
+        {face !== "watch" && (
+          <nav className="result-workspace-commands" aria-label="Result commands">
+            <div className="result-workspace-command-group">
+              <ResultsRunPanels />
+            </div>
             <button
               type="button"
               className="result-workspace-escape"
@@ -187,8 +198,8 @@ export default function ResultWorkspace() {
               <span className="result-workspace-escape-label">Close</span>
               <kbd aria-hidden="true">Esc</kbd>
             </button>
-          )}
-        </nav>
+          </nav>
+        )}
       </motion.div>
     </div>
   );

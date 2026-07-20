@@ -7,7 +7,7 @@ import { presentRecordedSource } from "./previewSession";
 import ResultsChrome from "./ResultsChrome";
 import RunAct from "./RunAct";
 import SourceDisplay from "./SourceDisplay";
-import { replayTransport, useBundle, useComplete, usePaused, useStage, useStudio } from "./store";
+import { replayTransport, useBundle, useComplete, usePaused, useResultView, useStage, useStudio } from "./store";
 import useShortcuts from "./useShortcuts";
 
 const DevLab = import.meta.env.DEV ? lazy(() => import("./lab/Lab")) : null;
@@ -17,6 +17,7 @@ export default function StudioApp({ runId }: { runId: string }) {
   const stage = useStage();
   const bundle = useBundle();
   const complete = useComplete();
+  const resultView = useResultView();
   const paused = usePaused();
   const [lab, setLab] = useState(false);
 
@@ -82,7 +83,10 @@ export default function StudioApp({ runId }: { runId: string }) {
         )}
       </AnimatePresence>
 
-      {stage === "run" && !complete && <Dock />}
+      {/* The run's global bar stays through completion on the process graph — status updates to Done
+          with Open Results and Clear — and stands down only when the result workspace is open, where
+          the watch room owns the bottom bar. */}
+      {stage === "run" && (!complete || resultView === "process") && <Dock />}
       {lab && DevLab && (
         <Suspense fallback={null}>
           <DevLab defaultRunId={runId} />

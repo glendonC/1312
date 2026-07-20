@@ -1,0 +1,526 @@
+/*
+ * The watch room: the stage console beneath the centered clip (the selection hint and the one
+ * command bar), the single docked panel the bar swaps between the transcript, Details, Saved, and
+ * Notes, and the on-video prepared-note marks.
+ * Owns: .watch-console, .watch-hint, .watch-bar and its options, .watch-panel and its docked
+ *   modes, and .watch-note*.
+ * Imported by WatchPanel.tsx for direct Vite invalidation.
+ * Layout placement and centering of the media column live in results.summary.css; the lit field
+ *   and the room's viewport chain live in results.shell.css.
+ */
+
+/* Mounted in every workbench face so the viewer never remounts; only the watch room shows the
+   stage console. The docked panel is placed by the shell and gated by the workspace face there. */
+.result-workspace:not([data-workspace-face="watch"]) .watch-console {
+  display: none;
+}
+
+/* Full screen keeps the command bar as a compact dark floating cluster at the frame's lower
+   right, above the transport (the YouTube fullscreen grammar), so the panels stay reachable and
+   dock beside the video on demand while the picture owns the display. The hint stands down; the
+   bar alone is the room's presence there. */
+.result-viewer[data-view-mode="fullscreen"] .watch-console {
+  position: absolute;
+  left: auto;
+  right: 18px;
+  bottom: 76px;
+  z-index: 6;
+  transform: none;
+  align-items: flex-end;
+}
+
+.result-viewer[data-view-mode="fullscreen"] .watch-hint {
+  display: none;
+}
+
+/* With a panel docked beside the video, the cluster stays on the video's own corner (the panel
+   column is minmax(300px, 24%) in results.summary.css; keep these in step). */
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"] .result-main:has(.watch-panel:not([data-watch-panel-mode="closed"])) .watch-console {
+  right: calc(max(300px, 24%) + 18px);
+}
+
+.result-viewer[data-view-mode="fullscreen"] .watch-bar {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(16, 32, 29, 0.6);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.result-viewer[data-view-mode="fullscreen"] .watch-bar-option {
+  height: 40px;
+  padding: 0 14px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.result-viewer[data-view-mode="fullscreen"] .watch-bar-option:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.result-viewer[data-view-mode="fullscreen"] .watch-bar-option[aria-pressed="true"] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.result-viewer[data-view-mode="fullscreen"] .watch-bar-icon,
+.result-viewer[data-view-mode="fullscreen"] .watch-bar-option:hover .watch-bar-icon {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.result-viewer[data-view-mode="fullscreen"] .watch-bar-option[aria-pressed="true"] .watch-bar-icon {
+  color: #fff;
+}
+
+/* ---------- the caption mode control, on the video ---------- */
+
+/* The captions read on the video, so their control rides it: a glass pill at the top of the picture,
+   dark-tinted so it reads over the frame rather than as paper chrome. */
+.watch-caption-controls {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+}
+
+.watch-caption-controls .caption-mode {
+  margin: 0;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(16, 32, 29, 0.5);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.watch-caption-controls .caption-mode-btn {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.watch-caption-controls .caption-mode-btn:hover {
+  color: #fff;
+}
+
+.watch-caption-controls .caption-mode-btn[aria-pressed="true"] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+}
+
+.watch-caption-controls .caption-cloze {
+  border-left-color: rgba(255, 255, 255, 0.24);
+}
+
+.watch-caption-controls .caption-cloze-dot {
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.watch-caption-controls .caption-cloze-dot[data-active="true"] {
+  border-color: #fff;
+  background: #fff;
+}
+
+/* ---------- prepared-note marks on the video ---------- */
+
+/* When the playhead is inside a prepared note's window, one small plain "Note" chip appears on
+   the frame's lower left, clear of the caption line; the notes open on tap and never by
+   themselves. The chip speaks the viewer's language; the lens category is a quiet tag inside the
+   opened note, not the headline. */
+.watch-notes {
+  position: absolute;
+  left: 14px;
+  bottom: 118px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: min(340px, 60%);
+}
+
+.watch-notes[data-note-lens="grammar_salience"],
+.watch-note-body[data-note-lens="grammar_salience"] { --lens: #d8b45a; }
+.watch-notes[data-note-lens="situating"],
+.watch-note-body[data-note-lens="situating"] { --lens: #4fa79f; }
+.watch-notes[data-note-lens="word_order"],
+.watch-note-body[data-note-lens="word_order"] { --lens: #8db8e8; }
+.watch-notes[data-note-lens="culture_reference"],
+.watch-note-body[data-note-lens="culture_reference"] { --lens: #c3a8e0; }
+.watch-notes[data-note-lens="historical_reference"],
+.watch-note-body[data-note-lens="historical_reference"] { --lens: #e096a1; }
+
+.watch-note-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(16, 32, 29, 0.55);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: var(--weight-medium, 500);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.watch-note-mark::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lens, #fff);
+  box-shadow: 0 0 8px -1px var(--lens, #fff);
+}
+
+.watch-note-mark:hover,
+.watch-note-mark[aria-expanded="true"] {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(16, 32, 29, 0.72);
+}
+
+.watch-note-mark:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.watch-note-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 13px;
+  border-left: 2px solid var(--lens, #fff);
+  border-radius: 4px 12px 12px 4px;
+  background: rgba(16, 32, 29, 0.72);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* The category is a quiet tag inside the note, never the mark's headline. */
+.watch-note-kind {
+  color: color-mix(in srgb, var(--lens, #fff) 80%, #fff);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.watch-note-body p {
+  margin: 0;
+}
+
+.watch-note-body b {
+  margin-right: 6px;
+  color: #fff;
+}
+
+/* ---------- the stage console under the clip ---------- */
+
+.watch-console {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+/* One quiet line naming the selection gesture, so a new viewer knows the captions answer to
+   highlighting without having to discover it. */
+.watch-hint {
+  margin: 0;
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+/* ---------- the command bar: the studio's one bottom-bar silhouette ---------- */
+
+/* The glass pill shared by .dock / .source-entry / the pause rail, reused so the watch room reads
+   as the same instrument the run was launched from. It is the room's sole control surface. */
+.watch-bar {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 9px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.58));
+  border-radius: 999px;
+  /* The same glass and lift as the input, run, and pause bars (dock.shell.css .rail) — no heavier
+     shadow than those, so the room's bar reads as the studio's one bottom-bar silhouette. */
+  background: rgba(255, 255, 255, 0.54);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.72),
+    0 9px 24px rgba(26, 70, 66, 0.09);
+  backdrop-filter: blur(20px) saturate(1.55);
+  -webkit-backdrop-filter: blur(20px) saturate(1.55);
+}
+
+/* Each option is a flat, label-forward control that lights its icon and takes a quiet ground on
+   hover, and reads as selected through the accent when its mode is docked. No nested capsules. */
+.watch-bar-option {
+  display: inline-flex;
+  height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.watch-bar-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  transition: color 150ms ease;
+}
+
+.watch-bar-icon svg {
+  display: block;
+}
+
+.watch-bar-option:hover {
+  color: var(--ink, #161d1b);
+  background: rgba(22, 29, 27, 0.05);
+}
+
+.watch-bar-option:hover .watch-bar-icon,
+.watch-bar-option[aria-pressed="true"] .watch-bar-icon,
+.watch-bar-option[data-watch-option="tune"][data-learning-prep-state="ready"] .watch-bar-icon {
+  color: var(--accent, #2f746e);
+}
+
+.watch-bar-option[aria-pressed="true"] {
+  color: var(--ink, #161d1b);
+  background: var(--accent-soft, rgba(47, 116, 110, 0.1));
+}
+
+.watch-bar-option:focus-visible {
+  outline: 2px solid var(--accent, #2f746e);
+  outline-offset: 2px;
+}
+
+/* ---------- the one docked panel ---------- */
+
+/* Base: a flex column that fills whatever holds it. The full-screen docked/float column keeps its
+   own placement, so this is all it needs there. */
+.watch-panel {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+}
+
+/* No card in the watch stage: the panel floats over the room's right directly on the field, the way
+   focus evidence sits on the dimmed world. It holds one mode at a time (the transcript, the run's
+   Details, the saved collection, or the Notes face) and fades and rises in as the clip steps aside,
+   so opening a command reads as one motion, not a drawer sliding out of a box. */
+.result-workspace[data-workspace-face="watch"] .result-viewer[data-shell-frame="workbench"]:not([data-view-mode="fullscreen"]) .watch-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: var(--watch-panel-w, clamp(360px, 30vw, 500px));
+  height: auto;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity 300ms ease,
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Closed: the panel lifts off and the clip takes the whole room. */
+.result-workspace[data-workspace-face="watch"] .result-viewer[data-shell-frame="workbench"]:not([data-view-mode="fullscreen"]) .watch-panel[data-watch-panel-mode="closed"] {
+  opacity: 0;
+  transform: translateX(22px);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-workspace[data-workspace-face="watch"] .result-viewer[data-shell-frame="workbench"]:not([data-view-mode="fullscreen"]) .watch-panel {
+    transition: opacity 120ms ease;
+    transform: none;
+  }
+  .result-workspace[data-workspace-face="watch"] .result-viewer[data-shell-frame="workbench"]:not([data-view-mode="fullscreen"]) .watch-panel[data-watch-panel-mode="closed"] {
+    transform: none;
+  }
+}
+
+/* Full screen with the panel closed: nothing docks, and the video takes the whole display instead
+   of leaving an empty rail where a panel would sit. */
+.result-viewer[data-view-mode="fullscreen"] .watch-panel[data-watch-panel-mode="closed"] {
+  display: none;
+}
+
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"] .result-main:has(.watch-panel[data-watch-panel-mode="closed"]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The transcript is mounted whenever the panel is, so a pinned explanation and the reading position
+   survive a trip through Details or Notes; it is shown only in its own mode. */
+.watch-panel-transcript {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.watch-panel:not([data-watch-panel-mode="transcript"]) .watch-panel-transcript {
+  display: none;
+}
+
+/* No card in the room: the transcript is a reading column on the field, not a boxed panel. */
+.watch-panel-transcript .learning-workspace {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  max-height: none;
+  overflow: hidden;
+}
+
+/* The reading feed fills the panel and scrolls inside it, rather than keeping the split view's
+   fixed preview height while the room is a whole viewport tall. A soft top-and-bottom fade lets
+   lines dissolve into the field at the column's edges instead of ending on a hard cut. */
+.watch-panel-transcript .cues {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  min-height: 0;
+  max-height: none;
+  padding: 6px 2px 20px;
+  overflow-y: auto;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 26px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 26px), transparent 100%);
+}
+
+/* Sleeker in the room than in the split card: more air per line, a lighter active tint that reads
+   as a lit line rather than a filled row, and the withheld/silence tells kept quiet. */
+.watch-panel-transcript .cue {
+  padding: 15px 6px 16px 14px;
+}
+
+.watch-panel-transcript .cue.is-active {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent, #2f746e) 9%, transparent),
+    transparent 82%
+  );
+}
+
+.watch-panel-docked {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 2px 4px 22px 16px;
+}
+
+.watch-panel-docked:focus-visible {
+  outline: none;
+}
+
+.watch-panel-region {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Minimal head on the field: the mode's name as a quiet eyebrow, its labelled close to the right,
+   and a hairline rule instead of a card lid. */
+.watch-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink, #161d1b) 8%, transparent);
+}
+
+.watch-panel-title {
+  margin: 0;
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6rem;
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.watch-panel-close {
+  padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, var(--ink, #161d1b) 14%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.watch-panel-close:hover {
+  color: var(--ink, #161d1b);
+  background: color-mix(in srgb, var(--ink, #161d1b) 5%, transparent);
+  border-color: color-mix(in srgb, var(--ink, #161d1b) 24%, transparent);
+}
+
+.watch-panel-close:focus-visible {
+  outline: 2px solid var(--accent, #2f746e);
+  outline-offset: 2px;
+}
+
+/* The Details tab speaks in the same sentences the arrival and report briefs use — the system
+   telling the viewer what this run is and how much of it got captioned — sized for the reading
+   column and floating on the field with no panel of its own. */
+.watch-panel-region .result-brief p {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  line-height: 1.62;
+}
+
+.watch-panel-region .result-brief p:last-child {
+  margin-bottom: 0;
+}
+
+.watch-panel-region .result-brief-files {
+  font-size: 0.82rem;
+}
+
+.watch-panel-scope {
+  margin: 0;
+  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
+  font-family: var(--font-mono, monospace);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+

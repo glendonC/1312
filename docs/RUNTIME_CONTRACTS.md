@@ -6,8 +6,10 @@
 - Last verified: 2026-07-20
 - Update when: A runtime contract changes, or fixture history is split out
 
-Long contract reference. For product orientation use [`PRODUCT.md`](./PRODUCT.md) and
-[`ARCHITECTURE.md`](./ARCHITECTURE.md).
+Long contract reference for implementers. For product orientation use [`PRODUCT.md`](./PRODUCT.md)
+and [`ARCHITECTURE.md`](./ARCHITECTURE.md). For how to run Studio locally use the root
+[`README.md`](../README.md) Try it section. For current next actions use
+[`build-week/STATUS.md`](./build-week/STATUS.md) **Now**.
 
 This file mixes two authorities until fixture history is split:
 

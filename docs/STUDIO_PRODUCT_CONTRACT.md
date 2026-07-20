@@ -3,8 +3,25 @@
 - Document type: UI/runtime contract
 - Lifecycle: Active
 - Authority: Studio meaning, authority, actions, evidence classes, and unavailable states
-- Last verified: 2026-07-19
+- Last verified: 2026-07-20
 - Update when: A Studio surface or authority boundary changes
+
+## Read this first
+
+How to run Studio locally: root [`README.md`](../README.md) Try it.
+
+| Path | Meaning |
+|---|---|
+| **Input Source** paste (YouTube URL) | Local YouTube ingest. Needs `npm run runtime:host` + Connect. Not run-006. |
+| **Process locally** | YouTube range or owned file on the same host. |
+| **Explore a recording** | Recorded run-006 demo only. |
+| Public try1321.com without a host | No hosted cloud ingest yet. |
+
+Submitted-preview / paste-to-replay is retired. Do not revive it.
+
+For product identity use [`PRODUCT.md`](./PRODUCT.md). For current milestones use
+[`build-week/STATUS.md`](./build-week/STATUS.md) **Now**. Everything below is the full surface
+inventory for people changing Studio meaning or authority.
 
 ## Purpose
 
@@ -89,31 +106,22 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 
 ## Current system truth
 
-- The recorded URL/demo side of default `/studio/` is hard-wired to `run-006` in
-  `src/pages/studio/index.astro` and boots a `ReplayTransport` in `src/studio/StudioApp.tsx` and
-  `src/studio/store.ts`. The top-right source chooser exposes separate YouTube-range and owned-file
-  local ingest actions. Both open the local host path without changing the replay store or projecting
-  production events as replay agents.
-- `ReplayTransport` reads `public/demo/runs/<id>/` files. The recorded URL/demo loop does not create
-  a runtime job, start `scripts/run-clip.mjs`, start `scripts/run-local-worker.ts`, or load a
-  production journal. The owned-source product surface and the development-only `/studio/?lab=1`
-  surface call the separate local runtime-start host without changing replay state.
-- The centered welcome keeps **Input Source** as its persistent bottom action, and it is the
-  primary real-processing entry. A pasted YouTube link opens the local YouTube ingest authority
-  seeded with that link; the control stays machine-readable as
-  `data-source-authority="live-local"`. Paste alone resolves no metadata, downloads nothing, and
-  creates no preview or replay identity: the bounded range, the local-processing confirmation, and
-  the loopback host's own re-validation all still stand between the field and any bytes. A
-  collapsed 40px chooser aligned with the top-left mark contains three alternate paths:
-  **Process a YouTube range locally**, **Process a file I own locally**, and **Explore the recorded
-  run-006 demo**. It groups the first two under **Process locally** and the replay under **Explore a
-  recording**. Example YouTube links sit with the local paths and only prefill the bottom field. The
-  YouTube local action opens the authenticated
-  product local-runtime surface, requires an explicit URL/range/local-processing confirmation, and
-  never creates a preview or replay identity. The loopback host resolves and
-  downloads it through a host-owned yt-dlp/ffmpeg seam, seals exact private bytes plus provider and
-  local-processing receipts, hot-registers the provider-neutral source session, and returns it to the
-  same forecast/start stages used by an owned upload.
+- The centered welcome keeps **Input Source** as the primary real-processing entry. A pasted YouTube
+  link opens the local YouTube ingest authority seeded with that link
+  (`data-source-authority="live-local"`). Paste alone resolves no metadata, downloads nothing, and
+  creates no replay identity: the bounded range, local-processing confirmation, and loopback host
+  re-validation stand between the field and any bytes. The host resolves and downloads through a
+  host-owned yt-dlp/ffmpeg seam, seals private bytes plus receipts, hot-registers the session, and
+  returns it to the same forecast/start stages as owned upload.
+- A collapsed chooser holds **Process a YouTube range locally**, **Process a file I own locally**,
+  and **Explore the recorded run-006 demo** (under **Explore a recording**). Only the last path
+  replays `run-006`.
+- `ReplayTransport` reads `public/demo/runs/<id>/` for the recorded demo. It does not create a
+  runtime job for a pasted URL. Studio still boots replay machinery for the demo path in
+  `src/pages/studio/index.astro`, `StudioApp.tsx`, and `store.ts`. Local ingest uses
+  `ProductLocalRuntime` and the host without projecting production events as replay agents.
+- The owned-source product surface and `/studio/?lab=1` call the local runtime-start host without
+  changing replay state.
 - `run-005` and `run-006` contain recorded artifacts used by the Studio and lab. `run-005` is also
   the content-addressed owned-media validator fixture consumed by local runtime tests.
 - A local runtime-start host now exists under

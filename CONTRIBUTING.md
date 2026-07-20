@@ -30,6 +30,13 @@ npm run dev
 Use `npm install` only when intentionally changing a dependency or the lockfile. The repository does
 not pin a Node version, so do not add an unsupported version claim.
 
+For real Studio ingest (paste YouTube or Process locally), also run `npm run runtime:host` and
+connect Studio with the printed `listening` URL and `authorizationToken`. See the root
+[`README.md`](README.md) Try it section.
+
+Secrets: copy [`.env.example`](.env.example) to `.env` when you need `OPENAI_API_KEY`. Default
+`runtime:host` ingest does not require it. Never commit `.env`.
+
 ## Make an evidence-backed change
 
 - Verify current behavior against code, tests, schemas, or bound receipts.

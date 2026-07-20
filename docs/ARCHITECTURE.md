@@ -38,8 +38,9 @@ Public site (Astro)          Studio product app (React)
 5. Captions and learning are Apply uses of checked understanding, not the category. See
    [`PRODUCT.md`](./PRODUCT.md).
 
-Default `/studio/` demo is a **recorded** investigation. Live study needs the local runtime host
-path. Recorded replay is not live execution.
+With the local runtime host, Studio paste / Process locally runs real ingest. **Explore a
+recording** is the recorded run-006 demo. Recorded replay is not live execution. Hosted cloud
+ingest on the public site is not available yet.
 
 ## Stack (short)
 

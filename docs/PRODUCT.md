@@ -119,7 +119,7 @@ meaning. That proves the spine. It does **not** redefine the product as “hard 
 | [`/method/`](https://www.try1321.com/method/) | How 1321 understands media |
 | [`/journey/`](https://www.try1321.com/journey/) | Why this exists; Build Week evidence log |
 | [`/benchmarks/`](https://www.try1321.com/benchmarks/) | Evaluation surface (not the product definition) |
-| [`/studio/`](https://www.try1321.com/studio/) | Product UI (ingest, swarm, workspaces, traces); default demo is recorded |
+| [`/studio/`](https://www.try1321.com/studio/) | Product UI. Local host: paste YouTube or Process locally for real ingest; Explore a recording is the run-006 demo. No hosted cloud ingest on the public site yet. |
 
 ## Related
 

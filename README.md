@@ -40,22 +40,52 @@ hard case (overlap, culture, register, speed). More of the why:
 [Benchmarks](https://www.try1321.com/benchmarks/) ·
 [Studio](https://www.try1321.com/studio/)
 
-The public Studio demo replays a recorded investigation so you can see the product without running
-a host. Pasting a URL there does not process that video.
+The public site has no hosted cloud ingest yet. Real YouTube paste needs the local steps below.
+**Explore a recording** still opens the recorded run-006 demo without a host.
 
-**Locally (real ingest):**
+### Local: browse the site and the recorded demo
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Use `npm install` only when intentionally changing a dependency or the lockfile. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md).
+Open `http://localhost:4321/` or `/studio/` → **Explore a recording**. No API key required.
+Use `npm install` only when changing a dependency or the lockfile.
 
-Same site routes under `http://localhost:4321`. In Studio, use **Process locally** (YouTube range or
-a file you own) with the local runtime host. That path really ingests and studies your source.
-**Explore a recording** is the recorded demo path.
+### Local: paste a YouTube URL (real ingest)
+
+1. Optional: copy [`.env.example`](.env.example) to `.env`. You do **not** need `OPENAI_API_KEY` for
+   default ingest (deterministic host). Add the key only for real OpenAI caption / explanation /
+   Codex paths (next section).
+2. In two terminals:
+
+```sh
+npm run dev
+npm run runtime:host
+```
+
+3. The host prints JSON on stdout. Copy `listening` (default `http://127.0.0.1:4312`) and
+   `authorizationToken`.
+4. Open `http://localhost:4321/studio/`, use **Connect to local host**, paste origin + token.
+5. Paste a YouTube URL into **Input Source**. That runs local YouTube ingest for that video (not
+   run-006). You can also use **Process locally** for a YouTube range or a file you own.
+
+More host flags and honesty boundaries:
+[`docs/STUDIO_PRODUCT_CONTRACT.md`](docs/STUDIO_PRODUCT_CONTRACT.md).
+
+### Local: real OpenAI captions / Codex (optional)
+
+Put your key in `.env` (never commit it):
+
+```sh
+cp .env.example .env
+# edit .env → OPENAI_API_KEY=...
+```
+
+Then use the guarded host commands in [`package.json`](package.json) (for example
+`runtime:host:caption-real`, `runtime:host:codex`). Those require explicit `--allow-real-*` flags
+and are not the default `runtime:host` path. Details: [`docs/CODEX.md`](docs/CODEX.md).
 
 ## Where next
 

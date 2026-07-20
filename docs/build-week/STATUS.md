@@ -6,35 +6,49 @@
 - Last verified: 2026-07-20
 - Update when: Engineering state changes
 
+## Now
+
+**Now is only what remains after today.** What already shipped for this submission lives in the
+[completion record](#completion-record) (local YouTube paste, Explore run-006 demo, owned-path spine,
+results faces, Bet G machinery). Do not re-read stale “make it demoable” items as missing product.
+
+### Next (future only)
+
+1. **Hosted cloud ingest** so public try1321.com paste can process without a local runtime host.
+2. **U7 ablation follow-through:** run the 9 pending pre-registered `hard-ko-v1`
+   raw-versus-eligible-stem pairs, get exact-byte-bound blinded labels, score all 18 captures.
+   Structural checklist only; not a semantic win by itself.
+3. **Keep IL-03 / kinship campaign incomplete:** do not retry spent c2 without-rule slots or treat
+   hackathon labels, six pairs, or refused qualification as a campaign win. Replacement grid or real
+   independent blind review needs a separate slice.
+4. **Later eval depth:** variance / repeated scores / later packs under G1, without upgrading
+   run-007 or structural QC into translation quality.
+
+### Parked (not this climb)
+
+- Learning OS, Anki/Quizlet/Feather exports, in-app tutors, mastery, SRS
+- Live/low-latency captions and always-on capture as the primary product
+- Unrestricted computer/browser/shell, credentials, uploads, publication, account changes
+- Unlimited / distributed autonomy theater
+- Accounts, retention policy, public CDN publication, production topology beyond local host
+
+### Tracks (do not confuse)
+
+- **Bet G / miss-to-gold:** beachhead meaning measurement on frozen evidence. Not swarm completeness.
+- **Owned-path runtime:** local study spine with receipts. Not media truth or translation quality.
+
 ## Document roles
 
-This is the **only living engineering status and roadmap**. Completed owned-swarm planning
-checklists have been consolidated into the completion record below; Git retains their detailed
-history. Product identity and architecture define stable intent and boundaries. Autonomy and
-contract documents are deep references. The miss-to-gold RFC owns conveyor invariants, not pack
-counts. The media-understanding capability sequence lives in
-[`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md); rung IDs such as U1 through U7 are defined there.
-This file summarizes acceptance and blockers; it does not reopen the closed owned-path v2 campaign.
+This is the living engineering status and roadmap. Product identity lives in
+[`PRODUCT.md`](../PRODUCT.md). Capability sequence and rung IDs live in
+[`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md). Contracts and autonomy ledgers are deep
+references, not status. Read **Now** first; use the completion record only when you need what was
+accepted.
 
-## North stars
+## Completion record
 
-Product identity is defined in [`PRODUCT.md`](../PRODUCT.md) and the public site. This file tracks
-engineering status only.
+Git and the ladder retain detail. This is the accepted spine, not the place to start.
 
-North stars for the active engineering tracks:
-
-- **Evaluation — Bet G / miss-to-gold:** turn run misses into agent-drafted, human-adjudicated,
-  receipt-frozen gold, then score and compare against that fixed evidence. This measures beachhead
-  meaning quality; it does not establish runtime autonomy or swarm completeness.
-- **Runtime — owned-path swarm depth:** execute and replay a bounded, agent-directed owned-media
-  study path with exact source, task, evidence, report, admission, synthesis, approval, post-study
-  text artifact, and QC lineage. This establishes the implemented understanding spine; it does not
-  establish media truth or translation quality.
-
-Keep these tracks separate. A Bet G score is not swarm depth, and runtime depth is not a quality
-score.
-
-## Done
 
 - **Owned-path depth v1:** the four foundational slices are implemented: range-bound perception and
   evidence reads, a root-to-child round trip, current-run caption/QC lineage, and a production-backed
@@ -366,6 +380,7 @@ and non-claims remain in the ladder.
   reading rail. The viewer stays mounted across faces, so playback, prep, pinned explanations,
   and saved items survive every transition and the round trip through the completed graph.
 
+
 ## Post-freeze backlog boundary
 
 ### Sequenced next — active understanding backlog
@@ -414,21 +429,10 @@ indefinite deferrals. Status here is a summary; ladder done-when and non-claims 
 - UI redesign/projection work owned elsewhere, plus hosted/link ingest, accounts, retention/access
   policy, public upload/CDN/publication, and production-topology work.
 
-## Next
-
-1. Catch the UI up to the validated production projections without inventing missing runtime facts.
-2. Make one owned-path walkthrough demoable end to end: source → plan → bounded swarm → study → human
-   approval → private captions/QC, with the recorded lineage visible.
-3. Execute the 9 pending pre-registered `hard-ko-v1` raw-versus-eligible-stem operation pairs through
-   the exact packager, then obtain exact-byte-bound blinded human labels and score all 18 captures.
-   The follow-through audit is the structural checklist, not a semantic result. Measure variance
-   later without recasting run-007 or structural diagnostics as runtime semantic QC.
-4. Preserve the provider-authorized campaign as an incomplete partial measurement. Do not retry the
-   three spent c2 without-rule attempts or treat the hackathon labels, six pairs, or refused
-   qualification command as a campaign win. Any replacement grid or real independent blind human
-   review requires a separately authorized slice.
 
 ## Honesty non-claims
+
+Standing product non-claims:
 
 - Recognizer hypotheses, coverage, citation closure, human approval, and structural QC are not
   transcription accuracy or translation quality.
@@ -439,64 +443,13 @@ indefinite deferrals. Status here is a summary; ladder done-when and non-claims 
   model judge; one human-labeled capture does not establish calibration, generalization, or that the
   prepped path is better.
 - The IL-03 provider campaign has 15 scored captures under disclosed hackathon labels and six
-  partial pairs, not independent blind human semantic QC or a qualification result. The partial
-  deltas are unfavorable, but an incomplete grid still cannot establish a campaign outcome.
-  Eligibility is not deployment, accepted memory is not runtime consumption, and none of these
-  facts proves a product self-improvement win.
-- U1 proves bounded execution, lineage, authorization, full-duration accounting, and abstention. It
-  does not prove acoustic classification accuracy, complete speech detection, lyric understanding,
-  transcription/translation correctness, or semantic caption QC.
-- U2 proves bounded source/video-track decoding, content-addressed PNG delivery, receipt lineage,
-  and replay/tamper closure. It does not prove that a child selected the right timestamp, saw or
-  understood a scene, recognized text or people, or produced a study-admissible visual claim.
-- U3 proves typed observation-to-target association, per-kind cold audit, range closure, generalized
-  abstention preservation, and content-addressed replay. It does not prove multimodal understanding,
-  evidence accuracy, independent corroboration, reliability equivalence, truth arbitration,
-  transcription/translation quality, OCR accuracy, or scene understanding.
-- U4 proves exact weak-range/cause selection, one bounded delta-bearing pass, scheduler caps/dedupe,
-  durable pass history/disagreement, attenuation-only citation support upgrades, padded-context
-  weak-state preservation, terminal weakness, and replay.
-  A pass count, token count, agent count, role label, or successful citation does not prove
-  understanding, semantic correctness, accuracy, quality, or improvement.
-- U5 proves one bounded local OCR execution path, exact U2 frame lineage, immutable hypotheses,
-  cold audit/tamper closure, cite-only U3 association, and fail-closed limits/abstention. It does not
-  prove displayed text is correct, identify a person/place/object, infer script/language,
-  translate/culturally interpret text, understand a scene, select the right frame, or improve a
-  transcript/caption.
-- U5.1 proves one bounded deterministic adjacent-frame RGB-grid measurement path, exact same-
-  executor U2/U5 lineage, immutable score/classification/interval identities, cold rerun, and
-  cite-only temporal association. It does not prove a scene, shot, cut, semantic change, relevant
-  moment, right frame, person, object, place, action, mood, culture, OCR truth, dialogue, caption
-  correctness, quality, or improvement.
-- U6 proves one bounded local anonymous-clustering execution path, exact owned-audio lineage,
-  complete range accounting, immutable hypotheses/receipt, cold audit/tamper closure, U3
-  coverage/conflict preservation, and one exact typed overlap-to-attenuated-speech request. It does
-  not prove that pass resolved overlap, identify people, link speakers across artifacts or runs, prove
-  speaker count/turn boundaries, validate any word or translation, authorize captions,
-  perform separation, or establish diarization accuracy.
-- U7 proves one exact U6.1-triggered and one U7.1 U1-`mixed`-triggered local separation path, private
-  raw/stem lineage, immutable receipts, same-recognizer structural comparison, and cold replay/tamper
-  closure. The Bet G adapter proves only exact input registration, capture completeness, and
-  missing/withheld mapping. The follow-through audit proves only exact minimum-grid accounting,
-  pair/score binding, and typed local readiness; its current 0 of 18 state is pending, not success.
-  It does not prove that either estimate is cleaner or semantically better,
-  that agreement is independent evidence, that any recognized word or translation is correct, or
-  that stems may support claims, captions, publication, speaker identity, source identity, or a
-  quality/improvement score.
-  The pinned SepFormer is a two-speaker wsj0-2mix model, so a `mixed` speech-plus-music U1 trigger
-  runs it outside its training domain and claims only raw-versus-stem comparability, never that music
-  and speech were cleanly separated.
-- R1 proves trigger-gated grant minting, closed egress policy enforcement, receipted
-  search/snapshot/extraction lineage, journal-projected operations with executor binding, cold
-  audit by content identity, exact snapshot-span worker echoes, cite-only `external_document_span`
-  report construction/admission, and one cold-auditable structural exhaustion cause when the full
-  query budget returns no results. It does not prove
-  source truth, currency, entity match, semantic correctness, transcript or caption authority, or
-  semantic insufficiency. It does not prove that any run researched anything: no default run
-  produces research, snippets are never
-  citations, and the snapshot receipts keep disclosing
-  `dnsRebindingWindow: "checked_before_fetch_not_pinned"` because the destination address is
-  re-resolved between the policy check and the fetch.
+  partial pairs, not independent blind human semantic QC or a qualification result. Eligibility is
+  not deployment, and none of these facts proves a product self-improvement win.
+- Paste YouTube local ingest requires a running local host. Hosted cloud ingest remains missing.
+- Explore a recording / run-006 is demo replay, not live processing of a pasted URL.
+
+Per-rung "does not prove" lists live in [`CAPABILITY_LADDER.md`](./CAPABILITY_LADDER.md). Do not
+copy them here.
 
 ## Where to read what
 

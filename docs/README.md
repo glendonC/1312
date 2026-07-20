@@ -6,25 +6,35 @@
 - Last verified: 2026-07-20
 - Update when: A public owner document is added, removed, renamed, or changes responsibility
 
-Find the document that owns a question. Verify implementation claims against code, schemas, tests,
-and bound receipts.
+Start with the [repository README](../README.md) for what / why / try it (including local host and
+`.env`). Verify implementation claims against code, schemas, tests, and bound receipts.
 
-Start with the [repository README](../README.md) for what / why / try it.
+Site: [try1321.com](https://www.try1321.com/).
 
 ## Start here
 
-| If you want… | Go here |
-|---|---|
-| What the product is (and is not) | [`PRODUCT.md`](./PRODUCT.md) |
-| How the system fits together | [`ARCHITECTURE.md`](./ARCHITECTURE.md) |
-| Local setup and contribution | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
-| Why Korean-to-English first | [Why 1321 has to exist](https://www.try1321.com/journey/2026-07-13-why-1321/) ([source](../src/content/journey/2026-07-13-why-1321.md)) |
-| How agents run in the product | [`CODEX.md`](./CODEX.md) |
-| Current milestones and next actions | [`build-week/STATUS.md`](./build-week/STATUS.md) |
-| Eval packs, scores, and receipts | [`../bench/README.md`](../bench/README.md) |
+| If you want… | Go here | Stop when… |
+|---|---|---|
+| What the product is (and is not) | [`PRODUCT.md`](./PRODUCT.md) | You understand the loop |
+| How the system fits together | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | You finish “How the system fits together” |
+| How to run locally | [README Try it](../README.md#try-it) + [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Host is connected or you only need the demo |
+| Why Korean-to-English first | [Why 1321 has to exist](https://www.try1321.com/journey/2026-07-13-why-1321/) | You have the human story |
+| Current next actions | [`build-week/STATUS.md`](./build-week/STATUS.md) **Now** | You have Next / Parked / tracks |
+| How agents run in the product | [`CODEX.md`](./CODEX.md) | You know the cage |
+| Eval packs and scores | [`../bench/README.md`](../bench/README.md) | You finish “In short” |
 
-Site: [try1321.com](https://www.try1321.com/). Most visitors only need PRODUCT, then Architecture’s
-opening section. Open the deeper owners below when you are changing that part of the system.
+Most visitors never need the deep owners below.
+
+## Deep owners (only when changing that system)
+
+| Document | Open when you are… |
+|---|---|
+| [`STUDIO_PRODUCT_CONTRACT.md`](./STUDIO_PRODUCT_CONTRACT.md) | Changing Studio meaning, authority, or unavailable states (read **Read this first** first) |
+| [`RUNTIME_CONTRACTS.md`](./RUNTIME_CONTRACTS.md) | Changing production runtime schemas or hosts |
+| [`STUDIO_AUTONOMY.md`](./STUDIO_AUTONOMY.md) | Changing durable runtime decisions (ledger below Decisions is history) |
+| [`build-week/CAPABILITY_LADDER.md`](./build-week/CAPABILITY_LADDER.md) | Changing rung order or done-when |
+| [`rfcs/0001-miss-to-gold-conveyor.md`](./rfcs/0001-miss-to-gold-conveyor.md) | Changing miss-to-gold invariants |
+| [`build-week/STATUS.md`](./build-week/STATUS.md) completion record | Checking what was already accepted |
 
 ## Owner registry
 
@@ -75,7 +85,8 @@ metadata, not proof.
 
 - Keep each current fact in one owner. Summaries link to the owner instead of copying detail.
 - Update a normative owner in the same accepted slice as the behavior change.
-- Let status summarize. Keep contract inventories out of architecture and roadmap state out of RFCs.
+- Let status lead with **Now**. Keep contract inventories out of architecture and roadmap state out
+  of RFCs.
 - Never link public docs to `docs/local/`. Treat tracked code mentions as cleanup debt, not authority,
   and do not add new ones.
 - Delete resolved local handoffs after their durable content is folded into an owner.

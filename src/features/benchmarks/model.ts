@@ -90,6 +90,24 @@ requireReceiptLink(
 );
 requireReceiptLink(scoreReceipt.delta_vs_cold.critical_meaning_rate < 0, "receipt no longer shows cold leading");
 
+const preparedHeadline = scoreReceipt.systems["1321-prepped"].headline;
+const coldHeadline = scoreReceipt.systems["1321-cold"].headline;
+
+// The overview states that preparation lost and that withholding is the mechanism.
+// Both must stay true in the receipt or the headline inverts silently.
+requireReceiptLink(
+  coldHeadline.critical_meaning.passes > preparedHeadline.critical_meaning.passes,
+  "cold no longer preserves more critical units than prepared",
+);
+requireReceiptLink(
+  preparedHeadline.critical_outcomes.withheld > 0,
+  "prepared no longer withholds a critical unit, so the withholding explanation is unsupported",
+);
+requireReceiptLink(
+  coldHeadline.critical_meaning.total === preparedHeadline.critical_meaning.total,
+  "systems no longer share one critical unit denominator",
+);
+
 export const tabs = [
   { id: "overview", label: "Overview", color: "ink" },
   { id: "evidence", label: "Coverage", color: "coral" },
@@ -106,13 +124,19 @@ export const roleLabels: Record<string, string> = {
   hard: "Hard clip",
 };
 
-export const scoredSystems = Object.entries(scoreReceipt.systems).map(([id, result]) => ({
-  id,
-  label: id === "1321-prepped" ? "Prepared" : "No preparation",
-  role: result.role,
-  result,
-  capture: captureReceipt.systems.find((system) => system.id === id),
-}));
+// Control first, so every panel reads left to right in the same order as the overview.
+// Receipt key order is not display order.
+const systemDisplayOrder = ["1321-cold", "1321-prepped"];
+
+export const scoredSystems = Object.entries(scoreReceipt.systems)
+  .map(([id, result]) => ({
+    id,
+    label: id === "1321-prepped" ? "Prepared" : "No preparation",
+    role: result.role,
+    result,
+    capture: captureReceipt.systems.find((system) => system.id === id),
+  }))
+  .sort((a, b) => systemDisplayOrder.indexOf(a.id) - systemDisplayOrder.indexOf(b.id));
 
 export const resultBySystem = new Map(scoredSystems.map((system) => [system.id, system.result]));
 
@@ -141,6 +165,21 @@ export const evidenceRows = packClips.map((clip) => ({
   labels: clip.outputLabeled,
   score: clip.scored,
 }));
+
+// Every overview headline number resolves from the score receipt or the frozen pack.
+// Nothing here may be written as a literal.
+export const overviewFacts = {
+  preparedShortfall: coldHeadline.critical_meaning.passes - preparedHeadline.critical_meaning.passes,
+  preparedWithheld: preparedHeadline.critical_outcomes.withheld,
+  coldWithheld: coldHeadline.critical_outcomes.withheld,
+  preparedWrong: preparedHeadline.critical_outcomes.wrong,
+  coldWrong: coldHeadline.critical_outcomes.wrong,
+  criticalUnits: preparedHeadline.critical_meaning.total,
+  scoredClips: packClips.filter((clip) => clip.scored).length,
+  totalClips: freezeReceipt.clips.length,
+  reviewers: labelsReceipt.reviewers.length,
+  catastrophic: preparedHeadline.catastrophic.count + coldHeadline.catastrophic.count,
+} as const;
 
 export const comparisonConditions = [
   ...scoredSystems.map((system) => ({

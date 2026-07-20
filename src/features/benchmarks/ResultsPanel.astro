@@ -3,6 +3,7 @@ import SectionLede from "./SectionLede.astro";
 import {
   displayRate,
   outcomePercent,
+  outcomeStates,
   scoredSystems,
 } from "./model";
 import { sectionCopy } from "./sections";
@@ -40,8 +41,8 @@ import { sectionCopy } from "./sections";
                   <span>Preservation rate</span>
                 </div>
                 <div>
-                  <strong>{headline.catastrophic.count} / {headline.catastrophic.denominator}</strong>
-                  <span>Serious errors / shown</span>
+                  <strong>{headline.catastrophic.count}</strong>
+                  <span>Serious errors in {headline.catastrophic.denominator} shown</span>
                 </div>
               </div>
               <div
@@ -55,10 +56,12 @@ import { sectionCopy } from "./sections";
                 <span class="outcome-missing" style={`width:${outcomePercent(outcomes.missing, outcomes.total)}`}></span>
               </div>
               <dl class="outcome-values">
-                <div class="outcome-correct"><dt>Correct</dt><dd>{outcomes.correct}</dd></div>
-                <div class="outcome-wrong"><dt>Wrong</dt><dd>{outcomes.wrong}</dd></div>
-                <div class="outcome-withheld"><dt>Withheld</dt><dd>{outcomes.withheld}</dd></div>
-                <div class="outcome-missing"><dt>Missing</dt><dd>{outcomes.missing}</dd></div>
+                {outcomeStates.map((state) => (
+                  <div class={`outcome-${state.id}`}>
+                    <dt>{state.label}</dt>
+                    <dd>{outcomes[state.id]}</dd>
+                  </div>
+                ))}
               </dl>
             </article>
           );

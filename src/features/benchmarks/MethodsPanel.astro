@@ -1,9 +1,11 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import { labelsReceipt, scoreReceipt } from "./model";
+import { labelsReceipt, outcomeStates, overviewFacts, scoreReceipt } from "./model";
 import { sectionCopy } from "./sections";
 
 const totalUnits = scoreReceipt.systems["1321-prepped"].headline.critical_meaning.total;
+// Outcome vocabulary comes from one source, so Method and Results cannot drift apart.
+const outcomeNames = outcomeStates.map((state) => state.label.toLowerCase()).join(", ");
 const methodRows = [
   {
     id: "meaning",
@@ -15,18 +17,18 @@ const methodRows = [
   },
   {
     id: "outcomes",
-    value: 4,
+    value: outcomeStates.length,
     unit: "states",
     label: "Outcome split",
-    measure: "Correct · wrong · withheld · missing",
+    measure: `Every moment is one of ${outcomeNames}`,
     basis: `Every one of the ${totalUnits} units`,
   },
   {
     id: "serious",
-    value: 0,
+    value: overviewFacts.catastrophic,
     unit: "this test",
     label: "Serious errors",
-    measure: "Count divided by captions shown",
+    measure: "Errors that reverse what a speaker meant",
     basis: "Blinded human review",
   },
 ];

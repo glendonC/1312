@@ -4,10 +4,13 @@
 
 import captureReceipt from "../../../bench/runs/run-007/capture.json";
 import freezeReceipt from "../../../bench/packs/hard-ko-v1/freeze.json";
+import labelsReceipt from "../../../bench/reviews/labels/run-007.json";
 import scoreReceipt from "../../../bench/scores/run-007/score.json";
 
 export interface SectionCopy {
   id: string;
+  /** optional scope line above the title, so a first-time reader knows what is being measured */
+  eyebrow?: string;
   title: string;
   /** plain-language lede under the title */
   lede: string;
@@ -18,13 +21,15 @@ export interface SectionCopy {
 const prepped = scoreReceipt.systems["1321-prepped"].headline;
 const cold = scoreReceipt.systems["1321-cold"].headline;
 const controlCount = freezeReceipt.clips.filter((clip) => clip.role === "control").length;
+const reviewerCount = labelsReceipt.reviewers.length;
 
 export const sectionCopy: Record<string, SectionCopy> = {
   overview: {
     id: "overview",
-    title: "Benchmark",
-    lede: "Prepared 1321 was compared with the same system without preparation on one Korean-to-English clip.",
-    secondary: `Without preparation, the system preserved ${cold.critical_meaning.passes} of ${cold.critical_meaning.total} critical units; prepared 1321 preserved ${prepped.critical_meaning.passes}. Two control clips have not been scored.`,
+    eyebrow: `Korean to English, one frozen clip, ${prepped.critical_meaning.total} moments that had to survive translation`,
+    title: "Does preparation help?",
+    lede: `On this clip, no. We ran the same system twice on the same Korean audio, once with prepared context and once cold, then had ${reviewerCount} blinded reviewers judge every moment where the meaning had to carry.`,
+    secondary: `Publishing a result that runs against our own system is the point of the benchmark. ${controlCount} of ${freezeReceipt.clips.length} clips remain unscored, so this is one measured point and not a full test-set result.`,
   },
   evidence: {
     id: "evidence",
@@ -47,14 +52,14 @@ export const sectionCopy: Record<string, SectionCopy> = {
   results: {
     id: "results",
     title: "Results",
-    lede: `Without preparation, the system preserved ${cold.critical_meaning.passes} of ${cold.critical_meaning.total} critical units, versus ${prepped.critical_meaning.passes} of ${prepped.critical_meaning.total} for prepared 1321.`,
-    secondary: `Prepared withheld ${prepped.critical_outcomes.withheld} units. Withheld units count as not preserved.`,
+    lede: `Without preparation the system preserved ${cold.critical_meaning.passes} of ${cold.critical_meaning.total} moments, against ${prepped.critical_meaning.passes} for prepared. Prepared declined to answer ${prepped.critical_outcomes.withheld} times, which is more than the ${cold.critical_meaning.passes - prepped.critical_meaning.passes} moment gap between them.`,
+    secondary: `Of the moments each system did answer, the cold run was wrong ${cold.critical_outcomes.wrong} times and the prepared run ${prepped.critical_outcomes.wrong}. Every decline counts as meaning not preserved.`,
   },
   methods: {
     id: "methods",
     title: "Method",
-    lede: `Two blinded reviewers judged ${prepped.critical_meaning.total} critical units defined before scoring.`,
-    secondary: "Correct, wrong, withheld, and missing remain separate. No model graded the output.",
+    lede: `Two blinded reviewers judged ${prepped.critical_meaning.total} moments that were chosen and frozen before any system ran.`,
+    secondary: "Answering right, answering wrong, holding back, and missing a line stay separate outcomes. No model graded the output.",
   },
   receipts: {
     id: "receipts",

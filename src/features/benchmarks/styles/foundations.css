@@ -248,7 +248,71 @@
   background: var(--bench-coral);
 }
 
-.snapshot-score > span,
+/* Scope line above the hero title: names what was measured before any verdict. */
+.section-eyebrow {
+  margin: 0 0 18px;
+  color: var(--bench-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.055em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.scores-caption {
+  margin: 0 0 12px;
+  color: var(--bench-muted);
+  font-size: 0.78rem;
+}
+
+/* Gives the scores a reference frame, so the numbers are not read as a verdict. */
+.reading-guide {
+  margin-top: 14px;
+  padding: 20px 22px;
+  border: 1px solid var(--bench-line);
+  border-radius: var(--bench-r-card);
+  background: var(--bench-surface);
+}
+
+.reading-guide h3 {
+  margin: 0 0 10px;
+  color: var(--bench-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: var(--weight-regular);
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.reading-guide p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.snapshot-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Names which side of the comparison the card is on, so the score cannot be read inverted. */
+.snapshot-flag {
+  padding: 4px 9px;
+  border-radius: var(--bench-r-tag);
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--bench-ink);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-style: normal;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.snapshot-topline > span,
 .snapshot-facts dt {
   color: var(--bench-muted);
   font-family: var(--font-mono);
@@ -335,6 +399,14 @@
   color: var(--bench-muted);
   font-size: 0.45em;
   letter-spacing: 0;
+}
+
+/* Each stat states which direction is good, so a value like zero is not read as a missing score. */
+.snapshot-facts p {
+  margin: 8px 0 0;
+  color: var(--bench-muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
 }
 
 /* ---- Overview: the evidence conveyor (colored stage blocks, Method-style) ---- */

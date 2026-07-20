@@ -1,11 +1,10 @@
 ---
 import SectionLede from "./SectionLede.astro";
-import { displayRate, freezeReceipt, labelsReceipt, scoreReceipt } from "./model";
+import { displayRate, overviewFacts, scoreReceipt } from "./model";
 import { sectionCopy } from "./sections";
 
 const prepared = scoreReceipt.systems["1321-prepped"].headline.critical_meaning;
 const cold = scoreReceipt.systems["1321-cold"].headline.critical_meaning;
-const scoredClips = 1;
 ---
 
 <section
@@ -20,30 +19,67 @@ const scoredClips = 1;
     <SectionLede copy={sectionCopy.overview} size="hero" />
 
     <div class="section-body">
-      <div class="snapshot-scores" aria-label="Headline benchmark scores">
+      <p class="scores-caption" id="scores-caption">
+        Moments where the meaning survived, out of {overviewFacts.criticalUnits}. Higher is better.
+      </p>
+
+      <div class="snapshot-scores" aria-labelledby="scores-caption">
         <article class="snapshot-score is-cold">
-          <span>No preparation</span>
+          <div class="snapshot-topline">
+            <span>No preparation</span>
+            <em class="snapshot-flag">Never stayed silent</em>
+          </div>
           <strong>{cold.passes}<small> / {cold.total}</small></strong>
           <div class="snapshot-meter" aria-label={`${Math.round(cold.rate * 100)} percent`}>
             <span style={`width:${cold.rate * 100}%`}></span>
           </div>
-          <p>{displayRate(cold.rate)} meaning preserved</p>
+          <p>{displayRate(cold.rate)} preserved. Answered every time, {overviewFacts.coldWrong} of them wrong.</p>
         </article>
         <article class="snapshot-score is-prepared">
-          <span>Prepared</span>
+          <div class="snapshot-topline">
+            <span>Prepared</span>
+            <em class="snapshot-flag">Stayed silent {overviewFacts.preparedWithheld} times</em>
+          </div>
           <strong>{prepared.passes}<small> / {prepared.total}</small></strong>
           <div class="snapshot-meter" aria-label={`${Math.round(prepared.rate * 100)} percent`}>
             <span style={`width:${prepared.rate * 100}%`}></span>
           </div>
-          <p>{displayRate(prepared.rate)} meaning preserved</p>
+          <p>{displayRate(prepared.rate)} preserved. Answered {prepared.total - overviewFacts.preparedWithheld} times, {overviewFacts.preparedWrong} of them wrong.</p>
         </article>
       </div>
 
+      <div class="reading-guide">
+        <h3>How to read this</h3>
+        <p>
+          Preparation scored lower because it declined to answer {overviewFacts.preparedWithheld} times, and our
+          rule counts silence as meaning not preserved. That rule is deliberately strict. When both systems did
+          answer, the cold run was wrong {overviewFacts.coldWrong} times and the prepared run
+          {" "}{overviewFacts.preparedWrong}. One unit on one clip is not enough to call either version safer,
+          and neither made a serious error, the kind that reverses what a speaker meant.
+        </p>
+      </div>
+
       <dl class="snapshot-facts">
-        <div><dt>Lead</dt><dd>+{cold.passes - prepared.passes}<small> units</small></dd></div>
-        <div><dt>Coverage</dt><dd>{scoredClips}<small> / {freezeReceipt.clips.length} clips</small></dd></div>
-        <div><dt>Reviewers</dt><dd>{labelsReceipt.reviewers.length}</dd></div>
-        <div><dt>Serious errors</dt><dd>0</dd></div>
+        <div>
+          <dt>Score gap</dt>
+          <dd>&minus;{overviewFacts.preparedShortfall}<small> units</small></dd>
+          <p>Prepared preserved fewer</p>
+        </div>
+        <div>
+          <dt>Coverage</dt>
+          <dd>{overviewFacts.scoredClips}<small> / {overviewFacts.totalClips} clips</small></dd>
+          <p>{overviewFacts.totalClips - overviewFacts.scoredClips} not yet scored</p>
+        </div>
+        <div>
+          <dt>Reviewers</dt>
+          <dd>{overviewFacts.reviewers}</dd>
+          <p>Blinded human review</p>
+        </div>
+        <div>
+          <dt>Serious errors</dt>
+          <dd>{overviewFacts.catastrophic}</dd>
+          <p>None on either side</p>
+        </div>
       </dl>
     </div>
   </div>

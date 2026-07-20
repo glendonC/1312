@@ -18,6 +18,10 @@ interface SourceEntryProps {
  * Source entry belongs to the welcome sequence, not the run dock. It deliberately reuses
  * the dock's field, review, and action atoms so the source keeps one visual language while
  * the two surfaces remain free to evolve around different jobs.
+ *
+ * The visible copy names the job (input a source), not the evidence class: recorded-preview
+ * provenance stays machine-readable here (data-source-authority) and is stated in the
+ * preflight provenance and confirmation facts before anything replays.
  */
 export default function SourceEntry({
   open,
@@ -96,7 +100,7 @@ export default function SourceEntry({
       ref={control}
       layout
       transition={SPRING}
-      aria-label="Recorded preview source setup"
+      aria-label="Source setup"
     >
       <AnimatePresence mode="popLayout" initial={false}>
         {!open ? (
@@ -115,7 +119,7 @@ export default function SourceEntry({
             transition={{ duration: 0.15 }}
             layout
           >
-            Preview a YouTube link with recorded demo
+            Input Source
           </motion.button>
         ) : (
           <motion.form
@@ -140,8 +144,8 @@ export default function SourceEntry({
                 inputMode="url"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Paste a YouTube link for recorded preview"
-                aria-label="YouTube link for recorded preview"
+                placeholder="Paste a YouTube link"
+                aria-label="YouTube link"
                 value={url}
                 onChange={(event) => {
                   dismissPreflight();
@@ -166,7 +170,7 @@ export default function SourceEntry({
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <button type="submit" className="dock-go" aria-label="Resolve metadata for recorded preview">
+              <button type="submit" className="dock-go" aria-label="Resolve source metadata">
                 <Arrow />
               </button>
             </motion.span>

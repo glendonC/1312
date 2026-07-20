@@ -2,7 +2,7 @@
  * Shared result-viewer shell chrome: the authority bar above the media/learning composition,
  * plus the completed run's floating action bar.
  * Owns: .result-shell-bar, .result-shell-chrome, .result-authority-badge, .run-view-switch,
- * .run-action-bar, .run-evidence-chip.
+ * .run-action-bar.
  * Must not: .result-main layout and view modes (results.summary.css); player chrome
  * (results.player.css); disclosure panels (results.chrome.css); the completed process stage
  * (canvas.css).
@@ -55,36 +55,6 @@
 }
 
 .run-action-bar[data-agent-focus] {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* The recorded surface's completed graph carries no toolbar — its one control is the golden
-   Result node. This passive chip keeps the recorded-evidence framing on screen in the same
-   glass, and steps back while an agent is focused. */
-.run-evidence-chip {
-  position: fixed;
-  right: clamp(14px, 2vw, 22px);
-  bottom: max(16px, env(safe-area-inset-bottom, 16px));
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px 14px;
-  max-width: calc(100vw - 2 * clamp(14px, 2vw, 22px));
-  padding: 8px 12px;
-  border: 1px solid var(--glass-border, rgba(22, 29, 27, 0.12));
-  border-radius: 14px;
-  corner-shape: squircle;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: var(--glass-shadow, 0 8px 22px rgba(26, 70, 66, 0.07));
-  backdrop-filter: blur(22px) saturate(1.5);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  transition: opacity 220ms ease;
-}
-
-.run-evidence-chip[data-agent-focus] {
   opacity: 0;
   pointer-events: none;
 }

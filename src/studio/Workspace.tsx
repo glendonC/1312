@@ -191,7 +191,7 @@ function Translate({ agent }: { agent: AgentView }) {
 
         {agreement === null ? (
           <span className="env-conf-none">
-            {draft ? (agreementRecorded ? "not corroborated" : "not measured") : "—"}
+            {draft ? (agreementRecorded ? "not corroborated" : "not measured") : "–"}
           </span>
         ) : (
           <>

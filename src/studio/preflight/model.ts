@@ -322,7 +322,7 @@ export function assessRecordedRequest(
 }
 
 export function formatSeconds(value: number): string {
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "–";
   const safe = Math.max(0, value);
   const minutes = Math.floor(safe / 60);
   const seconds = safe - minutes * 60;

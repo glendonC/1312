@@ -105,7 +105,7 @@ export default function ReviewSetupControl() {
         ref={trigger}
         type="button"
         className="dock-parameters-trigger"
-        aria-label="Review setup — the recorded replay's bound parameters"
+        aria-label="Review setup: the recorded replay's bound parameters"
         aria-haspopup="dialog"
         aria-expanded={open}
         title="Review setup"
@@ -121,7 +121,7 @@ export default function ReviewSetupControl() {
       </button>
 
       <div className="dock-parameters-menu" role="dialog" aria-label="Review setup" hidden={!open}>
-        <p className="dock-parameters-note">Recorded replay — these parameters are fixed.</p>
+        <p className="dock-parameters-note">Recorded replay. These parameters are fixed.</p>
 
         <dl className="dock-parameters-summary">
           <div>

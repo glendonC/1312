@@ -169,12 +169,12 @@ export function ProductionSourceWorkFacts({ context }: { context: ProductionFact
               const decidedTarget = spawn.decision === "accepted"
                 ? `${spawn.taskId} / ${spawn.agentId}`
                 : spawn.decision === "rejected"
-                  ? "Not created — request rejected"
+                  ? "Not created (request rejected)"
                   : "Unavailable until spawn.decided is validated";
               const decisionReason = spawn.decision === "rejected"
                 ? spawn.rejection
                 : spawn.decision === "accepted"
-                  ? "Not applicable — request accepted"
+                  ? "Not applicable (request accepted)"
                   : "Unavailable until spawn.decided is validated";
               return (
                 <article

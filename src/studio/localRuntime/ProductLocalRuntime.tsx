@@ -992,7 +992,7 @@ export default function ProductLocalRuntime({
                               : sourceMode === "youtube"
                                 ? <>Submit a bounded YouTube range from <b>Local host</b>, confirm local processing only, then continue.</>
                                 : <>Register media you own or control from <b>Local host</b>, then continue.</>
-                            : <>Connect the local source host with a paste-once bearer token — open <b>Connect host</b> to begin. Nothing is uploaded to a 1321 remote service.</>}
+                            : <>Connect the local source host with a paste-once bearer token. Open <b>Connect host</b> to begin. Nothing is uploaded to a 1321 remote service.</>}
                         </h2>
                       </div>
                     </section>

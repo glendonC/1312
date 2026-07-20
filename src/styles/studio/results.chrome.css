@@ -73,8 +73,7 @@
 }
 
 .result-chrome-trigger:focus-visible,
-.result-chrome-panel:focus-visible,
-.submitted-results-boundary summary:focus-visible {
+.result-chrome-panel:focus-visible {
   outline: 2px solid var(--accent, #2f746e);
   outline-offset: 2px;
 }

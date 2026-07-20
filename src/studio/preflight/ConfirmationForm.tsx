@@ -268,7 +268,7 @@ function RecordedRangeStage({
         <ConversationValue onEdit={onEdit} editLabel={`Edit range: ${recordedRangeLabel(request)}`}>
           {recordedRangeLabel(request)}
         </ConversationValue>{" "}
-        of the recorded selection — the one measured 0:00–{formatSeconds(facts.selection.duration)} window bundled
+        of the recorded selection, the one measured 0:00–{formatSeconds(facts.selection.duration)} window bundled
         with this demo. A different range would need a new producer run.
       </StageConversation>
       {assessment?.reason && <p className="preflight-block" role="status">{assessment.reason}</p>}
@@ -352,7 +352,7 @@ function RecordedForecast({
         </ConversationValue>{" "}
         to the recorded clip.{" "}
         {view.kind === "floor"
-          ? `A deterministic workload floor covers ${recordedForecastFloorLabel(view)} — that is workload volume, not elapsed time, which stays unavailable along with cost and runtime scale until a versioned backend estimate exists.`
+          ? `A deterministic workload floor covers ${recordedForecastFloorLabel(view)}. That is workload volume, not elapsed time, which stays unavailable along with cost and runtime scale until a versioned backend estimate exists.`
           : "Processing time, cost, and runtime scale stay unavailable until a versioned backend estimate exists."}
       </StageConversation>
     </section>
@@ -407,7 +407,7 @@ function RecordedRangeEditor({ facts }: { facts: RecordedPreflightFacts }) {
         <small>0:00–{formatSeconds(duration)}</small>
       </div>
       <p className="preflight-range-feedback">
-        The only replayable window — a different range would need a new producer run. This recorded clip has no
+        The only replayable window; a different range would need a new producer run. This recorded clip has no
         range recommender, detected-language sub-range, or custom-range output.
       </p>
     </div>

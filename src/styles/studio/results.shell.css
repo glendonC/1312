@@ -1,6 +1,6 @@
 /*
- * Results shell: completed-run workspace overlay, act padding, submitted-source boundary.
- * Owns: .results, .act-results, .act-results-viewer, .result-workspace-*, .submitted-results-*.
+ * Results shell: completed-run workspace overlay and act padding.
+ * Owns: .results, .act-results, .act-results-viewer, .result-workspace-*.
  * Must not: header chrome (.result-chrome-*, seats in studio.css); shared player (.player in
  * results.player.css); the persistent canvas underneath (canvas.css).
  */
@@ -396,7 +396,9 @@ a.result-brief-source:focus-visible {
   width: 100%;
   height: 100svh;
   min-height: 0;
-  padding: clamp(16px, 2.5vh, 28px) clamp(16px, 2vw, 32px) clamp(14px, 2vh, 22px);
+  /* The top inset clears the room's chrome band (the mark and the Back squircle ride there), so the
+     stage and the docked panel start beneath it rather than under the exit. */
+  padding: clamp(72px, 9vh, 96px) clamp(20px, 2.4vw, 40px) clamp(18px, 2.4vh, 26px);
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 0;
@@ -413,7 +415,7 @@ a.result-brief-source:focus-visible {
 .result-workspace[data-workspace-face="watch"] .result-workspace-shell {
   height: 100%;
   min-height: 0;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   align-content: stretch;
   gap: 10px;
 }
@@ -536,6 +538,65 @@ a.result-brief-source:focus-visible {
   font-size: 0.62rem;
 }
 
+/* ---------- the watch room's bright chrome ---------- */
+
+/* The gold result mark, top-left: the run's identity anchored on the room, the same object as the
+   canvas orb the room opens from. It is absolute so it never disturbs the single-cell stage grid. */
+.watch-room-mark {
+  position: absolute;
+  top: clamp(18px, 2.4vh, 28px);
+  left: clamp(20px, 2.4vw, 40px);
+  z-index: 6;
+  display: block;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+}
+
+/* The one exit, top-right: a squircle the height of the mark, the quiet-ink Back that steps to the
+   report (Esc does the same). It reads as an exit, not a command — the commands are the bottom bar. */
+.watch-room-escape {
+  position: absolute;
+  top: clamp(18px, 2.4vh, 28px);
+  right: clamp(20px, 2.4vw, 40px);
+  z-index: 6;
+  display: inline-flex;
+  height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong, rgba(22, 29, 27, 0.16));
+  border-radius: 15px;
+  corner-shape: squircle;
+  color: var(--ink-soft);
+  background: var(--paper-elevated, #fff);
+  box-shadow: 0 10px 26px -18px rgba(18, 38, 36, 0.5);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
+}
+
+.watch-room-escape:hover {
+  border-color: var(--ink-soft);
+  color: var(--ink);
+}
+
+.watch-room-escape kbd {
+  padding: 0;
+  border: 0;
+  color: var(--ink-muted);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.watch-room-escape:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* The wrapper is structural only: it carries the region identity and nothing else, because the
    environment frame above owns every margin. (It only ever mounts inside the workspace, so the
    old standalone page spacing was dead weight and is gone.) */
@@ -546,115 +607,6 @@ a.result-brief-source:focus-visible {
   min-width: 0;
   flex-direction: column;
   align-items: stretch;
-}
-
-.submitted-results-boundary {
-  width: min(1080px, 100%);
-  margin-bottom: 18px;
-  padding: 11px 0;
-  border-top: 1px solid var(--accent-line);
-  border-bottom: 1px solid var(--line);
-}
-
-.submitted-results-boundary header > span,
-.submitted-results-boundary dt,
-.submitted-results-identity > span,
-.submitted-results-boundary summary {
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.submitted-results-boundary h2 {
-  margin: 4px 0;
-  font-size: 0.98rem;
-  font-weight: var(--weight-medium);
-}
-
-.submitted-results-boundary header p,
-.submitted-results-identity {
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: 0.72rem;
-  line-height: 1.55;
-}
-
-.submitted-results-boundary header p b,
-.submitted-results-boundary summary {
-  color: var(--ink);
-  font-weight: var(--weight-medium);
-}
-
-.submitted-results-boundary details {
-  margin-top: 8px;
-}
-
-.submitted-results-boundary summary {
-  display: inline-block;
-  min-height: 32px;
-  padding: 7px 0;
-  cursor: pointer;
-  list-style-position: inside;
-}
-
-.submitted-results-boundary dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 8px 0 0;
-  border-top: 1px solid var(--line);
-}
-
-.submitted-results-boundary dl div {
-  display: grid;
-  grid-template-columns: 7rem minmax(0, 1fr);
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.submitted-results-boundary dl div:nth-child(odd) {
-  padding-right: 18px;
-}
-
-.submitted-results-boundary dt,
-.submitted-results-boundary dd {
-  margin: 0;
-  line-height: 1.45;
-}
-
-.submitted-results-boundary dd {
-  color: var(--ink-soft);
-  font-size: 0.69rem;
-}
-
-/* A value and its qualifier as two stacked rows, not "value · qualifier". */
-.submitted-results-boundary .dd-stacked {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.submitted-results-boundary .dd-stacked small {
-  color: var(--ink-muted);
-  font-size: 0.6rem;
-}
-
-.submitted-results-identity {
-  padding: 10px 0 0;
-}
-
-.submitted-results-identity span,
-.submitted-results-identity code {
-  display: block;
-}
-
-.submitted-results-identity code {
-  margin-top: 4px;
-  overflow-wrap: anywhere;
-  color: var(--ink-soft);
-  font-size: 0.62rem;
 }
 
 /* ---------- responsive ---------- */

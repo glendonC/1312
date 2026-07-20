@@ -334,6 +334,15 @@ test("the development processing fixture exposes honest running state and worker
   const focus = page.getByRole("dialog", { name: "bounded-media-child" });
   await expect(focus).toBeVisible();
   await expect(focus.getByText(/not an autonomous playback control/)).toBeVisible();
+  const activity = focus.locator(".processing-focus-activity");
+  await expect(activity).toHaveAttribute("data-activity-follow", "latest");
+  await expect(activity.locator(".processing-focus-activity-scroll")).toHaveCSS("scroll-behavior", "smooth");
+  await expect(activity.locator("dl")).toHaveAttribute("aria-live", "polite");
+  await expect(activity.locator("[data-processing-focus-activity-row]")).toHaveCount(5);
+  await expect(activity.getByRole("button", { name: "New activity" })).toHaveCount(0);
+  await expect(activity.locator('[data-processing-focus-activity-row="execution"]')).toContainText(
+    "active · determ…shot",
+  );
   await focus.getByRole("button", { name: "Close" }).press("Escape");
   await expect(focus).toHaveCount(0);
   await expect(worker).toBeFocused();
@@ -1586,7 +1595,7 @@ test("submitted preview Results reports no submitted artifact before recorded de
   await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
 });
 
-test("completed recorded runs transition directly into the learning viewer", async ({ page }) => {
+test("completed recorded runs transition directly into the learning viewer", async ({ page }, testInfo) => {
   await openLab(page);
   await scenario(page).selectOption("unscored-complete");
   await page.locator(".studio-lab").evaluate((element) => {
@@ -1597,23 +1606,96 @@ test("completed recorded runs transition directly into the learning viewer", asy
   await expect(results).toBeVisible();
   await expect(results).toHaveAccessibleName(/Result/);
   await expect(page.getByRole("button", { name: "Open Results" })).toHaveCount(0);
-  await expect(page.locator(".stage")).toHaveCount(0);
+  // The canvas persists beneath the auto-opened workspace: one world, never a screen swap.
+  await expect(page.locator(".stage-complete")).toHaveCount(1);
   await expect(page.locator(".dock-well")).toHaveCount(0);
   await expect(results.getByRole("button", { name: "Run again", exact: true })).toHaveCount(0);
   const viewer = results.getByRole("region", { name: "Learning viewer" });
   await expect(viewer).toBeVisible();
-  await expect(viewer.getByRole("button", { name: "Split" })).toHaveAttribute("aria-pressed", "true");
-  await expect(viewer.getByRole("button", { name: "Cinema" })).toBeVisible();
+  // Split/Cinema act on the desktop side-by-side layout; mobile is single column and drops them.
+  if (testInfo.project.name === "desktop") {
+    await expect(viewer.getByRole("button", { name: "Split" })).toHaveAttribute("aria-pressed", "true");
+    await expect(viewer.getByRole("button", { name: "Cinema" })).toBeVisible();
+  }
   await expect(viewer.getByRole("button", { name: "Full screen" })).toBeVisible();
+  // The volume slider unfolds out of the speaker on hover/focus; reveal it the way a viewer would.
+  await viewer.getByRole("button", { name: /^(Mute|Unmute)$/ }).hover();
   await expect(viewer.getByRole("slider", { name: "Volume" })).toBeVisible();
   await expect(viewer.getByRole("combobox", { name: "Playback speed" })).toBeVisible();
+  // The workbench frame carries no authority bar over the composition: the authority stays
+  // machine-readable on the region, and the evidence class reads in the hero facts.
   await expect(viewer).toHaveAttribute("data-result-authority", "recorded_demo");
-  await expect(viewer.locator(".result-authority-badge")).toHaveText("Recorded demo");
+  await expect(viewer).toHaveAttribute("data-shell-frame", "workbench");
+  await expect(viewer.locator(".result-authority-badge")).toHaveCount(0);
+  // The hero facts (including the evidence class) fold away on the compact band.
+  if (testInfo.project.name === "desktop") {
+    await expect(page.locator(".result-workspace-hero")).toContainText("Recorded demo");
+  }
+  // The environment head carries the source title, focus-panel style.
+  await expect(page.locator(".result-workspace-source-head h3")).toContainText("Natural Korean Conversation");
+  await expect(results.locator('[data-moments-overlay-authority="design_fixture"]')).toBeVisible();
+  await page.getByRole("button", { name: "Tune" }).click();
   const face = results.getByRole("region", { name: "Customize learning" });
   await expect(face).toHaveAttribute("data-learning-prep-authority", "recorded_fixture");
-  await expect(results.locator('[data-moments-overlay-authority="design_fixture"]')).toBeVisible();
-  await expect(results.locator('.result-coverage > div[data-kind="captioned"] dd')).toHaveText("11");
-  await expect(page.getByRole("button", { name: "Run details" })).toBeVisible();
+  await results.getByRole("button", { name: "Close learning controls" }).click();
+  await expect(results.locator(".result-media-meta")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Coverage" })).toBeVisible();
+});
+
+test("a completed run opens and closes the result workspace over the persistent process graph", async ({ page }) => {
+  await openLab(page);
+  await scenario(page).selectOption("unscored-complete");
+  await page.locator(".studio-lab").evaluate((element) => {
+    (element as HTMLElement).style.display = "none";
+  });
+
+  const results = page.locator("#studio-recorded-results");
+  await expect(results).toBeVisible();
+  const viewer = results.getByRole("region", { name: "Learning viewer" });
+  // The workspace auto-opened over the canvas, which stays mounted beneath it the whole time.
+  const stage = page.locator(".stage-complete");
+  await expect(stage).toHaveCount(1);
+  // The focus-panel command baseline: two distinctly named disclosures and the one exit.
+  // There is no Result/Process switch anywhere on the recorded surface.
+  const commands = page.getByRole("navigation", { name: "Result commands" });
+  await expect(commands.getByRole("button", { name: "Source" })).toBeVisible();
+  await expect(commands.getByRole("button", { name: "Coverage" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Run view" })).toHaveCount(0);
+
+  await commands.getByRole("button", { name: /^Close the result/ }).click();
+  await expect(stage).toBeVisible();
+  await expect(results).toBeHidden();
+  await expect(stage.locator(".graph")).toBeVisible();
+  await expect(stage.locator(".hub")).toBeVisible();
+  // The result is on the graph: a golden node at the terminus carrying the run's language pair,
+  // linked from the orchestrator, never drawn as a worker identity.
+  const artifact = stage.getByRole("button", { name: /^Result,/ });
+  await expect(artifact).toBeVisible();
+  await expect(artifact).toContainText("KO → EN captions");
+  await expect(stage.locator(".wire-artifact")).toHaveCount(1);
+  // The open graph keeps its recorded-evidence framing as a passive chip, never a toolbar.
+  const chip = page.locator(".run-evidence-chip");
+  await expect(chip.getByText("Recorded evidence · completed process graph")).toBeVisible();
+  await expect(chip.locator(".result-authority-badge")).toHaveText("Recorded demo");
+  await expect(page.locator(".dock-well")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^(Pause|Resume|Stop)$/ })).toHaveCount(0);
+
+  // The orb is the sole re-entry anchor: opening it reopens the result workspace.
+  await artifact.click();
+  await expect(results).toBeVisible();
+  await expect(viewer).toBeVisible();
+  await expect(chip).toHaveCount(0);
+  await expect(stage).toHaveCount(1);
+
+  // Esc steps back out of the workspace to the completed world with the orb.
+  await page.keyboard.press("Escape");
+  await expect(results).toBeHidden();
+  await expect(stage).toBeVisible();
+  await expect(artifact).toBeVisible();
+
+  await artifact.click();
+  await expect(results).toBeVisible();
+  await expect(viewer).toBeVisible();
 });
 
 test("a remote metadata failure keeps duration and range controls unavailable", async ({ page }) => {
@@ -2204,8 +2286,8 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
   expect(focusStyles?.identityCentered ?? 999).toBeLessThanOrEqual(0.5);
   expect(focusStyles?.identityMediaGap ?? -1).toBeGreaterThanOrEqual(20);
   expect(focusStyles?.mediaProjectionGap ?? -1).toBeGreaterThanOrEqual(30);
-  // Workbench screen is square-cornered; radius was a legacy env-media-frame claim.
-  expect(parseFloat(focusStyles?.mediaFrameRadius ?? "0")).toBe(0);
+  // The workbench plays in the shared squircle screen of the on-video chrome, same as Results.
+  expect(parseFloat(focusStyles?.mediaFrameRadius ?? "0")).toBe(18);
   expect(Number(focusStyles?.rootZIndex ?? 0)).toBeGreaterThan(
     Number(focusStyles?.pauseLayerZIndex ?? 0),
   );

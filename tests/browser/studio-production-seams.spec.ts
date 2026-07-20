@@ -468,6 +468,32 @@ test("attested approval explicitly produces private bounded captions without pub
   await expect(explanationPanel.getByRole("button", { name: "Retry explanation" })).toHaveCount(0);
   await expect(productionResults).toContainText("not replay Results identity");
   await expect(productionResults).toContainText("does not claim transcription accuracy, English quality, or a Bet G score");
+
+  // One completed local run, two views. Result became the default when the first verified caption
+  // artifact arrived, and moving between the views issues no runtime-host request beyond the
+  // already-granted media buffering.
+  await expect(page.locator("[data-production-view]")).toHaveAttribute("data-production-view", "result");
+  await expect(processingCanvas).toBeHidden();
+  const runViewBar = page.locator(".run-action-bar").getByRole("group", { name: "Run view" });
+  await expect(runViewBar.getByRole("button", { name: "Result" })).toHaveAttribute("aria-pressed", "true");
+  const viewSwitchRequests: string[] = [];
+  const onViewSwitchRequest = (request: Request) => {
+    const url = request.url();
+    if (url.includes("/v1/") && !url.includes("/v1/private-source-media/")) viewSwitchRequests.push(url);
+  };
+  page.on("request", onViewSwitchRequest);
+  await runViewBar.getByRole("button", { name: "Process" }).click();
+  await expect(processingCanvas).toBeVisible();
+  await expect(page.getByText("Validated runtime state · completed local run")).toBeVisible();
+  await expect(productionViewer).toBeHidden();
+  await runViewBar.getByRole("button", { name: "Result" }).click();
+  await expect(productionViewer).toBeVisible();
+  await expect(productionViewer.getByRole("button", { name: "Split" })).toHaveAttribute("aria-pressed", "true");
+  await runViewBar.getByRole("button", { name: "Process" }).click();
+  await expect(processingCanvas).toBeVisible();
+  page.off("request", onViewSwitchRequest);
+  expect(viewSwitchRequests).toEqual([]);
+
   await expect(processingCanvas.getByRole("heading", { name: "Structurally accepted private candidate" })).toBeVisible();
   const liveCaption = coordination.locator("[data-production-live-caption-job-id]");
   await expect(liveCaption).toHaveCount(1);
@@ -806,6 +832,34 @@ test("armed fine-tune prepares a receipted moments overlay that stays silent wit
       const productionResults = page.locator('[data-production-results-region="caption-lineage"]');
       await expect(productionResults.locator("[data-production-results-job-id]")).toHaveCount(1, { timeout: 15_000 });
 
+      // One completed local run, two views. Result becomes the default when the first verified
+      // caption artifact arrives, and moving between the views issues no runtime-host request
+      // beyond the already-granted media buffering.
+      const processingCanvas = page.getByRole("region", { name: "Processing canvas" });
+      const productionViewer = productionResults.getByRole("region", { name: "Learning viewer" });
+      const runViewBar = page.locator(".run-action-bar").getByRole("group", { name: "Run view" });
+      await expect(page.locator("[data-production-view]")).toHaveAttribute("data-production-view", "result");
+      await expect(processingCanvas).toBeHidden();
+      await expect(productionViewer).toBeVisible();
+      await expect(productionResults.getByRole("region", { name: "Private production media playback" }))
+        .toHaveAttribute("data-private-playback-state", "ready", { timeout: 15_000 });
+      const viewSwitchRequests: string[] = [];
+      const onViewSwitchRequest = (request: Request) => {
+        const url = request.url();
+        if (url.includes("/v1/") && !url.includes("/v1/private-source-media/")) viewSwitchRequests.push(url);
+      };
+      page.on("request", onViewSwitchRequest);
+      await runViewBar.getByRole("button", { name: "Process" }).click();
+      await expect(processingCanvas).toBeVisible();
+      await expect(page.getByText("Validated runtime state · completed local run")).toBeVisible();
+      await expect(productionViewer).toBeHidden();
+      await runViewBar.getByRole("button", { name: "Result" }).click();
+      await expect(productionViewer).toBeVisible();
+      page.off("request", onViewSwitchRequest);
+      expect(viewSwitchRequests).toEqual([]);
+
+      // The face lives behind the learning panel's Tune disclosure.
+      await productionResults.getByRole("button", { name: "Tune" }).click();
       const face = productionResults.getByRole("region", { name: "Customize learning" });
       await expect(face).toHaveAttribute("data-learning-prep-authority", "verified_production_caption");
       await expect(face).toHaveAttribute("data-learning-prep-state", "not_requested");
@@ -844,6 +898,8 @@ test("armed fine-tune prepares a receipted moments overlay that stays silent wit
         await expect(face.locator('[data-prep-lens="historical_reference"]')).toHaveAttribute("data-lens-state", "abstained");
         await expect(face).toContainText("Withheld and abstained help stays withheld");
         await expect(face).toContainText("not culture or history authority");
+        // The drawer slides over the transcript; close it before interacting with the cues below.
+        await productionResults.getByRole("button", { name: "Close learning controls" }).click();
 
         const privatePlayer = productionResults.getByRole("region", { name: "Private production media playback" });
         await expect(privatePlayer).toHaveAttribute("data-private-playback-state", "ready", { timeout: 15_000 });

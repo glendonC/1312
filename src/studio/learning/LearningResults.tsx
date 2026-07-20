@@ -227,8 +227,8 @@ export default function LearningResults({
   };
 
   // Selecting caption text raises the floating action bar over the highlight rather than jumping
-  // straight to a side panel: the learner chooses Translate, Explain, or Save from where their eye
-  // already is. The listener is document-level and reads the selection itself, so it works however
+  // straight to a side panel: the learner chooses Explain, Save, or on a live run Translate, from
+  // where their eye already is. The listener is document-level and reads the selection itself, so it works however
   // the selection was made (drag that releases anywhere, double-click, touch handles, keyboard) and
   // wherever the caption text lives: the transcript cues and the on-video caption both mark their
   // text with [data-caption-side] and [data-caption-line-id].

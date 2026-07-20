@@ -16,11 +16,13 @@ export interface SelectionAnchor {
 /**
  * The floating action bar a learner raises by selecting caption text — the natural "touch anything
  * to go deeper" gesture. It reads the meaning of the selection right where the eye already is, rather
- * than sending the reader to a side panel: Translate reveals the line's translation in place (and on
- * a live production run also requests one bounded host-receipted translation of the exact selected
- * span), Explain opens the full facet explanation, and Save keeps the word or phrase for study. The
- * bar tracks the live selection rectangle, so it stays pinned to the highlight while the transcript
- * scrolls, and it dismisses when the selection is cleared.
+ * than sending the reader to a side panel: Explain opens the full facet explanation and Save keeps
+ * the word or phrase for study. Translate exists only where it is real: a live production run with a
+ * configured executor requests one bounded host-receipted translation of the exact selected span and
+ * shows it beside the line's own verified translation. The recorded demo carries no Translate at
+ * all rather than answering the gesture with something else. The bar tracks the live selection
+ * rectangle, so it stays pinned to the highlight while the transcript scrolls, and it dismisses when
+ * the selection is cleared.
  */
 export default function SelectionBar({
   anchor,
@@ -125,18 +127,18 @@ export default function SelectionBar({
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="selection-bar-row">
-        <button
-          type="button"
-          className="selection-bar-btn"
-          aria-pressed={showTranslation}
-          title={canTranslateSpan
-            ? "Translate the selected text and show this line's translation"
-            : "Show this line's recorded translation"}
-          onClick={toggleTranslation}
-        >
-          <span className="selection-bar-icon" aria-hidden="true"><Captions /></span>
-          Translate
-        </button>
+        {canTranslateSpan && (
+          <button
+            type="button"
+            className="selection-bar-btn"
+            aria-pressed={showTranslation}
+            title="Translate the selected text and show this line's translation"
+            onClick={toggleTranslation}
+          >
+            <span className="selection-bar-icon" aria-hidden="true"><Captions /></span>
+            Translate
+          </button>
+        )}
         {canExplain && (
           <button type="button" className="selection-bar-btn" onClick={onExplain}>
             <span className="selection-bar-icon" aria-hidden="true"><Info /></span>
@@ -168,9 +170,9 @@ export default function SelectionBar({
           <SpanTranslationReadout state={spanTranslation} onRetry={onTranslateRetry} />
         </p>
       )}
-      {showTranslation && (
-        // What is shown here is the line's translation, and it says so: the span readout above is
-        // the only word-level claim, and it exists only as a receipted production artifact.
+      {showTranslation && canTranslateSpan && (
+        // The line row below the span readout is the verified caption translation, and it says so:
+        // the span row above is the only word-level claim, and both exist only on a live run.
         <p className="selection-bar-translation">
           <span className="selection-bar-translation-kind">This line</span>
           <span lang={targetLanguage}>

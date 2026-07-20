@@ -153,7 +153,7 @@ export default function LearningResultExperience({
             {(presentation.mode === "prototype" || learningInteraction) && (
               <p className="watch-hint">
                 {presentation.mode === "prototype"
-                  ? "Select any words in the captions to translate, explain, or save them"
+                  ? "Select any words in the captions to explain or save them"
                   : "Select any words in the captions to translate or explain them"}
               </p>
             )}

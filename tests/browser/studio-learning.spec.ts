@@ -390,7 +390,7 @@ test("results chrome: header title truncates, Details and Run details open on de
   await expect(viewer.locator(".player-provenance")).toHaveCount(0);
 });
 
-test("the recorded selection bar keeps Translate line-scoped and never claims a span translation", async ({ page }, testInfo) => {
+test("the recorded selection bar offers no Translate and never claims a span translation", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Desktop selection-bar honesty coverage");
   await openCompletedRun006(page);
 
@@ -413,13 +413,14 @@ test("the recorded selection bar keeps Translate line-scoped and never claims a 
     element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
   });
 
+  // Translation exists only where it is real: the recorded bar carries Explain and Save alone,
+  // shows no translation rows of any kind, and never calls a model.
   const selectionBar = page.getByRole("toolbar", { name: "Selection actions" });
   await expect(selectionBar).toBeVisible();
-  const translate = selectionBar.getByRole("button", { name: "Translate" });
-  await expect(translate).toHaveAttribute("title", "Show this line's recorded translation");
-  await translate.click();
-  // The recorded demo reveals only the line's recorded translation: no span row, no model call.
-  await expect(selectionBar.locator(".selection-bar-translation-kind")).toHaveText(["This line"]);
+  await expect(selectionBar.getByRole("button", { name: "Explain" })).toBeVisible();
+  await expect(selectionBar.getByRole("button", { name: "Save" })).toBeVisible();
+  await expect(selectionBar.getByRole("button", { name: "Translate" })).toHaveCount(0);
+  await expect(selectionBar.locator(".selection-bar-translation-kind")).toHaveCount(0);
   await expect(selectionBar.locator("[data-span-translation-state]")).toHaveCount(0);
   expect(translationRequests).toEqual([]);
 });

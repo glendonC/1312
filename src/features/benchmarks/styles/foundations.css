@@ -66,7 +66,8 @@
 
 .bench-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Column count follows the tab list; Instrument sets the custom property. */
+  grid-template-columns: repeat(var(--bench-tab-count, 5), minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid var(--bench-line-strong);
   border-radius: var(--bench-r-card);
@@ -246,49 +247,6 @@
 
 .snapshot-score.is-prepared {
   background: var(--bench-coral);
-}
-
-/* Scope line above the hero title: names what was measured before any verdict. */
-.section-eyebrow {
-  margin: 0 0 18px;
-  color: var(--bench-muted);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.055em;
-  line-height: 1.5;
-  text-transform: uppercase;
-}
-
-.scores-caption {
-  margin: 0 0 12px;
-  color: var(--bench-muted);
-  font-size: 0.78rem;
-}
-
-/* Gives the scores a reference frame, so the numbers are not read as a verdict. */
-.reading-guide {
-  margin-top: 14px;
-  padding: 20px 22px;
-  border: 1px solid var(--bench-line);
-  border-radius: var(--bench-r-card);
-  background: var(--bench-surface);
-}
-
-.reading-guide h3 {
-  margin: 0 0 10px;
-  color: var(--bench-muted);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  font-weight: var(--weight-regular);
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-
-.reading-guide p {
-  margin: 0;
-  font-size: 0.88rem;
-  line-height: 1.6;
-  text-wrap: pretty;
 }
 
 .snapshot-topline {

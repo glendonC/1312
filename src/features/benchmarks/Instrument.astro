@@ -1,4 +1,5 @@
 ---
+import CampaignPanel from "./CampaignPanel.astro";
 import EvidencePanel from "./EvidencePanel.astro";
 import MethodsPanel from "./MethodsPanel.astro";
 import OverviewPanel from "./OverviewPanel.astro";
@@ -15,7 +16,12 @@ import { tabs } from "./model";
     </select>
   </div>
 
-  <div class="bench-tabs" role="tablist" aria-label="Benchmark sections">
+  <div
+    class="bench-tabs"
+    role="tablist"
+    aria-label="Benchmark sections"
+    style={`--bench-tab-count:${tabs.length}`}
+  >
     {tabs.map((tab, index) => (
       <button
         id={`tab-${tab.id}`}
@@ -36,6 +42,7 @@ import { tabs } from "./model";
     <OverviewPanel />
     <EvidencePanel />
     <ResultsPanel />
+    <CampaignPanel />
     <MethodsPanel />
     <ReceiptsPanel />
   </div>

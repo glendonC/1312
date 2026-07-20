@@ -11,6 +11,8 @@
 
 html {
   min-width: 320px;
+  /* Reserve the scrollbar track so expanding content cannot narrow the page and reflow text. */
+  scrollbar-gutter: stable;
   background: var(--paper);
 }
 

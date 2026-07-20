@@ -1,0 +1,55 @@
+/* Rule-change campaign. Reuses the Method metric card; only the states differ. */
+
+/* Both measured clips carry the same finding, so they carry the same colour. */
+.metric-card.campaign-worse {
+  background: var(--bench-coral);
+}
+
+/* A clip with no completed comparison is absent evidence, not a measured zero. */
+.metric-card.campaign-absent {
+  border: 1px dashed var(--bench-line-strong);
+  box-shadow: none;
+  background:
+    repeating-linear-gradient(-45deg, rgba(21, 32, 29, 0.03) 0 6px, transparent 6px 12px),
+    var(--bench-surface);
+  color: var(--bench-muted);
+}
+
+.metric-card.campaign-absent:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.metric-card.campaign-absent footer {
+  border-top-color: var(--bench-line-strong);
+}
+
+/* ---- Coverage: what each column of the readiness matrix means ---- */
+
+.matrix-legend {
+  display: grid;
+  margin: 18px 0 0;
+  gap: 10px 20px;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+}
+
+.matrix-legend div {
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--bench-line);
+}
+
+.matrix-legend dt {
+  color: var(--bench-muted);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.matrix-legend dd {
+  margin: 6px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  text-wrap: pretty;
+}

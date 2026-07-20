@@ -112,6 +112,7 @@ export const tabs = [
   { id: "overview", label: "Overview", color: "ink" },
   { id: "evidence", label: "Coverage", color: "coral" },
   { id: "results", label: "Results", color: "lilac" },
+  { id: "campaign", label: "Rule change", color: "citron" },
   { id: "methods", label: "Method", color: "teal" },
   { id: "receipts", label: "Audit", color: "peach" },
 ] as const;

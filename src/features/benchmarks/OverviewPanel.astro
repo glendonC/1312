@@ -19,11 +19,7 @@ const cold = scoreReceipt.systems["1321-cold"].headline.critical_meaning;
     <SectionLede copy={sectionCopy.overview} size="hero" />
 
     <div class="section-body">
-      <p class="scores-caption" id="scores-caption">
-        Moments where the meaning survived, out of {overviewFacts.criticalUnits}. Higher is better.
-      </p>
-
-      <div class="snapshot-scores" aria-labelledby="scores-caption">
+      <div class="snapshot-scores" aria-label={`Moments preserved out of ${overviewFacts.criticalUnits}`}>
         <article class="snapshot-score is-cold">
           <div class="snapshot-topline">
             <span>No preparation</span>
@@ -46,17 +42,6 @@ const cold = scoreReceipt.systems["1321-cold"].headline.critical_meaning;
           </div>
           <p>{displayRate(prepared.rate)} preserved. Answered {prepared.total - overviewFacts.preparedWithheld} times, {overviewFacts.preparedWrong} of them wrong.</p>
         </article>
-      </div>
-
-      <div class="reading-guide">
-        <h3>How to read this</h3>
-        <p>
-          Preparation scored lower because it declined to answer {overviewFacts.preparedWithheld} times, and our
-          rule counts silence as meaning not preserved. That rule is deliberately strict. When both systems did
-          answer, the cold run was wrong {overviewFacts.coldWrong} times and the prepared run
-          {" "}{overviewFacts.preparedWrong}. One unit on one clip is not enough to call either version safer,
-          and neither made a serious error, the kind that reverses what a speaker meant.
-        </p>
       </div>
 
       <dl class="snapshot-facts">

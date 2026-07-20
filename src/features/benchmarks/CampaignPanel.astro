@@ -1,0 +1,63 @@
+---
+import SectionLede from "./SectionLede.astro";
+import {
+  campaignClips,
+  capturedRuns,
+  chargedSlots,
+  displaySignedCount,
+  displaySignedRate,
+  measuredPairs,
+  requiredPairs,
+} from "./campaign";
+import { sectionCopy } from "./sections";
+---
+
+<section
+  class="instrument-panel campaign-panel"
+  id="panel-campaign"
+  role="tabpanel"
+  aria-labelledby="tab-campaign"
+  tabindex="0"
+  data-bench-panel="campaign"
+  hidden
+>
+  <div class="section-split">
+    <SectionLede copy={sectionCopy.campaign} />
+
+    <div class="section-body">
+      <dl class="method-facts">
+        <div><dt>Runs booked</dt><dd>{chargedSlots}</dd></div>
+        <div><dt>Runs captured</dt><dd>{capturedRuns}</dd></div>
+        <div><dt>Comparisons</dt><dd>{measuredPairs}<small> / {requiredPairs}</small></dd></div>
+      </dl>
+
+      <div class="metric-deck" aria-label="Result for each clip">
+        {campaignClips.map((clip) => (
+          <article class:list={["metric-card", clip.measured === 0 ? "campaign-absent" : "campaign-worse"]}>
+            <span>{clip.label}</span>
+            {clip.measured === 0 ? (
+              <>
+                <strong>None<small>no comparison</small></strong>
+                <footer>
+                  <p>Every run without the rule failed</p>
+                  <small>Booked attempts spent, not repeated</small>
+                </footer>
+              </>
+            ) : (
+              <>
+                <strong>{displaySignedRate(clip.rateDelta!)}<small>meaning, with the rule</small></strong>
+                <footer>
+                  <p>{displaySignedCount(clip.catastrophicDelta!)} serious errors introduced</p>
+                  <small>
+                    {clip.measured} of {clip.planned} comparisons
+                    {clip.identicalAcrossRepetitions ? ", all alike" : ""}
+                  </small>
+                </footer>
+              </>
+            )}
+          </article>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

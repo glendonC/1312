@@ -1,18 +1,9 @@
 ---
 import SectionLede from "./SectionLede.astro";
+import { auditFailed, auditGroups, auditPassed, pinnedReceipts } from "./audit";
 import { sectionCopy } from "./sections";
 
-const checks = [
-  { label: "Test set locked before scoring", state: "verified" },
-  { label: "Both systems used the same source", state: "verified" },
-  { label: "Human review completed blind", state: "verified" },
-  { label: "Published score arithmetic verified", state: "verified" },
-  { label: "Two control clips scored", state: "pending" },
-  { label: "Public baseline scored", state: "pending" },
-  { label: "Repeat-run variance measured", state: "pending" },
-] as const;
-const verified = checks.filter((check) => check.state === "verified").length;
-const pending = checks.length - verified;
+const totalChecks = auditPassed + auditFailed;
 ---
 
 <section
@@ -28,20 +19,54 @@ const pending = checks.length - verified;
     <SectionLede copy={sectionCopy.receipts} />
 
     <div class="section-body">
-      <div class="audit-summary" aria-label={`${verified} verified and ${pending} pending audit checks`}>
-        <div><strong>{verified}</strong><span>Verified</span></div>
-        <div><strong>{pending}</strong><span>Pending</span></div>
+      <div class="metric-deck" aria-label="Audit summary">
+        <article class="metric-card audit-card-passed">
+          <span>Checks passed</span>
+          <strong>{auditPassed}<small>of {totalChecks}</small></strong>
+          <footer>
+            <p>Recomputed on every build</p>
+            <small>Never typed in by hand</small>
+          </footer>
+        </article>
+        <article class="metric-card audit-card-pinned">
+          <span>Files pinned</span>
+          <strong>{pinnedReceipts}<small>by fingerprint</small></strong>
+          <footer>
+            <p>Editing any file breaks the chain</p>
+            <small>Recording, grades, test set, score</small>
+          </footer>
+        </article>
+        <article class="metric-card audit-card-failed">
+          <span>Failed</span>
+          <strong>{auditFailed}<small>this build</small></strong>
+          <footer>
+            <p>A failing check stops the build</p>
+            <small>So this number cannot differ</small>
+          </footer>
+        </article>
       </div>
 
-      <div class="audit-list" role="list" aria-label="Benchmark audit checks">
-        {checks.map((check) => (
-          <div class:list={["audit-row", `is-${check.state}`]} role="listitem">
-            <span class="audit-marker" aria-hidden="true">{check.state === "verified" ? "✓" : ""}</span>
-            <strong>{check.label}</strong>
-            <span>{check.state === "verified" ? "Verified" : "Pending"}</span>
-          </div>
-        ))}
-      </div>
+      <details class="audit-details">
+        <summary>
+          See all {totalChecks} checks
+          <span aria-hidden="true"></span>
+        </summary>
+        <div class="audit-groups">
+          {auditGroups.map((group) => (
+            <section class="audit-group">
+              <h3>{group.title}</h3>
+              <ul>
+                {group.checks.map((check) => (
+                  <li class:list={[check.passed ? "is-passed" : "is-failed"]}>
+                    <span class="audit-text">{check.label}</span>
+                    {!check.passed && <span class="audit-state">Failed</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </details>
     </div>
   </div>
 </section>

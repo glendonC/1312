@@ -2,6 +2,18 @@
 import SectionLede from "./SectionLede.astro";
 import { evidenceRows } from "./model";
 import { sectionCopy } from "./sections";
+
+const scoredClips = evidenceRows.filter((row) => row.score).length;
+const pendingClips = evidenceRows.length - scoredClips;
+
+// Column names are short by necessity; a first-time reader needs them spelled out.
+const columnMeanings = [
+  { label: "Source", meaning: "Original audio pinned" },
+  { label: "Key", meaning: "Reference answer written before any run" },
+  { label: "Output", meaning: "A system ran and produced captions" },
+  { label: "Review", meaning: "People judged it blind" },
+  { label: "Score", meaning: "Judgements counted into these numbers" },
+];
 ---
 
 <section
@@ -19,7 +31,7 @@ import { sectionCopy } from "./sections";
     <div class="section-body">
       <div class="evidence-board">
         <div class="board-summary">
-          <strong>1<small> / 3</small></strong>
+          <strong>{scoredClips}<small> / {evidenceRows.length}</small></strong>
           <span>clips scored</span>
         </div>
 
@@ -40,17 +52,26 @@ import { sectionCopy } from "./sections";
                   class:list={["matrix-cell", row[field] ? "is-ready" : "is-missing"]}
                   role="cell"
                   aria-label={`${row.label} ${field}: ${row[field] ? "ready" : "missing"}`}
-                >{row[field] ? "✓" : ""}</span>
+                ></span>
               ))}
             </div>
           ))}
         </div>
       </div>
 
+      <dl class="matrix-legend">
+        {columnMeanings.map((column) => (
+          <div>
+            <dt>{column.label}</dt>
+            <dd>{column.meaning}</dd>
+          </div>
+        ))}
+      </dl>
+
       <dl class="coverage-facts">
-        <div><dt>Test clips</dt><dd>3</dd></div>
-        <div><dt>Scored</dt><dd>1</dd></div>
-        <div><dt>Pending</dt><dd>2</dd></div>
+        <div><dt>Test clips</dt><dd>{evidenceRows.length}</dd></div>
+        <div><dt>Scored</dt><dd>{scoredClips}</dd></div>
+        <div><dt>Pending</dt><dd>{pendingClips}</dd></div>
       </dl>
     </div>
   </div>

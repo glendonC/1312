@@ -1,101 +1,130 @@
-/* Receipts */
+/* Receipts: the page's self-check.
+   Summary reads as three numbers, matching Method. Individual checks are reference detail behind a
+   disclosure. This disclosure is self-contained: it must not inherit .receipt-details, whose row
+   grid and mono type would break these sentences apart. */
 
-.audit-summary {
-  display: grid;
+/* Footers reserve the same height in every card. Without this a line that wraps in one card
+   pushes its number up and the three cards stop aligning. Scoped so Method is unaffected. */
+.receipts-panel .metric-card footer p {
+  min-height: 2.7em;
+}
+
+.audit-card-passed { background: var(--bench-citron); }
+.audit-card-pinned { background: var(--bench-blue); }
+.audit-card-failed { background: var(--bench-teal-soft); }
+
+.audit-details {
+  margin-top: 12px;
   overflow: hidden;
+  border: 1px solid var(--bench-line-strong);
   border-radius: var(--bench-r-card);
-  box-shadow: 0 14px 38px rgba(22, 29, 27, 0.07);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--bench-surface);
 }
 
-.audit-summary > div {
-  padding: clamp(24px, 3vw, 36px);
-}
-
-.audit-summary > div + div {
-  border-left: 1px solid rgba(21, 32, 29, 0.12);
-}
-
-.audit-summary > div:first-child { background: var(--bench-teal-soft); }
-.audit-summary > div:last-child { background: var(--bench-peach); }
-
-.audit-summary strong,
-.audit-summary span {
-  display: block;
-}
-
-.audit-summary strong {
-  font-size: clamp(4rem, 7vw, 7rem);
-  font-weight: var(--weight-thin);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.08em;
-  line-height: 0.75;
-}
-
-.audit-summary span {
-  margin-top: 16px;
-  color: var(--bench-muted);
-  font-size: 0.8rem;
-}
-
-.audit-list {
-  margin-top: 20px;
-  border-top: 1px solid var(--bench-line-strong);
-}
-
-.audit-row {
-  display: grid;
+.audit-details > summary {
+  display: flex;
   min-height: 58px;
-  padding: 12px 4px;
-  border-bottom: 1px solid var(--bench-line);
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  gap: 12px;
+  padding: 14px 20px;
   align-items: center;
-  border-radius: 10px;
-  transition: background-color 160ms ease, transform 160ms ease;
-}
-
-.audit-row.is-verified:hover {
-  background: color-mix(in srgb, var(--bench-teal-soft) 58%, transparent);
-  transform: translateX(3px);
-}
-
-.audit-row.is-pending:hover {
-  background: color-mix(in srgb, var(--bench-peach) 58%, transparent);
-  transform: translateX(3px);
-}
-
-.audit-row strong {
-  font-size: 0.76rem;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 0.78rem;
   font-weight: var(--weight-medium);
+  cursor: pointer;
+  list-style: none;
 }
 
-.audit-row > span:last-child {
-  color: var(--bench-muted);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
+.audit-details > summary::-webkit-details-marker {
+  display: none;
 }
 
-.audit-marker {
+.audit-details > summary span {
   display: grid;
-  width: 14px;
-  height: 14px;
+  width: 26px;
+  height: 26px;
+  flex: none;
   place-items: center;
   border: 1px solid var(--bench-line-strong);
-  border-radius: 4px;
-  color: #fff;
-  font-size: 0.52rem;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
   line-height: 1;
-  corner-shape: squircle;
 }
 
-.audit-row.is-verified .audit-marker {
-  border-color: var(--bench-teal);
-  background: var(--bench-teal);
+.audit-details > summary span::after {
+  content: "+";
 }
 
-.audit-row.is-pending {
+.audit-details[open] > summary span::after {
+  content: "\2212";
+}
+
+.audit-groups {
+  display: grid;
+  padding: 2px 20px 26px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px 48px;
+}
+
+.audit-group h3 {
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--bench-line);
   color: var(--bench-muted);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  font-weight: var(--weight-regular);
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.audit-group ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 9px;
+  list-style: none;
+}
+
+.audit-group li {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.audit-text {
+  display: block;
+  color: rgba(21, 32, 29, 0.76);
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  letter-spacing: -0.004em;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.audit-group li.is-failed {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.audit-group li.is-failed .audit-text {
+  color: var(--bench-coral);
+}
+
+.audit-state {
+  flex: none;
+  color: var(--bench-coral);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .audit-groups {
+    grid-template-columns: 1fr;
+  }
 }
 
 .receipt-split {

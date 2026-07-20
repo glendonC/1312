@@ -126,3 +126,53 @@
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
+
+/* Non-result states of the span readout (translating, declined, unavailable, failed) speak in the
+   quiet voice so the one real translation reads as the only claim. */
+.selection-bar-waiting {
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+}
+
+.selection-bar-translation[data-span-translation-state="loading"] .selection-bar-waiting {
+  animation: selection-bar-waiting-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes selection-bar-waiting-pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selection-bar-translation[data-span-translation-state="loading"] .selection-bar-waiting {
+    animation: none;
+  }
+}
+
+.selection-bar-retry {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--ink, #161d1b) 16%, transparent);
+  border-radius: 8px;
+  corner-shape: squircle;
+  background: transparent;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: var(--weight-medium, 500);
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.selection-bar-retry:hover {
+  color: var(--ink, #161d1b);
+  background: rgba(22, 29, 27, 0.05);
+}
+
+.selection-bar-retry:focus-visible {
+  outline: 2px solid var(--accent, #2f746e);
+  outline-offset: 2px;
+}

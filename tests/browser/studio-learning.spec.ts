@@ -390,6 +390,40 @@ test("results chrome: header title truncates, Details and Run details open on de
   await expect(viewer.locator(".player-provenance")).toHaveCount(0);
 });
 
+test("the recorded selection bar keeps Translate line-scoped and never claims a span translation", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop selection-bar honesty coverage");
+  await openCompletedRun006(page);
+
+  const workspace = page.getByRole("region", { name: "Language learning workspace" });
+  const sourceCaption = workspace.locator('[data-learning-line-id="c01"]').locator(".cue-src");
+  const translationRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/span-translations")) translationRequests.push(request.url());
+  });
+  await sourceCaption.evaluate((element) => {
+    const textNode = Array.from(element.childNodes).find((node) =>
+      node.nodeType === Node.TEXT_NODE && node.textContent?.includes("분들이"));
+    if (!textNode) throw new Error("Expected the opening caption text node");
+    const range = document.createRange();
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, 3);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+  });
+
+  const selectionBar = page.getByRole("toolbar", { name: "Selection actions" });
+  await expect(selectionBar).toBeVisible();
+  const translate = selectionBar.getByRole("button", { name: "Translate" });
+  await expect(translate).toHaveAttribute("title", "Show this line's recorded translation");
+  await translate.click();
+  // The recorded demo reveals only the line's recorded translation: no span row, no model call.
+  await expect(selectionBar.locator(".selection-bar-translation-kind")).toHaveText(["This line"]);
+  await expect(selectionBar.locator("[data-span-translation-state]")).toHaveCount(0);
+  expect(translationRequests).toEqual([]);
+});
+
 test("mobile selection and tap open a bounded explanation sheet and return focus", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Mobile interaction coverage");
   await openCompletedRun006(page);

@@ -33,7 +33,9 @@ import type {
   LearningSelectionRequest,
   PreparedLearningSelection,
   ProductionLearningInteraction,
+  SpanTranslationState,
 } from "./presentation.ts";
+import { learningRequestKey } from "./presentation.ts";
 import { savedSpanId, type LearningTools } from "./useLearningTools";
 import { useViewerSession, type CaptionMode, type ClozeAmount } from "./viewerSession";
 
@@ -318,24 +320,45 @@ export default function LearningResults({
     if (floating) tools.keepSpan(floating.moment, floating.span);
   };
 
+  const selectionRequestFor = (
+    moment: PresentedMoment,
+    span: SelectedLanguageSpan,
+  ): LearningSelectionRequest => ({
+    lineId: moment.lineId,
+    startMs: moment.startMs,
+    endMs: moment.endMs,
+    sourceLanguage: moment.sourceLanguage,
+    targetLanguage: moment.targetLanguage,
+    source: moment.source,
+    target: moment.target,
+    span: { ...span },
+  });
+
   const requestProductionSelection = (
     moment: PresentedMoment,
     span: SelectedLanguageSpan,
     trigger: HTMLElement,
   ) => {
     if (!productionReady || !productionInteraction) return;
-    const request: LearningSelectionRequest = {
-      lineId: moment.lineId,
-      startMs: moment.startMs,
-      endMs: moment.endMs,
-      sourceLanguage: moment.sourceLanguage,
-      targetLanguage: moment.targetLanguage,
-      source: moment.source,
-      target: moment.target,
-      span: { ...span },
-    };
+    const request = selectionRequestFor(moment, span);
     productionInteraction.onRequest(request);
     openPinned({ state: "production", request }, trigger);
+  };
+
+  // The span translation for the bar's current selection: only the state whose request key matches
+  // the exact floating span is shown, so a stale response never rides a new highlight.
+  const floatingTranslation: SpanTranslationState | null = floating &&
+      presentation.mode === "production" && productionReady && productionInteraction?.spanTranslation &&
+      productionInteraction.spanTranslation.requestKey ===
+        learningRequestKey(presentation.source, selectionRequestFor(floating.moment, floating.span))
+    ? productionInteraction.spanTranslation
+    : null;
+
+  const translateFloating = (retry: boolean) => {
+    if (!floating || !productionReady || !productionInteraction) return;
+    const request = selectionRequestFor(floating.moment, floating.span);
+    if (retry) productionInteraction.onTranslateRetry(request);
+    else productionInteraction.onTranslate(request);
   };
 
   const closePinned = () => {
@@ -645,6 +668,10 @@ export default function LearningResults({
           translation={floating.moment.target}
           targetLanguage={floating.moment.targetLanguage}
           saved={tools.savedIds.has(savedSpanId(floating.moment, floating.span))}
+          canTranslateSpan={presentation.mode === "production" && productionReady}
+          spanTranslation={floatingTranslation}
+          onTranslate={() => translateFloating(false)}
+          onTranslateRetry={() => translateFloating(true)}
           onExplain={explainFloating}
           onSave={saveFloating}
           onDismiss={dismissFloating}

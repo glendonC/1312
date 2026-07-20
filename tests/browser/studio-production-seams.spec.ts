@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { expect, test, type Locator, type Page, type Request, type Response } from "@playwright/test";
 
 import {
+  DeterministicCurrentRunCaptionTestExecutor,
   DeterministicRuntimeExecutor,
   DurableRuntimeCommandStore,
   RuntimeSourceRegistry,
@@ -186,6 +187,113 @@ test("deterministic recovery receipts project absent, reported, and exhausted pr
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
       await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
     }
+  }
+});
+
+test("an unconfigured span translation executor stays visibly unavailable in the selection bar", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  test.skip(testInfo.project.name !== "desktop", "one deterministic desktop selection path is sufficient");
+
+  const directory = await mkdtemp(join(tmpdir(), "studio-span-translation-browser-"));
+  const sources = await RuntimeSourceRegistry.open({ sourceDirectories: [resolve("public/demo/runs/run-005")] });
+  const store = await DurableRuntimeCommandStore.open(join(directory, "runtime"));
+  const service = await RuntimeStartService.open({
+    store,
+    sources,
+    launcherFactory: new DeterministicRuntimeExecutor({}).factory(),
+    orchestratorLauncherFactory: deterministicOrchestratorLauncherFactory({ mode: "spawn_one" }),
+    captionExecutor: new DeterministicCurrentRunCaptionTestExecutor(),
+    recoverOnOpen: false,
+  });
+  const token = "d".repeat(64);
+  await page.goto("/studio/");
+  const origin = new URL(page.url()).origin;
+  const server = createRuntimeHostHttpServer({ service, token, allowedOrigins: [origin] });
+  try {
+    const address = await listenRuntimeHost(server, { port: 0 });
+    const url = `http://${address.host}:${address.port}`;
+    const spanTranslationPosts: Request[] = [];
+    const spanTranslationResponses: Response[] = [];
+    page.on("request", (request) => {
+      if (request.url().endsWith("/span-translations") && request.method() === "POST") {
+        spanTranslationPosts.push(request);
+      }
+    });
+    page.on("response", (response) => {
+      if (response.url().endsWith("/span-translations") && response.request().method() === "POST") {
+        spanTranslationResponses.push(response);
+      }
+    });
+
+    const production = await openCompletedDeterministicProjection(page, 2, { url, token });
+    const review = production.locator('[data-production-region="publish-review-human-review"]');
+    const control = review.locator("[data-production-review-control-intake-id]");
+    await expect(control).toHaveCount(1);
+    await control.locator("[data-production-review-attestation]").check();
+    await control.locator('[data-production-review-action="approve_for_caption_production"]').click();
+    const receipts = production.locator('[data-production-region="publish-review-decision-receipts"]');
+    await expect(receipts.locator("[data-production-publish-review-decision-receipt-id]")).toHaveCount(1, { timeout: 10_000 });
+    const captions = production.locator('[data-production-region="caption-production"]');
+    await captions.locator('[data-production-caption-action="start"]').click();
+    // A completed caption flips the run to the Result view, so wait on the results region itself.
+    const productionResults = page.locator('[data-production-results-region="caption-lineage"]');
+    await expect(productionResults.locator("[data-production-results-job-id]")).toHaveCount(1, { timeout: 10_000 });
+    const privatePlayer = productionResults.getByRole("region", { name: "Private production media playback" });
+    await expect(privatePlayer).toHaveAttribute("data-private-playback-state", "ready", { timeout: 10_000 });
+
+    const productionLearning = productionResults.getByRole("region", { name: "Language learning workspace" });
+    const firstCue = productionLearning.locator("[data-production-results-line-id]").first();
+    const selected = await firstCue.locator(".cue-src").evaluate((element) => {
+      const textNode = Array.from(element.childNodes).find((node) =>
+        node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim().length >= 2);
+      if (!(textNode instanceof Text)) throw new Error("Expected verified caption text");
+      const value = textNode.textContent ?? "";
+      const start = value.search(/\S/);
+      const range = document.createRange();
+      range.setStart(textNode, start);
+      range.setEnd(textNode, start + 2);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+      return value.slice(start, start + 2);
+    });
+
+    // The document-level selection listener attaches as the freshly loaded result view settles, so
+    // re-dispatch the release until the bar answers, exactly as a human would re-tap a selection.
+    await expect(async () => {
+      const raised = await page.evaluate(() => {
+        if (document.querySelector(".selection-bar")) return true;
+        document.querySelector('[data-caption-side="source"]')
+          ?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+        return false;
+      });
+      expect(raised).toBe(true);
+    }).toPass({ timeout: 10_000 });
+    const selectionBar = page.getByRole("toolbar", { name: "Selection actions" });
+    await expect(selectionBar).toBeVisible();
+    await selectionBar.getByRole("button", { name: "Translate" }).click();
+    const spanReadout = selectionBar.locator("[data-span-translation-state]");
+    await expect(spanReadout).toHaveAttribute("data-span-translation-state", "unavailable", { timeout: 10_000 });
+    await expect(spanReadout).toContainText("Word translation is not available on this run.");
+    await expect(selectionBar.getByRole("button", { name: "Retry translation" })).toHaveCount(0);
+    await expect(selectionBar.locator(".selection-bar-translation-kind").first()).toHaveText("This selection");
+    await expect(selectionBar.locator(".selection-bar-translation-kind").nth(1)).toHaveText("This line");
+
+    expect(spanTranslationPosts).toHaveLength(1);
+    const requestBody = spanTranslationPosts[0].postDataJSON() as {
+      caption: Record<string, string>;
+      lineId: string;
+      selection: { side: string; unit: string; start: number; end: number; text: string };
+    };
+    expect(Object.keys(requestBody).sort()).toEqual(["caption", "lineId", "selection"]);
+    expect(requestBody.selection.side).toBe("source");
+    expect(requestBody.selection.unit).toBe("unicode_code_point");
+    expect(requestBody.selection.text).toBe(selected);
+    expect(spanTranslationResponses.some((response) => response.status() === 409)).toBe(true);
+  } finally {
+    await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
   }
 });
 

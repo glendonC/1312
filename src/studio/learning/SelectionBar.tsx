@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import "../../styles/studio/results.selection.css";
 import { Bookmark, Captions, Info } from "../glyphs";
 import type { PresentedText } from "./model";
+import type { SpanTranslationState } from "./presentation";
 
 /** Where a live text selection sits in the viewport, so the bar can float above (or below) it. */
 export interface SelectionAnchor {
@@ -15,10 +16,11 @@ export interface SelectionAnchor {
 /**
  * The floating action bar a learner raises by selecting caption text — the natural "touch anything
  * to go deeper" gesture. It reads the meaning of the selection right where the eye already is, rather
- * than sending the reader to a side panel: Translate reveals the line's translation in place, Explain
- * opens the full facet explanation, and Save keeps the word or phrase for study. The bar tracks the
- * live selection rectangle, so it stays pinned to the highlight while the transcript scrolls, and it
- * dismisses when the selection is cleared.
+ * than sending the reader to a side panel: Translate reveals the line's translation in place (and on
+ * a live production run also requests one bounded host-receipted translation of the exact selected
+ * span), Explain opens the full facet explanation, and Save keeps the word or phrase for study. The
+ * bar tracks the live selection rectangle, so it stays pinned to the highlight while the transcript
+ * scrolls, and it dismisses when the selection is cleared.
  */
 export default function SelectionBar({
   anchor,
@@ -27,6 +29,10 @@ export default function SelectionBar({
   translation,
   targetLanguage,
   saved,
+  canTranslateSpan,
+  spanTranslation,
+  onTranslate,
+  onTranslateRetry,
   onExplain,
   onSave,
   onDismiss,
@@ -40,6 +46,13 @@ export default function SelectionBar({
   translation: PresentedText;
   targetLanguage: string;
   saved: boolean;
+  /** Only a live production run with a configured executor can translate the exact span; the
+   *  recorded demo keeps its honest line-translation reveal and never calls a model. */
+  canTranslateSpan: boolean;
+  /** The host-receipted state for this exact span, owned above the bar; null before any request. */
+  spanTranslation: SpanTranslationState | null;
+  onTranslate: () => void;
+  onTranslateRetry: () => void;
   onExplain: () => void;
   onSave: () => void;
   onDismiss: () => void;
@@ -91,7 +104,15 @@ export default function SelectionBar({
     let top = placeAbove ? aboveTop : live.bottom + margin;
     top = Math.max(margin, Math.min(top, viewportHeight - rect.height - margin));
     setPos({ left, top, placement: placeAbove ? "above" : "below" });
-  }, [live, showTranslation]);
+  }, [live, showTranslation, spanTranslation]);
+
+  const toggleTranslation = () => {
+    const opening = !showTranslation;
+    setShowTranslation(opening);
+    // One explicit request per selection: reopening reads the kept state, and failed attempts
+    // retry only through the explicit Retry control.
+    if (opening && canTranslateSpan && spanTranslation === null) onTranslate();
+  };
 
   return (
     <div
@@ -108,8 +129,10 @@ export default function SelectionBar({
           type="button"
           className="selection-bar-btn"
           aria-pressed={showTranslation}
-          title="Show this line's recorded translation"
-          onClick={() => setShowTranslation((open) => !open)}
+          title={canTranslateSpan
+            ? "Translate the selected text and show this line's translation"
+            : "Show this line's recorded translation"}
+          onClick={toggleTranslation}
         >
           <span className="selection-bar-icon" aria-hidden="true"><Captions /></span>
           Translate
@@ -133,9 +156,21 @@ export default function SelectionBar({
           </button>
         )}
       </div>
+      {showTranslation && canTranslateSpan && (
+        // The span readout is host-receipted model output for the exact selection, and every
+        // missing state stays visible: unavailable, declined, and exhausted are said, never blank.
+        <p
+          className="selection-bar-translation"
+          role="status"
+          data-span-translation-state={spanTranslation?.state ?? "loading"}
+        >
+          <span className="selection-bar-translation-kind">This selection</span>
+          <SpanTranslationReadout state={spanTranslation} onRetry={onTranslateRetry} />
+        </p>
+      )}
       {showTranslation && (
-        // What is shown is the line's recorded translation, and it says so: a word-level
-        // translation would be a new producer, never an inference smuggled into presentation.
+        // What is shown here is the line's translation, and it says so: the span readout above is
+        // the only word-level claim, and it exists only as a receipted production artifact.
         <p className="selection-bar-translation">
           <span className="selection-bar-translation-kind">This line</span>
           <span lang={targetLanguage}>
@@ -146,5 +181,55 @@ export default function SelectionBar({
         </p>
       )}
     </div>
+  );
+}
+
+function SpanTranslationReadout({
+  state,
+  onRetry,
+}: {
+  state: SpanTranslationState | null;
+  onRetry: () => void;
+}) {
+  if (state === null || state.state === "loading") {
+    return <span className="selection-bar-waiting">Translating the selection</span>;
+  }
+  if (state.state === "translated") {
+    return (
+      <span
+        lang={state.translation.language}
+        title="Model translation of the selected text. Not reviewed."
+      >
+        {state.translation.text}
+      </span>
+    );
+  }
+  if (state.state === "withheld") {
+    return (
+      <span className="selection-bar-waiting">
+        {state.reasonCode === "generator_abstained"
+          ? "The model declined this span."
+          : "The caption context is not enough for this span."}
+      </span>
+    );
+  }
+  if (state.state === "unavailable") {
+    return <span className="selection-bar-waiting">Word translation is not available on this run.</span>;
+  }
+  return (
+    <>
+      <span className="selection-bar-waiting">
+        {state.reasonCode === "translation_retry_exhausted"
+          ? "Translation retries are used up for this selection."
+          : state.reasonCode === "invalid_translation_binding"
+            ? "The selection changed before the translation returned."
+            : "The translation attempt failed."}
+      </span>
+      {state.retry === "available" && (
+        <button type="button" className="selection-bar-retry" onClick={onRetry}>
+          Retry translation
+        </button>
+      )}
+    </>
   );
 }

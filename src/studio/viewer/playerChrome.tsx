@@ -17,6 +17,15 @@ export const CAPTION_SCALE_STEPS: readonly CaptionScale[] = ["sm", "md", "lg"];
  * so the recorded demo and a verified production clip read as the same instrument without either
  * borrowing the other's authority.
  */
+/** A prepared point of interest on the timeline: where it sits (seconds domain) and which kind
+ *  of preparation put it there (machine-readable, like a region's kind). The chrome draws it;
+ *  only a surface that owns a prepared projection may supply it. The dots are decorative to
+ *  assistive tech — the supplying surface owns an accessible statement of the same facts. */
+export interface PlayerProgressMarker {
+  start: number;
+  kind: string;
+}
+
 export interface PlayerProgressChrome {
   /** Seconds domain. `min` is 0 for a recorded clip and the verified range start for production. */
   min: number;
@@ -27,6 +36,8 @@ export interface PlayerProgressChrome {
   onSeek: (seconds: number) => void;
   /** Recorded music/silence shading. Absent means an unshaded bar, never invented regions. */
   regions?: ReadonlyArray<{ kind: "music" | "silence"; start: number; end: number }>;
+  /** Prepared-moment dots. Absent means an unmarked bar, never invented moments. */
+  markers?: ReadonlyArray<PlayerProgressMarker>;
 }
 
 export interface PlayerTransportChrome {
@@ -167,6 +178,21 @@ export function PlayerOverlayBar({
           <div className="pbar-fill" style={{ width: `${progressPct}%` }} aria-hidden="true" />
           <span className="pbar-knob" style={{ left: `${progressPct}%` }} aria-hidden="true" />
         </div>
+        {/* Outside the clipped track so the dots can stand slightly proud of it. The slider
+            keeps all interaction; the dots are waypoints, stated accessibly by the surface
+            that supplied them. */}
+        {span > 0 && progress.markers && progress.markers.length > 0 && (
+          <div className="pbar-markers" aria-hidden="true">
+            {progress.markers.map((marker, index) => (
+              <span
+                key={`${marker.start}-${index}`}
+                className="pbar-marker"
+                data-kind={marker.kind}
+                style={{ left: `${pct(marker.start)}%` }}
+              />
+            ))}
+          </div>
+        )}
         <input
           type="range"
           className="pbar-input"

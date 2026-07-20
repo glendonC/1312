@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { useMemo } from "react";
 
 import { clock } from "./format";
+import { projectMomentMarkers } from "./learning/MomentsOverlay";
 import RecordedMediaPlayer from "./learning/RecordedMediaPlayer";
 import { projectPrototypeLearningPresentation } from "./learning/prototypeAdapter";
 import { learningPrototypeFixture } from "./learning/prototypeFixture";
@@ -62,6 +63,7 @@ function RecordedResult({
     learningPrototypeFixture,
   );
   const prepInteraction = useRecordedLearningPrep(learningSource, learningPrototypeFixture);
+  const momentMarkers = projectMomentMarkers(prepInteraction.prep);
   const playback = {
     state: "available" as const,
     authority: "recorded_fixture" as const,
@@ -92,7 +94,13 @@ function RecordedResult({
         authority="recorded_demo"
         frame="workbench"
         media={({ modeControls, panelControls }) => (
-          <RecordedMediaPlayer bundle={bundle} surface="results" modeControls={modeControls} panelControls={panelControls} />
+          <RecordedMediaPlayer
+            bundle={bundle}
+            surface="results"
+            modeControls={modeControls}
+            panelControls={panelControls}
+            momentMarkers={momentMarkers}
+          />
         )}
         presentation={learningPresentation}
         playback={playback}

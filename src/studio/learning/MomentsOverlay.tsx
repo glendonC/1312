@@ -1,12 +1,29 @@
-import type { LearningPlayback, LearningPrepProjection } from "./presentation.ts";
+import type { PlayerProgressMarker } from "../viewer/playerChrome";
+import type {
+  LearningLensKind,
+  LearningPlayback,
+  LearningPrepProjection,
+} from "./presentation.ts";
 
-const OVERLAY_LENS_LABELS: Record<string, string> = {
+const OVERLAY_LENS_LABELS: Record<LearningLensKind, string> = {
   word_order: "Word order",
   grammar_salience: "Grammar",
   situating: "Situating",
   culture_reference: "Culture",
   historical_reference: "History",
 };
+
+/**
+ * Where prepared help will surface, as timeline waypoints for the player's progress bar. Only
+ * available moments become markers — withheld and abstained help stays invisible here exactly
+ * as it stays silent in the overlay.
+ */
+export function projectMomentMarkers(prep: LearningPrepProjection): PlayerProgressMarker[] {
+  if (prep.state !== "ready") return [];
+  return prep.moments
+    .filter((moment) => moment.availability === "available")
+    .map((moment) => ({ start: moment.startMs / 1_000, kind: moment.lens }));
+}
 
 /**
  * The Moments overlay surfaces at most one prepared available note for the moment under the

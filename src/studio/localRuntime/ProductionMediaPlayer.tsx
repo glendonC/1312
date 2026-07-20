@@ -9,6 +9,7 @@ import {
   type CaptionBurnState,
   PlayerOverlayBar,
   PlayerSettingsPill,
+  type PlayerProgressMarker,
 } from "../viewer/playerChrome";
 import type { ProductionPlaybackBinding } from "./productionPlaybackController.ts";
 
@@ -66,6 +67,7 @@ export default function ProductionMediaPlayer({
   active = true,
   modeControls,
   panelControls,
+  momentMarkers,
 }: {
   binding: ProductionPlaybackBinding;
   onPlaybackChange: (playback: LearningPlayback) => void;
@@ -79,6 +81,11 @@ export default function ProductionMediaPlayer({
   active?: boolean;
   modeControls?: ReactNode;
   panelControls?: ReactNode;
+  /**
+   * Prepared-moment waypoints for the progress bar, projected by the composing surface from its
+   * learning prep. The player draws them; it never derives them.
+   */
+  momentMarkers?: readonly PlayerProgressMarker[];
 }) {
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const closeRef = useRef<(detail: string) => void>(() => undefined);
@@ -280,6 +287,7 @@ export default function ProductionMediaPlayer({
           disabled: !ready,
           ariaValueText: `${clock(currentTimeMs)} of ${clock(rangeEndMs)}`,
           onSeek: (seconds) => seek(seconds * 1_000),
+          markers: momentMarkers,
         },
         play: {
           playing,

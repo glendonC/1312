@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
-import { useContext, useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { Bookmark, Sliders } from "../glyphs";
-import { ResultCommandSeat } from "../viewer/resultCommandSeat";
 import LearningFineTuneFace from "./LearningFineTuneFace";
 import {
   codePointSlice,
@@ -225,9 +223,6 @@ export default function LearningResults({
     });
   };
 
-  // In the result workspace the toggles live at the command baseline, focus-panel style; the
-  // seat is a DOM element, so the buttons keep this component's state, ids, and handlers.
-  const commandSeat = useContext(ResultCommandSeat);
   const toggles = (
     <>
       {presentation.mode === "prototype" && (
@@ -270,8 +265,9 @@ export default function LearningResults({
       aria-label="Language learning workspace"
       data-learning-mode={presentation.mode}
     >
-      <div className="learning-bar" data-toggles={commandSeat ? "ported" : "inline"}>
-        {commandSeat ? createPortal(toggles, commandSeat) : toggles}
+      <div className="learning-bar">
+        {toggles}
+        <MomentsNote prep={prepInteraction.prep} />
         {/* A one-line affordance cue, not the old instruction paragraph: the tappable language is already
             highlighted in the transcript, so this only names the gesture. */}
         {presentation.mode === "prototype" && (
@@ -433,6 +429,23 @@ export default function LearningResults({
         <TuneDrawer id={tuneId} interaction={prepInteraction} onClose={() => setTuneOpen(false)} />
       )}
     </section>
+  );
+}
+
+/**
+ * The quiet standing counterpart to the playhead-bound Moments overlay: the overlay surfaces
+ * only inside a prepared window, so this note is what tells a viewer that prepared help exists
+ * at all and is waiting on the timeline (where the player marks each moment as a dot). It reads
+ * the same prep projection, counts only available moments, and disappears with them.
+ */
+function MomentsNote({ prep }: { prep: LearningPrepInteraction["prep"] }) {
+  if (prep.state !== "ready") return null;
+  const available = prep.moments.filter((moment) => moment.availability === "available").length;
+  if (available === 0) return null;
+  return (
+    <span className="learning-moments-note" data-prepared-moments={available}>
+      {available} {available === 1 ? "moment" : "moments"} on the timeline
+    </span>
   );
 }
 

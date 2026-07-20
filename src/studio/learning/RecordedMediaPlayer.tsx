@@ -11,6 +11,7 @@ import {
   CaptionBurn,
   PlayerOverlayBar,
   PlayerSettingsPill,
+  type PlayerProgressMarker,
 } from "../viewer/playerChrome";
 import { useViewerSession } from "./viewerSession";
 
@@ -34,6 +35,7 @@ export default function RecordedMediaPlayer({
   surface,
   modeControls,
   panelControls,
+  momentMarkers,
 }: {
   bundle: RunBundle;
   surface: "results" | "workbench";
@@ -48,6 +50,11 @@ export default function RecordedMediaPlayer({
    * top-right settings pill with the caption controls rather than crowding the transport bar.
    */
   panelControls?: ReactNode;
+  /**
+   * Results-only. Prepared-moment waypoints for the progress bar, projected by the composing
+   * surface from its learning prep. The player draws them; it never derives them.
+   */
+  momentMarkers?: readonly PlayerProgressMarker[];
 }) {
   const playerId = useId();
   const clipT = useStudio((state) => state.clipT);
@@ -204,6 +211,7 @@ export default function RecordedMediaPlayer({
             ...music.map(([start, end]) => ({ kind: "music" as const, start, end })),
             ...silence.map(([start, end]) => ({ kind: "silence" as const, start, end })),
           ],
+          markers: momentMarkers,
         },
         play: {
           playing: activelyPlaying,

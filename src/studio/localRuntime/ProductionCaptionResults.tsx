@@ -14,6 +14,7 @@ import {
   type LearningPrepProjection,
   type LearningSelectionRequest,
   type LearningPrepInteraction,
+  type SpanTranslationState,
 } from "../learning/presentation.ts";
 import { PRODUCTION_CAPTION_RESULTS_ID } from "../resultAccess";
 import type { VerifiedCaptionProductionResult } from "../runtime/production/captionProductionAudit";
@@ -23,6 +24,7 @@ import type { LocalRuntimeHostClient } from "./client";
 import ProductionMediaPlayer from "./ProductionMediaPlayer.tsx";
 import { ProductionLearningController } from "./productionLearningController.ts";
 import { ProductionLearningPrepController } from "./productionLearningPrepController.ts";
+import { ProductionSpanTranslationController } from "./productionSpanTranslationController.ts";
 import {
   ProductionPlaybackController,
   type ProductionPlaybackLoadResult,
@@ -110,11 +112,16 @@ function ProductionCaptionResult({
     () => client ? new ProductionLearningController(client) : null,
     [client],
   );
+  const translationController = useMemo(
+    () => client ? new ProductionSpanTranslationController(client) : null,
+    [client],
+  );
   const prepController = useMemo(
     () => client ? new ProductionLearningPrepController(client) : null,
     [client],
   );
   const [explanation, setExplanation] = useState<LearningExplanationState | null>(null);
+  const [spanTranslation, setSpanTranslation] = useState<SpanTranslationState | null>(null);
   const [fineTuneDraft, setFineTuneDraft] = useState<LearningFineTuneDraft>({ armedLenses: [], temperature: "medium" });
   const [prep, setPrep] = useState<LearningPrepProjection>({ state: "not_requested" });
   const playbackAvailable = playback.state === "available";
@@ -161,6 +168,12 @@ function ProductionCaptionResult({
     learningController?.invalidate();
     return () => learningController?.invalidate();
   }, [learningController, playbackAvailable, projectionKey]);
+
+  useEffect(() => {
+    setSpanTranslation(null);
+    translationController?.invalidate();
+    return () => translationController?.invalidate();
+  }, [translationController, playbackAvailable, projectionKey]);
 
   useEffect(() => {
     setFineTuneDraft({ armedLenses: [], temperature: "medium" });
@@ -211,6 +224,27 @@ function ProductionCaptionResult({
     onTemperature: (temperature) => updateFineTune({ armedLenses: fineTuneDraft.armedLenses, temperature }),
     onPrepare: () => updatePrep(false),
     onRetry: () => updatePrep(true),
+  };
+
+  const updateSpanTranslation = (request: LearningSelectionRequest, retry: boolean) => {
+    if (!translationController || !playbackAvailable || sourceProjection.state !== "ready") return;
+    const requestKey = learningRequestKey(sourceProjection.source, request);
+    if (!retry && spanTranslation?.requestKey === requestKey &&
+        spanTranslation.state !== "failed" && spanTranslation.state !== "unavailable") return;
+    if (
+      retry &&
+      (
+        spanTranslation?.requestKey !== requestKey ||
+        spanTranslation.state !== "failed" ||
+        spanTranslation.retry !== "available"
+      )
+    ) return;
+    setSpanTranslation({ state: "loading", requestKey, request });
+    const input = { runtimeId, source: sourceProjection.source, request };
+    const pending = retry ? translationController.retry(input) : translationController.request(input);
+    void pending.then((next) => {
+      setSpanTranslation((current) => current?.requestKey === requestKey ? next : current);
+    });
   };
 
   const updateExplanation = (request: LearningSelectionRequest, retry: boolean) => {
@@ -318,6 +352,9 @@ function ProductionCaptionResult({
               explanation,
               onRequest: (request) => updateExplanation(request, false),
               onRetry: (request) => updateExplanation(request, true),
+              spanTranslation,
+              onTranslate: (request) => updateSpanTranslation(request, false),
+              onTranslateRetry: (request) => updateSpanTranslation(request, true),
             } : undefined}
             prepInteraction={prepInteraction}
           />

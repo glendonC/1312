@@ -147,10 +147,54 @@ export type LearningPresentation =
       savedItems: { state: "unavailable"; reasonCode: "canonical_saved_item_missing" };
     };
 
+export type SpanTranslationState =
+  | { state: "loading"; requestKey: string; request: LearningSelectionRequest }
+  | {
+      state: "translated";
+      requestKey: string;
+      request: LearningSelectionRequest;
+      translation: { language: string; text: string };
+      authority: {
+        dataClass: "runtime_artifact";
+        productionAuthority: true;
+        executionAuthority: "host_receipted";
+        semanticReviewState: "not_reviewed";
+        artifactId: string;
+        contentId: string;
+        receiptId: string;
+        receiptContentId: string;
+      };
+    }
+  | {
+      state: "withheld";
+      requestKey: string;
+      request: LearningSelectionRequest;
+      reasonCode: "generator_abstained" | "insufficient_caption_context";
+    }
+  | {
+      state: "unavailable";
+      requestKey: string;
+      request: LearningSelectionRequest;
+      reasonCode: "production_translation_executor_unavailable";
+      detail: string;
+      retry: "unavailable";
+    }
+  | {
+      state: "failed";
+      requestKey: string;
+      request: LearningSelectionRequest;
+      reasonCode: "translation_request_failed" | "translation_retry_exhausted" | "invalid_translation_binding";
+      detail: string;
+      retry: "available" | "unavailable";
+    };
+
 export interface ProductionLearningInteraction {
   explanation: LearningExplanationState | null;
   onRequest: (request: LearningSelectionRequest) => void;
   onRetry: (request: LearningSelectionRequest) => void;
+  spanTranslation: SpanTranslationState | null;
+  onTranslate: (request: LearningSelectionRequest) => void;
+  onTranslateRetry: (request: LearningSelectionRequest) => void;
 }
 
 export type LearningPlayback =

@@ -12,6 +12,8 @@ import type {
   RuntimeHostLanguageExplanationResponse,
   RuntimeHostLearningPrepRequest,
   RuntimeHostLearningPrepResponse,
+  RuntimeHostSpanTranslationRequest,
+  RuntimeHostSpanTranslationResponse,
   RuntimeHostPlanResponse,
   RuntimeHostPollResponse,
   RuntimeHostPublishReviewDecisionRequest,
@@ -37,6 +39,7 @@ import {
 import { planResponse } from "./planResponse.ts";
 import { languageExplanationResponse } from "./languageExplanationResponses.ts";
 import { learningPrepResponse } from "./learningPrepResponses.ts";
+import { spanTranslationResponse } from "./spanTranslationResponses.ts";
 import {
   contentId,
   exact,
@@ -368,6 +371,27 @@ export class LocalRuntimeHostClient {
   ): Promise<RuntimeHostLanguageExplanationResponse> {
     return languageExplanationResponse(
       await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/language-explanations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      }),
+      runtimeId,
+    );
+  }
+
+  async spanTranslations(runtimeId: string): Promise<RuntimeHostSpanTranslationResponse> {
+    return spanTranslationResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/span-translations`),
+      runtimeId,
+    );
+  }
+
+  async createSpanTranslation(
+    runtimeId: string,
+    request: RuntimeHostSpanTranslationRequest,
+  ): Promise<RuntimeHostSpanTranslationResponse> {
+    return spanTranslationResponse(
+      await this.request(`/v1/runtimes/${encodeURIComponent(runtimeId)}/span-translations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),

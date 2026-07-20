@@ -22,6 +22,8 @@ import {
 } from "../src/studio/runtime/production/runtimeHost/index.ts";
 import { resolveLanguageExplanationExecutorConfiguration } from "../src/studio/runtime/production/languageExplanations/configuration.ts";
 import { resolveLearningPrepExecutorConfiguration } from "../src/studio/runtime/production/learningPrep/configuration.ts";
+import { resolveSpanTranslationExecutorConfiguration } from "../src/studio/runtime/production/spanTranslations/configuration.ts";
+import { OllamaSpanTranslationExecutor } from "../src/studio/runtime/production/spanTranslations/ollamaExecutor.ts";
 
 const REPOSITORY = resolve(import.meta.dirname, "..");
 
@@ -93,6 +95,13 @@ const learningPrepConfiguration = resolveLearningPrepExecutorConfiguration({
   allowReal: flag("--allow-real-learning-prep"),
   model: value("--learning-prep-model"),
 });
+const spanTranslationConfiguration = resolveSpanTranslationExecutorConfiguration({
+  mode: value("--span-translation-executor"),
+  allowReal: flag("--allow-real-span-translation"),
+  model: value("--span-translation-model"),
+  endpoint: value("--span-translation-endpoint"),
+  think: value("--span-translation-think"),
+});
 
 async function openAiKey(): Promise<string> {
   const environmentKey = process.env.OPENAI_API_KEY?.trim();
@@ -155,6 +164,13 @@ const learningPrepExecutor = learningPrepConfiguration.mode === "openai"
       model: learningPrepConfiguration.model,
     })
   : undefined;
+const spanTranslationExecutor = spanTranslationConfiguration.mode === "ollama"
+  ? new OllamaSpanTranslationExecutor({
+      model: spanTranslationConfiguration.model,
+      endpoint: spanTranslationConfiguration.endpoint,
+      think: spanTranslationConfiguration.think,
+    })
+  : undefined;
 const service = await RuntimeStartService.open({
   store,
   sources,
@@ -176,6 +192,7 @@ const service = await RuntimeStartService.open({
   captionExecutor,
   languageExplanationExecutor,
   learningPrepExecutor,
+  spanTranslationExecutor,
 });
 const token = randomBytes(32).toString("hex");
 const server = createRuntimeHostHttpServer({ service, ownedMediaIngest, youtubeLocalIngest, token, allowedOrigins });
@@ -219,6 +236,9 @@ process.stdout.write(`${JSON.stringify({
     : "unavailable-no-fixture-fallback",
   learningPrepExecutor: learningPrepConfiguration.mode === "openai"
     ? `current-run-openai-opt-in:${learningPrepConfiguration.model}`
+    : "unavailable-no-fixture-fallback",
+  spanTranslationExecutor: spanTranslationConfiguration.mode === "ollama"
+    ? `current-run-local-ollama-opt-in:${spanTranslationConfiguration.model}`
     : "unavailable-no-fixture-fallback",
   authorizationToken: token,
 }, null, 2)}\n`);

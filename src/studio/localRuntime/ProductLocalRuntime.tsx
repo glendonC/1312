@@ -53,6 +53,7 @@ import { LocalRuntimeHostClient } from "./client";
 import ProductionProcessingCanvas from "./ProductionProcessingCanvas";
 import ProductionProcessingMock, { type ProcessingMockScenario } from "./ProductionProcessingMock";
 import ProductionCaptionResults from "./ProductionCaptionResults";
+import RunViewSwitch, { type RunView } from "../viewer/RunViewSwitch";
 import {
   isLocalRuntimeLanguageTag,
   mapAnalysisRequestToRuntimeStart,
@@ -147,6 +148,8 @@ export default function ProductLocalRuntime({
   const [openSourcePopover, setOpenSourcePopover] = useState<"about" | "host" | null>(null);
   const aboutTrigger = useRef<HTMLButtonElement>(null);
   const hostTrigger = useRef<HTMLButtonElement>(null);
+  const [runtimeView, setRuntimeView] = useState<RunView>("process");
+  const focusedResultOnArrival = useRef(false);
 
   const requiredSourceKind = sourceMode === "youtube" ? "youtube_local" : "owned_local";
   const visibleSources = sources.filter((source) => source.sourceKind === requiredSourceKind);
@@ -154,6 +157,21 @@ export default function ProductLocalRuntime({
   const lifecycle = runtime
     ? projectLocalRuntimeLifecycle(runtime.status.lifecycle, runtime.status.reason)
     : null;
+  const hasCaptionResults = runtime !== null && runtime.captionResults.length > 0;
+
+  // Result becomes the default exactly once, when the first host-verified caption result of this
+  // runtime arrives; a learner who then chooses Process is not yanked back by later results.
+  useEffect(() => {
+    if (!hasCaptionResults) {
+      focusedResultOnArrival.current = false;
+      setRuntimeView("process");
+      return;
+    }
+    if (!focusedResultOnArrival.current) {
+      focusedResultOnArrival.current = true;
+      setRuntimeView("result");
+    }
+  }, [hasCaptionResults]);
   const rangeValid = client !== null &&
     selectedSource !== null &&
     Number.isFinite(analysisRequest.start) &&
@@ -820,53 +838,68 @@ export default function ProductLocalRuntime({
             <button type="button" onClick={onClose}>Back to source choices</button>
           </header>
           {lifecycle && selectedSource && (
-        <section className="product-runtime-status" aria-labelledby="product-runtime-status-title">
+        <section
+          className="product-runtime-status"
+          aria-labelledby="product-runtime-status-title"
+          data-production-view={hasCaptionResults ? runtimeView : undefined}
+        >
           <h2 id="product-runtime-status-title" className="product-runtime-visually-hidden">Local runtime status</h2>
-          <ProductionProcessingCanvas
-            source={selectedSource}
-            lifecycle={lifecycle}
-            status={runtime.status}
-            production={runtime.production}
-            cursor={runtime.cursor}
-            eventCount={runtime.eventCount}
-            lastEventType={runtime.lastEventType}
-            pollState={runtime.pollState}
-            pollMessage={runtime.pollMessage}
-            captionResultCount={runtime.captionResults.length}
-            onOpenEvidence={openRecordedEvidence}
-            onRetryPolling={runtime.pollState === "error" && client && productionAdapter.current
-              ? () => {
-                  const adapter = productionAdapter.current;
-                  if (adapter) void beginPolling(client, runtime.status, runtime.cursor, adapter);
-                }
-              : undefined}
-            onPrepareAnotherRun={clearReviewedState}
-          />
+          {hasCaptionResults && (
+            <div className="run-action-bar">
+              {runtimeView === "process" && (
+                <p className="run-action-note">Validated runtime state · completed local run</p>
+              )}
+              <RunViewSwitch view={runtimeView} onView={setRuntimeView} />
+            </div>
+          )}
+          {/* Both views stay mounted: hiding rather than unmounting keeps the private playback
+              grant, explanation, and prep session state alive without any new host request. */}
+          <div className="product-runtime-process-view" hidden={hasCaptionResults && runtimeView === "result"}>
+            <ProductionProcessingCanvas
+              source={selectedSource}
+              lifecycle={lifecycle}
+              status={runtime.status}
+              production={runtime.production}
+              cursor={runtime.cursor}
+              eventCount={runtime.eventCount}
+              lastEventType={runtime.lastEventType}
+              pollState={runtime.pollState}
+              pollMessage={runtime.pollMessage}
+              captionResultCount={runtime.captionResults.length}
+              onOpenEvidence={openRecordedEvidence}
+              onRetryPolling={runtime.pollState === "error" && client && productionAdapter.current
+                ? () => {
+                    const adapter = productionAdapter.current;
+                    if (adapter) void beginPolling(client, runtime.status, runtime.cursor, adapter);
+                  }
+                : undefined}
+              onPrepareAnotherRun={clearReviewedState}
+            />
 
-          <details
-            ref={evidenceDetails}
-            id="product-processing-evidence"
-            className="product-runtime-evidence"
-            open
-          >
-            <summary>
-              <span>
-                <b>Recorded evidence and review controls</b>
-                <small>{runtime.eventCount} validated events · separate from replay</small>
-              </span>
-            </summary>
-            <div className="product-runtime-evidence-boundary">
-              <p>
-                Audit the host journal separately in <a href="/studio/runtime/">Production Run Explorer</a>.
-                These events are not inserted into the recorded RunBundle or its agent graph.
-              </p>
-              <dl>
-                <div><dt>Command</dt><dd>{runtime.status.commandId}</dd></div>
-                <div><dt>Runtime</dt><dd>{runtime.status.runtimeId}</dd></div>
-                <div><dt>Journal</dt><dd>{runtime.status.journalId}</dd></div>
-                <div><dt>Frozen forecast</dt><dd>{runtime.status.forecast?.frozenForecastId ?? "Unavailable after initialization failure"}</dd></div>
-                <div><dt>Start receipt</dt><dd>{runtime.status.runStartReceipt?.contentId ?? "Unavailable after initialization failure"}</dd></div>
-              </dl>
+            <details
+              ref={evidenceDetails}
+              id="product-processing-evidence"
+              className="product-runtime-evidence"
+              open
+            >
+              <summary>
+                <span>
+                  <b>Recorded evidence and review controls</b>
+                  <small>{runtime.eventCount} validated events · separate from replay</small>
+                </span>
+              </summary>
+              <div className="product-runtime-evidence-boundary">
+                <p>
+                  Audit the host journal separately in <a href="/studio/runtime/">Production Run Explorer</a>.
+                  These events are not inserted into the recorded RunBundle or its agent graph.
+                </p>
+                <dl>
+                  <div><dt>Command</dt><dd>{runtime.status.commandId}</dd></div>
+                  <div><dt>Runtime</dt><dd>{runtime.status.runtimeId}</dd></div>
+                  <div><dt>Journal</dt><dd>{runtime.status.journalId}</dd></div>
+                  <div><dt>Frozen forecast</dt><dd>{runtime.status.forecast?.frozenForecastId ?? "Unavailable after initialization failure"}</dd></div>
+                  <div><dt>Start receipt</dt><dd>{runtime.status.runStartReceipt?.contentId ?? "Unavailable after initialization failure"}</dd></div>
+                </dl>
             </div>
             <ProductionJournalFacts
               projection={runtime.production}
@@ -885,13 +918,17 @@ export default function ProductLocalRuntime({
               onCaptionProduction={submitCaptionProduction}
             />
           </details>
+          </div>
 
-          <ProductionCaptionResults
-            client={client}
-            runtimeId={runtime.status.runtimeId}
-            sourceRevisionId={runtime.status.sourceRevisionId}
-            results={runtime.captionResults}
-          />
+          <div className="product-runtime-result-view" hidden={hasCaptionResults && runtimeView === "process"}>
+            <ProductionCaptionResults
+              client={client}
+              runtimeId={runtime.status.runtimeId}
+              sourceRevisionId={runtime.status.sourceRevisionId}
+              results={runtime.captionResults}
+              playbackActive={!hasCaptionResults || runtimeView === "result"}
+            />
+          </div>
         </section>
           )}
         </>

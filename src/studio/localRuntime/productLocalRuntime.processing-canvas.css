@@ -6,6 +6,10 @@
   margin-inline: auto;
 }
 
+/* Result / Process for a completed local run uses the shared floating .run-action-bar
+   (results.viewer.css). The process/result view wrappers hide through [hidden] and must never
+   gain a display rule of their own. */
+
 .processing-mock-boundary {
   width: min(980px, 100%);
   margin: 0 auto 12px;
@@ -698,8 +702,21 @@
 }
 
 .processing-focus-activity {
+  position: relative;
+  display: flex;
+  min-height: 0;
   max-height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.processing-focus-activity-scroll {
+  min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scroll-padding-block: 18px;
+  scrollbar-gutter: stable;
 }
 
 .processing-focus-activity h3 {
@@ -744,6 +761,22 @@
 .processing-focus-activity dd {
   overflow-wrap: anywhere;
   color: var(--ink-soft);
+}
+
+.processing-focus-new-activity {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  min-height: 30px;
+  padding: 6px 11px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  color: var(--accent);
+  background: rgba(247, 250, 248, 0.94);
+  box-shadow: 0 8px 24px rgba(26, 70, 66, 0.12);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
 }
 
 .processing-focus-commands {

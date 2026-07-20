@@ -66,11 +66,14 @@ export default function LearningFineTuneFace({ interaction }: { interaction: Lea
         </div>
         <b data-learning-prep-state-label="">{prepStateLabel}</b>
       </header>
-      <p className="learning-fine-tune-boundary" role="note">
-        {recorded
-          ? "This recorded demo uses run-bound design-fixture notes. They were not generated from your media, are not production output, and are not semantically verified."
-          : "Watching stays first. Arming lenses prepares moments from this clip's verified captions; prepared notes are unreviewed caption-context inference, never verified culture or history, and moments without justified help stay silent."}
-      </p>
+      <details className="learning-fine-tune-about">
+        <summary>About these notes</summary>
+        <p className="learning-fine-tune-boundary" role="note">
+          {recorded
+            ? "This recorded demo uses run-bound design-fixture notes. They were not generated from your media, are not production output, and are not semantically verified."
+            : "Watching stays first. Arming lenses prepares moments from this clip's verified captions; prepared notes are unreviewed caption-context inference, never verified culture or history, and moments without justified help stay silent."}
+        </p>
+      </details>
 
       <fieldset className="learning-fine-tune-lenses" disabled={controlsDisabled}>
         <legend>Armed lenses</legend>

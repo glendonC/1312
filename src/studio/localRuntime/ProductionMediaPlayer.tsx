@@ -63,6 +63,7 @@ export default function ProductionMediaPlayer({
   binding,
   onPlaybackChange,
   moments,
+  active = true,
   modeControls,
   panelControls,
 }: {
@@ -70,6 +71,12 @@ export default function ProductionMediaPlayer({
   onPlaybackChange: (playback: LearningPlayback) => void;
   /** Verified caption moments for the burned-in line. Presentation input, not new authority. */
   moments: readonly ProductionPresentedMoment[];
+  /**
+   * False while the composing surface shows another view of the same run. The player stays
+   * mounted so the grant, clock, and session state survive, but the clip must not keep sounding
+   * behind a view it is not on.
+   */
+  active?: boolean;
   modeControls?: ReactNode;
   panelControls?: ReactNode;
 }) {
@@ -204,6 +211,10 @@ export default function ProductionMediaPlayer({
       void binding.handle.dispose().catch(() => undefined);
     };
   }, [binding]);
+
+  useEffect(() => {
+    if (!active) mediaRef.current?.pause();
+  }, [active]);
 
   useEffect(() => {
     const media = mediaRef.current;

@@ -41,20 +41,10 @@ function rangeClock(timeMs: number): string {
 }
 
 /**
- * The wired strip beneath the verified clip: line coverage of the verified caption moments and the
- * verified analysis range. Both are facts of the host-verified artifact — the production mirror of
- * the recorded surface's coverage + attribution strip, with no attribution invented for a private
- * source.
+ * Line coverage of the verified caption moments, stated once inside Run details: facts of the
+ * host-verified artifact, not a second always-on strip under the clip.
  */
-function ProductionMediaMeta({
-  moments,
-  rangeStartMs,
-  rangeEndMs,
-}: {
-  moments: readonly ProductionPresentedMoment[];
-  rangeStartMs: number;
-  rangeEndMs: number;
-}) {
+function coverageSummary(moments: readonly ProductionPresentedMoment[]): string {
   const counts = { captioned: 0, withheld: 0, unavailable: 0, silent: 0 };
   for (const moment of moments) {
     if (moment.source.state !== "available") {
@@ -67,28 +57,13 @@ function ProductionMediaMeta({
       counts.unavailable += 1;
     }
   }
-
-  return (
-    <div className="result-media-meta">
-      <dl className="result-coverage" aria-label="Line coverage in range">
-        <div data-kind="captioned"><dt>Captioned</dt><dd>{counts.captioned}</dd></div>
-        <div data-kind="withheld"><dt>Withheld</dt><dd>{counts.withheld}</dd></div>
-        {counts.unavailable > 0 && (
-          <div data-kind="unavailable"><dt>Unavailable</dt><dd>{counts.unavailable}</dd></div>
-        )}
-        <div data-kind="silent"><dt>Silent</dt><dd>{counts.silent}</dd></div>
-        <p className="result-coverage-total">
-          of {moments.length} {moments.length === 1 ? "line" : "lines"} in range
-        </p>
-      </dl>
-      <p className="result-attribution">
-        <span className="result-attribution-title">Verified range</span>
-        <span className="result-attribution-source">
-          {rangeClock(rangeStartMs)} to {rangeClock(rangeEndMs)}
-        </span>
-      </p>
-    </div>
-  );
+  const parts = [
+    `${counts.captioned} captioned`,
+    `${counts.withheld} withheld`,
+    ...(counts.unavailable > 0 ? [`${counts.unavailable} unavailable`] : []),
+    `${counts.silent} silent`,
+  ];
+  return `${parts.join(", ")} of ${moments.length} ${moments.length === 1 ? "line" : "lines"} in range`;
 }
 
 function ProductionCaptionResult({
@@ -97,12 +72,14 @@ function ProductionCaptionResult({
   sourceRevisionId,
   result,
   playbackEligible,
+  playbackActive,
 }: {
   client: LocalRuntimeHostClient | null;
   runtimeId: string;
   sourceRevisionId: string;
   result: VerifiedCaptionProductionResult;
   playbackEligible: boolean;
+  playbackActive: boolean;
 }) {
   const { verification, artifact } = result;
   const projectionKey = [
@@ -266,6 +243,19 @@ function ProductionCaptionResult({
     >
       <dl className="result-panel-list">
         <div><dt>Projection</dt><dd>Timed KO / EN projection</dd></div>
+        {sourceProjection.state === "ready" && (
+          <>
+            <div><dt>Coverage</dt><dd>{coverageSummary(sourceProjection.source.moments)}</dd></div>
+            <div>
+              <dt>Verified range</dt>
+              <dd>
+                {rangeClock(sourceProjection.source.context.timeline.analysisRange.startMs)}
+                {" to "}
+                {rangeClock(sourceProjection.source.context.timeline.analysisRange.endMs)}
+              </dd>
+            </div>
+          </>
+        )}
         <div><dt>Artifact schema</dt><dd>studio.caption-production.artifact.v1</dd></div>
         <div><dt>Authority state</dt><dd>{verification.authorityState}</dd></div>
         <div><dt>Local runtime</dt><dd>{artifact.runId}</dd></div>
@@ -302,6 +292,7 @@ function ProductionCaptionResult({
                   binding={loadResult.binding}
                   onPlaybackChange={setPlayback}
                   moments={sourceProjection.source.moments}
+                  active={playbackActive}
                   modeControls={modeControls}
                   panelControls={panelControls}
                 />
@@ -318,13 +309,6 @@ function ProductionCaptionResult({
                 </p>
               )
             )}
-            mediaMeta={
-              <ProductionMediaMeta
-                moments={sourceProjection.source.moments}
-                rangeStartMs={sourceProjection.source.context.timeline.analysisRange.startMs}
-                rangeEndMs={sourceProjection.source.context.timeline.analysisRange.endMs}
-              />
-            }
             presentation={projectProductionLearningPresentation(sourceProjection.source, {
               playbackAvailable,
               interactionAvailable: learningController !== null,
@@ -351,11 +335,14 @@ export default function ProductionCaptionResults({
   runtimeId,
   sourceRevisionId,
   results,
+  playbackActive = true,
 }: {
   client: LocalRuntimeHostClient | null;
   runtimeId: string;
   sourceRevisionId: string;
   results: readonly VerifiedCaptionProductionResult[];
+  /** False while the composing surface shows the process view of the same run. */
+  playbackActive?: boolean;
 }) {
   return (
     <section
@@ -393,6 +380,7 @@ export default function ProductionCaptionResults({
               sourceRevisionId={sourceRevisionId}
               result={result}
               playbackEligible={results.length === 1}
+              playbackActive={playbackActive}
             />
           ))}
         </div>

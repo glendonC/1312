@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AgentMark from "../AgentMark";
 import {
@@ -40,6 +41,13 @@ interface RecordedFact {
   state: string;
 }
 
+interface WorkerActivityRow {
+  id: "agent" | "task" | "capabilities" | "execution" | "report";
+  label: string;
+  value: string;
+  revision: string;
+}
+
 const KIND_ROLE: Record<WorkerKind, Role> = {
   orchestrator: "orchestrator",
   media: "segment",
@@ -73,6 +81,43 @@ function workerStatusLabel(worker: ProductionStudioWorkerView): string {
   if (worker.status === "reporting") return "Reporting";
   if (worker.status === "working") return "Working";
   return "Registered";
+}
+
+function workerActivityRows(worker: ProductionStudioWorkerView): WorkerActivityRow[] {
+  const capabilities = worker.capabilities.length > 0
+    ? worker.capabilities.join(" · ")
+    : "None recorded";
+  const execution = worker.execution
+    ? `${worker.execution.status} · ${compactIdentity(worker.execution.id)}`
+    : "No execution recorded";
+  const report = worker.report
+    ? `${worker.report.status} · ${worker.report.summary}`
+    : "No report recorded";
+
+  return [
+    { id: "agent", label: "Agent", value: worker.agentId, revision: worker.agentId },
+    { id: "task", label: "Task", value: worker.taskId, revision: worker.taskId },
+    {
+      id: "capabilities",
+      label: "Capabilities",
+      value: capabilities,
+      revision: capabilities,
+    },
+    {
+      id: "execution",
+      label: "Execution",
+      value: execution,
+      revision: `${worker.execution?.id ?? "none"}:${worker.execution?.status ?? "absent"}`,
+    },
+    {
+      id: "report",
+      label: "Report",
+      value: report,
+      revision: worker.report
+        ? `${worker.report.id}:${worker.report.status}:${worker.report.summary}`
+        : "absent",
+    },
+  ];
 }
 
 function buildWorkerIdentities(
@@ -277,9 +322,35 @@ function WorkerFocus({
   onClose: () => void;
 }) {
   const closeButton = useRef<HTMLButtonElement>(null);
+  const activity = useRef<HTMLDivElement>(null);
+  const activityScrollRelease = useRef<number | null>(null);
+  const activityIsAutoScrolling = useRef(false);
+  const [activityFollow, setActivityFollow] = useState<"latest" | "paused">("latest");
+  const [activityHasUpdate, setActivityHasUpdate] = useState(false);
+  const reduceMotion = useReducedMotion();
   const worker = workers[index];
   const identity = identities.get(worker.agentId) ?? ORCHESTRATOR_IDENTITY;
   const workerIsActive = worker.status === "working" || worker.status === "reporting";
+  const activityRows = workerActivityRows(worker);
+  const activityRevision = activityRows.map((row) => `${row.id}:${row.revision}`).join("|");
+  const previousActivity = useRef({
+    workerId: worker.agentId,
+    revision: activityRevision,
+  });
+
+  const scrollActivityToLatest = useCallback((behavior: ScrollBehavior) => {
+    const region = activity.current;
+    if (!region) return;
+    activityIsAutoScrolling.current = true;
+    if (activityScrollRelease.current !== null) {
+      window.clearTimeout(activityScrollRelease.current);
+    }
+    region.scrollTo({ top: region.scrollHeight, behavior });
+    activityScrollRelease.current = window.setTimeout(() => {
+      activityIsAutoScrolling.current = false;
+      activityScrollRelease.current = null;
+    }, behavior === "smooth" ? 500 : 0);
+  }, []);
 
   useEffect(() => {
     closeButton.current?.focus();
@@ -291,6 +362,62 @@ function WorkerFocus({
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
   }, [index, onClose, onIndex, workers.length]);
+
+  useEffect(() => () => {
+    if (activityScrollRelease.current !== null) {
+      window.clearTimeout(activityScrollRelease.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    const previous = previousActivity.current;
+    previousActivity.current = { workerId: worker.agentId, revision: activityRevision };
+    const region = activity.current;
+    if (!region) return undefined;
+
+    if (previous.workerId !== worker.agentId) {
+      activityIsAutoScrolling.current = true;
+      region.scrollTop = 0;
+      window.requestAnimationFrame(() => {
+        activityIsAutoScrolling.current = false;
+      });
+      setActivityFollow("latest");
+      setActivityHasUpdate(false);
+      return undefined;
+    }
+    if (previous.revision === activityRevision) return undefined;
+    if (activityFollow === "paused") {
+      setActivityHasUpdate(true);
+      return undefined;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollActivityToLatest(reduceMotion ? "auto" : "smooth");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activityFollow, activityRevision, reduceMotion, scrollActivityToLatest, worker.agentId]);
+
+  const releaseActivityScroll = () => {
+    activityIsAutoScrolling.current = false;
+    if (activityScrollRelease.current !== null) {
+      window.clearTimeout(activityScrollRelease.current);
+      activityScrollRelease.current = null;
+    }
+  };
+
+  const readActivityScroll = () => {
+    const region = activity.current;
+    if (!region || activityIsAutoScrolling.current) return;
+    const nearLatest = region.scrollHeight - region.scrollTop - region.clientHeight <= 48;
+    setActivityFollow(nearLatest ? "latest" : "paused");
+    if (nearLatest) setActivityHasUpdate(false);
+  };
+
+  const revealLatestActivity = () => {
+    setActivityFollow("latest");
+    setActivityHasUpdate(false);
+    scrollActivityToLatest(reduceMotion ? "auto" : "smooth");
+  };
 
   const scope = worker.mediaScope.at(0);
 
@@ -333,23 +460,49 @@ function WorkerFocus({
           <p>This is recorded assignment scope, not an autonomous playback control.</p>
         </div>
 
-        <div className="processing-focus-activity">
+        <div
+          className="processing-focus-activity"
+          data-activity-follow={activityFollow}
+        >
           <span className="processing-kicker">Recorded activity</span>
           <h3>{workerStatusLabel(worker)}</h3>
           <p>{worker.objective}</p>
-          <dl>
-            <div><dt>Agent</dt><dd>{worker.agentId}</dd></div>
-            <div><dt>Task</dt><dd>{worker.taskId}</dd></div>
-            <div><dt>Capabilities</dt><dd>{worker.capabilities.length > 0 ? worker.capabilities.join(" · ") : "None recorded"}</dd></div>
-            <div>
-              <dt>Execution</dt>
-              <dd>{worker.execution ? `${worker.execution.status} · ${compactIdentity(worker.execution.id)}` : "No execution recorded"}</dd>
-            </div>
-            <div>
-              <dt>Report</dt>
-              <dd>{worker.report ? `${worker.report.status} · ${worker.report.summary}` : "No report recorded"}</dd>
-            </div>
-          </dl>
+          <div
+            ref={activity}
+            className="processing-focus-activity-scroll"
+            onScroll={readActivityScroll}
+            onWheel={releaseActivityScroll}
+            onPointerDown={releaseActivityScroll}
+            onTouchMove={releaseActivityScroll}
+          >
+            <dl aria-live="polite" aria-relevant="additions text">
+              {activityRows.map((row) => (
+                <div key={row.id} data-processing-focus-activity-row={row.id}>
+                  <dt>{row.label}</dt>
+                  <motion.dd
+                    key={row.revision}
+                    initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    {row.value}
+                  </motion.dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          {activityHasUpdate && (
+            <motion.button
+              type="button"
+              className="processing-focus-new-activity"
+              onClick={revealLatestActivity}
+              initial={reduceMotion ? false : { opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.16 }}
+            >
+              New activity <span aria-hidden="true">↓</span>
+            </motion.button>
+          )}
         </div>
 
         <div className="processing-focus-commands">

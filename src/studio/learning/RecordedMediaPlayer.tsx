@@ -165,10 +165,10 @@ export default function RecordedMediaPlayer({
   const { peaks } = bundle.wave;
   const { music, silence, source, title } = bundle.run.clip;
 
-  // Results plays the recorded clip in a squircle frame with its controls on the video surface,
-  // YouTube-style: revealed on hover/focus, always shown while paused and on touch. The workbench
-  // surface keeps the plain below-frame transport, so agent-focus playback is unchanged.
-  const overlayControls = surface === "results" && picture && Boolean(src);
+  // Every surface with a picture plays it in the squircle frame with the shared on-video chrome,
+  // YouTube-style: revealed on hover/focus, always shown while paused and on touch. The
+  // below-frame transport survives only as the fallback for media with no picture to overlay.
+  const overlayControls = picture && Boolean(src);
 
   const stepCaptionScale = (direction: -1 | 1): void => {
     const index = CAPTION_SCALE_STEPS.indexOf(captionScale);

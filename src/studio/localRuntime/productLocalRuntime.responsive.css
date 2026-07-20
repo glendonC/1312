@@ -267,6 +267,10 @@
     overflow: visible;
   }
 
+  .processing-focus-activity-scroll {
+    overflow: visible;
+  }
+
   .processing-focus-commands {
     position: fixed;
     right: 16px;
@@ -527,6 +531,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .processing-focus-activity-scroll {
+    scroll-behavior: auto;
+  }
+
   .processing-state-indicator,
   .processing-worker[data-active="true"] .processing-worker-mark::after {
     animation: none;

@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-import { Bookmark } from "../glyphs";
+import { Bookmark, Sliders } from "../glyphs";
+import { ResultCommandSeat } from "../viewer/resultCommandSeat";
+import LearningFineTuneFace from "./LearningFineTuneFace";
 import {
   codePointSlice,
   fullCodePointSpan,
@@ -16,6 +19,7 @@ import type {
   LearningFacetKind,
   LearningPlayback,
   LearningPresentation,
+  LearningPrepInteraction,
   LearningPrototypeProjection,
   LearningSelectionRequest,
   PreparedLearningSelection,
@@ -86,17 +90,21 @@ export default function LearningResults({
   presentation,
   playback,
   productionInteraction,
+  prepInteraction,
 }: {
   presentation: LearningPresentation;
   playback: LearningPlayback;
   productionInteraction?: ProductionLearningInteraction;
+  prepInteraction: LearningPrepInteraction;
 }) {
   const { source } = presentation;
   const [pinned, setPinned] = useState<PinnedSelection | null>(null);
   const [saved, setSaved] = useState<SessionSavedSelection[]>([]);
   const [savedOpen, setSavedOpen] = useState(false);
+  const [tuneOpen, setTuneOpen] = useState(false);
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
   const savedId = useId();
+  const tuneId = useId();
   const prototype = presentation.mode === "prototype" ? presentation.explanations : null;
   const productionReady = presentation.mode === "production" &&
     presentation.explanations.state === "ready" &&
@@ -113,6 +121,7 @@ export default function LearningResults({
     setPinned(null);
     setSaved([]);
     setSavedOpen(false);
+    setTuneOpen(false);
     setReturnFocus(null);
   }, [sourceKey]);
 
@@ -216,28 +225,62 @@ export default function LearningResults({
     });
   };
 
+  // In the result workspace the toggles live at the command baseline, focus-panel style; the
+  // seat is a DOM element, so the buttons keep this component's state, ids, and handlers.
+  const commandSeat = useContext(ResultCommandSeat);
+  const toggles = (
+    <>
+      {presentation.mode === "prototype" && (
+        <button
+          type="button"
+          className="learning-saved-toggle"
+          aria-expanded={savedOpen}
+          aria-controls={savedId}
+          onClick={() => {
+            setSavedOpen((open) => !open);
+            setTuneOpen(false);
+          }}
+        >
+          <Bookmark filled={saved.length > 0} />
+          <span>Saved{saved.length > 0 ? ` (${saved.length})` : ""}</span>
+        </button>
+      )}
+      {/* The whole Customize learning face sits behind this one chip, so the result stays the
+          dominant surface and tuning is disclosure, not a second dashboard. */}
+      <button
+        type="button"
+        className="learning-saved-toggle learning-tune-toggle"
+        aria-expanded={tuneOpen}
+        aria-controls={tuneId}
+        data-learning-prep-state={prepInteraction.prep.state}
+        onClick={() => {
+          setTuneOpen((open) => !open);
+          setSavedOpen(false);
+        }}
+      >
+        <Sliders />
+        <span>Tune</span>
+      </button>
+    </>
+  );
+
   return (
     <section
       className="learning-workspace"
       aria-label="Language learning workspace"
       data-learning-mode={presentation.mode}
     >
-      {presentation.mode === "prototype" && <div className="learning-bar">
-        <button
-          type="button"
-          className="learning-saved-toggle"
-          aria-expanded={savedOpen}
-          aria-controls={savedId}
-          onClick={() => setSavedOpen((open) => !open)}
-        >
-          <Bookmark filled={saved.length > 0} />
-          <span>Saved{saved.length > 0 ? ` (${saved.length})` : ""}</span>
-        </button>
+      <div className="learning-bar" data-toggles={commandSeat ? "ported" : "inline"}>
+        {commandSeat ? createPortal(toggles, commandSeat) : toggles}
         {/* A one-line affordance cue, not the old instruction paragraph: the tappable language is already
             highlighted in the transcript, so this only names the gesture. */}
-        <span className="learning-bar-hint" aria-hidden="true">Tap highlighted language to explain</span>
-        <span className="learning-session-note">Session only</span>
-      </div>}
+        {presentation.mode === "prototype" && (
+          <>
+            <span className="learning-bar-hint" aria-hidden="true">Tap highlighted language to explain</span>
+            <span className="learning-session-note">Session only</span>
+          </>
+        )}
+      </div>
 
       <>
           {pinned && (
@@ -385,7 +428,56 @@ export default function LearningResults({
           onClose={() => setSavedOpen(false)}
         />
       )}
+
+      {tuneOpen && (
+        <TuneDrawer id={tuneId} interaction={prepInteraction} onClose={() => setTuneOpen(false)} />
+      )}
     </section>
+  );
+}
+
+function TuneDrawer({
+  id,
+  interaction,
+  onClose,
+}: {
+  id: string;
+  interaction: LearningPrepInteraction;
+  onClose: () => void;
+}) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    drawerRef.current?.focus();
+  }, []);
+
+  // Like Saved, tuning slides over the transcript instead of replacing it, so the reading
+  // position is never lost and the face keeps its own region identity and state attributes.
+  return (
+    <div
+      id={id}
+      className="learning-tune"
+      ref={drawerRef}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      }}
+    >
+      <div className="learning-tune-head">
+        <button
+          type="button"
+          className="learning-saved-close"
+          aria-label="Close learning controls"
+          onClick={onClose}
+        >
+          Close
+        </button>
+      </div>
+      <LearningFineTuneFace interaction={interaction} />
+    </div>
   );
 }
 

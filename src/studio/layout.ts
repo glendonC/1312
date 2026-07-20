@@ -76,6 +76,68 @@ export function place(specs: Spec[], sizes: Record<string, Size>, layout: Layout
   return { pos, centre };
 }
 
+/**
+ * Where the run's finished artifact lands: on the orchestrator's FREE face, so its delivery wire
+ * can never intersect another wire or pass through a worker. That freedom is a property of each
+ * layout, not a tuning constant:
+ *
+ *   - the tidy layouts grow away from the root in one direction, so the space behind the root is
+ *     guaranteed empty — above it when the tree grows down, left of it when it grows right;
+ *   - the ring surrounds the hub, so the free direction is the bisector of the widest angular
+ *     gap between workers. Every worker wire is a spoke from the hub, and two spokes only ever
+ *     meet at the hub itself, so a spoke through the widest gap crosses nothing and clears the
+ *     ring by the most room available.
+ *
+ * The artifact is not a worker, so it never joins the tree or the ring — and like everything
+ * else here this is a pure function of the laid-out frame: same swarm, same terminus. The frame
+ * alone carries enough geometry (a node's size is twice the distance from its top-left corner to
+ * its centre), so no second size map is needed.
+ */
+export function terminus(frame: Frame, artifact: Size, layout: Layout): Point {
+  const hub = frame.centre.orchestrator ?? { x: 0, y: 0 };
+  const hubCorner = frame.pos.orchestrator ?? hub;
+
+  if (layout === "down") {
+    const hubTop = hubCorner.y;
+    return { x: hub.x, y: hubTop - AIR.along - artifact.h / 2 };
+  }
+  if (layout === "right") {
+    const hubLeft = hubCorner.x;
+    return { x: hubLeft - AIR.along - artifact.w / 2, y: hub.y };
+  }
+
+  const workers = Object.entries(frame.centre).filter(([id]) => id !== "orchestrator");
+  const clearance = AIR.along + Math.max(artifact.w, artifact.h) / 2;
+  if (workers.length === 0) {
+    return { x: hub.x, y: hub.y + (hub.y - hubCorner.y) + clearance };
+  }
+
+  let reach = 0;
+  const angles = workers
+    .map(([, c]) => {
+      reach = Math.max(reach, Math.hypot(c.x - hub.x, c.y - hub.y));
+      return Math.atan2(c.y - hub.y, c.x - hub.x);
+    })
+    .sort((a, b) => a - b);
+
+  let gapStart = angles[angles.length - 1];
+  let gapSize = angles[0] + Math.PI * 2 - gapStart;
+  for (let i = 1; i < angles.length; i += 1) {
+    const size = angles[i] - angles[i - 1];
+    if (size > gapSize) {
+      gapSize = size;
+      gapStart = angles[i - 1];
+    }
+  }
+  const bisector = gapStart + gapSize / 2;
+  const radius = reach + clearance;
+
+  return {
+    x: hub.x + Math.cos(bisector) * radius,
+    y: hub.y + Math.sin(bisector) * radius,
+  };
+}
+
 type Root = ReturnType<typeof hierarchy<Spec>>;
 
 /** Reingold–Tilford, straight out of d3, with the generations pointed down or right. */

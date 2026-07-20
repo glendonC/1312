@@ -15,8 +15,9 @@ import AgentMark from "./AgentMark";
 import { ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { isAgentThinking } from "./agentMeshRenderer";
 import { agentState, agentTitle } from "./agentPresentation";
-import { useAgent, useStudio } from "./store";
-import type { SwarmNode } from "./swarm";
+import ResultArtifactMark from "./ResultArtifactMark";
+import { useAgent, useBundle, useComplete, useStudio } from "./store";
+import { RESULT_ARTIFACT_NODE, type AgentSwarmNode } from "./swarm";
 import type { Role } from "./types";
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
@@ -68,7 +69,7 @@ function useOpen(id: string): {
 }
 
 /** One worker identity on the canvas. Its readable workspace opens in focus mode. */
-export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<SwarmNode>) {
+export const WorkerNode = memo(function WorkerNode({ data }: NodeProps<AgentSwarmNode>) {
   const agent = useAgent(data.agent);
   const on = useStudio((s) => s.selected === data.agent);
   const cancelled = useStudio((s) => s.outcome?.kind === "cancelled");
@@ -150,6 +151,50 @@ export const HubNode = memo(function HubNode() {
       </span>
       <span className="node-name">Orchestrator</span>
       <span className={`node-state${stateIsActive ? " text-shimmer" : ""}`}>{state}</span>
+    </div>
+  );
+});
+
+/**
+ * The run's result on the completed topology: the receipted captions artifact, at the terminus,
+ * linked from the orchestrator. It is a projection of the artifact the run actually produced —
+ * it mounts only once the fold is complete, it never emits or receives a trace, and it is drawn
+ * as a settled gold medallion rather than an agent identity, because it is a thing the swarm
+ * made and not a member of the swarm. Opening it opens the result workspace: the orb is the
+ * re-entry anchor to a result that has already been shown once.
+ */
+export const ArtifactNode = memo(function ArtifactNode() {
+  const complete = useComplete();
+  const bundle = useBundle();
+  const on = useStudio((s) => s.resultView === "result");
+  const setResultView = useStudio((s) => s.setResultView);
+
+  if (!complete || !bundle) return null;
+
+  const pair = `${bundle.run.pair.source.toUpperCase()} → ${bundle.run.pair.target.toUpperCase()}`;
+  const state = `${pair} captions`;
+
+  return (
+    <div
+      className="artifact-node"
+      data-agent-node={RESULT_ARTIFACT_NODE}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.stopPropagation();
+        setResultView("result");
+      }}
+      aria-label={`Result, ${state}. Open the result.`}
+      aria-expanded={on}
+    >
+      <span className="agent-node-identity">
+        <Pins />
+        <ResultArtifactMark />
+      </span>
+      <span className="node-name">Result</span>
+      <span className="node-state">{state}</span>
     </div>
   );
 });

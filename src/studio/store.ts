@@ -60,6 +60,13 @@ import type { Trace, View } from "./types";
 
 /** The swarm and the result are one screen: the agents stay on the canvas after the run. */
 export type Stage = "input" | "run";
+
+/**
+ * Which view of a completed run is on screen: the finished result, or the read-only completed
+ * process graph. Presentation state only — switching re-projects the already-folded event log
+ * and never restarts the transport.
+ */
+export type ResultView = "result" | "process";
 export type LoadStatus = "idle" | "loading" | "ready" | "failed";
 
 export interface SessionOutcome {
@@ -96,6 +103,9 @@ interface StudioStore {
   /** How the swarm is arranged on the canvas. A way of looking, not a fact about the run. */
   layout: Layout;
 
+  /** Which view of a completed run is on screen. Result is always the default. */
+  resultView: ResultView;
+
   /** The run is held: the transport's clock is stopped, so the fold is stopped too. */
   paused: boolean;
   /** A live pause was requested but no runtime acknowledgement exists yet. */
@@ -130,6 +140,7 @@ interface StudioStore {
 
   select: (id: string | null) => void;
   setStage: (stage: Stage) => void;
+  setResultView: (view: ResultView) => void;
   setSpeed: (speed: number) => void;
   setView: (view: View) => void;
   setLayout: (layout: Layout) => void;
@@ -295,6 +306,7 @@ export const useStudio = create<StudioStore>((set, get) => {
   speed: 6,
   view: "prepped",
   layout: "radial",
+  resultView: "result",
   clipT: 0,
   playing: false,
   paused: false,
@@ -321,6 +333,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       stage: "input",
       state: initialState(),
       selected: null,
+      resultView: "result",
       playing: false,
       paused: false,
       pausePending: false,
@@ -473,6 +486,7 @@ export const useStudio = create<StudioStore>((set, get) => {
     set({
       stage: "run",
       selected: null,
+      resultView: "result",
       playing: false,
       paused: false,
       pausePending: false,
@@ -516,6 +530,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       stage: "input",
       state: initialState(),
       selected: null,
+      resultView: "result",
       clipT: 0,
       playing: false,
       paused: false,
@@ -533,6 +548,7 @@ export const useStudio = create<StudioStore>((set, get) => {
     set({
       stage: "run",
       selected: null,
+      resultView: "result",
       playing: false,
       paused: false,
       pausePending: false,
@@ -548,6 +564,7 @@ export const useStudio = create<StudioStore>((set, get) => {
     set({
       stage: "run",
       selected: null,
+      resultView: "result",
       playing: false,
       paused: false,
       pausePending: false,
@@ -596,6 +613,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       stage: "run",
       state: projected,
       selected: null,
+      resultView: "result",
       clipT: 0,
       playing: false,
       paused: projected.status !== "complete",
@@ -635,6 +653,9 @@ export const useStudio = create<StudioStore>((set, get) => {
 
   select: (selected) => set({ selected }),
   setStage: (stage) => set({ stage }),
+  /** Choosing Process also stills the clip: the graph is a projection, never a resumed run. */
+  setResultView: (resultView) =>
+    set(resultView === "process" ? { resultView, playing: false } : { resultView }),
   setSpeed: (speed) => {
     if (!Number.isFinite(speed) || speed <= 0) return;
     const safe = Math.max(0.25, Math.min(24, speed));
@@ -693,6 +714,8 @@ export const useCueState = (id: string): string =>
   useStudio((s) => s.state.cues[id] ?? "pending");
 
 export const useComplete = (): boolean => useStudio((s) => s.state.status === "complete");
+
+export const useResultView = (): ResultView => useStudio((s) => s.resultView);
 
 export const usePaused = (): boolean => useStudio((s) => s.paused);
 

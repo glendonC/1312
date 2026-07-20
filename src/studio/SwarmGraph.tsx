@@ -33,10 +33,10 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { createAgentIdentityMap, ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { Overview } from "./glyphs";
-import { place, type Size, type Spec } from "./layout";
-import { useAgentIds, useBundle, useLayout, useSpawningIds, useStudio } from "./store";
-import { sideOf, type SwarmNode } from "./swarm";
-import { HubNode, WorkerNode } from "./SwarmNodes";
+import { place, terminus, type Size, type Spec } from "./layout";
+import { useAgentIds, useBundle, useComplete, useLayout, useSpawningIds, useStudio } from "./store";
+import { RESULT_ARTIFACT_NODE, sideOf, type SwarmNode } from "./swarm";
+import { ArtifactNode, HubNode, WorkerNode } from "./SwarmNodes";
 
 import "@xyflow/react/dist/base.css";
 
@@ -48,10 +48,14 @@ export default function SwarmGraph() {
   );
 }
 
+/** The artifact node's CSS-fixed footprint, used to place it before the engine measures it. */
+const ARTIFACT_SIZE: Size = { w: 128, h: 118 };
+
 function Swarm() {
   const bundle = useBundle();
   const ids = useAgentIds();
   const spawning = useSpawningIds();
+  const complete = useComplete();
   // The layout effect rebuilds edges on structural change only; it reads the live forming set
   // through this ref so a relayout keeps a forming wire forming, without taking `spawning` as a
   // dependency (which would relayout — and refit — on every status change).
@@ -219,10 +223,66 @@ function Swarm() {
 
     const frame = place(specs, sizes, layout);
 
-    setNodes((prev) => prev.map((n) => (frame.pos[n.id] ? { ...n, position: frame.pos[n.id] } : n)));
+    // The receipted result forms at the terminus once the fold is complete. It goes through the
+    // same placement pass as everything else — never through the spawn path, because no spawn
+    // happened: the log completed, and the artifact it produced is projected onto the canvas.
+    const artifactSize = sizes[RESULT_ARTIFACT_NODE] ?? ARTIFACT_SIZE;
+    const artifactCentre = complete ? terminus(frame, artifactSize, layout) : null;
 
-    setEdges(
-      specs
+    setNodes((prev) => {
+      const placed = prev
+        .filter((n) => n.id !== RESULT_ARTIFACT_NODE || artifactCentre !== null)
+        .map((n) => {
+          if (n.id === RESULT_ARTIFACT_NODE && artifactCentre) {
+            return {
+              ...n,
+              position: {
+                x: artifactCentre.x - artifactSize.w / 2,
+                y: artifactCentre.y - artifactSize.h / 2,
+              },
+            };
+          }
+          return frame.pos[n.id] ? { ...n, position: frame.pos[n.id] } : n;
+        });
+      if (artifactCentre && !placed.some((n) => n.id === RESULT_ARTIFACT_NODE)) {
+        placed.push({
+          id: RESULT_ARTIFACT_NODE,
+          type: "artifact",
+          position: {
+            x: artifactCentre.x - artifactSize.w / 2,
+            y: artifactCentre.y - artifactSize.h / 2,
+          },
+          data: {},
+          draggable: false,
+          selectable: false,
+          connectable: false,
+        });
+      }
+      return placed;
+    });
+
+    const artifactEdge: Edge[] = artifactCentre
+      ? [
+          (() => {
+            // Geometric pin choice regardless of layout: the artifact hangs off whichever face
+            // of the hub is actually free (terminus() decides), not the tidy growth direction.
+            const side = sideOf(frame.centre.orchestrator, artifactCentre, "radial");
+            return {
+              id: `orchestrator-${RESULT_ARTIFACT_NODE}`,
+              source: "orchestrator",
+              target: RESULT_ARTIFACT_NODE,
+              sourceHandle: side.source,
+              targetHandle: `${side.target}-in`,
+              type: layout === "radial" ? "default" : "smoothstep",
+              className: "wire wire-artifact",
+              focusable: false,
+            } satisfies Edge;
+          })(),
+        ]
+      : [];
+
+    setEdges([
+      ...specs
         .filter((s) => s.parent)
         .map((s) => {
           const side = sideOf(frame.centre[s.parent as string], frame.centre[s.id], layout);
@@ -239,11 +299,12 @@ function Swarm() {
             focusable: false,
           } satisfies Edge;
         }),
-    );
+      ...artifactEdge,
+    ]);
 
     const t = window.setTimeout(() => void fitSwarm(), 30);
     return () => clearTimeout(t);
-  }, [specs, layout, measured, getNodes, fitSwarm, setNodes, setEdges]);
+  }, [specs, layout, measured, complete, getNodes, fitSwarm, setNodes, setEdges]);
 
   // The mitosis wire reads as "forming" for exactly as long as its child is in the recorded
   // `spawning` state — a projection of the log, not a timer. Toggled on the existing edges so a
@@ -267,13 +328,19 @@ function Swarm() {
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: SwarmNode) => {
+      // The artifact opens the result workspace, not an agent focus: it is the run's output,
+      // and its one affordance is re-entry to the result it stands for.
+      if (node.type === "artifact") {
+        useStudio.getState().setResultView("result");
+        return;
+      }
       const open = useStudio.getState().selected;
       select(open === node.id ? null : node.id);
     },
     [select],
   );
 
-  const types = useMemo(() => ({ worker: WorkerNode, hub: HubNode }), []);
+  const types = useMemo(() => ({ worker: WorkerNode, hub: HubNode, artifact: ArtifactNode }), []);
 
   return (
     <div className="graph" ref={graph} data-preview={previewSession ? "recorded" : undefined}>
@@ -306,7 +373,9 @@ function Swarm() {
             style={{ width: 168, height: 104 }}
             position="bottom-right"
             pannable
-            nodeColor={(node) => (node.id === "orchestrator" ? "#2a6b66" : "#91a5a0")}
+            nodeColor={(node) =>
+              node.type === "artifact" ? "#b8963f" : node.id === "orchestrator" ? "#2a6b66" : "#91a5a0"
+            }
             nodeStrokeColor="rgba(255, 255, 255, 0.88)"
             nodeStrokeWidth={2}
             nodeBorderRadius={8}

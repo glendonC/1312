@@ -13,7 +13,19 @@ import type { Layout, Point } from "./layout";
 
 /** A node carries stable identity data. Live state is still read by id so one trace updates
  *  one agent rather than re-rendering the whole graph. */
-export type SwarmNode = Node<{ agent: string; identity: AgentIdentity }>;
+export type AgentSwarmNode = Node<{ agent: string; identity: AgentIdentity }, "worker" | "hub">;
+
+/**
+ * The completed run's result artifact on the canvas. It is not an agent: it carries no identity
+ * mesh and no live state, and it exists only as a projection of the receipted captions the run
+ * actually produced — so its data is empty and its component reads the bundle directly.
+ */
+export type ArtifactSwarmNode = Node<Record<string, never>, "artifact">;
+
+export type SwarmNode = AgentSwarmNode | ArtifactSwarmNode;
+
+/** The one non-agent node id. Kept beside the node types so canvas and nodes agree on it. */
+export const RESULT_ARTIFACT_NODE = "result-artifact";
 
 /**
  * Which face a wire leaves by, and which face it arrives at.

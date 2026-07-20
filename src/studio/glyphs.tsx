@@ -202,6 +202,42 @@ export function Compress() {
   );
 }
 
+/** Three slider rails with offset knobs: the learning controls behind the Tune chip. */
+export function Sliders() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M2.5 4.6h11M2.5 8h11M2.5 11.4h11"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+      <circle cx="6.2" cy="4.6" r="1.5" fill="currentColor" />
+      <circle cx="10.4" cy="8" r="1.5" fill="currentColor" />
+      <circle cx="4.8" cy="11.4" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** The completed process topology: the orchestrator hub over two spawned workers. */
+export function ProcessTree() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M8 5.7 4.9 10.4M8 5.7l3.1 4.7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+      <circle cx="8" cy="4" r="1.75" fill="none" stroke="currentColor" strokeWidth="1.25" />
+      <circle cx="4.9" cy="12" r="1.55" fill="none" stroke="currentColor" strokeWidth="1.25" />
+      <circle cx="11.1" cy="12" r="1.55" fill="none" stroke="currentColor" strokeWidth="1.25" />
+    </svg>
+  );
+}
+
 /*
  * Viewing-mode layout pickers. One family: a framed screen whose interior shows where the video and
  * the learning panel sit, so the glyph reads as the layout it selects rather than an arbitrary symbol.
@@ -235,7 +271,7 @@ export function PanelDock() {
   );
 }
 
-export function PanelOverlay() {
+export function PanelFloat() {
   return (
     <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
       <rect x="2" y="3.1" width="12" height="9.8" rx="1.7" fill="none" stroke="currentColor" strokeWidth="1.3" />

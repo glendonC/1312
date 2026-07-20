@@ -10,6 +10,23 @@
   overflow-y: auto;
 }
 
+/* ---------- the completed canvas ---------- */
+
+/*
+ * The finished topology. The stage never unmounts at completion — the swarm settles in place and
+ * this class joins it — but a seek can still land a fresh mount directly on a complete log, and
+ * reading a done run is inspection of recorded evidence: node flights are disabled so nothing
+ * ever re-enacts the spawn choreography as if execution were happening again.
+ */
+.stage-complete .graph .react-flow__node {
+  transition: none;
+}
+
+/* The recorded-evidence chip holds the bottom-right corner, so the overview trigger steps up. */
+.stage-complete .graph-overview-control {
+  margin-bottom: 64px;
+}
+
 /* ---------- the swarm topology ---------- */
 
 /*
@@ -21,8 +38,11 @@
  * of it as an overlay rather than taking a slice out of it.
  */
 /* the canvas takes the whole window: the header and the dock float on top of it */
+/* z-index 0 makes the stage its own stacking context, so the graph engine's inner panels
+   (overview trigger, minimap) can never paint through the result workspace floating above. */
 .stage {
   position: relative;
+  z-index: 0;
   width: 100%;
   height: 100svh;
 }
@@ -249,6 +269,18 @@
 }
 
 /*
+ * The delivery wire: orchestrator to the receipted result artifact. Solid where mitosis is
+ * dotted — lineage is a relation between agents, this is the run handing over the thing it made.
+ * Gold because the artifact is earned, drawn in once, and then still: a completed run's canvas
+ * renders settled.
+ */
+.wire-artifact .react-flow__edge-path {
+  stroke: var(--gold-line);
+  stroke-width: 1.5;
+  animation: wire-in 460ms ease both;
+}
+
+/*
  * The forming state, bound to the child's recorded `spawning` status — never a UI clock. The dots
  * travel from parent toward child while the log holds the child forming, and the wire settles to a
  * static lineage line the instant the log moves the child to working. Today's recorded runs spawn
@@ -387,6 +419,150 @@
   font-weight: var(--weight-regular);
 }
 
+/* ---------- the result artifact ---------- */
+
+/*
+ * The run's output on the completed topology. Not an agent identity: a settled gold medallion
+ * with the captions plate, full opacity, no mesh and no pulse — earned, finished, still. Its
+ * footprint is fixed so the layout can place it at the terminus before the engine has measured
+ * it without the position moving afterwards (ARTIFACT_SIZE in SwarmGraph.tsx must match).
+ */
+.artifact-node {
+  position: relative;
+  display: flex;
+  width: 128px;
+  height: 118px;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  cursor: pointer;
+  animation: artifact-settle 640ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition:
+    opacity 320ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.artifact-node .agent-node-identity {
+  width: 66px;
+  height: 66px;
+}
+
+/* The mark is the shared agent-field material in gold; the wrapper only stages it over its aura. */
+.result-artifact-mark {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A tight, faint bloom just past the rim — presence, not a halo. Static by design. */
+.result-artifact-mark::before {
+  position: absolute;
+  inset: -16%;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgba(184, 150, 63, 0.2),
+    rgba(184, 150, 63, 0.06) 64%,
+    transparent 80%
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.result-artifact-mark .agent-mark {
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 0 0 1px var(--gold-line),
+    0 6px 18px rgba(138, 111, 42, 0.28);
+}
+
+/*
+ * The aura is what says "output, not worker" at canvas scale: a hairline arc of light orbiting
+ * the rim. Continuous by design — the one earned piece of ongoing motion on an otherwise settled
+ * canvas — and stilled under prefers-reduced-motion, where the bloom keeps the distinction. The
+ * conic gradient is masked down to the ring itself, so the motion is a thin running light and
+ * never a smeared halo.
+ */
+.result-artifact-aura {
+  position: absolute;
+  inset: -7%;
+  z-index: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(184, 150, 63, 0) 0deg,
+    rgba(184, 150, 63, 0.55) 52deg,
+    rgba(248, 236, 192, 0.95) 74deg,
+    rgba(184, 150, 63, 0.55) 96deg,
+    rgba(184, 150, 63, 0) 148deg,
+    rgba(184, 150, 63, 0) 360deg
+  );
+  pointer-events: none;
+  animation: artifact-aura-turn 7s linear infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
+}
+
+@keyframes artifact-aura-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.artifact-node .node-name {
+  color: var(--gold-ink);
+}
+
+.artifact-node:hover .agent-mark {
+  transform: scale(1.025);
+}
+
+.artifact-node:focus-visible {
+  outline: none;
+}
+
+.artifact-node:focus-visible .agent-mark {
+  outline: 2px solid var(--gold-ink);
+  outline-offset: 3px;
+}
+
+@keyframes artifact-settle {
+  from {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Under the open result workspace the completed world steps back exactly as it does under an
+   agent focus — dimmed, blurred, settled — so opening the result reads as focusing on one more
+   inhabitant of the same world, never as leaving it. No lateral shift: the workspace is a
+   centred composition, not a side panel. */
+.act-results[data-result-view="result"] .stage .graph {
+  opacity: 0.42;
+  filter: blur(7px) saturate(0.72);
+  transform: scale(0.94);
+}
+
+.act-results[data-result-view="result"] .stage .graph .grid,
+.act-results[data-result-view="result"] .stage .wire {
+  opacity: 0.24;
+}
+
+.act-results[data-result-view="result"] .stage .agent-node,
+.act-results[data-result-view="result"] .stage .hub,
+.act-results[data-result-view="result"] .stage .artifact-node {
+  opacity: 0.18;
+}
+
 .stage[data-agent-focus="true"] .graph {
   opacity: 0.42;
   filter: blur(7px) saturate(0.72);
@@ -399,7 +575,8 @@
 }
 
 .stage[data-agent-focus="true"] .agent-node:not([data-on="true"]),
-.stage[data-agent-focus="true"] .hub:not([data-on="true"]) {
+.stage[data-agent-focus="true"] .hub:not([data-on="true"]),
+.stage[data-agent-focus="true"] .artifact-node {
   opacity: 0.18;
 }
 
@@ -467,21 +644,30 @@
 
 @media (prefers-reduced-motion: reduce) {
   .agent-node,
-  .hub {
+  .hub,
+  .artifact-node {
     transition: none;
   }
 
   /* The birth and mitosis motion is a flourish; the forming state itself reads from the dashed
-     ghost and static dotted wire, which stay. */
+     ghost and static dotted wire, which stay. The artifact's settle-in is the same kind of
+     flourish: without it the medallion is simply there, already settled. */
   .agent-node,
+  .artifact-node,
   .wire-mitosis .react-flow__edge-path,
   .wire-mitosis.wire-forming .react-flow__edge-path {
     animation: none;
   }
 
   .agent-node:hover .agent-mark,
-  .hub:hover .agent-mark {
+  .hub:hover .agent-mark,
+  .artifact-node:hover .agent-mark {
     transform: none;
+  }
+
+  /* A frozen comet reads as a glitch: the arc goes entirely, the static bloom stays. */
+  .result-artifact-aura {
+    display: none;
   }
 
   .agent-node:hover .agent-mark::after,

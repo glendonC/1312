@@ -47,6 +47,19 @@
   font-size: 0.5rem;
 }
 
+/* On a phone the note would cover most of the small picture, so it becomes an inline strip
+   directly under the player instead of a card floating on it. Same content, same silence
+   default; only the seat changes. */
+@media (max-width: 820px) {
+  .learning-moments-overlay {
+    position: static;
+    max-width: none;
+    margin-top: 8px;
+    box-shadow: none;
+    background: var(--paper-elevated, #fff);
+  }
+}
+
 .learning-fine-tune {
   margin-top: 18px;
   padding: 16px clamp(14px, 2vw, 22px) 18px;
@@ -167,4 +180,80 @@
   margin: 10px 0 0;
   color: var(--ink-muted);
   font-size: 0.62rem;
+}
+
+/* The boundary copy stays in the face's text (and in its accessible content) but reads on demand,
+   so the drawer opens onto controls, not a paragraph. */
+.learning-fine-tune-about {
+  margin-top: 8px;
+}
+
+.learning-fine-tune-about summary {
+  color: var(--ink-muted);
+  font-size: 0.66rem;
+  cursor: pointer;
+}
+
+.learning-fine-tune-about .learning-fine-tune-boundary {
+  margin-top: 6px;
+}
+
+/* ---------- the Tune drawer ---------- */
+
+/* The same slide-over seat as Saved, with its own class so the Saved item styles never leak onto
+   the face's lists. Inside it the face drops its standalone card chrome: the drawer is the surface. */
+.learning-tune {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px;
+  overflow-y: auto;
+  background: var(--paper-elevated, #fff);
+  animation: learning-tune-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.learning-tune:focus-visible {
+  outline: none;
+}
+
+/* Clearance for the floating run action bar, which shares the phone's bottom edge. */
+@media (max-width: 820px) {
+  .learning-tune {
+    padding-bottom: 84px;
+  }
+}
+
+@keyframes learning-tune-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.learning-tune-head {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+}
+
+.learning-tune .learning-fine-tune {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.learning-tune .learning-fine-tune fieldset label {
+  padding: 5px 10px;
+  border: 1px solid var(--line-strong, rgba(22, 29, 27, 0.16));
+  border-radius: 8px;
+  corner-shape: squircle;
+  background: var(--paper-elevated, #fff);
+  cursor: pointer;
+}
+
+.learning-tune .learning-fine-tune fieldset label:has(input:checked) {
+  border-color: var(--accent, #2f746e);
 }

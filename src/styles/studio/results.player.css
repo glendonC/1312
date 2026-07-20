@@ -386,14 +386,21 @@
 /* ---------- Results: the in-player control surface ---------- */
 
 /*
- * On the Results surface the recorded clip plays in a squircle frame with a familiar, YouTube-style
- * control surface ON the video: a full-width progress bar and one control row (play, volume, time on
- * the left; speed and the viewing modes on the right). The layer is revealed on hover and on keyboard
- * focus, and stays shown while paused and on touch, so it is never hover-only. The workbench surface
- * is untouched: it carries no [data-overlay-controls].
+ * Any surface with a picture — Results and the Focus workbench alike — plays it in a squircle
+ * frame with a familiar, YouTube-style control surface ON the video: a full-width progress bar
+ * and one control row (play, volume, time on the left; speed and the viewing modes on the
+ * right). The layer is revealed on hover and on keyboard focus, and stays shown while paused and
+ * on touch, so it is never hover-only. Only pictureless media keeps the below-frame transport.
  */
 .player[data-overlay-controls] {
   gap: 0;
+}
+
+/* The workbench keeps its licence credit below the frame; with the transport gone it needs its
+   own breathing room against the squircle edge. */
+.player[data-player-surface="workbench"] .credit {
+  margin-top: 10px;
+  padding: 0 2px;
 }
 
 .player[data-overlay-controls] .screen {

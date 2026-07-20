@@ -1,12 +1,13 @@
 /*
- * Results header chrome (title chip + Details / Run details panels).
+ * Results chrome: the header title chip, and the Details / Run details disclosures that live in
+ * the floating run action bar.
  * Owns: .result-title-*, .result-chrome-*, .result-panel-*.
- * Must not: .result-viewer layout; shared player; Dock.
- * Header seats (.results-title-seat, .results-control-seat) live in studio.css.
+ * Must not: .result-viewer layout; shared player; Dock; the bar itself (results.viewer.css).
+ * The header title seat (.results-title-seat) lives in studio.css.
  * Imported by ResultsChrome.tsx for direct Vite invalidation.
  */
 
-/* ---------- header chrome (rendered in .top, so it aligns with the home mark) ---------- */
+/* ---------- results chrome (title in .top; disclosure controls in .run-action-bar) ---------- */
 
 .result-title-chip {
   min-width: 0;
@@ -120,6 +121,14 @@
 
 .result-chrome-panel[hidden] {
   display: none;
+}
+
+/* Anchored at the bottom of the viewport — the production action bar or the result workspace's
+   command baseline — a disclosure opens upward so it never runs off the bottom edge. */
+.run-action-bar .result-chrome-panel,
+.result-workspace-commands .result-chrome-panel {
+  top: auto;
+  bottom: calc(100% + 10px);
 }
 
 .result-panel-list {

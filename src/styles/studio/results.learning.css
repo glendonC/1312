@@ -80,6 +80,11 @@
   border-color: var(--accent, #2f746e);
 }
 
+/* The Tune chip carries a quiet prepared tell: its sliders take the accent once prep is ready. */
+.learning-tune-toggle[data-learning-prep-state="ready"] svg {
+  color: var(--accent, #2f746e);
+}
+
 /* The single-line affordance cue in the bar. It replaces the old three-sentence guide: the tappable
    language is already highlighted in the transcript, so this just names the gesture, and it truncates
    rather than wrapping the bar to a second row. */
@@ -539,14 +544,16 @@
   font-size: 0.8rem;
 }
 
-/* Full screen, Overlay placement: the panel floats over the edge-to-edge video as glass. It is
+/* Full screen, Float placement: the panel floats over the edge-to-edge video as glass. It is
    translucent with a backdrop blur so the picture stays legible underneath, and it stops short of the
    video's control bar so the placement toggle and transport stay reachable. Desktop only; on a phone
    both placements stack (results.summary.css). */
 @media (min-width: 821px) {
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .learning-workspace {
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .learning-workspace {
     position: absolute;
-    top: 22px;
+    /* Starts below the settings pill (top 10px + ~40px tall), which stays above the panel at z 5:
+       the caption and placement controls must never sit on the panel's own header row. */
+    top: 64px;
     right: 22px;
     bottom: 92px;
     z-index: 4;
@@ -563,28 +570,28 @@
   }
 
   /* Keep the shared player controls above the floating reading panel. Otherwise the panel can cover
-     the mode buttons that are required to leave Overlay or full screen. */
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .player-controls,
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .player-settings-pill {
+     the mode buttons that are required to leave Float or full screen. */
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .player-controls,
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .player-settings-pill {
     z-index: 5;
   }
 
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"][data-panel-size="s"] .learning-workspace {
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"][data-panel-size="s"] .learning-workspace {
     width: min(340px, 28%);
   }
 
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"][data-panel-size="l"] .learning-workspace {
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"][data-panel-size="l"] .learning-workspace {
     width: min(460px, 40%);
   }
 
   /* The workspace's own surfaces inherit the glass rather than repainting an opaque white over it. The
      saved drawer keeps the glass too, using a slightly denser tint so its list stays readable. */
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .learning-bar,
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .learning-panel {
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .learning-bar,
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .learning-panel {
     background: transparent;
   }
 
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .learning-saved {
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .learning-saved {
     background: color-mix(in srgb, var(--paper-elevated, #fff) 90%, transparent);
     backdrop-filter: blur(22px) saturate(1.1);
     -webkit-backdrop-filter: blur(22px) saturate(1.1);
@@ -669,4 +676,31 @@
     max-height: none;
     overflow-y: auto;
   }
+}
+
+/* ---------- workbench frame: the transcript as a focus feed ---------- */
+
+/* Inside the result workspace's focus-panel frame the transcript is a feed on the dimmed world,
+   not a card: no border, no sheet. Its bar is the slim mono header row the focus activity feed
+   uses — the Saved / Tune toggles are portalled down to the command baseline, so the bar carries
+   only the gesture cue and the session scope. Full screen is excluded: there the panel sits on
+   the display-filling video and needs its own paper/glass surfaces back. */
+.result-viewer[data-shell-frame="workbench"]:not([data-view-mode="fullscreen"]) .learning-workspace {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.result-viewer[data-shell-frame="workbench"]:not([data-view-mode="fullscreen"]) .learning-bar {
+  gap: 12px;
+  padding: 0 2px 8px;
+  border-bottom: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+  background: transparent;
+}
+
+.result-viewer[data-shell-frame="workbench"]:not([data-view-mode="fullscreen"]) .learning-bar-hint {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }

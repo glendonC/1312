@@ -40,103 +40,13 @@
 }
 .result-main .cue { width: 100%; }
 
-/* The left column of the split: the clip and, directly beneath it, the wired coverage + attribution
-   meta (ResultMediaMeta). One flex column so the meta rides under the video as a credit line, not a
-   stranded strip. In cinema and on a phone the same column stacks in the single-column grid; in full
-   screen it is the media column and its meta is hidden (results below). */
+/* The left column of the split holds only the clip. Coverage accounting and attribution live
+   behind Run details / Details in the run action bar, never as a second strip under the video. */
 .result-media-col {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 12px;
-}
-
-/* The under-video meta: line coverage on the left, source attribution on the right. Understated, so it
-   reads as a credit line rather than a second panel; both halves are real bundle facts. */
-.result-media-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px 20px;
-  padding: 1px 4px 0;
-}
-
-.result-coverage {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 14px;
-  margin: 0;
-}
-
-.result-coverage > div {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.result-coverage > div::before {
-  align-self: center;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  content: "";
-}
-
-.result-coverage > div[data-kind="captioned"] { color: var(--accent, #2f746e); }
-.result-coverage > div[data-kind="withheld"] { color: var(--flag, #8c342a); }
-.result-coverage > div[data-kind="silent"] { color: var(--ink-muted, rgba(22, 29, 27, 0.5)); }
-
-.result-coverage dt {
-  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.result-coverage dd {
-  margin: 0;
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.result-coverage-total {
-  margin: 0;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.04em;
-}
-
-.result-attribution {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: 0.72rem;
-  line-height: 1.5;
-  text-align: right;
-}
-
-.result-attribution-title {
-  color: var(--ink-soft);
-  font-weight: var(--weight-medium, 500);
-}
-
-.result-attribution-source::before {
-  color: var(--ink-muted);
-  content: " · ";
-}
-
-.result-attribution a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 /* Split is the hero view. The row height is tied to the viewport WIDTH, not its height: the media
@@ -204,12 +114,22 @@
   max-height: 560px;
 }
 
+/* Workbench frame: cinema stays composed inside the focus environment — a taller video and the
+   transcript beneath, but never a page takeover; the title and commands keep their seats. */
+.result-viewer[data-shell-frame="workbench"][data-view-mode="cinema"] .screen-video {
+  max-height: min(54vh, 620px);
+}
+
+.result-viewer[data-shell-frame="workbench"][data-view-mode="cinema"] .learning-workspace {
+  max-height: min(40vh, 480px);
+}
+
 /* ---------- Full screen: the video dominates the display ---------- */
 
 /*
  * The viewer fills the display and the video is the surface, not a small player letterboxed in a
  * void. The Learning panel stays usable through the placement toggle: Docked parks it as a narrow
- * column beside the video; Overlay floats it over the video as glass so the picture reads underneath.
+ * column beside the video; Float hovers it over the video as glass so the picture reads underneath.
  * The letterbox bars match the player frame (--player-deep), so any pillar/letterbox reads as the
  * clip's own frame rather than dead space.
  */
@@ -231,16 +151,11 @@
   gap: 0;
 }
 
-/* Full screen is edge to edge: the media column is just the clip filling the frame, and its under-video
-   coverage/attribution meta is suppressed so nothing prints over the picture. */
+/* Full screen is edge to edge: the media column is just the clip filling the frame. */
 .result-viewer[data-view-mode="fullscreen"] .result-media-col {
   height: 100%;
   min-height: 0;
   gap: 0;
-}
-
-.result-viewer[data-view-mode="fullscreen"] .result-media-meta {
-  display: none;
 }
 
 /* Docked: video takes the display, the panel is a narrow right column. The row is stretched to the
@@ -267,16 +182,30 @@
   max-height: none;
 }
 
-/* Overlay: the video fills the display edge to edge; the panel floats over it (see results.learning.css). */
-.result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .result-main {
+/* Float: the video fills the display edge to edge; the panel floats over it (see results.learning.css). */
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .result-main {
   position: relative;
   display: block;
 }
 
-.result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .player {
+.result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .player {
   height: 100%;
   min-height: 0;
   max-height: none;
+}
+
+/* The learning surfaces wrap the player in .learning-player-frame (the Moments overlay's anchor);
+   the frame must pass the full-screen height through, or the video collapses to its intrinsic
+   box over a void. */
+.result-viewer[data-view-mode="fullscreen"] .learning-player-frame {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.result-viewer[data-view-mode="fullscreen"] .learning-player-frame .player {
+  flex: 1;
 }
 
 /* Both submodes: the player and its screen fill their box so the video is as large as it can be. */
@@ -302,21 +231,19 @@
     grid-template-columns: 1fr;
   }
 
-  .result-main .cues {
-    max-height: none;
-  }
-
-  /* Stacked single column: the attribution reads left, aligned with the coverage above it, rather than
-     right-aligning a wrapped credit against the screen edge. */
-  .result-attribution {
-    text-align: left;
+  /* Clamped, not endless: an unclamped transcript pushes everything below it thousands of pixels
+     down a phone page, so it scrolls inside its panel instead. Selector depth matches the
+     desktop rule in results.learning.css that it must override. */
+  .result-main .cues,
+  .result-main .learning-workspace .cues {
+    max-height: min(60svh, 520px);
   }
 
   /* On a phone the display is too narrow to float a legible panel over the video, so both placements
      collapse to the same stacked layout: video on top, panel beneath. The toggle stays present but is
-     a no-op here, and Overlay's absolute positioning is reset. */
+     a no-op here, and Float's absolute positioning is reset. */
   .result-viewer[data-view-mode="fullscreen"][data-fs-panel="docked"] .result-main,
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="overlay"] .result-main {
+  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .result-main {
     position: static;
     display: grid;
     grid-template-columns: 1fr;

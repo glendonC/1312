@@ -1,0 +1,278 @@
+{
+  "schema_version": "0.1.0",
+  "kind": "capture",
+  "capture_id": "rule-change-ko-kinship-address-context-provider-authorized-c1-r2-without",
+  "captured_at": "2026-07-20",
+  "scored": false,
+  "pack_evidence": false,
+  "clip": {
+    "id": "2o0f-V4uoMg",
+    "duration_s": 60,
+    "lang": "ko",
+    "pair": "ko->en",
+    "media": null,
+    "source": {
+      "kind": "youtube",
+      "url": "https://www.youtube.com/watch?v=2o0f-V4uoMg",
+      "channel": "카오스 사이언스",
+      "licence": "Creative Commons Attribution license (reuse allowed)",
+      "window": {
+        "start": "00:01:37",
+        "end": "00:02:37"
+      },
+      "attribution": "\"[코로나 인터뷰] 박종화_ 한국사람이 코로나19에 좀더 저항성이 있다?!\" by 카오스 사이언스, used under Creative Commons Attribution license (reuse allowed)."
+    }
+  },
+  "reproducible": {
+    "deterministic": false,
+    "note": "One provider translation call with no retry or output selection. Provider behavior is not deterministic."
+  },
+  "systems": [
+    {
+      "id": "1321-openai-audio-translation-rule-change",
+      "role": "subject",
+      "config": {
+        "model": "whisper-1",
+        "provider": {
+          "id": "openai",
+          "operation": "audio_translation",
+          "response_format": "verbose_json",
+          "temperature": 0,
+          "timeout_ms": 120000,
+          "max_response_bytes": 1048576
+        },
+        "reviewed_memory": {
+          "rule_content_id": null
+        }
+      }
+    }
+  ],
+  "measured": {
+    "1321-openai-audio-translation-rule-change": {
+      "units_total": 17,
+      "units_emitted": 17,
+      "units_withheld": 0,
+      "coverage": 1,
+      "latency": {
+        "first_usable_s": null,
+        "complete_s": 5.07
+      }
+    }
+  },
+  "unscored": {
+    "critical_meaning": null,
+    "critical_outcomes": null,
+    "catastrophic": null,
+    "reason": "Provider capture has no semantic authority. Human labels and separate scores are required."
+  },
+  "units": [
+    {
+      "t_start": 1,
+      "t_end": 3,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "There is a general formula.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 3,
+      "t_end": 7,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "There is a formula that is equivalent to the rate of death and the rate of infection.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 7,
+      "t_end": 11,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "So, in order to become a pandemic, you have no choice but to kill too many hostages,",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 11,
+      "t_end": 17,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "and you have to balance it appropriately so that you can get out of the hostages.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 17,
+      "t_end": 20,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "It has to be not too strong, but it has to be contagious.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 20,
+      "t_end": 24,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "That's why it's the golden ratio of the corona formula.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 24,
+      "t_end": 28,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "The contagious rate is determined according to the golden ratio.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 28,
+      "t_end": 33,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "Is there a genetic difference between Spanish and Italian scientists?",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 33,
+      "t_end": 34,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "I think there is.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 34,
+      "t_end": 38,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "Recently, a Spanish and Italian scientist published a paper.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 38,
+      "t_end": 39,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "There is a genetic difference.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 39,
+      "t_end": 45,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "So, until then, no one was sure of the difference in human genes.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 45,
+      "t_end": 46,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "Because there is no data.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 46,
+      "t_end": 48,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "But recently, it came out like that.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 48,
+      "t_end": 50,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "We also studied it recently.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 50,
+      "t_end": 55,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "We analyzed the genome of thousands of Koreans from the 10,000-person genome project in Ulsan.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 55,
+      "t_end": 60,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "The initial study showed that Koreans may be a little resistant to the coronavirus.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    }
+  ],
+  "artifacts": {
+    "provider_response": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c1-r2-without/provider-response.json"
+  },
+  "notes": "Unscored OpenAI audio translation capture. Empty source text records that the endpoint returned English translation only."
+}

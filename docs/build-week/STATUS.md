@@ -318,15 +318,22 @@ and non-claims remain in the ladder.
   terminus on the orchestrator's free face (widest ring gap; behind the root in tidy layouts), so
   its delivery wire can never cross another wire. It projects the run's real receipted captions,
   emits no trace, and mounts only once the fold is complete. The result workspace auto-opens
-  full-bleed over the canvas in the focus-panel idiom (gold identity anchor with bundle-derived
-  language pair, range, and per-line counts; LearningResultExperience unchanged) with a command
-  baseline: **Source** and **Coverage** disclosures (renamed from Details / Run details) and one
-  **Close · Esc** exit. The Result/Process switch is gone from the recorded surface — the orb is
-  the sole re-entry — while the owned-source production surface keeps its switch. The completed
-  graph carries a passive "Recorded evidence · completed process graph" chip. The agent-focus
-  workbench player now uses the shared squircle screen and on-video chrome; the below-frame
-  transport remains only for pictureless media. No new runtime request, receipt, or authority
-  claim is introduced; everything shown is projection of the already-loaded bundle.
+  full-bleed over the canvas in the literal focus-panel grammar: the world dims and blurs
+  beneath, a gold identity anchor (bundle-derived language pair, range, per-line counts, and
+  evidence class) sits beside a source-titled environment between stage rules, and the command
+  baseline carries the learning toggles (Saved / Tune, portalled down by the workspace they
+  control), the **Source** and **Coverage** disclosures (renamed from Details / Run details), and
+  one **Close · Esc** exit. The recorded viewer renders in a "workbench" shell frame: no
+  authority bar over the composition — the evidence class reads in the hero facts and the Source
+  panel while `data-result-authority` stays machine-readable — and the transcript is a bare
+  selectable feed with a slim mono header. The Result/Process switch is gone from the recorded
+  surface — the orb is the sole re-entry — while the owned-source production surface keeps its
+  switch, badge, and inline toggles. The completed graph carries a passive "Recorded evidence ·
+  completed process graph" chip. The agent-focus workbench player now uses the shared squircle
+  screen and on-video chrome (below-frame transport only for pictureless media), and full-screen
+  Docked/Float now pass their height through the learning player frame instead of collapsing to
+  a letterboxed void. No new runtime request, receipt, or authority claim is introduced;
+  everything shown is projection of the already-loaded bundle.
 
 ## Post-freeze backlog boundary
 

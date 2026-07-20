@@ -1,0 +1,41 @@
+{
+  "attribution_id": "bench-execution-attribution:sha256:f0cf72a5636230006d0dbc77c8a0bd02fc2d15a2ca3641de9f358d1aa96e0681",
+  "schema": "studio.bench.execution-attribution.v2",
+  "completed_at": "2026-07-20T00:17:25.853Z",
+  "attempt_id": "bench-attempt:sha256:bbed6daaa9c5ede0b380d837d200c5d8a9d204ba83216a4ea6db8a75076ecb53",
+  "run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without",
+  "side": "without",
+  "release_id": "bench-certified-release:sha256:f4903dc34e5222c918d2a27e311fffba7be6ebc3a1218b1098e9cb7c9110dff9",
+  "host_context_id": "bench-host-context:sha256:053638d7a4414581427f407ae4b57b7bc42d1f5bd43b598727b8fce8cd840686",
+  "execution_input": {
+    "path": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without/execution-input.json",
+    "content_id": "sha256:312da7c6443d4d25461a6d3463a74225a68eb92ec06a749ccbae93c4c5041f25",
+    "bytes": 2281,
+    "id": "bench-execution-input:sha256:f20efd3b78ab3464da0e39f064f24d5d5199d0868dc81c6168e7eea17cf87af6"
+  },
+  "charge": {
+    "path": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without/charge.json",
+    "content_id": "sha256:b35a5a080697dd18cad07755a5f319d29dea1e843ac5295e64f5d63e59e6b4e8",
+    "bytes": 875,
+    "attempt_id": "bench-attempt:sha256:bbed6daaa9c5ede0b380d837d200c5d8a9d204ba83216a4ea6db8a75076ecb53"
+  },
+  "charge_journal": {
+    "path": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without/journal.json",
+    "content_id": "sha256:8242c2a07e004c8fc9785cdb5a6c72d677e851272683e22461ee6cb0b19b6207",
+    "bytes": 467,
+    "head_commit": "074eda3390add46d7f1763a2571af66345eb6a9b",
+    "charge_commit": "dfde9f167d731d08a85ce60fc9d65045c5a2d7dc"
+  },
+  "provider_call": {
+    "path": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without/provider-call.json",
+    "content_id": "sha256:e2b0ba286c0ef6ab638f00b19f6f6150e266dd6403013a81ccd5c4117e9be5b7",
+    "bytes": 1547,
+    "id": "bench-provider-call:sha256:4235539589483364daa189985667297524ec37ab42cd1a15959469a3aa9f9874"
+  },
+  "capture": {
+    "path": "bench/runs/rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without/capture.json",
+    "content_id": "sha256:17a8bf80ada8393470b98250414b91f974a52593b3f61f78e4220712cf94ded6",
+    "bytes": 7250,
+    "id": "rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without"
+  }
+}

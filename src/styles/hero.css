@@ -302,6 +302,15 @@
     justify-self: end;
   }
 
+  /* Both panels share cell 1/1 for the crossfade, so the grid's single column fixes
+     their width. Once the story lines wrap inline in this range, an implicit auto
+     column tracks the whole sentence collapsed onto one line and overflows the
+     clipped hero; a zero-min flexible track holds the aside width so the paragraph
+     wraps in place instead. */
+  .hero-story {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .hero-story,
   .hero-story-panel {
     min-width: 0;

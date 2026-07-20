@@ -3,12 +3,28 @@
 - Document type: Living registry
 - Lifecycle: Active
 - Authority: Public document ownership, lifecycle, and routing
-- Last verified: 2026-07-19
+- Last verified: 2026-07-20
 - Update when: A public owner document is added, removed, renamed, or changes responsibility
 
-Use this page to find the document that owns a question. Use
-[`build-week/STATUS.md`](./build-week/STATUS.md) for current engineering state. Use code, schemas,
-tests, and bound receipts to verify implementation claims.
+Find the document that owns a question. Verify implementation claims against code, schemas, tests,
+and bound receipts.
+
+Start with the [repository README](../README.md) for what / why / try it.
+
+## Start here
+
+| If you want… | Go here |
+|---|---|
+| What the product is (and is not) | [`PRODUCT.md`](./PRODUCT.md) |
+| How the system fits together | [`ARCHITECTURE.md`](./ARCHITECTURE.md) |
+| Local setup and contribution | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
+| Why Korean-to-English first | [Why 1321 has to exist](https://www.try1321.com/journey/2026-07-13-why-1321/) ([source](../src/content/journey/2026-07-13-why-1321.md)) |
+| How agents run in the product | [`CODEX.md`](./CODEX.md) |
+| Current milestones and next actions | [`build-week/STATUS.md`](./build-week/STATUS.md) |
+| Eval packs, scores, and receipts | [`../bench/README.md`](../bench/README.md) |
+
+Site: [try1321.com](https://www.try1321.com/). Most visitors only need PRODUCT, then Architecture’s
+opening section. Open the deeper owners below when you are changing that part of the system.
 
 ## Owner registry
 
@@ -63,5 +79,5 @@ metadata, not proof.
 - Never link public docs to `docs/local/`. Treat tracked code mentions as cleanup debt, not authority,
   and do not add new ones.
 - Delete resolved local handoffs after their durable content is folded into an owner.
-- Use Git for ordinary history. Preserve separate history only when its rationale still changes work.
+- Use Git for ordinary history. Preserve separate history only when later work still needs it.
 - Run `npm run docs:check` after changing public documentation or agent instructions.

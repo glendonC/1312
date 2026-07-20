@@ -3,8 +3,22 @@
 - Document type: Capability plan
 - Lifecycle: Active
 - Authority: Rung order, dependencies, done-when, and capability non-claims
-- Last verified: 2026-07-19
+- Last verified: 2026-07-20
 - Update when: A rung is accepted, implemented, blocked, or reordered
+
+Long done-when plan for media-understanding work. Product identity lives in
+[`PRODUCT.md`](../PRODUCT.md). Living milestones live in [`STATUS.md`](./STATUS.md).
+
+| ID | Plain meaning |
+|---|---|
+| U1–U7 | Account for the owned media before trusting translation |
+| R1–R2 | Optional external context after the file |
+| G1 | Semantic evaluation on frozen evidence |
+
+Learning OS, live/low-latency capture, and unrestricted computer-use are parked for this climb.
+Detail: [Parked / out of this climb](#parked--out-of-this-climb).
+
+---
 
 This document owns the media-understanding capability sequence and the stable rung IDs (`U1`…
 `U7`, `U6.1`, `U7.1`, `R1`, `R2`, `G1`, and related slice labels). Outside this file, first use of a

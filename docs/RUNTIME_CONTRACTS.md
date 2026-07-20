@@ -3,8 +3,11 @@
 - Document type: Mixed contract reference
 - Lifecycle: Active
 - Authority: Production runtime contracts plus explicitly inert fixture history
-- Last verified: 2026-07-19
+- Last verified: 2026-07-20
 - Update when: A runtime contract changes, or fixture history is split out
+
+Long contract reference. For product orientation use [`PRODUCT.md`](./PRODUCT.md) and
+[`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 This file mixes two authorities until fixture history is split:
 

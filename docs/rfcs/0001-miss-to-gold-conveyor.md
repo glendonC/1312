@@ -3,8 +3,11 @@
 - Document type: Decision record
 - Lifecycle: Accepted
 - Authority: Miss routing, gold isolation, scoring invariants, and rationale
-- Last verified: 2026-07-19
+- Last verified: 2026-07-20
 - Update when: The decision or its invariants change
+
+For a short eval overview, see [`bench/README.md`](../../bench/README.md). Stop after
+[One line](#one-line) unless you need conveyor invariants.
 
 This RFC owns conveyor invariants and rationale. It does not own current pack counts, score counts,
 or runtime status. Current evaluation facts live in `bench/packs/`, `bench/scores/`, their bound

@@ -24,9 +24,6 @@ const SKIP_DIRECTORIES = new Set([
   "test-results",
 ]);
 const LEGACY_HARD_BREAKS = new Set([
-  "docs/ARCHITECTURE.md:1. **Inject** glossary/corrections/rules into the next prompt/tool context.",
-  "docs/ARCHITECTURE.md:2. **Grade** any model on the bench.",
-  "docs/ARCHITECTURE.md:- Exact computer-use host for squircles (Codex CUA vs embedded browser/player).",
   "docs/PRODUCT.md:**Codename:** 1321 (Build Week Jul 13–21, 2026)",
   "docs/PRODUCT.md:**Category:** Language intelligence for real-world media",
 ]);

@@ -3,7 +3,7 @@
 - Document type: Product executor runbook
 - Lifecycle: Active
 - Authority: Closed product-launched Codex roles, invocation, tools, and operator proof
-- Last verified: 2026-07-19
+- Last verified: 2026-07-20
 - Update when: The product executor cage or run procedure changes
 
 How 1321 uses Codex and GPT-5.6 in the product runtime (not only as an IDE assistant). Repository

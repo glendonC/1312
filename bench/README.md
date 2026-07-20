@@ -3,13 +3,27 @@
 - Document type: Evaluation-domain entry
 - Lifecycle: Active
 - Authority: Bench layout, commands, packs, and score artifacts in this directory
-- Last verified: 2026-07-19
+- Last verified: 2026-07-20
 - Update when: Bench layout, commands, or artifact ownership changes
 
+## In short
+
+This folder is the **evidence boundary** for `/benchmarks/`. The public page may show only what
+these artifacts support. Prose here is never stronger than packs, scores, and bound receipts.
+
+- We freeze hard Korean clips, then score against receipted gold.
+- Miss-to-gold machinery is real; a scored capture is not automatically a product win.
+- The kinship / provider-authorized campaign is a **partial measurement**, not a self-improvement
+  win, not deployment, and not independent blind QC.
+- Conveyor invariants: [`docs/rfcs/0001-miss-to-gold-conveyor.md`](../docs/rfcs/0001-miss-to-gold-conveyor.md).
+
+Open `/benchmarks/` after `npm run dev` for the public surface. Layout and current evidence detail
+continue below.
+
+## Evidence state and layout
+
 This directory is the evidence boundary for Benchmarks. The public page may render only what these
-artifacts can support. Conveyor invariants live in
-[`docs/rfcs/0001-miss-to-gold-conveyor.md`](../docs/rfcs/0001-miss-to-gold-conveyor.md). Capability
-rung U7 means conditional separation; see
+artifacts can support. Capability rung U7 means conditional separation; see
 [`docs/build-week/CAPABILITY_LADDER.md`](../docs/build-week/CAPABILITY_LADDER.md).
 
 Current evidence state (verify against artifacts, not this paragraph alone): `hard-ko-v1` is frozen

@@ -1,0 +1,48 @@
+{
+  "execution_input_id": "bench-execution-input:sha256:09ccd4769a997bf51af717a6cfc1227c00f91a49499ef3f9bd04dd253b16a38f",
+  "schema": "studio.bench.execution-input.v2",
+  "created_at": "2026-07-20T00:18:16.941Z",
+  "attempt_id": "bench-attempt:sha256:8ef98b361c21566f7cd0dae2a404d456c4c333e472fb850ed0ef5e5979c20561",
+  "registration": {
+    "receipt": {
+      "path": "bench/rule-changes/ko-kinship-address-context-provider-authorized/registration.json",
+      "content_id": "sha256:d14aec39ec44c441a01af7cbf79e81c7c0a2d1712df675701466f53d0f67db6c",
+      "bytes": 7897
+    },
+    "registration_id": "bench-rule-change-registration:sha256:222b65152093755812937f287139756e185b2bef94fc9556edcc4cee3b95ca8f"
+  },
+  "release": {
+    "receipt": {
+      "path": "bench/releases/f4903dc34e5222c918d2a27e311fffba7be6ebc3a1218b1098e9cb7c9110dff9.json",
+      "content_id": "sha256:5c12059492745be11a6c9e163a2f446ab99490de9bf7348a4a431be531c6fec7",
+      "bytes": 3617
+    },
+    "release_id": "bench-certified-release:sha256:f4903dc34e5222c918d2a27e311fffba7be6ebc3a1218b1098e9cb7c9110dff9"
+  },
+  "executor": {
+    "receipt": {
+      "path": "bench/executors/ad94989baaab7e4ac0a40ab4aec0f81602a2530b35f035c09efc8174a5e395bd.json",
+      "content_id": "sha256:0a66548858882504f9e62b5edb36420efb01aab60f669ff24f4081f07b9f33ad",
+      "bytes": 923
+    },
+    "executor_id": "bench-capture-executor:sha256:ad94989baaab7e4ac0a40ab4aec0f81602a2530b35f035c09efc8174a5e395bd",
+    "adapter_id": "openai_audio_translation_v1",
+    "host_content_id": "sha256:e8bfd13eba0fd7354602ce9c9aa4e0ecc5bc07068d22c99b689d95d9c5191e88",
+    "implementation_content_id": "sha256:812e445bd67ef511fc15833c7c934f12bcc5a03dfeb473dc72ef15b2e48006f9"
+  },
+  "plan": {
+    "run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r2-without",
+    "clip_id": "Ux-TMWnmntM",
+    "repetition": 2,
+    "side": "without"
+  },
+  "source": {
+    "clip_id": "Ux-TMWnmntM",
+    "artifact": {
+      "path": "public/demo/runs/run-006/clip.mp4",
+      "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+      "bytes": 3465772
+    }
+  },
+  "host_context_id": "bench-host-context:sha256:053638d7a4414581427f407ae4b57b7bc42d1f5bd43b598727b8fce8cd840686"
+}

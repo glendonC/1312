@@ -1,0 +1,170 @@
+{
+  "schema_version": "0.1.0",
+  "kind": "capture",
+  "capture_id": "rule-change-ko-kinship-address-context-provider-authorized-c3-r1-without",
+  "captured_at": "2026-07-20",
+  "scored": false,
+  "pack_evidence": false,
+  "clip": {
+    "id": "Ux-TMWnmntM",
+    "duration_s": 40,
+    "lang": "ko",
+    "pair": "ko->en",
+    "media": null,
+    "source": {
+      "kind": "youtube",
+      "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+      "channel": "Didi's Korean Culture Podcast",
+      "licence": "Creative Commons Attribution license (reuse allowed)",
+      "window": {
+        "start": "00:05:10",
+        "end": "00:05:50"
+      },
+      "attribution": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed)."
+    }
+  },
+  "reproducible": {
+    "deterministic": false,
+    "note": "One provider translation call with no retry or output selection. Provider behavior is not deterministic."
+  },
+  "systems": [
+    {
+      "id": "1321-openai-audio-translation-rule-change",
+      "role": "subject",
+      "config": {
+        "model": "whisper-1",
+        "provider": {
+          "id": "openai",
+          "operation": "audio_translation",
+          "response_format": "verbose_json",
+          "temperature": 0,
+          "timeout_ms": 120000,
+          "max_response_bytes": 1048576
+        },
+        "reviewed_memory": {
+          "rule_content_id": null
+        }
+      }
+    }
+  ],
+  "measured": {
+    "1321-openai-audio-translation-rule-change": {
+      "units_total": 8,
+      "units_emitted": 8,
+      "units_withheld": 0,
+      "coverage": 1,
+      "latency": {
+        "first_usable_s": null,
+        "complete_s": 2.462
+      }
+    }
+  },
+  "unscored": {
+    "critical_meaning": null,
+    "critical_outcomes": null,
+    "catastrophic": null,
+    "reason": "Provider capture has no semantic authority. Human labels and separate scores are required."
+  },
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 8,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "There are a few people I know who went to Thailand, and they said they really liked Thailand.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 8,
+      "t_end": 11,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "My dream is to open a Korean language academy in Thailand.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 11,
+      "t_end": 12,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "Oh, really?",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 12,
+      "t_end": 13,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "Yes.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 13,
+      "t_end": 14,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "Why?",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 14,
+      "t_end": 25,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "My older sister and sister-in-law were going to live in Thailand for a month with my older brother-in-law.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 25,
+      "t_end": 32,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "My older brother-in-law was so busy that I was the only one left, so I lived in Thailand for a month for free.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 32,
+      "t_end": 39,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "I lived in Chiang Mai for a month, and the neighborhood was so pretty and the people were so kind.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    }
+  ],
+  "artifacts": {
+    "provider_response": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c3-r1-without/provider-response.json"
+  },
+  "notes": "Unscored OpenAI audio translation capture. Empty source text records that the endpoint returned English translation only."
+}

@@ -1,0 +1,38 @@
+{
+  "provider_call_id": "bench-provider-call:sha256:71fa44039dc60d67eb3192864c23a9a514e243ce2ad037ee16d6906d22173eef",
+  "schema": "studio.bench.provider-call.v1",
+  "attempt_id": "bench-attempt:sha256:e9ceee2a04e7009a419064a859974c100554c377e2dd119ce08da6a6b7d3c71d",
+  "started_at": "2026-07-20T00:18:09.025Z",
+  "completed_at": "2026-07-20T00:18:11.487Z",
+  "execution_mode": "live_openai",
+  "provider": "openai",
+  "operation": "audio_translation",
+  "endpoint": "https://api.openai.com/v1/audio/translations",
+  "method": "POST",
+  "requested_model": "whisper-1",
+  "host_context_id": "bench-host-context:sha256:053638d7a4414581427f407ae4b57b7bc42d1f5bd43b598727b8fce8cd840686",
+  "media": {
+    "content_id": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+    "bytes": 3465772
+  },
+  "prompt": {
+    "content_id": "sha256:449546fdf0887dbb91e17af2ae238a8157e0d9928830ecd1f433bc8de3cd52d3",
+    "bytes": 246,
+    "rule_content_id": null
+  },
+  "request": {
+    "content_id": "sha256:e0fee086529a84d87e90ccd5674782763cf8fb1e3f18bd89377713a397950d89",
+    "bytes": 3466642
+  },
+  "http_status": 200,
+  "provider_request_id": "req_5169c4c8b7c04d918114ac04eeb5c508",
+  "response": {
+    "path": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c3-r1-without/provider-response.json",
+    "content_id": "sha256:7d94b452e438da9074ebb8f2e21f79e965901dc7142c05eaf3e15c83bb0f7fe6",
+    "bytes": 3183
+  },
+  "outcome": "success",
+  "failure_code": null,
+  "transport_invocations": 1,
+  "retries": 0
+}

@@ -1,0 +1,152 @@
+{
+  "score_id": "bench-score:sha256:48817d151e637c16fb5d87d7fc8355036e12dab64469106339d251d6d88dad2a",
+  "schema": "studio.bench.score.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "2o0f-V4uoMg",
+  "run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r1-without",
+  "scored_at": "2026-07-20T01:05:03.872Z",
+  "judge": null,
+  "bindings": {
+    "gold": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/2o0f-V4uoMg.gold.json",
+      "content_id": "sha256:e0047f26c88abef626f790552f37b0e9453b08836aa4c53a019c3eab7c098d1f",
+      "bytes": 7480
+    },
+    "freeze": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/freeze.json",
+      "content_id": "sha256:3b1ca65b87a912119c3b85a70962256cdd94a8721e6dfed8ec6cef065e27c962",
+      "bytes": 4907
+    },
+    "capture": {
+      "path": "bench/runs/rule-change-ko-kinship-address-context-provider-authorized-c1-r1-without/capture.json",
+      "content_id": "sha256:cf1c08cf870c5c88054f76726ac0db71ada7742f4ed75722e0350a9ad8d8f3c4",
+      "bytes": 7250
+    },
+    "labels": {
+      "path": "bench/reviews/labels/rule-change-ko-kinship-address-context-provider-authorized-c1-r1-without.json",
+      "content_id": "sha256:5d5136f44d886f7217aaaf6ca09108a0c6b30033588864e6269b6aff21ba1e7a",
+      "bytes": 3215
+    }
+  },
+  "preregistration": {
+    "frozen_at": "2026-07-19T20:19:34.015Z",
+    "captured_at": "2026-07-20",
+    "capture_after_freeze": true
+  },
+  "systems": {
+    "1321-openai-audio-translation-rule-change": {
+      "role": "subject",
+      "per_line": [
+        {
+          "t_start": 0,
+          "t_end": 6,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "2o0f-V4uoMg-0000-0600-inverse-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 6,
+          "t_end": 15,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "2o0f-V4uoMg-0600-1500-host-01",
+              "outcome": "correct",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 15,
+          "t_end": 27.8,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "2o0f-V4uoMg-1500-2780-balance-01",
+              "outcome": "correct",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 32.9,
+          "t_end": 38.72,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "2o0f-V4uoMg-3290-3872-paper-01",
+              "outcome": "wrong",
+              "catastrophic": true
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 39.34,
+          "t_end": 49.4,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "2o0f-V4uoMg-3934-4940-evidence-01",
+              "outcome": "correct",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 49.66,
+          "t_end": 60,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "2o0f-V4uoMg-4966-6000-genome-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        }
+      ],
+      "headline": {
+        "critical_meaning": {
+          "passes": 4,
+          "total": 6,
+          "rate": 0.6666666666666666
+        },
+        "critical_outcomes": {
+          "correct": 3,
+          "wrong": 3,
+          "withheld": 0,
+          "missing": 0,
+          "total": 6
+        },
+        "catastrophic": {
+          "count": 1,
+          "denominator": 6,
+          "rate": 0.16666666666666666
+        },
+        "latency": {
+          "first_usable_s": null,
+          "complete_s": 5.514
+        }
+      }
+    }
+  },
+  "delta_vs_cold": null,
+  "notes": "Withheld and missing are mechanical; correct, wrong, and catastrophic are human labels; judge is pinned null because no model grades anything in this pipeline. There is no composite score and coverage appears nowhere in this receipt: a system must not look better by refusing everything or by flooding easy lines."
+}

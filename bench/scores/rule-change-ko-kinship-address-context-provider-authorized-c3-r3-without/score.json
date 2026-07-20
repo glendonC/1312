@@ -1,0 +1,250 @@
+{
+  "score_id": "bench-score:sha256:6da51a2257de2ac3d2f6c2bfba07897b983e25798b0a857e063797538db5faf3",
+  "schema": "studio.bench.score.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r3-without",
+  "scored_at": "2026-07-20T01:05:05.706Z",
+  "judge": null,
+  "bindings": {
+    "gold": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/Ux-TMWnmntM.gold.json",
+      "content_id": "sha256:ff17cd6db4ddd9d4ffbb4b27108223c0f37559f2e8ee79e0ef0ee247e642036f",
+      "bytes": 10768
+    },
+    "freeze": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/freeze.json",
+      "content_id": "sha256:3b1ca65b87a912119c3b85a70962256cdd94a8721e6dfed8ec6cef065e27c962",
+      "bytes": 4907
+    },
+    "capture": {
+      "path": "bench/runs/rule-change-ko-kinship-address-context-provider-authorized-c3-r3-without/capture.json",
+      "content_id": "sha256:edd0edb21fceddb1ab6f690706bdaf72c4f083ee54c8aa106b3b0470a5e0a408",
+      "bytes": 4665
+    },
+    "labels": {
+      "path": "bench/reviews/labels/rule-change-ko-kinship-address-context-provider-authorized-c3-r3-without.json",
+      "content_id": "sha256:ea631ddbd6dc63f7000c4655c193074e3b0e874866c94b0ecef4e2093b52f779",
+      "bytes": 5634
+    }
+  },
+  "preregistration": {
+    "frozen_at": "2026-07-19T20:19:34.015Z",
+    "captured_at": "2026-07-20",
+    "capture_after_freeze": true
+  },
+  "systems": {
+    "1321-openai-audio-translation-rule-change": {
+      "role": "subject",
+      "per_line": [
+        {
+          "t_start": 0,
+          "t_end": 1.55,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-0000-0155-meaning-01",
+              "outcome": "correct",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 1.55,
+          "t_end": 1.95,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-0155-0195-backchannel-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 1.95,
+          "t_end": 7.7,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-0195-0770-meaning-01",
+              "outcome": "correct",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 11.9,
+          "t_end": 12.35,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1190-1235-backchannel-01",
+              "outcome": "correct",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 12.7,
+          "t_end": 13.6,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1270-1360-question-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 14,
+          "t_end": 18.8,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1400-1880-kinship-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 18.8,
+          "t_end": 19,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1880-1900-backchannel-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 19,
+          "t_end": 19.15,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1900-1915-kinship-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 19.15,
+          "t_end": 20.2,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1915-2020-backchannel-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 20.2,
+          "t_end": 25.2,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-2020-2520-kinship-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 25.52,
+          "t_end": 28.12,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-2552-2812-busy-01",
+              "outcome": "correct",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 28.12,
+          "t_end": 28.32,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-2812-2832-backchannel-01",
+              "outcome": "wrong",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 28.32,
+          "t_end": 39.87,
+          "disposition": "emitted",
+          "meaning_preserved": true,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-2832-3987-meaning-01",
+              "outcome": "correct",
+              "catastrophic": false
+            }
+          ],
+          "basis": "human_label"
+        }
+      ],
+      "headline": {
+        "critical_meaning": {
+          "passes": 5,
+          "total": 13,
+          "rate": 0.38461538461538464
+        },
+        "critical_outcomes": {
+          "correct": 5,
+          "wrong": 8,
+          "withheld": 0,
+          "missing": 0,
+          "total": 13
+        },
+        "catastrophic": {
+          "count": 0,
+          "denominator": 13,
+          "rate": 0
+        },
+        "latency": {
+          "first_usable_s": null,
+          "complete_s": 3.983
+        }
+      }
+    }
+  },
+  "delta_vs_cold": null,
+  "notes": "Withheld and missing are mechanical; correct, wrong, and catastrophic are human labels; judge is pinned null because no model grades anything in this pipeline. There is no composite score and coverage appears nowhere in this receipt: a system must not look better by refusing everything or by flooding easy lines."
+}

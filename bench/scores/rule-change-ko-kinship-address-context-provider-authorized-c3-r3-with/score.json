@@ -1,0 +1,250 @@
+{
+  "score_id": "bench-score:sha256:c383e0fcb9a0bb1e93ae7a1608e00987a78a40ff92485eec8f53c2a69d77eab4",
+  "schema": "studio.bench.score.v1",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r3-with",
+  "scored_at": "2026-07-20T01:05:05.852Z",
+  "judge": null,
+  "bindings": {
+    "gold": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/Ux-TMWnmntM.gold.json",
+      "content_id": "sha256:ff17cd6db4ddd9d4ffbb4b27108223c0f37559f2e8ee79e0ef0ee247e642036f",
+      "bytes": 10768
+    },
+    "freeze": {
+      "path": "bench/packs/hard-ko-provider-authorized-v1/freeze.json",
+      "content_id": "sha256:3b1ca65b87a912119c3b85a70962256cdd94a8721e6dfed8ec6cef065e27c962",
+      "bytes": 4907
+    },
+    "capture": {
+      "path": "bench/runs/rule-change-ko-kinship-address-context-provider-authorized-c3-r3-with/capture.json",
+      "content_id": "sha256:9d9c75e7b5c13e1a47c0aa79d98954719ae689625108dc3019f66c24fc9c7d84",
+      "bytes": 3123
+    },
+    "labels": {
+      "path": "bench/reviews/labels/rule-change-ko-kinship-address-context-provider-authorized-c3-r3-with.json",
+      "content_id": "sha256:74e2bc211eebb2a59da7fa00fc60a82495fc60764802449133832110b040ab97",
+      "bytes": 2678
+    }
+  },
+  "preregistration": {
+    "frozen_at": "2026-07-19T20:19:34.015Z",
+    "captured_at": "2026-07-20",
+    "capture_after_freeze": true
+  },
+  "systems": {
+    "1321-openai-audio-translation-rule-change": {
+      "role": "subject",
+      "per_line": [
+        {
+          "t_start": 0,
+          "t_end": 1.55,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-0000-0155-meaning-01",
+              "outcome": "wrong",
+              "catastrophic": true
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 1.55,
+          "t_end": 1.95,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-0155-0195-backchannel-01",
+              "outcome": "wrong",
+              "catastrophic": true
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 1.95,
+          "t_end": 7.7,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-0195-0770-meaning-01",
+              "outcome": "wrong",
+              "catastrophic": true
+            }
+          ],
+          "basis": "human_label"
+        },
+        {
+          "t_start": 11.9,
+          "t_end": 12.35,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1190-1235-backchannel-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 12.7,
+          "t_end": 13.6,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1270-1360-question-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 14,
+          "t_end": 18.8,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1400-1880-kinship-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 18.8,
+          "t_end": 19,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1880-1900-backchannel-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 19,
+          "t_end": 19.15,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1900-1915-kinship-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 19.15,
+          "t_end": 20.2,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-1915-2020-backchannel-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 20.2,
+          "t_end": 25.2,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-2020-2520-kinship-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 25.52,
+          "t_end": 28.12,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-2552-2812-busy-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 28.12,
+          "t_end": 28.32,
+          "disposition": "missing",
+          "meaning_preserved": null,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-2812-2832-backchannel-01",
+              "outcome": "missing",
+              "catastrophic": null
+            }
+          ],
+          "basis": "mechanical"
+        },
+        {
+          "t_start": 28.32,
+          "t_end": 39.87,
+          "disposition": "emitted",
+          "meaning_preserved": false,
+          "critical_units": [
+            {
+              "id": "Ux-TMWnmntM-2832-3987-meaning-01",
+              "outcome": "wrong",
+              "catastrophic": true
+            }
+          ],
+          "basis": "human_label"
+        }
+      ],
+      "headline": {
+        "critical_meaning": {
+          "passes": 0,
+          "total": 13,
+          "rate": 0
+        },
+        "critical_outcomes": {
+          "correct": 0,
+          "wrong": 4,
+          "withheld": 0,
+          "missing": 9,
+          "total": 13
+        },
+        "catastrophic": {
+          "count": 4,
+          "denominator": 4,
+          "rate": 1
+        },
+        "latency": {
+          "first_usable_s": null,
+          "complete_s": 3.596
+        }
+      }
+    }
+  },
+  "delta_vs_cold": null,
+  "notes": "Withheld and missing are mechanical; correct, wrong, and catastrophic are human labels; judge is pinned null because no model grades anything in this pipeline. There is no composite score and coverage appears nowhere in this receipt: a system must not look better by refusing everything or by flooding easy lines."
+}

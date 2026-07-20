@@ -4,6 +4,7 @@ import { contentId, exact, fail, string } from "./primitives.ts";
 const APPLY_RECEIPT_OUTPUT_KEYS: Record<string, [string, string]> = {
   language_explanation_receipt: ["explanationArtifactId", "explanationContentId"],
   learning_prep_receipt: ["prepArtifactId", "prepContentId"],
+  span_translation_receipt: ["translationArtifactId", "translationContentId"],
 };
 
 export function validateApplyArtifactOrigin(
@@ -13,7 +14,8 @@ export function validateApplyArtifactOrigin(
   const { item, origin, mediaClass, sources, task, agent, context, path } = input;
   if (
     kind !== "language_explanation_output" && kind !== "language_explanation_receipt" &&
-    kind !== "learning_prep_output" && kind !== "learning_prep_receipt"
+    kind !== "learning_prep_output" && kind !== "learning_prep_receipt" &&
+    kind !== "span_translation_output" && kind !== "span_translation_receipt"
   ) return false;
   const receiptKeys = APPLY_RECEIPT_OUTPUT_KEYS[kind] ?? null;
 

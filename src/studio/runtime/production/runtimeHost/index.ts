@@ -76,6 +76,12 @@ export {
   type LearningPrepExecutor,
 } from "../learningPrep/index.ts";
 export {
+  DeterministicSpanTranslationTestExecutor,
+  OllamaSpanTranslationExecutor,
+  UnavailableSpanTranslationExecutor,
+  type SpanTranslationExecutor,
+} from "../spanTranslations/index.ts";
+export {
   DeterministicCurrentRunCaptionTestExecutor,
   OpenAiCaptionProductionExecutor,
   RecordedCaptionFixtureExecutor,

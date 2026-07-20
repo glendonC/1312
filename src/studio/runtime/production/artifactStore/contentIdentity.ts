@@ -93,6 +93,32 @@ export function createLanguageExplanationReceiptArtifactId(
   })}`;
 }
 
+export function createSpanTranslationArtifactId(
+  runId: string,
+  jobId: string,
+  contentId: string,
+): string {
+  return `artifact:${canonicalSha256({
+    runId,
+    jobId,
+    kind: "span-translation-output",
+    contentId,
+  })}`;
+}
+
+export function createSpanTranslationReceiptArtifactId(
+  runId: string,
+  jobId: string,
+  contentId: string,
+): string {
+  return `artifact:${canonicalSha256({
+    runId,
+    jobId,
+    kind: "span-translation-receipt",
+    contentId,
+  })}`;
+}
+
 export function createLearningPrepArtifactId(
   runId: string,
   jobId: string,

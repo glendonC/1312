@@ -368,6 +368,17 @@ export interface RuntimeHostLanguageExplanationResponse {
 
 export type RuntimeHostLanguageExplanationRequest = import("../model.ts").LanguageExplanationRequest;
 
+export interface RuntimeHostSpanTranslationResponse {
+  schema: "studio.local-runtime-span-translations.v1";
+  commandId: string;
+  runtimeId: string;
+  journalHead: number;
+  attempts: import("../model.ts").SpanTranslationAttemptState[];
+  results: import("../model.ts").VerifiedSpanTranslationResult[];
+}
+
+export type RuntimeHostSpanTranslationRequest = import("../model.ts").SpanTranslationRequest;
+
 export interface RuntimeHostLearningPrepResponse {
   schema: "studio.local-runtime-learning-preps.v1";
   commandId: string;

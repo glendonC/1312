@@ -5,6 +5,7 @@ import { reopenCaptionProductionResults, reopenCaptionProductions } from "../cap
 import { reopenCaptionQualityControls } from "../captions/captionQualityControlAudit.ts";
 import { reopenLanguageExplanationResults } from "../languageExplanations/languageExplanationAudit.ts";
 import { reopenLearningPrepResults } from "../learningPrep/learningPrepAudit.ts";
+import { reopenSpanTranslationResults } from "../spanTranslations/spanTranslationAudit.ts";
 import type { PublishReviewOperator } from "../model.ts";
 import { reopenPublishReviewDecisions } from "../review/publishReviewDecisionAudit.ts";
 import { reopenPublishReviewIntakes } from "../review/publishReviewIntakeAudit.ts";
@@ -26,6 +27,7 @@ import type {
   RuntimeHostPublishReviewIntakeResponse,
   RuntimeHostLanguageExplanationResponse,
   RuntimeHostLearningPrepResponse,
+  RuntimeHostSpanTranslationResponse,
 } from "./model.ts";
 
 export class RuntimeHostQueries {
@@ -301,6 +303,47 @@ export class RuntimeHostQueries {
           lineId: attempt.lineId,
           selection: structuredClone(attempt.selection),
           facetKinds: [...attempt.facetKinds],
+          status: attempt.status,
+          failure: attempt.failure,
+        })),
+      results,
+    };
+  }
+
+  async spanTranslations(runtimeId: string): Promise<RuntimeHostSpanTranslationResponse> {
+    const record = await this.store.findByRuntimeId(runtimeId);
+    if (!record) throw new RuntimeHostError("unknown_runtime", "The runtime identity is unknown.", 404);
+    const reconciled = await this.reconcile(record, false);
+    const paths = this.store.paths(runtimeId);
+    const journal = await readValidatedRuntimeJournal(paths.journalPath, runtimeId);
+    let results;
+    try {
+      results = await reopenSpanTranslationResults(
+        journal.state,
+        journal.events,
+        new ContentAddressedArtifactStore(paths.artifactStoreRoot),
+      );
+    } catch (error) {
+      throw new RuntimeHostError(
+        "stored_content_inconsistent",
+        "A stored span translation, receipt, or exact caption lineage failed closed validation.",
+        409,
+        { cause: error },
+      );
+    }
+    return {
+      schema: "studio.local-runtime-span-translations.v1",
+      commandId: reconciled.commandId,
+      runtimeId,
+      journalHead: journal.head,
+      attempts: Object.values(journal.state.spanTranslations)
+        .sort((left, right) => left.jobId.localeCompare(right.jobId))
+        .map((attempt) => ({
+          jobId: attempt.jobId,
+          attempt: attempt.attempt,
+          caption: structuredClone(attempt.caption),
+          lineId: attempt.lineId,
+          selection: structuredClone(attempt.selection),
           status: attempt.status,
           failure: attempt.failure,
         })),

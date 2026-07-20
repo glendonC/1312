@@ -21,6 +21,7 @@ import { applyStudySynthesisEvent } from "./projection/studySynthesisEvents.ts";
 import { applyRestudyEvent } from "./projection/restudyEvents.ts";
 import { applyLanguageExplanationEvent } from "./projection/languageExplanationEvents.ts";
 import { applyLearningPrepEvent } from "./projection/learningPrepEvents.ts";
+import { applySpanTranslationEvent } from "./projection/spanTranslationEvents.ts";
 import { applyAgentRecoveryEvent } from "./projection/agentRecoveryEvents.ts";
 
 export function initialRuntimeProjection(runId: string): RuntimeProjection {
@@ -57,6 +58,7 @@ export function initialRuntimeProjection(runId: string): RuntimeProjection {
     captionQualityControls: {},
     languageExplanations: {},
     learningPreps: {},
+    spanTranslations: {},
     executions: {},
     modelUsage: {},
     reports: {},
@@ -106,6 +108,7 @@ export function applyRuntimeEvent(state: RuntimeProjection, candidate: unknown):
   if (applyCaptionEvent(next, event)) return next;
   if (applyLanguageExplanationEvent(next, event)) return next;
   if (applyLearningPrepEvent(next, event)) return next;
+  if (applySpanTranslationEvent(next, event)) return next;
   if (applyReportEvent(next, event)) return next;
   if (applyStudyReportEvent(next, event)) return next;
   if (applyRestudyEvent(next, event)) return next;

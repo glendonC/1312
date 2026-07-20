@@ -55,6 +55,7 @@ import type { OwnedMediaStudyRecordV3, RangePassRecord, StudyReadinessRecordV4 }
 import type { GeneralizedParentAdmissionRecord, GeneralizedParentArtifactReadRecord } from "./studyReportsV2.ts";
 import type { LanguageExplanationRecord } from "./languageExplanations.ts";
 import type { LearningPrepRecord } from "./learningPrep.ts";
+import type { SpanTranslationRecord } from "./spanTranslations.ts";
 import type {
   AgentRecoveryRecord,
   ExecutorFailureClassificationReceipt,
@@ -92,6 +93,7 @@ export interface RuntimeProjection {
   captionQualityControls: Record<string, CaptionQualityControlRecord>;
   languageExplanations: Record<string, LanguageExplanationRecord>;
   learningPreps: Record<string, LearningPrepRecord>;
+  spanTranslations: Record<string, SpanTranslationRecord>;
   executions: Record<string, ExecutorRecord>;
   modelUsage: Record<string, ModelUsageReceipt>;
   reports: Record<string, ReportRecord>;

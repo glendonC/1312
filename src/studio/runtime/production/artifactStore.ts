@@ -74,6 +74,9 @@ import {
   buildLearningPrepArtifacts as buildLearningPrepArtifactsBuilder,
 } from "./artifactStore/learningPrepArtifacts.ts";
 import {
+  buildSpanTranslationArtifacts as buildSpanTranslationArtifactsBuilder,
+} from "./artifactStore/spanTranslationArtifacts.ts";
+import {
   canonicalJson,
   canonicalJsonContentId,
   canonicalSha256,
@@ -90,6 +93,8 @@ export {
   createLearningPrepArtifactId,
   createLearningPrepReceiptArtifactId,
   createSourceArtifactId,
+  createSpanTranslationArtifactId,
+  createSpanTranslationReceiptArtifactId,
   identifyFile,
 } from "./artifactStore/contentIdentity.ts";
 
@@ -591,6 +596,12 @@ export class ContentAddressedArtifactStore {
     input: Parameters<typeof buildLearningPrepArtifactsBuilder>[0],
   ): ReturnType<typeof buildLearningPrepArtifactsBuilder> {
     return buildLearningPrepArtifactsBuilder(input);
+  }
+
+  buildSpanTranslationArtifacts(
+    input: Parameters<typeof buildSpanTranslationArtifactsBuilder>[0],
+  ): ReturnType<typeof buildSpanTranslationArtifactsBuilder> {
+    return buildSpanTranslationArtifactsBuilder(input);
   }
 
   async record(ledger: RuntimeLedger, artifact: RuntimeArtifact, causationId: string | null = null): Promise<void> {

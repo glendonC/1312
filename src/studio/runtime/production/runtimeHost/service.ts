@@ -43,6 +43,7 @@ import type {
   RuntimeHostPrivatePlaybackGrantRevocationResponse,
   RuntimeHostPublishReviewIntakeResponse,
   RuntimeHostLanguageExplanationResponse,
+  RuntimeHostSpanTranslationResponse,
   RuntimeHostLearningPrepResponse,
   RuntimeHostPublishReviewDecisionResponse,
   RuntimeHostStartAcknowledgement,
@@ -66,6 +67,9 @@ import { RuntimeReviewCaptionCoordinator } from "./reviewCaptionCoordinator.ts";
 import type { LanguageExplanationExecutor } from "../languageExplanations/executor.ts";
 import { UnavailableLanguageExplanationExecutor } from "../languageExplanations/executor.ts";
 import { RuntimeLanguageExplanationCoordinator } from "./languageExplanationCoordinator.ts";
+import type { SpanTranslationExecutor } from "../spanTranslations/executor.ts";
+import { UnavailableSpanTranslationExecutor } from "../spanTranslations/executor.ts";
+import { RuntimeSpanTranslationCoordinator } from "./spanTranslationCoordinator.ts";
 import type { LearningPrepExecutor } from "../learningPrep/executor.ts";
 import { UnavailableLearningPrepExecutor } from "../learningPrep/executor.ts";
 import { RuntimeLearningPrepCoordinator } from "./learningPrepCoordinator.ts";
@@ -85,6 +89,7 @@ export interface RuntimeStartServiceOptions {
   reviewer?: PublishReviewOperator;
   captionExecutor?: CaptionProductionExecutor;
   languageExplanationExecutor?: LanguageExplanationExecutor;
+  spanTranslationExecutor?: SpanTranslationExecutor;
   learningPrepExecutor?: LearningPrepExecutor;
   /** Explicit compatibility selector; omitted means the U3 generalized production spine. */
   studyContractVersion?: StudyContractVersion;
@@ -118,6 +123,7 @@ export class RuntimeStartService {
   private readonly queries: RuntimeHostQueries;
   private readonly reviewCaption: RuntimeReviewCaptionCoordinator;
   private readonly languageExplanation: RuntimeLanguageExplanationCoordinator;
+  private readonly spanTranslation: RuntimeSpanTranslationCoordinator;
   private readonly learningPrep: RuntimeLearningPrepCoordinator;
   private readonly privatePlayback: RuntimePrivatePlaybackService;
   private readonly studyContractVersion: StudyContractVersion;
@@ -170,6 +176,15 @@ export class RuntimeStartService {
       lifecycle: this.lifecycle,
       queries: this.queries,
       executor: options.learningPrepExecutor ?? new UnavailableLearningPrepExecutor(),
+      mutationQueue,
+      now: this.now,
+    });
+    this.spanTranslation = new RuntimeSpanTranslationCoordinator({
+      store: this.store,
+      sources: this.sources,
+      lifecycle: this.lifecycle,
+      queries: this.queries,
+      executor: options.spanTranslationExecutor ?? new UnavailableSpanTranslationExecutor(),
       mutationQueue,
       now: this.now,
     });
@@ -588,6 +603,17 @@ export class RuntimeStartService {
     return this.languageExplanation.create(runtimeId, value);
   }
 
+  async spanTranslations(runtimeId: string): Promise<RuntimeHostSpanTranslationResponse> {
+    return this.queries.spanTranslations(runtimeId);
+  }
+
+  async createSpanTranslation(
+    runtimeId: string,
+    value: unknown,
+  ): Promise<RuntimeHostSpanTranslationResponse> {
+    return this.spanTranslation.create(runtimeId, value);
+  }
+
   async learningPreps(runtimeId: string): Promise<RuntimeHostLearningPrepResponse> {
     return this.queries.learningPreps(runtimeId);
   }
@@ -634,6 +660,7 @@ export class RuntimeStartService {
       if (reconciled.journalHead > 0) {
         await this.languageExplanation.recoverInterrupted(record.runtimeId);
         await this.learningPrep.recoverInterrupted(record.runtimeId);
+        await this.spanTranslation.recoverInterrupted(record.runtimeId);
       }
     }
   }

@@ -91,6 +91,11 @@ import type {
   LearningPrepStartedEvent,
 } from "./protocol/learningPrepEvents.ts";
 import type {
+  SpanTranslationCompletedEvent,
+  SpanTranslationFailedEvent,
+  SpanTranslationStartedEvent,
+} from "./protocol/spanTranslationEvents.ts";
+import type {
   AgentRecoveryAuthorizedEvent,
   AgentRecoveryTerminalRecordedEvent,
   ExecutorFailureClassifiedEvent,
@@ -110,6 +115,7 @@ export * from "./protocol/reviewEvents.ts";
 export * from "./protocol/studyEvents.ts";
 export * from "./protocol/languageExplanationEvents.ts";
 export * from "./protocol/learningPrepEvents.ts";
+export * from "./protocol/spanTranslationEvents.ts";
 export * from "./protocol/agentRecoveryEvents.ts";
 
 export type RuntimeEvent =
@@ -185,6 +191,9 @@ export type RuntimeEvent =
   | LearningPrepStartedEvent
   | LearningPrepCompletedEvent
   | LearningPrepFailedEvent
+  | SpanTranslationStartedEvent
+  | SpanTranslationCompletedEvent
+  | SpanTranslationFailedEvent
   | ReportSubmittedEvent
   | ReportDecidedEvent
   | RootOutputDispositionRecordedEvent

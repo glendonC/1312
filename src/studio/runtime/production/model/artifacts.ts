@@ -478,6 +478,38 @@ export interface LanguageExplanationReceiptArtifactOrigin {
   approvalArtifactId: string;
 }
 
+export interface SpanTranslationOutputArtifactOrigin {
+  kind: "span_translation_output";
+  jobId: string;
+  receiptId: string;
+  receiptContentId: string;
+  captionArtifactId: string;
+  captionContentId: string;
+  captionReceiptArtifactId: string;
+  captionReceiptContentId: string;
+  sourceArtifactId: string;
+  studyArtifactId: string;
+  readinessArtifactId: string;
+  approvalArtifactId: string;
+}
+
+export interface SpanTranslationReceiptArtifactOrigin {
+  kind: "span_translation_receipt";
+  jobId: string;
+  receiptId: string;
+  receiptContentId: string;
+  translationArtifactId: string;
+  translationContentId: string;
+  captionArtifactId: string;
+  captionContentId: string;
+  captionReceiptArtifactId: string;
+  captionReceiptContentId: string;
+  sourceArtifactId: string;
+  studyArtifactId: string;
+  readinessArtifactId: string;
+  approvalArtifactId: string;
+}
+
 export interface LearningPrepOutputArtifactOrigin {
   kind: "learning_prep_output";
   jobId: string;
@@ -575,6 +607,8 @@ export interface RuntimeArtifact {
     | CaptionQualityControlArtifactOrigin
     | LanguageExplanationOutputArtifactOrigin
     | LanguageExplanationReceiptArtifactOrigin
+    | SpanTranslationOutputArtifactOrigin
+    | SpanTranslationReceiptArtifactOrigin
     | LearningPrepOutputArtifactOrigin
     | LearningPrepReceiptArtifactOrigin;
 }

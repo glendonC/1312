@@ -1,0 +1,10 @@
+{
+  "schema": "studio.bench.single-attempt-journal.v1",
+  "attempt_id": "bench-attempt:sha256:307ce74d5e9994bb9f87b8366e788fb9c3c3e97e6a76282194e08cd047eaf3fe",
+  "head_commit": "8df283caa0fe5134209d219a7229a5a8fdbe510a",
+  "charge": {
+    "path": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c2-r1-without/charge.json",
+    "content_id": "sha256:4a459588c8216e1aae964999cbc4b67bb345d0dab97363f996f70e397cc5be50",
+    "bytes": 875
+  }
+}

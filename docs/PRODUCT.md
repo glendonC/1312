@@ -1,10 +1,12 @@
 # 1321
 
-- Document type: Product identity
-- Lifecycle: Active
-- Authority: Category, product loop, beachhead, and proof boundary
-- Last verified: 2026-07-20
-- Update when: Product identity or proof boundary changes
+<!--
+Document type: Product identity
+Lifecycle: Active
+Authority: Category, product loop, beachhead, and proof boundary
+Last verified: 2026-07-20
+Update when: Product identity or proof boundary changes
+-->
 
 **Live translate guesses. This studies the video first.**
 

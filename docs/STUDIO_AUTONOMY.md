@@ -1,10 +1,12 @@
 # Studio Autonomous Media Runtime
 
-- Document type: Deep design ledger
-- Lifecycle: Active
-- Authority: Durable runtime decisions and dated implementation context
-- Last verified: 2026-07-20
-- Update when: A durable decision changes or the ledger is retired
+<!--
+Document type: Deep design ledger
+Lifecycle: Active
+Authority: Durable runtime decisions and dated implementation context
+Last verified: 2026-07-20
+Update when: A durable decision changes or the ledger is retired
+-->
 
 Deep design ledger, not an onboarding doc. Standing decisions are under [Decisions](#decisions);
 dated campaign narrative is historical context unless marked as a standing decision.

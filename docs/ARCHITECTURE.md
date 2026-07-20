@@ -1,10 +1,12 @@
 # Architecture
 
-- Document type: Architecture reference
-- Lifecycle: Stable
-- Authority: Module boundaries, dependency direction, and durable system shape
-- Last verified: 2026-07-20
-- Update when: A stable boundary changes
+<!--
+Document type: Architecture reference
+Lifecycle: Stable
+Authority: Module boundaries, dependency direction, and durable system shape
+Last verified: 2026-07-20
+Update when: A stable boundary changes
+-->
 
 Start with [How the system fits together](#how-the-system-fits-together). Read further only if you
 are changing code boundaries.

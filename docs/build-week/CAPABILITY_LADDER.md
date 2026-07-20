@@ -1,10 +1,12 @@
 # Capability ladder: media understanding
 
-- Document type: Capability plan
-- Lifecycle: Active
-- Authority: Rung order, dependencies, done-when, and capability non-claims
-- Last verified: 2026-07-20
-- Update when: A rung is accepted, implemented, blocked, or reordered
+<!--
+Document type: Capability plan
+Lifecycle: Active
+Authority: Rung order, dependencies, done-when, and capability non-claims
+Last verified: 2026-07-20
+Update when: A rung is accepted, implemented, blocked, or reordered
+-->
 
 Long done-when plan for media-understanding work. Product identity lives in
 [`PRODUCT.md`](../PRODUCT.md). Living milestones live in [`STATUS.md`](./STATUS.md).

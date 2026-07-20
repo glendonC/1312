@@ -1,10 +1,12 @@
 # Documentation map
 
-- Document type: Living registry
-- Lifecycle: Active
-- Authority: Public document ownership, lifecycle, and routing
-- Last verified: 2026-07-20
-- Update when: A public owner document is added, removed, renamed, or changes responsibility
+<!--
+Document type: Living registry
+Lifecycle: Active
+Authority: Public document ownership, lifecycle, and routing
+Last verified: 2026-07-20
+Update when: A public owner document is added, removed, renamed, or changes responsibility
+-->
 
 Start with the [repository README](../README.md) for what / why / try it (including local host and
 `.env`). Verify implementation claims against code, schemas, tests, and bound receipts.
@@ -70,7 +72,8 @@ A prose count is never stronger evidence than those artifacts.
 
 ## Lifecycle rules
 
-Use one of these labels when a document receives a control block:
+Owner docs keep a short HTML-comment control block under the title (invisible on GitHub). Use one of
+these Lifecycle labels there and in the Owner registry above:
 
 - `Active`: update in the same accepted slice as the owned fact.
 - `Stable`: change only when a durable boundary or definition changes.

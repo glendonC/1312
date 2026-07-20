@@ -362,7 +362,11 @@ for (const file of OWNER_CONTROL_BLOCK_DOCS) {
   const path = resolve(ROOT, file);
   if (!existsSync(path)) continue;
   const head = readFileSync(path, "utf8").split("\n").slice(0, 24).join("\n");
-  if (!/^- Lifecycle:\s+\S+/m.test(head)) {
+  // Prefer an HTML comment control block under the H1 so GitHub leads with human prose.
+  // Still accept a visible list form during transition.
+  const hasCommentLifecycle = /<!--[\s\S]*?Lifecycle:\s+\S+[\s\S]*?-->/.test(head);
+  const hasListLifecycle = /^- Lifecycle:\s+\S+/m.test(head);
+  if (!hasCommentLifecycle && !hasListLifecycle) {
     addError(`${file} is missing a Lifecycle control-block line near the top`);
   }
 }

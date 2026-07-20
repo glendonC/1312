@@ -1,10 +1,12 @@
 # Hard-KO Clip Pack bench
 
-- Document type: Evaluation-domain entry
-- Lifecycle: Active
-- Authority: Bench layout, commands, packs, and score artifacts in this directory
-- Last verified: 2026-07-20
-- Update when: Bench layout, commands, or artifact ownership changes
+<!--
+Document type: Evaluation-domain entry
+Lifecycle: Active
+Authority: Bench layout, commands, packs, and score artifacts in this directory
+Last verified: 2026-07-20
+Update when: Bench layout, commands, or artifact ownership changes
+-->
 
 ## In short
 

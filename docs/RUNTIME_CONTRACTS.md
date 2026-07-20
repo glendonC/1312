@@ -1,10 +1,12 @@
 # Runtime contracts
 
-- Document type: Mixed contract reference
-- Lifecycle: Active
-- Authority: Production runtime contracts plus explicitly inert fixture history
-- Last verified: 2026-07-20
-- Update when: A runtime contract changes, or fixture history is split out
+<!--
+Document type: Mixed contract reference
+Lifecycle: Active
+Authority: Production runtime contracts plus explicitly inert fixture history
+Last verified: 2026-07-20
+Update when: A runtime contract changes, or fixture history is split out
+-->
 
 Long contract reference for implementers. For product orientation use [`PRODUCT.md`](./PRODUCT.md)
 and [`ARCHITECTURE.md`](./ARCHITECTURE.md). For how to run Studio locally use the root

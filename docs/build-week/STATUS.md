@@ -1,10 +1,12 @@
 # Build Week status
 
-- Document type: Living status
-- Lifecycle: Active
-- Authority: Current milestones, blockers, active work, and next actions
-- Last verified: 2026-07-20
-- Update when: Engineering state changes
+<!--
+Document type: Living status
+Lifecycle: Active
+Authority: Current milestones, blockers, active work, and next actions
+Last verified: 2026-07-20
+Update when: Engineering state changes
+-->
 
 ## Now
 

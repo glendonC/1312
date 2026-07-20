@@ -1,10 +1,12 @@
 # RFC 0001: The Miss-to-Gold Conveyor
 
-- Document type: Decision record
-- Lifecycle: Accepted
-- Authority: Miss routing, gold isolation, scoring invariants, and rationale
-- Last verified: 2026-07-20
-- Update when: The decision or its invariants change
+<!--
+Document type: Decision record
+Lifecycle: Accepted
+Authority: Miss routing, gold isolation, scoring invariants, and rationale
+Last verified: 2026-07-20
+Update when: The decision or its invariants change
+-->
 
 For a short eval overview, see [`bench/README.md`](../../bench/README.md). Stop after
 [One line](#one-line) unless you need conveyor invariants.

@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useEffect } from "react";
 
 import AgentPanel from "./AgentPanel";
-import { useComplete, useResultView, useStudio } from "./store";
+import { useComplete, useResultFace, useResultView, useStudio } from "./store";
 import SwarmGraph from "./SwarmGraph";
 import { AuthorityBadge } from "./viewer/ResultViewerShell";
 import ResultWorkspace from "./viewer/ResultWorkspace";
@@ -11,22 +11,26 @@ export default function RunAct() {
   const complete = useComplete();
   const focused = useStudio((state) => state.selected !== null);
   const resultView = useResultView();
+  const resultFace = useResultFace();
   const setResultView = useStudio((state) => state.setResultView);
+  const setResultFace = useStudio((state) => state.setResultFace);
 
-  // Esc steps back from the open result workspace to the completed world under it. Deliberately
-  // the last Escape listener in line: every layer inside the workspace (drawers, pinned panels,
-  // popovers) prevents default when it consumes the key, and browser fullscreen owns Esc outright,
-  // so this fires only when there is nothing left to close but the workspace itself.
+  // Esc steps back one room at a time: watch → report, arrival → report (continuing the
+  // completion moment), report → the completed world under the workspace. Deliberately the last
+  // Escape listener in line: every layer inside the workspace (drawers, pinned panels, popovers)
+  // prevents default when it consumes the key, and browser fullscreen owns Esc outright, so this
+  // fires only when there is nothing left to close but the current face.
   useEffect(() => {
     if (!complete || resultView !== "result") return undefined;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       if (document.fullscreenElement) return;
-      setResultView("process");
+      if (resultFace === "report") setResultView("process");
+      else setResultFace("report");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [complete, resultView, setResultView]);
+  }, [complete, resultFace, resultView, setResultFace, setResultView]);
 
   // One persistent world. The stage never unmounts across completion: the run's swarm settles in
   // place, the golden result artifact forms at the terminus, and the result workspace opens OVER

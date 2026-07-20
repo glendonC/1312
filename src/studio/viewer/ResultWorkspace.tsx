@@ -1,58 +1,96 @@
-import { motion } from "motion/react";
-import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 
-import { clock } from "../format";
 import Results from "../Results";
 import ResultArtifactMark from "../ResultArtifactMark";
+import { projectResultAccounting } from "../resultAccounting";
 import { ResultsRunPanels } from "../ResultsChrome";
-import { useBundle, useStudio } from "../store";
-import { ResultCommandSeat } from "./resultCommandSeat";
+import { useBundle, useResultFace, useStudio } from "../store";
+import ResultBrief from "./ResultBrief";
 
 /**
- * The terminal workspace of a completed run, composed EXACTLY like an agent focus panel: the
- * world dims and blurs beneath, an identity anchor holds the left column, and the workspace
- * shell on the right carries a source-titled environment between two stage rules with the
- * command baseline underneath. Same spatial grammar, same geometry — the run's result is one
- * more inhabitant of the focus idiom, not a separate screen with its own rules.
+ * The terminal workspace of a completed run, in three faces of one room:
  *
- * Where an agent's anchor narrates lineage and remit, the artifact's anchor accounts for what
- * the run actually produced — language pair, range, per-line coverage, and the evidence class —
- * every value read from the bundle. The environment houses the unchanged
- * LearningResultExperience (selectable transcript, pinned explanations, Saved, Tune, viewing
- * modes all intact); the commands hold the Source and Coverage disclosures and the one exit.
- * Closing (Esc or the pill) reveals the completed graph with the golden Result orb, which is the
- * sole way back in.
+ * "arrival" is the completion moment — a full-veil statement ("Your video has finished
+ * processing.") over the result brief, shown once per run; continuing (or Esc) lands on
+ * "report". "report" keeps the focus-panel grammar: the gold identity anchor beside a
+ * source-titled environment holding the clip preview and the brief, with the Source and
+ * Coverage disclosures and the one exit at the command baseline. "watch" hands the whole
+ * viewport to the viewer — the clip beside the learning transcript — entered only through the
+ * report's Watch & study action and left with Back or Esc.
+ *
+ * The viewer stays mounted across every face (CSS reshapes the room), so playback position,
+ * prep state, pinned explanations, and saved items survive arrival, report, watch, and the
+ * round trip through the completed graph. Closing (Esc or the pill) reveals the graph with the
+ * golden Result orb, which is the sole way back in; re-entry resumes the last face, never
+ * arrival. The evidence class is stated by the Source disclosure and preflight facts, never
+ * worn as a label.
  */
 export default function ResultWorkspace() {
   const bundle = useBundle();
+  const face = useResultFace();
+  const setResultFace = useStudio((s) => s.setResultFace);
   const setResultView = useStudio((s) => s.setResultView);
-  // The command baseline's seat for the learning toggles: state (not a ref) so providing it
-  // re-renders the workspace tree and the portal lands once the element exists.
-  const [commandSeat, setCommandSeat] = useState<HTMLElement | null>(null);
   if (!bundle) return null;
 
-  const { run, captions } = bundle;
-  const pair = `${run.pair.source.toUpperCase()} → ${run.pair.target.toUpperCase()}`;
-
-  const counts = { captioned: 0, withheld: 0, silent: 0 };
-  for (const cue of captions.cues) {
-    if (cue.silence) {
-      counts.silent += 1;
-      continue;
-    }
-    const target = cue.targets.find((t) => t.lang === run.pair.target);
-    if (target?.withheld) counts.withheld += 1;
-    else if (target?.text) counts.captioned += 1;
-  }
+  const { run } = bundle;
+  const { pair, range, counts } = projectResultAccounting(bundle);
 
   return (
-    <div className="result-workspace">
+    <div className="result-workspace" data-workspace-face={face}>
+      {/* The arrival face floats over the (still-hidden) report and exits upward when the
+          viewer continues, so the report reveals through the statement rather than after it. */}
+      <AnimatePresence>
+        {face === "arrival" && (
+          <motion.section
+            className="result-arrival"
+            aria-labelledby="result-arrival-title"
+            exit={{ opacity: 0, y: -22, transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
+          >
+            <motion.p
+              className="result-arrival-kicker"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            >
+              Run complete
+            </motion.p>
+            <motion.h2
+              id="result-arrival-title"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            >
+              Your video has finished processing.
+            </motion.h2>
+            <motion.div
+              className="result-arrival-brief"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.34, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <ResultBrief bundle={bundle} />
+            </motion.div>
+            <motion.button
+              type="button"
+              className="result-arrival-continue"
+              onClick={() => setResultFace("report")}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.58, ease: [0.22, 1, 0.36, 1] }}
+            >
+              View result
+            </motion.button>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
       <motion.aside
         className="result-workspace-hero"
         aria-label="Result summary"
-        initial={{ opacity: 0, x: -24, scale: 0.94 }}
-        animate={{ opacity: 1, x: 0, scale: 1 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        initial={false}
+        animate={face === "arrival"
+          ? { opacity: 0, x: -24, scale: 0.94 }
+          : { opacity: 1, x: 0, scale: 1, transition: { duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] } }}
       >
         <div className="result-workspace-identity">
           <ResultArtifactMark />
@@ -72,9 +110,7 @@ export default function ResultWorkspace() {
             </div>
             <div className="result-workspace-fact">
               <dt>Range</dt>
-              <dd>
-                {clock(0)}–{clock(run.clip.duration)}
-              </dd>
+              <dd>{range}</dd>
             </div>
             <div className="result-workspace-fact">
               <dt>Lines</dt>
@@ -82,19 +118,16 @@ export default function ResultWorkspace() {
                 {counts.captioned} captioned, {counts.withheld} withheld, {counts.silent} silent
               </dd>
             </div>
-            <div className="result-workspace-fact">
-              <dt>Evidence</dt>
-              <dd>Recorded demo</dd>
-            </div>
           </dl>
         </div>
       </motion.aside>
 
       <motion.div
         className="result-workspace-shell"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        initial={false}
+        animate={face === "arrival"
+          ? { opacity: 0, y: 16 }
+          : { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.16, ease: [0.22, 1, 0.36, 1] } }}
       >
         <section
           className="result-workspace-environment"
@@ -107,31 +140,54 @@ export default function ResultWorkspace() {
           <span className="result-workspace-stage-rule" data-edge="top" aria-hidden="true" />
 
           <div className="result-workspace-body">
-            <ResultCommandSeat.Provider value={commandSeat}>
-              <Results />
-            </ResultCommandSeat.Provider>
+            <Results />
+            {/* The report's reading column: the run accounted for in sentences, with the study
+                room's door beneath it. Hidden in the watch face, where the transcript takes
+                this side of the room. */}
+            <aside className="result-brief-rail" aria-label="Result breakdown">
+              <ResultBrief bundle={bundle} />
+              <button
+                type="button"
+                className="result-watch-entry"
+                onClick={() => setResultFace("watch")}
+              >
+                Watch &amp; study
+              </button>
+            </aside>
           </div>
 
           <span className="result-workspace-stage-rule" data-edge="bottom" aria-hidden="true" />
         </section>
 
-        {/* The focus-panel command baseline: the learning toggles (Saved / Tune, portalled in by
-            the workspace they control), the Source and Coverage disclosures, and the one exit.
-            No view switch — the golden Result node on the canvas is the way back in. */}
+        {/* The focus-panel command baseline: the Source and Coverage disclosures and one exit —
+            Close to the completed graph from the report, Back to the report from the watch
+            room. No view switch — the golden Result node on the canvas is the way back in. */}
         <nav className="result-workspace-commands" aria-label="Result commands">
-          <div className="result-workspace-command-group" ref={setCommandSeat} />
           <div className="result-workspace-command-group">
             <ResultsRunPanels />
           </div>
-          <button
-            type="button"
-            className="result-workspace-escape"
-            onClick={() => setResultView("process")}
-            aria-label="Close the result and show the completed process graph"
-          >
-            <span className="result-workspace-escape-label">Close</span>
-            <kbd aria-hidden="true">Esc</kbd>
-          </button>
+          {face === "watch" ? (
+            <button
+              type="button"
+              className="result-workspace-escape"
+              data-intent="back"
+              onClick={() => setResultFace("report")}
+              aria-label="Back to the result report"
+            >
+              <span className="result-workspace-escape-label">Back</span>
+              <kbd aria-hidden="true">Esc</kbd>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="result-workspace-escape"
+              onClick={() => setResultView("process")}
+              aria-label="Close the result and show the completed process graph"
+            >
+              <span className="result-workspace-escape-label">Close</span>
+              <kbd aria-hidden="true">Esc</kbd>
+            </button>
+          )}
         </nav>
       </motion.div>
     </div>

@@ -115,30 +115,36 @@ export default function ResultViewerShell({
   // universal expand). No orphan control, no words sitting on the picture. Every button carries an
   // aria-label and a hover/focus tooltip, so the meaning is one pointer-hover or one screen reader away
   // and keyboard reachable (focus reveals the bar). In full screen a second pair chooses where the
-  // Learning panel sits: Docked beside the video, or Float hovering over it.
+  // Learning panel sits: Docked beside the video, or Float hovering over it. The workbench frame
+  // renders no Split/Cinema choice at all — its composing workspace owns the layout (the watch
+  // face is the stage) and browser Full screen is the one mode control it keeps.
   const modeControls = (
     <div className="player-modes">
       <span className="player-modes-seg" role="group" aria-label="Viewing mode">
-        <button
-          type="button"
-          className="pm-btn pm-view"
-          aria-label="Split"
-          aria-pressed={!fullscreen && viewerMode === "split"}
-          onClick={() => void chooseViewerMode("split")}
-        >
-          <SplitView />
-          <span className="pm-tip" aria-hidden="true">Split</span>
-        </button>
-        <button
-          type="button"
-          className="pm-btn pm-view"
-          aria-label="Cinema"
-          aria-pressed={!fullscreen && viewerMode === "cinema"}
-          onClick={() => void chooseViewerMode("cinema")}
-        >
-          <CinemaView />
-          <span className="pm-tip" aria-hidden="true">Cinema</span>
-        </button>
+        {frame === "standard" && (
+          <>
+            <button
+              type="button"
+              className="pm-btn pm-view"
+              aria-label="Split"
+              aria-pressed={!fullscreen && viewerMode === "split"}
+              onClick={() => void chooseViewerMode("split")}
+            >
+              <SplitView />
+              <span className="pm-tip" aria-hidden="true">Split</span>
+            </button>
+            <button
+              type="button"
+              className="pm-btn pm-view"
+              aria-label="Cinema"
+              aria-pressed={!fullscreen && viewerMode === "cinema"}
+              onClick={() => void chooseViewerMode("cinema")}
+            >
+              <CinemaView />
+              <span className="pm-tip" aria-hidden="true">Cinema</span>
+            </button>
+          </>
+        )}
         <button
           type="button"
           className="pm-btn pm-fs"

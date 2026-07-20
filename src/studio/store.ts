@@ -67,6 +67,14 @@ export type Stage = "input" | "run";
  * and never restarts the transport.
  */
 export type ResultView = "result" | "process";
+
+/**
+ * Which face of the open result workspace is showing. "arrival" is the completion moment —
+ * the big finished-processing statement with the result brief — and shows once per run;
+ * continuing lands on "report" (video preview beside the brief), and "watch" is the
+ * full-viewport study room. Re-entry through the orb resumes the last face, never arrival.
+ */
+export type ResultFace = "arrival" | "report" | "watch";
 export type LoadStatus = "idle" | "loading" | "ready" | "failed";
 
 export interface SessionOutcome {
@@ -105,6 +113,8 @@ interface StudioStore {
 
   /** Which view of a completed run is on screen. Result is always the default. */
   resultView: ResultView;
+  /** Which face of the open result workspace is showing. Resets to "arrival" with each run. */
+  resultFace: ResultFace;
 
   /** The run is held: the transport's clock is stopped, so the fold is stopped too. */
   paused: boolean;
@@ -141,6 +151,7 @@ interface StudioStore {
   select: (id: string | null) => void;
   setStage: (stage: Stage) => void;
   setResultView: (view: ResultView) => void;
+  setResultFace: (face: ResultFace) => void;
   setSpeed: (speed: number) => void;
   setView: (view: View) => void;
   setLayout: (layout: Layout) => void;
@@ -307,6 +318,7 @@ export const useStudio = create<StudioStore>((set, get) => {
   view: "prepped",
   layout: "radial",
   resultView: "result",
+  resultFace: "arrival",
   clipT: 0,
   playing: false,
   paused: false,
@@ -334,6 +346,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       state: initialState(),
       selected: null,
       resultView: "result",
+      resultFace: "arrival",
       playing: false,
       paused: false,
       pausePending: false,
@@ -487,6 +500,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       stage: "run",
       selected: null,
       resultView: "result",
+      resultFace: "arrival",
       playing: false,
       paused: false,
       pausePending: false,
@@ -531,6 +545,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       state: initialState(),
       selected: null,
       resultView: "result",
+      resultFace: "arrival",
       clipT: 0,
       playing: false,
       paused: false,
@@ -549,6 +564,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       stage: "run",
       selected: null,
       resultView: "result",
+      resultFace: "arrival",
       playing: false,
       paused: false,
       pausePending: false,
@@ -565,6 +581,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       stage: "run",
       selected: null,
       resultView: "result",
+      resultFace: "arrival",
       playing: false,
       paused: false,
       pausePending: false,
@@ -614,6 +631,7 @@ export const useStudio = create<StudioStore>((set, get) => {
       state: projected,
       selected: null,
       resultView: "result",
+      resultFace: "arrival",
       clipT: 0,
       playing: false,
       paused: projected.status !== "complete",
@@ -656,6 +674,7 @@ export const useStudio = create<StudioStore>((set, get) => {
   /** Choosing Process also stills the clip: the graph is a projection, never a resumed run. */
   setResultView: (resultView) =>
     set(resultView === "process" ? { resultView, playing: false } : { resultView }),
+  setResultFace: (resultFace) => set({ resultFace }),
   setSpeed: (speed) => {
     if (!Number.isFinite(speed) || speed <= 0) return;
     const safe = Math.max(0.25, Math.min(24, speed));
@@ -716,6 +735,7 @@ export const useCueState = (id: string): string =>
 export const useComplete = (): boolean => useStudio((s) => s.state.status === "complete");
 
 export const useResultView = (): ResultView => useStudio((s) => s.resultView);
+export const useResultFace = (): ResultFace => useStudio((s) => s.resultFace);
 
 export const usePaused = (): boolean => useStudio((s) => s.paused);
 

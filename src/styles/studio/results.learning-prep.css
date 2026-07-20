@@ -5,6 +5,13 @@
   position: relative;
 }
 
+/* Prepared help is a watch-room affordance. On the faced recorded workspace the report's clip
+   is a preview, so the card stays off it — the brief and the timeline dots still say prepared
+   moments exist. The production surface has no faces and keeps the overlay with playback. */
+.result-workspace:not([data-workspace-face="watch"]) .learning-moments-overlay {
+  display: none;
+}
+
 .learning-moments-overlay {
   position: absolute;
   top: 12px;

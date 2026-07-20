@@ -30,17 +30,25 @@
 }
 
 /* The header steps back while the workspace is open, exactly as it does for agent focus; the
-   run's title lives in the environment head, so nothing floats over the composition. */
+   run's title lives in the environment head, so nothing floats over the composition. The child
+   rule that re-enables `.top > *` over the base header must step back too, or the dimmed title
+   chip silently swallows clicks on watch-face chrome underneath it. */
+.studio:has(.act-results-viewer:not([hidden])) .top,
+.studio:has(.act-results-viewer:not([hidden])) .top > *,
+.studio:has(.act-results-viewer:not([hidden])) .studio-lab {
+  pointer-events: none;
+}
+
 .studio:has(.act-results-viewer:not([hidden])) .top,
 .studio:has(.act-results-viewer:not([hidden])) .studio-lab {
   opacity: 0.08;
   filter: blur(10px) saturate(0.7);
-  pointer-events: none;
   transition: opacity 200ms ease, filter 240ms ease;
 }
 
 /* The spatial grid: identity anchor beside the workspace shell, centred as one composition. */
 .result-workspace {
+  position: relative;
   display: grid;
   width: min(1900px, 100%);
   min-height: 100%;
@@ -49,6 +57,118 @@
   grid-template-columns: clamp(240px, 18vw, 310px) minmax(0, 1fr);
   gap: clamp(44px, 5vw, 92px);
   align-items: center;
+}
+
+/* ---------- the arrival face: the completion moment, once per run ---------- */
+
+/* The statement floats over the workspace grid instead of occupying it, so its exit can play
+   over the report revealing beneath. The hero and shell stay mounted while it shows (playback,
+   prep, and saved state survive) but out of layout and the tree. */
+.result-workspace[data-workspace-face="arrival"] .result-workspace-hero,
+.result-workspace[data-workspace-face="arrival"] .result-workspace-shell {
+  display: none;
+}
+
+.result-arrival {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  width: min(880px, 100%);
+  flex-direction: column;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 0 clamp(24px, 4vw, 76px);
+}
+
+.result-arrival-kicker {
+  margin: 0;
+  color: var(--gold-ink);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.result-arrival h2 {
+  margin: 14px 0 0;
+  color: var(--ink);
+  font-size: clamp(2.1rem, 3.9vw, 3.7rem);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.048em;
+  line-height: 1.04;
+}
+
+.result-arrival-brief {
+  margin-top: clamp(24px, 3.5vh, 40px);
+}
+
+.result-arrival-brief .result-brief {
+  font-size: clamp(0.98rem, 1.45vw, 1.24rem);
+}
+
+.result-arrival-continue {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: clamp(28px, 4vh, 46px);
+  padding: 0 26px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--paper, #f7faf8);
+  background: var(--ink);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.result-arrival-continue:hover {
+  background: color-mix(in srgb, var(--ink) 86%, var(--gold, #b8963f));
+  transform: translateY(-1px);
+}
+
+.result-arrival-continue:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ---------- the result brief: the run accounted for in sentences ---------- */
+
+.result-brief {
+  display: grid;
+  gap: 0.85em;
+  color: var(--ink-soft);
+  line-height: 1.66;
+}
+
+.result-brief p {
+  margin: 0;
+}
+
+/* A parameter value tinted with the palette of the preparation stage that asked for it: the
+   completion answers in the colors of the request. Same recipe as the preflight's read-only
+   conversation chip. */
+.result-brief-value {
+  padding: 0.08em 0.32em 0.12em;
+  border-radius: 0.5em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: var(--palette-ink);
+  background: color-mix(in srgb, var(--palette-color) 12%, rgba(255, 255, 255, 0.42));
+}
+
+a.result-brief-source {
+  text-decoration: none;
+}
+
+a.result-brief-source:hover,
+a.result-brief-source:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
 }
 
 .result-workspace-hero {
@@ -221,9 +341,116 @@
   );
 }
 
+/* The report face reads left to right: the clip preview beside the brief's reading column.
+   The watch face collapses this to one column — the transcript takes the right of the room. */
 .result-workspace-body {
+  display: grid;
   min-width: 0;
   min-height: 0;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  gap: clamp(26px, 3vw, 56px);
+  align-items: center;
+}
+
+.result-brief-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  font-size: 0.9rem;
+}
+
+/* The study room's door: the report's one forward action, under the brief it opens from. */
+.result-watch-entry {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: 22px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--paper, #f7faf8);
+  background: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.result-watch-entry:hover {
+  background: color-mix(in srgb, var(--ink) 86%, var(--gold, #b8963f));
+  transform: translateY(-1px);
+}
+
+.result-watch-entry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ---------- the watch face: the whole viewport becomes the study room ---------- */
+
+/* The overlay is inset 0, so 100svh is exactly the room; a definite height lets the shell's
+   and stage's percentage chain resolve with no scroll. */
+.result-workspace[data-workspace-face="watch"] {
+  width: 100%;
+  height: 100svh;
+  min-height: 0;
+  padding: clamp(16px, 2.5vh, 28px) clamp(16px, 2vw, 32px) clamp(14px, 2vh, 22px);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+}
+
+.result-workspace[data-workspace-face="watch"] .result-workspace-hero,
+.result-workspace[data-workspace-face="watch"] .result-workspace-source-head,
+.result-workspace[data-workspace-face="watch"] .result-workspace-stage-rule,
+.result-workspace[data-workspace-face="watch"] .result-brief-rail {
+  display: none;
+}
+
+.result-workspace[data-workspace-face="watch"] .result-workspace-shell {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
+  gap: 10px;
+}
+
+.result-workspace[data-workspace-face="watch"] .result-workspace-environment {
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  align-self: stretch;
+}
+
+.result-workspace[data-workspace-face="watch"] .result-workspace-body {
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.result-workspace[data-workspace-face="watch"] .results,
+.result-workspace[data-workspace-face="watch"] .result-viewer {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Below the side-by-side threshold the watch room stacks (results.summary.css), so the room
+   scrolls instead of clipping the transcript against a fixed viewport height. */
+@media (max-width: 820px) {
+  .result-workspace[data-workspace-face="watch"] {
+    height: auto;
+    min-height: 100svh;
+    grid-template-rows: auto;
+  }
+
+  .result-workspace[data-workspace-face="watch"] .result-workspace-shell,
+  .result-workspace[data-workspace-face="watch"] .results,
+  .result-workspace[data-workspace-face="watch"] .result-viewer {
+    height: auto;
+  }
 }
 
 /* The environment owns the framing now: the viewer sits bare inside it, on the veil rather than
@@ -276,6 +503,23 @@
 
 .result-workspace-escape:hover {
   background: var(--stop-hot);
+}
+
+/* Back is a step, not an exit: the watch room's return to the report keeps the escape pill's
+   seat and kbd but drops the stop red for quiet ink. */
+.result-workspace-escape[data-intent="back"] {
+  border-color: var(--line-strong, rgba(22, 29, 27, 0.16));
+  color: var(--ink-soft);
+  background: var(--paper-elevated, #fff);
+}
+
+.result-workspace-escape[data-intent="back"] kbd {
+  color: var(--ink-muted);
+}
+
+.result-workspace-escape[data-intent="back"]:hover {
+  border-color: var(--ink-soft);
+  background: var(--paper-elevated, #fff);
 }
 
 .result-workspace-escape:focus-visible {
@@ -470,5 +714,19 @@
   .result-workspace-commands {
     flex-wrap: wrap;
     gap: 12px;
+  }
+
+  /* One column on the compact band: the preview above the brief's reading column. */
+  .result-workspace-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .result-arrival h2 {
+    font-size: clamp(1.7rem, 6.4vw, 2.3rem);
+  }
+
+  .result-workspace[data-workspace-face="watch"] {
+    padding: 14px 14px 18px;
   }
 }

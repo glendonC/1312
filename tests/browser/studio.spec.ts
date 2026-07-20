@@ -861,22 +861,25 @@ test("completed recorded runs arrive on the finished statement and open the repo
     await expect(hero).toContainText("KO → EN");
     await expect(hero).not.toContainText("Recorded demo");
   }
-  // The environment head carries the source title, focus-panel style. Prepared help stays off
-  // the report's preview — the moments card belongs to the watch room.
+  // The environment head carries the source title, focus-panel style.
   await expect(page.locator(".result-workspace-source-head h3")).toContainText("Natural Korean Conversation");
-  await expect(results.locator('[data-moments-overlay-authority="design_fixture"]')).toBeHidden();
 
-  // The watch face hands the room to the viewer: the transcript, its learning controls, and the
-  // moments card live here, and Back is a step, not an exit.
+  // The watch face opens as a normal video: no docked panel until the command bar reveals one,
+  // and Back is a step, not an exit.
   await page.getByRole("button", { name: "Watch & study" }).click();
+  await expect(results.locator(".learning-workspace")).toBeHidden();
+  const watchBar = page.getByRole("navigation", { name: "Watch commands" });
+  await expect(watchBar).toBeVisible();
+  await watchBar.getByRole("button", { name: "Transcript" }).click();
   await expect(results.locator(".learning-workspace")).toBeVisible();
-  await expect(results.locator('[data-moments-overlay-authority="design_fixture"]')).toBeVisible();
-  await page.getByRole("button", { name: "Tune" }).click();
-  const face = results.getByRole("region", { name: "Customize learning" });
+  // Scoped to the bar: the on-video prepared-note chip ("2 notes") also matches a bare Notes query.
+  await watchBar.getByRole("button", { name: "Notes", exact: true }).click();
+  const face = results.getByRole("region", { name: "Learning notes" });
   await expect(face).toHaveAttribute("data-learning-prep-authority", "recorded_fixture");
-  await results.getByRole("button", { name: "Close learning controls" }).click();
+  await results.getByRole("button", { name: "Close notes" }).click();
   await expect(results.locator(".result-media-meta")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Coverage" })).toBeVisible();
+  // Source and Coverage are one Details command in the watch room; Back is the room's one exit.
+  await expect(page.getByRole("button", { name: "Details", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Back to the result report" })).toBeVisible();
 });
 
@@ -905,12 +908,14 @@ test("a completed run opens and closes the result workspace over the persistent 
   await expect(commands.getByRole("button", { name: "Coverage" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Run view" })).toHaveCount(0);
 
-  // Watch is a room inside the workspace: Back (or Esc) returns to the report, never past it.
+  // Watch is a room inside the workspace: it opens as a bare video with its own command bar, and
+  // Back (or Esc) returns to the report, never past it.
   await page.getByRole("button", { name: "Watch & study" }).click();
-  await expect(results.locator(".learning-workspace")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Watch commands" })).toBeVisible();
+  await expect(results.locator(".learning-workspace")).toBeHidden();
   await expect(commands.getByRole("button", { name: /^Close the result/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await expect(results.locator(".learning-workspace")).toBeHidden();
+  await expect(page.getByRole("navigation", { name: "Watch commands" })).toBeHidden();
   await expect(page.getByRole("button", { name: "Watch & study" })).toBeVisible();
 
   await commands.getByRole("button", { name: /^Close the result/ }).click();
@@ -924,20 +929,23 @@ test("a completed run opens and closes the result workspace over the persistent 
   await expect(artifact).toBeVisible();
   await expect(artifact).toContainText("KO → EN captions");
   await expect(stage.locator(".wire-artifact")).toHaveCount(1);
-  // The open graph keeps its recorded-evidence framing as a passive chip, never a toolbar.
-  const chip = page.locator(".run-evidence-chip");
-  await expect(chip.getByText("Recorded evidence · completed process graph")).toBeVisible();
-  await expect(chip.locator(".result-authority-badge")).toHaveText("Recorded demo");
-  await expect(page.locator(".dock-well")).toHaveCount(0);
+  // The completed graph keeps the run's global bar rather than a recorded-demo chip: the status now
+  // reads Done, with Open Results and Clear where Pause/Stop were. No recorded-evidence toolbar.
+  await expect(page.locator(".run-evidence-chip")).toHaveCount(0);
+  const dock = page.locator(".dock-well");
+  await expect(dock).toBeVisible();
+  await expect(dock.getByText("Done")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Results" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Clear" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^(Pause|Resume|Stop)$/ })).toHaveCount(0);
 
-  // The orb is the sole re-entry anchor: opening it resumes the report — never arrival,
-  // which belongs to the completion moment alone.
+  // The orb is a re-entry anchor: opening it resumes the report — never arrival, which belongs to
+  // the completion moment alone — and the run dock stands down for the watch room's own bottom bar.
   await artifact.click();
   await expect(results).toBeVisible();
   await expect(viewer).toBeVisible();
   await expect(arrival).toHaveCount(0);
-  await expect(chip).toHaveCount(0);
+  await expect(page.locator(".dock-well")).toHaveCount(0);
   await expect(stage).toHaveCount(1);
 
   // Esc steps back out of the workspace to the completed world with the orb.

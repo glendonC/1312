@@ -7,11 +7,14 @@ async function openCompletedRun006(page: Page): Promise<void> {
   await page.locator(".studio-lab").evaluate((element) => {
     (element as HTMLElement).style.display = "none";
   });
-  // Completion lands on the arrival statement; the transcript and learning controls live in
-  // the watch face, two doors in.
+  // Completion lands on the arrival statement; the watch face opens as a normal video with the
+  // panel closed, so the transcript is a reveal from the command bar, never an ambient sidebar.
   await page.getByRole("button", { name: "View result" }).click();
   await page.getByRole("button", { name: "Watch & study" }).click();
   await expect(page.getByRole("region", { name: "Result" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeHidden();
+  await page.getByRole("navigation", { name: "Watch commands" })
+    .getByRole("button", { name: "Transcript" }).click();
   await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
 }
 
@@ -25,19 +28,23 @@ test("the dev skip-to-results shortcut lands straight on the recorded learning v
   await page.getByRole("button", { name: "View result" }).click();
   await page.getByRole("button", { name: "Watch & study" }).click();
   await expect(page.getByRole("region", { name: "Result" })).toBeVisible();
+  // The room opens immersive; the transcript docks on command.
+  await page.getByRole("navigation", { name: "Watch commands" })
+    .getByRole("button", { name: "Transcript" }).click();
   await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
 });
 
-test("recorded results use the shared learning overlay and customization face", async ({ page }, testInfo) => {
+test("recorded results expose the learning-notes face behind Notes", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Desktop shared-result composition coverage");
   await openCompletedRun006(page);
 
+  // The prep engine lives behind Notes as the depth wheel; its prepared output surfaces as
+  // tappable marks on transcript lines, never as an auto-popping overlay. This covers that face.
   const results = page.getByRole("region", { name: "Result" });
-  // The face lives behind the learning panel's Tune disclosure; the prepared overlay is already
-  // active before it is ever opened.
-  await expect(results.locator('[data-moments-overlay-state="active"]')).toBeVisible();
-  await page.getByRole("button", { name: "Tune" }).click();
-  const face = results.getByRole("region", { name: "Customize learning" });
+  // Scoped to the bar: the on-video prepared-note chip ("2 notes") also matches a bare Notes query.
+  await page.getByRole("navigation", { name: "Watch commands" })
+    .getByRole("button", { name: "Notes", exact: true }).click();
+  const face = results.getByRole("region", { name: "Learning notes" });
   await expect(face).toHaveAttribute("data-learning-prep-authority", "recorded_fixture");
   await expect(face).toHaveAttribute("data-learning-prep-state", "ready");
   await expect(face.locator("[data-prep-fixture-id]")).toHaveAttribute(
@@ -46,34 +53,9 @@ test("recorded results use the shared learning overlay and customization face", 
   );
   await expect(face).toContainText("not production output");
 
-  const overlay = results.locator('[data-moments-overlay-state="active"]');
-  await expect(overlay).toBeVisible();
-  await expect(overlay).toHaveAttribute("data-moments-overlay-authority", "design_fixture");
-  await expect(overlay).toHaveAttribute("data-moments-lens", "grammar_salience");
-  await expect(overlay).toContainText("recorded fixture · not reviewed");
-
-  // The standing affordances for the same prep: the learning-bar count and the progress-bar
-  // waypoint dots both project the available moments, so their numbers must agree.
-  const momentsNote = results.locator(".learning-moments-note");
-  await expect(momentsNote).toBeVisible();
-  const preparedCount = Number(await momentsNote.getAttribute("data-prepared-moments"));
-  expect(preparedCount).toBeGreaterThan(0);
-  await expect(momentsNote).toHaveText(
-    `${preparedCount} ${preparedCount === 1 ? "moment" : "moments"} on the timeline`,
-  );
-  await expect(results.locator(".pbar-marker")).toHaveCount(preparedCount);
-
-  await face.locator('[data-fine-tune-lens="historical_reference"] input').check();
+  // Turning the depth wheel down re-arms the lens ramp, so the current prep is no longer valid.
+  await face.locator('.learning-depth-stop:not([data-active="true"])').first().click();
   await expect(face).toHaveAttribute("data-learning-prep-state", "not_requested");
-  await expect(overlay).toHaveCount(0);
-  // No prep, no standing affordances: the note and every waypoint dot leave with the projection.
-  await expect(momentsNote).toHaveCount(0);
-  await expect(results.locator(".pbar-marker")).toHaveCount(0);
-  await face.locator('[data-fine-tune-action="prepare"]').click();
-  await expect(face).toHaveAttribute("data-learning-prep-state", "ready");
-  await expect(face).toHaveAttribute("data-learning-prep-result-state", "partial");
-  await expect(overlay).toBeVisible();
-  await expect(momentsNote).toBeVisible();
 });
 
 test("prepared language stays pinned, saves explicitly, and closes unsupported states", async ({ page }, testInfo) => {
@@ -113,7 +95,9 @@ test("prepared language stays pinned, saves explicitly, and closes unsupported s
   await panel.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("button", { name: "Saved (1)" })).toBeVisible();
   await page.getByRole("button", { name: "Saved (1)" }).click();
-  const savedDrawer = workspace.getByRole("region", { name: "Saved" });
+  // Saved docks as one mode of the watch room's single side panel, beside the transcript rather
+  // than inside it, so it is scoped to the room and not to the reading workspace.
+  const savedDrawer = page.getByRole("region", { name: "Saved" });
   await expect(savedDrawer).toContainText("This session only");
   await expect(savedDrawer).toContainText("Nothing is saved after this result session ends.");
   await expect(savedDrawer).toContainText("몇 분");
@@ -124,10 +108,13 @@ test("prepared language stays pinned, saves explicitly, and closes unsupported s
   await savedDrawer.getByRole("button", { name: "Remove" }).click();
   await expect(savedDrawer).not.toContainText("I know a few people.");
   await savedDrawer.getByRole("button", { name: "Close saved" }).click();
-  // The drawer overlays the transcript, so closing it returns to the same reading position; the chip
-  // now shows no count because the set is empty again.
+  // Closing any docked mode empties the panel back to the bare video; the bar option now shows no
+  // count because the set is empty again, and the transcript is a fresh reveal.
   await expect(savedDrawer).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Saved", exact: true })).toBeVisible();
+  await page.getByRole("navigation", { name: "Watch commands" })
+    .getByRole("button", { name: "Transcript" }).click();
+  await expect(workspace).toBeVisible();
 
   const c01 = workspace.locator('[data-learning-line-id="c01"]');
   await c01.getByRole("button", { name: "Explain Korean sentence at 0:00.0" }).click();
@@ -153,7 +140,7 @@ test("prepared language stays pinned, saves explicitly, and closes unsupported s
   await expect(preparedWord).toBeFocused();
 
   await openCompletedRun006(page);
-  // The Saved toggle lives inline in the learning bar, inside the watch face's workspace.
+  // The Saved option lives on the watch room's command bar; with nothing kept it carries no count.
   await expect(page.getByRole("button", { name: "Saved", exact: true })).toBeVisible();
 });
 
@@ -205,6 +192,8 @@ test("a source without the bound fixture fails closed without repeated explanati
   });
   await page.getByRole("button", { name: "View result" }).click();
   await page.getByRole("button", { name: "Watch & study" }).click();
+  await page.getByRole("navigation", { name: "Watch commands" })
+    .getByRole("button", { name: "Transcript" }).click();
   const workspace = page.getByRole("region", { name: "Language learning workspace" });
   await expect(workspace).toContainText("Prepared explanation unavailable");
   await expect(workspace).toContainText("invalid_source_binding");
@@ -256,20 +245,11 @@ test("viewer modes keep a borderless learning shell and use the browser full scr
   await expect.poll(() => viewer.locator(".screen").evaluate((element) => getComputedStyle(element).borderRadius))
     .toBe("18px");
 
-  // Panel width lives in the top-right settings pill; stepping it sizes the watch room's
-  // reading rail through the attribute the layout reads.
-  await expect(viewer).toHaveAttribute("data-panel-size", "m");
-  const width = viewer.getByRole("group", { name: "Panel width" });
-  await width.getByRole("button", { name: "Wider panel" }).click();
-  await expect(viewer).toHaveAttribute("data-panel-size", "l");
-  await expect(width.getByRole("button", { name: "Wider panel" })).toBeDisabled();
-  await width.getByRole("button", { name: "Narrower panel" }).click();
-  await width.getByRole("button", { name: "Narrower panel" }).click();
-  await expect(viewer).toHaveAttribute("data-panel-size", "s");
-  await expect(width.getByRole("button", { name: "Narrower panel" })).toBeDisabled();
+  // The room sizes its own reading rail; there is deliberately no panel width control anywhere.
+  await expect(viewer.getByRole("group", { name: "Panel width" })).toHaveCount(0);
 
-  // Full screen: the placement pair joins the pill next to the width stepper. Docked is the default;
-  // Float keeps the Learning panel usable floating over the video. The choice is sticky.
+  // Full screen: the placement pair rides the settings pill. Docked is the default; Float keeps
+  // the Learning panel usable floating over the video. The choice is sticky.
   await fullScreen.click();
   await expect(viewer).toHaveAttribute("data-view-mode", "fullscreen");
   await expect(fullScreen).toHaveAttribute("aria-pressed", "true");
@@ -380,33 +360,25 @@ test("results chrome: header title truncates, Details and Run details open on de
   expect(clamp.truncated).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  // Source: run identity and attribution, on demand. It carries the source and licence links so
-  // removing the below-video credit does not drop the required attribution, and states the evidence
-  // class in full — the recorded-vs-live distinction is not softened.
-  const details = page.getByRole("button", { name: "Source", exact: true });
+  // Details: what this run is and how much of it got captioned, folded into one plain-language read
+  // in the room's voice — source identity, attribution and licence link, coverage, and the evidence
+  // class stated in full, so the recorded-vs-live distinction is never softened. It is one mode of
+  // the watch room's docked panel: the bar option docks the content, Escape closes it and returns
+  // focus to the option that opened it.
+  const details = page.getByRole("button", { name: "Details", exact: true });
   await expect(details).toBeVisible();
-  await expect(page.getByRole("dialog", { name: "Source and attribution" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Details" })).toHaveCount(0);
   await details.click();
-  const detailsPanel = page.getByRole("dialog", { name: "Source and attribution" });
+  const detailsPanel = page.getByRole("region", { name: "Details" });
   await expect(detailsPanel).toBeVisible();
-  await expect(detailsPanel).toContainText("KO → EN");
-  await expect(detailsPanel).toContainText("Time range");
+  await expect(detailsPanel).toContainText("0:00–0:40");
+  await expect(detailsPanel).toContainText("Korean");
+  await expect(detailsPanel).toContainText("have captions");
   await expect(detailsPanel.getByRole("link", { name: /Creative Commons/ })).toBeVisible();
-  await expect(detailsPanel).toContainText("Honest demo replay, not a live run.");
-  await detailsPanel.press("Escape");
+  await expect(detailsPanel).toContainText("honest demo replay, not a live run");
+  await page.keyboard.press("Escape");
   await expect(detailsPanel).toHaveCount(0);
   await expect(details).toBeFocused();
-
-  // Coverage: the second command, with the per-line accounting.
-  const runDetails = page.getByRole("button", { name: "Coverage" });
-  await expect(runDetails).toBeVisible();
-  await runDetails.click();
-  const runPanel = page.getByRole("dialog", { name: "Per-line coverage and evidence" });
-  await expect(runPanel).toBeVisible();
-  await expect(runPanel).toContainText("captioned");
-  await expect(runPanel).toContainText("Coverage");
-  await runPanel.press("Escape");
-  await expect(runPanel).toHaveCount(0);
 
   // Full screen rides on the video's control bar; the workbench viewer carries no Split/Cinema
   // choice. Recorded-vs-live provenance lives in the Source panel (Evidence and run files), not
@@ -439,6 +411,10 @@ test("mobile selection and tap open a bounded explanation sheet and return focus
     selection?.addRange(range);
     element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "touch" }));
   });
+  // Selecting caption text raises the floating action bar; Explain opens the bounded sheet.
+  const selectionBar = page.getByRole("toolbar", { name: "Selection actions" });
+  await expect(selectionBar).toBeVisible();
+  await selectionBar.getByRole("button", { name: "Explain" }).click();
   const panel = workspace.getByRole("complementary", { name: "Pinned language explanation" });
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("heading", { name: "분들이" })).toBeVisible();

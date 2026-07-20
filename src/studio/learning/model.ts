@@ -119,6 +119,11 @@ interface PresentedMomentBase {
   targetLanguage: string;
   source: PresentedText;
   target: PresentedText;
+  /**
+   * Speaker ids recorded against this line (Cue.speakers). Two or more is overlap. Absent means the
+   * source carries no speaker attribution at all; it is never invented for a source without one.
+   */
+  speakers?: string[];
 }
 
 export type RecordedPresentedMoment = PresentedMomentBase & {
@@ -154,10 +159,6 @@ export type LearningViewingSource =
       context: Extract<LearningSourceContext, { origin: "verified_production_caption" }>;
       moments: ProductionPresentedMoment[];
     };
-
-export type LearningSourceProjection =
-  | { state: "ready"; source: LearningViewingSource }
-  | { state: "failed"; reasonCode: "invalid_source_binding" | "mixed_authority" };
 
 export interface SelectedLanguageSpan {
   side: "source" | "target";

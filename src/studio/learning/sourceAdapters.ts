@@ -143,6 +143,7 @@ export function projectRecordedLearningSource(
       targetLanguage: bundle.run.pair.target,
       source: recordedSource(cue),
       target: recordedTarget(cue, bundle.run.pair.target),
+      speakers: [...cue.speakers],
       support: {
         state: "none",
         claimIds: [],
@@ -250,7 +251,8 @@ export function validateLearningViewingSource(input: LearningViewingSource): Lea
     if (
       !Number.isInteger(moment.startMs) || !Number.isInteger(moment.endMs) ||
       moment.startMs < 0 || moment.endMs <= moment.startMs ||
-      !nonEmptyString(moment.sourceLanguage) || !nonEmptyString(moment.targetLanguage)
+      !nonEmptyString(moment.sourceLanguage) || !nonEmptyString(moment.targetLanguage) ||
+      !(moment.speakers === undefined || stringArray(moment.speakers))
     ) throw new Error("Learning viewing source moment is invalid");
     if (
       context.origin === "verified_production_caption" &&

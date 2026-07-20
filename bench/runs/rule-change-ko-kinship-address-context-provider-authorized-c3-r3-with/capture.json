@@ -1,0 +1,98 @@
+{
+  "schema_version": "0.1.0",
+  "kind": "capture",
+  "capture_id": "rule-change-ko-kinship-address-context-provider-authorized-c3-r3-with",
+  "captured_at": "2026-07-20",
+  "scored": false,
+  "pack_evidence": false,
+  "clip": {
+    "id": "Ux-TMWnmntM",
+    "duration_s": 40,
+    "lang": "ko",
+    "pair": "ko->en",
+    "media": null,
+    "source": {
+      "kind": "youtube",
+      "url": "https://www.youtube.com/watch?v=Ux-TMWnmntM",
+      "channel": "Didi's Korean Culture Podcast",
+      "licence": "Creative Commons Attribution license (reuse allowed)",
+      "window": {
+        "start": "00:05:10",
+        "end": "00:05:50"
+      },
+      "attribution": "\"Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①\" by Didi's Korean Culture Podcast, used under Creative Commons Attribution license (reuse allowed)."
+    }
+  },
+  "reproducible": {
+    "deterministic": false,
+    "note": "One provider translation call with no retry or output selection. Provider behavior is not deterministic."
+  },
+  "systems": [
+    {
+      "id": "1321-openai-audio-translation-rule-change",
+      "role": "subject",
+      "config": {
+        "model": "whisper-1",
+        "provider": {
+          "id": "openai",
+          "operation": "audio_translation",
+          "response_format": "verbose_json",
+          "temperature": 0,
+          "timeout_ms": 120000,
+          "max_response_bytes": 1048576
+        },
+        "reviewed_memory": {
+          "rule_content_id": "sha256:365d886cdd82f867d244c538f622b66c3addf4d6a36e42ef543dde57292157a7"
+        }
+      }
+    }
+  ],
+  "measured": {
+    "1321-openai-audio-translation-rule-change": {
+      "units_total": 2,
+      "units_emitted": 2,
+      "units_withheld": 0,
+      "coverage": 1,
+      "latency": {
+        "first_usable_s": null,
+        "complete_s": 3.596
+      }
+    }
+  },
+  "unscored": {
+    "critical_meaning": null,
+    "critical_outcomes": null,
+    "catastrophic": null,
+    "reason": "Provider capture has no semantic authority. Human labels and separate scores are required."
+  },
+  "units": [
+    {
+      "t_start": 0,
+      "t_end": 7,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "Translate a family relationship only when surrounding speech supplies explicit kinship evidence, including terms such as 친누나 or 매형.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    },
+    {
+      "t_start": 30,
+      "t_end": 40,
+      "source": "",
+      "outputs": {
+        "1321-openai-audio-translation-rule-change": {
+          "text": "Translate a family relationship only when surrounding speech supplies explicit kinship evidence, including terms such as 친누나 or 매형.",
+          "withheld": null
+        }
+      },
+      "gold": null
+    }
+  ],
+  "artifacts": {
+    "provider_response": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c3-r3-with/provider-response.json"
+  },
+  "notes": "Unscored OpenAI audio translation capture. Empty source text records that the endpoint returned English translation only."
+}

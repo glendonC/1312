@@ -40,19 +40,6 @@
   white-space: nowrap;
 }
 
-/* The standing tell for prepared help: the Moments overlay surfaces only inside a moment window,
-   so this note (with the player's timeline dots) is how a viewer knows prepared moments exist
-   before the playhead reaches one. */
-.learning-moments-note {
-  flex: none;
-  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
-  font-family: var(--font-mono, monospace);
-  font-size: 0.6rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .learning-saved-toggle {
   display: inline-flex;
   align-items: center;
@@ -588,14 +575,6 @@
   .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .player-controls,
   .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"] .player-settings-pill {
     z-index: 5;
-  }
-
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"][data-panel-size="s"] .learning-workspace {
-    width: min(340px, 28%);
-  }
-
-  .result-viewer[data-view-mode="fullscreen"][data-fs-panel="float"][data-panel-size="l"] .learning-workspace {
-    width: min(460px, 40%);
   }
 
   /* The workspace's own surfaces inherit the glass rather than repainting an opaque white over it. The

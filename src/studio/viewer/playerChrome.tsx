@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 // including the production player, which never mounts RecordedMediaPlayer.
 import "../../styles/studio/results.player.css";
 import { Captions, Hold, Volume } from "../glyphs";
-import type { CaptionScale } from "../learning/viewerSession";
+import { ClozeText } from "../learning/cloze";
+import type { SpeakerDisplay } from "../learning/speakers";
+import type { CaptionMode, CaptionScale, ClozeAmount } from "../learning/viewerSession";
 
 export const CAPTION_SCALE_STEPS: readonly CaptionScale[] = ["sm", "md", "lg"];
 
@@ -17,15 +19,6 @@ export const CAPTION_SCALE_STEPS: readonly CaptionScale[] = ["sm", "md", "lg"];
  * so the recorded demo and a verified production clip read as the same instrument without either
  * borrowing the other's authority.
  */
-/** A prepared point of interest on the timeline: where it sits (seconds domain) and which kind
- *  of preparation put it there (machine-readable, like a region's kind). The chrome draws it;
- *  only a surface that owns a prepared projection may supply it. The dots are decorative to
- *  assistive tech — the supplying surface owns an accessible statement of the same facts. */
-export interface PlayerProgressMarker {
-  start: number;
-  kind: string;
-}
-
 export interface PlayerProgressChrome {
   /** Seconds domain. `min` is 0 for a recorded clip and the verified range start for production. */
   min: number;
@@ -36,8 +29,6 @@ export interface PlayerProgressChrome {
   onSeek: (seconds: number) => void;
   /** Recorded music/silence shading. Absent means an unshaded bar, never invented regions. */
   regions?: ReadonlyArray<{ kind: "music" | "silence"; start: number; end: number }>;
-  /** Prepared-moment dots. Absent means an unmarked bar, never invented moments. */
-  markers?: ReadonlyArray<PlayerProgressMarker>;
 }
 
 export interface PlayerTransportChrome {
@@ -71,24 +62,103 @@ export interface PlayerCaptionChrome {
   onStepScale: (direction: -1 | 1) => void;
 }
 
-export type CaptionBurnState =
-  | { path: "prepped"; text: string }
-  | { path: "withheld"; reason: string };
+/** The active line burned over the picture: the source, and its translation or a labelled gap. */
+export interface CaptionBurnLine {
+  /** The caption line identity, so a selection on the burn binds to the same moment the transcript reads. */
+  lineId: string;
+  source: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  target: { state: "text"; text: string } | { state: "withheld"; reason: string } | null;
+  /** Recorded speaker attribution for this line, when the source carries one. Never invented. */
+  speakers?: SpeakerDisplay[];
+}
 
-/** The burned-in caption line over the picture. Withheld stays a labelled gap, never a guess. */
-export function CaptionBurn({ burn }: { burn: CaptionBurnState | null }) {
-  if (!burn) return null;
-  if (burn.path === "withheld") {
-    return (
-      <figcaption className="burn" data-path="withheld">
-        <span className="burn-mark">withheld</span>
-        {burn.reason}
-      </figcaption>
-    );
-  }
+/**
+ * The burned-in caption line over the picture, the immersive reading surface. It shows the source
+ * and its translation together (or one language, or with words blanked for Listen practice), driven
+ * by the shared caption mode so one control steers the video and the transcript alike. Withheld
+ * stays a labelled gap, never a guess. The caption text is selectable: the language-learning
+ * surface listens for selections on the [data-caption-side] spans and raises its action bar there.
+ */
+export function CaptionBurn({
+  line,
+  mode,
+  cloze,
+}: {
+  line: CaptionBurnLine | null;
+  mode: CaptionMode;
+  cloze: ClozeAmount;
+}) {
+  if (!line) return null;
+  const showSource = mode !== "target";
+  const showTarget = mode !== "source";
+  const withheld = line.target?.state === "withheld";
   return (
-    <figcaption className="burn" data-path="prepped">
-      {burn.text}
+    <figcaption
+      className="burn"
+      data-path={withheld ? "withheld" : "prepped"}
+      data-caption-mode={mode}
+    >
+      {line.speakers && line.speakers.length > 0 && (
+        <span className="burn-speakers">
+          {line.speakers.map((speaker) => (
+            <span
+              key={speaker.id}
+              className="burn-speaker"
+              data-speaker-index={speaker.colorIndex}
+              title={speaker.label}
+            >
+              {speaker.shortLabel}
+            </span>
+          ))}
+        </span>
+      )}
+      {showSource && (
+        mode === "listen" ? (
+          // Practice keeps the line selectable: the blanks preserve the full recorded text, so a
+          // selection here binds to the same code-point span as the plain caption.
+          <span
+            className="burn-src"
+            lang={line.sourceLanguage}
+            data-caption-side="source"
+            data-caption-line-id={line.lineId}
+          >
+            <ClozeText
+              text={line.source}
+              seed={`${line.lineId}:source`}
+              amount={cloze}
+              lang={line.sourceLanguage}
+            />
+          </span>
+        ) : (
+          <span
+            className="burn-src"
+            lang={line.sourceLanguage}
+            data-caption-side="source"
+            data-caption-line-id={line.lineId}
+          >
+            {line.source}
+          </span>
+        )
+      )}
+      {showTarget && line.target && (
+        line.target.state === "withheld" ? (
+          <span className="burn-withheld">
+            <span className="burn-mark">withheld</span>
+            {line.target.reason}
+          </span>
+        ) : (
+          <span
+            className="burn-tgt"
+            lang={line.targetLanguage}
+            data-caption-side="target"
+            data-caption-line-id={line.lineId}
+          >
+            {line.target.text}
+          </span>
+        )
+      )}
     </figcaption>
   );
 }
@@ -178,21 +248,6 @@ export function PlayerOverlayBar({
           <div className="pbar-fill" style={{ width: `${progressPct}%` }} aria-hidden="true" />
           <span className="pbar-knob" style={{ left: `${progressPct}%` }} aria-hidden="true" />
         </div>
-        {/* Outside the clipped track so the dots can stand slightly proud of it. The slider
-            keeps all interaction; the dots are waypoints, stated accessibly by the surface
-            that supplied them. */}
-        {span > 0 && progress.markers && progress.markers.length > 0 && (
-          <div className="pbar-markers" aria-hidden="true">
-            {progress.markers.map((marker, index) => (
-              <span
-                key={`${marker.start}-${index}`}
-                className="pbar-marker"
-                data-kind={marker.kind}
-                style={{ left: `${pct(marker.start)}%` }}
-              />
-            ))}
-          </div>
-        )}
         <input
           type="range"
           className="pbar-input"

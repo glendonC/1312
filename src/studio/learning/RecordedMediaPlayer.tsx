@@ -11,8 +11,8 @@ import {
   CaptionBurn,
   PlayerOverlayBar,
   PlayerSettingsPill,
-  type PlayerProgressMarker,
 } from "../viewer/playerChrome";
+import { speakerDisplays } from "./speakers";
 import { useViewerSession } from "./viewerSession";
 
 const HAS_PICTURE = /\.(mp4|webm|mov|m4v)$/i;
@@ -20,14 +20,31 @@ const HAS_PICTURE = /\.(mp4|webm|mov|m4v)$/i;
 function CaptionOverlay({ bundle }: { bundle: RunBundle }) {
   const clipT = useStudio((state) => state.clipT);
   const captionsVisible = useViewerSession((state) => state.captionsVisible);
+  const captionMode = useViewerSession((state) => state.captionMode);
+  const clozeAmount = useViewerSession((state) => state.clozeAmount);
   if (!captionsVisible) return null;
   const cue = bundle.captions.cues.find((candidate) => clipT >= candidate.t_start && clipT < candidate.t_end);
-  if (!cue || cue.silence) return null;
+  if (!cue || cue.silence || !cue.source.text) return null;
 
   const target = cue.targets.find((candidate) => candidate.lang === bundle.run.pair.target);
-  if (target?.withheld) return <CaptionBurn burn={{ path: "withheld", reason: target.withheld.reason }} />;
-  if (!target?.text) return null;
-  return <CaptionBurn burn={{ path: "prepped", text: target.text }} />;
+  return (
+    <CaptionBurn
+      mode={captionMode}
+      cloze={clozeAmount}
+      line={{
+        lineId: cue.id,
+        source: cue.source.text,
+        sourceLanguage: bundle.run.pair.source,
+        targetLanguage: bundle.run.pair.target,
+        target: target?.withheld
+          ? { state: "withheld", reason: target.withheld.reason }
+          : target?.text
+            ? { state: "text", text: target.text }
+            : null,
+        speakers: speakerDisplays(bundle.run.clip.speakers, cue.speakers),
+      }}
+    />
+  );
 }
 
 export default function RecordedMediaPlayer({
@@ -35,7 +52,6 @@ export default function RecordedMediaPlayer({
   surface,
   modeControls,
   panelControls,
-  momentMarkers,
 }: {
   bundle: RunBundle;
   surface: "results" | "workbench";
@@ -46,15 +62,10 @@ export default function RecordedMediaPlayer({
    */
   modeControls?: ReactNode;
   /**
-   * Results-only. Learning-panel settings (width, and placement in full screen) that share the
-   * top-right settings pill with the caption controls rather than crowding the transport bar.
+   * Results-only. Learning-panel full-screen placement, sharing the top-right settings pill with
+   * the caption controls rather than crowding the transport bar.
    */
   panelControls?: ReactNode;
-  /**
-   * Results-only. Prepared-moment waypoints for the progress bar, projected by the composing
-   * surface from its learning prep. The player draws them; it never derives them.
-   */
-  momentMarkers?: readonly PlayerProgressMarker[];
 }) {
   const playerId = useId();
   const clipT = useStudio((state) => state.clipT);
@@ -211,7 +222,6 @@ export default function RecordedMediaPlayer({
             ...music.map(([start, end]) => ({ kind: "music" as const, start, end })),
             ...silence.map(([start, end]) => ({ kind: "silence" as const, start, end })),
           ],
-          markers: momentMarkers,
         },
         play: {
           playing: activelyPlaying,

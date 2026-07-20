@@ -6,10 +6,9 @@ import { useViewerSession } from "../learning/viewerSession";
 import {
   CAPTION_SCALE_STEPS,
   CaptionBurn,
-  type CaptionBurnState,
+  type CaptionBurnLine,
   PlayerOverlayBar,
   PlayerSettingsPill,
-  type PlayerProgressMarker,
 } from "../viewer/playerChrome";
 import type { ProductionPlaybackBinding } from "./productionPlaybackController.ts";
 
@@ -67,7 +66,6 @@ export default function ProductionMediaPlayer({
   active = true,
   modeControls,
   panelControls,
-  momentMarkers,
 }: {
   binding: ProductionPlaybackBinding;
   onPlaybackChange: (playback: LearningPlayback) => void;
@@ -81,11 +79,6 @@ export default function ProductionMediaPlayer({
   active?: boolean;
   modeControls?: ReactNode;
   panelControls?: ReactNode;
-  /**
-   * Prepared-moment waypoints for the progress bar, projected by the composing surface from its
-   * learning prep. The player draws them; it never derives them.
-   */
-  momentMarkers?: readonly PlayerProgressMarker[];
 }) {
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const closeRef = useRef<(detail: string) => void>(() => undefined);
@@ -103,6 +96,8 @@ export default function ProductionMediaPlayer({
   const playbackRate = useViewerSession((state) => state.playbackRate);
   const captionScale = useViewerSession((state) => state.captionScale);
   const captionsVisible = useViewerSession((state) => state.captionsVisible);
+  const captionMode = useViewerSession((state) => state.captionMode);
+  const clozeAmount = useViewerSession((state) => state.clozeAmount);
   const setMuted = useViewerSession((state) => state.setMuted);
   const setVolume = useViewerSession((state) => state.setVolume);
   const setPlaybackRate = useViewerSession((state) => state.setPlaybackRate);
@@ -269,12 +264,18 @@ export default function ProductionMediaPlayer({
   const activeMoment = captionsVisible && ready
     ? moments.find((moment) => currentTimeMs >= moment.startMs && currentTimeMs < moment.endMs)
     : undefined;
-  const burn: CaptionBurnState | null = activeMoment
-    ? activeMoment.target.state === "available"
-      ? { path: "prepped", text: activeMoment.target.text }
-      : activeMoment.target.state === "withheld"
-        ? { path: "withheld", reason: activeMoment.target.detail }
-        : null
+  const burnLine: CaptionBurnLine | null = activeMoment && activeMoment.source.state === "available"
+    ? {
+        lineId: activeMoment.lineId,
+        source: activeMoment.source.text,
+        sourceLanguage: activeMoment.sourceLanguage,
+        targetLanguage: activeMoment.targetLanguage,
+        target: activeMoment.target.state === "available"
+          ? { state: "text", text: activeMoment.target.text }
+          : activeMoment.target.state === "withheld"
+            ? { state: "withheld", reason: activeMoment.target.detail }
+            : null,
+      }
     : null;
 
   const overlayBar = (
@@ -287,7 +288,6 @@ export default function ProductionMediaPlayer({
           disabled: !ready,
           ariaValueText: `${clock(currentTimeMs)} of ${clock(rangeEndMs)}`,
           onSeek: (seconds) => seek(seconds * 1_000),
-          markers: momentMarkers,
         },
         play: {
           playing,
@@ -343,7 +343,7 @@ export default function ProductionMediaPlayer({
               playsInline
               onClick={togglePlay}
             />
-            <CaptionBurn burn={burn} />
+            <CaptionBurn line={burnLine} mode={captionMode} cloze={clozeAmount} />
             <PlayerSettingsPill
               captions={{
                 visible: captionsVisible,

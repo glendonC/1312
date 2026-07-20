@@ -51,7 +51,6 @@
   border-left: 2px solid transparent;
   background: transparent;
   text-align: left;
-  cursor: pointer;
   transition:
     background-color 150ms ease,
     border-color 150ms ease;
@@ -66,10 +65,13 @@
   background: var(--paper-soft);
 }
 
-/* The playhead. */
+/* The playhead: the line being spoken right now, lit as a soft accent squircle so the eye tracks
+   the voice karaoke-style. Line-level is what the recorded timing supports; no per-word claim. */
 .cue.is-active {
   border-left-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 4px 12px 12px 4px;
+  corner-shape: squircle;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .cue-t {
@@ -100,12 +102,138 @@
   font-size: 1.05rem;
   line-height: 1.55;
   word-break: keep-all;
+  cursor: text;
 }
 
 .cue-tgt {
   color: var(--ink-muted);
   font-size: 0.85rem;
   line-height: 1.5;
+  cursor: text;
+}
+
+/* ---------- speaker attribution (recorded diarization only) ---------- */
+
+/* The speaker palette, indexed by the clip legend's order. Shared by the transcript chips here and
+   the on-video chip in results.player.css; keep the two lists identical. */
+.cue-speaker[data-speaker-index="0"] { --speaker-color: #2f746e; }
+.cue-speaker[data-speaker-index="1"] { --speaker-color: #b8963f; }
+.cue-speaker[data-speaker-index="2"] { --speaker-color: #6f9bd1; }
+.cue-speaker[data-speaker-index="3"] { --speaker-color: #a98cc9; }
+.cue-speaker[data-speaker-index="4"] { --speaker-color: #c77b86; }
+.cue-speaker[data-speaker-index="5"] { --speaker-color: #5f6f6b; }
+
+/* A turn chip where the recorded speaker set changes: the speaker's dot and label, quiet enough to
+   read as attribution rather than a heading. Overlap shows every recorded speaker's chip. */
+.cue-speakers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 1px 0 2px;
+}
+
+.cue-speaker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: color-mix(in srgb, var(--speaker-color, var(--ink-soft)) 78%, var(--ink, #161d1b));
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.cue-speaker::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--speaker-color, var(--ink-soft));
+}
+
+/* ---------- prepared notes marked on their lines ---------- */
+
+/* Each prepared note is a small lens-colored mark on the line it belongs to. The mark names its
+   kind and opens the note in place; nothing pops on its own. The lens palette matches the process
+   room's worker spheres, so a grammar note and a grammar worker read as one family. */
+.cue-note-mark[data-note-lens="grammar_salience"],
+.cue-note[data-note-lens="grammar_salience"] { --lens: #b8963f; }
+.cue-note-mark[data-note-lens="situating"],
+.cue-note[data-note-lens="situating"] { --lens: #2f746e; }
+.cue-note-mark[data-note-lens="word_order"],
+.cue-note[data-note-lens="word_order"] { --lens: #6f9bd1; }
+.cue-note-mark[data-note-lens="culture_reference"],
+.cue-note[data-note-lens="culture_reference"] { --lens: #a98cc9; }
+.cue-note-mark[data-note-lens="historical_reference"],
+.cue-note[data-note-lens="historical_reference"] { --lens: #c77b86; }
+
+.cue-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.cue-note-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid color-mix(in srgb, var(--lens, var(--accent)) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lens, var(--accent)) 9%, transparent);
+  color: color-mix(in srgb, var(--lens, var(--accent)) 72%, var(--ink, #161d1b));
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.cue-note-mark::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lens, var(--accent));
+}
+
+.cue-note-mark:hover,
+.cue-note-mark[aria-expanded="true"] {
+  border-color: var(--lens, var(--accent));
+  background: color-mix(in srgb, var(--lens, var(--accent)) 16%, transparent);
+}
+
+.cue-note-mark:focus-visible {
+  outline: 2px solid var(--lens, var(--accent));
+  outline-offset: 2px;
+}
+
+/* The opened note, in place under its line: a quiet left-ruled block in the note's lens color. */
+.cue-note {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--lens, var(--accent));
+  border-radius: 4px 10px 10px 4px;
+  background: color-mix(in srgb, var(--lens, var(--accent)) 6%, transparent);
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.cue-note p {
+  margin: 0;
+}
+
+.cue-note b {
+  margin-right: 6px;
+  color: var(--ink, #161d1b);
 }
 
 /* Withheld: a held-back line. Flag-tinted, quiet, and clearly not speech, with the reason spelled out
@@ -165,4 +293,128 @@
 
 .cue-silence-note {
   color: var(--ink-muted);
+}
+
+/* ---------- caption display mode: Both / one language / Listen practice ---------- */
+
+/* A compact segmented pill above the reading feed, in the studio's paper tone. */
+.caption-mode {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  margin: 0 0 10px;
+  padding: 3px;
+  border: 1px solid var(--line, rgba(22, 29, 27, 0.1));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper, #f7faf8) 70%, transparent);
+}
+
+.caption-mode-btn {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-family: var(--font-sans);
+  font-size: 0.74rem;
+  font-weight: var(--weight-medium, 500);
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+
+.caption-mode-btn:hover {
+  color: var(--ink, #161d1b);
+}
+
+.caption-mode-btn[aria-pressed="true"] {
+  color: var(--ink, #161d1b);
+  background: var(--paper-elevated, #fff);
+  box-shadow: 0 1px 3px rgba(26, 70, 66, 0.12);
+}
+
+.caption-mode-btn:focus-visible {
+  outline: 2px solid var(--accent, #2f746e);
+  outline-offset: 2px;
+}
+
+/* The Listen blank-amount dial, shown only while Listen is on: more filled dots, more words blanked. */
+.caption-cloze {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+  padding: 0 4px 0 8px;
+  border-left: 1px solid var(--line, rgba(22, 29, 27, 0.16));
+}
+
+.caption-cloze-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink, #161d1b) 24%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.caption-cloze-dot[data-active="true"] {
+  border-color: var(--accent, #2f746e);
+  background: var(--accent, #2f746e);
+}
+
+.caption-cloze-dot:hover {
+  border-color: var(--accent, #2f746e);
+}
+
+.caption-cloze-dot:focus-visible {
+  outline: 2px solid var(--accent, #2f746e);
+  outline-offset: 2px;
+}
+
+/* Single-language reading: the other side stands down so the feed is one column of one language. */
+.learning-workspace[data-caption-mode="source"] .cue-tgt,
+.learning-workspace[data-caption-mode="source"] .cue-withheld,
+.learning-workspace[data-caption-mode="source"] .cue-unavailable,
+.learning-workspace[data-caption-mode="source"] .learning-sentence-action,
+.learning-workspace[data-caption-mode="target"] .cue-src {
+  display: none;
+}
+
+/* ---------- Listen practice: fill-in blanks ---------- */
+
+/* A blanked word keeps the real recorded text in the flow and masks it as a small accent box, so
+   the line reads XXX ____ YYY. Tap (or keyboard-activate) a blank to reveal it; hover peeks. The
+   text is never substituted, only hidden. */
+.cloze-word {
+  margin: 0 1px;
+  padding: 0 3px;
+  border: 0;
+  border-bottom: 2px solid color-mix(in srgb, var(--accent, #2f746e) 55%, transparent);
+  border-radius: 7px 7px 3px 3px;
+  background: color-mix(in srgb, var(--accent, #2f746e) 11%, transparent);
+  color: transparent;
+  font: inherit;
+  line-height: inherit;
+  text-shadow: none;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.cloze-word:hover,
+.cloze-word:focus-visible,
+.cloze-word[data-revealed="true"] {
+  color: inherit;
+  background: color-mix(in srgb, var(--accent, #2f746e) 6%, transparent);
+}
+
+.cloze-word:focus-visible {
+  outline: 2px solid var(--accent, #2f746e);
+  outline-offset: 1px;
 }

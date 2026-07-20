@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Coverage } from "../glyphs";
 import type { ProductionPresentedMoment } from "../learning/model";
-import { projectMomentMarkers } from "../learning/MomentsOverlay";
 import { projectProductionLearningPresentation } from "../learning/productionExplanationAdapter";
 import { projectVerifiedProductionLearningSource } from "../learning/productionSourceAdapter";
 import {
@@ -296,7 +295,6 @@ function ProductionCaptionResult({
                   active={playbackActive}
                   modeControls={modeControls}
                   panelControls={panelControls}
-                  momentMarkers={projectMomentMarkers(prepInteraction.prep)}
                 />
               ) : (
                 <p

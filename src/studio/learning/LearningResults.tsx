@@ -1,8 +1,12 @@
 import type { ReactNode } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-import { Bookmark, Sliders } from "../glyphs";
-import LearningFineTuneFace from "./LearningFineTuneFace";
+import { languageName } from "../preflight/preparationKit";
+import type { SpeakerRef } from "../types";
+import { ClozeText } from "./cloze";
+import { LearningToolDrawers, LearningToolToggles } from "./LearningToolControls";
+import SelectionBar, { type SelectionAnchor } from "./SelectionBar";
 import {
   codePointSlice,
   fullCodePointSpan,
@@ -10,6 +14,13 @@ import {
   type PresentedMoment,
   type SelectedLanguageSpan,
 } from "./model";
+import {
+  availableMoments,
+  LEARNING_LENS_LABELS,
+  MomentBody,
+  momentClock,
+} from "./momentContent";
+import { speakerDisplays } from "./speakers";
 import type {
   AvailableLearningFacet,
   LearningExplanationState,
@@ -22,8 +33,9 @@ import type {
   LearningSelectionRequest,
   PreparedLearningSelection,
   ProductionLearningInteraction,
-  SessionSavedSelection,
 } from "./presentation.ts";
+import { savedSpanId, type LearningTools } from "./useLearningTools";
+import { useViewerSession, type CaptionMode, type ClozeAmount } from "./viewerSession";
 
 type PinnedSelection =
   | { state: "prepared"; selection: PreparedLearningSelection; span: SelectedLanguageSpan }
@@ -40,6 +52,21 @@ type PinnedSelection =
       span: SelectedLanguageSpan;
       reasonCode: Extract<LearningPrototypeProjection, { state: "failed" }>["reasonCode"];
     };
+
+/**
+ * A live text selection the learner raised the floating action bar on. It carries the span, the
+ * matching prepared explanation if one exists, and the anchor rectangle the bar floats against.
+ */
+type FloatingSelection = {
+  moment: PresentedMoment;
+  span: SelectedLanguageSpan;
+  side: "source" | "target";
+  anchor: SelectionAnchor;
+  trigger: HTMLElement;
+  prepared: PreparedLearningSelection | null;
+  canExplain: boolean;
+};
+
 
 const INSIGHT_LABELS: Record<LearningFacetKind, string> = {
   meaning: "Meaning in this scene",
@@ -89,20 +116,39 @@ export default function LearningResults({
   playback,
   productionInteraction,
   prepInteraction,
+  tools,
+  showBar,
+  speakers,
+  onExplainRequested,
 }: {
   presentation: LearningPresentation;
   playback: LearningPlayback;
   productionInteraction?: ProductionLearningInteraction;
   prepInteraction: LearningPrepInteraction;
+  /** The result session's study tools (Saved / Notes), owned above the transcript and shared with
+   *  whichever surface places their controls. */
+  tools: LearningTools;
+  /** Standard viewers carry the study controls in the transcript's own bar. The watch room sets
+   *  this false and places them on the video and the command bar instead. */
+  showBar: boolean;
+  /** The clip's recorded speaker legend, when the source carries one. Display only, never invented. */
+  speakers?: readonly SpeakerRef[];
+  /** The watch room reveals the reading panel before a pinned explanation opens, since the
+   *  explanation lives in the transcript surface and that panel may be closed. */
+  onExplainRequested?: () => void;
 }) {
   const { source } = presentation;
   const [pinned, setPinned] = useState<PinnedSelection | null>(null);
-  const [saved, setSaved] = useState<SessionSavedSelection[]>([]);
-  const [savedOpen, setSavedOpen] = useState(false);
-  const [tuneOpen, setTuneOpen] = useState(false);
+  const [floating, setFloating] = useState<FloatingSelection | null>(null);
+  /** Which prepared note is open inline in the transcript, as `lineId:index`. */
+  const [openNote, setOpenNote] = useState<string | null>(null);
+  const captionMode = useViewerSession((state) => state.captionMode);
+  const setCaptionMode = useViewerSession((state) => state.setCaptionMode);
+  const clozeAmount = useViewerSession((state) => state.clozeAmount);
+  const setClozeAmount = useViewerSession((state) => state.setClozeAmount);
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
-  const savedId = useId();
-  const tuneId = useId();
+  const cuesRef = useRef<HTMLDivElement | null>(null);
+  const lastActiveLineId = useRef<string | null>(null);
   const prototype = presentation.mode === "prototype" ? presentation.explanations : null;
   const productionReady = presentation.mode === "production" &&
     presentation.explanations.state === "ready" &&
@@ -113,22 +159,44 @@ export default function LearningResults({
     : `${source.context.identities.runId}:${source.context.identities.captionContentId}`;
 
   const selections = prototype?.state === "ready" ? prototype.selections : [];
-  const savedSelectionIds = new Set(saved.map((item) => item.id));
 
   useEffect(() => {
     setPinned(null);
-    setSaved([]);
-    setSavedOpen(false);
-    setTuneOpen(false);
+    setFloating(null);
     setReturnFocus(null);
+    setOpenNote(null);
   }, [sourceKey]);
 
   useEffect(() => {
     if (presentation.mode === "production" && !productionReady) {
       setPinned(null);
+      setFloating(null);
       setReturnFocus(null);
     }
   }, [presentation.mode, productionReady]);
+
+  // The floating bar dismisses on any pointer that starts elsewhere (the bar stops its own pointer
+  // events) and on Escape, so it never lingers over a stale highlight.
+  const dismissFloating = useCallback(() => setFloating(null), []);
+  useEffect(() => {
+    if (!floating) return undefined;
+    const onPointerDown = () => setFloating(null);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        // Consume the Escape so it dismisses only the bar, one layer at a time, and never also
+        // steps the watch face back to the report.
+        event.preventDefault();
+        setFloating(null);
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [floating]);
 
   const openPinned = (next: PinnedSelection, trigger: HTMLElement) => {
     setReturnFocus(trigger);
@@ -156,36 +224,98 @@ export default function LearningResults({
       : { state: "unavailable", moment, span: fullSpan, reasonCode: "explanation_not_prepared" }, trigger);
   };
 
-  const selectCaptionRange = (
-    moment: PresentedMoment,
-    momentSelections: PreparedLearningSelection[],
-    textElement: HTMLElement,
-    side: "source" | "target",
-  ) => {
+  // Selecting caption text raises the floating action bar over the highlight rather than jumping
+  // straight to a side panel: the learner chooses Translate, Explain, or Save from where their eye
+  // already is. The listener is document-level and reads the selection itself, so it works however
+  // the selection was made (drag that releases anywhere, double-click, touch handles, keyboard) and
+  // wherever the caption text lives: the transcript cues and the on-video caption both mark their
+  // text with [data-caption-side] and [data-caption-line-id].
+  const raiseFromSelection = useCallback(() => {
+    if (!prototype && !productionReady) return;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    const anchorNode = range.commonAncestorContainer;
+    const anchorElement = anchorNode instanceof Element ? anchorNode : anchorNode.parentElement;
+    const container = anchorElement?.closest<HTMLElement>("[data-caption-side]") ??
+      // A drag can overshoot the caption span; fall back to the element the selection started in.
+      (range.startContainer.parentElement?.closest<HTMLElement>("[data-caption-side]") ?? null);
+    if (!container) return;
+    const side = container.dataset.captionSide === "target" ? "target" as const : "source" as const;
+    const lineId = container.dataset.captionLineId;
+    const moment = source.moments.find((candidate) => candidate.lineId === lineId);
+    if (!moment) return;
     const selectedText = side === "source" ? moment.source : moment.target;
     if (selectedText.state !== "available") return;
-    const span = selectedCodePointSpan(textElement, selectedText.text, side);
+    const span = selectedCodePointSpan(container, selectedText.text, side, range);
     if (!span) return;
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+    const momentSelections = selections.filter((candidate) => candidate.lineId === moment.lineId);
+    const prepared = side === "source" && prototype && prototype.state !== "failed"
+      ? momentSelections.find((candidate) =>
+          candidate.span.start === span.start &&
+          candidate.span.end === span.end &&
+          candidate.span.text === span.text) ?? null
+      : null;
+    setFloating({
+      moment,
+      span,
+      side,
+      anchor: { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width },
+      trigger: container,
+      prepared,
+      // Explain is offered for any source selection (the panel states honestly when nothing is
+      // prepared) and for a live production run; the target side has no explanation path in the demo.
+      canExplain: (Boolean(prototype) && side === "source") || productionReady,
+    });
+  }, [prototype, productionReady, source.moments, selections]);
 
-    if (!prototype) {
-      if (productionReady) requestProductionSelection(moment, span, textElement);
-      window.getSelection()?.removeAllRanges();
-      return;
-    }
-    if (side !== "source") return;
-    if (prototype.state === "failed") {
-      openPinned({ state: "failed", moment, span, reasonCode: prototype.reasonCode }, textElement);
-    } else {
-      const prepared = momentSelections.find((candidate) =>
-        candidate.span.start === span.start &&
-        candidate.span.end === span.end &&
-        candidate.span.text === span.text);
-      openPinned(prepared
-        ? { state: "prepared", selection: prepared, span: prepared.span }
-        : { state: "unavailable", moment, span, reasonCode: "explanation_not_prepared" }, textElement);
-    }
+  useEffect(() => {
+    if (!prototype && !productionReady) return undefined;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    // pointerup catches mouse and pen; touch selection moves through handle drags that end without
+    // a pointerup on the text, so a settled selectionchange raises the bar there too.
+    const raiseSoon = (delay: number) => {
+      clearTimeout(settle);
+      settle = setTimeout(raiseFromSelection, delay);
+    };
+    const onPointerUp = () => raiseSoon(0);
+    const onSelectionChange = () => raiseSoon(280);
+    document.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => {
+      clearTimeout(settle);
+      document.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("selectionchange", onSelectionChange);
+    };
+  }, [prototype, productionReady, raiseFromSelection]);
 
+  // Explain opens the full facet explanation for the selection the bar sits on: the prepared
+  // fixture explanation, the honest "not prepared" state, or a live production request. The
+  // explanation lives in the reading surface, so a selection made on the video first asks the
+  // composing room to reveal that panel.
+  const explainFloating = () => {
+    if (!floating) return;
+    onExplainRequested?.();
+    const { moment, span, side, prepared, trigger } = floating;
+    if (prototype && side === "source") {
+      if (prototype.state === "failed") {
+        openPinned({ state: "failed", moment, span, reasonCode: prototype.reasonCode }, trigger);
+      } else {
+        openPinned(prepared
+          ? { state: "prepared", selection: prepared, span: prepared.span }
+          : { state: "unavailable", moment, span, reasonCode: "explanation_not_prepared" }, trigger);
+      }
+    } else if (productionReady) {
+      requestProductionSelection(moment, span, trigger);
+    }
     window.getSelection()?.removeAllRanges();
+    setFloating(null);
+  };
+
+  const saveFloating = () => {
+    if (floating) tools.keepSpan(floating.moment, floating.span);
   };
 
   const requestProductionSelection = (
@@ -215,76 +345,96 @@ export default function LearningResults({
     requestAnimationFrame(() => trigger?.focus());
   };
 
-  const keepSelection = (selection: PreparedLearningSelection) => {
-    if (presentation.mode !== "prototype" || selection.authority.dataClass !== "design_fixture") return;
-    setSaved((current) => {
-      if (current.some((item) => item.id === selection.selectionId)) return current;
-      return [...current, sessionItem(presentation.source, selection)];
-    });
-  };
+  const showSaved = presentation.mode === "prototype";
 
-  const toggles = (
-    <>
-      {presentation.mode === "prototype" && (
-        <button
-          type="button"
-          className="learning-saved-toggle"
-          aria-expanded={savedOpen}
-          aria-controls={savedId}
-          onClick={() => {
-            setSavedOpen((open) => !open);
-            setTuneOpen(false);
-          }}
-        >
-          <Bookmark filled={saved.length > 0} />
-          <span>Saved{saved.length > 0 ? ` (${saved.length})` : ""}</span>
-        </button>
-      )}
-      {/* The whole Customize learning face sits behind this one chip, so the result stays the
-          dominant surface and tuning is disclosure, not a second dashboard. */}
-      <button
-        type="button"
-        className="learning-saved-toggle learning-tune-toggle"
-        aria-expanded={tuneOpen}
-        aria-controls={tuneId}
-        data-learning-prep-state={prepInteraction.prep.state}
-        onClick={() => {
-          setTuneOpen((open) => !open);
-          setSavedOpen(false);
-        }}
-      >
-        <Sliders />
-        <span>Tune</span>
-      </button>
-    </>
-  );
+  // The playhead line, for the karaoke-style highlight and the follow scroll. Line-level is what the
+  // recorded timing supports: cues carry start and end, never per-word times, so no word is ever
+  // claimed as "now" beyond what was measured.
+  const activeLineId = playback.state === "available"
+    ? source.moments.find((moment) =>
+        playback.currentTimeMs >= moment.startMs && playback.currentTimeMs < moment.endMs)?.lineId ?? null
+    : null;
+
+  // Follow playback only while the reader is at the playhead: if the previous active line is still
+  // on screen, bring the next one into view; if the reader scrolled away, never yank them back.
+  useEffect(() => {
+    const feed = cuesRef.current;
+    if (!activeLineId || !feed) return;
+    const previous = lastActiveLineId.current;
+    lastActiveLineId.current = activeLineId;
+    const next = feed.querySelector(`[data-learning-line-id="${CSS.escape(activeLineId)}"]`);
+    if (!next) return;
+    if (previous && previous !== activeLineId) {
+      const previousElement = feed.querySelector(`[data-learning-line-id="${CSS.escape(previous)}"]`);
+      if (previousElement) {
+        const feedRect = feed.getBoundingClientRect();
+        const previousRect = previousElement.getBoundingClientRect();
+        const visible = previousRect.bottom > feedRect.top && previousRect.top < feedRect.bottom;
+        if (!visible) return;
+      }
+    }
+    next.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeLineId]);
+
+  // Prepared notes, keyed by line: the visible result of the Notes depth wheel. Only available
+  // notes appear; withheld and abstained help stays silent here exactly as everywhere else.
+  const prep = prepInteraction.prep;
+  const notesByLine = new Map<string, ReturnType<typeof availableMoments>>();
+  for (const note of availableMoments(prep)) {
+    const list = notesByLine.get(note.lineId);
+    if (list) list.push(note);
+    else notesByLine.set(note.lineId, [note]);
+  }
 
   return (
     <section
       className="learning-workspace"
       aria-label="Language learning workspace"
       data-learning-mode={presentation.mode}
+      data-caption-mode={captionMode}
     >
-      <div className="learning-bar">
-        {toggles}
-        <MomentsNote prep={prepInteraction.prep} />
-        {/* A one-line affordance cue, not the old instruction paragraph: the tappable language is already
-            highlighted in the transcript, so this only names the gesture. */}
-        {presentation.mode === "prototype" && (
-          <>
-            <span className="learning-bar-hint" aria-hidden="true">Tap highlighted language to explain</span>
-            <span className="learning-session-note">Session only</span>
-          </>
-        )}
-      </div>
+      {/* Standard viewers carry the study controls in the transcript's own bar. The watch room
+          hands them to the dossier under the video, so here the transcript is a bare reading feed. */}
+      {showBar && (
+        <div className="learning-bar">
+          <LearningToolToggles
+            tools={tools}
+            prepState={prepInteraction.prep.state}
+            showSaved={showSaved}
+          />
+          {/* A one-line affordance cue, not an instruction paragraph: it names both gestures the
+              transcript answers to. */}
+          {presentation.mode === "prototype" && (
+            <>
+              <span className="learning-bar-hint" aria-hidden="true">
+                Tap a highlighted word, or select any text, to translate, explain, or save it
+              </span>
+              <span className="learning-session-note">Session only</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* The standard viewer carries the caption control in the transcript; the watch room places it
+          on the video (LearningResultExperience), where the captions now read. */}
+      {showBar && source.moments.length > 0 && (
+        <CaptionModeControl
+          mode={captionMode}
+          onMode={setCaptionMode}
+          cloze={clozeAmount}
+          onCloze={setClozeAmount}
+          sourceLanguage={source.moments[0]?.sourceLanguage}
+          targetLanguage={source.moments[0]?.targetLanguage}
+        />
+      )}
 
       <>
           {pinned && (
             <ExplanationPanel
               key={`${pinned.state}:${pinnedLineId(pinned)}:${pinnedSpan(pinned).start}:${pinnedSpan(pinned).end}`}
               pinned={pinned}
-              kept={pinned.state === "prepared" && savedSelectionIds.has(pinned.selection.selectionId)}
-              onKeep={keepSelection}
+              kept={pinned.state === "prepared" && tools.savedIds.has(pinned.selection.selectionId)}
+              onKeep={tools.keep}
               onClose={closePinned}
               productionExplanation={productionInteraction?.explanation ?? null}
               onProductionRetry={(request) => productionInteraction?.onRetry(request)}
@@ -310,20 +460,27 @@ export default function LearningResults({
           )}
           <div
             className="cues"
+            ref={cuesRef}
             aria-label={`${source.moments[0]?.sourceLanguage ?? "Source"} to ${source.moments[0]?.targetLanguage ?? "target"} transcript`}
           >
             {source.moments.length === 0 ? (
               <p className="cues-empty">No caption cues were recorded. No transcript or result is implied.</p>
-            ) : source.moments.map((moment) => {
+            ) : source.moments.map((moment, index) => {
               const momentSelections = selections.filter((candidate) => candidate.lineId === moment.lineId);
               const fullPrepared = preparedSentence(moment, momentSelections);
-              const active = playback.state === "available" &&
-                playback.currentTimeMs >= moment.startMs && playback.currentTimeMs < moment.endMs;
+              const active = moment.lineId === activeLineId;
               const selectedLineId = pinned?.state === "prepared"
                 ? pinned.selection.lineId
                 : pinned?.state === "production"
                   ? pinned.request.lineId
                   : pinned?.moment.lineId;
+              // Speaker attribution, shown where the recorded speaker set changes: a turn chip in
+              // the speaker's color, so a two-voice clip reads like the conversation it is.
+              const momentSpeakers = speakerDisplays(speakers, moment.speakers);
+              const previousSpeakers = index > 0 ? source.moments[index - 1].speakers ?? [] : [];
+              const turnChange = momentSpeakers.length > 0 &&
+                (moment.speakers ?? []).join(",") !== previousSpeakers.join(",");
+              const lineNotes = notesByLine.get(moment.lineId) ?? [];
               return (
                 <article
                   key={moment.lineId}
@@ -333,6 +490,8 @@ export default function LearningResults({
                   data-learning-pinned={selectedLineId === moment.lineId ? "true" : undefined}
                   data-withheld={moment.target.state === "withheld" ? "true" : undefined}
                   data-silence={moment.source.reasonCode === "recorded_silence" ? "true" : undefined}
+                  data-speakers={moment.speakers && moment.speakers.length > 0 ? moment.speakers.join(",") : undefined}
+                  data-speaker-primary={momentSpeakers[0]?.colorIndex}
                 >
                   {playback.state === "available" ? (
                     <button
@@ -345,6 +504,20 @@ export default function LearningResults({
                     </button>
                   ) : <span className="cue-t">{momentClock(moment.startMs)}</span>}
                   <span className="cue-body">
+                    {turnChange && (
+                      <span className="cue-speakers">
+                        {momentSpeakers.map((speaker) => (
+                          <span
+                            key={speaker.id}
+                            className="cue-speaker"
+                            data-speaker-index={speaker.colorIndex}
+                            title={speaker.label}
+                          >
+                            {speaker.shortLabel}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                     {moment.source.state !== "available" ? (
                       <span className="cue-silence">
                         <span className="cue-silence-mark">
@@ -357,32 +530,45 @@ export default function LearningResults({
                       </span>
                     ) : (
                       <>
-                        <span
-                          className="cue-src"
-                          lang={moment.sourceLanguage}
-                          tabIndex={-1}
-                          onPointerUp={prototype || productionReady
-                            ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget, "source")
-                            : undefined}
-                          onTouchEnd={prototype || productionReady
-                            ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget, "source")
-                            : undefined}
-                        >
-                          {sourceText(moment, momentSelections, (selection, trigger) => {
-                            openPinned({ state: "prepared", selection, span: selection.span }, trigger);
-                          })}
-                        </span>
+                        {captionMode === "listen" ? (
+                          // Practice: the source line renders with words blanked; the same
+                          // deterministic blanking the on-video caption shows. The blanks preserve
+                          // the full recorded text, so selection still works; only the
+                          // prepared-word buttons stand down while the line is an exercise.
+                          <span
+                            className="cue-src"
+                            lang={moment.sourceLanguage}
+                            tabIndex={-1}
+                            data-caption-side="source"
+                            data-caption-line-id={moment.lineId}
+                          >
+                            <ClozeText
+                              text={moment.source.text}
+                              seed={`${moment.lineId}:source`}
+                              amount={clozeAmount}
+                              lang={moment.sourceLanguage}
+                            />
+                          </span>
+                        ) : (
+                          <span
+                            className="cue-src"
+                            lang={moment.sourceLanguage}
+                            tabIndex={-1}
+                            data-caption-side="source"
+                            data-caption-line-id={moment.lineId}
+                          >
+                            {sourceText(moment, momentSelections, (selection, trigger) => {
+                              openPinned({ state: "prepared", selection, span: selection.span }, trigger);
+                            })}
+                          </span>
+                        )}
                         {moment.target.state === "available" ? (
                           <span
                             className="cue-tgt"
                             lang={moment.targetLanguage}
-                            tabIndex={productionReady ? -1 : undefined}
-                            onPointerUp={productionReady
-                              ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget, "target")
-                              : undefined}
-                            onTouchEnd={productionReady
-                              ? (event) => selectCaptionRange(moment, momentSelections, event.currentTarget, "target")
-                              : undefined}
+                            tabIndex={prototype || productionReady ? -1 : undefined}
+                            data-caption-side="target"
+                            data-caption-line-id={moment.lineId}
                           >
                             {moment.target.text}
                           </span>
@@ -407,6 +593,38 @@ export default function LearningResults({
                             Explain sentence
                           </button>
                         )}
+                        {lineNotes.length > 0 && (
+                          // The prepared notes the depth wheel produced, marked on the line they
+                          // belong to. Each mark names its kind and opens the note in place; nothing
+                          // ever pops on its own.
+                          <span className="cue-notes">
+                            {lineNotes.map((note, noteIndex) => {
+                              const noteKey = `${moment.lineId}:${noteIndex}`;
+                              return (
+                                <button
+                                  key={noteKey}
+                                  type="button"
+                                  className="cue-note-mark"
+                                  data-note-lens={note.lens}
+                                  aria-expanded={openNote === noteKey}
+                                  onClick={() => setOpenNote((current) => current === noteKey ? null : noteKey)}
+                                >
+                                  {LEARNING_LENS_LABELS[note.lens]}
+                                </button>
+                              );
+                            })}
+                          </span>
+                        )}
+                        {lineNotes.map((note, noteIndex) =>
+                          openNote === `${moment.lineId}:${noteIndex}` ? (
+                            <span
+                              key={`open-${moment.lineId}:${noteIndex}`}
+                              className="cue-note"
+                              data-note-lens={note.lens}
+                            >
+                              <MomentBody moment={note} />
+                            </span>
+                          ) : null)}
                       </>
                     )}
                   </span>
@@ -416,105 +634,141 @@ export default function LearningResults({
           </div>
       </>
 
-      {presentation.mode === "prototype" && savedOpen && (
-        <SavedDrawer
-          id={savedId}
-          saved={saved}
-          onRemove={(id) => setSaved((current) => current.filter((item) => item.id !== id))}
-          onClose={() => setSavedOpen(false)}
-        />
+      {/* Portalled to the body: the bar answers selections made on the on-video captions too, and
+          in the watch room this workspace subtree is display:none while the panel is closed, which
+          would silently hide a fixed-position bar rendered in place. */}
+      {floating && createPortal(
+        <SelectionBar
+          anchor={floating.anchor}
+          canExplain={floating.canExplain}
+          canSave={presentation.mode === "prototype"}
+          translation={floating.moment.target}
+          targetLanguage={floating.moment.targetLanguage}
+          saved={tools.savedIds.has(savedSpanId(floating.moment, floating.span))}
+          onExplain={explainFloating}
+          onSave={saveFloating}
+          onDismiss={dismissFloating}
+        />,
+        document.body,
       )}
 
-      {tuneOpen && (
-        <TuneDrawer id={tuneId} interaction={prepInteraction} onClose={() => setTuneOpen(false)} />
+      {showBar && (
+        <LearningToolDrawers tools={tools} prepInteraction={prepInteraction} showSaved={showSaved} />
       )}
     </section>
   );
 }
 
 /**
- * The quiet standing counterpart to the playhead-bound Moments overlay: the overlay surfaces
- * only inside a prepared window, so this note is what tells a viewer that prepared help exists
- * at all and is waiting on the timeline (where the player marks each moment as a dot). It reads
- * the same prep projection, counts only available moments, and disappears with them.
+ * The caption display control: a compact segmented pill that says exactly what each choice does.
+ * Both shows source and translation; each language name shows only that side; Practice is
+ * fill-in-the-blank, hiding some of the words so the ear supplies them, with the amount as a
+ * small dial. It reads as one instrument on the watch room's video and in the standard viewer
+ * alike. (The mode key stays "listen" on the wire.)
  */
-function MomentsNote({ prep }: { prep: LearningPrepInteraction["prep"] }) {
-  if (prep.state !== "ready") return null;
-  const available = prep.moments.filter((moment) => moment.availability === "available").length;
-  if (available === 0) return null;
-  return (
-    <span className="learning-moments-note" data-prepared-moments={available}>
-      {available} {available === 1 ? "moment" : "moments"} on the timeline
-    </span>
-  );
-}
+const CLOZE_LABELS: Record<ClozeAmount, string> = {
+  1: "Blank a few words",
+  2: "Blank about half the words",
+  3: "Blank most words",
+};
 
-function TuneDrawer({
-  id,
-  interaction,
-  onClose,
+export function CaptionModeControl({
+  mode,
+  onMode,
+  cloze,
+  onCloze,
+  sourceLanguage,
+  targetLanguage,
 }: {
-  id: string;
-  interaction: LearningPrepInteraction;
-  onClose: () => void;
+  mode: CaptionMode;
+  onMode: (mode: CaptionMode) => void;
+  cloze: ClozeAmount;
+  onCloze: (cloze: ClozeAmount) => void;
+  sourceLanguage: string | undefined;
+  targetLanguage: string | undefined;
 }) {
-  const drawerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    drawerRef.current?.focus();
-  }, []);
-
-  // Like Saved, tuning slides over the transcript instead of replacing it, so the reading
-  // position is never lost and the face keeps its own region identity and state attributes.
+  const options: Array<{ mode: CaptionMode; label: string; hint: string }> = [
+    { mode: "both", label: "Both", hint: "Show both languages" },
+    { mode: "source", label: sourceLanguage ? languageName(sourceLanguage) : "Source", hint: "Show the source only" },
+    { mode: "target", label: targetLanguage ? languageName(targetLanguage) : "Target", hint: "Show the translation only" },
+    { mode: "listen", label: "Practice", hint: "Fill in the blanks: some words are hidden so your ear supplies them. Tap a blank to reveal it" },
+  ];
+  const clozeLevels: ClozeAmount[] = [1, 2, 3];
   return (
-    <div
-      id={id}
-      className="learning-tune"
-      ref={drawerRef}
-      tabIndex={-1}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-      }}
-    >
-      <div className="learning-tune-head">
+    <div className="caption-mode" role="group" aria-label="Caption display">
+      {options.map((option) => (
         <button
+          key={option.mode}
           type="button"
-          className="learning-saved-close"
-          aria-label="Close learning controls"
-          onClick={onClose}
+          className="caption-mode-btn"
+          data-caption-option={option.mode}
+          aria-pressed={mode === option.mode}
+          title={option.hint}
+          onClick={() => onMode(option.mode)}
         >
-          Close
+          {option.label}
         </button>
-      </div>
-      <LearningFineTuneFace interaction={interaction} />
+      ))}
+      {/* When Listen is on, how many words are blanked is a dial: more filled dots, more blanks.
+          Every blank still reveals on tap or hover, so nothing is ever locked away. */}
+      {mode === "listen" && (
+        <span className="caption-cloze" role="group" aria-label="How many words to blank">
+          {clozeLevels.map((level) => (
+            <button
+              key={level}
+              type="button"
+              className="caption-cloze-dot"
+              data-cloze-level={level}
+              data-active={cloze >= level ? "true" : undefined}
+              aria-pressed={cloze === level}
+              aria-label={CLOZE_LABELS[level]}
+              title={CLOZE_LABELS[level]}
+              onClick={() => onCloze(level)}
+            />
+          ))}
+        </span>
+      )}
     </div>
   );
 }
 
+
+/**
+ * The selected code-point span within one caption element. Forgiving on purpose: a drag that starts
+ * or ends outside the caption is clamped to the caption's own text instead of rejected, and edge
+ * whitespace is trimmed, so the natural gesture of sweeping across a word or a sentence always
+ * yields the span the learner meant. The returned text is always an exact slice of the recorded
+ * caption; nothing outside it can enter the span.
+ */
 function selectedCodePointSpan(
   sourceElement: HTMLElement,
   sourceText: string,
   side: "source" | "target",
+  range: Range,
 ): SelectedLanguageSpan | null {
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed || selection.rangeCount !== 1) return null;
-  const range = selection.getRangeAt(0);
-  if (!sourceElement.contains(range.startContainer) || !sourceElement.contains(range.endContainer)) return null;
-
   try {
-    const beforeStart = document.createRange();
-    beforeStart.selectNodeContents(sourceElement);
-    beforeStart.setEnd(range.startContainer, range.startOffset);
-    const beforeEnd = document.createRange();
-    beforeEnd.selectNodeContents(sourceElement);
-    beforeEnd.setEnd(range.endContainer, range.endOffset);
-    const start = Array.from(beforeStart.toString()).length;
-    const end = Array.from(beforeEnd.toString()).length;
+    const bounds = document.createRange();
+    bounds.selectNodeContents(sourceElement);
+    const startPosition = bounds.comparePoint(range.startContainer, range.startOffset);
+    const endPosition = bounds.comparePoint(range.endContainer, range.endOffset);
+    // The selection must overlap the caption at all.
+    if (startPosition === 1 || endPosition === -1) return null;
+
+    const measure = (container: Node, offset: number): number => {
+      const before = document.createRange();
+      before.selectNodeContents(sourceElement);
+      before.setEnd(container, offset);
+      return Array.from(before.toString()).length;
+    };
+    const characters = Array.from(sourceText);
+    let start = startPosition === -1 ? 0 : measure(range.startContainer, range.startOffset);
+    let end = endPosition === 1 ? characters.length : measure(range.endContainer, range.endOffset);
+    end = Math.min(end, characters.length);
+    while (start < end && !/\S/u.test(characters[start])) start += 1;
+    while (end > start && !/\S/u.test(characters[end - 1])) end -= 1;
+    if (end <= start) return null;
     const text = codePointSlice(sourceText, start, end);
-    if (end <= start || !/\S/u.test(text) || text !== range.toString()) return null;
+    if (!/\S/u.test(text)) return null;
     return { side, unit: "unicode_code_point", start, end, text };
   } catch {
     return null;
@@ -868,89 +1122,6 @@ function UnavailableState({
   );
 }
 
-function SavedDrawer({
-  id,
-  saved,
-  onRemove,
-  onClose,
-}: {
-  id: string;
-  saved: SessionSavedSelection[];
-  onRemove: (itemId: string) => void;
-  onClose: () => void;
-}) {
-  const drawerRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    drawerRef.current?.focus();
-  }, []);
-
-  // Saved language slides over the transcript instead of replacing it, so the reading position is
-  // never lost. It is a session-only collection, not a co-equal view, so it stays behind one chip.
-  return (
-    <section
-      id={id}
-      className="learning-saved"
-      ref={drawerRef}
-      tabIndex={-1}
-      aria-labelledby="learning-saved-title"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-      }}
-    >
-      <header className="learning-saved-head">
-        <div>
-          <span>This session only</span>
-          <h3 id="learning-saved-title">Saved</h3>
-        </div>
-        <button type="button" className="learning-saved-close" aria-label="Close saved" onClick={onClose}>
-          Close
-        </button>
-      </header>
-      <p className="learning-saved-note">Only language you explicitly keep appears here. Nothing is saved after this result session ends.</p>
-      {saved.length === 0 ? (
-        <p className="learning-saved-empty">Select a prepared word or sentence, then choose Save.</p>
-      ) : (
-        <ul>
-          {saved.map((item) => (
-            <li key={item.id}>
-              <div>
-                <b lang={item.sourceLanguage}>{item.selection.text}</b>
-                <span>{momentClock(item.startMs)} to {momentClock(item.endMs)}</span>
-                {item.target.state === "available" && <p lang={item.targetLanguage}>{item.target.text}</p>}
-              </div>
-              <button type="button" onClick={() => onRemove(item.id)}>Remove</button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function sessionItem(
-  source: Extract<LearningPresentation, { mode: "prototype" }>["source"],
-  selection: PreparedLearningSelection,
-): SessionSavedSelection {
-  return {
-    dataClass: "learner_owned_session_state",
-    id: selection.selectionId,
-    sourceOrigin: source.context.origin,
-    lineId: selection.lineId,
-    startMs: selection.startMs,
-    endMs: selection.endMs,
-    sourceLanguage: selection.sourceLanguage,
-    targetLanguage: selection.targetLanguage,
-    sourceText: selection.source.state === "available" ? selection.source.text : "",
-    target: selection.target,
-    selection: selection.span,
-    facetKinds: selection.facets.map((facet) => facet.kind),
-  };
-}
-
 function productionPlaybackMatches(
   presentation: Extract<LearningPresentation, { mode: "production" }>,
   playback: LearningPlayback,
@@ -969,13 +1140,4 @@ function productionPlaybackMatches(
 
 function stateLabel(state: Exclude<PinnedSelection["state"], "prepared" | "production">): string {
   return state === "failed" ? "Failed closed" : "Unavailable";
-}
-
-function momentClock(milliseconds: number): string {
-  const safe = Math.max(0, Math.trunc(milliseconds));
-  const totalSeconds = Math.floor(safe / 1_000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  const tenths = Math.floor((safe % 1_000) / 100);
-  return `${minutes}:${String(seconds).padStart(2, "0")}.${tenths}`;
 }

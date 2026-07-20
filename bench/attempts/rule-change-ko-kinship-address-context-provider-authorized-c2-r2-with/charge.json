@@ -1,0 +1,18 @@
+{
+  "schema": "studio.bench.single-attempt-charge.v1",
+  "attempt_id": "bench-attempt:sha256:cf150d7163c92902b5e4eacf4762ab3182018ffe727697c91f49b589f370d8d5",
+  "charged_at": "2026-07-20T00:17:48.822Z",
+  "slot": {
+    "registration_id": "bench-rule-change-registration:sha256:222b65152093755812937f287139756e185b2bef94fc9556edcc4cee3b95ca8f",
+    "run": "rule-change-ko-kinship-address-context-provider-authorized-c2-r2-with",
+    "side": "with"
+  },
+  "execution_input": {
+    "receipt": {
+      "path": "bench/attempts/rule-change-ko-kinship-address-context-provider-authorized-c2-r2-with/execution-input.json",
+      "content_id": "sha256:f0487584d1d3227c7bed2ab453565c6053f1fab84b6a9930c4b88883ba2d75ff",
+      "bytes": 2275
+    },
+    "execution_input_id": "bench-execution-input:sha256:ba59753bd5a6882e5e11e71e448560e4cd0d6d5cfbd38a4708785ed4582507dd"
+  }
+}

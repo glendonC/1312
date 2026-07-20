@@ -17,9 +17,11 @@ import LearningResultExperience from "./viewer/LearningResultExperience";
  * stand behind. Lines it cannot stand behind are shown as labelled gaps — withheld with a reason,
  * or silence — never a guess. Coverage, receipts, and raw files sit under progressive disclosure.
  *
- * The composition itself is the shared ResultViewerShell; this surface contributes the recorded
- * authority: the replay-clock player, the fixture-bound prototype learning presentation, and the
- * "Recorded demo" badge. Title, Details, and Run details stay in the floating header chrome.
+ * The composition itself is the shared ResultViewerShell in its "workbench" frame: the result
+ * workspace around it owns the framing (title in the environment head, evidence class in the
+ * hero facts and the Source panel), so no authority bar renders above the viewer here. This
+ * surface contributes the recorded authority itself: the replay-clock player and the
+ * fixture-bound prototype learning presentation.
  *
  * Deliberately absent: accuracy scores, cold/diff comparison, timing, and agent/worker counts.
  * None of those are produced for a real request — they belong to the benchmark lane, not here.
@@ -53,7 +55,6 @@ function RecordedResult({
   clipT: number;
   setClipT: (time: number) => void;
 }) {
-
   const { run } = bundle;
   const learningSource = useMemo(() => projectRecordedLearningSource(bundle), [bundle]);
   const learningPresentation = projectPrototypeLearningPresentation(
@@ -89,63 +90,15 @@ function RecordedResult({
 
       <LearningResultExperience
         authority="recorded_demo"
+        frame="workbench"
         media={({ modeControls, panelControls }) => (
           <RecordedMediaPlayer bundle={bundle} surface="results" modeControls={modeControls} panelControls={panelControls} />
         )}
-        mediaMeta={<ResultMediaMeta bundle={bundle} />}
         presentation={learningPresentation}
         playback={playback}
         prepInteraction={prepInteraction}
       />
     </motion.div>
-  );
-}
-
-/**
- * The wired strip beneath the clip: line coverage (captioned / withheld / silent of the lines in range)
- * and the source attribution the licence requires. Both are real bundle facts, not filler, and match the
- * header Details accounting exactly. It fills the space directly under the video that the fixed-height
- * split otherwise left as a void, and puts the creative credit on the page the clip actually plays on.
- */
-function ResultMediaMeta({ bundle }: { bundle: RunBundle }) {
-  const { run, captions } = bundle;
-  const { source, title } = run.clip;
-
-  const counts = { captioned: 0, withheld: 0, silent: 0 };
-  for (const cue of captions.cues) {
-    if (cue.silence) {
-      counts.silent += 1;
-      continue;
-    }
-    const target = cue.targets.find((candidate) => candidate.lang === run.pair.target);
-    if (target?.withheld) counts.withheld += 1;
-    else if (target?.text) counts.captioned += 1;
-  }
-  const total = captions.cues.length;
-
-  return (
-    <div className="result-media-meta">
-      <dl className="result-coverage" aria-label="Line coverage in range">
-        <div data-kind="captioned"><dt>Captioned</dt><dd>{counts.captioned}</dd></div>
-        <div data-kind="withheld"><dt>Withheld</dt><dd>{counts.withheld}</dd></div>
-        <div data-kind="silent"><dt>Silent</dt><dd>{counts.silent}</dd></div>
-        <p className="result-coverage-total">of {total} {total === 1 ? "line" : "lines"} in range</p>
-      </dl>
-      <p className="result-attribution">
-        <span className="result-attribution-title">{title}</span>
-        <span className="result-attribution-source">
-          {source.label}
-          {source.licence ? (
-            <>
-              {" · "}
-              {source.url ? (
-                <a href={source.url} target="_blank" rel="noreferrer noopener">{source.licence}</a>
-              ) : source.licence}
-            </>
-          ) : null}
-        </span>
-      </p>
-    </div>
   );
 }
 

@@ -8,8 +8,8 @@ import { Chevron } from "../glyphs";
 /**
  * A glass disclosure control: a labelled trigger that opens one dialog panel and closes on
  * outside pointer, blur, or Escape. It is the one presentation for "details on demand" next to a
- * result — the header Details / Run details panels and the production Run details all use it, so
- * disclosure reads the same on every watch surface.
+ * result — the result workspace's Source / Coverage panels and the production Run details all
+ * use it, so disclosure reads the same on every watch surface.
  */
 export default function ChromePanel({
   label,

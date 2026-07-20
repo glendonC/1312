@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import "../../styles/studio/results.learning-prep.css";
-import LearningFineTuneFace from "../learning/LearningFineTuneFace";
 import LearningResults from "../learning/LearningResults";
 import MomentsOverlay from "../learning/MomentsOverlay";
 import type {
@@ -17,14 +16,15 @@ import ResultViewerShell, {
 
 /**
  * The complete result presentation shared by recorded and production authority: one viewer shell,
- * one media-overlay seat, one learning workspace, and one fine-tune face. Authority-specific code
- * supplies media, playback, and projections only; it cannot silently drop pieces of the product UI.
+ * one media-overlay seat, and one learning workspace that carries the fine-tune face behind its
+ * Tune disclosure. Authority-specific code supplies media, playback, and projections only; it
+ * cannot silently drop pieces of the product UI.
  */
 export default function LearningResultExperience({
   authority,
   chrome,
+  frame,
   media,
-  mediaMeta,
   presentation,
   playback,
   learningInteraction,
@@ -32,34 +32,33 @@ export default function LearningResultExperience({
 }: {
   authority: ResultAuthority;
   chrome?: ReactNode;
+  /** Passed through to ResultViewerShell: "workbench" when the composing surface owns the framing. */
+  frame?: "standard" | "workbench";
   media: (slots: ViewerModeSlots) => ReactNode;
-  mediaMeta?: ReactNode;
   presentation: LearningPresentation;
   playback: LearningPlayback;
   learningInteraction?: ProductionLearningInteraction;
   prepInteraction: LearningPrepInteraction;
 }) {
   return (
-    <>
-      <ResultViewerShell
-        authority={authority}
-        chrome={chrome}
-        media={(slots) => (
-          <div className="learning-player-frame">
-            {media(slots)}
-            <MomentsOverlay prep={prepInteraction.prep} playback={playback} />
-          </div>
-        )}
-        mediaMeta={mediaMeta}
-        learning={(
-          <LearningResults
-            presentation={presentation}
-            playback={playback}
-            productionInteraction={learningInteraction}
-          />
-        )}
-      />
-      <LearningFineTuneFace interaction={prepInteraction} />
-    </>
+    <ResultViewerShell
+      authority={authority}
+      chrome={chrome}
+      frame={frame}
+      media={(slots) => (
+        <div className="learning-player-frame">
+          {media(slots)}
+          <MomentsOverlay prep={prepInteraction.prep} playback={playback} />
+        </div>
+      )}
+      learning={(
+        <LearningResults
+          presentation={presentation}
+          playback={playback}
+          productionInteraction={learningInteraction}
+          prepInteraction={prepInteraction}
+        />
+      )}
+    />
   );
 }

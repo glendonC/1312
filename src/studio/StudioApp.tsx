@@ -84,9 +84,9 @@ export default function StudioApp({ runId }: { runId: string }) {
         )}
 
         {/*
-         * On a completed run the header carries the result's identity: the title in the centre seat
-         * and the Details / Run details controls in the true top-right seat, aligned with the home
-         * mark. While a run is still going the third seat stays empty.
+         * On a completed run the header carries only the result's identity: the title in the
+         * centre seat. Every run-level action, including Details and Run details, lives in the
+         * floating run action bar. While a run is still going the centre seat stays empty.
          */}
         {complete && <ResultsChrome />}
       </header>

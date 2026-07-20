@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 // Direct import so Vite invalidates shell styles on every surface that composes the viewer.
 import "../../styles/studio/results.viewer.css";
-import { CinemaView, Compress, Expand, PanelDock, PanelNarrower, PanelOverlay, PanelWider, SplitView } from "../glyphs";
+import { CinemaView, Compress, Expand, PanelDock, PanelNarrower, PanelFloat, PanelWider, SplitView } from "../glyphs";
 
 /**
  * Which authority stands behind what is playing. This is presentation of an already-established
@@ -43,16 +43,21 @@ export interface ViewerModeSlots {
 export default function ResultViewerShell({
   authority,
   chrome,
+  frame = "standard",
   media,
-  mediaMeta,
   learning,
 }: {
   authority: ResultAuthority;
   /** Optional right side of the shell bar: title and disclosure panels for surfaces without header chrome. */
   chrome?: ReactNode;
+  /**
+   * "standard" carries the always-on authority bar above the composition. "workbench" is for a
+   * surface that already frames the viewer with its own identity and evidence facts (the result
+   * workspace's focus-panel hero): the bar is omitted, the authority stays machine-readable on
+   * the region, and the composing surface owns stating the evidence class in visible text.
+   */
+  frame?: "standard" | "workbench";
   media: (slots: ViewerModeSlots) => ReactNode;
-  /** The wired under-video strip (coverage, attribution, verified range). Hidden in full screen. */
-  mediaMeta?: ReactNode;
   learning: ReactNode;
 }) {
   const viewerRef = useRef<HTMLElement>(null);
@@ -61,7 +66,7 @@ export default function ResultViewerShell({
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
   // Where the Learning panel sits once the viewer is full screen, and how wide it reads. Both are
   // sticky for the session so the choice survives leaving and re-entering full screen.
-  const [panelPlacement, setPanelPlacement] = useState<"docked" | "overlay">("docked");
+  const [panelPlacement, setPanelPlacement] = useState<"docked" | "float">("docked");
   const [panelSize, setPanelSize] = useState<"s" | "m" | "l">("m");
   const [viewerNotice, setViewerNotice] = useState<string | null>(null);
 
@@ -110,7 +115,7 @@ export default function ResultViewerShell({
   // universal expand). No orphan control, no words sitting on the picture. Every button carries an
   // aria-label and a hover/focus tooltip, so the meaning is one pointer-hover or one screen reader away
   // and keyboard reachable (focus reveals the bar). In full screen a second pair chooses where the
-  // Learning panel sits: Docked beside the video, or Overlay floating on it.
+  // Learning panel sits: Docked beside the video, or Float hovering over it.
   const modeControls = (
     <div className="player-modes">
       <span className="player-modes-seg" role="group" aria-label="Viewing mode">
@@ -151,7 +156,7 @@ export default function ResultViewerShell({
 
   // The panel-facing settings live in the top-right pill next to the caption controls, not on the
   // transport bar: how wide the Learning panel reads (Split and full screen), and where it sits once
-  // full screen (Docked beside the video, or Overlay floating on it).
+  // full screen (Docked beside the video, or Float hovering over it).
   const panelControls = (
     <>
       {panelHasWidth && (
@@ -198,12 +203,12 @@ export default function ResultViewerShell({
             <button
               type="button"
               className="pcap-btn"
-              aria-label="Overlay"
-              aria-pressed={panelPlacement === "overlay"}
-              onClick={() => setPanelPlacement("overlay")}
+              aria-label="Float"
+              aria-pressed={panelPlacement === "float"}
+              onClick={() => setPanelPlacement("float")}
             >
-              <PanelOverlay />
-              <span className="pm-tip" aria-hidden="true">Overlay</span>
+              <PanelFloat />
+              <span className="pm-tip" aria-hidden="true">Float</span>
             </button>
           </span>
         </>
@@ -217,19 +222,21 @@ export default function ResultViewerShell({
       ref={viewerRef}
       aria-label="Learning viewer"
       data-result-authority={authority}
+      data-shell-frame={frame}
       data-view-mode={fullscreen ? "fullscreen" : viewerMode}
       data-fs-panel={fullscreen ? panelPlacement : undefined}
       data-panel-size={panelSize}
     >
-      <div className="result-shell-bar">
-        <AuthorityBadge authority={authority} />
-        {chrome && <div className="result-shell-chrome">{chrome}</div>}
-      </div>
+      {frame === "standard" && (
+        <div className="result-shell-bar">
+          <AuthorityBadge authority={authority} />
+          {chrome && <div className="result-shell-chrome">{chrome}</div>}
+        </div>
+      )}
       {viewerNotice && <p className="result-viewer-notice" role="status">{viewerNotice}</p>}
       <div className="result-main">
         <div className="result-media-col">
           {media({ modeControls, panelControls })}
-          {mediaMeta}
         </div>
         {learning}
       </div>

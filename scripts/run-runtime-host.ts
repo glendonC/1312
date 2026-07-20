@@ -24,6 +24,7 @@ import { resolveLanguageExplanationExecutorConfiguration } from "../src/studio/r
 import { resolveLearningPrepExecutorConfiguration } from "../src/studio/runtime/production/learningPrep/configuration.ts";
 import { resolveSpanTranslationExecutorConfiguration } from "../src/studio/runtime/production/spanTranslations/configuration.ts";
 import { OllamaSpanTranslationExecutor } from "../src/studio/runtime/production/spanTranslations/ollamaExecutor.ts";
+import { OpenAiSpanTranslationExecutor } from "../src/studio/runtime/production/spanTranslations/openAiExecutor.ts";
 
 const REPOSITORY = resolve(import.meta.dirname, "..");
 
@@ -170,7 +171,12 @@ const spanTranslationExecutor = spanTranslationConfiguration.mode === "ollama"
       endpoint: spanTranslationConfiguration.endpoint,
       think: spanTranslationConfiguration.think,
     })
-  : undefined;
+  : spanTranslationConfiguration.mode === "openai"
+    ? new OpenAiSpanTranslationExecutor({
+        apiKey: await openAiKey(),
+        model: spanTranslationConfiguration.model,
+      })
+    : undefined;
 const service = await RuntimeStartService.open({
   store,
   sources,
@@ -239,7 +245,9 @@ process.stdout.write(`${JSON.stringify({
     : "unavailable-no-fixture-fallback",
   spanTranslationExecutor: spanTranslationConfiguration.mode === "ollama"
     ? `current-run-local-ollama-opt-in:${spanTranslationConfiguration.model}`
-    : "unavailable-no-fixture-fallback",
+    : spanTranslationConfiguration.mode === "openai"
+      ? `current-run-openai-opt-in:${spanTranslationConfiguration.model}`
+      : "unavailable-no-fixture-fallback",
   authorizationToken: token,
 }, null, 2)}\n`);
 

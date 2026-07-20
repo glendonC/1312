@@ -225,8 +225,8 @@ test("configuration refuses real execution without the explicit allow flag and m
     /--span-translation-model/,
   );
   assert.throws(
-    () => resolveSpanTranslationExecutorConfiguration({ mode: "openai", allowReal: true, model: "gpt", endpoint: null, think: null }),
-    /must be unavailable or ollama/,
+    () => resolveSpanTranslationExecutorConfiguration({ mode: "cloud", allowReal: true, model: "gpt", endpoint: null, think: null }),
+    /must be unavailable, ollama, or openai/,
   );
   assert.throws(
     () => resolveSpanTranslationExecutorConfiguration({ mode: "ollama", allowReal: true, model: "gemma3:4b", endpoint: null, think: "medium" }),

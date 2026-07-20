@@ -141,6 +141,7 @@ export function validateSpanTranslationExecutorDescriptor(
     "studio.unavailable-span-translation-generator",
     "studio.deterministic-span-translation-test-seam",
     "studio.ollama-span-translation-generator",
+    "studio.openai-span-translation-generator",
   ]), context, `${path}.id`);
   const classification = oneOf<SpanTranslationExecutorDescriptor["classification"]>(item.classification, new Set([
     "unavailable", "deterministic_test", "real_model",
@@ -151,7 +152,8 @@ export function validateSpanTranslationExecutorDescriptor(
   if (
     (classification === "unavailable" && (id !== "studio.unavailable-span-translation-generator" || model !== null)) ||
     (classification === "deterministic_test" && (id !== "studio.deterministic-span-translation-test-seam" || model !== "deterministic-test-model")) ||
-    (classification === "real_model" && (id !== "studio.ollama-span-translation-generator" || model === null))
+    (classification === "real_model" &&
+      ((id !== "studio.ollama-span-translation-generator" && id !== "studio.openai-span-translation-generator") || model === null))
   ) fail(context, path, "executor identity, classification, and model must agree");
   if (model !== null && (model.trim() !== model || model.length > 160 || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(model))) {
     fail(context, `${path}.model`, "must be a bounded path-free model identity");

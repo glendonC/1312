@@ -64,6 +64,15 @@ export type SpanTranslationExecutorDescriptor =
       model: string;
       promptContractContentId: string;
       configurationContentId: string;
+    }
+  | {
+      id: "studio.openai-span-translation-generator";
+      version: "1";
+      classification: "real_model";
+      executionScope: "current_run";
+      model: string;
+      promptContractContentId: string;
+      configurationContentId: string;
     };
 
 export interface SpanTranslationGrant {

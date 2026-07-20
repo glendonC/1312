@@ -78,6 +78,7 @@ export {
 export {
   DeterministicSpanTranslationTestExecutor,
   OllamaSpanTranslationExecutor,
+  OpenAiSpanTranslationExecutor,
   UnavailableSpanTranslationExecutor,
   type SpanTranslationExecutor,
 } from "../spanTranslations/index.ts";

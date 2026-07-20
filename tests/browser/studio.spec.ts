@@ -64,7 +64,7 @@ test.beforeEach(async ({ page }) => {
 
 async function openLab(page: Page): Promise<void> {
   await page.goto("/studio/?lab=1");
-  await expect(page.getByRole("button", { name: "Preview a YouTube link with recorded demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Studio trace lab" })).toBeVisible();
 }
 
@@ -123,8 +123,8 @@ async function startSubmittedPreview(
   page: Page,
   source = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
 ): Promise<void> {
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill(source);
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill(source);
   await page.keyboard.press("Enter");
   await finishPreparation(page);
 }
@@ -230,7 +230,7 @@ async function renderedDifference(
 
 test("the lab is opt-in during development", async ({ page }) => {
   await page.goto("/studio/");
-  await expect(page.getByRole("button", { name: "Preview a YouTube link with recorded demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Choose source: local or recorded" })).toBeVisible();
   await expect((await openSourceChooser(page)).getByRole("button", { name: "Process a file I own locally" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Studio trace lab" })).toHaveCount(0);
@@ -261,7 +261,7 @@ test("the default Studio exposes a separate owned-source operator path", async (
   await expect(productRuntime.getByRole("button", { name: "Connect to local host", exact: true })).toBeDisabled();
 
   await productRuntime.getByRole("button", { name: "Exit setup" }).click();
-  await expect(page.getByRole("button", { name: "Preview a YouTube link with recorded demo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
   await expect((await openSourceChooser(page)).getByRole("button", { name: "Explore the recorded run-006 demo" })).toBeVisible();
 });
 
@@ -501,7 +501,7 @@ test("the input stage introduces the orchestrator before asking for a source", a
   });
   const sourceTrigger = page.getByRole("button", { name: "Choose source: local or recorded" });
   const sourcePanel = page.getByRole("dialog", { name: "Choose a Studio source" });
-  const previewTrigger = page.getByRole("button", { name: "Preview a YouTube link with recorded demo" });
+  const previewTrigger = page.getByRole("button", { name: "Input Source" });
   await expect(heading).toBeVisible();
   await expect(previewTrigger).toBeVisible();
   await expect(sourceTrigger).toHaveAttribute("aria-expanded", "false");
@@ -542,7 +542,7 @@ test("the input stage introduces the orchestrator before asking for a source", a
   await expect(sourcePanel).toHaveCount(0);
 
   await previewTrigger.click();
-  await expect(page.getByRole("textbox", { name: "YouTube link for recorded preview" })).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "YouTube link" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(previewTrigger).toBeFocused();
   await expect(sourcePanel).toHaveCount(0);
@@ -604,7 +604,7 @@ test("source authority options separate live local ingest from recorded preview"
   await page.goto("/studio/");
 
   const trigger = page.getByRole("button", { name: "Choose source: local or recorded" });
-  const previewTrigger = page.getByRole("button", { name: "Preview a YouTube link with recorded demo" });
+  const previewTrigger = page.getByRole("button", { name: "Input Source" });
   const panel = page.getByRole("dialog", { name: "Choose a Studio source" });
   await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
@@ -634,7 +634,7 @@ test("source authority options separate live local ingest from recorded preview"
   await expect(secondSample).toHaveAttribute("data-source-example-authority", "recorded-preview");
 
   await firstSample.click();
-  const sourceField = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
+  const sourceField = page.getByRole("textbox", { name: "YouTube link" });
   await expect(sourceField).toBeFocused();
   await expect(sourceField).toHaveValue(
     "https://www.youtube.com/watch?v=hWxESR68Olg&list=RDhWxESR68Olg&start_radio=1&pp=oAcB",
@@ -647,7 +647,7 @@ test("source authority options separate live local ingest from recorded preview"
   await secondSample.click();
   await expect(sourceField).toBeFocused();
   await expect(sourceField).toHaveValue("https://www.youtube.com/watch?v=XauBqFepc-s");
-  await expect(page.getByRole("button", { name: "Resolve metadata for recorded preview" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resolve source metadata" })).toBeVisible();
   await page.waitForTimeout(240);
   const sourceBarAfter = await page.locator(".source-entry .dock-bar").boundingBox();
   for (const key of ["x", "y", "width", "height"] as const) {
@@ -741,8 +741,8 @@ test("YouTube local ingest registers exact local bytes and enters the existing p
 
 test("a failed source check reports directly above the source dock", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  const source = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
+  await page.getByRole("button", { name: "Input Source" }).click();
+  const source = page.getByRole("textbox", { name: "YouTube link" });
   await source.fill("https://example.com/media");
   await page.keyboard.press("Enter");
 
@@ -761,8 +761,8 @@ test("a failed source check reports directly above the source dock", async ({ pa
 
 test("an identified source keeps the URL editor unchanged", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  const source = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
+  await page.getByRole("button", { name: "Input Source" }).click();
+  const source = page.getByRole("textbox", { name: "YouTube link" });
   const editor = page.locator(".source-entry .dock-bar");
   await page.waitForTimeout(420);
   const editorBox = await editor.boundingBox();
@@ -850,8 +850,8 @@ test("the welcome composition fits every supported viewport", async ({ page }, t
 
 test("a submitted source moves through setup and forecast before the recorded interface preview", async ({ page }, testInfo) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  const clipField = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
+  await page.getByRole("button", { name: "Input Source" }).click();
+  const clipField = page.getByRole("textbox", { name: "YouTube link" });
   const submittedUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
   await clipField.fill(submittedUrl);
   await page.waitForTimeout(420);
@@ -1257,8 +1257,8 @@ test("submitted metadata resolution stays in the welcome composition", async ({ 
   });
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/resolvingfixture");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/resolvingfixture");
   await page.keyboard.press("Enter");
 
   await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
@@ -1283,7 +1283,7 @@ test("submitted metadata resolution stays in the welcome composition", async ({ 
   await expect(page.getByRole("heading", {
     name: "One moment—I’m asking YouTube for the title, creator, and duration. The media itself remains untouched.",
   })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "YouTube link for recorded preview" })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "YouTube link" })).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "Choose a Studio source" })).toHaveCount(0);
   await expect(page.locator(".preflight")).toHaveCount(0);
 
@@ -1310,17 +1310,17 @@ test("metadata resolution can be cancelled without implying a pausable operation
   });
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
+  await page.getByRole("button", { name: "Input Source" }).click();
   const submittedUrl = "https://youtu.be/cancelledfixture";
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill(submittedUrl);
-  await page.getByRole("button", { name: "Resolve metadata for recorded preview" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill(submittedUrl);
+  await page.getByRole("button", { name: "Resolve source metadata" }).click();
 
   const lifecycleBar = page.getByLabel("Studio lifecycle");
   await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "resolving");
   await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
   await lifecycleBar.getByRole("button", { name: "Cancel" }).click();
 
-  const sourceField = page.getByRole("textbox", { name: "YouTube link for recorded preview" });
+  const sourceField = page.getByRole("textbox", { name: "YouTube link" });
   await expect(sourceField).toBeVisible();
   await expect(sourceField).toHaveValue(submittedUrl);
   await expect(sourceField).toBeFocused();
@@ -1334,8 +1334,8 @@ test("metadata resolution can be cancelled without implying a pausable operation
 
 test("a submitted custom range presents one exact and directly manipulable trim control", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/customrangefixture");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/customrangefixture");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Continue to Range" }).click();
   await page.getByRole("button", { name: "Update range: 0:00–1:23" }).click();
@@ -1450,8 +1450,8 @@ test("a long submitted source opens with an explicit editable two-minute request
   });
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/longfixture");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/longfixture");
   await page.keyboard.press("Enter");
 
   await expect(page.getByRole("note", { name: "Submitted source metadata boundary" })).toContainText(
@@ -1524,8 +1524,8 @@ test("a compact submitted range popover does not show a phantom scrollbar", asyn
   });
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/compactrangefixture");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/compactrangefixture");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Continue to Range" }).click();
   await page.getByRole("button", { name: "Update range: 0:00–2:00" }).click();
@@ -1577,10 +1577,15 @@ test("submitted preview Results reports no submitted artifact before recorded de
   await page.goto("/studio/");
   await startSubmittedPreview(page);
 
-  const boundary = page.locator(".submitted-results-boundary");
-  await expect(boundary.getByRole("heading", { name: "Submitted source was not processed" })).toBeVisible({
+  // The replay completes on the arrival statement; the submitted-source boundary reads on the
+  // report face behind it.
+  await expect(page.getByRole("heading", { name: "Your video has finished processing." })).toBeVisible({
     timeout: 30_000,
   });
+  await page.getByRole("button", { name: "View result" }).click();
+
+  const boundary = page.locator(".submitted-results-boundary");
+  await expect(boundary.getByRole("heading", { name: "Submitted source was not processed" })).toBeVisible();
   await expect(boundary).toContainText("Resolved browser-test video");
   await expect(boundary).toContainText("The viewer below shows only the recorded demo run-006");
   const submittedDetails = boundary.getByText("Submitted request details");
@@ -1595,12 +1600,20 @@ test("submitted preview Results reports no submitted artifact before recorded de
   await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
 });
 
-test("completed recorded runs transition directly into the learning viewer", async ({ page }, testInfo) => {
+test("completed recorded runs arrive on the finished statement and open the report", async ({ page }, testInfo) => {
   await openLab(page);
   await scenario(page).selectOption("unscored-complete");
   await page.locator(".studio-lab").evaluate((element) => {
     (element as HTMLElement).style.display = "none";
   });
+
+  // Completion lands on the arrival face once: the finished statement over the result brief,
+  // its parameter values read from the bundle, and one way forward.
+  await expect(page.getByRole("heading", { name: "Your video has finished processing." })).toBeVisible();
+  const arrivalBrief = page.locator(".result-arrival .result-brief");
+  await expect(arrivalBrief).toContainText("0:00–0:40");
+  await expect(arrivalBrief).toContainText("11 of its 15 lines");
+  await page.getByRole("button", { name: "View result" }).click();
 
   const results = page.locator("#studio-recorded-results");
   await expect(results).toBeVisible();
@@ -1612,27 +1625,38 @@ test("completed recorded runs transition directly into the learning viewer", asy
   await expect(results.getByRole("button", { name: "Run again", exact: true })).toHaveCount(0);
   const viewer = results.getByRole("region", { name: "Learning viewer" });
   await expect(viewer).toBeVisible();
-  // Split/Cinema act on the desktop side-by-side layout; mobile is single column and drops them.
-  if (testInfo.project.name === "desktop") {
-    await expect(viewer.getByRole("button", { name: "Split" })).toHaveAttribute("aria-pressed", "true");
-    await expect(viewer.getByRole("button", { name: "Cinema" })).toBeVisible();
-  }
+  // The report reads clip beside brief: the transcript belongs to the watch face, and the
+  // workbench viewer carries no Split/Cinema choice — the watch face is the stage.
+  await expect(page.locator(".result-brief-rail")).toBeVisible();
+  await expect(page.locator(".result-brief-rail .result-brief")).toContainText("held back instead of guessed");
+  await expect(results.locator(".learning-workspace")).toBeHidden();
+  await expect(viewer.locator(".pm-view")).toHaveCount(0);
   await expect(viewer.getByRole("button", { name: "Full screen" })).toBeVisible();
   // The volume slider unfolds out of the speaker on hover/focus; reveal it the way a viewer would.
   await viewer.getByRole("button", { name: /^(Mute|Unmute)$/ }).hover();
   await expect(viewer.getByRole("slider", { name: "Volume" })).toBeVisible();
   await expect(viewer.getByRole("combobox", { name: "Playback speed" })).toBeVisible();
   // The workbench frame carries no authority bar over the composition: the authority stays
-  // machine-readable on the region, and the evidence class reads in the hero facts.
+  // machine-readable on the region, and the evidence class is stated by the Source disclosure,
+  // never worn as a hero label.
   await expect(viewer).toHaveAttribute("data-result-authority", "recorded_demo");
   await expect(viewer).toHaveAttribute("data-shell-frame", "workbench");
   await expect(viewer.locator(".result-authority-badge")).toHaveCount(0);
-  // The hero facts (including the evidence class) fold away on the compact band.
+  // The hero facts fold away on the compact band; on desktop they carry accounting only.
   if (testInfo.project.name === "desktop") {
-    await expect(page.locator(".result-workspace-hero")).toContainText("Recorded demo");
+    const hero = page.locator(".result-workspace-hero");
+    await expect(hero).toContainText("KO → EN");
+    await expect(hero).not.toContainText("Recorded demo");
   }
-  // The environment head carries the source title, focus-panel style.
+  // The environment head carries the source title, focus-panel style. Prepared help stays off
+  // the report's preview — the moments card belongs to the watch room.
   await expect(page.locator(".result-workspace-source-head h3")).toContainText("Natural Korean Conversation");
+  await expect(results.locator('[data-moments-overlay-authority="design_fixture"]')).toBeHidden();
+
+  // The watch face hands the room to the viewer: the transcript, its learning controls, and the
+  // moments card live here, and Back is a step, not an exit.
+  await page.getByRole("button", { name: "Watch & study" }).click();
+  await expect(results.locator(".learning-workspace")).toBeVisible();
   await expect(results.locator('[data-moments-overlay-authority="design_fixture"]')).toBeVisible();
   await page.getByRole("button", { name: "Tune" }).click();
   const face = results.getByRole("region", { name: "Customize learning" });
@@ -1640,6 +1664,7 @@ test("completed recorded runs transition directly into the learning viewer", asy
   await results.getByRole("button", { name: "Close learning controls" }).click();
   await expect(results.locator(".result-media-meta")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Coverage" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back to the result report" })).toBeVisible();
 });
 
 test("a completed run opens and closes the result workspace over the persistent process graph", async ({ page }) => {
@@ -1649,10 +1674,15 @@ test("a completed run opens and closes the result workspace over the persistent 
     (element as HTMLElement).style.display = "none";
   });
 
+  // The workspace auto-opened on its arrival face over the canvas, which stays mounted
+  // beneath it the whole time.
+  const arrival = page.getByRole("heading", { name: "Your video has finished processing." });
+  await expect(arrival).toBeVisible();
+  await page.getByRole("button", { name: "View result" }).click();
+
   const results = page.locator("#studio-recorded-results");
   await expect(results).toBeVisible();
   const viewer = results.getByRole("region", { name: "Learning viewer" });
-  // The workspace auto-opened over the canvas, which stays mounted beneath it the whole time.
   const stage = page.locator(".stage-complete");
   await expect(stage).toHaveCount(1);
   // The focus-panel command baseline: two distinctly named disclosures and the one exit.
@@ -1661,6 +1691,14 @@ test("a completed run opens and closes the result workspace over the persistent 
   await expect(commands.getByRole("button", { name: "Source" })).toBeVisible();
   await expect(commands.getByRole("button", { name: "Coverage" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Run view" })).toHaveCount(0);
+
+  // Watch is a room inside the workspace: Back (or Esc) returns to the report, never past it.
+  await page.getByRole("button", { name: "Watch & study" }).click();
+  await expect(results.locator(".learning-workspace")).toBeVisible();
+  await expect(commands.getByRole("button", { name: /^Close the result/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(results.locator(".learning-workspace")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Watch & study" })).toBeVisible();
 
   await commands.getByRole("button", { name: /^Close the result/ }).click();
   await expect(stage).toBeVisible();
@@ -1680,10 +1718,12 @@ test("a completed run opens and closes the result workspace over the persistent 
   await expect(page.locator(".dock-well")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^(Pause|Resume|Stop)$/ })).toHaveCount(0);
 
-  // The orb is the sole re-entry anchor: opening it reopens the result workspace.
+  // The orb is the sole re-entry anchor: opening it resumes the report — never arrival,
+  // which belongs to the completion moment alone.
   await artifact.click();
   await expect(results).toBeVisible();
   await expect(viewer).toBeVisible();
+  await expect(arrival).toHaveCount(0);
   await expect(chip).toHaveCount(0);
   await expect(stage).toHaveCount(1);
 
@@ -1719,9 +1759,9 @@ test("a remote metadata failure keeps duration and range controls unavailable", 
     });
   });
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/privatevideo");
-  await page.getByRole("button", { name: "Resolve metadata for recorded preview" }).click();
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/privatevideo");
+  await page.getByRole("button", { name: "Resolve source metadata" }).click();
 
   await expect(page.getByRole("heading", { name: "Source metadata unavailable" })).toBeVisible();
   await expect(page.getByText("YouTube video metadata is unavailable.")).toBeVisible();
@@ -1751,9 +1791,9 @@ test("the submitted preparation sequence stays horizontally contained at every s
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-    await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/dQw4w9WgXcQ");
-    await page.getByRole("button", { name: "Resolve metadata for recorded preview" }).click();
+  await page.getByRole("button", { name: "Input Source" }).click();
+    await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/dQw4w9WgXcQ");
+    await page.getByRole("button", { name: "Resolve source metadata" }).click();
 
     const panel = page.locator(".preflight-stage-panel");
     await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
@@ -1762,7 +1802,7 @@ test("the submitted preparation sequence stays horizontally contained at every s
     await expect(panel).toHaveCSS("position", "relative");
     await expect(panel).toHaveCSS("overflow-y", "visible");
     const lifecycleBar = page.getByLabel("Studio lifecycle");
-    await expect(page.getByRole("textbox", { name: "YouTube link for recorded preview" })).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "YouTube link" })).toHaveCount(0);
     await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
     await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "source");
     await page.waitForTimeout(360);
@@ -2192,9 +2232,9 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
 
   await page.goto("/");
   await page.getByRole("link", { name: "Open Studio" }).click();
-  await expect(page.getByRole("button", { name: "Preview a YouTube link with recorded demo" })).toBeVisible();
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill(
+  await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill(
     "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   );
   await page.keyboard.press("Enter");
@@ -2483,8 +2523,8 @@ test("the submitted preview fits every supported viewport", async ({ page }, tes
     await page.setViewportSize(viewport);
     await page.goto("/studio/?lab=1");
     await page.getByRole("button", { name: "Collapse trace lab" }).click();
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-    await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill(`https://youtu.be/${longVideoId}`);
+  await page.getByRole("button", { name: "Input Source" }).click();
+    await page.getByRole("textbox", { name: "YouTube link" }).fill(`https://youtu.be/${longVideoId}`);
     await page.keyboard.press("Enter");
     await finishPreparation(page, true, true);
     await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
@@ -2528,8 +2568,8 @@ test("the submitted preview fits every supported viewport", async ({ page }, tes
 
 test("the source capsule sizes to content before applying its maximum", async ({ page }) => {
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
-  await page.getByRole("textbox", { name: "YouTube link for recorded preview" }).fill("https://youtu.be/dQw4w9WgXcQ");
+  await page.getByRole("button", { name: "Input Source" }).click();
+  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/dQw4w9WgXcQ");
   await page.keyboard.press("Enter");
   await finishPreparation(page);
 
@@ -2540,9 +2580,9 @@ test("the source capsule sizes to content before applying its maximum", async ({
   expect(shortWidth).toBeLessThan(360);
 
   await page.goto("/studio/");
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
+  await page.getByRole("button", { name: "Input Source" }).click();
   await page
-    .getByRole("textbox", { name: "YouTube link for recorded preview" })
+    .getByRole("textbox", { name: "YouTube link" })
     .fill(`https://youtu.be/${"deliberately-long-source-id-".repeat(12)}`);
   await page.keyboard.press("Enter");
   await finishPreparation(page);
@@ -2663,7 +2703,7 @@ test("owned-media preflight keeps receipted language decisions separate from job
   await expect(readout(page)).toHaveText(/\d+ \/ 72/);
   await page.getByRole("button", { name: "Ready", exact: true }).click();
   await page.getByRole("button", { name: "Collapse trace lab" }).click();
-  await page.getByRole("button", { name: "Preview a YouTube link with recorded demo" }).click();
+  await page.getByRole("button", { name: "Input Source" }).click();
   await chooseSource(page, "Explore the recorded run-006 demo");
 
   // The recorded source stage now narrates its boundary conversationally instead of

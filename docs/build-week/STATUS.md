@@ -334,6 +334,31 @@ and non-claims remain in the ladder.
   Docked/Float now pass their height through the learning player frame instead of collapsing to
   a letterboxed void. No new runtime request, receipt, or authority claim is introduced;
   everything shown is projection of the already-loaded bundle.
+- **Result workspace data binding, moments affordances, and Input Source copy:** the workspace
+  hero, the Source and Coverage panels, and the canvas Result node now read one shared
+  `projectResultAccounting(bundle)` projection (language pair, range, per-line counts); the hero
+  facts carry only that accounting — the evidence class is no longer worn as a hero label and is
+  stated by the Source disclosure and preflight facts, with `data-result-authority` staying
+  machine-readable — and a missing source licence reads "No licence was recorded" instead of
+  borrowing the evidence-class string. Prepared available
+  learning moments now stand visible between overlay windows: waypoint dots on the shared player
+  progress bar (typed `markers` chrome fed by `projectMomentMarkers(prep)` on both the recorded
+  and production players) and a quiet learning-bar count; both project the same prep and disappear
+  with it, so nothing is invented when no prep exists. The welcome's bottom action reads **Input
+  Source** again — the recorded-preview evidence class stays machine-readable on the control and
+  stated by the preflight provenance and confirmation facts, not baked into the entry label.
+- **Three-face result workspace (arrival → report → watch):** completion now lands on a
+  once-per-run arrival statement ("Your video has finished processing.") over a sentence-form
+  result brief whose parameter values are bundle-bound and tinted with the preparation-stage
+  palettes (source coral, range citron, language blue, coverage lilac). **View result** opens the
+  report — clip preview beside the brief and its **Watch & study** door — and the watch face
+  hands the full viewport to clip-beside-transcript, where the learning toggles sit inline in the
+  learning bar (the command-baseline portal is retired, which also removes the old
+  fullscreen-unreachable-toggles limit). Esc steps back one room at a time; the orb resumes the
+  last face, never arrival. The workbench viewer drops Split/Cinema (the watch face is the stage;
+  browser Full screen remains), and the settings-pill width stepper now sizes the watch room's
+  reading rail. The viewer stays mounted across faces, so playback, prep, pinned explanations,
+  and saved items survive every transition and the round trip through the completed graph.
 
 ## Post-freeze backlog boundary
 

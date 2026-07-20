@@ -26,19 +26,13 @@ import { useBundle, useStudio } from "./store";
 
 const ProductLocalRuntime = lazy(() => import("./localRuntime/ProductLocalRuntime"));
 
-type SourceGuideState = "welcome" | "recorded" | "resolving" | "resolved" | "unavailable" | "cancelled";
+type SourceGuideState = "welcome" | "recorded" | "cancelled";
 
 const SOURCE_GUIDE_COPY: Record<SourceGuideState, string> = {
   welcome:
     "Welcome to Studio. Add a source when you’re ready. We’ll take it from there, so you can sit back and watch it come together.",
   recorded:
     "The recorded demo is ready. Review its receipted source and replay request in the guided setup.",
-  resolving:
-    "One moment—I’m asking YouTube for the title, creator, and duration. The media itself remains untouched.",
-  resolved:
-    "I found the source. Choose a section of up to two minutes, then tell me what you’d like prepared.",
-  unavailable:
-    "I couldn’t verify this source’s metadata, so I’ve kept its duration and preparation controls unavailable.",
   cancelled:
     "Nothing was started. You can edit the source below or close this check and begin again when you’re ready.",
 };
@@ -55,7 +49,7 @@ const KOREAN_SAMPLES = [
 ] as const;
 
 interface StudioWelcomeProps {
-  openLocalSource: (mode: LocalSourceMode) => void;
+  openLocalSource: (mode: LocalSourceMode, seedUrl?: string) => void;
   selectSample: (url: string) => void;
 }
 
@@ -67,22 +61,15 @@ function StudioWelcome({
   selectSample,
 }: StudioWelcomeProps) {
   const preflight = useStudio((state) => state.preflight);
-  const previewSession = useStudio((state) => state.previewSession);
-  const sourceGuideState: SourceGuideState = !previewSession
-    ? preflight.status !== "idle" && preflight.provenance.kind !== "client_validation"
+  const sourceGuideState: SourceGuideState = preflight.status === "cancelled"
+    ? "cancelled"
+    : preflight.status !== "idle" && preflight.provenance.kind !== "client_validation"
       ? "recorded"
-      : "welcome"
-    : preflight.status === "cancelled"
-      ? "cancelled"
-      : previewSession.resolutionFailure
-        ? "unavailable"
-        : previewSession.resolution
-          ? "resolved"
-          : "resolving";
+      : "welcome";
   const sourceGuideActive = sourceGuideState !== "welcome";
-  const showPreparation = sourceGuideActive && sourceGuideState !== "resolving";
+  const showPreparation = sourceGuideActive && sourceGuideState === "recorded";
   const guideMessage = SOURCE_GUIDE_COPY[sourceGuideState];
-  const labelId = sourceGuideState === "resolved" || (sourceGuideState === "recorded" && preflight.status === "ready")
+  const labelId = sourceGuideState === "recorded" && preflight.status === "ready"
     ? "preflight-stage-title"
     : showPreparation
       ? "preflight-title"
@@ -107,7 +94,7 @@ function StudioWelcome({
               >
                 <AgentMark
                   identity={ORCHESTRATOR_IDENTITY}
-                  status={sourceGuideState === "resolving" ? "working" : "idle"}
+                  status="idle"
                 />
               </motion.div>
             </div>
@@ -122,20 +109,10 @@ function StudioWelcome({
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <strong>Source guide</strong>
-                  <span
-                    className={sourceGuideState === "resolving" ? "text-shimmer" : undefined}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {sourceGuideState === "resolving"
-                      ? "Resolving provider metadata…"
-                      : sourceGuideState === "recorded"
-                        ? "Recorded source ready"
-                        : sourceGuideState === "resolved"
-                          ? "Metadata resolved"
-                          : sourceGuideState === "cancelled"
-                            ? "Request closed"
-                            : "Metadata unavailable"}
+                  <span role="status" aria-live="polite">
+                    {sourceGuideState === "recorded"
+                      ? "Recorded source ready"
+                      : "Request closed"}
                   </span>
                 </motion.div>
               )}
@@ -199,6 +176,7 @@ interface StudioSourceDockProps {
   sourceFocusRequest: number;
   setSourceEntryOpen: (open: boolean) => void;
   setSourceUrl: (url: string) => void;
+  submitSource: (url: string) => void;
 }
 
 function StudioSourceDock({
@@ -207,14 +185,13 @@ function StudioSourceDock({
   sourceFocusRequest,
   setSourceEntryOpen,
   setSourceUrl,
+  submitSource,
 }: StudioSourceDockProps) {
   const preflight = useStudio((state) => state.preflight);
   const preparationStage = useStudio((state) => state.preparationStage);
   const initialization = useStudio((state) => state.initialization);
   const cancelInitialization = useStudio((state) => state.cancelInitialization);
   const dismissPreflight = useStudio((state) => state.dismissPreflight);
-  const retrySubmittedSource = useStudio((state) => state.retrySubmittedSource);
-  const previewSession = useStudio((state) => state.previewSession);
   const notice =
     preflight.status !== "idle" && preflight.provenance.kind === "client_validation"
       ? preflight.message
@@ -225,10 +202,6 @@ function StudioSourceDock({
   const sourceEntryMode =
     initialization === null &&
     (preflight.status === "idle" || preflight.provenance.kind === "client_validation");
-  const resolving =
-    initialization === null &&
-    preflight.status === "loading_source" &&
-    preflight.provenance.kind === "remote_resolution";
   const preparing = initialization === null && preflight.status === "ready";
   const failed =
     initialization === null &&
@@ -277,14 +250,13 @@ function StudioSourceDock({
               focusRequest={sourceFocusRequest}
               setOpen={setSourceEntryOpen}
               setUrl={setSourceUrl}
+              submitSource={submitSource}
             />
           ) : initialization ? (
             <LifecycleBottomBar
               key="initializing"
               mode="initializing"
-              title={initialization === "submitted-preview"
-                ? "Initializing recorded preview"
-                : "Initializing recorded replay"}
+              title="Initializing recorded replay"
               busy
               primaryAction={{
                 label: "Cancel start",
@@ -292,21 +264,12 @@ function StudioSourceDock({
                 onClick: cancelInitialization,
               }}
             />
-          ) : resolving ? (
-            <LifecycleBottomBar
-              key="resolving"
-              mode="resolving"
-              title="Resolving metadata"
-              busy
-              primaryAction={{ label: "Cancel", emphasis: "danger", onClick: returnToSource }}
-            />
           ) : preparing ? (
             <LifecycleBottomBar
               key="preparation"
               mode="preparation"
               title={preparationItem.label}
               stage={preparationStage}
-              busy={previewSession?.preparation.status === "building"}
               primaryAction={{ label: "Exit setup", emphasis: "danger", onClick: returnToSource }}
             />
           ) : failed ? (
@@ -314,9 +277,7 @@ function StudioSourceDock({
               key="failed"
               mode="failed"
               title={preflight.title}
-              primaryAction={previewSession?.resolutionFailure?.retryable
-                ? { label: "Retry", onClick: retrySubmittedSource }
-                : { label: "Edit source", onClick: returnToSource }}
+              primaryAction={{ label: "Edit source", onClick: returnToSource }}
             />
           ) : (
             <LifecycleBottomBar
@@ -441,6 +402,24 @@ function StudioSourceControl({
                   <span className="studio-source-choice-arrow" aria-hidden="true">›</span>
                 </button>
               </div>
+
+              <div className="studio-source-examples" role="group" aria-label="Example link presets">
+                <SourceChoiceIcon kind="link" />
+                <span><b>Example links</b><small>Fill the source bar only</small></span>
+                <div>
+                  {KOREAN_SAMPLES.map((sample) => (
+                    <button
+                      key={sample.label}
+                      type="button"
+                      data-source-example-authority="live-local"
+                      aria-label={`Fill the source bar with ${sample.label}`}
+                      onClick={() => choose(() => selectSample(sample.url))}
+                    >
+                      {sample.label.slice(-2)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </section>
 
             <section
@@ -467,24 +446,6 @@ function StudioSourceControl({
                   <span><b>run-006 demo</b><small>Replay saved evidence</small></span>
                   <span className="studio-source-choice-arrow" aria-hidden="true">›</span>
                 </button>
-              </div>
-
-              <div className="studio-source-examples" role="group" aria-label="Example recorded preview links">
-                <SourceChoiceIcon kind="link" />
-                <span><b>Example links</b><small>Fill the preview bar only</small></span>
-                <div>
-                  {KOREAN_SAMPLES.map((sample) => (
-                    <button
-                      key={sample.label}
-                      type="button"
-                      data-source-example-authority="recorded-preview"
-                      aria-label={`Use ${sample.label} for recorded preview`}
-                      onClick={() => choose(() => selectSample(sample.url))}
-                    >
-                      {sample.label.slice(-2)}
-                    </button>
-                  ))}
-                </div>
               </div>
             </section>
           </motion.div>
@@ -554,6 +515,7 @@ export default function InputAct() {
   const [localSourceMode, setLocalSourceMode] = useState<LocalSourceMode | null>(
     processingMock === null ? null : "owned",
   );
+  const [localSourceSeedUrl, setLocalSourceSeedUrl] = useState("");
   const [sourceEntryOpen, setSourceEntryOpen] = useState(false);
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceFocusRequest, setSourceFocusRequest] = useState(0);
@@ -561,22 +523,35 @@ export default function InputAct() {
   const error = useStudio((state) => state.error);
   const retry = useStudio((state) => state.retry);
   const preflightStatus = useStudio((state) => state.preflight.status);
-  const previewSession = useStudio((state) => state.previewSession);
   const dismissPreflight = useStudio((state) => state.dismissPreflight);
   const clientSourceCheck = useStudio(
     (state) =>
       state.preflight.status !== "idle" &&
       state.preflight.provenance.kind === "client_validation",
   );
-  const submittedSourceGuide = previewSession !== null && preflightStatus !== "idle";
-  const recordedSourceGuide = previewSession === null && preflightStatus !== "idle" && !clientSourceCheck;
-  const showWelcome = preflightStatus === "idle" || clientSourceCheck || submittedSourceGuide || recordedSourceGuide;
+  const recordedSourceGuide = preflightStatus !== "idle" && !clientSourceCheck;
+  const showWelcome = preflightStatus === "idle" || clientSourceCheck || recordedSourceGuide;
 
   function selectSample(url: string): void {
     dismissPreflight();
     setSourceUrl(url);
     setSourceEntryOpen(true);
     setSourceFocusRequest((current) => current + 1);
+  }
+
+  function openLocalSource(mode: LocalSourceMode, seedUrl = ""): void {
+    setLocalSourceSeedUrl(seedUrl);
+    setLocalSourceMode(mode);
+  }
+
+  /**
+   * The pasted link is a request to process that source, so it opens the local YouTube
+   * ingest authority rather than the recorded bundle. Nothing about the paste is treated as
+   * processing evidence: the ingest still has to clear its own range and confirmation gates.
+   */
+  function submitPastedSource(url: string): void {
+    dismissPreflight();
+    openLocalSource("youtube", url);
   }
 
   return (
@@ -603,6 +578,7 @@ export default function InputAct() {
           <ProductLocalRuntime
             processingMock={processingMock}
             sourceMode={localSourceMode}
+            initialYoutubeUrl={localSourceSeedUrl}
             onClose={() => setLocalSourceMode(null)}
           />
         </Suspense>
@@ -611,7 +587,7 @@ export default function InputAct() {
       {localSourceMode === null && showWelcome && loadStatus === "ready" && (
         <>
           <StudioWelcome
-            openLocalSource={setLocalSourceMode}
+            openLocalSource={openLocalSource}
             selectSample={selectSample}
           />
           <StudioSourceDock
@@ -620,6 +596,7 @@ export default function InputAct() {
             sourceFocusRequest={sourceFocusRequest}
             setSourceEntryOpen={setSourceEntryOpen}
             setSourceUrl={setSourceUrl}
+            submitSource={submitPastedSource}
           />
         </>
       )}

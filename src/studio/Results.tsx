@@ -1,9 +1,8 @@
 import { motion } from "motion/react";
 import { useMemo } from "react";
 
-import { clock } from "./format";
-import { projectMomentMarkers } from "./learning/MomentsOverlay";
 import RecordedMediaPlayer from "./learning/RecordedMediaPlayer";
+import { projectMomentMarkers } from "./learning/MomentsOverlay";
 import { projectPrototypeLearningPresentation } from "./learning/prototypeAdapter";
 import { learningPrototypeFixture } from "./learning/prototypeFixture";
 import { projectRecordedLearningSource } from "./learning/sourceAdapters";
@@ -29,7 +28,6 @@ import LearningResultExperience from "./viewer/LearningResultExperience";
  */
 export default function Results() {
   const bundle = useBundle();
-  const previewSession = useStudio((s) => s.previewSession);
   const clipT = useStudio((s) => s.clipT);
   const setClipT = useStudio((s) => s.setClipT);
 
@@ -38,7 +36,6 @@ export default function Results() {
   return (
     <RecordedResult
       bundle={bundle}
-      previewSession={previewSession}
       clipT={clipT}
       setClipT={setClipT}
     />
@@ -47,16 +44,13 @@ export default function Results() {
 
 function RecordedResult({
   bundle,
-  previewSession,
   clipT,
   setClipT,
 }: {
   bundle: RunBundle;
-  previewSession: ReturnType<typeof useStudio.getState>["previewSession"];
   clipT: number;
   setClipT: (time: number) => void;
 }) {
-  const { run } = bundle;
   const learningSource = useMemo(() => projectRecordedLearningSource(bundle), [bundle]);
   const learningPresentation = projectPrototypeLearningPresentation(
     learningSource,
@@ -82,14 +76,6 @@ function RecordedResult({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
     >
-      {previewSession?.preparation.status === "ready" && (
-        <SubmittedSourceResultBoundary
-          previewSession={previewSession}
-          recordedRunId={run.id}
-          recordedTitle={run.clip.title}
-        />
-      )}
-
       <LearningResultExperience
         authority="recorded_demo"
         frame="workbench"
@@ -107,51 +93,5 @@ function RecordedResult({
         prepInteraction={prepInteraction}
       />
     </motion.div>
-  );
-}
-
-function SubmittedSourceResultBoundary({
-  previewSession,
-  recordedRunId,
-  recordedTitle,
-}: {
-  previewSession: NonNullable<ReturnType<typeof useStudio.getState>["previewSession"]>;
-  recordedRunId: string;
-  recordedTitle: string;
-}) {
-  if (!previewSession.resolution || previewSession.preparation.status !== "ready") return null;
-  const { resolution } = previewSession;
-  const request = previewSession.preparation.request;
-  const sourceLanguage = request.language.source.mode === "automatic"
-    ? { value: "Automatic requested", note: "detection never started" }
-    : { value: request.language.source.language, note: "user declared" };
-  return (
-    <section
-      className="submitted-results-boundary"
-      aria-labelledby="submitted-results-title"
-      data-submitted-preparation-request-id={request.requestId}
-    >
-      <header>
-        <span>Submitted source</span>
-        <h2 id="submitted-results-title">Submitted source was not processed</h2>
-        <p>
-          No artifact exists for <b>{resolution.source.label}</b>. The viewer below shows only the recorded demo
-          {` ${recordedRunId}`}: {recordedTitle}.
-        </p>
-      </header>
-      <details>
-        <summary>Submitted request details</summary>
-        <dl>
-          <div><dt>Selected range</dt><dd>{clock(request.range.startMs / 1_000)} to {clock(request.range.endMs / 1_000)}</dd></div>
-          <div><dt>Source language</dt><dd className="dd-stacked"><span>{sourceLanguage.value}</span><small>{sourceLanguage.note}</small></dd></div>
-          <div><dt>Requested target</dt><dd>{request.language.target}</dd></div>
-          <div><dt>Artifact status</dt><dd className="dd-stacked"><span>Unavailable</span><small>no runtime receipt</small></dd></div>
-        </dl>
-        <p className="submitted-results-identity">
-          <span>Preparation identity</span>
-          <code>{request.requestId}</code>
-        </p>
-      </details>
-    </section>
   );
 }

@@ -105,10 +105,17 @@ export default function ProductLocalRuntime({
   onClose,
   processingMock = null,
   sourceMode = "owned",
+  initialYoutubeUrl = "",
 }: {
   onClose: () => void;
   processingMock?: ProcessingMockScenario | null;
   sourceMode?: ProductLocalSourceMode;
+  /**
+   * Seeds the ingest URL field only. Every download gate stays closed: the range bounds and
+   * the local-processing confirmation are still the operator's to set, and the host re-checks
+   * both regardless of what seeded this field.
+   */
+  initialYoutubeUrl?: string;
 }) {
   const [baseUrl, setBaseUrl] = useState(defaultHostUrl);
   const [token, setToken] = useState("");
@@ -119,7 +126,7 @@ export default function ProductLocalRuntime({
   const [sourceLabel, setSourceLabel] = useState("");
   const [rightsHolder, setRightsHolder] = useState("");
   const [ownershipAttested, setOwnershipAttested] = useState(false);
-  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState(initialYoutubeUrl);
   const [youtubeStartSeconds, setYoutubeStartSeconds] = useState(0);
   const [youtubeEndSeconds, setYoutubeEndSeconds] = useState(120);
   const [youtubeLocalProcessingConfirmed, setYoutubeLocalProcessingConfirmed] = useState(false);

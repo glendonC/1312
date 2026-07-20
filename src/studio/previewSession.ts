@@ -1,9 +1,4 @@
 import type { ClipSource, IngestReceipt } from "./types";
-import type { RemoteSourceResolutionReceipt } from "./sourceResolution";
-import type {
-  SubmittedPreparationState,
-  SubmittedSourceLanguageIntent,
-} from "./submittedPreparation";
 
 const YOUTUBE_HOSTS = new Set(["youtube.com", "m.youtube.com", "youtu.be"]);
 
@@ -12,28 +7,6 @@ export interface SourcePresentation {
   displayUrl: string;
   compactUrl?: string;
   accessibleName: string;
-}
-
-export interface PreviewSource extends SourcePresentation {
-  raw: string;
-}
-
-/**
- * UI-only context for exercising Studio with the recorded replay. It is deliberately
- * separate from RunBundle so a submitted URL can never be mistaken for recorded evidence.
- */
-export interface StudioPreviewSession {
-  mode: "submitted_source";
-  dataSource: "recorded_run";
-  source: PreviewSource;
-  resolution: RemoteSourceResolutionReceipt | null;
-  resolutionFailure: {
-    code: string;
-    message: string;
-    retryable: boolean;
-  } | null;
-  sourceLanguage: SubmittedSourceLanguageIntent;
-  preparation: SubmittedPreparationState;
 }
 
 export function presentSource(raw: string): SourcePresentation | null {
@@ -83,8 +56,7 @@ export function presentSource(raw: string): SourcePresentation | null {
 }
 
 /**
- * Name a recorded source from its producer-backed receipt when one exists. A submitted
- * preview never reaches this path, so recorded metadata cannot be attached to a new URL.
+ * Name a recorded source from its producer-backed receipt when one exists.
  */
 export function presentRecordedSource(
   source: ClipSource,
@@ -113,21 +85,5 @@ export function presentRecordedSource(
     kind: "web",
     displayUrl: label,
     accessibleName: `${receipt?.kind === "owned_local" ? "Local" : "Recorded"} source ${label}`,
-  };
-}
-
-export function createStudioPreviewSession(raw: string): StudioPreviewSession | null {
-  const trimmed = raw.trim();
-  const presentation = presentSource(trimmed);
-  if (!presentation || presentation.kind !== "youtube") return null;
-
-  return {
-    mode: "submitted_source",
-    dataSource: "recorded_run",
-    source: { ...presentation, raw: trimmed },
-    resolution: null,
-    resolutionFailure: null,
-    sourceLanguage: { mode: "automatic", language: null },
-    preparation: { status: "idle", request: null, message: null },
   };
 }

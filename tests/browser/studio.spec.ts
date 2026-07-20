@@ -54,14 +54,6 @@ function sourceResolutionReceipt(url: string, durationMs = 83_000) {
   };
 }
 
-test.beforeEach(async ({ page }) => {
-  await page.route("**/api/studio/source-resolutions", async (route) => {
-    const request = route.request();
-    const body = request.postDataJSON() as { url: string };
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(sourceResolutionReceipt(body.url)) });
-  });
-});
-
 async function openLab(page: Page): Promise<void> {
   await page.goto("/studio/?lab=1");
   await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
@@ -94,7 +86,7 @@ async function chooseSource(page: Page, name: string): Promise<void> {
   await panel.getByRole("button", { name, exact: true }).click();
 }
 
-async function finishPreparation(page: Page, previewMode = true, keyboard = false): Promise<void> {
+async function finishPreparation(page: Page, keyboard = false): Promise<void> {
   for (const label of [
     "Continue to Range",
     "Continue to Language",
@@ -110,22 +102,15 @@ async function finishPreparation(page: Page, previewMode = true, keyboard = fals
   if (keyboard) await reviewAction.press("Enter");
   else await reviewAction.click();
   await expect(page.getByRole("heading", {
-    name: previewMode ? /^I’m ready to open the recorded run-006 interface preview/ : /^I’m ready to replay this recorded analysis/,
+    name: /^I’m ready to replay this recorded analysis/,
   })).toBeVisible();
-  const finalAction = page.getByRole("button", {
-    name: previewMode ? "Preview run-006 recorded processing" : "Replay recorded analysis",
-  });
+  const finalAction = page.getByRole("button", { name: "Replay recorded analysis" });
   if (keyboard) await finalAction.press("Enter");
   else await finalAction.click();
 }
 
-async function startSubmittedPreview(
-  page: Page,
-  source = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-): Promise<void> {
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "YouTube link" }).fill(source);
-  await page.keyboard.press("Enter");
+async function startRecordedDemo(page: Page): Promise<void> {
+  await chooseSource(page, "Explore the recorded run-006 demo");
   await finishPreparation(page);
 }
 
@@ -610,15 +595,15 @@ test("source authority options separate live local ingest from recorded preview"
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await expect(panel).toHaveCount(0);
   await expect(previewTrigger).toBeVisible();
-  await expect(page.locator('.source-entry[data-source-authority="recorded-preview"]')).toBeVisible();
+  await expect(page.locator('.source-entry[data-source-authority="live-local"]')).toBeVisible();
 
   await trigger.click();
   const local = panel.getByRole("group", { name: "Process locally" });
   const recorded = panel.getByRole("group", { name: "Explore a recording" });
   const localChoices = local.locator(".studio-source-choice");
   const recordedChoices = recorded.locator(".studio-source-choice");
-  const firstSample = panel.getByRole("button", { name: "Use Korean sample 01 for recorded preview" });
-  const secondSample = panel.getByRole("button", { name: "Use Korean sample 02 for recorded preview" });
+  const firstSample = panel.getByRole("button", { name: "Fill the source bar with Korean sample 01" });
+  const secondSample = panel.getByRole("button", { name: "Fill the source bar with Korean sample 02" });
 
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
   await expect(panel).toBeVisible();
@@ -630,8 +615,8 @@ test("source authority options separate live local ingest from recorded preview"
   await expect(local).toContainText("Private local host");
   await expect(recorded).toContainText("No new processing");
   await expect(recorded.getByRole("button", { name: "Explore the recorded run-006 demo" })).toBeVisible();
-  await expect(firstSample).toHaveAttribute("data-source-example-authority", "recorded-preview");
-  await expect(secondSample).toHaveAttribute("data-source-example-authority", "recorded-preview");
+  await expect(firstSample).toHaveAttribute("data-source-example-authority", "live-local");
+  await expect(secondSample).toHaveAttribute("data-source-example-authority", "live-local");
 
   await firstSample.click();
   const sourceField = page.getByRole("textbox", { name: "YouTube link" });
@@ -647,7 +632,7 @@ test("source authority options separate live local ingest from recorded preview"
   await secondSample.click();
   await expect(sourceField).toBeFocused();
   await expect(sourceField).toHaveValue("https://www.youtube.com/watch?v=XauBqFepc-s");
-  await expect(page.getByRole("button", { name: "Resolve source metadata" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Set up local processing for this link" })).toBeVisible();
   await page.waitForTimeout(240);
   const sourceBarAfter = await page.locator(".source-entry .dock-bar").boundingBox();
   for (const key of ["x", "y", "width", "height"] as const) {
@@ -739,26 +724,6 @@ test("YouTube local ingest registers exact local bytes and enters the existing p
   }
 });
 
-test("a failed source check reports directly above the source dock", async ({ page }) => {
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  const source = page.getByRole("textbox", { name: "YouTube link" });
-  await source.fill("https://example.com/media");
-  await page.keyboard.press("Enter");
-
-  const notice = page.getByRole("alert");
-  await expect(notice).toHaveText("example.com has no registered source adapter.");
-  await expect(source).toBeVisible();
-
-  const [noticeBox, dockBox] = await Promise.all([
-    notice.boundingBox(),
-    page.locator(".source-dock-actions").boundingBox(),
-  ]);
-  expect(noticeBox).not.toBeNull();
-  expect(dockBox).not.toBeNull();
-  expect((noticeBox?.y ?? 0) + (noticeBox?.height ?? 0)).toBeLessThan(dockBox?.y ?? 0);
-});
-
 test("an identified source keeps the URL editor unchanged", async ({ page }) => {
   await page.goto("/studio/");
   await page.getByRole("button", { name: "Input Source" }).click();
@@ -846,758 +811,6 @@ test("the welcome composition fits every supported viewport", async ({ page }, t
       expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height + 0.5);
     }
   }
-});
-
-test("a submitted source moves through setup and forecast before the recorded interface preview", async ({ page }, testInfo) => {
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  const clipField = page.getByRole("textbox", { name: "YouTube link" });
-  const submittedUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-  await clipField.fill(submittedUrl);
-  await page.waitForTimeout(420);
-  const welcomeLockupBefore = await page.locator(".welcome-lockup").boundingBox();
-  const welcomeOrbBefore = await page.locator(".welcome-orchestrator-anchor").boundingBox();
-  const welcomePanelBefore = await page.locator(".welcome-panel").boundingBox();
-  const sourceDockBefore = await page.locator(".studio-source-dock").boundingBox();
-  const sourceBarBefore = await page.locator(".source-entry .dock-bar").boundingBox();
-  await page.keyboard.press("Enter");
-
-  await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
-  await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "Metadata resolved" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
-  await expect(clipField).toHaveCount(0);
-  const lifecycleBar = page.getByLabel("Studio lifecycle");
-  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
-  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "source");
-  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Source");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("1 / 6");
-  await expect(lifecycleBar.getByRole("button", { name: "Exit setup" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "Choose a Studio source" })).toHaveCount(0);
-  await page.waitForTimeout(420);
-  const welcomeLockupAfter = await page.locator(".welcome-lockup").boundingBox();
-  const welcomeOrbAfter = await page.locator(".welcome-orchestrator-anchor").boundingBox();
-  const welcomePanelAfter = await page.locator(".preflight-stage-panel").boundingBox();
-  const sourceDockAfter = await page.locator(".studio-source-dock").boundingBox();
-  for (const key of ["x", "y", "width", "height"] as const) {
-    expect(Math.abs((sourceDockAfter?.[key] ?? Infinity) - (sourceDockBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(2);
-  }
-  expect(sourceBarBefore).not.toBeNull();
-  const lifecycleBarBox = await lifecycleBar.boundingBox();
-  const viewportWidth = await page.evaluate(() => window.innerWidth);
-  expect(lifecycleBarBox).not.toBeNull();
-  expect(Math.abs((lifecycleBarBox?.x ?? 0) + (lifecycleBarBox?.width ?? 0) / 2 - viewportWidth / 2)).toBeLessThanOrEqual(1);
-  if (testInfo.project.name === "desktop") {
-    expect(Math.abs((welcomeLockupAfter?.x ?? Infinity) - (welcomeLockupBefore?.x ?? -Infinity))).toBeLessThanOrEqual(1);
-    expect(Math.abs((welcomeLockupAfter?.width ?? Infinity) - (welcomeLockupBefore?.width ?? -Infinity))).toBeLessThanOrEqual(1);
-    for (const key of ["x", "y", "width", "height"] as const) {
-      expect(Math.abs((welcomeOrbAfter?.[key] ?? Infinity) - (welcomeOrbBefore?.[key] ?? -Infinity))).toBeLessThanOrEqual(1);
-    }
-    const welcomePanelCenterBefore = (welcomePanelBefore?.x ?? Infinity) + (welcomePanelBefore?.width ?? 0) / 2;
-    const welcomePanelCenterAfter = (welcomePanelAfter?.x ?? -Infinity) + (welcomePanelAfter?.width ?? 0) / 2;
-    expect(Math.abs(welcomePanelCenterAfter - welcomePanelCenterBefore)).toBeLessThanOrEqual(1);
-  }
-  const sourceBoundary = page.getByRole("note", { name: "Submitted source metadata boundary" });
-  await expect(sourceBoundary).toContainText(
-    "I found Resolved browser-test video by Recorded test producer. It’s 1:23 long. I haven’t downloaded or processed the media.",
-  );
-  const sourceLink = sourceBoundary.getByRole("link", {
-    name: "Resolved browser-test video",
-  });
-  await expect(sourceLink).toHaveAttribute("href", "https://www.youtube.com/watch?v=fixturevideo");
-  await expect(sourceLink).toHaveAttribute("target", "_blank");
-  await expect(sourceLink).toHaveAttribute("rel", "noreferrer");
-  await expect(sourceLink).toHaveAttribute("title", "Open on YouTube in a new tab");
-  const sourceLinkIdleBackground = await sourceLink.evaluate((element) => getComputedStyle(element).backgroundColor);
-  await sourceLink.hover();
-  await expect.poll(() => sourceLink.evaluate((element) => getComputedStyle(element).backgroundColor))
-    .not.toBe(sourceLinkIdleBackground);
-  await expect(sourceBoundary).toHaveCSS("border-top-width", "0px");
-  await expect(page.locator(".preflight-stage-panel")).toHaveCSS("min-height", "0px");
-  await expect(page.locator(".preflight-stage-panel")).toHaveCSS("max-height", "none");
-  await expect(page.locator(".preflight-stage-panel .preflight-actions")).toHaveCount(0);
-  const preparationControls = page.getByRole("group", { name: "Preparation controls" });
-  await expect(preparationControls).toBeVisible();
-  await expect(page.locator(".preflight-stage-panel")).toHaveCSS("z-index", "2");
-  await expect(preparationControls).toHaveCSS("z-index", "1");
-  await expect(preparationControls.getByRole("button", { name: /Back to/ })).toHaveCount(0);
-  const continueToRange = preparationControls.getByRole("button", { name: "Continue to Range" });
-  await expect(continueToRange).toBeVisible();
-  await expect(continueToRange.locator("svg")).toHaveCount(1);
-  expect(await continueToRange.evaluate((element) => getComputedStyle(element, "::before").content)).toBe("none");
-  expect(await continueToRange.evaluate((element) => getComputedStyle(element, "::after").content)).toBe("none");
-  await expect(continueToRange).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  await expect(continueToRange.locator(".preflight-control-label")).toHaveCSS(
-    "background-color",
-    "rgba(0, 0, 0, 0)",
-  );
-  const preparationControlsBox = await preparationControls.boundingBox();
-  const continueToRangeBox = await continueToRange.boundingBox();
-  expect(preparationControlsBox).not.toBeNull();
-  expect(continueToRangeBox).not.toBeNull();
-  expect(preparationControlsBox?.width ?? Infinity).toBeLessThan(welcomePanelAfter?.width ?? 0);
-  expect(Math.abs(
-    (continueToRangeBox?.x ?? 0) + (continueToRangeBox?.width ?? 0) / 2 -
-    ((preparationControlsBox?.x ?? 0) + (preparationControlsBox?.width ?? 0) / 2),
-  )).toBeLessThanOrEqual(1);
-  expect(Math.abs(
-    (preparationControlsBox?.y ?? 0) -
-    ((welcomePanelAfter?.y ?? 0) + (welcomePanelAfter?.height ?? 0) - 1),
-  )).toBeLessThanOrEqual(2.5);
-  expect((preparationControlsBox?.y ?? 0) + (preparationControlsBox?.height ?? 0))
-    .toBeLessThan((lifecycleBarBox?.y ?? 0) - 8);
-  await expect(page.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
-  await expect(page.getByText("Source ready", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Resolved source", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Source details", { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/Provider metadata only/i)).toHaveCount(0);
-  await expect(page.getByLabel("Recorded selection · 0:00–0:40")).toHaveCount(0);
-  await expect(page.getByText("Recorded fixture facts · not the submitted link")).toHaveCount(0);
-  await expect(page.getByText("Didi's Korean Culture Podcast")).toHaveCount(0);
-  await expect(page.getByText("Creative Commons Attribution license (reuse allowed)")).toHaveCount(0);
-  await expect(page.getByText("ko-v3")).toHaveCount(0);
-  await expect(page.getByText("mp4 · h264 1280×720 · aac 48000Hz 2ch")).toHaveCount(0);
-
-  const requestForm = page.locator(".preflight-form");
-  await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
-  await expect(requestForm.locator(".preflight-stage-nav button")).toHaveCount(6);
-  await expect(page.getByRole("button", { name: "01 Source" })).toHaveAttribute("aria-current", "step");
-  await expect(page.getByRole("button", { name: "02 Range" })).toBeDisabled();
-  const stagePaletteContracts = await requestForm.locator(".preflight-stage-nav").evaluate((navigation) =>
-    [...navigation.querySelectorAll("button")].map((button) => {
-      const style = getComputedStyle(button);
-      return {
-        name: button.getAttribute("data-palette"),
-        color: style.getPropertyValue("--palette-color").trim(),
-        ink: style.getPropertyValue("--palette-ink").trim(),
-        soft: style.getPropertyValue("--palette-soft").trim(),
-        shadow: style.boxShadow,
-      };
-    }),
-  );
-  expect(stagePaletteContracts.map(({ name }) => name)).toEqual([
-    "coral",
-    "citron",
-    "blue",
-    "lilac",
-    "peach",
-    "teal",
-  ]);
-  expect(new Set(stagePaletteContracts.map(({ color }) => color)).size).toBe(6);
-  expect(new Set(stagePaletteContracts.map(({ ink }) => ink)).size).toBe(6);
-  expect(new Set(stagePaletteContracts.map(({ soft }) => soft)).size).toBe(6);
-  expect(stagePaletteContracts.every(({ shadow }) =>
-    shadow
-      .split(/,\s*(?=(?:rgba?|color)\()/)
-      .every((layer) => layer.includes("inset")),
-  )).toBe(true);
-  await expect(requestForm).toHaveAttribute("data-palette", "coral");
-  expect(await requestForm.evaluate((element) => getComputedStyle(element, "::before").content)).toBe("none");
-  const initialRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
-  expect(initialRequestId).toMatch(/^submitted-preparation:/);
-
-  await page.getByRole("button", { name: "Continue to Range" }).click();
-  await expect(preparationControls.getByRole("button", { name: "Back to Source" })).toBeVisible();
-  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "range");
-  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Range");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("2 / 6");
-  await expect(page.getByRole("heading", { name: /^I’ll prepare / })).toBeFocused();
-  await expect(requestForm).toHaveAttribute("data-palette", "citron");
-  const rangeParameter = preparationControls.getByRole("button", { name: "Update range: 0:00–1:23" });
-  const backToSource = preparationControls.getByRole("button", { name: "Back to Source" });
-  const continueToLanguage = preparationControls.getByRole("button", { name: "Continue to Language" });
-  for (const navigationAction of [backToSource, continueToLanguage]) {
-    await expect(navigationAction.locator("svg")).toHaveCount(1);
-    await expect(navigationAction).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(navigationAction.locator(".preflight-control-label")).toHaveCSS(
-      "background-color",
-      "rgba(0, 0, 0, 0)",
-    );
-    expect(await navigationAction.evaluate((element) => getComputedStyle(element, "::before").content)).toBe("none");
-    expect(await navigationAction.evaluate((element) => getComputedStyle(element, "::after").content)).toBe("none");
-  }
-  const [rangePanelBox, rangeShelfBox, backIconBox] = await Promise.all([
-    page.locator(".preflight-stage-panel").boundingBox(),
-    preparationControls.boundingBox(),
-    backToSource.locator(".preflight-control-icon").boundingBox(),
-  ]);
-  const visibleTopSpace = (backIconBox?.y ?? Infinity) -
-    ((rangePanelBox?.y ?? 0) + (rangePanelBox?.height ?? 0));
-  const visibleBottomSpace = ((rangeShelfBox?.y ?? 0) + (rangeShelfBox?.height ?? 0)) -
-    ((backIconBox?.y ?? Infinity) + (backIconBox?.height ?? 0));
-  expect(Math.abs(visibleTopSpace - visibleBottomSpace)).toBeLessThanOrEqual(1.5);
-  await expect(rangeParameter).toHaveAttribute("aria-expanded", "false");
-  const geometryBeforeRangePopover = await Promise.all([
-    page.locator(".preflight-stage-panel").boundingBox(),
-    preparationControls.boundingBox(),
-    lifecycleBar.boundingBox(),
-  ]);
-  await rangeParameter.click();
-  await expect(rangeParameter).toHaveAttribute("aria-expanded", "true");
-  const rangePopover = page.getByRole("dialog", { name: "Range options" });
-  await expect(rangePopover).toBeVisible();
-  await expect(rangePopover).toHaveAttribute("popover", "auto");
-  const geometryWithRangePopover = await Promise.all([
-    page.locator(".preflight-stage-panel").boundingBox(),
-    preparationControls.boundingBox(),
-    lifecycleBar.boundingBox(),
-  ]);
-  for (let index = 0; index < geometryBeforeRangePopover.length; index += 1) {
-    for (const key of ["x", "y", "width", "height"] as const) {
-      expect(Math.abs(
-        (geometryWithRangePopover[index]?.[key] ?? Infinity) -
-        (geometryBeforeRangePopover[index]?.[key] ?? -Infinity),
-      )).toBeLessThanOrEqual(1);
-    }
-  }
-  const [rangePopoverBox, rangeTriggerBox] = await Promise.all([
-    rangePopover.boundingBox(),
-    rangeParameter.boundingBox(),
-  ]);
-  expect(rangePopoverBox).not.toBeNull();
-  expect(rangeTriggerBox).not.toBeNull();
-  expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual(7.5);
-  expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(7.5);
-  expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(viewportWidth - 7.5);
-  // The Range editor opens downward, attached below the control shelf — it never covers the panel face.
-  await expect(rangePopover).toHaveAttribute("data-placement", "below");
-  expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(
-    (rangeShelfBox?.y ?? 0) + (rangeShelfBox?.height ?? 0) - 1,
-  );
-  // ...and stays clamped within the center panel's horizontal bounds, not merely the viewport.
-  expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual((rangePanelBox?.x ?? 0) - 0.5);
-  expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(
-    (rangePanelBox?.x ?? 0) + (rangePanelBox?.width ?? 0) + 0.5,
-  );
-  await expect(page.getByLabel("Entire video, 1:23")).toBeChecked();
-  await expect(
-    rangePopover.locator('.preflight-range-choice[data-selected="true"] .preflight-range-choice-indicator'),
-  ).toBeVisible();
-  // The oversized checkmark tile is gone; selection now reads through a restrained radio indicator.
-  await expect(rangePopover.locator(".preflight-choice-check")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(rangePopover).not.toBeVisible();
-  await expect(rangeParameter).toHaveAttribute("aria-expanded", "false");
-  await expect(rangeParameter).toBeFocused();
-  await rangeParameter.click();
-  await expect(rangePopover).toBeVisible();
-  await lifecycleBar.locator(".dock-status").click();
-  await expect(rangePopover).not.toBeVisible();
-  await expect(rangeParameter).toBeFocused();
-  await rangeParameter.click();
-  await page.getByRole("radio", { name: "Custom range" }).check();
-  await expect(rangePopover.getByText("2 min max", { exact: true })).toBeVisible();
-  const rangeTrim = rangePopover.getByRole("group", { name: "Custom range trim" });
-  const startGrip = rangeTrim.getByRole("slider", { name: "Start trim handle" });
-  await startGrip.press("ArrowRight");
-  await expect(page.getByRole("textbox", { name: "Start timestamp" })).toHaveValue("0:01");
-  const rangeEnd = page.getByRole("textbox", { name: "End timestamp" });
-  await expect(rangeEnd).toHaveValue("1:23");
-  await expect.poll(() => rangePopover.evaluate((element) => element.scrollHeight - element.clientHeight)).toBe(0);
-  await rangeEnd.fill("1:30");
-  // The invalid reason is shown inline in the editor (the stage sentence echoes it too, so scope here).
-  await expect(rangePopover.getByText("Choose a valid range within 0:00–1:23.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeDisabled();
-  // Bare seconds are accepted and normalized to M:SS when the field commits.
-  await rangeEnd.fill("80");
-  await rangeEnd.press("Enter");
-  await expect(rangeEnd).toHaveValue("1:20");
-  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
-  await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
-  const changedRangeRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
-  expect(changedRangeRequestId).not.toBe(initialRequestId);
-  await page.getByLabel("Entire video, 1:23").check();
-
-  await page.getByRole("button", { name: "Continue to Language" }).click();
-  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "language");
-  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Language");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("3 / 6");
-  await expect(requestForm).toHaveAttribute("data-palette", "blue");
-  const languageParameter = preparationControls.getByRole("button", {
-    name: "Update language: Detect later → English",
-  });
-  await expect(languageParameter).toHaveAttribute("aria-expanded", "false");
-  await languageParameter.click();
-  const languagePopover = page.getByRole("dialog", { name: "Language options" });
-  await expect(languagePopover).toBeVisible();
-  const automaticLanguage = page.getByLabel("Automatic (detection requested later)");
-  const declaredLanguage = page.getByLabel("Declare the source language");
-  await expect(automaticLanguage).toBeChecked();
-  await expect(automaticLanguage).toBeFocused();
-  await automaticLanguage.press("ArrowDown");
-  await expect(declaredLanguage).toBeChecked();
-  await page.getByRole("textbox", { name: "Declared BCP-47 language" }).fill("ko");
-  await expect(requestForm).toHaveAttribute("data-preparation-status", "ready");
-  const changedLanguageRequestId = await requestForm.getAttribute("data-submitted-preparation-request-id");
-  expect(changedLanguageRequestId).not.toBe(changedRangeRequestId);
-  await page.keyboard.press("Escape");
-  await expect(languagePopover).not.toBeVisible();
-  await expect(preparationControls.getByRole("button", {
-    name: "Update language: Korean → English",
-  })).toBeFocused();
-
-  await page.getByRole("button", { name: "Continue to Output" }).click();
-  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "output");
-  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Output");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("4 / 6");
-  await expect(requestForm).toHaveAttribute("data-palette", "lilac");
-  const outputParameter = preparationControls.getByRole("button", {
-    name: "Update output: Watch aids + evidence",
-  });
-  await outputParameter.click();
-  const outputPopover = page.getByRole("dialog", { name: "Output options" });
-  await expect(outputPopover).toBeVisible();
-  await expect(page.getByLabel("Watch aids plus evidence and breakdown")).toBeChecked();
-  await page.keyboard.press("Escape");
-  await expect(outputPopover).not.toBeVisible();
-  await expect(outputParameter).toBeFocused();
-  await page.getByRole("button", { name: "Continue to Forecast" }).click();
-  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "forecast");
-  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Forecast");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("5 / 6");
-  await expect(requestForm).toHaveAttribute("data-palette", "peach");
-  const forecast = page.getByRole("heading", { name: /^I’ve bound / });
-  await expect(forecast).toBeVisible();
-  await expect(forecast).toBeFocused();
-  await expect(forecast).toContainText("I still can’t forecast processing time, cost, scale, or workload");
-  const currentSetup = preparationControls.getByRole("button", { name: "Review current setup" });
-  await currentSetup.click();
-  const forecastPopover = page.getByRole("dialog", { name: "Forecast options" });
-  await expect(forecastPopover).toBeVisible();
-  await expect(page.getByRole("group", { name: "Current setup parameters" })).toBeVisible();
-  const rangeSetupRow = page.getByRole("button", { name: /Edit range:/ });
-  const languageSetupRow = page.getByRole("button", { name: /Edit language: Korean → English/ });
-  await expect(rangeSetupRow).toBeFocused();
-  await rangeSetupRow.press("ArrowDown");
-  await expect(languageSetupRow).toBeFocused();
-  await expect(page.locator("[data-submitted-preparation-request-id]")).toHaveCount(1);
-  await languageSetupRow.click();
-  await expect(page.getByRole("heading", { name: /^I’ll / })).toBeFocused();
-  await page.getByRole("button", { name: "05 Forecast" }).click();
-  await expect(forecast).toBeFocused();
-  await page.getByRole("button", { name: "Continue to Review" }).click();
-  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "confirm");
-  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Review");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("6 / 6");
-  await expect(requestForm).toHaveAttribute("data-palette", "teal");
-  await expect(page.getByRole("heading", { name: /^I’m ready to open the recorded run-006 interface preview/ }))
-    .toBeFocused();
-  await expect(page.getByRole("heading", { name: /won’t download or process Resolved browser-test video/i })).toBeVisible();
-  await expect(page.getByText(/does not submit a runtime command/i)).toBeVisible();
-  const reviewSetup = preparationControls.getByRole("button", { name: "Review current setup" });
-  await reviewSetup.click();
-  const reviewPopover = page.getByRole("dialog", { name: "Review options" });
-  await expect(reviewPopover).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(reviewPopover).not.toBeVisible();
-  await expect(reviewSetup).toBeFocused();
-  await page.getByRole("button", { name: "Preview run-006 recorded processing" }).click();
-
-  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "initializing");
-  await expect(lifecycleBar).toContainText("Initializing recorded preview");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveAttribute("aria-hidden", "true");
-  await expect(preparationControls).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
-  await lifecycleBar.getByRole("button", { name: "Cancel start" }).click();
-  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
-  await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "confirm");
-  await expect(preparationControls).toBeVisible();
-  await expect(page.locator('.studio[data-stage="input"]')).toBeVisible();
-  await page.getByRole("button", { name: "Preview run-006 recorded processing" }).click();
-  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "initializing");
-  await expect(preparationControls).toHaveCount(0);
-
-  await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
-  await expect(lifecycleBar).toHaveCount(0);
-  await expect(page.locator('.hub [data-agent-identity="orchestrator-root"]')).toBeVisible();
-  const thinking = page.locator('.hub [data-field-motion="thinking"]');
-  await expect(thinking).toBeVisible();
-  await expect(thinking.locator(".agent-mark-mesh")).toHaveAttribute("data-mesh-motion", "running");
-  const sourceIdentity = page.getByRole("group", {
-    name: "Source: YouTube video link dQw4w9WgXcQ",
-  });
-  const provenance = page.getByRole("note").filter({
-    hasText: "This interface preview uses a recorded run. Your source was not processed.",
-  });
-  await expect(sourceIdentity).toBeVisible();
-  await expect(provenance).toBeVisible();
-  await expect(provenance).toContainText("preparation request did not start a runtime");
-  expect(await provenance.evaluate((element) => element.closest(".top-mid"))).toBeNull();
-  await expect(page.getByRole("alert")).toHaveCount(0);
-  await expect(page.getByText("Hosted source probe unavailable")).toHaveCount(0);
-
-  const runDock = page.locator(".dock");
-  const stop = page.getByRole("button", { name: "Stop" });
-  await expect(stop).toBeVisible();
-  await expect
-    .poll(async () => {
-      const [dockBox, stopBox] = await Promise.all([runDock.boundingBox(), stop.boundingBox()]);
-      if (!dockBox || !stopBox) return Infinity;
-      return dockBox.x + dockBox.width - (stopBox.x + stopBox.width);
-    })
-    .toBeLessThanOrEqual(10);
-});
-
-test("submitted metadata resolution stays in the welcome composition", async ({ page }) => {
-  await page.unroute("**/api/studio/source-resolutions");
-  let releaseResolution!: () => void;
-  const resolutionGate = new Promise<void>((resolve) => {
-    releaseResolution = resolve;
-  });
-  await page.route("**/api/studio/source-resolutions", async (route) => {
-    const request = route.request().postDataJSON() as { url: string };
-    await resolutionGate;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(sourceResolutionReceipt(request.url)),
-    });
-  });
-
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/resolvingfixture");
-  await page.keyboard.press("Enter");
-
-  await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
-  const sourceGuideStatus = page.locator('.welcome-guide-copy [role="status"]');
-  await expect(sourceGuideStatus).toHaveText("Resolving provider metadata…");
-  await expect(sourceGuideStatus).toHaveClass(/text-shimmer/);
-  await expect(sourceGuideStatus).toHaveCSS("color", "rgba(0, 0, 0, 0)");
-  await expect(sourceGuideStatus).toHaveCSS("animation-name", "text-shimmer-sweep");
-  const lifecycleBar = page.getByLabel("Studio lifecycle");
-  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "resolving");
-  await expect(lifecycleBar.locator(".dock-status")).toHaveText("Resolving metadata…");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveText("");
-  await expect(lifecycleBar.locator(".dock-pct")).toHaveAttribute("aria-hidden", "true");
-  await expect(lifecycleBar.getByRole("button", { name: "Cancel" })).toBeVisible();
-  await expect(lifecycleBar).toHaveCSS("display", "flex");
-  await expect(lifecycleBar).toHaveCSS("border-radius", "999px");
-  await expect(lifecycleBar).toHaveCSS("background-color", "rgba(255, 255, 255, 0.58)");
-  expect(await lifecycleBar.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe("none");
-  await expect(lifecycleBar.locator(".studio-lifecycle-bar-content")).toHaveCSS("display", "grid");
-  await expect(lifecycleBar.getByRole("button", { name: "Cancel" })).toHaveCSS("height", "40px");
-  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
-  await expect(page.getByRole("heading", {
-    name: "One moment—I’m asking YouTube for the title, creator, and duration. The media itself remains untouched.",
-  })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "YouTube link" })).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "Choose a Studio source" })).toHaveCount(0);
-  await expect(page.locator(".preflight")).toHaveCount(0);
-
-  releaseResolution();
-  await expect(sourceGuideStatus).toHaveText("Metadata resolved");
-  await expect(sourceGuideStatus).not.toHaveClass(/text-shimmer/);
-  await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
-});
-
-test("metadata resolution can be cancelled without implying a pausable operation", async ({ page }) => {
-  await page.unroute("**/api/studio/source-resolutions");
-  let releaseResolution!: () => void;
-  const resolutionGate = new Promise<void>((resolve) => {
-    releaseResolution = resolve;
-  });
-  await page.route("**/api/studio/source-resolutions", async (route) => {
-    const request = route.request().postDataJSON() as { url: string };
-    await resolutionGate;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(sourceResolutionReceipt(request.url)),
-    }).catch(() => undefined);
-  });
-
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  const submittedUrl = "https://youtu.be/cancelledfixture";
-  await page.getByRole("textbox", { name: "YouTube link" }).fill(submittedUrl);
-  await page.getByRole("button", { name: "Resolve source metadata" }).click();
-
-  const lifecycleBar = page.getByLabel("Studio lifecycle");
-  await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "resolving");
-  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
-  await lifecycleBar.getByRole("button", { name: "Cancel" }).click();
-
-  const sourceField = page.getByRole("textbox", { name: "YouTube link" });
-  await expect(sourceField).toBeVisible();
-  await expect(sourceField).toHaveValue(submittedUrl);
-  await expect(sourceField).toBeFocused();
-  await expect(lifecycleBar).toHaveCount(0);
-
-  releaseResolution();
-  await page.waitForTimeout(150);
-  await expect(page.locator(".preflight-form")).toHaveCount(0);
-  await expect(sourceField).toBeVisible();
-});
-
-test("a submitted custom range presents one exact and directly manipulable trim control", async ({ page }) => {
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/customrangefixture");
-  await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Continue to Range" }).click();
-  await page.getByRole("button", { name: "Update range: 0:00–1:23" }).click();
-
-  const rangePopover = page.getByRole("dialog", { name: "Range options" });
-  await page.getByRole("radio", { name: "Custom range" }).check();
-  const trimControl = rangePopover.getByRole("group", { name: "Custom range trim" });
-  const sourceRange = trimControl.getByRole("group", { name: "Source range" });
-  const startTimestamp = page.getByRole("textbox", { name: "Start timestamp" });
-  const endTimestamp = page.getByRole("textbox", { name: "End timestamp" });
-  const selectedDuration = trimControl.getByLabel("Selected duration");
-  const startHandle = sourceRange.getByRole("slider", { name: "Start trim handle" });
-  const endHandle = sourceRange.getByRole("slider", { name: "End trim handle" });
-  await expect(startTimestamp).toHaveValue("0:00");
-  await expect(endTimestamp).toHaveValue("1:23");
-  await expect(selectedDuration).toHaveText("1:23 selected");
-  await expect(startHandle).toHaveAttribute("aria-valuetext", "0:00 start");
-  await expect(endHandle).toHaveAttribute("aria-valuetext", "1:23 end");
-  await expect(rangePopover).toHaveAttribute("data-scrollable", "false");
-  const customControlSurface = await trimControl.evaluate((element) => ({
-    borderWidth: getComputedStyle(element).borderTopWidth,
-    backgroundImage: getComputedStyle(element).backgroundImage,
-  }));
-  expect(customControlSurface).toEqual({ borderWidth: "0px", backgroundImage: "none" });
-  const endpointSurface = await startTimestamp.evaluate((element) => ({
-    borderWidth: getComputedStyle(element).borderTopWidth,
-    borderRadius: Number.parseFloat(getComputedStyle(element).borderRadius),
-    backgroundColor: getComputedStyle(element).backgroundColor,
-  }));
-  expect(endpointSurface.borderWidth).toBe("1px");
-  expect(endpointSurface.borderRadius).toBeGreaterThanOrEqual(7);
-  expect(endpointSurface.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
-  for (const handle of [startHandle, endHandle]) {
-    const box = await handle.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box?.width ?? 0).toBeGreaterThanOrEqual(24);
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
-  }
-
-  await startTimestamp.focus();
-  await expect(trimControl).toHaveAttribute("data-active-boundary", "start");
-  await expect(startHandle).toHaveAttribute("data-active", "true");
-  expect(await startTimestamp.evaluate((element) => Number.parseFloat(getComputedStyle(element).outlineWidth)))
-    .toBeGreaterThanOrEqual(2);
-  await page.keyboard.press("Tab");
-  await expect(endTimestamp).toBeFocused({ timeout: 10_000 });
-  await expect(trimControl).toHaveAttribute("data-active-boundary", "end");
-  await page.keyboard.press("Tab");
-  await expect(startHandle).toBeFocused({ timeout: 10_000 });
-  await page.keyboard.press("Tab");
-  await expect(endHandle).toBeFocused({ timeout: 10_000 });
-
-  await startHandle.press("ArrowRight");
-  await expect(startTimestamp).toHaveValue("0:01");
-  await endHandle.press("ArrowLeft");
-  await expect(endTimestamp).toHaveValue("1:22");
-  const [trackBox, endHandleBox] = await Promise.all([
-    trimControl.locator(".preflight-range-trim-track").boundingBox(),
-    endHandle.boundingBox(),
-  ]);
-  expect(trackBox).not.toBeNull();
-  expect(endHandleBox).not.toBeNull();
-  await page.mouse.move(
-    (endHandleBox?.x ?? 0) + (endHandleBox?.width ?? 0) / 2,
-    (endHandleBox?.y ?? 0) + (endHandleBox?.height ?? 0) / 2,
-  );
-  await page.mouse.down();
-  await page.mouse.move(
-    (trackBox?.x ?? 0) + (trackBox?.width ?? 0) * 0.75,
-    (trackBox?.y ?? 0) + (trackBox?.height ?? 0) / 2,
-  );
-  await page.mouse.up();
-  await expect(endTimestamp).toHaveValue("1:02");
-  await expect(selectedDuration).toHaveText("1:01 selected");
-
-  await endTimestamp.fill("1:30");
-  await expect(rangePopover.getByText("Choose a valid range within 0:00–1:23.")).toBeVisible();
-  await expect(endTimestamp).toHaveAttribute("aria-invalid", "true");
-  await expect(sourceRange.getByRole("slider", { name: "End trim handle" })).toHaveCount(0);
-  await expect(trimControl.locator(".preflight-range-trim-selection")).toHaveCount(0);
-  await expect(page.locator(".preflight-stage-panel .preflight-block")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeDisabled();
-
-  await startTimestamp.fill("70");
-  await startTimestamp.press("Enter");
-  await endTimestamp.fill("60");
-  await endTimestamp.press("Enter");
-  await expect(startTimestamp).toHaveValue("1:10");
-  await expect(endTimestamp).toHaveValue("1:00");
-  await expect(startTimestamp).toHaveAttribute("aria-invalid", "true");
-  await expect(endTimestamp).toHaveAttribute("aria-invalid", "true");
-  await expect(selectedDuration).toHaveText("Range incomplete");
-  await expect(trimControl.locator(".preflight-range-trim-selection")).toHaveCount(0);
-
-  await endTimestamp.fill("80");
-  await endTimestamp.press("Enter");
-  await expect(endTimestamp).toHaveValue("1:20");
-  await expect(selectedDuration).toHaveText("0:10 selected");
-  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
-  await expect.poll(() => rangePopover.evaluate((element) => element.scrollHeight - element.clientHeight)).toBe(0);
-});
-
-test("a long submitted source opens with an explicit editable two-minute request default", async ({ page }) => {
-  await page.unroute("**/api/studio/source-resolutions");
-  await page.route("**/api/studio/source-resolutions", async (route) => {
-    const request = route.request().postDataJSON() as { url: string };
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(sourceResolutionReceipt(request.url, 758_000)),
-    });
-  });
-
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/longfixture");
-  await page.keyboard.press("Enter");
-
-  await expect(page.getByRole("note", { name: "Submitted source metadata boundary" })).toContainText(
-    "It’s 12:38 long",
-  );
-  await page.getByRole("button", { name: "Continue to Range" }).click();
-  await page.getByRole("button", { name: "Update range: 0:00–2:00" }).click();
-  await expect(page.getByRole("radio", { name: "Custom range" })).toBeChecked();
-  const longRangePopover = page.getByRole("dialog", { name: "Range options" });
-  const longRangeTrim = longRangePopover.getByRole("group", { name: "Custom range trim" });
-  const longSourceRange = longRangeTrim.getByRole("group", { name: "Source range" });
-  const longStartTimestamp = page.getByRole("textbox", { name: "Start timestamp" });
-  const longEndTimestamp = page.getByRole("textbox", { name: "End timestamp" });
-  const selectedDuration = longRangeTrim.getByLabel("Selected duration");
-  await expect(longStartTimestamp).toHaveValue("0:00");
-  await expect(longEndTimestamp).toHaveValue("2:00");
-  await expect(selectedDuration).toHaveText("2:00 selected");
-  const longStartHandle = longSourceRange.getByRole("slider", { name: "Start trim handle" });
-  await longStartHandle.press("ArrowRight");
-  await expect(longStartTimestamp).toHaveValue("0:01");
-  const longEndHandle = longSourceRange.getByRole("slider", { name: "End trim handle" });
-  await longEndHandle.press("ArrowRight");
-  await expect(longEndTimestamp).toHaveValue("2:01");
-  await longStartTimestamp.fill("0:00:50");
-  await longStartTimestamp.press("Enter");
-  await longEndTimestamp.fill("170");
-  await longEndTimestamp.press("Enter");
-  await expect(longStartTimestamp).toHaveValue("0:50");
-  await expect(longEndTimestamp).toHaveValue("2:50");
-  await expect(selectedDuration).toHaveText("2:00 selected");
-  const [sourceTrackBox, selectedRangeBox] = await Promise.all([
-    longRangeTrim.locator(".preflight-range-trim-track").boundingBox(),
-    longRangeTrim.locator(".preflight-range-trim-selection").boundingBox(),
-  ]);
-  expect(sourceTrackBox).not.toBeNull();
-  expect(selectedRangeBox).not.toBeNull();
-  const selectedWidthRatio = (selectedRangeBox?.width ?? 0) / (sourceTrackBox?.width ?? 1);
-  expect(selectedWidthRatio).toBeGreaterThan(0.14);
-  expect(selectedWidthRatio).toBeLessThan(0.18);
-
-  await longEndTimestamp.fill("171");
-  await longEndTimestamp.press("Enter");
-  await expect(selectedDuration).toHaveText("2:01 selected");
-  await expect(selectedDuration).toHaveAttribute("data-invalid", "true");
-  await expect(longRangePopover.getByText(
-    "The current hosted request contract is limited to 120 seconds. Choose a custom range within the resolved video.",
-  )).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeDisabled();
-  await longEndTimestamp.fill("170");
-  await longEndTimestamp.press("Enter");
-  await expect.poll(() => longRangePopover.evaluate((element) => element.scrollHeight - element.clientHeight)).toBe(0);
-  // A source longer than the limit makes the Entire option visibly unavailable rather than selectable.
-  await expect(page.getByLabel("Entire video, 12:38, exceeds 2:00 limit")).toBeDisabled();
-  await expect(longRangePopover.getByText("2 min max", { exact: true })).toBeVisible();
-  await expect(longRangePopover.getByText("Choose up to 2:00.")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Continue to Language" })).toBeEnabled();
-});
-
-test("a compact submitted range popover does not show a phantom scrollbar", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "one compact viewport covers popover measurement");
-  await page.setViewportSize({ width: 440, height: 340 });
-  await page.unroute("**/api/studio/source-resolutions");
-  await page.route("**/api/studio/source-resolutions", async (route) => {
-    const request = route.request().postDataJSON() as { url: string };
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(sourceResolutionReceipt(request.url, 758_000)),
-    });
-  });
-
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/compactrangefixture");
-  await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Continue to Range" }).click();
-  await page.getByRole("button", { name: "Update range: 0:00–2:00" }).click();
-
-  const rangePopover = page.getByRole("dialog", { name: "Range options" });
-  await expect(rangePopover).toBeVisible();
-  await expect(rangePopover).toHaveAttribute("data-scrollable", "false");
-  const compactTrim = rangePopover.getByRole("group", { name: "Custom range trim" });
-  const compactStart = compactTrim.getByRole("textbox", { name: "Start timestamp" });
-  const compactEnd = compactTrim.getByRole("textbox", { name: "End timestamp" });
-  const compactSourceRange = compactTrim.getByRole("group", { name: "Source range" });
-  const [popoverBox, trimBox, startBox, endBox, stripBox, startHandleBox, endHandleBox, lifecycleBox] = await Promise.all([
-    rangePopover.boundingBox(),
-    compactTrim.boundingBox(),
-    compactStart.boundingBox(),
-    compactEnd.boundingBox(),
-    compactSourceRange.boundingBox(),
-    compactSourceRange.getByRole("slider", { name: "Start trim handle" }).boundingBox(),
-    compactSourceRange.getByRole("slider", { name: "End trim handle" }).boundingBox(),
-    page.getByLabel("Studio lifecycle").boundingBox(),
-  ]);
-  for (const box of [popoverBox, trimBox, startBox, endBox, stripBox, startHandleBox, endHandleBox, lifecycleBox]) {
-    expect(box).not.toBeNull();
-  }
-  expect(startBox?.x ?? Infinity).toBeGreaterThanOrEqual((popoverBox?.x ?? 0) - 0.5);
-  expect((endBox?.x ?? 0) + (endBox?.width ?? 0)).toBeLessThanOrEqual(
-    (popoverBox?.x ?? 0) + (popoverBox?.width ?? 0) + 0.5,
-  );
-  expect((startBox?.x ?? 0) + (startBox?.width ?? 0)).toBeLessThan(endBox?.x ?? 0);
-  expect(stripBox?.width ?? 0).toBeGreaterThan(startBox?.width ?? Infinity);
-  expect(startHandleBox?.width ?? 0).toBeGreaterThanOrEqual(24);
-  expect(endHandleBox?.width ?? 0).toBeGreaterThanOrEqual(24);
-  expect((popoverBox?.y ?? 0) + (popoverBox?.height ?? 0)).toBeLessThanOrEqual(
-    (lifecycleBox?.y ?? 0) - 8,
-  );
-  await compactEnd.focus();
-  expect(await compactEnd.evaluate((element) => Number.parseFloat(getComputedStyle(element).outlineWidth)))
-    .toBeGreaterThanOrEqual(2);
-  await expect(compactTrim).toHaveAttribute("data-active-boundary", "end");
-  expect(await rangePopover.evaluate((element) => getComputedStyle(element).overflowY))
-    .toMatch(/^(clip|hidden)$/);
-  await expect.poll(() => rangePopover.evaluate((element) => element.scrollHeight - element.clientHeight))
-    .toBeLessThanOrEqual(2);
-});
-
-test("submitted preview Results reports no submitted artifact before recorded demo output", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "one completed replay covers the shared Results boundary");
-
-  await page.goto("/studio/");
-  await startSubmittedPreview(page);
-
-  // The replay completes on the arrival statement; the submitted-source boundary reads on the
-  // report face behind it.
-  await expect(page.getByRole("heading", { name: "Your video has finished processing." })).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByRole("button", { name: "View result" }).click();
-
-  const boundary = page.locator(".submitted-results-boundary");
-  await expect(boundary.getByRole("heading", { name: "Submitted source was not processed" })).toBeVisible();
-  await expect(boundary).toContainText("Resolved browser-test video");
-  await expect(boundary).toContainText("The viewer below shows only the recorded demo run-006");
-  const submittedDetails = boundary.getByText("Submitted request details");
-  await expect(submittedDetails).toBeVisible();
-  await expect(boundary.getByText("Unavailable", { exact: true })).not.toBeVisible();
-  await submittedDetails.click();
-  await expect(boundary).toContainText("Unavailable");
-  await expect(boundary).toContainText("no runtime receipt");
-  await expect(boundary).toHaveAttribute("data-submitted-preparation-request-id", /^submitted-preparation:/);
-  await expect(page.locator('.dock[data-outcome="complete"]')).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Learning viewer" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
 });
 
 test("completed recorded runs arrive on the finished statement and open the report", async ({ page }, testInfo) => {
@@ -1738,164 +951,6 @@ test("a completed run opens and closes the result workspace over the persistent 
   await expect(viewer).toBeVisible();
 });
 
-test("a remote metadata failure keeps duration and range controls unavailable", async ({ page }) => {
-  await page.unroute("**/api/studio/source-resolutions");
-  let attempts = 0;
-  await page.route("**/api/studio/source-resolutions", async (route) => {
-    attempts += 1;
-    if (attempts === 1) {
-      await route.fulfill({
-        status: 422,
-        contentType: "application/json",
-        body: JSON.stringify({ error: { code: "source_inaccessible", message: "YouTube video metadata is unavailable." } }),
-      });
-      return;
-    }
-    const request = route.request().postDataJSON() as { url: string };
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(sourceResolutionReceipt(request.url)),
-    });
-  });
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/privatevideo");
-  await page.getByRole("button", { name: "Resolve source metadata" }).click();
-
-  await expect(page.getByRole("heading", { name: "Source metadata unavailable" })).toBeVisible();
-  await expect(page.getByText("YouTube video metadata is unavailable.")).toBeVisible();
-  await expect(page.getByRole("group", { name: "Analysis range" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Retry same source" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Open recorded demo" })).toBeVisible();
-  await expect(page.getByLabel("Studio lifecycle")).toHaveAttribute("data-lifecycle-mode", "failed");
-  await expect(page.getByLabel("Studio lifecycle").locator(".dock-pct")).toHaveText("");
-  await expect(page.getByLabel("Studio lifecycle").locator(".dock-pct")).toHaveAttribute("aria-hidden", "true");
-  await expect(page.getByRole("button", { name: /Pause|Resume/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Retry same source" }).click();
-  await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
-  expect(attempts).toBe(2);
-  await expect(page.getByText("Recorded fixture facts · not the submitted link")).toHaveCount(0);
-});
-
-test("the submitted preparation sequence stays horizontally contained at every supported viewport", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive preparation contract");
-
-  for (const viewport of [
-    { width: 2048, height: 1152 },
-    { width: 1440, height: 900 },
-    { width: 768, height: 1024 },
-    { width: 390, height: 844 },
-    { width: 844, height: 390 },
-    { width: 320, height: 568 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-    await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/dQw4w9WgXcQ");
-    await page.getByRole("button", { name: "Resolve source metadata" }).click();
-
-    const panel = page.locator(".preflight-stage-panel");
-    await expect(page.getByRole("heading", { name: "Resolved browser-test video" })).toBeVisible();
-    await expect(page.locator('.studio-welcome[data-source-guide="true"]')).toBeVisible();
-    await expect(page.getByText("Source guide", { exact: true })).toBeVisible();
-    await expect(panel).toHaveCSS("position", "relative");
-    await expect(panel).toHaveCSS("overflow-y", "visible");
-    const lifecycleBar = page.getByLabel("Studio lifecycle");
-    await expect(page.getByRole("textbox", { name: "YouTube link" })).toHaveCount(0);
-    await expect(lifecycleBar).toHaveAttribute("data-lifecycle-mode", "preparation");
-    await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "source");
-    await page.waitForTimeout(360);
-    const sourceDock = page.locator(".studio-source-dock");
-    const sourceDockBox = await sourceDock.boundingBox();
-    expect(sourceDockBox).not.toBeNull();
-    expect(
-      Math.abs((sourceDockBox?.x ?? 0) + (sourceDockBox?.width ?? 0) / 2 - viewport.width / 2),
-    ).toBeLessThanOrEqual(0.5);
-    const expectedDockBottom = Math.min(34, Math.max(20, viewport.height * 0.04));
-    expect(
-      Math.abs(viewport.height - ((sourceDockBox?.y ?? 0) + (sourceDockBox?.height ?? 0)) - expectedDockBottom),
-    ).toBeLessThanOrEqual(0.6);
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-    const panelBox = await panel.boundingBox();
-    const preparationControls = page.getByRole("group", { name: "Preparation controls" });
-    const preparationControlsBox = await preparationControls.boundingBox();
-    expect(panelBox).not.toBeNull();
-    expect(preparationControlsBox).not.toBeNull();
-    expect(panelBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
-    expect((panelBox?.x ?? 0) + (panelBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
-    expect(Math.abs(
-      (preparationControlsBox?.y ?? 0) - ((panelBox?.y ?? 0) + (panelBox?.height ?? 0) - 1),
-    )).toBeLessThanOrEqual(2.5);
-    expect((preparationControlsBox?.y ?? 0) + (preparationControlsBox?.height ?? 0))
-      .toBeLessThanOrEqual((sourceDockBox?.y ?? 0) - 8);
-
-    await page.getByRole("button", { name: "Continue to Range" }).click();
-    const rangeHeading = page.getByRole("heading", { name: /^I’ll prepare / });
-    await expect(rangeHeading).toBeFocused();
-    const rangeParameter = preparationControls.getByRole("button", { name: "Update range: 0:00–1:23" });
-    const [rangePanelBefore, rangeControlsBefore, rangeDockBefore, rangeHeadingBox] = await Promise.all([
-      panel.boundingBox(),
-      preparationControls.boundingBox(),
-      sourceDock.boundingBox(),
-      rangeHeading.boundingBox(),
-    ]);
-    expect((rangePanelBefore?.height ?? Infinity) - (rangeHeadingBox?.height ?? 0)).toBeLessThanOrEqual(60);
-    await rangeParameter.click();
-    const rangePopover = page.getByRole("dialog", { name: "Range options" });
-    await expect(rangePopover).toBeVisible();
-    await expect(page.getByLabel("Entire video, 1:23")).toBeVisible();
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-    const [editedPanelBox, editedControlsBox, editedDockBox, rangePopoverBox] = await Promise.all([
-      panel.boundingBox(),
-      preparationControls.boundingBox(),
-      sourceDock.boundingBox(),
-      rangePopover.boundingBox(),
-    ]);
-    for (const [before, after] of [
-      [rangePanelBefore, editedPanelBox],
-      [rangeControlsBefore, editedControlsBox],
-      [rangeDockBefore, editedDockBox],
-    ] as const) {
-      for (const key of ["x", "y", "width", "height"] as const) {
-        expect(Math.abs((after?.[key] ?? Infinity) - (before?.[key] ?? -Infinity))).toBeLessThanOrEqual(1);
-      }
-    }
-    expect(rangePopoverBox?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
-    expect(rangePopoverBox?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
-    expect((rangePopoverBox?.x ?? 0) + (rangePopoverBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
-    // The editor may open below, flip above, or become a contained sheet — it stays within the viewport either way.
-    expect((rangePopoverBox?.y ?? 0) + (rangePopoverBox?.height ?? 0)).toBeLessThanOrEqual(
-      viewport.height + 0.5,
-    );
-    await page.keyboard.press("Escape");
-    await expect(rangePopover).not.toBeVisible();
-    await expect(rangeParameter).toBeFocused();
-    await page.getByRole("button", { name: "Continue to Language" }).click();
-    await page.getByRole("button", { name: "Continue to Output" }).click();
-    await page.getByRole("button", { name: "Continue to Forecast" }).click();
-    await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "forecast");
-    await expect(page.getByRole("heading", { name: /^I’ve bound / })).toBeFocused();
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-    const forecastPanelBox = await panel.boundingBox();
-    const forecastDockBox = await sourceDock.boundingBox();
-    const forecastControlsBox = await preparationControls.boundingBox();
-    expect(Math.abs(
-      (forecastControlsBox?.y ?? 0) -
-      ((forecastPanelBox?.y ?? 0) + (forecastPanelBox?.height ?? 0) - 1),
-    )).toBeLessThanOrEqual(2.5);
-    expect((forecastControlsBox?.y ?? 0) + (forecastControlsBox?.height ?? 0))
-      .toBeLessThanOrEqual((forecastDockBox?.y ?? 0) - 8);
-
-    await page.getByRole("button", { name: "Continue to Review" }).click();
-    await expect(lifecycleBar).toHaveAttribute("data-preparation-stage", "confirm");
-    await expect(page.getByRole("heading", { name: /^I’m ready to open the recorded run-006 interface preview/ }))
-      .toBeFocused();
-    await expect(page.getByRole("button", { name: "Preview run-006 recorded processing" })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-  }
-});
-
 test("active agent materials visibly change at canvas scale", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "one rendered sample covers the shared shader");
 
@@ -1927,7 +982,7 @@ test("active agent materials visibly change at canvas scale", async ({ page }, t
 
 test("the public Dock pauses and resumes without stopping the run", async ({ page }, testInfo) => {
   await page.goto("/studio/");
-  await startSubmittedPreview(page);
+  await startRecordedDemo(page);
 
   const dock = page.locator(".dock");
   const rail = page.locator(".rail");
@@ -1998,7 +1053,7 @@ test("the public Dock pauses and resumes without stopping the run", async ({ pag
 
 test("cancelling a run resolves in the dock without replacing the canvas", async ({ page }) => {
   await page.goto("/studio/");
-  await startSubmittedPreview(page);
+  await startRecordedDemo(page);
   await page.getByRole("button", { name: "Stop" }).click();
 
   await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
@@ -2233,12 +1288,7 @@ test("agent focus keeps its spatial stylesheet after client navigation", async (
   await page.goto("/");
   await page.getByRole("link", { name: "Open Studio" }).click();
   await expect(page.getByRole("button", { name: "Input Source" })).toBeVisible();
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "YouTube link" }).fill(
-    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  );
-  await page.keyboard.press("Enter");
-  await finishPreparation(page);
+  await startRecordedDemo(page);
   await expect(page.locator(".graph-preview-mark")).toHaveCount(0);
   await expect(page.getByText(/These agents replay a bundled demonstration/)).toHaveCount(0);
 
@@ -2507,96 +1557,10 @@ test("agent focus separates identity, bare media, narrative, and commands at eve
     await expect(focus).toHaveCount(0);
   }
 });
-test("the submitted preview fits every supported viewport", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "one pass covers the responsive viewport contract");
-
-  const longVideoId = "source-identity-".repeat(12);
-
-  for (const viewport of [
-    { width: 320, height: 568 },
-    { width: 360, height: 800 },
-    { width: 390, height: 844 },
-    { width: 768, height: 1024 },
-    { width: 1440, height: 900 },
-    { width: 844, height: 390 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto("/studio/?lab=1");
-    await page.getByRole("button", { name: "Collapse trace lab" }).click();
-  await page.getByRole("button", { name: "Input Source" }).click();
-    await page.getByRole("textbox", { name: "YouTube link" }).fill(`https://youtu.be/${longVideoId}`);
-    await page.keyboard.press("Enter");
-    await finishPreparation(page, true, true);
-    await expect(page.locator('.studio[data-stage="run"]')).toBeVisible();
-
-    const capsule = page.locator(".top-mid");
-    const sourceLabel = capsule.locator(".source-display-url");
-    await expect(sourceLabel).toHaveAttribute("data-overflow", "true");
-    expect(
-      await sourceLabel.evaluate((element) => getComputedStyle(element).maskImage),
-    ).not.toBe("none");
-
-    for (const locator of [capsule, page.locator(".dock")]) {
-      const box = await locator.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box?.x ?? -1).toBeGreaterThanOrEqual(-0.5);
-      expect(box?.y ?? -1).toBeGreaterThanOrEqual(-0.5);
-      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 0.5);
-      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height + 0.5);
-    }
-
-    const [capsuleBox, markBox, labBox] = await Promise.all([
-      capsule.boundingBox(),
-      page.locator(".top-mark").boundingBox(),
-      page.getByRole("complementary", { name: "Studio trace lab" }).boundingBox(),
-    ]);
-    expect(capsuleBox).not.toBeNull();
-    expect(markBox).not.toBeNull();
-    expect(labBox).not.toBeNull();
-    const overlaps = (
-      first: NonNullable<typeof capsuleBox>,
-      second: NonNullable<typeof capsuleBox>,
-    ) =>
-      first.x < second.x + second.width
-      && first.x + first.width > second.x
-      && first.y < second.y + second.height
-      && first.y + first.height > second.y;
-    expect(overlaps(capsuleBox!, markBox!)).toBe(false);
-    expect(overlaps(capsuleBox!, labBox!)).toBe(false);
-  }
-});
-
-test("the source capsule sizes to content before applying its maximum", async ({ page }) => {
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page.getByRole("textbox", { name: "YouTube link" }).fill("https://youtu.be/dQw4w9WgXcQ");
-  await page.keyboard.press("Enter");
-  await finishPreparation(page);
-
-  const capsule = page.locator(".top-mid");
-  const label = capsule.locator(".source-display-url");
-  await expect(label).toHaveAttribute("data-overflow", "false");
-  const shortWidth = await capsule.evaluate((element) => element.getBoundingClientRect().width);
-  expect(shortWidth).toBeLessThan(360);
-
-  await page.goto("/studio/");
-  await page.getByRole("button", { name: "Input Source" }).click();
-  await page
-    .getByRole("textbox", { name: "YouTube link" })
-    .fill(`https://youtu.be/${"deliberately-long-source-id-".repeat(12)}`);
-  await page.keyboard.press("Enter");
-  await finishPreparation(page);
-
-  await expect(label).toHaveAttribute("data-overflow", "true");
-  const longWidth = await capsule.evaluate((element) => element.getBoundingClientRect().width);
-  expect(longWidth).toBeGreaterThan(shortWidth + 30);
-  expect(longWidth).toBeLessThanOrEqual(480.5);
-});
-
 test("the recorded run uses its receipted source identity", async ({ page }) => {
   await page.goto("/studio/");
   await chooseSource(page, "Explore the recorded run-006 demo");
-  await finishPreparation(page, false);
+  await finishPreparation(page);
 
   const source = page.getByRole("group", {
     name: "Source: YouTube source Natural Korean Conversation with 태웅쌤 | 이렇게 귀하신 분이 ①",
@@ -2675,7 +1639,7 @@ test("mobile controls remain in the viewport", async ({ page }, testInfo) => {
 test("reduced motion disables decorative animation", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/studio/");
-  await startSubmittedPreview(page);
+  await startRecordedDemo(page);
   const thinkingMesh = page.locator('.hub [data-field-motion="thinking"] .agent-mark-mesh');
   await expect(thinkingMesh).toBeVisible();
   await expect(thinkingMesh).toHaveAttribute("data-mesh-motion", "still");
@@ -2706,14 +1670,15 @@ test("owned-media preflight keeps receipted language decisions separate from job
   await page.getByRole("button", { name: "Input Source" }).click();
   await chooseSource(page, "Explore the recorded run-006 demo");
 
-  // The recorded source stage now narrates its boundary conversationally instead of
-  // rendering the receipted evidence tables. The measured language ranges stay
-  // preflight-only: the detected-language range is offered but never replayable.
+  // The recorded source stage narrates its boundary conversationally. Opening the
+  // range editor must still state that detector language ranges are not a
+  // replayable job choice: only the recorded selection window can replay.
   await expect(page.getByRole("heading", { name: /^I found / })).toBeVisible();
 
   await page.getByRole("button", { name: "Continue to Range" }).click();
   await page.getByRole("button", { name: /^Update range/ }).click();
-  await expect(
-    page.getByLabel(/Measured language ranges · preflight evidence only; no replayable detected-language subrange/),
-  ).toBeDisabled();
+  const rangeSelection = page.getByLabel("Recorded range selection");
+  await expect(rangeSelection).toBeVisible();
+  await expect(rangeSelection).toContainText("Recorded selection");
+  await expect(rangeSelection).toContainText(/no[\s\S]*detected-language sub-range/);
 });

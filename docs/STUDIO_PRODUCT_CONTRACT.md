@@ -98,17 +98,16 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
   a runtime job, start `scripts/run-clip.mjs`, start `scripts/run-local-worker.ts`, or load a
   production journal. The owned-source product surface and the development-only `/studio/?lab=1`
   surface call the separate local runtime-start host without changing replay state.
-- A submitted YouTube URL creates a `StudioPreviewSession` with `dataSource: "recorded_run"`.
-  It starts the recorded run and displays: “This interface preview uses a recorded run. Your
-  source was not processed.”
-- The centered welcome keeps **Input Source** as its persistent bottom action. Its visible copy
-  names the job, not the evidence class: the control stays machine-readable as
-  `data-source-authority="recorded-preview"`, and the recorded-preview provenance is stated in the
-  preflight provenance and confirmation facts before anything replays. A collapsed 40px chooser
-  aligned with the top-left mark contains three alternate paths:
+- The centered welcome keeps **Input Source** as its persistent bottom action, and it is the
+  primary real-processing entry. A pasted YouTube link opens the local YouTube ingest authority
+  seeded with that link; the control stays machine-readable as
+  `data-source-authority="live-local"`. Paste alone resolves no metadata, downloads nothing, and
+  creates no preview or replay identity: the bounded range, the local-processing confirmation, and
+  the loopback host's own re-validation all still stand between the field and any bytes. A
+  collapsed 40px chooser aligned with the top-left mark contains three alternate paths:
   **Process a YouTube range locally**, **Process a file I own locally**, and **Explore the recorded
   run-006 demo**. It groups the first two under **Process locally** and the replay under **Explore a
-  recording**. Example YouTube links only prefill the separate bottom recorded-preview field. The
+  recording**. Example YouTube links sit with the local paths and only prefill the bottom field. The
   YouTube local action opens the authenticated
   product local-runtime surface, requires an explicit URL/range/local-processing confirmation, and
   never creates a preview or replay identity. The loopback host resolves and
@@ -242,7 +241,7 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 
 | Step | Required user-visible outcome | Today | Class / status | Required runtime boundary |
 |---|---|---|---|---|
-| 1. Add source | User supplies a supported link or owned clip | The centered welcome and bottom **Input Source** action stay visible as the primary recorded-preview path; its label names the job while the preflight provenance and confirmation facts state the recorded-preview evidence class. The collapsed top-right chooser holds two explicitly local paths and one recorded-demo replay. **Process a YouTube range locally** and **Process a file I own locally** connect to the authenticated loopback surface; YouTube requires a bounded URL range plus local-processing confirmation, while owned files require ownership/control attestation. **Explore the recorded run-006 demo** replays the loaded bundle. The bottom preview resolves metadata and later replays run-006 without processing the linked media | A+B+C / explicit recorded preview plus real private product wiring for both local authorities | Hosted/cloud ingest remains missing; both byte-ingest paths are development-only and private |
+| 1. Add source | User supplies a supported link or owned clip | The centered welcome and bottom **Input Source** action stay visible as the primary real-processing path; a pasted YouTube link opens the local YouTube ingest authority seeded with that link and never replays run-006. The collapsed top-right chooser holds two explicitly local paths and one recorded-demo replay. **Process a YouTube range locally** and **Process a file I own locally** connect to the authenticated loopback surface; YouTube requires a bounded URL range plus local-processing confirmation, while owned files require ownership/control attestation. **Explore the recorded run-006 demo** replays the loaded bundle and is the only entry that does | B+C / real private product wiring for both local authorities, with recorded replay kept behind its own explicit entry | Hosted/cloud ingest remains missing; both byte-ingest paths are development-only and private, so paste does nothing without a running local host |
 | 2. Validate and probe | Access, rights, duration, tracks, speech, languages, and known gaps | Owned and YouTube-local ingest preserve bytes under ignored `.studio/`, run ffprobe, seal V1 preflight, hot-register provider-neutral sessions, and select only the source kind opened by the operator. YouTube-local additionally retains canonical provider identity, requested provider range, resolver/tool lineage, and an explicit no-redistribution local-processing receipt. Speech/language findings remain unavailable for either V1 path | B / real and wired in the host and default product for both local source authorities; detector gaps remain | Add detectors only through their sealed producer chain; do not infer findings from media, filename, or provider metadata |
 | 3. Choose range | Suggested, detected-language, whole, or custom time window | Both local-source numeric ranges are bounded by host-reported measured duration; replay custom changes remain blocked; recommendation is absent | A+B+C / real local custom range; replay and missing recommendation boundaries retained | Add measured selection affordance/recommender without inventing findings |
 | 4. Choose result | Target language, captions/evidence depth, relevant advanced options | The shared local-source path maps explicit declared/target language, optional pack, range, and output contract into `studio.analysis-request.v1`; this does not imply a corresponding output producer | B / real and wired request mapping | Extend only when producers support more options |
@@ -265,14 +264,13 @@ to zero, false, empty arrays, guessed ranges, estimated prices, or plausible act
 |---|---|---|---|---|---|
 | `welcome.message` | Centered welcome panel | Says **Welcome to Studio. Add a source when you’re ready. We’ll take it from there, so you can sit back and watch it come together.** as one continuous message with one typography | Client copy | Keep the original first-time invitation visible while source choices remain secondary | C / product copy |
 | `source.entry.open` | 40px top-right source chooser | Opens a compact icon-led panel, collapsed by default, with separate **Process locally** and **Explore a recording** groups | Client state | Keep local and recorded authority explicit without displacing the centered welcome or bottom primary action | A+B / source routing control |
-| `source.input.open` | Bottom **Input Source** bar | Opens and focuses the recorded-preview URL entry control; it never calls local ingest and remains outside the alternate-source chooser | Client state, `data-source-authority="recorded-preview"` | The visible label names the job; the recorded-preview evidence class stays machine-readable here and is stated by the preflight provenance and confirmation facts before anything replays | A / recorded preview entry |
-| `source.preview.example` | **Korean sample 01** / **Korean sample 02** | Prefills and focuses `source.url` | Client constants | Examples are recorded-preview convenience values, not source evidence or another authority path | A / recorded preview entry |
-| `source.url` | **Paste a YouTube link** | Validates the URL client-side, then requests and validates a provider-metadata receipt | `presentSource()`, `resolveRemoteSource()` | Feed only the explicit recorded-preview path; metadata resolution is not media download or processing | A / recorded preview entry |
+| `source.input.open` | Bottom **Input Source** bar | Opens and focuses the primary URL entry control; it remains outside the alternate-source chooser | Client state, `data-source-authority="live-local"` | The visible label names the job; the live-local authority stays machine-readable here, and every ingest gate is still stated and enforced downstream | B / real local path entry |
+| `source.preview.example` | **Korean sample 01** / **Korean sample 02** | Prefills and focuses `source.url` | Client constants | Examples are convenience values, not source evidence or another authority path | B / real local path entry |
+| `source.url` | **Paste a YouTube link** | Holds the link only; no client validation, metadata request, or download happens on entry | Client state | Carry the link into the local ingest setup; entry is never processing | B / real local path entry |
 | `source.edit` | Source review/edit button | Returns to URL editing | Client state | Edit before submission; invalidate any stale probe/plan | C / UI contract only |
-| `source.submit` | Arrow, labelled **Resolve source metadata** | For a valid YouTube URL, creates a metadata-only preview session and later starts `run-006` replay when explicitly confirmed | `sourceResolution.ts`, `previewSession.ts`, recorded bundle | Preserve the not-processed warning and the confirmation stage's replay statement; never call live ingest from this action | A / recorded replay |
-| `source.preview.notice` | Submitted-source provenance note | Says the submitted source was not processed | `StudioPreviewSession.dataSource` | Must remain visible anywhere a submitted URL is displayed over recorded evidence | A / recorded replay |
-| `source.youtube-local.open` | **Process a YouTube range locally** | Opens the product local-runtime surface in `youtube` mode; it never creates `StudioPreviewSession` or calls replay `start()` | Client state plus `ProductLocalRuntime` | Preserve the local/recorded authority split | B / real local path entry |
-| `source.owned.open` | **Process a file I own locally** | Opens the separate product-facing loopback-host path; it does not submit the recorded-preview URL field or start replay | Client state | Preserve the explicit replay/production boundary | B / real local path entry |
+| `source.submit` | Arrow, labelled **Set up local processing for this link** | Opens the local YouTube ingest authority seeded with the pasted link; it never creates a preview session or starts `run-006` replay | `InputAct.tsx`, `ProductLocalRuntime` | The bounded range, the local-processing confirmation, and the host's own re-validation stay between this action and any bytes | B / real local path entry |
+| `source.youtube-local.open` | **Process a YouTube range locally** | Opens the product local-runtime surface in `youtube` mode; it never opens recorded preflight or calls replay `start()` | Client state plus `ProductLocalRuntime` | Preserve the local/recorded authority split | B / real local path entry |
+| `source.owned.open` | **Process a file I own locally** | Opens the separate product-facing loopback-host path; it does not submit the bottom URL field or start replay | Client state | Preserve the explicit replay/production boundary | B / real local path entry |
 | `demo.open` | **Explore the recorded run-006 demo** | Opens recorded-source preflight for the loaded bundle | `run-006` | Explicit entry into recorded demonstration | A / recorded replay |
 | `bundle.retry` | **Retry loading** | Reloads recorded bundle after a fetch/validation failure | `ReplayTransport` | Retry the current source of truth only; never imply runtime retry | A / recorded replay |
 
@@ -446,9 +444,8 @@ place the detached active chip in a compact top rail. Adjacent previous/next arr
 **Esc Close** remains separate and a spatial X occupies the same right-side rail as the section
 controls; there is no competing close control in the panel header. While focus is
 open, the top source chrome recedes but
-the global recorded-replay Dock remains visible and authoritative for pause, progress, and stop. When
-a submitted-source preview is active, its not-processed warning is repeated inside the focus panel.
-Keep the recorded-preview boundary until a separate production topology/workspace projection
+the global recorded-replay Dock remains visible and authoritative for pause, progress, and stop.
+Keep the recorded-demo authority boundary until a separate production topology/workspace projection
 consumes scheduler evidence; lifecycle polling alone does not make the recorded graph live.
 
 ### 7. Results, captions, study, and evidence — `/studio/`
@@ -736,9 +733,9 @@ receipts. It is not a child capability, new detector finding, Results merge, upl
 
 UI/UX changes must not:
 
-- Remove or obscure the submitted-source recorded-preview notice
-- Change `StudioPreviewSession.dataSource` away from `recorded_run` without a real producer path
-- Attach submitted URL metadata to recorded run evidence
+- Revive a paste-to-recorded-replay or submitted-preview path without a real producer and an
+  explicit product entry
+- Attach a pasted URL's metadata to recorded run evidence
 - Rename **Replay recorded analysis** to a live-sounding action
 - Describe the owned-source **Start local runtime** action as caption/study/swarm production merely
   because it starts the bounded proof
@@ -787,7 +784,8 @@ semantics without updating this contract with the UIUX owner.
 |---|---|
 | Main Studio loads `run-006` | `src/pages/studio/index.astro` |
 | Main Studio uses replay transport | `src/studio/StudioApp.tsx`, `src/studio/store.ts`, `src/studio/transport.ts` |
-| Submitted source is recorded-preview-only | `src/studio/previewSession.ts`, `src/studio/StudioApp.tsx` |
+| Pasted source opens local YouTube ingest, not replay | `src/studio/SourceEntry.tsx`, `src/studio/InputAct.tsx`, `src/studio/localRuntime/ProductLocalRuntime.tsx` |
+| Recorded demo opens only through Explore a recording | `src/studio/InputAct.tsx`, `src/studio/store.ts` `openRecordedPreflight`, `src/studio/preflight/ConfirmationForm.tsx` |
 | Product owned-source path, forecast/status regions, and production fact selectors | `src/studio/localRuntime/ProductLocalRuntime.tsx`, `src/studio/localRuntime/productProductionFacts.tsx` |
 | Browser-owned ingest composition and progress protocol | `src/studio/runtime/production/runtimeHost/ownedMediaIngest.ts`, `src/studio/localRuntime/client.ts` |
 | Range and output controls | `src/studio/preflight/ConfirmationForm.tsx` |

@@ -1,6 +1,6 @@
 import type { RunBundle } from "../transport";
 import { projectLanguageRanges, type RecordedLanguageRangeFacts } from "./languageProjection";
-import { classifySourceUrl, normalizeIngestReceipt, type RecordedSourceFacts } from "./sourceAdapters";
+import { normalizeIngestReceipt, type RecordedSourceFacts } from "./sourceAdapters";
 import { projectSpeechActivity, type RecordedSpeechActivityFacts } from "./speechProjection";
 
 export const RECOMMENDED_RANGE_S = { min: 30, max: 60 } as const;
@@ -44,7 +44,7 @@ export interface ProducerGap {
 }
 
 export interface PreflightProvenance {
-  kind: "recorded_ingest" | "remote_resolution" | "contract_fixture" | "client_validation";
+  kind: "recorded_ingest" | "contract_fixture" | "client_validation";
   producer: string | null;
   note: string;
 }
@@ -144,66 +144,6 @@ export function loadingRecordedPreflight(): PreflightSession {
   };
 }
 
-export function resolvingSubmittedSourcePreflight(): PreflightSession {
-  return {
-    ...idlePreflight(),
-    status: "loading_source",
-    title: "Resolving submitted source",
-    message: "Studio is requesting YouTube metadata. No media download or content processing has started.",
-    provenance: {
-      kind: "remote_resolution",
-      producer: "studio.youtube-metadata-resolver",
-      note: "Waiting for a metadata-only duration receipt from the local Studio server.",
-    },
-  };
-}
-
-export function resolvedSubmittedSourcePreflight(durationSeconds: number): PreflightSession {
-  const boundedDuration = Math.min(durationSeconds, HOSTED_MAX_RANGE_S);
-  return {
-    ...idlePreflight(),
-    status: "ready",
-    title: "Submitted source metadata resolved",
-    message: "Provider metadata is ready for request setup. Media download and content processing have not started.",
-    request: {
-      ...initialRequest("en", boundedDuration),
-      rangeMode: durationSeconds > HOSTED_MAX_RANGE_S ? "custom" : "entire",
-    },
-    missing: [...PRODUCER_GAPS],
-    provenance: {
-      kind: "remote_resolution",
-      producer: "studio.youtube-metadata-resolver",
-      note: "Only the content-identified YouTube metadata receipt belongs to this submitted source.",
-    },
-  };
-}
-
-export function failedSubmittedSourceResolution(code: string, message: string): PreflightSession {
-  const title = code === "unsupported_source"
-    ? "Source is not supported"
-    : code === "resolver_unavailable"
-      ? "Metadata resolver unavailable"
-      : code === "invalid_resolver_output" || code === "invalid_resolution_receipt"
-        ? "Source metadata could not be verified"
-        : "Source metadata unavailable";
-  return {
-    ...idlePreflight(),
-    status: "inaccessible",
-    title,
-    message,
-    missing: [{
-      id: "hosted-ingest",
-      label: "Remote source resolution",
-      consequence: "Duration and range controls remain unavailable because no source-resolution receipt exists.",
-    }],
-    provenance: {
-      kind: "remote_resolution",
-      producer: "studio.youtube-metadata-resolver",
-      note: "No media download or processing was started.",
-    },
-  };
-}
-
 export function unavailableRecordedPreflight(): PreflightSession {
   return {
     ...idlePreflight(),
@@ -284,49 +224,6 @@ export function recordedPreflight(bundle: RunBundle): PreflightSession {
           : "Redistribution licence, selected duration, source window, media, and waveform were produced during ingest.",
     },
     relevance: { backgroundSpeech: false, music: false, speakerFocus: false },
-  };
-}
-
-export function submittedSourcePreflight(raw: string): PreflightSession {
-  const classification = classifySourceUrl(raw);
-  if (classification.kind === "invalid") {
-    return {
-      ...idlePreflight(),
-      status: "invalid_source",
-      title: "Invalid source",
-      message: classification.label,
-      provenance: { kind: "client_validation", producer: "URL parser", note: "No network request ran." },
-    };
-  }
-
-  if (classification.kind === "unsupported") {
-    return {
-      ...idlePreflight(),
-      status: "invalid_source",
-      title: "Source is not supported",
-      message: classification.label,
-      provenance: { kind: "client_validation", producer: "source allowlist", note: "No network request ran." },
-    };
-  }
-
-  return {
-    ...idlePreflight(),
-    status: "inaccessible",
-    title: "Hosted source probe unavailable",
-    message:
-      "The static Studio cannot fetch or inspect this link. No analysis was started. Use the recorded source, or run the ingest producer locally.",
-    missing: [
-      {
-        id: "hosted-ingest",
-        label: "Hosted ingest service",
-        consequence: "Access, licence, duration, and media metadata could not be checked.",
-      },
-    ],
-    provenance: {
-      kind: "client_validation",
-      producer: classification.producer,
-      note: `The ${classification.adapter} source adapter accepted the URL; no remote probe ran.`,
-    },
   };
 }
 
@@ -422,56 +319,6 @@ export function assessRecordedRequest(
   }
 
   return { duration, canReplay: true, reason: null, recommendation, localWarning: overHostedCap };
-}
-
-export function assessSubmittedPreviewRequest(
-  session: PreflightSession,
-  measuredDuration: number,
-): RangeAssessment {
-  if (session.status !== "ready" || !Number.isFinite(measuredDuration) || measuredDuration <= 0) {
-    return {
-      duration: null,
-      canReplay: false,
-      reason: "Source metadata is not ready.",
-      recommendation: null,
-      localWarning: false,
-    };
-  }
-  const { start, end, rangeMode } = session.request;
-  if (![start, end].every(Number.isFinite) || start < 0 || end <= start || end > measuredDuration) {
-    return {
-      duration: Number.isFinite(end - start) ? end - start : null,
-      canReplay: false,
-      reason: `Choose a valid range within 0:00–${formatSeconds(measuredDuration)}.`,
-      recommendation: null,
-      localWarning: false,
-    };
-  }
-  const duration = end - start;
-  const recommendation = duration < RECOMMENDED_RANGE_S.min
-    ? "short"
-    : duration <= RECOMMENDED_RANGE_S.max
-      ? "recommended"
-      : "long";
-  if (duration > HOSTED_MAX_RANGE_S) {
-    return {
-      duration,
-      canReplay: false,
-      reason: `The current hosted request contract is limited to ${HOSTED_MAX_RANGE_S} seconds. Choose a custom range within the resolved video.`,
-      recommendation,
-      localWarning: false,
-    };
-  }
-  if (rangeMode === "suggested" || rangeMode === "detected" || rangeMode === "recorded") {
-    return {
-      duration,
-      canReplay: false,
-      reason: "Choose the resolved entire video or a custom range.",
-      recommendation,
-      localWarning: false,
-    };
-  }
-  return { duration, canReplay: true, reason: null, recommendation, localWarning: false };
 }
 
 export function formatSeconds(value: number): string {

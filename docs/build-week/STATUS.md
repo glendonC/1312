@@ -3,7 +3,7 @@
 - Document type: Living status
 - Lifecycle: Active
 - Authority: Current milestones, blockers, active work, and next actions
-- Last verified: 2026-07-19
+- Last verified: 2026-07-20
 - Update when: Engineering state changes
 
 ## Document roles
@@ -334,6 +334,12 @@ and non-claims remain in the ladder.
   Docked/Float now pass their height through the learning player frame instead of collapsing to
   a letterboxed void. No new runtime request, receipt, or authority claim is introduced;
   everything shown is projection of the already-loaded bundle.
+- **Submitted-preview retired; paste is local YouTube:** the bottom **Input Source** paste seeds
+  the local YouTube ingest authority and never creates a preview session or replays run-006.
+  Recorded demo entry remains only **Explore the recorded run-006 demo**. The unreachable
+  submitted-preview modules (`SubmittedPreparationForm`, client source-resolution API, store
+  `submitSource` / `StudioPreviewSession`) are removed; browser tests that asserted that surface
+  are deleted, and the remaining studio.spec entry ramp uses the recorded run-006 path.
 - **Result workspace data binding, moments affordances, and Input Source copy:** the workspace
   hero, the Source and Coverage panels, and the canvas Result node now read one shared
   `projectResultAccounting(bundle)` projection (language pair, range, per-line counts); the hero
@@ -345,8 +351,8 @@ and non-claims remain in the ladder.
   progress bar (typed `markers` chrome fed by `projectMomentMarkers(prep)` on both the recorded
   and production players) and a quiet learning-bar count; both project the same prep and disappear
   with it, so nothing is invented when no prep exists. The welcome's bottom action reads **Input
-  Source** again — the recorded-preview evidence class stays machine-readable on the control and
-  stated by the preflight provenance and confirmation facts, not baked into the entry label.
+  Source** again — live-local authority stays machine-readable on the control, and recorded
+  replay stays behind **Explore a recording**, not baked into the entry label.
 - **Three-face result workspace (arrival → report → watch):** completion now lands on a
   once-per-run arrival statement ("Your video has finished processing.") over a sentence-form
   result brief whose parameter values are bundle-bound and tinted with the preparation-stage

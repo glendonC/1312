@@ -13,15 +13,10 @@ import { useShallow } from "zustand/react/shallow";
 import type { Layout } from "./layout";
 import {
   assessRecordedRequest,
-  assessSubmittedPreviewRequest,
   cancelledPreflight,
-  failedSubmittedSourceResolution,
   idlePreflight,
   loadingRecordedPreflight,
   recordedPreflight,
-  resolvedSubmittedSourcePreflight,
-  resolvingSubmittedSourcePreflight,
-  submittedSourcePreflight,
   unavailableRecordedPreflight,
   type AnalysisRequest,
   type OutputDepth,
@@ -32,12 +27,6 @@ import {
   preparationStageIndex,
   type PreparationStage,
 } from "./preflight/PreparationStages";
-import { createStudioPreviewSession, type StudioPreviewSession } from "./previewSession";
-import { resolveRemoteSource, SourceResolutionClientError } from "./sourceResolution";
-import {
-  createSubmittedSourcePreparationRequest,
-  type SubmittedSourceLanguageIntent,
-} from "./submittedPreparation";
 import { projectRun } from "./replayProjection";
 import {
   applyTrace,
@@ -82,7 +71,7 @@ export interface SessionOutcome {
   reason: string;
 }
 
-export type RunInitializationKind = "recorded-replay" | "submitted-preview";
+export type RunInitializationKind = "recorded-replay";
 
 interface StudioStore {
   stage: Stage;
@@ -94,8 +83,6 @@ interface StudioStore {
   preparationStage: PreparationStage;
   preparationFurthestStage: number;
   initialization: RunInitializationKind | null;
-  /** UI-only source context. Recorded evidence remains entirely inside bundle. */
-  previewSession: StudioPreviewSession | null;
   outputDepth: OutputDepth;
   /** Which worker's workspace and history is open. */
   selected: string | null;
@@ -124,10 +111,7 @@ interface StudioStore {
   boot: (transport: RunTransport) => Promise<void>;
   retry: () => Promise<void>;
   openRecordedPreflight: () => void;
-  submitSource: (source: string) => void;
-  retrySubmittedSource: () => void;
   updatePreflightRequest: (request: Partial<AnalysisRequest>) => void;
-  updateSubmittedSourceLanguage: (intent: SubmittedSourceLanguageIntent) => void;
   selectPreparationStage: (stage: PreparationStage) => void;
   advancePreparationStage: () => void;
   dismissPreflight: () => void;
@@ -162,9 +146,6 @@ interface StudioStore {
 let transport: RunTransport | null = null;
 let handle: RunHandle | null = null;
 let loadVersion = 0;
-let sourceResolutionVersion = 0;
-let submittedPreparationVersion = 0;
-let sourceResolutionAbortController: AbortController | null = null;
 let initializationVersion = 0;
 let initializationTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -186,120 +167,6 @@ export const useStudio = create<StudioStore>((set, get) => {
     };
   }
 
-  function invalidateSubmittedPreparation(): void {
-    submittedPreparationVersion += 1;
-    set((current) => current.previewSession
-      ? {
-          previewSession: {
-            ...current.previewSession,
-            preparation: { status: "idle", request: null, message: null },
-          },
-        }
-      : current);
-  }
-
-  function rebuildSubmittedPreparation(): void {
-    const { previewSession, preflight } = get();
-    if (!previewSession?.resolution || preflight.status !== "ready") return;
-    const version = ++submittedPreparationVersion;
-    const resolutionId = previewSession.resolution.resolutionId;
-    set((current) => current.previewSession?.resolution?.resolutionId === resolutionId
-      ? {
-          previewSession: {
-            ...current.previewSession,
-            preparation: { status: "building", request: null, message: null },
-          },
-        }
-      : current);
-
-    void createSubmittedSourcePreparationRequest(
-      previewSession.resolution,
-      preflight.request,
-      previewSession.sourceLanguage,
-    ).then((request) => {
-      if (version !== submittedPreparationVersion) return;
-      set((current) => current.previewSession?.resolution?.resolutionId === resolutionId
-        ? {
-            previewSession: {
-              ...current.previewSession,
-              preparation: { status: "ready", request, message: null },
-            },
-          }
-        : current);
-    }).catch((error: unknown) => {
-      if (version !== submittedPreparationVersion) return;
-      const message = error instanceof Error ? error.message : "Submitted preparation request is invalid.";
-      set((current) => current.previewSession?.resolution?.resolutionId === resolutionId
-        ? {
-            previewSession: {
-              ...current.previewSession,
-              preparation: { status: "invalid", request: null, message },
-            },
-          }
-        : current);
-    });
-  }
-
-  function beginSubmittedResolution(source: string, existing?: StudioPreviewSession): void {
-    sourceResolutionAbortController?.abort();
-    const abortController = new AbortController();
-    sourceResolutionAbortController = abortController;
-    const resolutionVersion = ++sourceResolutionVersion;
-    submittedPreparationVersion += 1;
-    const previewSession = existing ?? createStudioPreviewSession(source);
-    if (!previewSession) {
-      set({ preflight: submittedSourcePreflight(source), previewSession: null, outcome: null });
-      return;
-    }
-    const pending: StudioPreviewSession = {
-      ...previewSession,
-      resolution: null,
-      resolutionFailure: null,
-      preparation: { status: "idle", request: null, message: null },
-    };
-    set({
-      preflight: resolvingSubmittedSourcePreflight(),
-      previewSession: pending,
-      outcome: null,
-      ...resetPreparationLifecycle(),
-    });
-
-    void resolveRemoteSource(source, fetch, abortController.signal).then((resolution) => {
-      if (resolutionVersion !== sourceResolutionVersion) return;
-      set((current) => current.previewSession?.source.raw === source
-        ? {
-            previewSession: {
-              ...current.previewSession,
-              resolution,
-              resolutionFailure: null,
-            },
-            preflight: resolvedSubmittedSourcePreflight(resolution.source.durationMs / 1_000),
-          }
-        : current);
-      rebuildSubmittedPreparation();
-    }).catch((resolutionError: unknown) => {
-      if (resolutionVersion !== sourceResolutionVersion) return;
-      const code = resolutionError instanceof SourceResolutionClientError
-        ? resolutionError.code
-        : "source_resolution_failed";
-      const message = resolutionError instanceof Error
-        ? resolutionError.message
-        : "Source metadata resolution failed.";
-      const retryable = code !== "invalid_source" && code !== "unsupported_source";
-      set((current) => current.previewSession?.source.raw === source
-        ? {
-            previewSession: {
-              ...current.previewSession,
-              resolution: null,
-              resolutionFailure: { code, message, retryable },
-              preparation: { status: "idle", request: null, message: null },
-            },
-            preflight: failedSubmittedSourceResolution(code, message),
-          }
-        : current);
-    });
-  }
-
   return ({
   stage: "input",
   bundle: null,
@@ -310,7 +177,6 @@ export const useStudio = create<StudioStore>((set, get) => {
   preparationStage: "source",
   preparationFurthestStage: 0,
   initialization: null,
-  previewSession: null,
   outputDepth: "evidence",
   selected: null,
   state: initialState(),
@@ -326,10 +192,7 @@ export const useStudio = create<StudioStore>((set, get) => {
 
   async boot(next) {
     clearInitialization();
-    sourceResolutionAbortController?.abort();
-    sourceResolutionAbortController = null;
     const version = ++loadVersion;
-    submittedPreparationVersion += 1;
     handle?.stop();
     handle = null;
     transport = next;
@@ -339,7 +202,6 @@ export const useStudio = create<StudioStore>((set, get) => {
       error: null,
       outcome: null,
       preflight: idlePreflight(),
-      previewSession: null,
       ...resetPreparationLifecycle(),
       outputDepth: "evidence",
       stage: "input",
@@ -376,30 +238,16 @@ export const useStudio = create<StudioStore>((set, get) => {
 
   openRecordedPreflight() {
     clearInitialization();
-    sourceResolutionAbortController?.abort();
-    sourceResolutionAbortController = null;
-    sourceResolutionVersion += 1;
-    submittedPreparationVersion += 1;
     const { bundle, loadStatus } = get();
     if (loadStatus === "loading") {
-      set({ preflight: loadingRecordedPreflight(), previewSession: null, ...resetPreparationLifecycle() });
+      set({ preflight: loadingRecordedPreflight(), ...resetPreparationLifecycle() });
       return;
     }
     if (!bundle) {
-      set({ preflight: unavailableRecordedPreflight(), previewSession: null, ...resetPreparationLifecycle() });
+      set({ preflight: unavailableRecordedPreflight(), ...resetPreparationLifecycle() });
       return;
     }
-    set({ preflight: recordedPreflight(bundle), previewSession: null, ...resetPreparationLifecycle() });
-  },
-
-  submitSource(source) {
-    beginSubmittedResolution(source);
-  },
-
-  retrySubmittedSource() {
-    const previewSession = get().previewSession;
-    if (!previewSession || previewSession.resolutionFailure?.retryable !== true) return;
-    beginSubmittedResolution(previewSession.source.raw, previewSession);
+    set({ preflight: recordedPreflight(bundle), ...resetPreparationLifecycle() });
   },
 
   updatePreflightRequest(request) {
@@ -409,16 +257,6 @@ export const useStudio = create<StudioStore>((set, get) => {
         request: { ...current.preflight.request, ...request },
       },
     }));
-    invalidateSubmittedPreparation();
-    rebuildSubmittedPreparation();
-  },
-
-  updateSubmittedSourceLanguage(sourceLanguage) {
-    set((current) => current.previewSession
-      ? { previewSession: { ...current.previewSession, sourceLanguage } }
-      : current);
-    invalidateSubmittedPreparation();
-    rebuildSubmittedPreparation();
   },
 
   selectPreparationStage(preparationStage) {
@@ -438,17 +276,11 @@ export const useStudio = create<StudioStore>((set, get) => {
 
   dismissPreflight() {
     clearInitialization();
-    sourceResolutionAbortController?.abort();
-    sourceResolutionAbortController = null;
-    sourceResolutionVersion += 1;
-    submittedPreparationVersion += 1;
-    set({ preflight: idlePreflight(), previewSession: null, ...resetPreparationLifecycle() });
+    set({ preflight: idlePreflight(), ...resetPreparationLifecycle() });
   },
 
   cancelPreflight() {
     clearInitialization();
-    sourceResolutionAbortController?.abort();
-    sourceResolutionAbortController = null;
     set((current) => ({ preflight: cancelledPreflight(current.preflight) }));
   },
 
@@ -458,27 +290,8 @@ export const useStudio = create<StudioStore>((set, get) => {
   },
 
   confirmPreflight() {
-    const { bundle, preflight, previewSession } = get();
+    const { bundle, preflight } = get();
     if (!bundle) return;
-    if (previewSession) {
-      if (!previewSession.resolution || previewSession.preparation.status !== "ready") return;
-      const assessment = assessSubmittedPreviewRequest(
-        preflight,
-        previewSession.resolution.source.durationMs / 1_000,
-      );
-      if (!assessment.canReplay) return;
-      const version = ++initializationVersion;
-      set({
-        outputDepth: previewSession.preparation.request.output.depth,
-        initialization: "submitted-preview",
-      });
-      initializationTimer = setTimeout(() => {
-        initializationTimer = null;
-        if (version !== initializationVersion || get().initialization !== "submitted-preview") return;
-        get().start();
-      }, 520);
-      return;
-    }
     const assessment = assessRecordedRequest(preflight, bundle, import.meta.env.DEV);
     if (!assessment.canReplay) return;
     const version = ++initializationVersion;
@@ -534,10 +347,6 @@ export const useStudio = create<StudioStore>((set, get) => {
 
   reset() {
     clearInitialization();
-    sourceResolutionAbortController?.abort();
-    sourceResolutionAbortController = null;
-    sourceResolutionVersion += 1;
-    submittedPreparationVersion += 1;
     handle?.stop();
     handle = null;
     set({
@@ -551,7 +360,6 @@ export const useStudio = create<StudioStore>((set, get) => {
       paused: false,
       pausePending: false,
       outcome: null,
-      previewSession: null,
       preflight: idlePreflight(),
       ...resetPreparationLifecycle(),
     });

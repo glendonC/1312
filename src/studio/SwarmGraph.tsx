@@ -65,10 +65,6 @@ function Swarm() {
   const layout = useLayout();
   const focused = useStudio((s) => s.selected !== null);
   const select = useStudio((s) => s.select);
-  // A submitted URL opens this same recorded swarm as a preview. The header carries a quiet
-  // provenance note, but a worker that pops in over the user's own source chip is the moment the
-  // boundary is easiest to miss — so the canvas states it plainly, right where the agents appear.
-  const previewSession = useStudio((s) => s.previewSession);
   const graph = useRef<HTMLDivElement>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [overview, setOverview] = useState({ needed: false, offscreen: 0 });
@@ -343,7 +339,7 @@ function Swarm() {
   const types = useMemo(() => ({ worker: WorkerNode, hub: HubNode, artifact: ArtifactNode }), []);
 
   return (
-    <div className="graph" ref={graph} data-preview={previewSession ? "recorded" : undefined}>
+    <div className="graph" ref={graph}>
       <ReactFlow<SwarmNode>
         nodes={nodes}
         edges={edges}

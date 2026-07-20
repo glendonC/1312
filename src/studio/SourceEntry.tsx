@@ -12,6 +12,7 @@ interface SourceEntryProps {
   focusRequest: number;
   setOpen: (open: boolean) => void;
   setUrl: (url: string) => void;
+  submitSource: (url: string) => void;
 }
 
 /**
@@ -19,9 +20,10 @@ interface SourceEntryProps {
  * the dock's field, review, and action atoms so the source keeps one visual language while
  * the two surfaces remain free to evolve around different jobs.
  *
- * The visible copy names the job (input a source), not the evidence class: recorded-preview
- * provenance stays machine-readable here (data-source-authority) and is stated in the
- * preflight provenance and confirmation facts before anything replays.
+ * The visible copy names the job (input a source), not the evidence class: live-local
+ * authority stays machine-readable here (data-source-authority). Submitting only carries the
+ * URL into the local ingest setup; the range bounds, the local-processing confirmation, and
+ * the host's own re-validation all still stand between this field and any downloaded bytes.
  */
 export default function SourceEntry({
   open,
@@ -29,8 +31,8 @@ export default function SourceEntry({
   focusRequest,
   setOpen,
   setUrl,
+  submitSource,
 }: SourceEntryProps) {
-  const submitSource = useStudio((state) => state.submitSource);
   const dismissPreflight = useStudio((state) => state.dismissPreflight);
 
   const [fieldOverflow, setFieldOverflow] = useState({ left: false, right: false });
@@ -96,7 +98,7 @@ export default function SourceEntry({
     <motion.div
       className="source-entry studio-bottom-bar-shell"
       data-lifecycle-mode="source"
-      data-source-authority="recorded-preview"
+      data-source-authority="live-local"
       ref={control}
       layout
       transition={SPRING}
@@ -170,7 +172,7 @@ export default function SourceEntry({
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <button type="submit" className="dock-go" aria-label="Resolve source metadata">
+              <button type="submit" className="dock-go" aria-label="Set up local processing for this link">
                 <Arrow />
               </button>
             </motion.span>

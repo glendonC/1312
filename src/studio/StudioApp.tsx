@@ -18,7 +18,6 @@ export default function StudioApp({ runId }: { runId: string }) {
   const bundle = useBundle();
   const complete = useComplete();
   const paused = usePaused();
-  const previewSession = useStudio((s) => s.previewSession);
   const [lab, setLab] = useState(false);
 
   useShortcuts();
@@ -34,10 +33,6 @@ export default function StudioApp({ runId }: { runId: string }) {
 
   const recordedSource = bundle
     ? presentRecordedSource(bundle.run.clip.source, bundle.ingestReceipt)
-    : null;
-  const visibleSource = previewSession?.source ?? recordedSource;
-  const submittedPreparation = previewSession?.preparation.status === "ready"
-    ? previewSession.preparation.request
     : null;
 
   // Held is a property of the whole instrument, not of one control: everything that
@@ -56,30 +51,18 @@ export default function StudioApp({ runId }: { runId: string }) {
           <img src="/favicon.svg" alt="" width="30" height="30" />
         </a>
 
-        {bundle && stage !== "input" && !complete && visibleSource && (
+        {bundle && stage !== "input" && !complete && recordedSource && (
           <div className="top-source">
             <div
               className="top-mid"
               role="group"
-              aria-label={`Source: ${visibleSource.accessibleName}`}
-              aria-describedby={previewSession ? "top-source-provenance" : undefined}
+              aria-label={`Source: ${recordedSource.accessibleName}`}
             >
               <SourceDisplay
-                source={visibleSource}
-                title={previewSession?.source.raw ?? visibleSource.displayUrl}
+                source={recordedSource}
+                title={recordedSource.displayUrl}
               />
             </div>
-            {previewSession && (
-              <p
-                id="top-source-provenance"
-                className="top-source-provenance"
-                role="note"
-                data-submitted-preparation-request-id={submittedPreparation?.requestId}
-              >
-                This interface preview uses a recorded run. Your source was not processed.
-                {submittedPreparation && " Its preparation request did not start a runtime."}
-              </p>
-            )}
           </div>
         )}
 

@@ -1,0 +1,105 @@
+{
+  "pair_id": "bench-paired-score:sha256:c2d9bab3d5c7128ba16a640844a951ae835a66f6e3915214adeab01cf793f8c0",
+  "schema": "studio.bench.paired-score.v2",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "compared_at": "2026-07-20T01:09:13.469Z",
+  "subject_system": "1321-openai-audio-translation-rule-change",
+  "without": {
+    "run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r1-without",
+    "score": {
+      "path": "bench/scores/rule-change-ko-kinship-address-context-provider-authorized-c3-r1-without/score.json",
+      "content_id": "sha256:c3e97ff2b6a3e3abd286bd4b99eb2947ca6afe7b8d3c9948307f755deaf41c47",
+      "bytes": 7377
+    },
+    "memory": null
+  },
+  "with": {
+    "run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r1-with",
+    "score": {
+      "path": "bench/scores/rule-change-ko-kinship-address-context-provider-authorized-c3-r1-with/score.json",
+      "content_id": "sha256:bc18b89b252328c8ca1528c770b673a65bb60644ff34310420f5c8742e193d38",
+      "bytes": 7331
+    },
+    "memory": null
+  },
+  "delta": {
+    "critical_meaning_rate": -0.38461538461538464,
+    "catastrophic_count": 4,
+    "critical_outcomes": {
+      "correct": -5,
+      "wrong": -4,
+      "withheld": 0,
+      "missing": 9
+    }
+  },
+  "regressions": [
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "critical_unit_id": "Ux-TMWnmntM-0000-0155-meaning-01",
+      "without_outcome": "correct",
+      "with_outcome": "wrong"
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "critical_unit_id": "Ux-TMWnmntM-0195-0770-meaning-01",
+      "without_outcome": "correct",
+      "with_outcome": "wrong"
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "critical_unit_id": "Ux-TMWnmntM-1190-1235-backchannel-01",
+      "without_outcome": "correct",
+      "with_outcome": "missing"
+    },
+    {
+      "t_start": 25.52,
+      "t_end": 28.12,
+      "critical_unit_id": "Ux-TMWnmntM-2552-2812-busy-01",
+      "without_outcome": "correct",
+      "with_outcome": "missing"
+    },
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "critical_unit_id": "Ux-TMWnmntM-2832-3987-meaning-01",
+      "without_outcome": "correct",
+      "with_outcome": "wrong"
+    }
+  ],
+  "catastrophic_regressions": [
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "critical_unit_id": "Ux-TMWnmntM-0000-0155-meaning-01",
+      "without_catastrophic": false,
+      "with_catastrophic": true
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "critical_unit_id": "Ux-TMWnmntM-0155-0195-backchannel-01",
+      "without_catastrophic": false,
+      "with_catastrophic": true
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "critical_unit_id": "Ux-TMWnmntM-0195-0770-meaning-01",
+      "without_catastrophic": false,
+      "with_catastrophic": true
+    },
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "critical_unit_id": "Ux-TMWnmntM-2832-3987-meaning-01",
+      "without_catastrophic": false,
+      "with_catastrophic": true
+    }
+  ],
+  "judge": null,
+  "notes": "Paired compare preserves critical_meaning rate delta, catastrophic count delta, and all four outcome deltas. Regressions list loss of a previously correct critical unit and newly catastrophic critical units. judge is pinned null. No composite score. A null with.memory means this pair does not claim reviewed-memory consumption."
+}

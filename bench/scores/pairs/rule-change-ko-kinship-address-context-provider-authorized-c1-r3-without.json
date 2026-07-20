@@ -1,0 +1,84 @@
+{
+  "pair_id": "bench-paired-score:sha256:065c5459cfdfbbc7211fb3061d60978f662f31858f1a220185254d4b10fdd3cf",
+  "schema": "studio.bench.paired-score.v2",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "2o0f-V4uoMg",
+  "compared_at": "2026-07-20T01:09:13.469Z",
+  "subject_system": "1321-openai-audio-translation-rule-change",
+  "without": {
+    "run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without",
+    "score": {
+      "path": "bench/scores/rule-change-ko-kinship-address-context-provider-authorized-c1-r3-without/score.json",
+      "content_id": "sha256:ec2b426124e95d784b9061db284123ec1490a95a2ca376a440655b902902d7bc",
+      "bytes": 4713
+    },
+    "memory": null
+  },
+  "with": {
+    "run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r3-with",
+    "score": {
+      "path": "bench/scores/rule-change-ko-kinship-address-context-provider-authorized-c1-r3-with/score.json",
+      "content_id": "sha256:3e8ea9dadce795b19fd08083ddf7945e542c1de27aa3afc8dffd4cc1d4bb7d94",
+      "bytes": 4662
+    },
+    "memory": null
+  },
+  "delta": {
+    "critical_meaning_rate": -0.6666666666666666,
+    "catastrophic_count": 2,
+    "critical_outcomes": {
+      "correct": -3,
+      "wrong": 0,
+      "withheld": 0,
+      "missing": 3
+    }
+  },
+  "regressions": [
+    {
+      "t_start": 6,
+      "t_end": 15,
+      "critical_unit_id": "2o0f-V4uoMg-0600-1500-host-01",
+      "without_outcome": "correct",
+      "with_outcome": "wrong"
+    },
+    {
+      "t_start": 15,
+      "t_end": 27.8,
+      "critical_unit_id": "2o0f-V4uoMg-1500-2780-balance-01",
+      "without_outcome": "correct",
+      "with_outcome": "wrong"
+    },
+    {
+      "t_start": 39.34,
+      "t_end": 49.4,
+      "critical_unit_id": "2o0f-V4uoMg-3934-4940-evidence-01",
+      "without_outcome": "correct",
+      "with_outcome": "missing"
+    }
+  ],
+  "catastrophic_regressions": [
+    {
+      "t_start": 0,
+      "t_end": 6,
+      "critical_unit_id": "2o0f-V4uoMg-0000-0600-inverse-01",
+      "without_catastrophic": false,
+      "with_catastrophic": true
+    },
+    {
+      "t_start": 6,
+      "t_end": 15,
+      "critical_unit_id": "2o0f-V4uoMg-0600-1500-host-01",
+      "without_catastrophic": false,
+      "with_catastrophic": true
+    },
+    {
+      "t_start": 15,
+      "t_end": 27.8,
+      "critical_unit_id": "2o0f-V4uoMg-1500-2780-balance-01",
+      "without_catastrophic": false,
+      "with_catastrophic": true
+    }
+  ],
+  "judge": null,
+  "notes": "Paired compare preserves critical_meaning rate delta, catastrophic count delta, and all four outcome deltas. Regressions list loss of a previously correct critical unit and newly catastrophic critical units. judge is pinned null. No composite score. A null with.memory means this pair does not claim reviewed-memory consumption."
+}

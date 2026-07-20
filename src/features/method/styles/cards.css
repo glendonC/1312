@@ -106,6 +106,12 @@
   transition: transform 200ms ease;
 }
 
+/* Transparent to the desktop flex column so the panel stays a direct flex child.
+   On narrow layouts (responsive.css) it becomes the height-animating accordion track. */
+.card-panel-shell {
+  display: contents;
+}
+
 .card-panel {
   display: grid;
   min-height: 0;

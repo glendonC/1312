@@ -52,17 +52,32 @@
     min-height: 0;
   }
 
+  /* Block flow, not the desktop flex column: the shell's grid-rows accordion resolves
+     its open height from content only in a normal-flow container. As a flex child the
+     track collapses to its 0 minimum in both states and never animates. */
   .process-card {
-    min-height: 80px;
+    display: block;
     flex-basis: auto;
+    min-height: 80px;
   }
 
   .process-card.is-active {
     min-height: 0;
   }
 
-  .process-card:not(.is-active) .card-panel {
-    display: none;
+  /* The shell is the accordion track: one row running from a collapsed to an open
+     fraction, so the panel's own height sets the open extent and both directions
+     animate. The row is minmax(0, Nfr) rather than Nfr so it has no auto minimum to
+     hold it open, and min-height: 0 lets it shrink as a flex child of the card. */
+  .card-panel-shell {
+    display: grid;
+    grid-template-rows: minmax(0, 0fr);
+    min-height: 0;
+    transition: grid-template-rows 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .process-card.is-active .card-panel-shell {
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .card-heading {
@@ -73,7 +88,8 @@
     padding-bottom: 28px;
     flex: 0 0 auto;
     grid-template-rows: auto auto auto;
-    overflow: visible;
+    overflow: hidden;
+    transition: opacity 260ms ease;
   }
 
   .card-detail-mobile {
@@ -225,6 +241,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .process-card,
+  .card-panel-shell,
+  .card-panel,
   .card-state > span:last-child {
     transition: none;
   }

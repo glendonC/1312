@@ -76,7 +76,9 @@ export function enhanceMethodProcess(root: HTMLElement) {
 
       if (panel) {
         panel.style.opacity = String(desktop ? panelOpacity(openness) : Number(active));
-        panel.style.transform = `translateY(${desktop ? 22 * (1 - openness) : active ? 0 : 22}px)`;
+        // On narrow layouts the shell animates height; the panel only fades, so it
+        // holds still instead of sliding down as it collapses.
+        panel.style.transform = `translateY(${desktop ? 22 * (1 - openness) : 0}px)`;
       }
 
       if (stateLine) stateLine.style.transform = `rotate(${active ? 0 : 90}deg)`;
@@ -105,9 +107,11 @@ export function enhanceMethodProcess(root: HTMLElement) {
       "click",
       () => {
         if (!desktopQuery.matches) {
-          activeIndex = index;
-          render(0, index);
-          renderDetails(index);
+          // Tapping the open card collapses it; -1 means no card is open.
+          const willClose = activeIndex === index;
+          activeIndex = willClose ? -1 : index;
+          render(0);
+          if (!willClose) renderDetails(index);
           return;
         }
 

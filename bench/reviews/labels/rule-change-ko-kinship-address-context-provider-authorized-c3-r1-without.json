@@ -1,0 +1,208 @@
+{
+  "schema": "studio.bench.output-labels.v1",
+  "labels_id": "bench-labels:sha256:067957bc7f34986df226e6447216493e9e725e0799cd7d03f3c0c41a02f9b89f",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r1-without",
+  "capture": {
+    "path": "bench/runs/rule-change-ko-kinship-address-context-provider-authorized-c3-r1-without/capture.json",
+    "content_id": "sha256:916bffca2018594c785fdb914f52f658c8a18ff8d0e1bed3abf03a7cf4556123",
+    "bytes": 4665
+  },
+  "blinded": true,
+  "reviewers": [
+    {
+      "name": "Bench Reviewer A",
+      "git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+    },
+    {
+      "name": "Bench Reviewer B",
+      "git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+    }
+  ],
+  "labels": [
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2832-3987-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 28.12,
+      "t_end": 28.32,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2812-2832-backchannel-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 25.52,
+      "t_end": 28.12,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2552-2812-busy-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 20.2,
+      "t_end": 25.2,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2020-2520-kinship-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 19.15,
+      "t_end": 20.2,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1915-2020-backchannel-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 19,
+      "t_end": 19.15,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1900-1915-kinship-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 18.8,
+      "t_end": 19,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1880-1900-backchannel-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 14,
+      "t_end": 18.8,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1400-1880-kinship-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 12.7,
+      "t_end": 13.6,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1270-1360-question-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 11.9,
+      "t_end": 12.35,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-1190-1235-backchannel-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0195-0770-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0155-0195-backchannel-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": true,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0000-0155-meaning-01",
+          "correct": true,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    }
+  ],
+  "notes": "Hackathon operator-authorized worksheet fill. Judgments derived from frozen gold english_guidance/facts vs worksheet emitted English (junk rule-prompt dumps fail closed). Not independent blind human semantic QC; used only to unblock mechanical scoring of the 15 live captures. Campaign remains incomplete on spent c2-without slots."
+}

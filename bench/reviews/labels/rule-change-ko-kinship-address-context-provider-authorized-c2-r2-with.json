@@ -1,0 +1,82 @@
+{
+  "schema": "studio.bench.output-labels.v1",
+  "labels_id": "bench-labels:sha256:176425f6545a016363dcf495cf53a12ec5a73a85300ba036aea8894882ee5dfe",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ni5rBtowdnI",
+  "run": "rule-change-ko-kinship-address-context-provider-authorized-c2-r2-with",
+  "capture": {
+    "path": "bench/runs/rule-change-ko-kinship-address-context-provider-authorized-c2-r2-with/capture.json",
+    "content_id": "sha256:fe4ea39c76dc1dec9f9fefa052576fbd0d4a6f5629036616edbfdedb6d1b1207",
+    "bytes": 5359
+  },
+  "blinded": true,
+  "reviewers": [
+    {
+      "name": "Bench Reviewer A",
+      "git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+    },
+    {
+      "name": "Bench Reviewer B",
+      "git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+    }
+  ],
+  "labels": [
+    {
+      "t_start": 31,
+      "t_end": 45,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ni5rBtowdnI-3100-4500-persona-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 23,
+      "t_end": 31,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ni5rBtowdnI-2300-3100-drag-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 9.3,
+      "t_end": 23,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ni5rBtowdnI-0930-2300-waacking-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    },
+    {
+      "t_start": 0,
+      "t_end": 9.3,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ni5rBtowdnI-0000-0930-identity-01",
+          "correct": false,
+          "catastrophic": false
+        }
+      ],
+      "note": null
+    }
+  ],
+  "notes": "Hackathon operator-authorized worksheet fill. Judgments derived from frozen gold english_guidance/facts vs worksheet emitted English (junk rule-prompt dumps fail closed). Not independent blind human semantic QC; used only to unblock mechanical scoring of the 15 live captures. Campaign remains incomplete on spent c2-without slots."
+}

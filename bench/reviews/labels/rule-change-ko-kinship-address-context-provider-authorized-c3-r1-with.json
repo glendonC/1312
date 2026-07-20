@@ -1,0 +1,82 @@
+{
+  "schema": "studio.bench.output-labels.v1",
+  "labels_id": "bench-labels:sha256:d834cbbb1b9a0a11f67ec4841274b9c6f417beeac98542558c63d111cf211c25",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "Ux-TMWnmntM",
+  "run": "rule-change-ko-kinship-address-context-provider-authorized-c3-r1-with",
+  "capture": {
+    "path": "bench/runs/rule-change-ko-kinship-address-context-provider-authorized-c3-r1-with/capture.json",
+    "content_id": "sha256:d3096aef049d71d0b8a7b0d265e2611c00885ae27377fe94120d6928a0dd1eba",
+    "bytes": 3123
+  },
+  "blinded": true,
+  "reviewers": [
+    {
+      "name": "Bench Reviewer A",
+      "git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+    },
+    {
+      "name": "Bench Reviewer B",
+      "git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+    }
+  ],
+  "labels": [
+    {
+      "t_start": 28.32,
+      "t_end": 39.87,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-2832-3987-meaning-01",
+          "correct": false,
+          "catastrophic": true
+        }
+      ],
+      "note": "rule-prompt dump / non-translation"
+    },
+    {
+      "t_start": 1.95,
+      "t_end": 7.7,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0195-0770-meaning-01",
+          "correct": false,
+          "catastrophic": true
+        }
+      ],
+      "note": "rule-prompt dump / non-translation"
+    },
+    {
+      "t_start": 1.55,
+      "t_end": 1.95,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0155-0195-backchannel-01",
+          "correct": false,
+          "catastrophic": true
+        }
+      ],
+      "note": "rule-prompt dump / non-translation"
+    },
+    {
+      "t_start": 0,
+      "t_end": 1.55,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "Ux-TMWnmntM-0000-0155-meaning-01",
+          "correct": false,
+          "catastrophic": true
+        }
+      ],
+      "note": "rule-prompt dump / non-translation"
+    }
+  ],
+  "notes": "Hackathon operator-authorized worksheet fill. Judgments derived from frozen gold english_guidance/facts vs worksheet emitted English (junk rule-prompt dumps fail closed). Not independent blind human semantic QC; used only to unblock mechanical scoring of the 15 live captures. Campaign remains incomplete on spent c2-without slots."
+}

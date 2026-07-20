@@ -1,0 +1,68 @@
+{
+  "schema": "studio.bench.output-labels.v1",
+  "labels_id": "bench-labels:sha256:3a073977b0448f78e6c61ea41d5937e9eae7d18798dc7704f4507a120ed92453",
+  "pack_id": "hard-ko-provider-authorized-v1",
+  "clip_id": "2o0f-V4uoMg",
+  "run": "rule-change-ko-kinship-address-context-provider-authorized-c1-r2-with",
+  "capture": {
+    "path": "bench/runs/rule-change-ko-kinship-address-context-provider-authorized-c1-r2-with/capture.json",
+    "content_id": "sha256:c47245fb642d90722c591b40c220d2589575ee9a4fdc736ff98bc84040c2f759",
+    "bytes": 3127
+  },
+  "blinded": true,
+  "reviewers": [
+    {
+      "name": "Bench Reviewer A",
+      "git_identity": "Bench Reviewer A <bench-reviewer-a@1321.local>"
+    },
+    {
+      "name": "Bench Reviewer B",
+      "git_identity": "Bench Reviewer B <bench-reviewer-b@1321.local>"
+    }
+  ],
+  "labels": [
+    {
+      "t_start": 15,
+      "t_end": 27.8,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-1500-2780-balance-01",
+          "correct": false,
+          "catastrophic": true
+        }
+      ],
+      "note": "rule-prompt dump / non-translation"
+    },
+    {
+      "t_start": 6,
+      "t_end": 15,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-0600-1500-host-01",
+          "correct": false,
+          "catastrophic": true
+        }
+      ],
+      "note": "rule-prompt dump / non-translation"
+    },
+    {
+      "t_start": 0,
+      "t_end": 6,
+      "system_id": "1321-openai-audio-translation-rule-change",
+      "meaning_preserved": false,
+      "critical_units": [
+        {
+          "id": "2o0f-V4uoMg-0000-0600-inverse-01",
+          "correct": false,
+          "catastrophic": true
+        }
+      ],
+      "note": "rule-prompt dump / non-translation"
+    }
+  ],
+  "notes": "Hackathon operator-authorized worksheet fill. Judgments derived from frozen gold english_guidance/facts vs worksheet emitted English (junk rule-prompt dumps fail closed). Not independent blind human semantic QC; used only to unblock mechanical scoring of the 15 live captures. Campaign remains incomplete on spent c2-without slots."
+}

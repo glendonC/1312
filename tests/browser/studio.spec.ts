@@ -640,6 +640,24 @@ test("source authority options separate live local ingest from recorded preview"
   }
 });
 
+test("the recorded preflight's Skip setup control confirms with defaults and starts processing", async ({ page }) => {
+  await page.goto("/studio/");
+  await expect(page.locator(".studio")).toHaveAttribute("data-stage", "input");
+
+  // Reach the recorded preflight through the source chooser.
+  await page.getByRole("button", { name: "Choose source: local or recorded" }).click();
+  await page.getByRole("button", { name: "Explore the recorded run-006 demo" }).click();
+  const preflight = page.locator('.preflight[data-preview-mode="recorded-demo"]');
+  await expect(preflight).toBeVisible();
+
+  // The skip control is a standing part of the preflight (like the run's Pause / Open Results pills):
+  // it confirms with the recorded defaults and hands off to processing.
+  const skip = page.getByRole("button", { name: "Skip setup" });
+  await expect(skip).toBeVisible();
+  await skip.click();
+  await expect(page.locator(".studio")).toHaveAttribute("data-stage", "run");
+});
+
 test("YouTube local ingest registers exact local bytes and enters the existing plan/start flow without replay", async ({ page }, testInfo) => {
   test.setTimeout(30_000);
   test.skip(testInfo.project.name !== "desktop", "one real local-host browser walk is sufficient");

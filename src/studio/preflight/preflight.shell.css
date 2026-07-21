@@ -62,6 +62,23 @@
   overflow: visible;
 }
 
+/*
+ * Skip control: a floating pill that confirms the recorded preflight with its defaults and begins
+ * processing, so the guided setup can be bypassed. Reuses the run's `.rail` pill look (Pause /
+ * Open Results); this rule only places it above the preflight's bottom bar.
+ */
+.preflight-skip {
+  position: fixed;
+  bottom: 92px;
+  left: 50%;
+  z-index: 22;
+  transform: translateX(-50%);
+}
+
+.preflight-skip .rail-btn {
+  color: var(--accent);
+}
+
 .preflight[data-preview-mode="submitted-source"] .preflight-form {
   height: auto;
   min-height: 0;

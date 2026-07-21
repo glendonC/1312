@@ -1,5 +1,8 @@
 import { useMemo } from "react";
+import { createPortal } from "react-dom";
+import { motion } from "motion/react";
 
+import { Arrow } from "../glyphs";
 import { useBundle, useStudio } from "../store";
 import ConfirmationForm, { AdvancedFields } from "./ConfirmationForm";
 import {
@@ -83,6 +86,33 @@ export default function Preflight() {
         update={update}
         confirm={confirm}
       />
+      {assessment?.canReplay && session.status === "ready" && typeof document !== "undefined" &&
+        createPortal(
+          // Portaled to the body so the fixed position resolves against the viewport, not the
+          // preflight's transform-animated ancestors, which would otherwise capture it. The plain
+          // wrapper owns positioning/centering so the inner pill's entrance transform can't drop it.
+          <div className="preflight-skip">
+            <motion.div
+              className="rail"
+              initial={{ opacity: 0, y: 7, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 280, damping: 32, mass: 0.7 }}
+            >
+              <button
+                type="button"
+                className="rail-btn"
+                onClick={confirm}
+                title="Skip the guided setup and replay with the recorded defaults"
+              >
+                <span className="rail-glyph">
+                  <Arrow />
+                </span>
+                <span>Skip setup</span>
+              </button>
+            </motion.div>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }

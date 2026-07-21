@@ -72,6 +72,8 @@ export default function RecordedMediaPlayer({
   const setClipT = useStudio((state) => state.setClipT);
   const playing = useStudio((state) => state.playing);
   const setPlaying = useStudio((state) => state.setPlaying);
+  const resultView = useStudio((state) => state.resultView);
+  const resultFace = useStudio((state) => state.resultFace);
   const activePlayerId = useViewerSession((state) => state.activePlayerId);
   const muted = useViewerSession((state) => state.muted);
   const volume = useViewerSession((state) => state.volume);
@@ -96,14 +98,20 @@ export default function RecordedMediaPlayer({
   const ownsPlayback = activePlayerId === playerId;
   const activelyPlaying = ownsPlayback && playing;
 
+  // The report shows the clip as a calm, chrome-free preview: it plays muted and loops so the result
+  // reads as alive, while the operable controls (transport, caption modes, notes, full screen) belong
+  // to the watch room reached through the door. Only the results surface, and only while the report is
+  // the shown face, is a preview.
+  const previewMode = surface === "results" && resultView === "result" && resultFace === "report";
+
   useEffect(() => setMediaFailed(false), [src]);
 
   useEffect(() => {
     const element = mediaRef.current;
     if (!element) return;
-    element.muted = muted;
+    element.muted = previewMode || muted;
     element.volume = volume;
-  }, [muted, volume, src]);
+  }, [muted, volume, previewMode, src]);
 
   useEffect(() => {
     const element = mediaRef.current;
@@ -132,6 +140,14 @@ export default function RecordedMediaPlayer({
       last = now;
       const next = element?.currentTime ?? useStudio.getState().clipT + elapsed;
       if (next >= duration) {
+        if (previewMode) {
+          // Loop the muted preview from the start rather than stopping at the end.
+          if (element) element.currentTime = 0;
+          setClipT(0);
+          last = now;
+          raf.current = requestAnimationFrame(tick);
+          return;
+        }
         setClipT(duration);
         setPlaying(false);
         return;
@@ -141,7 +157,16 @@ export default function RecordedMediaPlayer({
     };
     raf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf.current);
-  }, [activelyPlaying, duration, mediaFailed, ownsPlayback, playing, setClipT, setPlaying, src]);
+  }, [activelyPlaying, duration, mediaFailed, ownsPlayback, playing, previewMode, setClipT, setPlaying, src]);
+
+  // Enter the report preview: this player takes playback and rolls, muted; leaving the report (to the
+  // watch room, or closing) stills it, so the watch room opens paused rather than mid-preview.
+  useEffect(() => {
+    if (!previewMode || !src || mediaFailed || !picture) return undefined;
+    activatePlayer(playerId);
+    setPlaying(true);
+    return () => setPlaying(false);
+  }, [previewMode, src, mediaFailed, picture, playerId, activatePlayer, setPlaying]);
 
   useEffect(() => () => {
     if (useViewerSession.getState().activePlayerId !== playerId) return;
@@ -152,7 +177,7 @@ export default function RecordedMediaPlayer({
   const attach = (element: HTMLMediaElement | null): void => {
     mediaRef.current = element;
     if (!element) return;
-    element.muted = muted;
+    element.muted = previewMode || muted;
     element.volume = volume;
     element.playbackRate = playbackRate;
   };
@@ -383,6 +408,7 @@ export default function RecordedMediaPlayer({
       data-player-surface={surface}
       data-playback-owner={ownsPlayback || undefined}
       data-overlay-controls={overlayControls || undefined}
+      data-preview={previewMode || undefined}
       data-playing={activelyPlaying ? "true" : "false"}
     >
       {src && (picture ? (
@@ -394,14 +420,14 @@ export default function RecordedMediaPlayer({
             preload="auto"
             playsInline
             aria-label="Recorded source video"
-            onClick={togglePlayback}
+            onClick={previewMode ? undefined : togglePlayback}
             onError={() => {
               setMediaFailed(true);
               setPlaying(false);
             }}
           />
           <CaptionOverlay bundle={bundle} />
-          {overlayControls && (
+          {overlayControls && !previewMode && (
             <>
               {settingsPill}
               <div className="player-controls">{overlayBar}</div>

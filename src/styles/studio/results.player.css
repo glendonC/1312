@@ -52,6 +52,11 @@
   cursor: pointer;
 }
 
+/* The report preview is not operated in place; clicking it does nothing (the door is the button). */
+.player[data-preview] .screen-video {
+  cursor: default;
+}
+
 .player[data-player-surface="workbench"] {
   width: 100%;
 }

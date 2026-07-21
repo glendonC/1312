@@ -149,6 +149,15 @@ export default function LearningResults({
   const clozeAmount = useViewerSession((state) => state.clozeAmount);
   const setClozeAmount = useViewerSession((state) => state.setClozeAmount);
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null);
+  // Browser fullscreen paints only the fullscreen element's subtree, so a bar portalled to the
+  // body would exist yet never render there; the portal follows the fullscreen host instead.
+  const [fullscreenHost, setFullscreenHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const sync = () => setFullscreenHost(document.fullscreenElement instanceof HTMLElement ? document.fullscreenElement : null);
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
   const cuesRef = useRef<HTMLDivElement | null>(null);
   const lastActiveLineId = useRef<string | null>(null);
   const prototype = presentation.mode === "prototype" ? presentation.explanations : null;
@@ -657,9 +666,10 @@ export default function LearningResults({
           </div>
       </>
 
-      {/* Portalled to the body: the bar answers selections made on the on-video captions too, and
-          in the watch room this workspace subtree is display:none while the panel is closed, which
-          would silently hide a fixed-position bar rendered in place. */}
+      {/* Portalled outside this subtree: the bar answers selections made on the on-video captions
+          too, and in the watch room this workspace subtree is display:none while the panel is
+          closed, which would silently hide a fixed-position bar rendered in place. The target is
+          the fullscreen element whenever one is active, because nothing outside it paints. */}
       {floating && createPortal(
         <SelectionBar
           anchor={floating.anchor}
@@ -676,7 +686,7 @@ export default function LearningResults({
           onSave={saveFloating}
           onDismiss={dismissFloating}
         />,
-        document.body,
+        fullscreenHost ?? document.body,
       )}
 
       {showBar && (

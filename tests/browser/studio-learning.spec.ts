@@ -261,6 +261,29 @@ test("viewer modes keep a borderless learning shell and use the browser full scr
   await expect(viewer).toHaveAttribute("data-fs-panel", "float");
   await expect(viewer.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
 
+  // Selecting the on-video caption in full screen raises the floating bar INSIDE the fullscreen
+  // subtree: the browser paints nothing outside the fullscreen element, so a body-portalled bar
+  // would exist yet stay invisible there.
+  await viewer.locator('.burn-src[data-caption-line-id="c01"]').evaluate((element) => {
+    const textNode = Array.from(element.childNodes).find((node) =>
+      node.nodeType === Node.TEXT_NODE && node.textContent?.includes("분들이"));
+    if (!textNode) throw new Error("Expected the burned caption text node");
+    const range = document.createRange();
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, 3);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+  });
+  const fullscreenSelectionBar = page.getByRole("toolbar", { name: "Selection actions" });
+  await expect(fullscreenSelectionBar).toBeVisible();
+  expect(await page.evaluate(() =>
+    document.fullscreenElement?.contains(document.querySelector(".selection-bar")) ?? false,
+  )).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(fullscreenSelectionBar).toHaveCount(0);
+
   // Leaving full screen restores the watch composition; re-entering keeps the sticky Float placement.
   await fullScreen.click();
   await expect(viewer).toHaveAttribute("data-view-mode", "split");

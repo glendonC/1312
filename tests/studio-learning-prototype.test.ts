@@ -113,7 +113,7 @@ test("recorded adapter preserves run-006 cue authority and never projects withhe
   assert.equal(source.context.identities.captionArtifactId, "captions");
   assert.equal(
     source.context.identities.captionContentId,
-    "sha256:45b3ff96cef4a0112586e6bfb6e530e7cb227d48147f90a65e4ace3fd3f6690c",
+    "sha256:83d337f7dc474c769f9e3e042335b663c78894bcdf5e035798547d57303a2e60",
   );
 
   const supported = source.moments.find((moment) => moment.lineId === "c01");

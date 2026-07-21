@@ -855,7 +855,7 @@
       "view": {
         "draft": {
           "source": "친누나가",
-          "target": "My biological older sister—",
+          "target": "My biological older sister...",
           "conf": null
         }
       },
@@ -1123,7 +1123,7 @@
       "view": {
         "draft": {
           "source": "그 막 그 매형이랑 태국에 한 달 살기를 하려고 했는데",
-          "target": "Like, she and my brother-in-law were planning a one-month stay in Thailand, but—",
+          "target": "Like, she and my brother-in-law were planning a one-month stay in Thailand, but...",
           "conf": 0.857
         }
       },
@@ -1401,7 +1401,7 @@
       "view": {
         "draft": {
           "source": "아니 그 예전에 코로나 사태 이전에 누나랑",
-          "target": "Well, back before COVID, with my sister—",
+          "target": "Well, back before COVID, with my sister...",
           "conf": 0.824
         }
       },
@@ -1449,7 +1449,7 @@
       "view": {
         "draft": {
           "source": "저밖에 없어서 그 공짜로 태국 한 달 살기를 한 적이 있어요 아 근데 그 치앙마이에서 한 달을 살았는데 너무 동네가 예쁘고 사람들도 너무 친절하고 한국어",
-          "target": "I was the only one with free time, so I ended up doing a one-month stay in Thailand for free. I spent a month in Chiang Mai—the place was so pretty and the people were so friendly, and Korean...",
+          "target": "I was the only one with free time, so I ended up doing a one-month stay in Thailand for free. I spent a month in Chiang Mai, the place was so pretty and the people were so friendly, and Korean...",
           "conf": 1
         }
       },

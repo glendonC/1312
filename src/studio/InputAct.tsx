@@ -110,9 +110,7 @@ function StudioWelcome({
                 >
                   <strong>Source guide</strong>
                   <span role="status" aria-live="polite">
-                    {sourceGuideState === "recorded"
-                      ? "Recorded source ready"
-                      : "Request closed"}
+                    {sourceGuideState === "recorded" ? "Recorded source ready" : "Request closed"}
                   </span>
                 </motion.div>
               )}
@@ -468,44 +466,6 @@ function SourceChoiceIcon({ kind }: { kind: "youtube" | "file" | "replay" | "lin
   );
 }
 
-/** Development replay controls stay outside the product welcome and source composition. */
-function StudioDevShortcuts() {
-  const bundle = useBundle();
-  const dismissPreflight = useStudio((state) => state.dismissPreflight);
-  const start = useStudio((state) => state.start);
-  const seekCursor = useStudio((state) => state.seekCursor);
-
-  return (
-    <div className="studio-dev-skip" role="group" aria-label="Developer shortcuts">
-      <span className="studio-dev-skip-label">Dev</span>
-      <button
-        type="button"
-        className="studio-dev-skip-btn"
-        disabled={!bundle}
-        onClick={() => {
-          if (!bundle) return;
-          dismissPreflight();
-          seekCursor(bundle.traces.length);
-        }}
-      >
-        Skip to results
-      </button>
-      <button
-        type="button"
-        className="studio-dev-skip-btn"
-        disabled={!bundle}
-        onClick={() => {
-          if (!bundle) return;
-          dismissPreflight();
-          start();
-        }}
-      >
-        Skip to processing
-      </button>
-    </div>
-  );
-}
-
 export default function InputAct() {
   const [processingMock] = useState<ProcessingMockScenario | null>(() => {
     if (!import.meta.env.DEV || typeof window === "undefined") return null;
@@ -563,8 +523,6 @@ export default function InputAct() {
       transition={{ duration: 0.4 }}
     >
       <div className="canvas" aria-hidden="true" />
-
-      {import.meta.env.DEV && localSourceMode === null && loadStatus === "ready" && <StudioDevShortcuts />}
 
       {localSourceMode !== null && loadStatus === "ready" && (
         <Suspense

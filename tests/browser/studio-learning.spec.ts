@@ -18,22 +18,6 @@ async function openCompletedRun006(page: Page): Promise<void> {
   await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
 }
 
-test("the dev skip-to-results shortcut lands straight on the recorded learning viewer", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "Desktop dev-shortcut coverage");
-  // The shortcut is gated by import.meta.env.DEV, which the dev server used for these tests satisfies.
-  await page.goto("/studio/");
-  const dev = page.getByRole("group", { name: "Developer shortcuts" });
-  await expect(dev).toBeVisible();
-  await dev.getByRole("button", { name: "Skip to results" }).click();
-  await page.getByRole("button", { name: "View result" }).click();
-  await page.getByRole("button", { name: "Watch the clip" }).click();
-  await expect(page.getByRole("region", { name: "Result" })).toBeVisible();
-  // The room opens immersive; the transcript docks on command.
-  await page.getByRole("navigation", { name: "Watch commands" })
-    .getByRole("button", { name: "Transcript" }).click();
-  await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeVisible();
-});
-
 test("recorded results expose the learning-notes face behind Notes", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Desktop shared-result composition coverage");
   await openCompletedRun006(page);

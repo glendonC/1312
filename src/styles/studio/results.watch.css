@@ -440,15 +440,21 @@
  * here the watch face shows them whenever awake and the idle rule hides them again — outranking the
  * hover reveal so resting the cursor over the picture still lets everything fade.
  */
+/* Awake shows the transport scrim and the settings pill. The scrim is full-frame (inset:0), so it
+   must keep its base pointer-events:none, since its inner widgets set their own pointer-events; letting
+   the wrapper capture would eat the burned-in caption's selection and the frame's click-to-pause. The
+   settings pill is a small top-right control clear of the caption, so it takes pointer events. */
 .result-workspace[data-workspace-face="watch"] .result-viewer .player-controls,
 .result-workspace[data-workspace-face="watch"] .result-viewer .player-settings-pill {
   opacity: 1;
+}
+
+.result-workspace[data-workspace-face="watch"] .result-viewer .player-settings-pill {
   pointer-events: auto;
 }
 
 .result-workspace[data-workspace-face="watch"] .watch-caption-controls,
 .result-workspace[data-workspace-face="watch"] .watch-console,
-.result-workspace[data-workspace-face="watch"] .watch-notes,
 .result-workspace[data-workspace-face="watch"] .watch-room-mark,
 .result-workspace[data-workspace-face="watch"] .watch-room-escape {
   transition: opacity 220ms ease;
@@ -458,7 +464,6 @@
 .result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .result-viewer .player-settings-pill,
 .result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-caption-controls,
 .result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-console,
-.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-notes,
 .result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-room-mark,
 .result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-room-escape {
   opacity: 0;

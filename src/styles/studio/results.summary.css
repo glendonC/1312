@@ -149,7 +149,7 @@
   height: 100%;
   min-height: 0;
   /* Reserve the console's full footprint (its bottom offset + the hint line + the bar), so the
-     centered clip's burned-in caption — which sits at 5% up from the frame's foot — always clears
+     centered clip's burned-in caption, which sits at 5% up from the frame's foot, always clears
      the floating command bar instead of being covered by it. */
   padding-bottom: clamp(106px, 13vh, 136px);
   overflow: visible;

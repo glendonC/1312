@@ -47,6 +47,7 @@ export default function RunAct() {
         className={complete ? "stage stage-complete" : "stage"}
         data-agent-focus={focused ? "true" : undefined}
         aria-label={complete ? "Completed process graph" : undefined}
+        inert={complete && resultView === "result" ? true : undefined}
       >
         <SwarmGraph />
         <AgentPanel />

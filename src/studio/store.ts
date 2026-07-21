@@ -341,8 +341,15 @@ export const useStudio = create<StudioStore>((set, get) => {
   end() {
     handle?.stop();
     handle = null;
-    // The stage does not change: the swarm stays on screen, the result appears under it.
-    set((s) => ({ state: finish(s.state), paused: false, pausePending: false }));
+    // Completion transfers interaction authority from the process graph to the result workspace.
+    // Revoke any open agent focus in the same state transition so two full-viewport surfaces can
+    // never remain active together. The stage itself stays mounted beneath the result.
+    set((s) => ({
+      state: finish(s.state),
+      selected: null,
+      paused: false,
+      pausePending: false,
+    }));
   },
 
   reset() {

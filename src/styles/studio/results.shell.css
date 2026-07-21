@@ -12,13 +12,14 @@
  * focus panel floats over the swarm: the world dims and blurs beneath (canvas.css), a light
  * veil — not an opaque sheet — carries the composition, and the [hidden] attribute closes the
  * workspace without unmounting it, so playback position, viewer mode, pinned explanations, and
- * saved items all survive the round trip to the process view. Below the floating header (z 10),
- * above the stage (z 0). Geometry mirrors focus/shell.css deliberately; keep them in step.
+ * saved items all survive the round trip to the process view. Completion owns the viewport above
+ * both the stage (z 0) and an agent focus exiting at z 16. Geometry mirrors focus/shell.css
+ * deliberately; keep them in step.
  */
 .act-results-viewer {
   position: fixed;
   inset: 0;
-  z-index: 9;
+  z-index: 17;
   overflow-x: hidden;
   overflow-y: auto;
   background: rgba(247, 250, 248, 0.58);

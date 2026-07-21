@@ -20,6 +20,7 @@ export default function StudioApp({ runId }: { runId: string }) {
   const resultView = useResultView();
   const paused = usePaused();
   const [lab, setLab] = useState(false);
+  const resultOpen = complete && resultView === "result";
 
   useShortcuts();
 
@@ -47,7 +48,7 @@ export default function StudioApp({ runId }: { runId: string }) {
        * supposed to be endless — stopped short of the top edge of the window. Everything up
        * here is an overlay now, and the canvas runs under all of it.
        */}
-      <header className="top">
+      <header className="top" inert={resultOpen ? true : undefined}>
         <a className="top-mark" href="/" aria-label="1321 home">
           <img src="/favicon.svg" alt="" width="30" height="30" />
         </a>
@@ -88,9 +89,11 @@ export default function StudioApp({ runId }: { runId: string }) {
           the watch room owns the bottom bar. */}
       {stage === "run" && (!complete || resultView === "process") && <Dock />}
       {lab && DevLab && (
-        <Suspense fallback={null}>
-          <DevLab defaultRunId={runId} />
-        </Suspense>
+        <div className="studio-lab-host" inert={resultOpen ? true : undefined}>
+          <Suspense fallback={null}>
+            <DevLab defaultRunId={runId} />
+          </Suspense>
+        </div>
       )}
       </main>
     </MotionConfig>

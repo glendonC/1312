@@ -93,7 +93,7 @@ const REASON_LABELS: Record<LearningReasonCode, string> = {
   recorded_target_text_missing: "The recorded target caption is unavailable.",
   production_caption_withheld: "The verified production caption was withheld.",
   production_caption_unavailable: "The verified production caption is unavailable.",
-  explanation_not_prepared: "No contextual explanation is prepared for this language moment.",
+  explanation_not_prepared: "No explanation was prepared for this selection. Try a highlighted word or Explain sentence.",
   production_media_playback_unavailable: "Private production media playback is not connected to the browser learning surface.",
   production_explanation_interaction_unavailable: "Private media playback is verified. Production explanation interaction is not connected yet.",
   production_explanation_executor_unavailable: "No production explanation executor is configured for this runtime host.",
@@ -1150,11 +1150,12 @@ function UnavailableState({
   reasonCode: LearningReasonCode;
   detail?: string;
 }) {
+  // The reason stays machine-readable on data-reason-code for tests and telemetry; the learner reads
+  // the plain sentence, not the raw code. This is a learning surface, not a diagnostic console.
   return (
     <div className="learning-unavailable" data-reason-code={reasonCode}>
       <b>{label}</b>
       <p>{detail ?? REASON_LABELS[reasonCode]}</p>
-      <code>{reasonCode}</code>
     </div>
   );
 }

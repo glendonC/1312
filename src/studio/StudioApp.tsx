@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 
 import Dock from "./Dock";
 import InputAct from "./InputAct";
+import LocalHostNotice from "./LocalHostNotice";
 import { presentRecordedSource } from "./previewSession";
 import ResultsChrome from "./ResultsChrome";
 import RunAct from "./RunAct";
@@ -95,6 +96,7 @@ export default function StudioApp({ runId }: { runId: string }) {
           </Suspense>
         </div>
       )}
+      <LocalHostNotice />
       </main>
     </MotionConfig>
   );

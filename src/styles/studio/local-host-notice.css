@@ -1,0 +1,104 @@
+/*
+ * First-visit local-host notice. Glass dialog over a soft blur scrim.
+ * Owns: .local-host-notice*
+ * Must not: welcome lockup, dock menus, result chrome panels.
+ */
+
+.local-host-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.local-host-notice-backdrop,
+.local-host-notice-panel {
+  pointer-events: auto;
+}
+
+.local-host-notice-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--paper, #f3f1ea) 42%, rgba(16, 32, 29, 0.18));
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+}
+
+.local-host-notice-panel {
+  position: relative;
+  z-index: 1;
+  width: min(360px, 100%);
+  padding: 18px 18px 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  corner-shape: squircle;
+  background: var(--glass-panel);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur-panel)) saturate(var(--glass-saturation-panel));
+  -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(var(--glass-saturation-panel));
+  color: var(--ink, #161d1b);
+  text-align: left;
+}
+
+.local-host-notice-kicker {
+  margin: 0 0 8px;
+  color: var(--accent, #2f746e);
+  font-size: 0.72rem;
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.local-host-notice-body {
+  margin: 0;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.78));
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.local-host-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Icon-only ghost control, same control height as .cta Got it. */
+.local-host-notice-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  text-decoration: none;
+}
+
+.local-host-notice-link svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.local-host-notice-dismiss {
+  box-sizing: border-box;
+  min-height: 42px;
+  margin-left: auto;
+}
+
+.local-host-notice-panel:focus-visible,
+.local-host-notice-dismiss:focus-visible,
+.local-host-notice-link:focus-visible {
+  outline: 2px solid var(--accent, #2f746e);
+  outline-offset: 2px;
+}

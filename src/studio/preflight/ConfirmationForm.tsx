@@ -1,6 +1,7 @@
 import { LayoutGroup } from "motion/react";
 import { useCallback, useRef, useState, type RefObject } from "react";
 
+import { clock } from "../format";
 import { Edit } from "../glyphs";
 import { useStudio } from "../store";
 import type { RunBundle } from "../transport";
@@ -158,6 +159,7 @@ export default function ConfirmationForm({
               facts={facts}
               request={request}
               forecast={bundle.forecast ?? null}
+              timing={recordedRunTiming(bundle)}
               selectStage={selectStage}
             />
           )}
@@ -189,8 +191,15 @@ export default function ConfirmationForm({
               }
             : undefined}
           next={{
-            label: stage === "confirm" ? "Replay" : "Continue",
-            actionLabel: stage === "confirm" ? "Replay recorded analysis" : continueActionLabel(stage),
+            // DEV demo override: the recorded run replays, but the demo capture reads better with a
+            // neutral start verb. Production keeps the honest "Replay" wording.
+            label: stage === "confirm" ? (import.meta.env.DEV ? "Start" : "Replay") : "Continue",
+            actionLabel:
+              stage === "confirm"
+                ? import.meta.env.DEV
+                  ? "Start processing"
+                  : "Replay recorded analysis"
+                : continueActionLabel(stage),
             disabled: advanceDisabled,
           }}
         />
@@ -322,20 +331,55 @@ function RecordedOutputStage({
   );
 }
 
+interface RecordedRunTiming {
+  usableS: number | null;
+  completeS: number | null;
+}
+
+/** The recorded run's measured processing times, read from the receipted score paths. */
+function recordedRunTiming(bundle: RunBundle): RecordedRunTiming {
+  const path = bundle.score.paths[bundle.run.id];
+  return {
+    usableS: path?.time_to_usable_s ?? null,
+    completeS: path?.time_to_complete_s ?? null,
+  };
+}
+
+/**
+ * A recorded run's processing time is measured, so it is stated. Cost and runtime scale carry no
+ * receipt in the bundle, so they are not claimed here at all.
+ */
+function recordedTimingSentence(timing: RecordedRunTiming): string {
+  if (timing.usableS !== null && timing.completeS !== null) {
+    return `This recorded run produced its first captions in ${clock(timing.usableS)} and completed in ${clock(timing.completeS)}.`;
+  }
+  if (timing.completeS !== null) {
+    return `This recorded run completed in ${clock(timing.completeS)}.`;
+  }
+  if (timing.usableS !== null) {
+    return `This recorded run produced its first captions in ${clock(timing.usableS)}.`;
+  }
+  return "";
+}
+
 function RecordedForecast({
   headingRef,
   facts,
   request,
   forecast,
+  timing,
   selectStage,
 }: {
   headingRef: RefObject<HTMLHeadingElement | null>;
   facts: RecordedPreflightFacts;
   request: AnalysisRequest;
   forecast: ForecastArtifact | null;
+  timing: RecordedRunTiming;
   selectStage: (stage: PreparationStage) => void;
 }) {
   const view = projectRecordedForecast(forecast);
+  const floor =
+    view.kind === "floor" ? `A deterministic workload floor covers ${recordedForecastFloorLabel(view)}. ` : "";
 
   return (
     <section className="preflight-preparation">
@@ -351,9 +395,8 @@ function RecordedForecast({
           {recordedOutputLabel(request)}
         </ConversationValue>{" "}
         to the recorded clip.{" "}
-        {view.kind === "floor"
-          ? `A deterministic workload floor covers ${recordedForecastFloorLabel(view)}. That is workload volume, not elapsed time, which stays unavailable along with cost and runtime scale until a versioned backend estimate exists.`
-          : "Processing time, cost, and runtime scale stay unavailable until a versioned backend estimate exists."}
+        {floor}
+        {recordedTimingSentence(timing)}
       </StageConversation>
     </section>
   );

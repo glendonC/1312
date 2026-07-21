@@ -34,7 +34,15 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createAgentIdentityMap, ORCHESTRATOR_IDENTITY } from "./agentIdentity";
 import { Overview } from "./glyphs";
 import { place, terminus, type Size, type Spec } from "./layout";
-import { useAgentIds, useBundle, useComplete, useLayout, useSpawningIds, useStudio } from "./store";
+import {
+  useAgentIds,
+  useBundle,
+  useComplete,
+  useLayout,
+  useReportingIds,
+  useSpawningIds,
+  useStudio,
+} from "./store";
 import { RESULT_ARTIFACT_NODE, sideOf, type SwarmNode } from "./swarm";
 import { ArtifactNode, HubNode, WorkerNode } from "./SwarmNodes";
 
@@ -55,12 +63,15 @@ function Swarm() {
   const bundle = useBundle();
   const ids = useAgentIds();
   const spawning = useSpawningIds();
+  const reporting = useReportingIds();
   const complete = useComplete();
-  // The layout effect rebuilds edges on structural change only; it reads the live forming set
-  // through this ref so a relayout keeps a forming wire forming, without taking `spawning` as a
-  // dependency (which would relayout — and refit — on every status change).
+  // The layout effect rebuilds edges on structural change only; it reads the live forming and
+  // delivering sets through these refs so a relayout keeps a transient wire state intact, without
+  // taking status as a dependency (which would relayout — and refit — on every status change).
   const spawningRef = useRef<Set<string>>(new Set());
   spawningRef.current = new Set(spawning);
+  const reportingRef = useRef<Set<string>>(new Set());
+  reportingRef.current = new Set(reporting);
   const reduceMotion = useReducedMotion();
   const layout = useLayout();
   const focused = useStudio((s) => s.selected !== null);
@@ -283,7 +294,9 @@ function Swarm() {
         .map((s) => {
           const side = sideOf(frame.centre[s.parent as string], frame.centre[s.id], layout);
 
-          const base = s.mitosis ? "wire wire-mitosis" : "wire";
+          const classes = [s.mitosis ? "wire wire-mitosis" : "wire"];
+          if (spawningRef.current.has(s.id)) classes.push("wire-forming");
+          if (reportingRef.current.has(s.id)) classes.push("wire-delivering");
           return {
             id: `${s.parent}-${s.id}`,
             source: s.parent as string,
@@ -291,7 +304,7 @@ function Swarm() {
             sourceHandle: side.source,
             targetHandle: `${side.target}-in`,
             type: layout === "radial" ? "default" : "smoothstep",
-            className: spawningRef.current.has(s.id) ? `${base} wire-forming` : base,
+            className: classes.join(" "),
             focusable: false,
           } satisfies Edge;
         }),
@@ -302,25 +315,32 @@ function Swarm() {
     return () => clearTimeout(t);
   }, [specs, layout, measured, complete, getNodes, fitSwarm, setNodes, setEdges]);
 
-  // The mitosis wire reads as "forming" for exactly as long as its child is in the recorded
-  // `spawning` state — a projection of the log, not a timer. Toggled on the existing edges so a
-  // status change never triggers a relayout, and the wire settles to a static lineage line the
-  // moment the log itself moves the child to working. In wall-clock replay that window is a
-  // single frame; under a cursor step it is held, because the reducer holds it.
+  // The two transient wire states, each a projection of the child's recorded status, not a timer.
+  // `wire-forming` holds while the child is `spawning` — the wire stays dotted and closes into its
+  // solid connection the moment the log moves the child to working. `wire-delivering` holds while
+  // the child is `reporting` — the wire to its parent carries light as the result is handed up.
+  // Toggled on the existing edges so a status change never triggers a relayout; each holds under a
+  // cursor step, because the reducer holds it, and in wall-clock replay lasts the recorded window.
   useEffect(() => {
     const forming = new Set(spawning);
+    const delivering = new Set(reporting);
     setEdges((prev) => {
       let changed = false;
       const next = prev.map((edge) => {
-        const base = (edge.className ?? "").replace(/\s*wire-forming\b/g, "").trim();
-        const want = forming.has(edge.target) ? `${base} wire-forming` : base;
+        const base = (edge.className ?? "")
+          .replace(/\s*wire-forming\b/g, "")
+          .replace(/\s*wire-delivering\b/g, "")
+          .trim();
+        let want = base;
+        if (forming.has(edge.target)) want += " wire-forming";
+        if (delivering.has(edge.target)) want += " wire-delivering";
         if (want === edge.className) return edge;
         changed = true;
         return { ...edge, className: want };
       });
       return changed ? next : prev;
     });
-  }, [spawning, setEdges]);
+  }, [spawning, reporting, setEdges]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: SwarmNode) => {

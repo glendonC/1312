@@ -533,6 +533,16 @@ export const useSpawningIds = (): string[] =>
     useShallow((s) => s.state.order.filter((id) => s.state.agents[id]?.status === "spawning")),
   );
 
+/**
+ * The ids currently in the recorded `reporting` state — the workers handing a result up to their
+ * parent. Bound to the reducer just like the forming set: the wire to that parent carries light for
+ * exactly as long as the log holds the handoff, held under pause and never on a UI clock.
+ */
+export const useReportingIds = (): string[] =>
+  useStudio(
+    useShallow((s) => s.state.order.filter((id) => s.state.agents[id]?.status === "reporting")),
+  );
+
 export const useOrchestrator = (): RunState["orchestrator"] =>
   useStudio(useShallow((s) => s.state.orchestrator));
 

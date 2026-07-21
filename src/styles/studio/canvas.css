@@ -226,10 +226,17 @@
   pointer-events: none;
 }
 
+/*
+ * A connection carries two readings on two independent axes. FORMED vs FORMING is the dash: a solid
+ * stroke is a formed connection, a dashed stroke is one still forming, and nothing settled is ever
+ * dashed — so two working agents joined by a line always read as connected, never as pending.
+ * PARENTAGE is hue and weight: ink-grey is a worker the orchestrator spawned, gold and heavier is a
+ * worker that divided out of another.
+ */
 .wire .react-flow__edge-path {
   stroke: var(--line-strong);
   stroke-width: 1;
-  animation: wire-in 460ms ease both;
+  animation: wire-form 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .wire {
@@ -237,15 +244,38 @@
 }
 
 /*
- * A worker that divided out of another is bound to it, not to the orchestrator — the dotted
- * gold line IS the mitosis. It draws in once as the child is born: the dots settle into place
- * from the parent's edge rather than the whole wire blinking on at full strength.
+ * Lineage: a worker bound to the one it divided out of, not to the orchestrator. Carried by hue and
+ * weight — gold and heavier than a spawn line — and solid once formed, because a standing lineage is
+ * a settled bond. The division itself is a birth, drawn by the same forming beat every wire gets.
  */
 .wire-mitosis .react-flow__edge-path {
-  stroke: var(--gold-line);
+  stroke: color-mix(in srgb, var(--gold) 52%, transparent);
   stroke-width: 1.5;
-  stroke-dasharray: 3 3;
-  animation: wire-mitosis-draw 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+ * The forming beat: a wire is born as sparse dots and its gaps close into a solid stroke as the
+ * child settles in. Presentation only — it plays as the wire first appears, the same birth flourish
+ * the node itself gets on mount, and it is animation, not a claim that work is being spent.
+ * `backwards` fill paints the dotted start before the first frame, so a wire caught at mount reads
+ * as forming rather than snapping in solid.
+ */
+@keyframes wire-form {
+  0% {
+    opacity: 0;
+    stroke-dasharray: 2 8;
+    stroke-dashoffset: 14;
+  }
+  45% {
+    opacity: 1;
+    stroke-dasharray: 2 8;
+    stroke-dashoffset: 0;
+  }
+  100% {
+    opacity: 1;
+    stroke-dasharray: 30 0;
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes wire-in {
@@ -257,22 +287,10 @@
   }
 }
 
-@keyframes wire-mitosis-draw {
-  from {
-    opacity: 0;
-    stroke-dashoffset: 18;
-  }
-  to {
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
-}
-
 /*
- * The delivery wire: orchestrator to the receipted result artifact. Solid where mitosis is
- * dotted — lineage is a relation between agents, this is the run handing over the thing it made.
- * Gold because the artifact is earned, drawn in once, and then still: a completed run's canvas
- * renders settled.
+ * The delivery wire: orchestrator to the receipted result artifact. Solid gold, settled in with a
+ * plain fade rather than the forming beat — the run is handing over a thing it already made, not
+ * bringing a new agent into being.
  */
 .wire-artifact .react-flow__edge-path {
   stroke: var(--gold-line);
@@ -281,28 +299,57 @@
 }
 
 /*
- * The forming state, bound to the child's recorded `spawning` status — never a UI clock. The dots
- * travel from parent toward child while the log holds the child forming, and the wire settles to a
- * static lineage line the instant the log moves the child to working. Today's recorded runs spawn
- * in a single frame, so this is seen held only under a deliberate cursor step; it is the seam that
- * lights up on its own the day a producer emits a real pre-spawn intent window
+ * The held forming state, bound to the child's recorded `spawning` status — never a UI clock. While
+ * the log holds the child forming, the wire stays dotted and the dots travel from parent toward
+ * child, showing the worker still coming into being. The instant the log moves the child to
+ * working, this class drops and the wire runs its forming beat once more, closing the gaps into the
+ * solid bond. Today's recorded runs spawn in a single frame, so the held look is seen only under a
+ * deliberate cursor step; it is the seam a real pre-spawn intent producer lights up
  * (docs/local/HANDOFF_spawn_intent.md). It stills whenever the run is paused: a held run shows no
  * motion, so nothing implies work the clock is not spending.
  */
-.wire-mitosis.wire-forming .react-flow__edge-path {
-  animation: wire-mitosis-flow 900ms linear infinite;
+.wire-forming .react-flow__edge-path {
+  stroke-dasharray: 2 8;
+  animation: wire-forming-hold 1100ms linear infinite;
 }
 
-@keyframes wire-mitosis-flow {
+@keyframes wire-forming-hold {
   from {
-    stroke-dashoffset: 12;
+    stroke-dashoffset: 10;
   }
   to {
     stroke-dashoffset: 0;
   }
 }
 
-.studio[data-paused="true"] .wire-mitosis.wire-forming .react-flow__edge-path {
+.studio[data-paused="true"] .wire-forming .react-flow__edge-path {
+  animation: none;
+}
+
+/*
+ * The delivery state, bound to the child's recorded `reporting` status. While the log holds the
+ * child reporting, the wire to its parent carries a soft gold light — the same gold the earned
+ * result wears — so a worker handing its result upward is seen on the connection itself, not just on
+ * the node. The wire keeps its own parentage colour; only the halo is added, and it breathes rather
+ * than travels, so it reads as a live handoff without implying the wire is being redrawn. It stills
+ * on pause, and holds a static glow under reduced motion, where the lit connection is the tell.
+ */
+.wire-delivering .react-flow__edge-path {
+  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--gold) 38%, transparent));
+  animation: wire-deliver 1300ms ease-in-out infinite;
+}
+
+@keyframes wire-deliver {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--gold) 38%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gold) 66%, transparent));
+  }
+}
+
+.studio[data-paused="true"] .wire-delivering .react-flow__edge-path {
   animation: none;
 }
 
@@ -649,13 +696,13 @@
     transition: none;
   }
 
-  /* The birth and mitosis motion is a flourish; the forming state itself reads from the dashed
-     ghost and static dotted wire, which stay. The artifact's settle-in is the same kind of
-     flourish: without it the medallion is simply there, already settled. */
+  /* The forming beat and the birth flights are flourishes; the forming state itself still reads
+     from the dashed ghost ring and the static dotted wire, which stay. The artifact's settle-in is
+     the same kind of flourish: without it the medallion is simply there, already settled. */
   .agent-node,
   .artifact-node,
-  .wire-mitosis .react-flow__edge-path,
-  .wire-mitosis.wire-forming .react-flow__edge-path {
+  .wire-forming .react-flow__edge-path,
+  .wire-delivering .react-flow__edge-path {
     animation: none;
   }
 

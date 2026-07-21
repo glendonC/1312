@@ -41,6 +41,21 @@
   pointer-events: auto;
 }
 
+.agent-focus-activity-switch {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+}
+
+.agent-focus-activity-switch:not(:last-child) {
+  pointer-events: none;
+}
+
 @media (max-width: 1100px) {
   .agent-focus-media-instrument {
     width: min(100%, 680px);

@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 
 import { agentIdentityStyle, type AgentIdentity } from "./agentIdentity";
-import { isAgentThinking, mountAgentMesh } from "./agentMeshRenderer";
+import {
+  isAgentThinking,
+  mountAgentMesh,
+  type AgentMeshHandle,
+} from "./agentMeshRenderer";
 import type { AgentStatus } from "./types";
 
 interface AgentMarkProps {
@@ -23,6 +27,7 @@ export default function AgentMark({
   fieldMotion = "auto",
 }: AgentMarkProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const mesh = useRef<AgentMeshHandle | null>(null);
   const initialRenderState = useRef({ status, fieldMotion });
   initialRenderState.current = { status, fieldMotion };
   const thinking = isAgentThinking(status);
@@ -30,12 +35,21 @@ export default function AgentMark({
 
   useEffect(() => {
     if (!canvas.current) return undefined;
-    return mountAgentMesh(
+    const handle = mountAgentMesh(
       canvas.current,
       identity,
       initialRenderState.current.status,
       initialRenderState.current.fieldMotion,
     );
+    mesh.current = handle;
+    return () => {
+      handle.dispose();
+      if (mesh.current === handle) mesh.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    mesh.current?.updateIdentity(identity);
   }, [identity]);
 
   return (

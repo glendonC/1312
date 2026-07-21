@@ -17,7 +17,9 @@ const agentFragmentSource = `#version 300 es
   uniform vec2 u_resolution;
   uniform float u_time;
   uniform float u_seed;
+  uniform float u_previous_topology_kind;
   uniform float u_topology_kind;
+  uniform float u_identity_mix;
   uniform float u_angle;
   uniform float u_scale;
   uniform float u_band_width;
@@ -95,6 +97,7 @@ const agentFragmentSource = `#version 300 es
   }
 
   void topologyField(
+    float topologyKind,
     vec2 p,
     float cycle,
     out float primary,
@@ -103,7 +106,7 @@ const agentFragmentSource = `#version 300 es
   ) {
     float width = clamp(u_band_width, 0.08, 0.46);
 
-    if (u_topology_kind < 0.5) {
+    if (topologyKind < 0.5) {
       // Confluence: two traveling currents narrow toward a breathing join.
       float joinEdge = 0.64 + sin(cycle * 0.46 + u_phase.y) * 0.2;
       float join = smoothstep(-0.88, joinEdge, p.x);
@@ -118,7 +121,7 @@ const agentFragmentSource = `#version 300 es
       return;
     }
 
-    if (u_topology_kind < 1.5) {
+    if (topologyKind < 1.5) {
       // Strata: broad layers slide past one another in opposite directions.
       float layerSlide = sin(cycle * 0.82 + u_phase.x) * 0.14;
       float upper = p.y + 0.25 + layerSlide
@@ -134,7 +137,7 @@ const agentFragmentSource = `#version 300 es
       return;
     }
 
-    if (u_topology_kind < 2.5) {
+    if (topologyKind < 2.5) {
       // Basin: two nested masses orbit while the larger shoreline expands and contracts.
       vec2 centreA = vec2(-0.18 + u_phase.x * 0.12, -0.06 + u_phase.y * 0.1);
       vec2 centreB = vec2(0.34 - u_phase.y * 0.08, 0.23 + u_phase.x * 0.08);
@@ -155,7 +158,7 @@ const agentFragmentSource = `#version 300 es
       return;
     }
 
-    if (u_topology_kind < 3.5) {
+    if (topologyKind < 3.5) {
       // Braid: ribbons travel in opposite directions, continually changing their crossings.
       float braidBreath = 0.23 + sin(cycle * 0.58 + u_phase.x) * 0.055;
       float waveA = sin(p.x * 2.12 + u_phase.x - cycle * 1.32) * braidBreath;
@@ -184,6 +187,53 @@ const agentFragmentSource = `#version 300 es
     structure = smoothstep(0.34, 0.82, primary * secondary);
   }
 
+  float topologyFlowSignal(float topologyKind, vec2 p, float cycle) {
+    if (topologyKind < 0.5) {
+      return sin(p.x * 2.0 - cycle * 1.2 + u_phase.x);
+    }
+    if (topologyKind < 1.5) {
+      return sin(p.y * 2.4 + cycle * 0.96 + u_phase.y);
+    }
+    if (topologyKind < 2.5) {
+      return sin(length(p - u_phase * 0.08) * 5.2 - cycle * 1.08);
+    }
+    if (topologyKind < 3.5) {
+      return sin(p.x * 2.7 - cycle * 1.42 + u_phase.x);
+    }
+    return sin(dot(p, vec2(1.12, -0.76)) * 2.2 + cycle * 1.24);
+  }
+
+  vec2 topologyCausticMotion(float topologyKind, float cycle) {
+    if (topologyKind < 0.5) {
+      return vec2(
+        sin(cycle * 0.8 + u_phase.x) * 0.15,
+        cos(cycle * 0.5 + u_phase.y) * 0.045
+      );
+    }
+    if (topologyKind < 1.5) {
+      return vec2(
+        sin(cycle * 0.45 + u_phase.x) * 0.035,
+        sin(cycle * 0.86 + u_phase.y) * 0.15
+      );
+    }
+    if (topologyKind < 2.5) {
+      return vec2(
+        cos(cycle * 0.82 + u_phase.x),
+        sin(cycle * 0.82 + u_phase.y)
+      ) * 0.15;
+    }
+    if (topologyKind < 3.5) {
+      return vec2(
+        sin(cycle * 1.1 + u_phase.x),
+        sin(cycle * 2.2 + u_phase.y)
+      ) * vec2(0.14, 0.08);
+    }
+    return vec2(
+      cos(cycle * 0.94 + u_phase.x),
+      sin(cycle * 1.24 + u_phase.y)
+    ) * 0.13;
+  }
+
   void main() {
     vec2 uv = v_uv;
     float aspect = u_resolution.x / max(u_resolution.y, 1.0);
@@ -207,57 +257,49 @@ const agentFragmentSource = `#version 300 es
     vec2 warpVector = vec2(warpX, warpY) - 0.5;
     vec2 p = composedPoint + warpVector * u_warp;
 
-    float primary;
-    float secondary;
-    float structure;
-    topologyField(p, cycle, primary, secondary, structure);
+    float previousPrimary;
+    float previousSecondary;
+    float previousStructure;
+    float nextPrimary;
+    float nextSecondary;
+    float nextStructure;
+    topologyField(
+      u_previous_topology_kind,
+      p,
+      cycle,
+      previousPrimary,
+      previousSecondary,
+      previousStructure
+    );
+    topologyField(
+      u_topology_kind,
+      p,
+      cycle,
+      nextPrimary,
+      nextSecondary,
+      nextStructure
+    );
+    float primary = mix(previousPrimary, nextPrimary, u_identity_mix);
+    float secondary = mix(previousSecondary, nextSecondary, u_identity_mix);
+    float structure = mix(previousStructure, nextStructure, u_identity_mix);
     primary = clamp(primary, 0.0, 1.0);
     secondary = clamp(secondary, 0.0, 1.0);
     structure = clamp(structure, 0.0, 1.0);
-    float flowSignal;
-    if (u_topology_kind < 0.5) {
-      flowSignal = sin(p.x * 2.0 - cycle * 1.2 + u_phase.x);
-    } else if (u_topology_kind < 1.5) {
-      flowSignal = sin(p.y * 2.4 + cycle * 0.96 + u_phase.y);
-    } else if (u_topology_kind < 2.5) {
-      flowSignal = sin(length(p - u_phase * 0.08) * 5.2 - cycle * 1.08);
-    } else if (u_topology_kind < 3.5) {
-      flowSignal = sin(p.x * 2.7 - cycle * 1.42 + u_phase.x);
-    } else {
-      flowSignal = sin(dot(p, vec2(1.12, -0.76)) * 2.2 + cycle * 1.24);
-    }
+    float flowSignal = mix(
+      topologyFlowSignal(u_previous_topology_kind, p, cycle),
+      topologyFlowSignal(u_topology_kind, p, cycle),
+      u_identity_mix
+    );
     float travelingFlow = smoothstep(-0.72, 0.72, flowSignal);
 
     float depthNoise = fbm(p * 1.22 + seedOffset * 0.41 - drift * 0.52);
     float internalOcclusion = smoothstep(0.48, 0.86, depthNoise + (1.0 - max(primary, secondary)) * 0.12);
 
-    vec2 causticMotion;
-    if (u_topology_kind < 0.5) {
-      causticMotion = vec2(
-        sin(cycle * 0.8 + u_phase.x) * 0.15,
-        cos(cycle * 0.5 + u_phase.y) * 0.045
-      );
-    } else if (u_topology_kind < 1.5) {
-      causticMotion = vec2(
-        sin(cycle * 0.45 + u_phase.x) * 0.035,
-        sin(cycle * 0.86 + u_phase.y) * 0.15
-      );
-    } else if (u_topology_kind < 2.5) {
-      causticMotion = vec2(
-        cos(cycle * 0.82 + u_phase.x),
-        sin(cycle * 0.82 + u_phase.y)
-      ) * 0.15;
-    } else if (u_topology_kind < 3.5) {
-      causticMotion = vec2(
-        sin(cycle * 1.1 + u_phase.x),
-        sin(cycle * 2.2 + u_phase.y)
-      ) * vec2(0.14, 0.08);
-    } else {
-      causticMotion = vec2(
-        cos(cycle * 0.94 + u_phase.x),
-        sin(cycle * 1.24 + u_phase.y)
-      ) * 0.13;
-    }
+    vec2 causticMotion = mix(
+      topologyCausticMotion(u_previous_topology_kind, cycle),
+      topologyCausticMotion(u_topology_kind, cycle),
+      u_identity_mix
+    );
     vec2 movingCausticPoint = u_caustic_point + causticMotion;
     float causticDistance = length((uv - movingCausticPoint) * vec2(aspect, 1.0));
     float causticFalloff = 1.0 - smoothstep(0.035, 0.49, causticDistance);
@@ -401,15 +443,115 @@ const TOPOLOGY_INDEX: Record<AgentIdentity["topology"], number> = {
   interference: 4,
 };
 
-const MAX_BACKING_SCALE = 2.5;
+type MeshColor = [number, number, number];
 
-/** Mount one compact field. Still marks hold their exact frame; active marks redraw near 30fps. */
+interface MeshIdentityState {
+  seed: number;
+  angle: number;
+  scale: number;
+  bandWidth: number;
+  warp: number;
+  phaseX: number;
+  phaseY: number;
+  causticX: number;
+  causticY: number;
+  driftSeconds: number;
+  mirror: number;
+  absorption: MeshColor;
+  body: MeshColor;
+  current: MeshColor;
+  counter: MeshColor;
+  caustic: MeshColor;
+}
+
+export interface AgentMeshHandle {
+  updateIdentity: (identity: AgentIdentity) => void;
+  dispose: () => void;
+}
+
+function meshIdentityState(identity: AgentIdentity): MeshIdentityState {
+  return {
+    seed: identity.seed % 10000,
+    angle: (identity.geometry.angle * Math.PI) / 180,
+    scale: identity.geometry.scale,
+    bandWidth: identity.geometry.bandWidth,
+    warp: identity.geometry.warp,
+    phaseX: identity.geometry.phaseX,
+    phaseY: identity.geometry.phaseY,
+    causticX: identity.geometry.causticX / 100,
+    causticY: identity.geometry.causticY / 100,
+    driftSeconds: identity.geometry.driftSeconds,
+    mirror: identity.geometry.mirror,
+    absorption: rgb(identity.palette.absorption),
+    body: rgb(identity.palette.body),
+    current: rgb(identity.palette.current),
+    counter: rgb(identity.palette.counter),
+    caustic: rgb(identity.palette.caustic),
+  };
+}
+
+function mixNumber(from: number, to: number, amount: number): number {
+  return from + (to - from) * amount;
+}
+
+function mixAngle(from: number, to: number, amount: number): number {
+  const turn = Math.PI * 2;
+  const delta = ((to - from + Math.PI * 3) % turn) - Math.PI;
+  return from + delta * amount;
+}
+
+function mixColor(from: MeshColor, to: MeshColor, amount: number): MeshColor {
+  return [
+    mixNumber(from[0], to[0], amount),
+    mixNumber(from[1], to[1], amount),
+    mixNumber(from[2], to[2], amount),
+  ];
+}
+
+function mixIdentityState(
+  from: MeshIdentityState,
+  to: MeshIdentityState,
+  amount: number,
+): MeshIdentityState {
+  return {
+    seed: mixNumber(from.seed, to.seed, amount),
+    angle: mixAngle(from.angle, to.angle, amount),
+    scale: mixNumber(from.scale, to.scale, amount),
+    bandWidth: mixNumber(from.bandWidth, to.bandWidth, amount),
+    warp: mixNumber(from.warp, to.warp, amount),
+    phaseX: mixNumber(from.phaseX, to.phaseX, amount),
+    phaseY: mixNumber(from.phaseY, to.phaseY, amount),
+    causticX: mixNumber(from.causticX, to.causticX, amount),
+    causticY: mixNumber(from.causticY, to.causticY, amount),
+    driftSeconds: mixNumber(from.driftSeconds, to.driftSeconds, amount),
+    mirror: mixNumber(from.mirror, to.mirror, amount),
+    absorption: mixColor(from.absorption, to.absorption, amount),
+    body: mixColor(from.body, to.body, amount),
+    current: mixColor(from.current, to.current, amount),
+    counter: mixColor(from.counter, to.counter, amount),
+    caustic: mixColor(from.caustic, to.caustic, amount),
+  };
+}
+
+function settledMeshHandle(canvas: HTMLCanvasElement): AgentMeshHandle {
+  canvas.dataset.identityTransition = "settled";
+  return {
+    updateIdentity: () => undefined,
+    dispose: () => undefined,
+  };
+}
+
+const MAX_BACKING_SCALE = 2.5;
+const IDENTITY_TRANSITION_MS = 700;
+
+/** Mount one compact field. Identity changes interpolate in this canvas; the media compositor never
+ * has to carry two WebGL surfaces. Still marks hold their exact frame outside that brief handoff. */
 export function mountAgentMesh(
   canvas: HTMLCanvasElement,
   identity: AgentIdentity,
   status: AgentStatus,
   fieldMotion: "auto" | "still" = "auto",
-): () => void {
+): AgentMeshHandle {
   const gl = canvas.getContext("webgl2", {
     alpha: false,
     antialias: false,
@@ -418,28 +560,28 @@ export function mountAgentMesh(
   });
   if (!gl) {
     canvas.dataset.meshReady = "fallback";
-    return () => undefined;
+    return settledMeshHandle(canvas);
   }
 
   const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
   const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, agentFragmentSource);
   if (!vertexShader || !fragmentShader) {
     canvas.dataset.meshReady = "fallback";
-    return () => undefined;
+    return settledMeshHandle(canvas);
   }
 
   const program = gl.createProgram();
-  if (!program) return () => undefined;
+  if (!program) return settledMeshHandle(canvas);
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     canvas.dataset.meshReady = "fallback";
-    return () => undefined;
+    return settledMeshHandle(canvas);
   }
 
   const buffer = gl.createBuffer();
-  if (!buffer) return () => undefined;
+  if (!buffer) return settledMeshHandle(canvas);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(
     gl.ARRAY_BUFFER,
@@ -455,7 +597,9 @@ export function mountAgentMesh(
   const resolution = gl.getUniformLocation(program, "u_resolution");
   const time = gl.getUniformLocation(program, "u_time");
   const seed = gl.getUniformLocation(program, "u_seed");
+  const previousTopologyKind = gl.getUniformLocation(program, "u_previous_topology_kind");
   const topologyKind = gl.getUniformLocation(program, "u_topology_kind");
+  const identityMix = gl.getUniformLocation(program, "u_identity_mix");
   const angle = gl.getUniformLocation(program, "u_angle");
   const fieldScale = gl.getUniformLocation(program, "u_scale");
   const bandWidth = gl.getUniformLocation(program, "u_band_width");
@@ -470,39 +614,31 @@ export function mountAgentMesh(
   const counter = gl.getUniformLocation(program, "u_counter");
   const caustic = gl.getUniformLocation(program, "u_caustic");
 
-  gl.uniform1f(seed, identity.seed % 10000);
-  gl.uniform1f(topologyKind, TOPOLOGY_INDEX[identity.topology]);
-  gl.uniform1f(angle, (identity.geometry.angle * Math.PI) / 180);
-  gl.uniform1f(fieldScale, identity.geometry.scale);
-  gl.uniform1f(bandWidth, identity.geometry.bandWidth);
-  gl.uniform1f(warp, identity.geometry.warp);
-  gl.uniform2f(phase, identity.geometry.phaseX, identity.geometry.phaseY);
-  gl.uniform2f(
-    causticPoint,
-    identity.geometry.causticX / 100,
-    identity.geometry.causticY / 100,
-  );
-  gl.uniform1f(driftSeconds, identity.geometry.driftSeconds);
-  gl.uniform1f(mirror, identity.geometry.mirror);
-  gl.uniform3fv(absorption, rgb(identity.palette.absorption));
-  gl.uniform3fv(body, rgb(identity.palette.body));
-  gl.uniform3fv(current, rgb(identity.palette.current));
-  gl.uniform3fv(counter, rgb(identity.palette.counter));
-  gl.uniform3fv(caustic, rgb(identity.palette.caustic));
-
   const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const staticTime = (identity.seed % 997) / 83;
   let currentStatus = status;
   let motionPolicy = fieldMotion;
   let reducedMotion = media.matches;
+  let identityKey = identity.key;
+  let renderedIdentity = meshIdentityState(identity);
+  let identityFrom = renderedIdentity;
+  let identityTarget = renderedIdentity;
+  let previousTopology = TOPOLOGY_INDEX[identity.topology];
+  let nextTopology = previousTopology;
+  let materialMix = 1;
+  let identityTransitionStarted = 0;
+  let identityTransitioning = false;
   let animationFrame = 0;
   let lastFrame = 0;
   let lastTimestamp = 0;
   let elapsed = 0;
   let disposed = false;
 
+  canvas.dataset.identityTransition = "settled";
+
   const shouldAnimate = () =>
     motionPolicy === "auto" && isAgentThinking(currentStatus) && !reducedMotion;
+
+  const needsFrames = () => shouldAnimate() || identityTransitioning;
 
   const syncMotionState = () => {
     canvas.dataset.meshMotion = shouldAnimate() ? "running" : "still";
@@ -520,27 +656,73 @@ export function mountAgentMesh(
     }
   };
 
-  const draw = () => {
+  const advanceIdentityTransition = (timestamp: number) => {
+    if (!identityTransitioning) return;
+    const progress = Math.min(1, (timestamp - identityTransitionStarted) / IDENTITY_TRANSITION_MS);
+    const eased = progress * progress * (3 - 2 * progress);
+    renderedIdentity = mixIdentityState(identityFrom, identityTarget, eased);
+    materialMix = eased;
+    if (progress >= 1) {
+      renderedIdentity = identityTarget;
+      previousTopology = nextTopology;
+      materialMix = 1;
+      identityTransitioning = false;
+      canvas.dataset.identityTransition = "settled";
+    }
+  };
+
+  const applyIdentityUniforms = () => {
+    gl.uniform1f(seed, renderedIdentity.seed);
+    gl.uniform1f(previousTopologyKind, previousTopology);
+    gl.uniform1f(topologyKind, nextTopology);
+    gl.uniform1f(identityMix, materialMix);
+    gl.uniform1f(angle, renderedIdentity.angle);
+    gl.uniform1f(fieldScale, renderedIdentity.scale);
+    gl.uniform1f(bandWidth, renderedIdentity.bandWidth);
+    gl.uniform1f(warp, renderedIdentity.warp);
+    gl.uniform2f(phase, renderedIdentity.phaseX, renderedIdentity.phaseY);
+    gl.uniform2f(causticPoint, renderedIdentity.causticX, renderedIdentity.causticY);
+    gl.uniform1f(driftSeconds, renderedIdentity.driftSeconds);
+    gl.uniform1f(mirror, renderedIdentity.mirror);
+    gl.uniform3fv(absorption, renderedIdentity.absorption);
+    gl.uniform3fv(body, renderedIdentity.body);
+    gl.uniform3fv(current, renderedIdentity.current);
+    gl.uniform3fv(counter, renderedIdentity.counter);
+    gl.uniform3fv(caustic, renderedIdentity.caustic);
+  };
+
+  const draw = (timestamp = window.performance.now()) => {
+    advanceIdentityTransition(timestamp);
     resize();
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(resolution, canvas.width, canvas.height);
-    gl.uniform1f(time, staticTime + elapsed);
+    gl.uniform1f(time, (renderedIdentity.seed % 997) / 83 + elapsed);
+    applyIdentityUniforms();
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // The focus room also carries a hardware-decoded video layer. Submit each brief identity
+    // handoff frame before the compositor samples both surfaces, without blocking on gl.finish().
+    if (identityTransitioning) gl.flush();
     canvas.dataset.meshReady = "true";
   };
 
   const tick = (timestamp: number) => {
-    if (disposed || !canvas.isConnected || !shouldAnimate()) return;
-    if (lastTimestamp) {
+    if (disposed || !canvas.isConnected || !needsFrames()) return;
+    if (lastTimestamp && shouldAnimate()) {
       elapsed += ((timestamp - lastTimestamp) / 1000) * motionRate(currentStatus);
     }
     lastTimestamp = timestamp;
     if (timestamp - lastFrame >= 34) {
-      draw();
+      draw(timestamp);
       lastFrame = timestamp;
     }
-    animationFrame = window.requestAnimationFrame(tick);
+    if (needsFrames()) animationFrame = window.requestAnimationFrame(tick);
+  };
+
+  const scheduleFrames = () => {
+    window.cancelAnimationFrame(animationFrame);
+    lastTimestamp = 0;
+    if (needsFrames()) animationFrame = window.requestAnimationFrame(tick);
   };
 
   const syncRuntimeState = () => {
@@ -548,15 +730,51 @@ export function mountAgentMesh(
     if (nextStatus) currentStatus = nextStatus;
     motionPolicy = canvas.dataset.motionPolicy === "still" ? "still" : "auto";
 
-    window.cancelAnimationFrame(animationFrame);
-    lastTimestamp = 0;
     syncMotionState();
-    if (shouldAnimate()) animationFrame = window.requestAnimationFrame(tick);
+    scheduleFrames();
   };
 
   const updateMotionPreference = (event: MediaQueryListEvent) => {
     reducedMotion = event.matches;
+    if (reducedMotion && identityTransitioning) {
+      renderedIdentity = identityTarget;
+      previousTopology = nextTopology;
+      materialMix = 1;
+      identityTransitioning = false;
+      canvas.dataset.identityTransition = "settled";
+      draw();
+    }
     syncRuntimeState();
+  };
+
+  const updateIdentity = (nextIdentity: AgentIdentity) => {
+    if (nextIdentity.key === identityKey) return;
+    const timestamp = window.performance.now();
+    advanceIdentityTransition(timestamp);
+    const dominantTopology = materialMix >= 0.5 ? nextTopology : previousTopology;
+    identityKey = nextIdentity.key;
+    identityFrom = renderedIdentity;
+    identityTarget = meshIdentityState(nextIdentity);
+    previousTopology = dominantTopology;
+    nextTopology = TOPOLOGY_INDEX[nextIdentity.topology];
+
+    if (reducedMotion) {
+      renderedIdentity = identityTarget;
+      previousTopology = nextTopology;
+      materialMix = 1;
+      identityTransitioning = false;
+      canvas.dataset.identityTransition = "settled";
+      draw(timestamp);
+      scheduleFrames();
+      return;
+    }
+
+    materialMix = 0;
+    identityTransitionStarted = timestamp;
+    identityTransitioning = true;
+    canvas.dataset.identityTransition = "running";
+    draw(timestamp);
+    scheduleFrames();
   };
 
   const resizeObserver = new ResizeObserver(() => draw());
@@ -583,7 +801,7 @@ export function mountAgentMesh(
   syncRuntimeState();
   draw();
 
-  return () => {
+  const dispose = () => {
     disposed = true;
     window.cancelAnimationFrame(animationFrame);
     resizeObserver.disconnect();
@@ -596,4 +814,6 @@ export function mountAgentMesh(
     gl.deleteShader(vertexShader);
     gl.deleteShader(fragmentShader);
   };
+
+  return { updateIdentity, dispose };
 }

@@ -5,8 +5,8 @@
  * recorded events and never implies hidden model reasoning.
  */
 
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef } from "react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 // Direct leaf imports so Vite invalidates each sheet; a CSS @import barrel can serve stale CSS until HMR.
 import "../styles/studio/focus/shell.css";
@@ -40,6 +40,95 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
+const FOCUS_EASE = [0.22, 1, 0.36, 1] as const;
+
+const nameplateSwitchVariants: Variants = {
+  enter: (direction: number) => ({
+    opacity: 0,
+    x: direction * 22,
+    filter: "blur(3px)",
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.42,
+      ease: FOCUS_EASE,
+      delayChildren: 0.055,
+      staggerChildren: 0.05,
+    },
+  },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: direction * -14,
+    filter: "blur(2px)",
+    transition: { duration: 0.18, ease: FOCUS_EASE },
+  }),
+};
+
+const nameplateItemVariants: Variants = {
+  enter: { opacity: 0, y: 8 },
+  center: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.32, ease: FOCUS_EASE },
+  },
+  exit: { opacity: 0, y: -3, transition: { duration: 0.12, ease: FOCUS_EASE } },
+};
+
+const materialRuleSwitchVariants: Variants = {
+  enter: (direction: number) => ({
+    opacity: 0,
+    scaleX: 0.08,
+    transformOrigin: direction > 0 ? "left center" : "right center",
+  }),
+  center: {
+    opacity: 1,
+    scaleX: 1,
+    transition: { duration: 0.46, ease: FOCUS_EASE },
+  },
+  exit: (direction: number) => ({
+    opacity: 0,
+    scaleX: 0.35,
+    transformOrigin: direction > 0 ? "right center" : "left center",
+    transition: { duration: 0.16, ease: FOCUS_EASE },
+  }),
+};
+
+const identityHandoffVariants: Variants = {
+  enter: (direction: number) => ({
+    opacity: 0,
+    scale: 0.92,
+    rotate: direction * -24,
+  }),
+  center: (direction: number) => ({
+    opacity: [0, 0.78, 0.5, 0],
+    scale: [0.92, 1, 1.055, 1.1],
+    rotate: [direction * -24, 0, direction * 18, direction * 34],
+    transition: {
+      duration: 0.72,
+      ease: FOCUS_EASE,
+      times: [0, 0.22, 0.62, 1],
+    },
+  }),
+  exit: { opacity: 0, transition: { duration: 0.08 } },
+};
+
+const activitySwitchVariants: Variants = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 16 }),
+  center: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.36, ease: FOCUS_EASE },
+  },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: direction * -10,
+    transition: { duration: 0.16, ease: FOCUS_EASE },
+  }),
+};
+
 export default function AgentPanel() {
   const selected = useStudio((state) => state.selected);
   const select = useStudio((state) => state.select);
@@ -53,6 +142,11 @@ export default function AgentPanel() {
   const paused = useStudio((state) => state.paused);
   const closeButton = useRef<HTMLButtonElement>(null);
   const priorFocus = useRef<HTMLElement | null>(null);
+  const heroPanel = useRef<HTMLElement>(null);
+  const identityFrame = useRef<HTMLDivElement>(null);
+  const activeNameplate = useRef<HTMLDivElement>(null);
+  const pendingFocusAnchor = useRef<{ identityCenterY: number; nameplateTop: number } | null>(null);
+  const [cycleDirection, setCycleDirection] = useState<-1 | 1>(1);
   const open = selected !== null;
 
   const identities = useMemo(
@@ -70,7 +164,9 @@ export default function AgentPanel() {
     return () => {
       window.cancelAnimationFrame(frame);
       const previous = priorFocus.current;
-      if (previous?.isConnected) {
+      const current = useStudio.getState();
+      const resultOwnsFocus = current.state.status === "complete" && current.resultView === "result";
+      if (!resultOwnsFocus && previous?.isConnected) {
         window.requestAnimationFrame(() => previous.focus());
       }
     };
@@ -87,6 +183,30 @@ export default function AgentPanel() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [open, select]);
 
+  useLayoutEffect(() => {
+    if (!open) {
+      pendingFocusAnchor.current = null;
+      return;
+    }
+
+    const anchor = pendingFocusAnchor.current;
+    const hero = heroPanel.current;
+    const identity = identityFrame.current;
+    const nameplate = activeNameplate.current;
+    if (!anchor || !hero || !identity || !nameplate) return;
+
+    const identityBox = identity.getBoundingClientRect();
+    const nameplateBox = nameplate.getBoundingClientRect();
+    const currentHeroTop = Number.parseFloat(hero.style.top) || 0;
+    const identityDelta = anchor.identityCenterY - (identityBox.top + identityBox.height / 2);
+
+    // Preserve the two visible anchors from the outgoing agent. Agent-specific copy can keep its
+    // natural height, but it cannot re-center the left composition during a cycle.
+    hero.style.top = `${currentHeroTop + identityDelta}px`;
+    nameplate.style.top = `${anchor.nameplateTop - (nameplateBox.top + identityDelta)}px`;
+    pendingFocusAnchor.current = null;
+  }, [open, selected]);
+
   if (!selected || !bundle) return <AnimatePresence />;
 
   const isOrchestrator = selected === "orchestrator";
@@ -98,6 +218,8 @@ export default function AgentPanel() {
   if (!identity) return <AnimatePresence />;
   const title = agentTitle(selected, role, agent?.label);
   const state = agentState(status, role, cancelled);
+  const titleId = `agent-focus-title-${selected}`;
+  const stateId = `agent-focus-state-${selected}`;
   const stateIsActive = isAgentThinking(status) && !cancelled && !paused;
   const log = isOrchestrator
     ? emitted.filter((trace) => trace.agent === "orchestrator")
@@ -151,8 +273,17 @@ export default function AgentPanel() {
   const move = (direction: -1 | 1) => {
     if (inspectableIds.length < 2) return;
     const next = (selectedIndex + direction + inspectableIds.length) % inspectableIds.length;
+    const identityBox = identityFrame.current?.getBoundingClientRect();
+    const nameplateBox = activeNameplate.current?.getBoundingClientRect();
+    if (identityBox && nameplateBox) {
+      pendingFocusAnchor.current = {
+        identityCenterY: identityBox.top + identityBox.height / 2,
+        nameplateTop: nameplateBox.top,
+      };
+    }
+    setCycleDirection(direction);
     select(inspectableIds[next]);
-    window.requestAnimationFrame(() => closeButton.current?.focus());
+    window.requestAnimationFrame(() => closeButton.current?.focus({ preventScroll: true }));
   };
 
   const trapFocus = (event: React.KeyboardEvent<HTMLElement>) => {
@@ -208,8 +339,8 @@ export default function AgentPanel() {
         data-status={status}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="agent-focus-title"
-        aria-describedby="agent-focus-state"
+        aria-labelledby={titleId}
+        aria-describedby={stateId}
         onKeyDown={handleFocusKeys}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -218,57 +349,101 @@ export default function AgentPanel() {
       >
         <div className="agent-focus-spatial" style={agentIdentityStyle(identity)}>
           <motion.section
+            ref={heroPanel}
             className="agent-focus-hero"
-            key={`hero-${selected}`}
             initial={{ opacity: 0, x: -24, scale: 0.94 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.3, ease: FOCUS_EASE }}
           >
-            <div className="agent-focus-identity">
-              <AgentMark
-                identity={identity}
-                status={status}
-                fieldMotion={cancelled || paused ? "still" : "auto"}
-              />
+            <div ref={identityFrame} className="agent-focus-identity">
+              <div className="agent-focus-identity-material">
+                <AgentMark
+                  identity={identity}
+                  status={status}
+                  fieldMotion={cancelled || paused ? "still" : "auto"}
+                />
+              </div>
+              <AnimatePresence initial={false} custom={cycleDirection}>
+                <motion.span
+                  key={`identity-handoff-${selected}`}
+                  className="agent-focus-identity-handoff"
+                  style={agentIdentityStyle(identity)}
+                  custom={cycleDirection}
+                  variants={identityHandoffVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  aria-hidden="true"
+                />
+              </AnimatePresence>
             </div>
 
-            <div className="agent-focus-hero-copy">
-              <p
-                id="agent-focus-state"
-                className={`agent-focus-state${stateIsActive ? " text-shimmer" : ""}`}
-                data-status={status}
+            <AnimatePresence initial={false} mode="popLayout" custom={cycleDirection}>
+              <motion.div
+                ref={activeNameplate}
+                key={selected}
+                className="agent-focus-hero-copy"
+                style={agentIdentityStyle(identity)}
+                custom={cycleDirection}
+                variants={nameplateSwitchVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
               >
-                <span className="agent-focus-visually-hidden">Recorded state: </span>
-                {state}
-              </p>
-              <span className="agent-focus-material-rule" aria-hidden="true" />
-              <h2 id="agent-focus-title">{title}</h2>
-              <span className="agent-focus-nameplate-rule" aria-hidden="true" />
-              <p className="agent-focus-role-remit">
-                <span className="agent-focus-visually-hidden">Recorded role remit: </span>
-                {agentRoleRemit(role)}
-              </p>
+                <motion.p
+                  id={stateId}
+                  className={`agent-focus-state${stateIsActive ? " text-shimmer" : ""}`}
+                  data-status={status}
+                  variants={nameplateItemVariants}
+                >
+                  <span className="agent-focus-visually-hidden">Recorded state: </span>
+                  {state}
+                </motion.p>
+                <motion.span
+                  className="agent-focus-material-rule"
+                  aria-hidden="true"
+                  variants={materialRuleSwitchVariants}
+                />
+                <motion.h2
+                  id={titleId}
+                  className="agent-focus-title"
+                  variants={nameplateItemVariants}
+                >
+                  {title}
+                </motion.h2>
+                <motion.span
+                  className="agent-focus-nameplate-rule"
+                  aria-hidden="true"
+                  variants={nameplateItemVariants}
+                />
+                <motion.p className="agent-focus-role-remit" variants={nameplateItemVariants}>
+                  <span className="agent-focus-visually-hidden">Recorded role remit: </span>
+                  {agentRoleRemit(role)}
+                </motion.p>
 
-              {lineage.length > 0 && (
-                <dl className="agent-focus-lineage" aria-label="Recorded lineage">
-                  {lineage.map((row) => (
-                    <div className="agent-focus-lineage-row" key={row.label}>
-                      <dt>{row.label}</dt>
-                      <dd>{row.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-
-            </div>
+                {lineage.length > 0 && (
+                  <motion.dl
+                    className="agent-focus-lineage"
+                    aria-label="Recorded lineage"
+                    variants={nameplateItemVariants}
+                  >
+                    {lineage.map((row) => (
+                      <div className="agent-focus-lineage-row" key={row.label}>
+                        <dt>{row.label}</dt>
+                        <dd>{row.value}</dd>
+                      </div>
+                    ))}
+                  </motion.dl>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </motion.section>
 
           <motion.div
             className="agent-focus-shell"
-            key={`focus-${selected}`}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.28, ease: FOCUS_EASE }}
           >
             <section
               className="agent-focus-environment"
@@ -293,10 +468,23 @@ export default function AgentPanel() {
                   aria-label="Recorded activity"
                 >
                   <div className="agent-focus-activity-content">
-                    <WorkbenchPanel
-                      state={state}
-                      log={log}
-                    />
+                    <AnimatePresence initial={false} custom={cycleDirection}>
+                      <motion.div
+                        key={selected}
+                        className="agent-focus-activity-switch"
+                        custom={cycleDirection}
+                        variants={activitySwitchVariants}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                      >
+                        <WorkbenchPanel
+                          state={state}
+                          log={log}
+                          active={stateIsActive}
+                        />
+                      </motion.div>
+                    </AnimatePresence>
                   </div>
                 </aside>
               </div>
@@ -328,7 +516,19 @@ export default function AgentPanel() {
                   <span className="agent-focus-cycle-eyebrow">Cycle agents</span>
                   <span className="agent-focus-cycle-position" aria-live="polite">
                     <span className="agent-focus-visually-hidden">Agent </span>
-                    <span className="agent-focus-cycle-current">{selectedIndex + 1}</span>
+                    <AnimatePresence initial={false} mode="wait" custom={cycleDirection}>
+                      <motion.span
+                        key={selectedIndex}
+                        className="agent-focus-cycle-current"
+                        custom={cycleDirection}
+                        initial={{ opacity: 0, y: cycleDirection * 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: cycleDirection * -4 }}
+                        transition={{ duration: 0.18, ease: FOCUS_EASE }}
+                      >
+                        {selectedIndex + 1}
+                      </motion.span>
+                    </AnimatePresence>
                     <span className="agent-focus-cycle-of">of {inspectableIds.length}</span>
                   </span>
                 </span>

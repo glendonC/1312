@@ -19,9 +19,11 @@ import {
 export default function WorkbenchPanel({
   state,
   log,
+  active,
 }: {
   state: string;
   log: Trace[];
+  active: boolean;
 }) {
   const records = [...log].reverse();
   const groups = records.reduce<Array<{ t: number; entries: ActivityEntry[] }>>((current, trace) => {
@@ -38,12 +40,11 @@ export default function WorkbenchPanel({
 
   return (
     <section
-      id="agent-focus-activity-feed"
       className="agent-focus-activity-feed"
       aria-label="Recorded activity"
     >
       <header className="agent-focus-activity-head">
-        <h3>{state}</h3>
+        <h3 className={active ? "text-shimmer" : undefined}>{state}</h3>
         {counter && (
           <dl className="agent-focus-activity-counter" aria-label="Recorded activity totals">
             {counter.mediaFromS !== null && counter.mediaToS !== null && (

@@ -130,25 +130,41 @@
   bottom: calc(100% + 10px);
 }
 
+/*
+ * Panel rows are a spec sheet with exactly two type sizes: one 0.78rem row size shared by the
+ * label and value (hierarchy comes from color and weight, never from size), and one 0.68rem
+ * note size shared by qualifiers, identifiers, and links. Labels sit in one aligned column so
+ * every value starts on the same edge; monospace is reserved for recorded identifiers.
+ */
+/* The technical record holds denser rows than the other disclosures; give it more seat. */
+.result-panel-method {
+  width: 344px;
+}
+
 .result-panel-list {
   display: grid;
-  gap: 11px;
+  grid-template-columns: minmax(84px, max-content) 1fr;
+  gap: 10px 16px;
   margin: 0;
+}
+
+.result-panel-list > div {
+  display: contents;
 }
 
 .result-panel-list dt {
   color: var(--ink-muted, rgba(22, 29, 27, 0.5));
-  font-family: var(--font-mono, monospace);
-  font-size: 0.58rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .result-panel-list dd {
-  margin: 3px 0 0;
+  margin: 0;
   color: var(--ink, #161d1b);
-  font-size: 0.8rem;
-  line-height: 1.4;
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium, 500);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
@@ -158,61 +174,52 @@
   text-underline-offset: 2px;
 }
 
-.result-panel-stacked {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.result-panel-stacked small {
+.result-panel-list dd small {
+  display: block;
+  margin-top: 3px;
   color: var(--ink-muted, rgba(22, 29, 27, 0.5));
-  font-size: 0.66rem;
+  font-size: 0.68rem;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
-.result-panel-counts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin: 0 0 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line, rgba(22, 29, 27, 0.1));
-  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
-  font-family: var(--font-mono, monospace);
-  font-size: 0.62rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.result-panel-provenance {
-  margin-top: 12px;
-  padding-top: 12px;
+/* A ruled group inside one disclosure; the rule carries the section break, not a heading. */
+.result-panel-divide {
+  margin-top: 13px;
+  padding-top: 13px;
   border-top: 1px solid var(--line, rgba(22, 29, 27, 0.1));
 }
 
-.result-panel-provenance .recorded-evidence {
-  margin-top: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+/* Recorded identifiers (gate names, content hashes) read as identifiers, not prose. */
+.result-panel-list dd small.result-panel-idents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+}
+
+.result-panel-idents code,
+.result-panel-hash {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+}
+
+.result-panel-hash {
+  display: block;
+  color: var(--ink-soft, rgba(22, 29, 27, 0.72));
+  font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .result-panel-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
-  margin: 10px 0 0;
+  gap: 3px 12px;
 }
 
 .result-panel-links a {
-  color: var(--accent, #2f746e);
   font-family: var(--font-mono, monospace);
-  font-size: 0.72rem;
-}
-
-.result-panel-empty {
-  margin: 10px 0 0;
-  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
-  font-size: 0.72rem;
+  font-size: 0.68rem;
+  font-weight: 400;
 }
 
 @media (max-width: 820px) {

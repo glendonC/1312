@@ -330,6 +330,29 @@ export function Coverage() {
   );
 }
 
+/** A checked list: the run's technical record behind the Method disclosure. */
+export function Method() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path
+        d="M3 4.4h10M3 8h10M3 11.6h4.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="m9.8 11.6 1.7 1.7 2.9-3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function Chevron() {
   return (
     <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">

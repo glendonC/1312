@@ -905,8 +905,33 @@ test("a completed run opens and closes the result workspace over the persistent 
   // There is no Result/Process switch anywhere on the recorded surface.
   const commands = page.getByRole("navigation", { name: "Result commands" });
   await expect(commands.getByRole("button", { name: "Source" })).toBeVisible();
-  await expect(commands.getByRole("button", { name: "Coverage" })).toBeVisible();
+  await expect(commands.getByRole("button", { name: "Method" })).toBeVisible();
+  await expect(commands.getByRole("button", { name: "Coverage" })).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Run view" })).toHaveCount(0);
+
+  // Method is the one consolidated technical record, projected from the same recorded
+  // artifacts: measured process facts, the per-line accounting, content identity, and an
+  // honest scoring state — never a quality claim.
+  await commands.getByRole("button", { name: "Method" }).click();
+  const method = commands.getByRole("dialog", { name: "Method and technical record" });
+  await expect(method).toBeVisible();
+  await expect(method).toContainText("1:51");
+  await expect(method).toContainText("0:55");
+  await expect(method).toContainText("5 recorded");
+  await expect(method).toContainText("13 checks, 5 failed");
+  await expect(method).toContainText("8 of 11 lines");
+  await expect(method).toContainText("Checked against whisper-1");
+  await expect(method).toContainText("11 captioned, 4 withheld, 0 silent");
+  await expect(method).toContainText("Of 15 lines in range");
+  await expect(method).toContainText("sha256:4f60799f8a71");
+  await expect(method).toContainText("h264 1280×720, aac 48 kHz stereo");
+  await expect(method).toContainText("00:05:10–00:05:50");
+  await expect(method).toContainText("Not scored");
+  await expect(method).toContainText("No gold exists for this clip");
+  await expect(method).toContainText("7 glossary terms, 5 correction rows");
+  await expect(method.getByRole("link", { name: "evidence.json" })).toBeVisible();
+  await commands.getByRole("button", { name: "Method" }).click();
+  await expect(method).toBeHidden();
 
   // Watch is a room inside the workspace: it opens as a bare video with its own command bar, and
   // Back (or Esc) returns to the report, never past it.

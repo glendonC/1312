@@ -3,7 +3,7 @@ import { useMemo } from "react";
 
 import RecordedMediaPlayer from "./learning/RecordedMediaPlayer";
 import { projectPrototypeLearningPresentation } from "./learning/prototypeAdapter";
-import { learningPrototypeFixture } from "./learning/prototypeFixture";
+import { learningPrototypeFixture, learningPrototypeFixtures } from "./learning/prototypeFixture";
 import { projectRecordedLearningSource } from "./learning/sourceAdapters";
 import { useRecordedLearningPrep } from "./learning/useRecordedLearningPrep";
 import { RECORDED_RESULTS_ID } from "./resultAccess";
@@ -53,7 +53,7 @@ function RecordedResult({
   const learningSource = useMemo(() => projectRecordedLearningSource(bundle), [bundle]);
   const learningPresentation = projectPrototypeLearningPresentation(
     learningSource,
-    learningPrototypeFixture,
+    learningPrototypeFixtures,
   );
   const prepInteraction = useRecordedLearningPrep(learningSource, learningPrototypeFixture);
   const playback = {

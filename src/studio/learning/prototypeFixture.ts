@@ -1,4 +1,7 @@
 import fixtureData from "./fixtures/run-006.learning-prototype.json" with { type: "json" };
+import fixtureDataC03 from "./fixtures/run-006.learning-prototype.c03.json" with { type: "json" };
+import fixtureDataC04 from "./fixtures/run-006.learning-prototype.c04.json" with { type: "json" };
+import fixtureDataC05 from "./fixtures/run-006.learning-prototype.c05.json" with { type: "json" };
 import {
   codePointSlice,
   type LearningViewingSource,
@@ -350,3 +353,33 @@ export function bindLearningPrototypeFixture(
 }
 
 export const learningPrototypeFixture = readLearningPrototypeFixture(fixtureData);
+
+/**
+ * The demo's prepared explanations, one design-fixture file per recorded line. Each still binds to
+ * the exact recorded cue and its own Unicode code-point spans; this only lets the recorded viewer
+ * carry more than one prepared line so Explain lands across the clip, not just on the first cue.
+ */
+export const learningPrototypeFixtures: LearningPrototypeFixtureV1[] = [
+  learningPrototypeFixture,
+  readLearningPrototypeFixture(fixtureDataC03),
+  readLearningPrototypeFixture(fixtureDataC04),
+  readLearningPrototypeFixture(fixtureDataC05),
+];
+
+/**
+ * Bind every prepared fixture against one recorded source and merge their selections into one
+ * projection. Fails closed on the first fixture that does not bind, so an authoring error surfaces
+ * rather than silently dropping a line.
+ */
+export function bindLearningPrototypeFixtures(
+  source: LearningViewingSource,
+  fixtures: readonly LearningPrototypeFixtureV1[],
+): LearningPrototypeProjection {
+  const selections: PreparedLearningSelection[] = [];
+  for (const fixture of fixtures) {
+    const bound = bindLearningPrototypeFixture(source, fixture);
+    if (bound.state !== "ready") return bound;
+    selections.push(...bound.selections);
+  }
+  return { state: "ready", selections };
+}

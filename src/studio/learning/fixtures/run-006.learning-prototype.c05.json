@@ -1,0 +1,131 @@
+{
+  "schema": "studio.learning-prototype-fixture.v1",
+  "dataClass": "design_fixture",
+  "productionAuthority": false,
+  "fixtureId": "learning-prototype:run-006:c05",
+  "binding": {
+    "origin": "recorded_fixture",
+    "runId": "run-006",
+    "sourceId": "Ux-TMWnmntM",
+    "sourceContentId": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+    "captionArtifactId": "captions",
+    "captionContentId": "sha256:83d337f7dc474c769f9e3e042335b663c78894bcdf5e035798547d57303a2e60",
+    "lineId": "c05",
+    "startMs": 11250,
+    "endMs": 11900,
+    "sourceLanguage": "ko",
+    "targetLanguage": "en",
+    "sourceText": "아 진짜요?",
+    "target": {
+      "state": "available",
+      "text": "Oh, really?"
+    }
+  },
+  "semanticReview": {
+    "state": "not_reviewed",
+    "receiptId": null
+  },
+  "semanticSupport": {
+    "state": "none",
+    "reasonCode": "design_fixture_has_no_semantic_evidence",
+    "claimIds": [],
+    "citationIds": []
+  },
+  "selections": [
+    {
+      "selectionId": "run-006:c05:source:2-4",
+      "side": "source",
+      "span": {
+        "unit": "unicode_code_point",
+        "start": 2,
+        "end": 4,
+        "text": "진짜"
+      },
+      "insights": [
+        {
+          "kind": "meaning",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sceneMeaning": "진짜 means 'really' or 'for real', here used to check that what was just heard is true."
+          }
+        },
+        {
+          "kind": "word",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "form": "진짜",
+            "sense": "really, truly",
+            "role": "the core of the surprised question."
+          }
+        }
+      ]
+    },
+    {
+      "selectionId": "run-006:c05:source:0-6",
+      "side": "source",
+      "span": {
+        "unit": "unicode_code_point",
+        "start": 0,
+        "end": 6,
+        "text": "아 진짜요?"
+      },
+      "insights": [
+        {
+          "kind": "meaning",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sceneMeaning": "A surprised reaction, checking that what was just heard is really true."
+          }
+        },
+        {
+          "kind": "grammar",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "construction": "아 + 진짜 + 요?",
+            "explanation": "진짜 means 'really'. Adding the polite particle 요 turns the casual 진짜 into a polite question, 'really?'. 아 is a soft interjection of surprise.",
+            "segments": [
+              {
+                "form": "아",
+                "role": "an interjection of mild surprise"
+              },
+              {
+                "form": "진짜",
+                "role": "really, truly"
+              },
+              {
+                "form": "요",
+                "role": "polite ending that makes it a question"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "nonClaims": [
+    "not_runtime_generated",
+    "not_semantically_verified",
+    "not_follow_up_capable",
+    "not_grading_capable"
+  ]
+}

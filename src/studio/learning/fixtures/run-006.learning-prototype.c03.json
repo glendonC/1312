@@ -1,0 +1,145 @@
+{
+  "schema": "studio.learning-prototype-fixture.v1",
+  "dataClass": "design_fixture",
+  "productionAuthority": false,
+  "fixtureId": "learning-prototype:run-006:c03",
+  "binding": {
+    "origin": "recorded_fixture",
+    "runId": "run-006",
+    "sourceId": "Ux-TMWnmntM",
+    "sourceContentId": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+    "captionArtifactId": "captions",
+    "captionContentId": "sha256:83d337f7dc474c769f9e3e042335b663c78894bcdf5e035798547d57303a2e60",
+    "lineId": "c03",
+    "startMs": 1950,
+    "endMs": 7700,
+    "sourceLanguage": "ko",
+    "targetLanguage": "en",
+    "sourceText": "어떤 분은 태국 갔다 오셨다고 했거든요. 근데 태국이 진짜 좋았다고 그러시더라구요.",
+    "target": {
+      "state": "available",
+      "text": "One of them said they’d been to Thailand, and they said it was really great."
+    }
+  },
+  "semanticReview": {
+    "state": "not_reviewed",
+    "receiptId": null
+  },
+  "semanticSupport": {
+    "state": "none",
+    "reasonCode": "design_fixture_has_no_semantic_evidence",
+    "claimIds": [],
+    "citationIds": []
+  },
+  "selections": [
+    {
+      "selectionId": "run-006:c03:source:6-8",
+      "side": "source",
+      "span": {
+        "unit": "unicode_code_point",
+        "start": 6,
+        "end": 8,
+        "text": "태국"
+      },
+      "insights": [
+        {
+          "kind": "meaning",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sceneMeaning": "태국 is the country Thailand, the place the person had visited."
+          }
+        },
+        {
+          "kind": "word",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "form": "태국",
+            "sense": "Thailand",
+            "role": "the destination the person went to and praised."
+          }
+        }
+      ]
+    },
+    {
+      "selectionId": "run-006:c03:source:0-46",
+      "side": "source",
+      "span": {
+        "unit": "unicode_code_point",
+        "start": 0,
+        "end": 46,
+        "text": "어떤 분은 태국 갔다 오셨다고 했거든요. 근데 태국이 진짜 좋았다고 그러시더라구요."
+      },
+      "insights": [
+        {
+          "kind": "meaning",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sceneMeaning": "The speaker relays what someone else told them: that person had been to Thailand and said it was really nice. It is reported speech, not the speaker's own firsthand claim."
+          }
+        },
+        {
+          "kind": "grammar",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "construction": "어떤 분은 + 갔다 오셨다고 + 그러시더라구요",
+            "explanation": "-다고 하다 reports what someone said. 그러시다 is the honorific of 그러다 (to say so), and -더라구요 recounts something the speaker personally heard. -거든요 offers the line as background the listener may not know yet.",
+            "segments": [
+              {
+                "form": "어떤 분은",
+                "role": "a certain person, marked as the topic"
+              },
+              {
+                "form": "갔다 오셨다고",
+                "role": "honorific reported speech: they went and came back"
+              },
+              {
+                "form": "그러시더라구요",
+                "role": "honorific recollection of what that person said"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "translation_choice",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sourceChoice": "태국이 진짜 좋았다고 그러시더라구요",
+            "targetChoice": "they said it was really great",
+            "rationale": "English flattens the layered honorific reporting into a plain 'they said', since English marks reported speech with word order rather than verb endings."
+          }
+        }
+      ]
+    }
+  ],
+  "nonClaims": [
+    "not_runtime_generated",
+    "not_semantically_verified",
+    "not_follow_up_capable",
+    "not_grading_capable"
+  ]
+}

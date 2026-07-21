@@ -1,0 +1,145 @@
+{
+  "schema": "studio.learning-prototype-fixture.v1",
+  "dataClass": "design_fixture",
+  "productionAuthority": false,
+  "fixtureId": "learning-prototype:run-006:c04",
+  "binding": {
+    "origin": "recorded_fixture",
+    "runId": "run-006",
+    "sourceId": "Ux-TMWnmntM",
+    "sourceContentId": "sha256:4f60799f8a71c7c6a19d05067eb7b74b74a9d0f2a32000ba6c1e341273c1905f",
+    "captionArtifactId": "captions",
+    "captionContentId": "sha256:83d337f7dc474c769f9e3e042335b663c78894bcdf5e035798547d57303a2e60",
+    "lineId": "c04",
+    "startMs": 8300,
+    "endMs": 10750,
+    "sourceLanguage": "ko",
+    "targetLanguage": "en",
+    "sourceText": "저 태국에 한국어 학원을 차리는게 꿈이에요",
+    "target": {
+      "state": "available",
+      "text": "My dream is to open a Korean language school in Thailand."
+    }
+  },
+  "semanticReview": {
+    "state": "not_reviewed",
+    "receiptId": null
+  },
+  "semanticSupport": {
+    "state": "none",
+    "reasonCode": "design_fixture_has_no_semantic_evidence",
+    "claimIds": [],
+    "citationIds": []
+  },
+  "selections": [
+    {
+      "selectionId": "run-006:c04:source:10-12",
+      "side": "source",
+      "span": {
+        "unit": "unicode_code_point",
+        "start": 10,
+        "end": 12,
+        "text": "학원"
+      },
+      "insights": [
+        {
+          "kind": "meaning",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sceneMeaning": "학원 is a private academy or after-school institute, here a Korean-language school."
+          }
+        },
+        {
+          "kind": "word",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "form": "학원",
+            "sense": "private academy / language school",
+            "role": "the kind of school the speaker wants to open."
+          }
+        }
+      ]
+    },
+    {
+      "selectionId": "run-006:c04:source:0-23",
+      "side": "source",
+      "span": {
+        "unit": "unicode_code_point",
+        "start": 0,
+        "end": 23,
+        "text": "저 태국에 한국어 학원을 차리는게 꿈이에요"
+      },
+      "insights": [
+        {
+          "kind": "meaning",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sceneMeaning": "The speaker shares a personal goal: their dream is to open a Korean-language academy in Thailand."
+          }
+        },
+        {
+          "kind": "grammar",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "construction": "태국에 + 학원을 차리는 게 + 꿈이에요",
+            "explanation": "-는 게 turns the verb 차리다 (to set up or open) into a noun phrase, 'the act of opening'. -이/가 꿈이다 then states that this act is one's dream.",
+            "segments": [
+              {
+                "form": "태국에",
+                "role": "in Thailand, the location"
+              },
+              {
+                "form": "학원을 차리는 게",
+                "role": "opening an academy, nominalized as the subject"
+              },
+              {
+                "form": "꿈이에요",
+                "role": "is my dream (polite)"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "translation_choice",
+          "availability": "available",
+          "authority": "design_fixture",
+          "semanticReviewState": "not_reviewed",
+          "reasonCode": null,
+          "claimIds": [],
+          "citationIds": [],
+          "content": {
+            "sourceChoice": "차리는게 꿈이에요",
+            "targetChoice": "My dream is to open",
+            "rationale": "English fronts 'my dream is' with an infinitive 'to open', where Korean nominalizes the action and places 'dream' last."
+          }
+        }
+      ]
+    }
+  ],
+  "nonClaims": [
+    "not_runtime_generated",
+    "not_semantically_verified",
+    "not_follow_up_capable",
+    "not_grading_capable"
+  ]
+}

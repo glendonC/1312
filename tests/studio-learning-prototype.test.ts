@@ -309,7 +309,7 @@ test("fixture validation rejects offset drift, unsupported facets, and fabricate
 
 test("prototype presentation is selected explicitly and retains fixture-only authority", () => {
   const source = projectRecordedLearningSource(recordedBundle());
-  const presentation = projectPrototypeLearningPresentation(source, learningPrototypeFixture);
+  const presentation = projectPrototypeLearningPresentation(source, [learningPrototypeFixture]);
   assert.equal(presentation.mode, "prototype");
   assert.deepEqual(presentation.savedItems, { state: "session" });
   assert.equal(presentation.explanations.state, "ready");

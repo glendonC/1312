@@ -844,11 +844,18 @@ test("completed recorded runs arrive on the finished statement and open the repo
   await expect(page.locator(".result-brief-rail .result-brief")).toContainText("held back instead of guessed");
   await expect(results.locator(".learning-workspace")).toBeHidden();
   await expect(viewer.locator(".pm-view")).toHaveCount(0);
-  await expect(viewer.getByRole("button", { name: "Full screen" })).toBeVisible();
-  // The volume slider unfolds out of the speaker on hover/focus; reveal it the way a viewer would.
-  await viewer.getByRole("button", { name: /^(Mute|Unmute)$/ }).hover();
-  await expect(viewer.getByRole("slider", { name: "Volume" })).toBeVisible();
-  await expect(viewer.getByRole("combobox", { name: "Playback speed" })).toBeVisible();
+  // The report shows the clip as a calm, chrome-free preview, not a second operable player: the
+  // caption-mode bar stands down, and the transport, settings pill, and viewing modes are withheld —
+  // those belong to the watch room reached through the door. The preview plays muted so the result
+  // reads as alive rather than frozen.
+  const previewPlayer = viewer.locator('.player[data-player-surface="results"]');
+  await expect(previewPlayer).toHaveAttribute("data-preview", "true");
+  await expect(viewer.locator(".watch-caption-controls")).toBeHidden();
+  await expect(viewer.getByRole("button", { name: "Full screen" })).toHaveCount(0);
+  await expect(viewer.getByRole("slider", { name: "Volume" })).toHaveCount(0);
+  await expect(viewer.getByRole("combobox", { name: "Playback speed" })).toHaveCount(0);
+  await expect(previewPlayer).toHaveAttribute("data-playing", "true");
+  await expect(previewPlayer.locator("video.screen-video")).toHaveJSProperty("muted", true);
   // The workbench frame carries no authority bar over the composition: the authority stays
   // machine-readable on the region, and the evidence class is stated by the Source disclosure,
   // never worn as a hero label.
@@ -866,13 +873,13 @@ test("completed recorded runs arrive on the finished statement and open the repo
 
   // The watch face opens as a normal video: no docked panel until the command bar reveals one,
   // and Back is a step, not an exit.
-  await page.getByRole("button", { name: "Watch & study" }).click();
+  await page.getByRole("button", { name: "Watch the clip" }).click();
   await expect(results.locator(".learning-workspace")).toBeHidden();
   const watchBar = page.getByRole("navigation", { name: "Watch commands" });
   await expect(watchBar).toBeVisible();
   await watchBar.getByRole("button", { name: "Transcript" }).click();
   await expect(results.locator(".learning-workspace")).toBeVisible();
-  // Scoped to the bar: the on-video prepared-note chip ("2 notes") also matches a bare Notes query.
+  // The watch command bar's Notes option opens the depth-wheel prep face.
   await watchBar.getByRole("button", { name: "Notes", exact: true }).click();
   const face = results.getByRole("region", { name: "Learning notes" });
   await expect(face).toHaveAttribute("data-learning-prep-authority", "recorded_fixture");
@@ -881,6 +888,38 @@ test("completed recorded runs arrive on the finished statement and open the repo
   // Source and Coverage are one Details command in the watch room; Back is the room's one exit.
   await expect(page.getByRole("button", { name: "Details", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Back to the result report" })).toBeVisible();
+});
+
+test("completion replaces an open agent focus and gives the result sole interaction authority", async ({ page }) => {
+  await openLab(page);
+  await scenario(page).selectOption("withheld");
+
+  const lab = page.getByRole("complementary", { name: "Studio trace lab" });
+  await lab.getByLabel("Playback speed").selectOption("24");
+
+  const orchestrator = page.getByRole("button", { name: /^orchestrator,/ });
+  await orchestrator.focus();
+  await page.keyboard.press("Enter");
+  const focus = page.getByRole("dialog", { name: "Orchestrator" });
+  await expect(focus).toBeVisible();
+  await expect(focus.getByRole("button", { name: "Close agent focus" })).toBeFocused();
+
+  // The lab is intentionally behind the modal. Trigger its deterministic transport control from
+  // the test so the real end() transition occurs while agent focus still owns the viewport.
+  await lab.getByRole("button", { name: "Resume", exact: true }).evaluate((button) => {
+    (button as HTMLButtonElement).click();
+  });
+
+  const arrival = page.getByRole("dialog", { name: "Your video has finished processing." });
+  await expect(arrival).toBeVisible();
+  await expect(focus).toHaveCount(0);
+  await expect(page.locator(".stage-complete"))
+    .not.toHaveAttribute("data-agent-focus");
+  await expect(page.locator(".stage-complete")).toHaveAttribute("inert", "");
+  await expect(page.locator(".top")).toHaveAttribute("inert", "");
+  await expect(page.locator(".studio-lab-host")).toHaveAttribute("inert", "");
+  await expect(page.locator('[role="dialog"][aria-modal="true"]')).toHaveCount(1);
+  await expect(arrival.getByRole("button", { name: "View result" })).toBeFocused();
 });
 
 test("a completed run opens and closes the result workspace over the persistent process graph", async ({ page }) => {
@@ -935,13 +974,13 @@ test("a completed run opens and closes the result workspace over the persistent 
 
   // Watch is a room inside the workspace: it opens as a bare video with its own command bar, and
   // Back (or Esc) returns to the report, never past it.
-  await page.getByRole("button", { name: "Watch & study" }).click();
+  await page.getByRole("button", { name: "Watch the clip" }).click();
   await expect(page.getByRole("navigation", { name: "Watch commands" })).toBeVisible();
   await expect(results.locator(".learning-workspace")).toBeHidden();
   await expect(commands.getByRole("button", { name: /^Close the result/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("navigation", { name: "Watch commands" })).toBeHidden();
-  await expect(page.getByRole("button", { name: "Watch & study" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Watch the clip" })).toBeVisible();
 
   await commands.getByRole("button", { name: /^Close the result/ }).click();
   await expect(stage).toBeVisible();
@@ -1315,6 +1354,94 @@ test("agent focus presents one bare media stage and one recorded activity narrat
   await translatorFocus.getByRole("button", { name: "Close agent focus" }).click();
   await expect(focus).toHaveCount(0);
 });
+
+test("cycling agents preserves the focus room while identity and content transition", async ({ page }) => {
+  await openLab(page);
+  await scenario(page).selectOption("withheld");
+  await page.getByRole("button", { name: "Collapse trace lab" }).click();
+
+  const translator = page.getByRole("button", { name: /^Translator 01,/ });
+  await translator.click();
+  const translatorFocus = page.getByRole("dialog", { name: "Translator 01" });
+  await expect(translatorFocus).toBeVisible();
+  await expectFocusSettled(translatorFocus);
+
+  const paletteBefore = await translatorFocus.locator(".agent-focus-spatial").evaluate((element) =>
+    getComputedStyle(element).getPropertyValue("--agent-current").trim()
+  );
+  const identityGeometry = (scope: typeof translatorFocus) =>
+    scope.locator(".agent-focus-identity").evaluate((element) => {
+      const root = element.closest(".agent-focus") as HTMLElement;
+      const rootBox = root.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      return {
+        x: box.left - rootBox.left + root.scrollLeft,
+        y: box.top - rootBox.top + root.scrollTop,
+      };
+    });
+  const identityBoxBefore = await identityGeometry(translatorFocus);
+  await translatorFocus.evaluate((root) => {
+    const continuity = window as Window & {
+      __agentFocusContinuity?: {
+        identityFrame: Element | null;
+        identityCanvas: Element | null;
+        mediaPlayer: Element | null;
+      };
+    };
+    continuity.__agentFocusContinuity = {
+      identityFrame: root.querySelector(".agent-focus-identity"),
+      identityCanvas: root.querySelector(".agent-focus-identity .agent-mark-mesh"),
+      mediaPlayer: root.querySelector('.player[data-player-surface="workbench"]'),
+    };
+  });
+
+  await translatorFocus.getByRole("button", { name: "Next agent" }).click();
+  // The orb changes inside one shader canvas; the room and playing media never remount.
+  await expect(page.locator(".agent-focus-identity-material")).toHaveCount(1);
+  await expect(page.locator(".agent-focus-identity .agent-mark-mesh"))
+    .toHaveAttribute("data-identity-transition", "running");
+
+  const verifierFocus = page.getByRole("dialog", { name: "Verifier 01" });
+  await expect(verifierFocus).toBeVisible();
+  await expect(verifierFocus.locator('[id^="agent-focus-title-"]')).toHaveCount(1);
+  await expect(verifierFocus.locator('[id^="agent-focus-state-"]')).toHaveCount(1);
+  await expect(verifierFocus.locator(".agent-focus-activity-switch")).toHaveCount(1);
+  await expect(verifierFocus.locator(".agent-focus-identity-material")).toHaveCount(1);
+  await expect(verifierFocus.locator(".agent-focus-identity .agent-mark-mesh"))
+    .toHaveAttribute("data-identity-transition", "settled");
+  await expect(verifierFocus.getByRole("button", { name: "Close agent focus" })).toBeFocused();
+
+  const continuity = await verifierFocus.evaluate((root) => {
+    const state = window as Window & {
+      __agentFocusContinuity?: {
+        identityFrame: Element | null;
+        identityCanvas: Element | null;
+        mediaPlayer: Element | null;
+      };
+    };
+    const preserved = {
+      identityFrame: root.querySelector(".agent-focus-identity")
+        === state.__agentFocusContinuity?.identityFrame,
+      identityCanvas: root.querySelector(".agent-focus-identity .agent-mark-mesh")
+        === state.__agentFocusContinuity?.identityCanvas,
+      mediaPlayer: root.querySelector('.player[data-player-surface="workbench"]')
+        === state.__agentFocusContinuity?.mediaPlayer,
+    };
+    delete state.__agentFocusContinuity;
+    return preserved;
+  });
+  expect(continuity).toEqual({ identityFrame: true, identityCanvas: true, mediaPlayer: true });
+
+  const identityBoxAfter = await identityGeometry(verifierFocus);
+  expect(Math.abs(identityBoxAfter.x - identityBoxBefore.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(identityBoxAfter.y - identityBoxBefore.y)).toBeLessThanOrEqual(2);
+
+  const paletteAfter = await verifierFocus.locator(".agent-focus-spatial").evaluate((element) =>
+    getComputedStyle(element).getPropertyValue("--agent-current").trim()
+  );
+  expect(paletteAfter).not.toBe(paletteBefore);
+});
+
 test("agent focus keeps its spatial stylesheet after client navigation", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "the failure was specific to the routed desktop surface");
 
@@ -1684,6 +1811,10 @@ test("reduced motion disables decorative animation", async ({ page }) => {
   await orchestrator.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "Orchestrator" })).toBeVisible();
+  const focusTransitionSeconds = await page.locator(".agent-focus-spatial").evaluate((element) =>
+    Math.max(...getComputedStyle(element).transitionDuration.split(",").map(Number.parseFloat))
+  );
+  expect(focusTransitionSeconds).toBeLessThanOrEqual(0.00001);
 
   const animations = await page.locator(".studio").evaluate((root) =>
     [...root.querySelectorAll("*")].filter((node) => {

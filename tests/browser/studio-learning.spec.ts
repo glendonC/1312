@@ -10,7 +10,7 @@ async function openCompletedRun006(page: Page): Promise<void> {
   // Completion lands on the arrival statement; the watch face opens as a normal video with the
   // panel closed, so the transcript is a reveal from the command bar, never an ambient sidebar.
   await page.getByRole("button", { name: "View result" }).click();
-  await page.getByRole("button", { name: "Watch & study" }).click();
+  await page.getByRole("button", { name: "Watch the clip" }).click();
   await expect(page.getByRole("region", { name: "Result" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Language learning workspace" })).toBeHidden();
   await page.getByRole("navigation", { name: "Watch commands" })
@@ -26,7 +26,7 @@ test("the dev skip-to-results shortcut lands straight on the recorded learning v
   await expect(dev).toBeVisible();
   await dev.getByRole("button", { name: "Skip to results" }).click();
   await page.getByRole("button", { name: "View result" }).click();
-  await page.getByRole("button", { name: "Watch & study" }).click();
+  await page.getByRole("button", { name: "Watch the clip" }).click();
   await expect(page.getByRole("region", { name: "Result" })).toBeVisible();
   // The room opens immersive; the transcript docks on command.
   await page.getByRole("navigation", { name: "Watch commands" })
@@ -41,7 +41,7 @@ test("recorded results expose the learning-notes face behind Notes", async ({ pa
   // The prep engine lives behind Notes as the depth wheel; its prepared output surfaces as
   // tappable marks on transcript lines, never as an auto-popping overlay. This covers that face.
   const results = page.getByRole("region", { name: "Result" });
-  // Scoped to the bar: the on-video prepared-note chip ("2 notes") also matches a bare Notes query.
+  // The watch command bar's Notes option opens the depth-wheel prep face.
   await page.getByRole("navigation", { name: "Watch commands" })
     .getByRole("button", { name: "Notes", exact: true }).click();
   const face = results.getByRole("region", { name: "Learning notes" });
@@ -176,7 +176,7 @@ test("the process view stills playback and keeps the result session for the retu
   await expect(results).toBeVisible();
   // The canvas is not gone — it persists under the reopened workspace; one world, two views.
   await expect(page.locator(".stage-complete")).toHaveCount(1);
-  await page.getByRole("button", { name: "Watch & study" }).click();
+  await page.getByRole("button", { name: "Watch the clip" }).click();
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("heading", { name: "몇 분" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Saved (1)" })).toBeVisible();
@@ -191,7 +191,7 @@ test("a source without the bound fixture fails closed without repeated explanati
     (element as HTMLElement).style.display = "none";
   });
   await page.getByRole("button", { name: "View result" }).click();
-  await page.getByRole("button", { name: "Watch & study" }).click();
+  await page.getByRole("button", { name: "Watch the clip" }).click();
   await page.getByRole("navigation", { name: "Watch commands" })
     .getByRole("button", { name: "Transcript" }).click();
   const workspace = page.getByRole("region", { name: "Language learning workspace" });
@@ -502,4 +502,38 @@ test("mobile selection and tap open a bounded explanation sheet and return focus
   await panel.getByRole("button", { name: "Close explanation" }).click();
   await expect(panel).toHaveCount(0);
   await expect(preparedWord).toBeFocused();
+});
+
+test("the watch room hides its chrome after stillness while playing and wakes on activity", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop idle-chrome coverage");
+  await openCompletedRun006(page);
+
+  const room = page.locator(".result-workspace");
+  const viewer = page.getByRole("region", { name: "Learning viewer" });
+  const modeBar = viewer.locator(".watch-caption-controls");
+  const transport = viewer.locator(".player-controls");
+
+  // Playing is the precondition; the room opens paused, so start it, then hold the pointer still.
+  await viewer.getByRole("button", { name: "Play", exact: true }).click();
+  await page.mouse.move(700, 430);
+
+  // Past the idle timeout the chrome fades together and the cursor hides — even with the pointer
+  // resting over the picture, so it is inactivity that hides it, not leaving the frame.
+  await expect(room).toHaveAttribute("data-chrome-idle", "true");
+  await expect(modeBar).toHaveCSS("opacity", "0");
+  await expect(transport).toHaveCSS("opacity", "0");
+  await expect(room).toHaveCSS("cursor", "none");
+
+  // Any movement wakes everything back.
+  await page.mouse.move(720, 450);
+  await page.mouse.move(770, 480);
+  await expect(room).not.toHaveAttribute("data-chrome-idle", "true");
+  await expect(modeBar).toHaveCSS("opacity", "1");
+  await expect(transport).toHaveCSS("opacity", "1");
+
+  // Paused, the chrome stays regardless of stillness — idle-hide is only for active playback.
+  await viewer.getByRole("button", { name: "Pause", exact: true }).click();
+  await page.mouse.move(700, 430);
+  await expect(room).not.toHaveAttribute("data-chrome-idle", "true");
+  await expect(modeBar).toHaveCSS("opacity", "1");
 });

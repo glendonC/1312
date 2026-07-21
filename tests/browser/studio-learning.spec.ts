@@ -98,8 +98,12 @@ test("prepared language stays pinned, saves explicitly, and closes unsupported s
   // Saved docks as one mode of the watch room's single side panel, beside the transcript rather
   // than inside it, so it is scoped to the room and not to the reading workspace.
   const savedDrawer = page.getByRole("region", { name: "Saved" });
-  await expect(savedDrawer).toContainText("This session only");
-  await expect(savedDrawer).toContainText("Nothing is saved after this result session ends.");
+  // The session-only truth is now one compact honesty badge, not a paragraph: the pill reads
+  // "Session only" and still carries the whole disclosure for a screen reader and on hover.
+  const scope = savedDrawer.locator(".learning-saved-scope-pill");
+  await expect(scope).toContainText("Session only");
+  await expect(scope).toContainText("Nothing is saved after this result session ends.");
+  await expect(scope).toHaveAttribute("title", "Nothing is saved after this result session ends.");
   await expect(savedDrawer).toContainText("몇 분");
   await expect(savedDrawer).toContainText("I know a few people.");
   await expect(savedDrawer.getByRole("button", { name: "Remove" })).toBeVisible();

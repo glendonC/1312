@@ -1,10 +1,23 @@
 import { useEffect, useRef } from "react";
 
-import { Bookmark, Sliders } from "../glyphs";
+import { Bookmark, Dismiss, Sliders } from "../glyphs";
 import LearningFineTuneFace from "./LearningFineTuneFace";
 import { momentClock } from "./momentContent";
-import type { LearningPrepInteraction, SessionSavedSelection } from "./presentation.ts";
+import type { LearningFacetKind, LearningPrepInteraction, SessionSavedSelection } from "./presentation.ts";
 import type { LearningTools } from "./useLearningTools";
+
+/**
+ * The plain name each kept-language category wears in the saved list. The color that goes with each
+ * lives in CSS, keyed by the facet kind, so the pills read as one system with the speaker legend and
+ * the transcript's lens marks rather than a second palette.
+ */
+const SAVED_FACET_LABELS: Record<LearningFacetKind, string> = {
+  grammar: "Grammar",
+  meaning: "Meaning",
+  word: "Word",
+  phrase: "Phrase",
+  translation_choice: "Translation",
+};
 
 /**
  * The two study-tool disclosures, Saved and Notes. They render once, in the standard viewer's
@@ -159,9 +172,9 @@ function SavedDrawer({
       }}
     >
       <header className="learning-saved-head">
-        <div>
-          <span>This session only</span>
+        <div className="learning-saved-head-lead">
           <h3 id="learning-saved-title">Saved</h3>
+          <SavedScopeBadge />
         </div>
         <button type="button" className="learning-saved-close" aria-label="Close saved" onClick={onClose}>
           Close
@@ -186,23 +199,75 @@ export function SavedList({
 }) {
   return (
     <>
-      <p className="learning-saved-note">Only language you explicitly keep appears here. Nothing is saved after this result session ends.</p>
       {saved.length === 0 ? (
         <p className="learning-saved-empty">Select a prepared word or sentence, then choose Save.</p>
       ) : (
-        <ul>
+        <ul className="learning-saved-list">
           {saved.map((item) => (
-            <li key={item.id}>
-              <div>
-                <b lang={item.sourceLanguage}>{item.selection.text}</b>
-                <span>{momentClock(item.startMs)} to {momentClock(item.endMs)}</span>
-                {item.target.state === "available" && <p lang={item.targetLanguage}>{item.target.text}</p>}
+            <li key={item.id} className="learning-saved-card">
+              <div className="learning-saved-card-body">
+                <b className="learning-saved-term" lang={item.sourceLanguage}>{item.selection.text}</b>
+                {item.target.state === "available" && (
+                  <p className="learning-saved-gloss" lang={item.targetLanguage}>{item.target.text}</p>
+                )}
+                <div className="learning-saved-card-meta">
+                  <span className="learning-saved-time">
+                    {momentClock(item.startMs)}–{momentClock(item.endMs)}
+                  </span>
+                  <SavedFacets facetKinds={item.facetKinds} />
+                </div>
               </div>
-              <button type="button" onClick={() => onRemove(item.id)}>Remove</button>
+              <button
+                type="button"
+                className="learning-saved-remove"
+                aria-label={`Remove ${item.selection.text}`}
+                onClick={() => onRemove(item.id)}
+              >
+                <Dismiss />
+              </button>
             </li>
           ))}
         </ul>
       )}
     </>
+  );
+}
+
+/**
+ * The one required honesty disclosure the saved collection carries: it lives only for this result
+ * session. It rides in the header beside the title as a compact muted badge, never as a row in the
+ * list, and the full sentence stays reachable to a screen reader (and on hover) so nothing is lost by
+ * shrinking it. Shared, so the standard drawer and the watch-room panel show the same promise.
+ */
+export function SavedScopeBadge() {
+  return (
+    <span className="learning-saved-scope-pill" title="Nothing is saved after this result session ends.">
+      Session only
+      <span className="learning-saved-scope-full">. Nothing is saved after this result session ends.</span>
+    </span>
+  );
+}
+
+/**
+ * The category pills for one saved item: one colored squircle per facet kind so a learner scans the
+ * list by what help each keep carries. A raw vocabulary keep has no prepared facets, so it wears a
+ * single neutral "Kept" pill instead of nothing.
+ */
+function SavedFacets({ facetKinds }: { facetKinds: LearningFacetKind[] }) {
+  if (facetKinds.length === 0) {
+    return (
+      <span className="learning-saved-facets">
+        <span className="learning-saved-facet" data-facet="kept">Kept</span>
+      </span>
+    );
+  }
+  return (
+    <span className="learning-saved-facets">
+      {facetKinds.map((kind) => (
+        <span key={kind} className="learning-saved-facet" data-facet={kind}>
+          {SAVED_FACET_LABELS[kind]}
+        </span>
+      ))}
+    </span>
   );
 }

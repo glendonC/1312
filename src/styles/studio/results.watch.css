@@ -379,6 +379,15 @@
   text-transform: uppercase;
 }
 
+/* The mode title and, for Saved, the session-scope badge sit together at the head's start; the badge
+   qualifies the collection rather than taking a row in the panel body. */
+.watch-panel-head-lead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
 .watch-panel-close {
   padding: 5px 12px;
   border: 1px solid color-mix(in srgb, var(--ink, #161d1b) 14%, transparent);
@@ -417,15 +426,6 @@
 
 .watch-panel-region .result-brief-files {
   font-size: 0.82rem;
-}
-
-.watch-panel-scope {
-  margin: 0;
-  color: var(--ink-muted, rgba(22, 29, 27, 0.5));
-  font-family: var(--font-mono, monospace);
-  font-size: 0.56rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 /* ---------- idle-hide: the room's chrome follows pointer activity ---------- */

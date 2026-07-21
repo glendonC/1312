@@ -382,3 +382,18 @@ export function Edit() {
     </svg>
   );
 }
+
+/** A quiet ×, for the demoted per-item dismiss controls that stay out of the way until hovered. */
+export function Dismiss() {
+  return (
+    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+      <path
+        d="M4.3 4.3 11.7 11.7M11.7 4.3 4.3 11.7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

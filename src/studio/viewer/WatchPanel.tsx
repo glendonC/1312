@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 
 import "../../styles/studio/results.watch.css";
 import LearningFineTuneFace from "../learning/LearningFineTuneFace";
-import { SavedList } from "../learning/LearningToolControls";
+import { SavedList, SavedScopeBadge } from "../learning/LearningToolControls";
 import type { LearningPrepInteraction } from "../learning/presentation.ts";
 import { useStudio } from "../store";
 import type { RunBundle } from "../transport";
@@ -123,7 +123,10 @@ export default function WatchPanel({
           ) : (
             <section className="watch-panel-region" aria-label={REGION_LABELS[docked]}>
               <header className="watch-panel-head">
-                <h3 className="watch-panel-title">{PANEL_HEADS[docked].title}</h3>
+                <div className="watch-panel-head-lead">
+                  <h3 className="watch-panel-title">{PANEL_HEADS[docked].title}</h3>
+                  {docked === "saved" && <SavedScopeBadge />}
+                </div>
                 <button
                   type="button"
                   className="watch-panel-close"
@@ -134,12 +137,7 @@ export default function WatchPanel({
                 </button>
               </header>
               {docked === "details" && <ResultBrief bundle={bundle} detailed showEvidence={showEvidence} />}
-              {docked === "saved" && (
-                <>
-                  <p className="watch-panel-scope">This session only</p>
-                  {showSaved && <SavedList saved={tools.saved} onRemove={tools.remove} />}
-                </>
-              )}
+              {docked === "saved" && showSaved && <SavedList saved={tools.saved} onRemove={tools.remove} />}
             </section>
           )}
         </div>

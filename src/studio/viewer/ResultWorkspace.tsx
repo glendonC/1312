@@ -44,8 +44,21 @@ export default function ResultWorkspace() {
           <motion.section
             className="result-arrival"
             aria-labelledby="result-arrival-title"
-            exit={{ opacity: 0, y: -22, transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
+            exit={{ opacity: 0, transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] } }}
           >
+            {/* The run's identity, held large at the center of the acknowledgment. It carries the
+                shared layoutId, so continuing does not swap it out: motion shrinks it and carries it
+                to the hero seat while this statement fades, and the report assembles around it. */}
+            <motion.div
+              layoutId="result-orb"
+              className="result-arrival-orb"
+              aria-hidden="true"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ layout: { duration: 0.66, ease: [0.22, 1, 0.36, 1] }, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <ResultArtifactMark />
+            </motion.div>
             <motion.p
               className="result-arrival-kicker"
               initial={{ opacity: 0, y: 8 }}
@@ -105,18 +118,26 @@ export default function ResultWorkspace() {
         </>
       )}
 
-      <motion.aside
-        className="result-workspace-hero"
-        aria-label="Result summary"
-        initial={false}
-        animate={face === "arrival"
-          ? { opacity: 0, x: -24, scale: 0.94 }
-          : { opacity: 1, x: 0, scale: 1, transition: { duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] } }}
-      >
-        <div className="result-workspace-identity">
-          <ResultArtifactMark />
-        </div>
-        <div className="result-workspace-hero-copy">
+      <aside className="result-workspace-hero" aria-label="Result summary">
+        {/* The morphed-in orb lands here from the acknowledgment; the copy fades up a beat behind it,
+            so the seat is taken before its facts arrive. Gated off during arrival so exactly one orb
+            carries the shared layoutId at a time (the aside is display:none there anyway). */}
+        {face !== "arrival" && (
+          <motion.div
+            layoutId="result-orb"
+            className="result-workspace-identity"
+            transition={{ layout: { duration: 0.66, ease: [0.22, 1, 0.36, 1] } }}
+          >
+            <ResultArtifactMark />
+          </motion.div>
+        )}
+        <motion.div
+          className="result-workspace-hero-copy"
+          initial={false}
+          animate={face === "arrival"
+            ? { opacity: 0, y: 10 }
+            : { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.24, ease: [0.22, 1, 0.36, 1] } }}
+        >
           <p className="result-workspace-state">Run complete</p>
           <span className="result-workspace-material-rule" aria-hidden="true" />
           <h2>Result</h2>
@@ -140,15 +161,15 @@ export default function ResultWorkspace() {
               </dd>
             </div>
           </dl>
-        </div>
-      </motion.aside>
+        </motion.div>
+      </aside>
 
       <motion.div
         className="result-workspace-shell"
         initial={false}
         animate={face === "arrival"
           ? { opacity: 0, y: 16 }
-          : { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.16, ease: [0.22, 1, 0.36, 1] } }}
+          : { opacity: 1, y: 0, transition: { duration: 0.52, delay: 0.32, ease: [0.22, 1, 0.36, 1] } }}
       >
         <section
           className="result-workspace-environment"

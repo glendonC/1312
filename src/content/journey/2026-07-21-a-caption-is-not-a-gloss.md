@@ -1,6 +1,6 @@
 ---
-title: A caption is not a gloss
-description: "A full caption helps someone keep watching. A selected phrase asks a smaller contextual question, and the answer should not pretend translation divides word for word."
+title: A phrase is smaller than its meaning
+description: "Selecting an exact span makes the question precise, but the context needed to answer it may still live across the caption, speaker, scene, and earlier moment."
 date: 2026-07-21
 type: note
 author: "1321"
@@ -11,121 +11,108 @@ draft: false
 Last night we added a small action to the watch room: select part of a caption and ask for a
 translation of that exact span.
 
-That can sound redundant. The video already has a timed Korean line and an English translation. Why
-translate something that has already been translated?
+The selection can be only two words. The question is exact. Neither fact makes the answer simple.
 
-Because the full caption and the selected phrase answer different questions.
+A phrase can occupy a precise range of text while its meaning depends on material outside that
+range. The rest of the sentence may change its role. The speaker may change its tone. The scene or
+an earlier exchange may establish who is being addressed. Selecting fewer characters makes the
+request smaller, but it does not make the required context shrink with it.
 
-A caption helps someone follow the video. A selected phrase becomes interesting when the full
-caption is not enough, or when the learner wants to understand how one part contributed to the
-whole. Treating those as the same translation problem creates a tempting fiction: that every piece
-of the source has one matching piece on the other side.
+That is the larger problem behind the new action. Language intelligence for real-world media cannot
+treat a selected phrase as if the media around it disappeared.
 
-Translation does not usually divide that cleanly.
+## A phrase is smaller than its meaning
 
-## Captions serve the flow of watching
-
-A caption has to arrive with the scene, fit on the screen, and remain readable before the next line
-replaces it. Its job is not to display a complete linguistic analysis.
-
-Natural translation can reorder a sentence, make an omitted subject explicit, combine several words
-into one English phrase, or leave out repetition that would sound awkward in the target language. A
-good caption may preserve what the speaker meant without exposing a neat correspondence for every
-word.
-
-One of the test lines behind the new selection path contains the Korean span `몇 분`. In one
-setting, that expression can ask about minutes. In another, it can politely count people. The
-National Institute of Korean Language dictionary includes `몇 분` among its examples for
+One of the test lines behind the selection path contains the Korean span `몇 분`. In one setting,
+that expression can ask about minutes. In another, it can politely count people. The National
+Institute of Korean Language dictionary includes `몇 분` among its examples for
 [minutes](https://krdict.korean.go.kr/eng/dicSearch/SearchView?ParaWordNo=70891&nation=eng), while
 another entry gives `몇 분이세요?` as a polite question about
 [how many people there are](https://krdict.korean.go.kr/eng/dicSearch/SearchView?ParaWordNo=58161).
 
-The surrounding line determines which reading makes sense. In our caption context, the English line
-is “I know a few people.” That is useful while watching. But highlighting two Korean words inside
-the source asks something the full English line does not answer by itself: what does this smaller
-span mean here?
+The selected characters alone do not settle the reading. In our caption, the surrounding Korean
+line makes the people reading plausible, and the English line is “I know a few people.” That full
+translation is useful while watching. It still does not prove that every smaller piece of the Korean
+has one matching piece inside the English.
 
-Copying an arbitrary slice from the English caption would not answer that question. It would only
-pretend the two lines share the same internal boundaries.
+Natural translation can reorder a sentence, make an omitted subject explicit, combine several
+words into one phrase, or leave out repetition that would sound awkward in the target language. A
+caption may preserve the movement of the scene without exposing a neat correspondence for every
+word.
 
-## A selected phrase asks a different question
+Highlighting a phrase therefore asks a new question: what does this part contribute here?
 
-The selection action begins with an exact caption line, an exact side of that line, and exact Unicode
-code-point positions. The host checks that the selected text still occupies those positions in the
-stored caption before doing anything else.
+Copying an arbitrary slice from the English caption would not answer it. That would only pretend the
+two lines share the same internal boundaries.
 
-The translation request also carries the whole selected line and a bounded window of nearby caption
-context. The smaller the visible selection becomes, the more important that surrounding context can
-be.
+## Text can narrow the reading
 
-This is not because context guarantees the right answer. It does not. It prevents the system from
-quietly changing the question from “What does this phrase mean in this moment?” to “What might these
-characters mean somewhere?”
+The selection request begins with an exact verified caption, line, source or target side, and
+Unicode code-point range. The host checks that the selected text still occupies those positions in
+the stored caption before it can call an executor.
 
-The interface keeps the two units visible beside each other: “This selection” and “This line.” That
-distinction matters more than it first appears. The line translation is the existing playback aid.
-The span translation is a new, explicit interpretation of one part of it. Agreement may be
-reassuring, but the two outputs are not independent evidence for each other.
+The request also carries the whole selected line and a bounded window of nearby caption lines. This
+keeps the model from quietly changing “What does this phrase mean in this moment?” into “What might
+these characters mean somewhere?”
+
+That context can narrow the reading. It does not guarantee the right one.
+
+The interface keeps “This selection” beside “This line” for the same reason. The full line is the
+existing playback aid. The span result is a new contextual interpretation of one part of it. Even
+when the two agree, they are not independent evidence for each other.
 
 A learner can also select the English side and ask for Korean. The direction changes, but the
-contract does not. The request still belongs to one verified caption moment rather than becoming a
+boundary does not. The request still belongs to one caption moment instead of becoming a
 free-standing dictionary lookup.
 
-## Translation does not divide cleanly by word
+## The media may hold the missing context
 
-Language-learning tools often make word-level interaction feel obvious. Tap a word, receive its
+Today this span-translation seam receives caption text. It does not inspect the audio, frames,
+speaker evidence, visible text, or outside sources.
+
+That boundary matters. The watch room keeps the learner beside the clip, but placing an answer over
+the video does not mean the model watched the video. A timestamp does not mean it heard the delivery.
+A caption identity does not mean it knows who spoke or why the phrase carried a particular social
 meaning.
 
-That interaction is useful when the unit really behaves like a word with a stable local definition.
-It becomes misleading when meaning is carried by grammar, politeness, omitted material, an idiom, or
-the relationship between several words.
+Real-world media can distribute meaning across all of those places. A pause may change the force of
+a line. Two speakers may use the same words differently. A reaction shot can make a literal reading
+unlikely. An earlier scene can establish a relationship that the current sentence leaves unstated.
 
-A span can therefore receive a contextual gloss without becoming proof of word-for-word alignment.
-The answer may explain what the selection contributes to this line. It does not establish that the
-same English phrase should replace it in every sentence, or that the caption can be reconstructed by
-joining a set of isolated glosses.
+Caption context is still useful. It is simply narrower than media context. The current product
+should say which one it used rather than letting the interface blur them together.
 
-This is why the new result remains marked `not_reviewed`. The receipt can establish which caption,
-line, selection, context, executor, and response produced it. It cannot establish that the
+## A receipt preserves the question, not the answer
+
+The span result remains marked `not_reviewed`. Its receipt can establish which caption, line,
+selection, context window, executor, and response produced it. It cannot establish that the
 translation is semantically correct.
 
-Caption context is input to the answer. It is not evidence that the answer deserves to be trusted.
+The missing states matter too. The default executor is unavailable until a model is explicitly
+configured. A configured model can abstain, fail, or return output that the host rejects. Those
+outcomes remain unavailable, withheld, or failed instead of becoming plausible prose.
 
-## Missing help is better than a false equivalence
+The recorded Studio demo does not offer Translate at all. It already contains full caption lines,
+but revealing part of an existing answer would demonstrate a gesture without demonstrating the
+operation the gesture claims to perform. Only the live local path has the receipted span request.
 
-The default span-translation executor is unavailable until a model is explicitly configured. A
-configured model can still decline to answer, fail, or produce an output that the host rejects.
+This is one bounded caption-context inference. It is not a dictionary, a reviewed language
+reference, or proof that 1321 understood the phrase.
 
-Those states remain separate. An unavailable executor does not become an empty translation. An
-abstention does not become a guess. A failed request can be retried only through the bounded retry
-path.
+## Help should inherit the investigation
 
-The recorded Studio demo goes further: it does not offer Translate at all.
+The larger 1321 direction begins before the learner selects anything. Agents investigate the media,
+keep exact evidence and uncertainty attached to their findings, and produce checked understanding
+that can support later uses.
 
-The recording already contains full caption lines, so it would have been easy to make selection look
-interactive by revealing part of an existing answer. That would demonstrate a gesture without
-demonstrating the operation the gesture claims to perform. The live path now has a real, receipted
-span request. The recorded path does not borrow it.
+A useful learning action should eventually inherit the relevant parts of that investigation. If a
+speaker distinction changes the phrase, the help needs speaker evidence. If a visual reference
+changes the reading, it needs the exact frame and its limitations. If the answer depends on outside
+history or culture, that requires a separate grounded source rather than a confident completion.
 
-This is a narrow capability. It is not a dictionary, a reviewed language reference, or evidence that
-the system understood the phrase correctly. It is one contextual attempt over one exact selection,
-with the option to remain unavailable.
+Those are future contracts, not properties of the span translator we have now. Today it inherits a
+verified caption moment and nearby caption text. It should remain honest about everything it does
+not inherit.
 
-## Answer the question, then return to the video
-
-The larger learning direction remains watch first.
-
-A viewer encounters a line, notices something worth understanding, and selects it without leaving
-the moment behind. The help appears beside the caption. When the question is answered, the video is
-still there.
-
-That is different from converting the clip into a sequence of vocabulary items or treating every
-caption as an assignment. The media supplies the voices, timing, situation, and reason the phrase
-mattered. The learning action should preserve those things instead of extracting the phrase into a
-context-free lesson.
-
-A caption tells the viewer enough to stay with the scene. A gloss helps investigate the part that
-made them pause.
-
-The smaller question does not need less context. It needs a more exact boundary around the question,
-and enough of the video around it to keep the answer honest.
+The media stays important even when the learner selects only two words. A phrase is smaller than its
+meaning, and the smaller question may be the moment when the larger investigation matters most.

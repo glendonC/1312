@@ -371,6 +371,7 @@ test("documented example shapes stay bound to the contract they claim", () => {
   const caption201 = JSON.parse(CAPTION_PRODUCTION_201) as {
     schema?: string;
     captions?: Array<{
+      jobId?: string;
       approval?: { reviewId?: string; receiptContentId?: string };
       executor?: {
         classification?: string;

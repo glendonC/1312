@@ -1,12 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 
 import "../../styles/studio/results.learning-prep.css";
 import LearningResults, { CaptionModeControl } from "../learning/LearningResults";
-import {
-  availableMoments,
-  LEARNING_LENS_LABELS,
-  MomentBody,
-} from "../learning/momentContent";
 import { useViewerSession } from "../learning/viewerSession";
 import type {
   LearningPlayback,
@@ -66,23 +61,9 @@ export default function LearningResultExperience({
   const setCaptionMode = useViewerSession((state) => state.setCaptionMode);
   const clozeAmount = useViewerSession((state) => state.clozeAmount);
   const setClozeAmount = useViewerSession((state) => state.setClozeAmount);
-  /** Whether the on-video note body is open. Marks never open themselves. */
-  const [videoNotesOpen, setVideoNotesOpen] = useState(false);
   const showSaved = presentation.mode === "prototype";
   const inWorkbench = frame === "workbench";
   const prep = prepInteraction.prep;
-
-  // The prepared notes whose caption window the playhead is inside right now. They show only as
-  // one small plain mark on the video; the notes themselves open on tap and never pop on their
-  // own, so playback rolling into the next window closes the reading, never opens one.
-  const activeNotes = inWorkbench && playback.state === "available"
-    ? availableMoments(prep).filter((note) =>
-        playback.currentTimeMs >= note.startMs && playback.currentTimeMs < note.endMs)
-    : [];
-  const activeNoteKey = activeNotes.map((note) => `${note.lineId}:${note.lens}`).join("|");
-  useEffect(() => {
-    setVideoNotesOpen(false);
-  }, [activeNoteKey]);
 
   const transcript = (
     <LearningResults
@@ -117,28 +98,6 @@ export default function LearningResultExperience({
                 sourceLanguage={bundle.run.pair.source}
                 targetLanguage={bundle.run.pair.target}
               />
-            </div>
-          )}
-          {activeNotes.length > 0 && (
-            <div className="watch-notes" data-note-lens={activeNotes[0].lens}>
-              <button
-                type="button"
-                className="watch-note-mark"
-                aria-expanded={videoNotesOpen}
-                onClick={() => setVideoNotesOpen((open) => !open)}
-              >
-                {activeNotes.length === 1 ? "Note" : `${activeNotes.length} notes`}
-              </button>
-              {videoNotesOpen && activeNotes.map((note) => (
-                <div
-                  key={`${note.lineId}:${note.lens}`}
-                  className="watch-note-body"
-                  data-note-lens={note.lens}
-                >
-                  <span className="watch-note-kind">{LEARNING_LENS_LABELS[note.lens]}</span>
-                  <MomentBody moment={note} />
-                </div>
-              ))}
             </div>
           )}
         </div>

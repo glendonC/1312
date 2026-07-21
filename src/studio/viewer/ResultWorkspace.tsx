@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef } from "react";
 
 import Results from "../Results";
 import ResultArtifactMark from "../ResultArtifactMark";
@@ -16,7 +17,7 @@ import ResultBrief from "./ResultBrief";
  * source-titled environment holding the clip preview and the brief, with the Source and
  * Coverage disclosures and the one exit at the command baseline. "watch" hands the whole
  * viewport to the viewer — the clip beside the learning transcript — entered only through the
- * report's Watch & study action and left with Back or Esc.
+ * report's Watch the clip action and left with Back or Esc.
  *
  * The viewer stays mounted across every face (CSS reshapes the room), so playback position,
  * prep state, pinned explanations, and saved items survive arrival, report, watch, and the
@@ -30,19 +31,59 @@ export default function ResultWorkspace() {
   const face = useResultFace();
   const setResultFace = useStudio((s) => s.setResultFace);
   const setResultView = useStudio((s) => s.setResultView);
+  const arrivalAction = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (face !== "arrival") return undefined;
+    const frame = window.requestAnimationFrame(() => arrivalAction.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [face]);
+
+  // The watch room hides its chrome on stillness, the way a video player does: after a few seconds
+  // without pointer or keyboard activity while the clip plays, the transport, caption bar, note
+  // marks, and command bar fade together and the cursor hides; any move, tap, or focus wakes them.
+  // Driven by a data attribute set straight on the room, so a mouse move costs no React render; the
+  // fade rules live in results.watch.css. Off the watch face, or paused, the chrome stays put.
+  const playing = useStudio((s) => s.playing);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = workspaceRef.current;
+    if (!root || face !== "watch" || !playing) {
+      root?.removeAttribute("data-chrome-idle");
+      return undefined;
+    }
+    let timer = 0;
+    const sleep = () => root.setAttribute("data-chrome-idle", "true");
+    const wake = () => {
+      root.removeAttribute("data-chrome-idle");
+      window.clearTimeout(timer);
+      timer = window.setTimeout(sleep, 2800);
+    };
+    wake();
+    const events = ["pointermove", "pointerdown", "keydown", "focusin"] as const;
+    for (const type of events) window.addEventListener(type, wake, { passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      for (const type of events) window.removeEventListener(type, wake);
+      root.removeAttribute("data-chrome-idle");
+    };
+  }, [face, playing]);
+
   if (!bundle) return null;
 
   const { run } = bundle;
   const { pair, range, counts } = projectResultAccounting(bundle);
 
   return (
-    <div className="result-workspace" data-workspace-face={face}>
+    <div ref={workspaceRef} className="result-workspace" data-workspace-face={face}>
       {/* The arrival face floats over the (still-hidden) report and exits upward when the
           viewer continues, so the report reveals through the statement rather than after it. */}
       <AnimatePresence>
         {face === "arrival" && (
           <motion.section
             className="result-arrival"
+            role="dialog"
+            aria-modal="true"
             aria-labelledby="result-arrival-title"
             exit={{ opacity: 0, transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] } }}
           >
@@ -84,6 +125,7 @@ export default function ResultWorkspace() {
               <ResultBrief bundle={bundle} />
             </motion.div>
             <motion.button
+              ref={arrivalAction}
               type="button"
               className="result-arrival-continue"
               onClick={() => setResultFace("report")}
@@ -193,7 +235,7 @@ export default function ResultWorkspace() {
                 className="result-watch-entry"
                 onClick={() => setResultFace("watch")}
               >
-                Watch &amp; study
+                Watch the clip
               </button>
             </aside>
           </div>

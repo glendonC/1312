@@ -72,6 +72,13 @@
 
 /* ---------- the caption mode control, on the video ---------- */
 
+/* The report shows the clip as a calm preview, not an operable player: the caption-mode bar belongs
+   to the watch room reached through the door, so it stands down here. The player's own transport and
+   settings pill are withheld by the player in preview mode. */
+.result-workspace[data-workspace-face="report"] .watch-caption-controls {
+  display: none;
+}
+
 /* The captions read on the video, so their control rides it: a glass pill at the top of the picture,
    dark-tinted so it reads over the frame rather than as paper chrome. */
 .watch-caption-controls {
@@ -115,109 +122,6 @@
 .watch-caption-controls .caption-cloze-dot[data-active="true"] {
   border-color: #fff;
   background: #fff;
-}
-
-/* ---------- prepared-note marks on the video ---------- */
-
-/* When the playhead is inside a prepared note's window, one small plain "Note" chip appears on
-   the frame's lower left, clear of the caption line; the notes open on tap and never by
-   themselves. The chip speaks the viewer's language; the lens category is a quiet tag inside the
-   opened note, not the headline. */
-.watch-notes {
-  position: absolute;
-  left: 14px;
-  bottom: 118px;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  max-width: min(340px, 60%);
-}
-
-.watch-notes[data-note-lens="grammar_salience"],
-.watch-note-body[data-note-lens="grammar_salience"] { --lens: #d8b45a; }
-.watch-notes[data-note-lens="situating"],
-.watch-note-body[data-note-lens="situating"] { --lens: #4fa79f; }
-.watch-notes[data-note-lens="word_order"],
-.watch-note-body[data-note-lens="word_order"] { --lens: #8db8e8; }
-.watch-notes[data-note-lens="culture_reference"],
-.watch-note-body[data-note-lens="culture_reference"] { --lens: #c3a8e0; }
-.watch-notes[data-note-lens="historical_reference"],
-.watch-note-body[data-note-lens="historical_reference"] { --lens: #e096a1; }
-
-.watch-note-mark {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 13px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 999px;
-  background: rgba(16, 32, 29, 0.55);
-  color: rgba(255, 255, 255, 0.92);
-  font-family: var(--font-sans);
-  font-size: 0.76rem;
-  font-weight: var(--weight-medium, 500);
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition:
-    border-color 150ms ease,
-    background-color 150ms ease;
-}
-
-.watch-note-mark::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--lens, #fff);
-  box-shadow: 0 0 8px -1px var(--lens, #fff);
-}
-
-.watch-note-mark:hover,
-.watch-note-mark[aria-expanded="true"] {
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(16, 32, 29, 0.72);
-}
-
-.watch-note-mark:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.85);
-  outline-offset: 2px;
-}
-
-.watch-note-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 9px 13px;
-  border-left: 2px solid var(--lens, #fff);
-  border-radius: 4px 12px 12px 4px;
-  background: rgba(16, 32, 29, 0.72);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-/* The category is a quiet tag inside the note, never the mark's headline. */
-.watch-note-kind {
-  color: color-mix(in srgb, var(--lens, #fff) 80%, #fff);
-  font-family: var(--font-mono);
-  font-size: 0.54rem;
-  font-weight: var(--weight-medium, 500);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.watch-note-body p {
-  margin: 0;
-}
-
-.watch-note-body b {
-  margin-right: 6px;
-  color: #fff;
 }
 
 /* ---------- the stage console under the clip ---------- */
@@ -522,5 +426,58 @@
   font-size: 0.56rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* ---------- idle-hide: the room's chrome follows pointer activity ---------- */
+
+/*
+ * In the watch room the chrome reads like a video player: shown whenever the viewer is awake, and
+ * faded together after a few seconds of stillness while the clip plays. ResultWorkspace sets
+ * data-chrome-idle on the room from pointer and keyboard activity; any move, tap, or focus clears it.
+ * Windowed and full screen alike, since the attribute rides an ancestor of the full-screen element.
+ *
+ * The overlay transport and settings pill default to hidden and reveal on hover (results.player.css);
+ * here the watch face shows them whenever awake and the idle rule hides them again — outranking the
+ * hover reveal so resting the cursor over the picture still lets everything fade.
+ */
+.result-workspace[data-workspace-face="watch"] .result-viewer .player-controls,
+.result-workspace[data-workspace-face="watch"] .result-viewer .player-settings-pill {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.result-workspace[data-workspace-face="watch"] .watch-caption-controls,
+.result-workspace[data-workspace-face="watch"] .watch-console,
+.result-workspace[data-workspace-face="watch"] .watch-notes,
+.result-workspace[data-workspace-face="watch"] .watch-room-mark,
+.result-workspace[data-workspace-face="watch"] .watch-room-escape {
+  transition: opacity 220ms ease;
+}
+
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .result-viewer .player-controls,
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .result-viewer .player-settings-pill,
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-caption-controls,
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-console,
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-notes,
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-room-mark,
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .watch-room-escape {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The picture owns the frame while the chrome is gone: the pointer hides too, the way a video does. */
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"],
+.result-workspace[data-workspace-face="watch"][data-chrome-idle="true"] .screen-video {
+  cursor: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-workspace[data-workspace-face="watch"] .watch-caption-controls,
+  .result-workspace[data-workspace-face="watch"] .watch-console,
+  .result-workspace[data-workspace-face="watch"] .watch-notes,
+  .result-workspace[data-workspace-face="watch"] .watch-room-mark,
+  .result-workspace[data-workspace-face="watch"] .watch-room-escape {
+    transition: none;
+  }
 }
 
